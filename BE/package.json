@@ -1,0 +1,23 @@
+{
+  "name": "sep490-g48-backend",
+  "version": "1.0.0",
+  "description": "SEP490 Group 48 Backend Project",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "build": "echo Build completed",
+    "test": "echo Run tests"
+  },
+  "keywords": ["nodejs", "express", "sql-server"],
+  "author": "Group 48",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.0.3",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}
