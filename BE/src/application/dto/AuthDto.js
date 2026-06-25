@@ -1,0 +1,19 @@
+function toUserDto(user, roles) {
+  return {
+    id: user.id,
+    employeeCode: user.employee_code,
+    name: user.user_name,
+    email: user.email,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    phone: user.phone,
+    branchId: user.branch_id,
+    avatar: user.avatar,
+    roles: roles.map((r) => r.role_name),
+    roleLabels: roles.map((r) => r.role_label),
+    primaryRole: roles[0]?.role_name || null,
+    primaryRoleLabel: roles[0]?.role_label || null,
+  };
+}
+
+module.exports = { toUserDto };

@@ -1,0 +1,56 @@
+.dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dashboard__welcome {
+  margin-bottom: 28px;
+}
+
+.dashboard__welcome h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 4px;
+}
+
+.dashboard__welcome p {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.dashboard__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.dash-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  border: 1px solid #e5e7eb;
+}
+
+.dash-card__icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.dash-card__label {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.dash-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 4px 0 0;
+}
