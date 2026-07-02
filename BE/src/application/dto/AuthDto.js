@@ -1,7 +1,7 @@
 function toUserDto(user, roles) {
   return {
     id: user.id,
-    employeeCode: user.employee_code,
+    pseudoId: user.pseudo_id,
     name: user.user_name,
     email: user.email,
     firstName: user.first_name,

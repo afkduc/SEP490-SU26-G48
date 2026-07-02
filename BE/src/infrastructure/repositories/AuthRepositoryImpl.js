@@ -4,7 +4,7 @@ const { query } = require('../database/sqlServer');
 class AuthRepositoryImpl extends AuthRepository {
   async findUserByEmail(email) {
     const result = await query(
-      `SELECT id, employee_code, user_name, email, user_password,
+      `SELECT id, pseudo_id, user_name, email, user_password,
               first_name, last_name, phone, branch_id, status, avatar
        FROM   users
        WHERE  email = @email AND status = 'active'`,

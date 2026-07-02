@@ -1,7 +1,8 @@
 -- ============================================================
 --  AutoGara Database – SQL Server
 --  Hệ thống quản lý bảo dưỡng & sửa chữa ủy quyền Mazda & Kia
---  Phiên bản: 2.2  (xóa vehicle_ownership, thêm customer_id vào vehicles)
+--  Phiên bản: 2.3  (gộp team_leaders vào users, employee_code -> pseudo_id,
+--                    parts -> products)
 -- ============================================================
 
 USE master;
@@ -77,15 +78,18 @@ INSERT INTO roles (role_name, role_label) VALUES
     ('manager',          N'Quản lý chi nhánh'),
     ('warehouse_staff',  N'Nhân viên kho'),
     ('accountant',       N'Kế toán'),
-    ('service_advisor',  N'Cố vấn dịch vụ');
+    ('service_advisor',  N'Cố vấn dịch vụ'),
+    ('team_leader',      N'Tổ trưởng kỹ thuật');
 GO
 
 -- ------------------------------------------------------------
---  1.4  USERS – Nhân viên
+--  1.4  USERS – Nhân viên (gộp cả tổ trưởng kỹ thuật, phân biệt qua user_role)
+--       pseudo_id: mã định danh nội bộ (thay cho employee_code / leader_code cũ)
+--       specialty, team_size: chỉ có giá trị với nhân viên giữ vai trò team_leader
 -- ------------------------------------------------------------
 CREATE TABLE users (
     id            BIGINT IDENTITY(1,1) NOT NULL,
-    employee_code VARCHAR(20)          NOT NULL,
+    pseudo_id     VARCHAR(20)          NOT NULL,   -- mã định danh (VD: NV-HN-001, TT-HN-001)
     user_name     NVARCHAR(250)        NOT NULL,
     email         VARCHAR(100)             NULL,
     user_password VARCHAR(250)         NOT NULL,
@@ -93,11 +97,14 @@ CREATE TABLE users (
     last_name     NVARCHAR(50)             NULL,
     phone         VARCHAR(20)              NULL,
     branch_id     BIGINT                   NULL,
+    specialty     NVARCHAR(100)            NULL,   -- chuyên môn (chỉ dùng cho tổ trưởng: Động cơ, Điện tử, Gầm-Phanh...)
+    team_size     INT         NOT NULL DEFAULT 0,  -- số nhân viên trong tổ (chỉ dùng cho tổ trưởng)
     status        VARCHAR(20) NOT NULL DEFAULT 'active',   -- active | inactive
     avatar        VARCHAR(255)             NULL,
+    notes         NVARCHAR(500)            NULL,
     created_at    DATETIME    NOT NULL DEFAULT GETDATE(),
     CONSTRAINT users_pkey        PRIMARY KEY (id),
-    CONSTRAINT users_code_uq     UNIQUE (employee_code),
+    CONSTRAINT users_code_uq     UNIQUE (pseudo_id),
     CONSTRAINT users_email_uq    UNIQUE (email),
     CONSTRAINT users_branch_fkey FOREIGN KEY (branch_id) REFERENCES branches(id)
 );
@@ -285,22 +292,9 @@ GO
 
 -- ============================================================
 --  PHẦN 4: TỔ TRƯỞNG KỸ THUẬT
+--  (đã gộp vào bảng users – xem mục 1.4; vai trò 'team_leader' trong
+--   roles/user_role xác định nhân viên nào là tổ trưởng)
 -- ============================================================
-CREATE TABLE team_leaders (
-    id          BIGINT IDENTITY(1,1) NOT NULL,
-    leader_code VARCHAR(20)          NOT NULL,
-    full_name   NVARCHAR(150)        NOT NULL,
-    phone       VARCHAR(20)              NULL,
-    specialty   NVARCHAR(100)            NULL,   -- Chuyên môn (Động cơ, Điện tử, Gầm-Phanh...)
-    team_size   INT          NOT NULL DEFAULT 0,
-    branch_id   BIGINT               NOT NULL,
-    status      VARCHAR(20)  NOT NULL DEFAULT 'active',   -- active | inactive
-    notes       NVARCHAR(500)            NULL,
-    CONSTRAINT tl_pkey        PRIMARY KEY (id),
-    CONSTRAINT tl_code_uq     UNIQUE (leader_code),
-    CONSTRAINT tl_branch_fkey FOREIGN KEY (branch_id) REFERENCES branches(id)
-);
-GO
 
 -- ============================================================
 --  PHẦN 5: DỊCH VỤ & GÓI DỊCH VỤ
@@ -373,7 +367,7 @@ CREATE TABLE service_package_items (
 GO
 
 -- ============================================================
---  PHẦN 6: KHO PHỤ TÙNG
+--  PHẦN 6: KHO PHỤ TÙNG / SẢN PHẨM
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -395,15 +389,15 @@ CREATE TABLE suppliers (
 GO
 
 -- ------------------------------------------------------------
---  6.2  PARTS – Phụ tùng (tồn kho theo từng chi nhánh)
+--  6.2  PRODUCTS – Phụ tùng / sản phẩm (tồn kho theo từng chi nhánh)
 --       Mỗi chi nhánh quản lý kho độc lập; không chia sẻ giữa chi nhánh.
 -- ------------------------------------------------------------
-CREATE TABLE parts (
+CREATE TABLE products (
     id                  BIGINT IDENTITY(1,1) NOT NULL,
-    part_code           VARCHAR(30)          NOT NULL,
-    part_name           NVARCHAR(200)        NOT NULL,
+    product_code        VARCHAR(30)          NOT NULL,
+    product_name        NVARCHAR(200)        NOT NULL,
     category            NVARCHAR(100)            NULL,
-    brand_name          NVARCHAR(100)            NULL,   -- thương hiệu phụ tùng (Bosch, 3M...)
+    brand_name          NVARCHAR(100)            NULL,   -- thương hiệu sản phẩm (Bosch, 3M...)
     compatible_brand_id BIGINT                   NULL,   -- tương thích hãng xe nào
     unit                VARCHAR(20) NOT NULL DEFAULT N'Cái',
     supplier_id         BIGINT                   NULL,
@@ -413,11 +407,11 @@ CREATE TABLE parts (
     min_stock           INT         NOT NULL DEFAULT 0,  -- ngưỡng cảnh báo sắp hết
     status              VARCHAR(20) NOT NULL DEFAULT 'active',
     -- active | low_stock | inactive
-    CONSTRAINT parts_pkey        PRIMARY KEY (id),
-    CONSTRAINT parts_code_branch UNIQUE (part_code, branch_id),
-    CONSTRAINT parts_sup_fkey    FOREIGN KEY (supplier_id)         REFERENCES suppliers(id),
-    CONSTRAINT parts_branch_fkey FOREIGN KEY (branch_id)           REFERENCES branches(id),
-    CONSTRAINT parts_brand_fkey  FOREIGN KEY (compatible_brand_id) REFERENCES brands(id)
+    CONSTRAINT products_pkey        PRIMARY KEY (id),
+    CONSTRAINT products_code_branch UNIQUE (product_code, branch_id),
+    CONSTRAINT products_sup_fkey    FOREIGN KEY (supplier_id)         REFERENCES suppliers(id),
+    CONSTRAINT products_branch_fkey FOREIGN KEY (branch_id)           REFERENCES branches(id),
+    CONSTRAINT products_brand_fkey  FOREIGN KEY (compatible_brand_id) REFERENCES brands(id)
 );
 GO
 
@@ -453,14 +447,14 @@ GO
 CREATE TABLE import_request_items (
     id                BIGINT IDENTITY(1,1) NOT NULL,
     import_request_id BIGINT               NOT NULL,
-    part_id           BIGINT                   NULL,
-    part_code         VARCHAR(30)              NULL,
-    part_name         NVARCHAR(200)            NULL,
+    product_id        BIGINT                   NULL,
+    product_code      VARCHAR(30)              NULL,
+    product_name      NVARCHAR(200)            NULL,
     unit              VARCHAR(20)              NULL,
     quantity          INT          NOT NULL DEFAULT 0,
     CONSTRAINT iri_pkey         PRIMARY KEY (id),
     CONSTRAINT iri_request_fkey FOREIGN KEY (import_request_id) REFERENCES import_requests(id),
-    CONSTRAINT iri_part_fkey    FOREIGN KEY (part_id)            REFERENCES parts(id)
+    CONSTRAINT iri_product_fkey FOREIGN KEY (product_id)         REFERENCES products(id)
 );
 GO
 
@@ -472,7 +466,7 @@ CREATE TABLE inventory_transactions (
     transaction_code VARCHAR(30)          NOT NULL,
     transaction_type VARCHAR(10)          NOT NULL,   -- import | export
     branch_id        BIGINT               NOT NULL,
-    part_id          BIGINT               NOT NULL,
+    product_id       BIGINT               NOT NULL,
     quantity         INT                  NOT NULL,
     import_request_id BIGINT                  NULL,   -- nhập: liên kết phiếu nhập kho
     service_order_id  BIGINT                  NULL,   -- xuất: liên kết phiếu RO
@@ -484,10 +478,10 @@ CREATE TABLE inventory_transactions (
     CONSTRAINT it_pkey         PRIMARY KEY (id),
     CONSTRAINT it_code_uq      UNIQUE (transaction_code),
     CONSTRAINT it_branch_fkey  FOREIGN KEY (branch_id)         REFERENCES branches(id),
-    CONSTRAINT it_part_fkey    FOREIGN KEY (part_id)            REFERENCES parts(id),
+    CONSTRAINT it_product_fkey FOREIGN KEY (product_id)         REFERENCES products(id),
     CONSTRAINT it_import_fkey  FOREIGN KEY (import_request_id)  REFERENCES import_requests(id),
     CONSTRAINT it_user_fkey    FOREIGN KEY (performed_by)       REFERENCES users(id),
-    CONSTRAINT it_leader_fkey  FOREIGN KEY (team_leader_id)     REFERENCES team_leaders(id)
+    CONSTRAINT it_leader_fkey  FOREIGN KEY (team_leader_id)     REFERENCES users(id)
     -- service_order_id FK thêm sau (tránh circular dependency)
 );
 GO
@@ -531,7 +525,7 @@ CREATE TABLE service_orders (
     CONSTRAINT so_vehicle_fkey  FOREIGN KEY (vehicle_id)     REFERENCES vehicles(id),
     CONSTRAINT so_customer_fkey FOREIGN KEY (customer_id)    REFERENCES customers(id),
     CONSTRAINT so_advisor_fkey  FOREIGN KEY (advisor_id)     REFERENCES users(id),
-    CONSTRAINT so_leader_fkey   FOREIGN KEY (team_leader_id) REFERENCES team_leaders(id)
+    CONSTRAINT so_leader_fkey   FOREIGN KEY (team_leader_id) REFERENCES users(id)
 );
 GO
 
@@ -549,7 +543,7 @@ CREATE TABLE service_order_items (
     id               BIGINT IDENTITY(1,1) NOT NULL,
     service_order_id BIGINT               NOT NULL,
     item_type        VARCHAR(10)          NOT NULL,   -- PT | DV
-    part_id          BIGINT                   NULL,   -- NULL nếu là dịch vụ
+    product_id       BIGINT                   NULL,   -- NULL nếu là dịch vụ
     service_id       BIGINT                   NULL,   -- NULL nếu là phụ tùng
     item_code        VARCHAR(30)              NULL,
     item_description NVARCHAR(300)        NOT NULL,
@@ -563,7 +557,7 @@ CREATE TABLE service_order_items (
     total            DECIMAL(18,2) NOT NULL DEFAULT 0,
     CONSTRAINT soi_pkey         PRIMARY KEY (id),
     CONSTRAINT soi_order_fkey   FOREIGN KEY (service_order_id) REFERENCES service_orders(id),
-    CONSTRAINT soi_part_fkey    FOREIGN KEY (part_id)           REFERENCES parts(id),
+    CONSTRAINT soi_product_fkey FOREIGN KEY (product_id)        REFERENCES products(id),
     CONSTRAINT soi_service_fkey FOREIGN KEY (service_id)        REFERENCES services(id)
 );
 GO
@@ -588,7 +582,7 @@ CREATE TABLE repair_orders (
     CONSTRAINT ro_code_uq      UNIQUE (repair_code),
     CONSTRAINT ro_so_fkey      FOREIGN KEY (service_order_id) REFERENCES service_orders(id),
     CONSTRAINT ro_branch_fkey  FOREIGN KEY (branch_id)        REFERENCES branches(id),
-    CONSTRAINT ro_leader_fkey  FOREIGN KEY (team_leader_id)   REFERENCES team_leaders(id),
+    CONSTRAINT ro_leader_fkey  FOREIGN KEY (team_leader_id)   REFERENCES users(id),
     CONSTRAINT ro_vehicle_fkey FOREIGN KEY (vehicle_id)       REFERENCES vehicles(id),
     CONSTRAINT ro_creator_fkey FOREIGN KEY (created_by)       REFERENCES users(id)
 );
@@ -602,13 +596,13 @@ CREATE TABLE repair_order_tasks (
     repair_order_id BIGINT               NOT NULL,
     task_name       NVARCHAR(300)        NOT NULL,
     task_type       VARCHAR(10) NOT NULL DEFAULT 'DV',   -- DV | PT
-    part_id         BIGINT                   NULL,
+    product_id      BIGINT                   NULL,
     quantity        INT         NOT NULL DEFAULT 1,
     unit_price      DECIMAL(18,2)            NULL,
     is_done         BIT         NOT NULL DEFAULT 0,
-    CONSTRAINT rot_pkey       PRIMARY KEY (id),
-    CONSTRAINT rot_order_fkey FOREIGN KEY (repair_order_id) REFERENCES repair_orders(id),
-    CONSTRAINT rot_part_fkey  FOREIGN KEY (part_id)          REFERENCES parts(id)
+    CONSTRAINT rot_pkey         PRIMARY KEY (id),
+    CONSTRAINT rot_order_fkey   FOREIGN KEY (repair_order_id) REFERENCES repair_orders(id),
+    CONSTRAINT rot_product_fkey FOREIGN KEY (product_id)       REFERENCES products(id)
 );
 GO
 
@@ -762,8 +756,8 @@ CREATE INDEX idx_so_branch         ON service_orders       (branch_id);
 CREATE INDEX idx_so_vehicle        ON service_orders       (vehicle_id);
 CREATE INDEX idx_so_customer       ON service_orders       (customer_id);
 CREATE INDEX idx_soi_order         ON service_order_items  (service_order_id);
-CREATE INDEX idx_parts_branch      ON parts                (branch_id);
-CREATE INDEX idx_parts_code        ON parts                (part_code);
+CREATE INDEX idx_products_branch   ON products             (branch_id);
+CREATE INDEX idx_products_code     ON products             (product_code);
 CREATE INDEX idx_it_date           ON inventory_transactions (transaction_date);
 CREATE INDEX idx_it_type           ON inventory_transactions (transaction_type);
 CREATE INDEX idx_mr_due_date       ON maintenance_reminders (due_date);
@@ -774,8 +768,8 @@ CREATE INDEX idx_ct_vehicle        ON contracts            (vehicle_id);
 CREATE INDEX idx_ct_purchase_date  ON contracts            (purchase_date);
 GO
 
-PRINT N'AutoGara Database v2.2 tao thanh cong!';
-PRINT N'Tong bang: 27 bang + 1 VIEW + 1 Stored Procedure';
+PRINT N'AutoGara Database v2.3 tao thanh cong!';
+PRINT N'Tong bang: 25 bang + 1 VIEW + 1 Stored Procedure';
 GO
 
 -- ============================================================
@@ -784,10 +778,9 @@ GO
 --         6 Cố vấn dịch vụ, 6 Nhân viên kho)
 -- ============================================================
 
--- Mật khẩu mặc định: 123456
--- BƯỚC 1: Chạy lệnh sau để lấy bcrypt hash, rồi thay vào @pwd bên dưới:
---   node -e "const b=require('bcryptjs');b.hash('123456',10).then(console.log)"
--- Sau đó thay chuỗi 'BCRYPT_HASH_CUA_123456' bằng kết quả in ra.
+-- Mật khẩu mặc định cho TẤT CẢ tài khoản: 123456
+-- Hash bcrypt (cost 10) của '123456', sinh bằng:
+--   node -e "const b=require('bcryptjs');console.log(b.hashSync('123456',10))"
 
 -- Thêm role Admin (không có trong bảng roles ban đầu)
 INSERT INTO roles (role_name, role_label) VALUES
@@ -797,15 +790,15 @@ GO
 -- ──────────────────────────────────────────────────────────────────────────────
 --  Toàn bộ INSERT users + user_role + UPDATE branches trong 1 batch
 -- ──────────────────────────────────────────────────────────────────────────────
-DECLARE @pwd VARCHAR(250) = 'BCRYPT_HASH_CUA_123456';
+DECLARE @pwd VARCHAR(250) = '$2b$10$IqMConyESFmhlrGkQGb82O9re0G6jiKem6mNi4dX26k5tYGemrREW';
 
 -- ── ADMIN HỆ THỐNG & GIÁM ĐỐC ────────────────────────────────────────────────
-INSERT INTO users (employee_code, user_name, email, user_password, first_name, last_name, phone, branch_id, status) VALUES
+INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status) VALUES
 ('ADMIN-001', N'Admin',    'admin@autogara.vn',           @pwd, N'Admin',  N'System',  '0900000001', NULL, 'active'),
 ('GD-001',    N'Giám Đốc', 'generaldirecter@autogara.vn', @pwd, N'Giám',   N'Đốc',     '0900000002', NULL, 'active');
 
 -- ── CHI NHÁNH 1 – HÀ NỘI (branch_id = 1) ─────────────────────────────────────
-INSERT INTO users (employee_code, user_name, email, user_password, first_name, last_name, phone, branch_id, status) VALUES
+INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status) VALUES
 ('QL-HN-001',   N'Nguyễn Văn E', 'qlcn1@autogara.vn',        @pwd, N'Văn E', N'Nguyễn', '0901001001', 1, 'active'),
 ('CVDV-HN-001', N'Nguyễn Văn A', 'cvdvcn1nv1@autogara.vn',   @pwd, N'Văn A', N'Nguyễn', '0901001002', 1, 'active'),
 ('CVDV-HN-002', N'Nguyễn Văn B', 'cvdvcn1nv2@autogara.vn',   @pwd, N'Văn B', N'Nguyễn', '0901001003', 1, 'active'),
@@ -813,7 +806,7 @@ INSERT INTO users (employee_code, user_name, email, user_password, first_name, l
 ('NVK-HN-002',  N'Nguyễn Văn D', 'nvkcn1nv2@autogara.vn',    @pwd, N'Văn D', N'Nguyễn', '0901001005', 1, 'active');
 
 -- ── CHI NHÁNH 2 – TP.HCM (branch_id = 2) ─────────────────────────────────────
-INSERT INTO users (employee_code, user_name, email, user_password, first_name, last_name, phone, branch_id, status) VALUES
+INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status) VALUES
 ('QL-HCM-001',   N'Nguyễn Văn K', 'qlcn2@autogara.vn',       @pwd, N'Văn K', N'Nguyễn', '0902001001', 2, 'active'),
 ('CVDV-HCM-001', N'Nguyễn Văn F', 'cvdvcn2nv1@autogara.vn',  @pwd, N'Văn F', N'Nguyễn', '0902001002', 2, 'active'),
 ('CVDV-HCM-002', N'Nguyễn Văn G', 'cvdvcn2nv2@autogara.vn',  @pwd, N'Văn G', N'Nguyễn', '0902001003', 2, 'active'),
@@ -821,7 +814,7 @@ INSERT INTO users (employee_code, user_name, email, user_password, first_name, l
 ('NVK-HCM-002',  N'Nguyễn Văn I', 'nvkcn2nv2@autogara.vn',   @pwd, N'Văn I', N'Nguyễn', '0902001005', 2, 'active');
 
 -- ── CHI NHÁNH 3 – ĐÀ NẴNG (branch_id = 3) ────────────────────────────────────
-INSERT INTO users (employee_code, user_name, email, user_password, first_name, last_name, phone, branch_id, status) VALUES
+INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status) VALUES
 ('QL-DNA-001',   N'Nguyễn Văn P', 'qlcn3@autogara.vn',        @pwd, N'Văn P', N'Nguyễn', '0903001001', 3, 'active'),
 ('CVDV-DNA-001', N'Nguyễn Văn L', 'cvdvcn3nv1@autogara.vn',   @pwd, N'Văn L', N'Nguyễn', '0903001002', 3, 'active'),
 ('CVDV-DNA-002', N'Nguyễn Văn M', 'cvdvcn3nv2@autogara.vn',   @pwd, N'Văn M', N'Nguyễn', '0903001003', 3, 'active'),
@@ -855,5 +848,5 @@ UPDATE branches SET manager_id = (SELECT id FROM users WHERE email = 'qlcn3@auto
 GO
 
 PRINT N'Seed users hoan tat! Tong 17 tai khoan (Admin, Giam doc, 3 QL, 6 CVDV, 6 NVK).';
-PRINT N'Mat khau mac dinh: 123456 – nho thay bcrypt hash truoc khi chay.';
+PRINT N'Mat khau mac dinh cho tat ca tai khoan: 123456';
 GO
