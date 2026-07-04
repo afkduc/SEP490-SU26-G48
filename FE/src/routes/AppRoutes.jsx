@@ -2,10 +2,12 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import AppLayout from '../components/layout/AppLayout';
+import { ROLES } from '../constants/roles';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
+const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 
 function Loading() {
@@ -30,6 +32,18 @@ function AppRoutes() {
             <ProtectedRoute>
               <AppLayout>
                 <DashboardPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin – chỉ role admin */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AppLayout>
+                <AdminDashboardPage />
               </AppLayout>
             </ProtectedRoute>
           }
