@@ -22,3 +22,8 @@ export function hasRole(user, allowedRoles) {
   const userRoles = Array.isArray(user.roles) ? user.roles : [user.role];
   return userRoles.some((r) => allowedRoles.includes(r));
 }
+
+export function routeAfterLogin(user) {
+  const primaryRole = user?.primaryRole ?? user?.role ?? user?.roles?.[0];
+  return getDefaultRouteByRole(primaryRole);
+}
