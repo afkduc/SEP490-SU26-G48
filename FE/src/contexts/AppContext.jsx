@@ -35,6 +35,7 @@ export function AppProvider({ children }) {
     storage.setItem('user', JSON.stringify(result.user));
     setToken(result.token);
     setUser(result.user);
+    return result;
   };
 
   const logout = () => {
