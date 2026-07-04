@@ -5,6 +5,7 @@ import AppLayout from '../components/layout/AppLayout';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
+const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
 function Loading() {
@@ -34,8 +35,20 @@ function AppRoutes() {
           }
         />
 
+        {/* Phiếu quyết toán sửa chữa – Cố vấn dịch vụ */}
+        <Route
+          path="/repair-settlement/*"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <RepairSettlementPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Placeholder routes – thêm page thật sau */}
-        {['/repair-settlement', '/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
+        {['/repair-orders', '/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
           <Route
             key={path}
             path={path}
