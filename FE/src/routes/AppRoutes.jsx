@@ -6,7 +6,7 @@ import AppLayout from '../components/layout/AppLayout';
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
-const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
+const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 
 function Loading() {
   return (
