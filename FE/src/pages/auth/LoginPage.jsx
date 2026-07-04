@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { routeAfterLogin } from '../../utils/roleRedirect';
 import './LoginPage.css';
 
 export default function LoginPage() {
@@ -26,8 +27,8 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      await login(form.email, form.password, rememberMe);
-      navigate('/dashboard');
+      const result = await login(form.email, form.password, rememberMe);
+      navigate(routeAfterLogin(result?.user));
     } catch (err) {
       setError(err.message || 'Đăng nhập thất bại');
     } finally {

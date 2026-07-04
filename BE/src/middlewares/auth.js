@@ -27,4 +27,6 @@ function authorize(...roles) {
   };
 }
 
-module.exports = { authenticate, authorize };
+const requireAdmin = authorize('admin');
+
+module.exports = { authenticate, authorize, requireAdmin };
