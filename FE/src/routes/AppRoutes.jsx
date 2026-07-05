@@ -9,6 +9,7 @@ const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
+const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 
 function Loading() {
   return (
@@ -24,6 +25,7 @@ function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         {/* Protected – wrapped in AppLayout (Navbar) */}
         <Route
