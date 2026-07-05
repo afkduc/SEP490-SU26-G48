@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { formatCurrency } from '../../utils';
-import { MOCK_BRANCH, STATUS_LABELS, mockAutoParts, mockCustomers, mockRepairSettlements } from './mockData';
+import { searchVehiclesApi } from '../../services/vehicleApi';
+import { MOCK_BRANCH, STATUS_LABELS, mockAutoParts, mockRepairSettlements } from './mockData';
 
 const LHSC_OPTIONS = ['DV', 'PT', 'BH', 'HD'];
 const HTTT_OPTIONS = ['KHT', 'BH', 'HD', 'NB'];
@@ -42,6 +43,15 @@ function numberToVietnamese(num) {
 
 function emptyItem() {
   return { code: '', description: '', lhsc: 'DV', httt: 'KHT', unit: 'Lần', qty: 1, unitPrice: 0, discount: 0, isFree: false, total: 0 };
+}
+
+// Che dữ liệu nhạy cảm (điện thoại, email, CCCD) khi hiển thị dữ liệu đã tra cứu
+// từ DB — chỉ hiện 4 ký tự cuối, phần còn lại thay bằng dấu *.
+function maskLast4(value) {
+  if (!value) return '';
+  const str = String(value);
+  if (str.length <= 4) return '*'.repeat(str.length);
+  return '*'.repeat(str.length - 4) + str.slice(-4);
 }
 
 function recalcItem(item) {
@@ -651,8 +661,12 @@ function RepairSettlementForm({ isEdit }) {
 
   const [customerQuery, setCustomerQuery] = useState(existingOrder?.customer?.fullName || '');
   const [plateQuery, setPlateQuery] = useState(existingOrder?.vehicle?.licensePlate || '');
-  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
-  const [showPlateSuggestions, setShowPlateSuggestions] = useState(false);
+  const [activeField, setActiveField] = useState(null); // 'customer' | 'plate' | 'frame' | 'engine' | 'phone'
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  // true khi thông tin khách hàng đến từ tra cứu DB có sẵn -> che phone/email/cccd khi hiển thị
+  const [isFromLookup, setIsFromLookup] = useState(Boolean(existingOrder?.customer?.phone));
+  const searchSeq = useRef(0);
 
   const [customerInfo, setCustomerInfo] = useState(existingOrder?.customer || {
     fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '',
@@ -668,31 +682,51 @@ function RepairSettlementForm({ isEdit }) {
   const [partSuggestions, setPartSuggestions] = useState({});
   const [saved, setSaved] = useState(false);
 
-  const customerSuggestions = customerQuery.length >= 1
-    ? mockCustomers.filter((c) => c.fullName.toLowerCase().includes(customerQuery.toLowerCase())).slice(0, 5)
-    : [];
+  // Tra cứu khách hàng/xe thật trong DB theo tên, biển số, số khung hoặc số máy.
+  // Debounce 300ms; searchSeq huỷ kết quả của lần tra cứu cũ nếu đã có lần mới hơn.
+  const queryByField = {
+    customer: customerQuery,
+    plate: plateQuery,
+    frame: vehicleInfo.frameNumber,
+    engine: vehicleInfo.engineNumber,
+    phone: customerInfo.phone,
+  };
 
-  const plateSuggestions = plateQuery.length >= 2
-    ? mockCustomers.filter((c) => c.vehicles.some((v) => v.licensePlate.toLowerCase().includes(plateQuery.toLowerCase()))).slice(0, 5)
-    : [];
-
-  const fillFromCustomer = (cust, vehicle) => {
-    setCustomerInfo({
-      fullName: cust.fullName, address: cust.address, phone: cust.phone,
-      taxCode: cust.taxCode || '', cccd: cust.cccd || '', email: cust.email || '',
-      contactPerson: cust.contactPerson || cust.fullName, contactPhone: cust.contactPhone || cust.phone,
-    });
-    if (vehicle) {
-      setVehicleInfo({
-        licensePlate: vehicle.licensePlate, vehicleModel: vehicle.vehicleModel,
-        frameNumber: vehicle.frameNumber, engineNumber: vehicle.engineNumber,
-        purchaseDate: vehicle.purchaseDate, currentKm: vehicle.currentKm,
-      });
-      setPlateQuery(vehicle.licensePlate);
+  useEffect(() => {
+    if (!activeField) return undefined;
+    const term = (queryByField[activeField] || '').trim();
+    if (term.length < 2) {
+      setSuggestions([]);
+      return undefined;
     }
-    setCustomerQuery(cust.fullName);
-    setShowCustomerSuggestions(false);
-    setShowPlateSuggestions(false);
+    const seq = ++searchSeq.current;
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchVehiclesApi(term);
+        if (seq === searchSeq.current) setSuggestions(results || []);
+      } catch {
+        if (seq === searchSeq.current) setSuggestions([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeField, customerQuery, plateQuery, vehicleInfo.frameNumber, vehicleInfo.engineNumber, customerInfo.phone]);
+
+  const fillFromRow = (row) => {
+    setCustomerInfo({
+      id: row.customerId, fullName: row.fullName, address: row.address || '', phone: row.phone || '',
+      taxCode: row.taxCode || '', cccd: row.cccd || '', email: row.email || '',
+      contactPerson: row.contactName || row.fullName, contactPhone: row.contactPhone || row.phone,
+    });
+    setVehicleInfo({
+      id: row.vehicleId, licensePlate: row.licensePlate, vehicleModel: row.vehicleModel || '',
+      frameNumber: row.frameNumber || '', engineNumber: row.engineNumber || '',
+      purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : '', currentKm: row.currentKm || '',
+    });
+    setCustomerQuery(row.fullName);
+    setPlateQuery(row.licensePlate);
+    setIsFromLookup(true);
+    setShowSuggestions(false);
   };
 
   const cInfoSet = (k, v) => setCustomerInfo((p) => ({ ...p, [k]: v }));
@@ -792,7 +826,6 @@ function RepairSettlementForm({ isEdit }) {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
           <span className="card-title">📋 Thông tin khách hàng & xe</span>
-          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>Nhập tên hoặc biển số để tự động điền thông tin</span>
         </div>
         <div className="card-body">
           <div className="form-grid form-grid-2">
@@ -801,17 +834,17 @@ function RepairSettlementForm({ isEdit }) {
                 <label className="form-label required">Tên khách hàng</label>
                 <input className="form-input"
                   value={customerQuery}
-                  onChange={(e) => { setCustomerQuery(e.target.value); cInfoSet('fullName', e.target.value); setShowCustomerSuggestions(true); }}
-                  onFocus={() => setShowCustomerSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 180)}
-                  placeholder="Nhập tên → tự động điền thông tin" />
-                {showCustomerSuggestions && customerSuggestions.length > 0 && (
+                  onChange={(e) => { setCustomerQuery(e.target.value); cInfoSet('fullName', e.target.value); setIsFromLookup(false); setActiveField('customer'); setShowSuggestions(true); }}
+                  onFocus={() => { setActiveField('customer'); setShowSuggestions(true); }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
+                  placeholder="Nhập tên" />
+                {activeField === 'customer' && showSuggestions && suggestions.length > 0 && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
-                    {customerSuggestions.map((c) => (
-                      <div key={c.id} onMouseDown={() => fillFromCustomer(c, c.vehicles[0])}
+                    {suggestions.map((row) => (
+                      <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
                         style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{c.fullName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{c.phone} • {c.vehicles[0]?.licensePlate}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{row.fullName}</div>
+                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.phone} • {row.licensePlate}</div>
                       </div>
                     ))}
                   </div>
@@ -823,18 +856,59 @@ function RepairSettlementForm({ isEdit }) {
                 <input className="form-input" value={customerInfo.address} onChange={(e) => cInfoSet('address', e.target.value)} placeholder="Địa chỉ khách hàng" />
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
-                <div className="form-group">
-                  <label className="form-label required">Điện thoại</label>
-                  <input className="form-input" value={customerInfo.phone} onChange={(e) => cInfoSet('phone', e.target.value)} placeholder="0912345678" />
+                <div className="form-group" style={{ position: 'relative' }}>
+                  <label className="form-label required">Điện thoại {isFromLookup && <span title="Đã che 1 phần để bảo mật dữ liệu cá nhân">🔒</span>}</label>
+                  <input className="form-input"
+                    value={isFromLookup ? maskLast4(customerInfo.phone) : customerInfo.phone}
+                    readOnly={isFromLookup}
+                    onChange={(e) => { cInfoSet('phone', e.target.value); setIsFromLookup(false); setActiveField('phone'); setShowSuggestions(true); }}
+                    onFocus={() => { if (!isFromLookup) { setActiveField('phone'); setShowSuggestions(true); } }}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
+                    placeholder="0912345678" />
+                  {activeField === 'phone' && showSuggestions && suggestions.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
+                      {suggestions.map((row) => (
+                        <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
+                          style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{row.phone} — {row.fullName}</div>
+                          <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.licensePlate}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
-                  <label className="form-label">MST</label>
+                  <label className="form-label">Mã Số Thuế</label>
                   <input className="form-input" value={customerInfo.taxCode} onChange={(e) => cInfoSet('taxCode', e.target.value)} placeholder="Mã số thuế" />
                 </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">CCCD</label>
-                <input className="form-input" value={customerInfo.cccd} onChange={(e) => cInfoSet('cccd', e.target.value)} placeholder="Số CCCD / CMND" />
+              <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">CCCD {isFromLookup && <span title="Đã che 1 phần để bảo mật dữ liệu cá nhân">🔒</span>}</label>
+                  <input className="form-input"
+                    value={isFromLookup ? maskLast4(customerInfo.cccd) : customerInfo.cccd}
+                    readOnly={isFromLookup}
+                    onChange={(e) => { cInfoSet('cccd', e.target.value); setIsFromLookup(false); }}
+                    placeholder="Số CCCD / CMND" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email {isFromLookup && <span title="Đã che 1 phần để bảo mật dữ liệu cá nhân">🔒</span>}</label>
+                  <input className="form-input"
+                    value={isFromLookup ? maskLast4(customerInfo.email) : customerInfo.email}
+                    readOnly={isFromLookup}
+                    onChange={(e) => { cInfoSet('email', e.target.value); setIsFromLookup(false); }}
+                    placeholder="email@example.com" />
+                </div>
+              </div>
+              <div className="form-grid form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Người liên hệ</label>
+                  <input className="form-input" value={customerInfo.contactPerson} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Nếu khác chủ xe (khách hàng công ty)" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Điện thoại liên hệ</label>
+                  <input className="form-input" value={customerInfo.contactPhone} onChange={(e) => cInfoSet('contactPhone', e.target.value)} placeholder="SĐT người liên hệ" />
+                </div>
               </div>
             </div>
 
@@ -843,35 +917,63 @@ function RepairSettlementForm({ isEdit }) {
                 <label className="form-label required">Biển số xe</label>
                 <input className="form-input"
                   value={plateQuery}
-                  onChange={(e) => { setPlateQuery(e.target.value); vInfoSet('licensePlate', e.target.value); setShowPlateSuggestions(true); }}
-                  onFocus={() => setShowPlateSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowPlateSuggestions(false), 180)}
-                  placeholder="30A-12345 → tự động điền thông tin xe" />
-                {showPlateSuggestions && plateSuggestions.length > 0 && (
+                  onChange={(e) => { setPlateQuery(e.target.value); vInfoSet('licensePlate', e.target.value); setIsFromLookup(false); setActiveField('plate'); setShowSuggestions(true); }}
+                  onFocus={() => { setActiveField('plate'); setShowSuggestions(true); }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
+                  placeholder="Nhập biển số xe" />
+                {activeField === 'plate' && showSuggestions && suggestions.length > 0 && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
-                    {plateSuggestions.map((c) => c.vehicles.filter((v) => v.licensePlate.toLowerCase().includes(plateQuery.toLowerCase())).map((v) => (
-                      <div key={v.licensePlate} onMouseDown={() => fillFromCustomer(c, v)}
+                    {suggestions.map((row) => (
+                      <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
                         style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{v.licensePlate} — {v.vehicleModel}</div>
-                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{c.fullName} • {c.phone}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{row.licensePlate} — {row.vehicleModel}</div>
+                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.fullName} • {row.phone}</div>
                       </div>
-                    )))}
+                    ))}
                   </div>
                 )}
               </div>
 
               <div className="form-group" style={{ marginBottom: 12 }}>
                 <label className="form-label">Loại xe</label>
-                <input className="form-input" value={vehicleInfo.vehicleModel} onChange={(e) => vInfoSet('vehicleModel', e.target.value)} placeholder="Hãng, dòng xe, đời xe" />
+                <input className="form-input" value={vehicleInfo.vehicleModel} onChange={(e) => vInfoSet('vehicleModel', e.target.value)} placeholder=" " />
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Số khung</label>
-                  <input className="form-input" value={vehicleInfo.frameNumber} onChange={(e) => vInfoSet('frameNumber', e.target.value)} />
+                  <input className="form-input" value={vehicleInfo.frameNumber}
+                    onChange={(e) => { vInfoSet('frameNumber', e.target.value); setIsFromLookup(false); setActiveField('frame'); setShowSuggestions(true); }}
+                    onFocus={() => { setActiveField('frame'); setShowSuggestions(true); }}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 180)} />
+                  {activeField === 'frame' && showSuggestions && suggestions.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
+                      {suggestions.map((row) => (
+                        <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
+                          style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{row.frameNumber} — {row.licensePlate}</div>
+                          <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.fullName} • {row.phone}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Số máy</label>
-                  <input className="form-input" value={vehicleInfo.engineNumber} onChange={(e) => vInfoSet('engineNumber', e.target.value)} />
+                  <input className="form-input" value={vehicleInfo.engineNumber}
+                    onChange={(e) => { vInfoSet('engineNumber', e.target.value); setIsFromLookup(false); setActiveField('engine'); setShowSuggestions(true); }}
+                    onFocus={() => { setActiveField('engine'); setShowSuggestions(true); }}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 180)} />
+                  {activeField === 'engine' && showSuggestions && suggestions.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
+                      {suggestions.map((row) => (
+                        <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
+                          style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{row.engineNumber} — {row.licensePlate}</div>
+                          <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.fullName} • {row.phone}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="form-grid form-grid-2">
