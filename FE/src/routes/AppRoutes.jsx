@@ -8,7 +8,7 @@ import { ROUTES } from '../constants/routes';
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
-const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
+// const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage')); // TODO: dang co nguoi lam
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
@@ -55,7 +55,7 @@ function AppRoutes() {
           }
         />
 
-        {/* Giám đốc */}
+        {/* Giam doc - tam thoi comment, dang co nguoi lam
         <Route
           path="/general-director/*"
           element={
@@ -66,6 +66,7 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        */}
 
         {/* Phiếu quyết toán sửa chữa */}
         <Route
