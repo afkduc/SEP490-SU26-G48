@@ -3,13 +3,19 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import AppLayout from '../components/layout/AppLayout';
 import { ROLES } from '../constants/roles';
+import { ROUTES } from '../constants/routes';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
+const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
+// const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage')); // TODO: dang co nguoi lam
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
-const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
+const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
+const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
+const SupplierListPage = lazy(() => import('../pages/inventory/SupplierListPage'));
+const SupplierDetailPage = lazy(() => import('../pages/inventory/SupplierDetailPage'));
 
 function Loading() {
   return (
@@ -39,7 +45,7 @@ function AppRoutes() {
           }
         />
 
-        {/* Admin – chỉ role admin */}
+        {/* Admin */}
         <Route
           path="/admin/dashboard"
           element={
@@ -52,6 +58,20 @@ function AppRoutes() {
         />
 
         {/* Phiếu quyết toán sửa chữa – Cố vấn dịch vụ */}
+        {/* Giam doc - tam thoi comment, dang co nguoi lam
+        <Route
+          path="/general-director/*"
+          element={
+            <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR]}>
+              <AppLayout>
+                <GeneralDirectorPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        */}
+
+        {/* Phiếu quyết toán sửa chữa */}
         <Route
           path="/repair-settlement/*"
           element={
@@ -63,7 +83,23 @@ function AppRoutes() {
           }
         />
 
-        {/* Placeholder routes – thêm page thật sau */}
+        {/* Inventory module */}
+        <Route
+          path={ROUTES.INVENTORY}
+          element={
+            <ProtectedRoute roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ACCOUNTANT, ROLES.ADMIN]}>
+              <AppLayout>
+                <InventoryLayout />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<InventoryDashboardPage />} />
+          <Route path="suppliers" element={<SupplierListPage />} />
+          <Route path="suppliers/:id" element={<SupplierDetailPage />} />
+        </Route>
+
+        {/* Placeholder routes */}
         {['/repair-orders', '/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
           <Route
             key={path}
