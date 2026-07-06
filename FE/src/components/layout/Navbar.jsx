@@ -1,10 +1,23 @@
 import { useState, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { ROLES } from '../../constants/roles';
 import './Navbar.css';
 
 const DEFAULT_NAV = [
   { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Kho', path: '/inventory' },
+  { label: 'Quyết toán sửa chữa', path: '/repair-settlement' },
+  { label: 'Bảo dưỡng', path: '/maintenance' },
+  { label: 'Chăm sóc khách hàng', path: '/customer-care' },
+  { label: 'Khách hàng', path: '/customers' },
+  { label: 'Dịch vụ', path: '/services' },
+];
+
+const ADMIN_NAV = [
+  { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Admin', path: '/admin/dashboard', icon: '🛡️' },
+  { label: 'Kho', path: '/inventory' },
   { label: 'Quyết toán sửa chữa', path: '/repair-settlement' },
   { label: 'Bảo dưỡng', path: '/maintenance' },
   { label: 'Chăm sóc khách hàng', path: '/customer-care' },
@@ -53,7 +66,7 @@ const SERVICE_ADVISOR_NAV = [
 ];
 
 const NAV_ITEMS_BY_ROLE = {
-  admin: DEFAULT_NAV,
+  [ROLES.ADMIN]: ADMIN_NAV,
   general_director: DEFAULT_NAV,
   manager: DEFAULT_NAV,
   service_advisor: SERVICE_ADVISOR_NAV,
@@ -133,6 +146,7 @@ export default function Navbar() {
 
   const navItems = NAV_ITEMS_BY_ROLE[user?.primaryRole] ?? DEFAULT_NAV;
   const isServiceAdvisor = user?.primaryRole === 'service_advisor';
+  const isAdmin = user?.primaryRole === ROLES.ADMIN;
 
   const handleLogout = () => {
     logout();
@@ -163,6 +177,7 @@ export default function Navbar() {
                   'navbar__link' + (isActive ? ' navbar__link--active' : '')
                 }
               >
+                {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
                 {item.label}
               </NavLink>
             ))}
