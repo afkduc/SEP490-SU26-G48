@@ -10,6 +10,8 @@ export const ROUTES = Object.freeze({
   ADMIN_ROLES: '/admin/roles',
   ADMIN_LOGS: '/admin/logs',
 
+  INVENTORY: '/inventory',
+
   REPAIR_SETTLEMENT: '/repair-settlement',
   MAINTENANCE: '/maintenance',
   CUSTOMER_CARE: '/customer-care',
