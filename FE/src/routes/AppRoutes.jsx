@@ -14,6 +14,8 @@ const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
+const SupplierListPage = lazy(() => import('../pages/inventory/SupplierListPage'));
+const SupplierDetailPage = lazy(() => import('../pages/inventory/SupplierDetailPage'));
 
 function Loading() {
   return (
@@ -91,6 +93,8 @@ function AppRoutes() {
           }
         >
           <Route index element={<InventoryDashboardPage />} />
+          <Route path="suppliers" element={<SupplierListPage />} />
+          <Route path="suppliers/:id" element={<SupplierDetailPage />} />
         </Route>
 
         {/* Placeholder routes */}
