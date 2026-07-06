@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { ROLES } from '../../constants/roles';
 import { formatCurrency } from '../../utils';
 import { searchVehiclesApi } from '../../services/vehicleApi';
 import { MOCK_BRANCH, STATUS_LABELS, mockAutoParts, mockRepairSettlements } from './mockData';
@@ -228,8 +229,8 @@ function printSettlement(order) {
 }
 
 // ─── Modal xem trước & xuất phiếu quyết toán ────────────────────────
-function SettlementPreviewModal({ order, onClose, onConfirm }) {
-  const canConfirm = order.status === 'waiting_payment';
+function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
+  const canConfirm = canManage && order.status === 'waiting_payment';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -352,7 +353,7 @@ function SettlementPreviewModal({ order, onClose, onConfirm }) {
 }
 
 // ─── Modal xem chi tiết phiếu ────────────────────────────────────────
-function DetailModal({ order, onClose, onComplete, onPreview }) {
+function DetailModal({ order, onClose, onComplete, onPreview, canManage }) {
   const st = STATUS_LABELS[order.status];
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -446,7 +447,9 @@ function DetailModal({ order, onClose, onComplete, onPreview }) {
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
           {order.status === 'inprogress' && (<>
             <button className="btn btn-secondary" onClick={() => { onClose(); printWorkList(order); }}>🖨️ In DS công việc</button>
-            <button className="btn btn-primary" onClick={() => { onClose(); onComplete(order.id); }}>✅ Đánh dấu hoàn thành</button>
+            {canManage && (
+              <button className="btn btn-primary" onClick={() => { onClose(); onComplete(order.id); }}>✅ Đánh dấu hoàn thành</button>
+            )}
           </>)}
           {(order.status === 'waiting_payment' || order.status === 'invoiced') && (
             <button className="btn btn-primary" style={{ background: '#2E7D32', borderColor: '#2E7D32' }}
@@ -463,6 +466,7 @@ function DetailModal({ order, onClose, onComplete, onPreview }) {
 // ─── Danh sách phiếu quyết toán sửa chữa ─────────────────────────────
 function RepairSettlementList() {
   const { user } = useAuth();
+  const canManage = user?.primaryRole !== ROLES.ADMIN;
   const [orders, setOrders] = useState(mockRepairSettlements);
   const [tab, setTab] = useState('waiting_repair');
   const [search, setSearch] = useState('');
@@ -505,7 +509,9 @@ function RepairSettlementList() {
           <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
             🏢 {user?.branchName || user?.branch || MOCK_BRANCH}
           </span>
-          <Link to="/repair-settlement/create" className="btn btn-primary">➕ Tạo phiếu quyết toán</Link>
+          {canManage && (
+            <Link to="/repair-settlement/create" className="btn btn-primary">➕ Tạo phiếu quyết toán</Link>
+          )}
         </div>
       </div>
 
@@ -597,7 +603,9 @@ function RepairSettlementList() {
 
                       {o.status === 'inprogress' && (<>
                         <button className="btn btn-secondary btn-sm btn-icon" title="In danh sách CV" onClick={() => printWorkList(o)}>🖨️</button>
-                        <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => handleComplete(o.id)}>✅ Hoàn thành</button>
+                        {canManage && (
+                          <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => handleComplete(o.id)}>✅ Hoàn thành</button>
+                        )}
                       </>)}
 
                       {o.status === 'waiting_payment' && (
@@ -611,7 +619,7 @@ function RepairSettlementList() {
                         <button className="btn btn-secondary btn-sm btn-icon" title="Xem / In lại" onClick={() => setPreviewOrder(o)}>🖨️</button>
                       )}
 
-                      {o.status !== 'invoiced' && (
+                      {canManage && o.status !== 'invoiced' && (
                         <Link to={`/repair-settlement/edit/${o.id}`} state={{ order: o }} className="btn btn-warning btn-sm btn-icon" title="Chỉnh sửa">✏️</Link>
                       )}
                     </div>
@@ -632,6 +640,7 @@ function RepairSettlementList() {
           onClose={() => setView(null)}
           onComplete={handleComplete}
           onPreview={setPreviewOrder}
+          canManage={canManage}
         />
       )}
 
@@ -640,6 +649,7 @@ function RepairSettlementList() {
           order={previewOrder}
           onClose={() => setPreviewOrder(null)}
           onConfirm={handleInvoice}
+          canManage={canManage}
         />
       )}
     </div>
@@ -1132,11 +1142,20 @@ function RepairSettlementForm({ isEdit }) {
 
 // ─── Export ───────────────────────────────────────────────────────────
 export default function RepairSettlementPage() {
+  const { user } = useAuth();
+  const canManage = user?.primaryRole !== ROLES.ADMIN;
+
   return (
     <Routes>
       <Route index element={<RepairSettlementList />} />
-      <Route path="create" element={<RepairSettlementForm />} />
-      <Route path="edit/:id" element={<RepairSettlementForm isEdit />} />
+      <Route
+        path="create"
+        element={canManage ? <RepairSettlementForm /> : <Navigate to="/repair-settlement" replace />}
+      />
+      <Route
+        path="edit/:id"
+        element={canManage ? <RepairSettlementForm isEdit /> : <Navigate to="/repair-settlement" replace />}
+      />
     </Routes>
   );
 }
