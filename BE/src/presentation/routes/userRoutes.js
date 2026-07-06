@@ -1,9 +1,12 @@
 const express = require('express');
 const { makeUserController } = require('../controllers');
+const { authenticate, requireAdmin } = require('../../middlewares/auth');
 
 function buildUserRouter() {
   const router = express.Router();
   const controller = makeUserController();
+
+  router.use(authenticate, requireAdmin);
 
   router.get('/', controller.getAll);
   router.get('/:id', controller.getById);
