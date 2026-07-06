@@ -913,7 +913,7 @@ function RepairSettlementForm({ isEdit }) {
               <div className="form-grid form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Người liên hệ</label>
-                  <input className="form-input" value={customerInfo.contactPerson} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Nếu khác chủ xe (khách hàng công ty)" />
+                  <input className="form-input" value={customerInfo.contactPerson} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Tên người liên hệ" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Điện thoại liên hệ</label>
