@@ -2,7 +2,28 @@
 
 export const MOCK_BRANCH = 'AutoGara Hà Nội';
 
-export const mockCustomers = [
+// Mã phụ tùng mẫu — dùng để gợi ý tự động điền khi nhập "Mã số"
+export const mockAutoParts = [
+  { code: 'PT-001', name: 'Dầu động cơ 5W-30 (lít)', unit: 'Lít', sellPrice: 180000 },
+  { code: 'PT-002', name: 'Lọc dầu động cơ', unit: 'Cái', sellPrice: 95000 },
+  { code: 'PT-003', name: 'Lọc gió động cơ', unit: 'Cái', sellPrice: 120000 },
+  { code: 'PT-004', name: 'Bố thắng trước (bộ)', unit: 'Bộ', sellPrice: 650000 },
+  { code: 'PT-005', name: 'Bố thắng sau (bộ)', unit: 'Bộ', sellPrice: 580000 },
+  { code: 'DV-001', name: 'Công thay dầu + lọc', unit: 'Lần', sellPrice: 100000 },
+  { code: 'DV-002', name: 'Công thay bố thắng', unit: 'Lần', sellPrice: 150000 },
+  { code: 'DV-003', name: 'Cân chỉnh góc đặt bánh xe', unit: 'Lần', sellPrice: 300000 },
+];
+
+export const STATUS_LABELS = {
+  waiting_repair: { label: 'Chờ sửa chữa', badge: 'badge-pending' },
+  inprogress: { label: 'Đang sửa chữa', badge: 'badge-inprogress' },
+  waiting_payment: { label: 'Chờ thanh toán', badge: 'badge-approved' },
+  invoiced: { label: 'Đã xuất hóa đơn', badge: 'badge-active' },
+};
+
+// Khách hàng/xe mẫu — chỉ dùng để dựng dữ liệu minh hoạ cho mockRepairSettlements
+// bên dưới (danh sách phiếu quyết toán vẫn đang mock, ngoài phạm vi nối API lần này).
+const sampleCustomers = [
   {
     id: 1,
     fullName: 'Nguyễn Văn An',
@@ -68,25 +89,6 @@ export const mockCustomers = [
   },
 ];
 
-// Mã phụ tùng mẫu — dùng để gợi ý tự động điền khi nhập "Mã số"
-export const mockAutoParts = [
-  { code: 'PT-001', name: 'Dầu động cơ 5W-30 (lít)', unit: 'Lít', sellPrice: 180000 },
-  { code: 'PT-002', name: 'Lọc dầu động cơ', unit: 'Cái', sellPrice: 95000 },
-  { code: 'PT-003', name: 'Lọc gió động cơ', unit: 'Cái', sellPrice: 120000 },
-  { code: 'PT-004', name: 'Bố thắng trước (bộ)', unit: 'Bộ', sellPrice: 650000 },
-  { code: 'PT-005', name: 'Bố thắng sau (bộ)', unit: 'Bộ', sellPrice: 580000 },
-  { code: 'DV-001', name: 'Công thay dầu + lọc', unit: 'Lần', sellPrice: 100000 },
-  { code: 'DV-002', name: 'Công thay bố thắng', unit: 'Lần', sellPrice: 150000 },
-  { code: 'DV-003', name: 'Cân chỉnh góc đặt bánh xe', unit: 'Lần', sellPrice: 300000 },
-];
-
-export const STATUS_LABELS = {
-  waiting_repair: { label: 'Chờ sửa chữa', badge: 'badge-pending' },
-  inprogress: { label: 'Đang sửa chữa', badge: 'badge-inprogress' },
-  waiting_payment: { label: 'Chờ thanh toán', badge: 'badge-approved' },
-  invoiced: { label: 'Đã xuất hóa đơn', badge: 'badge-active' },
-};
-
 export const mockRepairSettlements = [
   {
     id: 1,
@@ -95,8 +97,8 @@ export const mockRepairSettlements = [
     advisor: 'Phạm Thị Em',
     advisorPhone: '0977123456',
     branch: MOCK_BRANCH,
-    customer: mockCustomers[0],
-    vehicle: mockCustomers[0].vehicles[0],
+    customer: sampleCustomers[0],
+    vehicle: sampleCustomers[0].vehicles[0],
     customerRequest: 'Kiểm tra tổng quát, thay dầu và lọc dầu định kỳ.',
     items: [
       { code: 'PT-001', description: 'Dầu động cơ 5W-30 (lít)', lhsc: 'PT', httt: 'KHT', unit: 'Lít', qty: 4, unitPrice: 180000, discount: 0, isFree: false, total: 720000 },
@@ -121,8 +123,8 @@ export const mockRepairSettlements = [
     advisor: 'Phạm Thị Em',
     advisorPhone: '0977123456',
     branch: MOCK_BRANCH,
-    customer: mockCustomers[1],
-    vehicle: mockCustomers[1].vehicles[0],
+    customer: sampleCustomers[1],
+    vehicle: sampleCustomers[1].vehicles[0],
     customerRequest: 'Xe có tiếng kêu khi phanh, kiểm tra và thay bố thắng nếu cần.',
     items: [
       { code: 'PT-004', description: 'Bố thắng trước (bộ)', lhsc: 'PT', httt: 'KHT', unit: 'Bộ', qty: 1, unitPrice: 650000, discount: 5, isFree: false, total: 617500 },
@@ -147,8 +149,8 @@ export const mockRepairSettlements = [
     advisor: 'Phạm Thị Em',
     advisorPhone: '0977123456',
     branch: MOCK_BRANCH,
-    customer: mockCustomers[2],
-    vehicle: mockCustomers[2].vehicles[0],
+    customer: sampleCustomers[2],
+    vehicle: sampleCustomers[2].vehicles[0],
     customerRequest: 'Bảo dưỡng 5.000km theo lịch hãng.',
     items: [
       { code: 'PT-001', description: 'Dầu động cơ 5W-30 (lít)', lhsc: 'PT', httt: 'KHT', unit: 'Lít', qty: 4, unitPrice: 180000, discount: 0, isFree: false, total: 720000 },
@@ -173,8 +175,8 @@ export const mockRepairSettlements = [
     advisor: 'Phạm Thị Em',
     advisorPhone: '0977123456',
     branch: MOCK_BRANCH,
-    customer: mockCustomers[0],
-    vehicle: mockCustomers[0].vehicles[0],
+    customer: sampleCustomers[0],
+    vehicle: sampleCustomers[0].vehicles[0],
     customerRequest: 'Nạp gas điều hòa, vệ sinh dàn lạnh.',
     items: [
       { code: 'DV-002', description: 'Nạp gas điều hòa R134a', lhsc: 'DV', httt: 'KHT', unit: 'Lần', qty: 1, unitPrice: 350000, discount: 0, isFree: false, total: 350000 },
