@@ -6,7 +6,7 @@ class HttpClient {
   }
 
   async request(path, { method = 'GET', body, headers = {} } = {}) {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     const response = await fetch(`${this.baseURL}${path}`, {
       method,
       headers: {
