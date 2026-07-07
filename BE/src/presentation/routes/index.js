@@ -4,6 +4,7 @@ const buildUserRouter = require('./userRoutes');
 const buildAuthRouter = require('./authRoutes');
 const buildVehicleRouter = require('./vehicleRoutes');
 const buildAdminRouter = require('./adminRoutes');
+const buildProductRouter = require('./productRoutes');
 
 const router = express.Router();
 
@@ -15,5 +16,6 @@ router.use('/auth', buildAuthRouter());
 router.use('/users', buildUserRouter());
 router.use('/vehicles', buildVehicleRouter());
 router.use('/admin', buildAdminRouter());
+router.use('/products', buildProductRouter());
 
 module.exports = router;
