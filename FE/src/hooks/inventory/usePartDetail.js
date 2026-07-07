@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPartByIdApi, getStockHistoryApi } from '../services/partMockApi';
+import { getPartByIdApi, getStockHistoryApi } from '../../services/partMockApi';
 
 export function usePartDetail(partId) {
   const [part, setPart] = useState(null);
