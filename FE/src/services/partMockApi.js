@@ -26,6 +26,11 @@ let partStore = clone(mockParts);
 
 // ===== Parts / Products =====
 
+/**
+ * Lay danh sach parts co loc theo search, status, category, lowStockOnly.
+ * @param {Object} params - { search?, status?, category?, lowStockOnly? }
+ * @returns {Promise<{ data: Part[], total: number }>}
+ */
 export async function getPartsApi(params = {}) {
   await delay();
   let result = clone(partStore);
@@ -51,6 +56,12 @@ export async function getPartsApi(params = {}) {
   return { data: result, total: result.length };
 }
 
+/**
+ * Lay chi tiet mot part theo id.
+ * @param {number|string} id
+ * @returns {Promise<{ data: Part }>}
+ * @throws {Error} 404 neu khong tim thay
+ */
 export async function getPartByIdApi(id) {
   await delay();
   const found = partStore.find((p) => p.id === Number(id));
@@ -58,6 +69,12 @@ export async function getPartByIdApi(id) {
   return { data: clone(found) };
 }
 
+/**
+ * Tao moi mot part. Kiem tra trung ma phu tung truoc khi tao.
+ * @param {Object} payload - Dữ liệu part (partCode bat buoc)
+ * @returns {Promise<{ data: Part }>}
+ * @throws {Error} 409 neu ma phu tung da ton tai
+ */
 export async function createPartApi(payload) {
   await delay();
   const exists = partStore.find(
@@ -74,6 +91,13 @@ export async function createPartApi(payload) {
   return { data: clone(created) };
 }
 
+/**
+ * Cap nhat thong tin part theo id, ghi de cac truong duoc truyen.
+ * @param {number|string} id
+ * @param {Object} payload - Cac truong can cap nhat
+ * @returns {Promise<{ data: Part }>}
+ * @throws {Error} 404 neu khong tim thay
+ */
 export async function updatePartApi(id, payload) {
   await delay();
   const idx = partStore.findIndex((p) => p.id === Number(id));
@@ -82,6 +106,12 @@ export async function updatePartApi(id, payload) {
   return { data: clone(partStore[idx]) };
 }
 
+/**
+ * Xoa mot part theo id khoi store.
+ * @param {number|string} id
+ * @returns {Promise<{ data: { id, deleted: boolean } }>}
+ * @throws {Error} 404 neu khong tim thay
+ */
 export async function deletePartApi(id) {
   await delay();
   const idx = partStore.findIndex((p) => p.id === Number(id));
@@ -90,6 +120,10 @@ export async function deletePartApi(id) {
   return { data: { id: Number(id), deleted: true } };
 }
 
+/**
+ * Lay danh sach tat ca categories (danh mục phu tung).
+ * @returns {Promise<{ data: Category[] }>}
+ */
 export async function getPartCategoriesApi() {
   await delay();
   return { data: clone(mockPartCategories) };
@@ -97,6 +131,10 @@ export async function getPartCategoriesApi() {
 
 // ===== Stock / Dashboard =====
 
+/**
+ * Lay so lieu tong quan kho: tong so phu tung, gia tri ton kho, ton kho thap, het hang.
+ * @returns {Promise<{ data: { totalParts, totalStockValue, lowStockCount, outOfStockCount } }>}
+ */
 export async function getStockSummaryApi() {
   await delay();
   const totalParts = partStore.length;
@@ -115,6 +153,11 @@ export async function getStockSummaryApi() {
   };
 }
 
+/**
+ * Lay lich su giao dich ton kho cua mot part (nhap/xuat/huy).
+ * @param {number|string} partId
+ * @returns {Promise<{ data: StockTransaction[] }>}
+ */
 export async function getStockHistoryApi(partId) {
   await delay();
   const result = mockStockTransactions.filter(
