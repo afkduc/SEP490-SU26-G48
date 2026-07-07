@@ -1,0 +1,164 @@
+.part-detail {
+  padding: 8px 4px;
+}
+
+.part-detail__header {
+  margin-bottom: 20px;
+}
+
+.part-detail__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 12px;
+}
+
+.part-detail__title {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: #111827;
+}
+
+.part-detail__code {
+  font-size: 13px;
+  color: #4338ca;
+  margin: 0;
+}
+
+.part-detail__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.detail-loading,
+.detail-error {
+  padding: 24px;
+  text-align: center;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.detail-loading {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.detail-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.detail-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+
+.detail-card--full {
+  grid-column: 1 / -1;
+}
+
+.detail-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.detail-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.detail-row__label {
+  font-size: 13px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.detail-row__value {
+  font-size: 14px;
+  color: #111827;
+  font-weight: 500;
+  text-align: right;
+}
+
+/* Stock highlight */
+.stock-highlight {
+  text-align: center;
+  padding: 14px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+
+.stock-highlight--ok {
+  background: #d1fae5;
+}
+
+.stock-highlight--warn {
+  background: #fef3c7;
+}
+
+.stock-highlight__number {
+  display: block;
+  font-size: 36px;
+  font-weight: 700;
+  color: #065f46;
+}
+
+.stock-highlight--warn .stock-highlight__number {
+  color: #92400e;
+}
+
+.stock-highlight__unit {
+  font-size: 14px;
+  color: #374151;
+}
+
+/* Detail form */
+.detail-form {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-form__footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.detail-empty {
+  color: #9ca3af;
+  font-size: 14px;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.text-right {
+  text-align: right;
+}
