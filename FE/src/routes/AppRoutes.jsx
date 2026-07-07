@@ -8,6 +8,7 @@ import { ROUTES } from '../constants/routes';
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
+const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 // const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage')); // TODO: dang co nguoi lam
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
@@ -15,6 +16,8 @@ const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'))
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
 const SupplierListPage = lazy(() => import('../pages/inventory/SupplierListPage'));
 const SupplierDetailPage = lazy(() => import('../pages/inventory/SupplierDetailPage'));
+const PartListPage = lazy(() => import('../pages/inventory/PartListPage'));
+const PartDetailPage = lazy(() => import('../pages/inventory/PartDetailPage'));
 
 function Loading() {
   return (
@@ -30,6 +33,7 @@ function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         {/* Protected – wrapped in AppLayout (Navbar) */}
         <Route
@@ -55,6 +59,7 @@ function AppRoutes() {
           }
         />
 
+        {/* Phiếu quyết toán sửa chữa – Cố vấn dịch vụ */}
         {/* Giam doc - tam thoi comment, dang co nguoi lam
         <Route
           path="/general-director/*"
@@ -94,6 +99,8 @@ function AppRoutes() {
           <Route index element={<InventoryDashboardPage />} />
           <Route path="suppliers" element={<SupplierListPage />} />
           <Route path="suppliers/:id" element={<SupplierDetailPage />} />
+          <Route path="parts" element={<PartListPage />} />
+          <Route path="parts/:id" element={<PartDetailPage />} />
         </Route>
 
         {/* Placeholder routes */}
