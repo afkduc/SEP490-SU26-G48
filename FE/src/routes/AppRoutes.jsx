@@ -8,6 +8,7 @@ import { ROUTES } from '../constants/routes';
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
+const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 // const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage')); // TODO: dang co nguoi lam
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
@@ -32,6 +33,7 @@ function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         {/* Protected – wrapped in AppLayout (Navbar) */}
         <Route
@@ -57,6 +59,7 @@ function AppRoutes() {
           }
         />
 
+        {/* Phiếu quyết toán sửa chữa – Cố vấn dịch vụ */}
         {/* Giam doc - tam thoi comment, dang co nguoi lam
         <Route
           path="/general-director/*"
