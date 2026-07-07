@@ -2,18 +2,6 @@
 
 export const MOCK_BRANCH = 'AutoGara Hà Nội';
 
-// Mã phụ tùng mẫu — dùng để gợi ý tự động điền khi nhập "Mã số"
-export const mockAutoParts = [
-  { code: 'PT-001', name: 'Dầu động cơ 5W-30 (lít)', unit: 'Lít', sellPrice: 180000 },
-  { code: 'PT-002', name: 'Lọc dầu động cơ', unit: 'Cái', sellPrice: 95000 },
-  { code: 'PT-003', name: 'Lọc gió động cơ', unit: 'Cái', sellPrice: 120000 },
-  { code: 'PT-004', name: 'Bố thắng trước (bộ)', unit: 'Bộ', sellPrice: 650000 },
-  { code: 'PT-005', name: 'Bố thắng sau (bộ)', unit: 'Bộ', sellPrice: 580000 },
-  { code: 'DV-001', name: 'Công thay dầu + lọc', unit: 'Lần', sellPrice: 100000 },
-  { code: 'DV-002', name: 'Công thay bố thắng', unit: 'Lần', sellPrice: 150000 },
-  { code: 'DV-003', name: 'Cân chỉnh góc đặt bánh xe', unit: 'Lần', sellPrice: 300000 },
-];
-
 export const STATUS_LABELS = {
   waiting_repair: { label: 'Chờ sửa chữa', badge: 'badge-pending' },
   inprogress: { label: 'Đang sửa chữa', badge: 'badge-inprogress' },

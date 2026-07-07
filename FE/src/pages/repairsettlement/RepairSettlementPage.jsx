@@ -1,13 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
 import { formatCurrency } from '../../utils';
 import { searchVehiclesApi } from '../../services/vehicleApi';
-import { MOCK_BRANCH, STATUS_LABELS, mockAutoParts, mockRepairSettlements } from './mockData';
+import { searchCatalogApi } from '../../services/catalogApi';
+import { MOCK_BRANCH, STATUS_LABELS, mockRepairSettlements } from './mockData';
 
-const LHSC_OPTIONS = ['DV', 'PT', 'BH', 'HD'];
-const HTTT_OPTIONS = ['KHT', 'BH', 'HD', 'NB'];
+// Value giữ mã ngắn (khớp dữ liệu lưu/in phiếu), label hiển thị đầy đủ trên form nhập liệu.
+const LHSC_OPTIONS = [
+  { value: 'DV', label: 'Dịch vụ' },
+  { value: 'PT', label: 'Phụ tùng' },
+  { value: 'BH', label: 'Bảo hành' },
+  { value: 'HD', label: 'Hợp đồng' },
+];
+const HTTT_OPTIONS = [
+  { value: 'KHT', label: 'Khách hàng thanh toán' },
+  { value: 'BH', label: 'Bảo hiểm chi trả' },
+  { value: 'HD', label: 'Hợp đồng bảo dưỡng' },
+  { value: 'NB', label: 'Nội bộ chịu phí' },
+];
 
 const TABS = [
   { key: 'waiting_repair', label: 'Chờ sửa chữa', color: '#E65100' },
@@ -689,7 +702,13 @@ function RepairSettlementForm({ isEdit }) {
   const [nextKm, setNextKm] = useState(existingOrder?.nextMaintenanceKm || '');
   const [nextDate, setNextDate] = useState(existingOrder?.nextMaintenanceDate || '');
   const [items, setItems] = useState(existingOrder?.items?.length ? existingOrder.items : [emptyItem()]);
-  const [partSuggestions, setPartSuggestions] = useState({});
+  // Tra cứu hạng mục công việc / gói combo thật trong DB khi gõ ô "Mã hạng mục".
+  const [activeCatalogIdx, setActiveCatalogIdx] = useState(null); // dòng nào đang mở dropdown gợi ý
+  const [catalogSuggestions, setCatalogSuggestions] = useState({}); // idx -> { services, packages }
+  // Toạ độ (viewport) của ô đang mở dropdown - dropdown render qua portal ra
+  // ngoài table-wrapper (vốn overflow:auto để cuộn ngang bảng) để không bị cắt/cuộn kẹt.
+  const [catalogDropdownRect, setCatalogDropdownRect] = useState(null);
+  const catalogSearchSeq = useRef(0);
   const [saved, setSaved] = useState(false);
 
   // Tra cứu khách hàng/xe thật trong DB theo tên, biển số, số khung hoặc số máy.
@@ -722,6 +741,30 @@ function RepairSettlementForm({ isEdit }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeField, customerQuery, plateQuery, vehicleInfo.frameNumber, vehicleInfo.engineNumber, customerInfo.phone]);
 
+  // Tra cứu hạng mục công việc / gói combo thật trong DB theo tên (hoặc mã),
+  // debounce 300ms giống các ô tra cứu khách hàng/xe ở trên. Auto lọc real-time
+  // theo đúng text đang gõ trong ô "Tên hạng mục / gói combo".
+  useEffect(() => {
+    if (activeCatalogIdx === null) return undefined;
+    const idx = activeCatalogIdx;
+    const term = (items[idx]?.description || '').trim();
+    if (term.length < 2) {
+      setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
+      return undefined;
+    }
+    const seq = ++catalogSearchSeq.current;
+    const timer = setTimeout(async () => {
+      try {
+        const result = await searchCatalogApi(term);
+        if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: result }));
+      } catch {
+        if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCatalogIdx, items[activeCatalogIdx]?.description]);
+
   const fillFromRow = (row) => {
     setCustomerInfo({
       id: row.customerId, fullName: row.fullName, address: row.address || '', phone: row.phone || '',
@@ -753,23 +796,45 @@ function RepairSettlementForm({ isEdit }) {
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
   const removeItem = (idx) => setItems((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
 
-  const handlePartCode = (idx, val) => {
-    setItem(idx, 'code', val);
-    if (val.length >= 2) {
-      const matches = mockAutoParts.filter((p) => p.code.toLowerCase().includes(val.toLowerCase()) || p.name.toLowerCase().includes(val.toLowerCase())).slice(0, 6);
-      setPartSuggestions((prev) => ({ ...prev, [idx]: matches }));
-    } else {
-      setPartSuggestions((prev) => ({ ...prev, [idx]: [] }));
-    }
+  const handleItemDescription = (idx, val) => {
+    setItem(idx, 'description', val);
+    setActiveCatalogIdx(idx);
   };
 
-  const selectPart = (idx, part) => {
+  const closeCatalogSuggestions = (idx) => {
+    setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
+    setActiveCatalogIdx((cur) => (cur === idx ? null : cur));
+    setCatalogDropdownRect(null);
+  };
+
+  const openCatalogDropdown = (idx, inputEl) => {
+    const rect = inputEl.getBoundingClientRect();
+    setCatalogDropdownRect({ top: rect.bottom, left: rect.left, width: rect.width });
+    setActiveCatalogIdx(idx);
+  };
+
+  // Chọn 1 hạng mục đơn lẻ từ catalog -> điền đúng dòng đang gõ, không giảm giá.
+  const selectCatalogService = (idx, svc) => {
     setItems((prev) => {
-      const n = [...prev];
-      n[idx] = recalcItem({ ...n[idx], code: part.code, description: part.name, unit: part.unit, unitPrice: part.sellPrice, lhsc: part.code.startsWith('PT') ? 'PT' : 'DV' });
-      return n;
+      const next = [...prev];
+      next[idx] = recalcItem({ ...next[idx], code: svc.code, description: svc.name, unitPrice: svc.unitPrice, lhsc: 'DV', discount: 0 });
+      return next;
     });
-    setPartSuggestions((prev) => ({ ...prev, [idx]: [] }));
+    closeCatalogSuggestions(idx);
+  };
+
+  // Chọn 1 gói combo -> tách thành nhiều dòng (mỗi hạng mục trong gói 1 dòng),
+  // chiết khấu 20% mỗi dòng để tổng đúng bằng total_price của gói (= 80% tổng giá gốc).
+  const selectCatalogPackage = (idx, pkg) => {
+    const expanded = pkg.items.map((it) =>
+      recalcItem({ ...emptyItem(), code: it.serviceCode, description: it.serviceName, unitPrice: it.unitPrice, lhsc: 'DV', discount: 20 })
+    );
+    setItems((prev) => {
+      const next = [...prev];
+      next.splice(idx, 1, ...expanded);
+      return next;
+    });
+    closeCatalogSuggestions(idx);
   };
 
   const totals = calcTotals(items);
@@ -1017,48 +1082,67 @@ function RepairSettlementForm({ isEdit }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: 110 }}>Mã số</th>
-                  <th>Nội dung công việc</th>
-                  <th style={{ width: 70 }}>LHSC</th>
-                  <th style={{ width: 70 }}>HTTT</th>
-                  <th style={{ width: 70 }}>ĐVT</th>
-                  <th style={{ width: 60 }}>SL</th>
-                  <th style={{ width: 110 }}>Đơn giá</th>
-                  <th style={{ width: 70 }}>CK %</th>
-                  <th style={{ width: 60 }}>Miễn phí</th>
-                  <th style={{ width: 110 }}>Thành tiền</th>
+                  <th style={{ minWidth: 320 }}>Tên hạng mục / gói combo</th>
+                  <th style={{ width: 170 }}>Loại hình sửa chữa</th>
+                  <th style={{ width: 190 }}>Hình thức thanh toán</th>
+                  <th style={{ width: 90 }}>Đơn vị tính</th>
+                  <th style={{ width: 70 }}>Số lượng</th>
+                  <th style={{ width: 150 }}>Đơn giá</th>
+                  <th style={{ width: 110 }}>Chiết khấu (%)</th>
+                  <th style={{ width: 70 }}>Miễn phí</th>
+                  <th style={{ width: 130 }}>Thành tiền</th>
                   <th style={{ width: 40 }}></th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, idx) => (
+                {items.map((item, idx) => {
+                  const suggestion = catalogSuggestions[idx];
+                  const hasSuggestions = activeCatalogIdx === idx && suggestion && (suggestion.packages?.length > 0 || suggestion.services?.length > 0);
+                  return (
                   <tr key={idx}>
                     <td style={{ position: 'relative' }}>
-                      <input className="form-input" style={{ fontSize: 12 }} value={item.code}
-                        onChange={(e) => handlePartCode(idx, e.target.value)} placeholder="Mã..." />
-                      {partSuggestions[idx]?.length > 0 && (
-                        <div style={{ position: 'absolute', top: '100%', left: 0, minWidth: 260, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
-                          {partSuggestions[idx].map((p) => (
-                            <div key={p.code} onMouseDown={() => selectPart(idx, p)}
-                              style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
-                              <b>{p.code}</b> — {p.name} <span style={{ color: 'var(--gray-500)' }}>({formatCurrency(p.sellPrice)})</span>
+                      <input className="form-input" style={{ fontSize: 12 }} value={item.description}
+                        onChange={(e) => handleItemDescription(idx, e.target.value)}
+                        onFocus={(e) => openCatalogDropdown(idx, e.target)}
+                        onBlur={() => setTimeout(() => closeCatalogSuggestions(idx), 180)}
+                        placeholder="Nhập tên hạng mục / gói combo..." />
+                      {hasSuggestions && catalogDropdownRect && createPortal(
+                        <div style={{ position: 'fixed', top: catalogDropdownRect.top, left: catalogDropdownRect.left, width: 440, maxHeight: 420, overflowY: 'auto', background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000 }}>
+                          {suggestion.packages?.length > 0 && (
+                            <div>
+                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>🎁 Gói combo</div>
+                              {suggestion.packages.map((pkg) => (
+                                <div key={`pkg-${pkg.id}`} onMouseDown={() => selectCatalogPackage(idx, pkg)}
+                                  style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
+                                  <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pkg.name} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({pkg.items.length} hạng mục)</span></div>
+                                  <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{pkg.code} — {formatCurrency(pkg.totalPrice)}</div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          )}
+                          {suggestion.services?.length > 0 && (
+                            <div>
+                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>🔧 Hạng mục đơn lẻ</div>
+                              {suggestion.services.map((svc) => (
+                                <div key={`svc-${svc.id}`} onMouseDown={() => selectCatalogService(idx, svc)}
+                                  style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
+                                  <b>{svc.name}</b> <span style={{ color: 'var(--gray-500)' }}>({svc.code} — {formatCurrency(svc.unitPrice)})</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>,
+                        document.body
                       )}
                     </td>
                     <td>
-                      <input className="form-input" style={{ fontSize: 12 }} value={item.description}
-                        onChange={(e) => setItem(idx, 'description', e.target.value)} placeholder="Nội dung công việc / phụ tùng" />
-                    </td>
-                    <td>
                       <select className="form-select" style={{ fontSize: 12 }} value={item.lhsc} onChange={(e) => setItem(idx, 'lhsc', e.target.value)}>
-                        {LHSC_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                        {LHSC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </td>
                     <td>
                       <select className="form-select" style={{ fontSize: 12 }} value={item.httt} onChange={(e) => setItem(idx, 'httt', e.target.value)}>
-                        {HTTT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                        {HTTT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </td>
                     <td>
@@ -1068,7 +1152,9 @@ function RepairSettlementForm({ isEdit }) {
                       <input className="form-input" style={{ fontSize: 12 }} type="number" min={1} value={item.qty} onChange={(e) => setItem(idx, 'qty', Number(e.target.value))} />
                     </td>
                     <td>
-                      <input className="form-input" style={{ fontSize: 12 }} type="number" min={0} value={item.unitPrice} onChange={(e) => setItem(idx, 'unitPrice', Number(e.target.value))} />
+                      <input className="form-input" style={{ fontSize: 12 }}
+                        value={(item.unitPrice || 0).toLocaleString('vi-VN')} readOnly
+                        title="Đơn giá lấy theo catalog, không chỉnh sửa trực tiếp trên form" />
                     </td>
                     <td>
                       <input className="form-input" style={{ fontSize: 12 }} type="number" min={0} max={100} value={item.discount} onChange={(e) => setItem(idx, 'discount', Number(e.target.value))} />
@@ -1081,7 +1167,8 @@ function RepairSettlementForm({ isEdit }) {
                       <button className="btn btn-danger btn-sm btn-icon" onClick={() => removeItem(idx)} title="Xóa dòng">🗑️</button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
