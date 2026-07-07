@@ -17,7 +17,6 @@ const DEFAULT_NAV = [
 const ADMIN_NAV = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Admin', path: '/admin/dashboard', icon: '🛡️' },
-  { label: 'Kho', path: '/inventory' },
   { label: 'Quyết toán sửa chữa', path: '/repair-settlement' },
   { label: 'Bảo dưỡng', path: '/maintenance' },
   { label: 'Chăm sóc khách hàng', path: '/customer-care' },

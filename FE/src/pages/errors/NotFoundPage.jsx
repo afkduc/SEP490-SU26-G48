@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Button } from '../components/common';
+import { Button } from '../../components/common';
 
 export default function NotFoundPage() {
   useEffect(() => {
