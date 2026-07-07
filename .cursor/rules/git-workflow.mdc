@@ -1,0 +1,59 @@
+---
+description: Git commit conventions and workflow for this project
+alwaysApply: true
+---
+
+# Git Commit Workflow
+
+## 1. Chạy lệnh commit để tự copy
+
+Sau khi hoàn thành thay đổi, VIẾT RA cho user một block lệnh **để user tự chạy**. KHÔNG tự chạy git commit.
+
+Block lệnh phải gồm:
+- `git add <file>...` (liệt kê file cụ thể, KHÔNG dùng `git add .`)
+- `git commit -m "message"`
+- (Tuỳ) `git status` để xác nhận
+
+Ví dụ:
+
+```powershell
+git add FE/src/hooks/inventory/useParts.js
+git commit -m "fix(inventory): correct import path"
+git status
+```
+
+## 2. Quy tắc commit message
+
+Dùng Conventional Commits:
+
+```
+<type>(<scope>): <description>
+```
+
+### Types
+| Type | Dùng khi |
+|------|----------|
+| `feat` | Thêm feature mới |
+| `fix` | Sửa bug |
+| `chore` | Việc nhỏ, cấu hình, refactor nhẹ |
+| `refactor` | Cấu trúc lại code |
+| `docs` | Chỉnh sửa tài liệu |
+
+### Scopes thường dùng
+- `inventory` - module kho / phụ tùng
+- `auth` - xác thực
+- `repair` - sửa chữa
+- `common` - code dùng chung
+
+### Ví dụ tốt
+```
+feat(inventory): add PartListPage with filter and CRUD modal
+fix(inventory): correct import path in useParts hook
+chore: add .cursor/rules for commit workflow
+```
+
+## 3. KHÔNG làm
+
+- Không `git add .` - chỉ add file cụ thể
+- Không tự động commit nếu user không yêu cầu
+- Không commit file binary, `.env`, credentials
