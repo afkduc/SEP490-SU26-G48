@@ -6,6 +6,9 @@ import {
   deletePartApi,
 } from '../../services/partMockApi';
 
+/**
+ * Quan ly trang thai danh sach parts: tai, loc, tao, sua, xoa.
+ */
 export function useParts() {
   const [parts, setParts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,6 +20,10 @@ export function useParts() {
     lowStockOnly: false,
   });
 
+  /**
+   * Tai danh sach parts tu API voi bo loc hien tai.
+   * Tu dong goi khi params thay doi.
+   */
   const fetch = useCallback(async (filters = params) => {
     setLoading(true);
     setError(null);
@@ -34,18 +41,33 @@ export function useParts() {
     fetch();
   }, []);
 
+  /**
+   * Tao moi mot part, them vao state.
+   * @param {Object} data
+   * @returns {Promise<{ data: Part }>}
+   */
   const create = useCallback(async (data) => {
     const res = await createPartApi(data);
     setParts((prev) => [...prev, res.data]);
     return res;
   }, []);
 
+  /**
+   * Cap nhat mot part trong state.
+   * @param {number} id
+   * @param {Object} data
+   * @returns {Promise<{ data: Part }>}
+   */
   const update = useCallback(async (id, data) => {
     const res = await updatePartApi(id, data);
     setParts((prev) => prev.map((p) => (p.id === id ? res.data : p)));
     return res;
   }, []);
 
+  /**
+   * Xoa mot part khoi state.
+   * @param {number} id
+   */
   const remove = useCallback(async (id) => {
     await deletePartApi(id);
     setParts((prev) => prev.filter((p) => p.id !== id));
