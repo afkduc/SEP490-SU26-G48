@@ -34,7 +34,7 @@ function emptyForm() {
 export default function PartListPage() {
   const {
     parts, loading, error,
-    params, setSearch, setStatus, setCategory, setLowStockOnly, applyFilters,
+    params, setParams,
     create, update, remove,
   } = useParts();
 
@@ -43,6 +43,12 @@ export default function PartListPage() {
   const [form, setForm] = useState(emptyForm());
   const [formError, setFormError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+
+  function setSearch(v) { setParams((p) => ({ ...p, search: v })); }
+  function setStatus(v) { setParams((p) => ({ ...p, status: v })); }
+  function setCategory(v) { setParams((p) => ({ ...p, category: v })); }
+  function setLowStockOnly(v) { setParams((p) => ({ ...p, lowStockOnly: v })); }
+  function applyFilters() {}
 
   function openCreate() {
     setEditing(null);
