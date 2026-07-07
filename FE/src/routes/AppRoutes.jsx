@@ -15,6 +15,8 @@ const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'))
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
 const SupplierListPage = lazy(() => import('../pages/inventory/SupplierListPage'));
 const SupplierDetailPage = lazy(() => import('../pages/inventory/SupplierDetailPage'));
+const PartListPage = lazy(() => import('../pages/inventory/PartListPage'));
+const PartDetailPage = lazy(() => import('../pages/inventory/PartDetailPage'));
 
 function Loading() {
   return (
@@ -94,6 +96,8 @@ function AppRoutes() {
           <Route index element={<InventoryDashboardPage />} />
           <Route path="suppliers" element={<SupplierListPage />} />
           <Route path="suppliers/:id" element={<SupplierDetailPage />} />
+          <Route path="parts" element={<PartListPage />} />
+          <Route path="parts/:id" element={<PartDetailPage />} />
         </Route>
 
         {/* Placeholder routes */}
