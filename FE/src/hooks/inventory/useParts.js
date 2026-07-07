@@ -4,7 +4,7 @@ import {
   createPartApi,
   updatePartApi,
   deletePartApi,
-} from '../services/partMockApi';
+} from '../../services/partMockApi';
 
 export function useParts() {
   const [parts, setParts] = useState([]);
@@ -28,64 +28,28 @@ export function useParts() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [params]);
 
   useEffect(() => {
     fetch();
   }, []);
 
-  const create = useCallback(async (payload) => {
-    const res = await createPartApi(payload);
+  const create = useCallback(async (data) => {
+    const res = await createPartApi(data);
     setParts((prev) => [...prev, res.data]);
-    return res.data;
+    return res;
   }, []);
 
-  const update = useCallback(async (id, payload) => {
-    const res = await updatePartApi(id, payload);
-    setParts((prev) =>
-      prev.map((p) => (p.id === Number(id) ? res.data : p)),
-    );
-    return res.data;
+  const update = useCallback(async (id, data) => {
+    const res = await updatePartApi(id, data);
+    setParts((prev) => prev.map((p) => (p.id === id ? res.data : p)));
+    return res;
   }, []);
 
   const remove = useCallback(async (id) => {
     await deletePartApi(id);
-    setParts((prev) => prev.filter((p) => p.id !== Number(id)));
+    setParts((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const setSearch = useCallback((search) => {
-    setParams((p) => ({ ...p, search }));
-  }, []);
-
-  const setStatus = useCallback((status) => {
-    setParams((p) => ({ ...p, status }));
-  }, []);
-
-  const setCategory = useCallback((category) => {
-    setParams((p) => ({ ...p, category }));
-  }, []);
-
-  const setLowStockOnly = useCallback((lowStockOnly) => {
-    setParams((p) => ({ ...p, lowStockOnly }));
-  }, []);
-
-  const applyFilters = useCallback(() => {
-    fetch(params);
-  }, [fetch, params]);
-
-  return {
-    parts,
-    loading,
-    error,
-    params,
-    setSearch,
-    setStatus,
-    setCategory,
-    setLowStockOnly,
-    applyFilters,
-    create,
-    update,
-    remove,
-    refetch: () => fetch(params),
-  };
+  return { parts, loading, error, params, setParams, fetch, create, update, remove };
 }
