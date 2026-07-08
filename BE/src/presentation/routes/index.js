@@ -6,6 +6,8 @@ const buildVehicleRouter = require('./vehicleRoutes');
 const buildAdminRouter = require('./adminRoutes');
 const buildProductRouter = require('./productRoutes');
 const buildInventoryRouter = require('./inventoryRoutes');
+const buildCatalogRouter = require('./catalogRoutes');
+const buildGeneralDirectorRouter = require('./generalDirectorRoutes');
 
 const router = express.Router();
 
@@ -19,5 +21,7 @@ router.use('/vehicles', buildVehicleRouter());
 router.use('/admin', buildAdminRouter());
 router.use('/products', buildProductRouter());
 router.use('/inventory', buildInventoryRouter());
+router.use('/catalog', buildCatalogRouter());
+router.use('/general-director', buildGeneralDirectorRouter());
 
 module.exports = router;
