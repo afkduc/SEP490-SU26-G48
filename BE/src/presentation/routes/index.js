@@ -5,6 +5,7 @@ const buildAuthRouter = require('./authRoutes');
 const buildVehicleRouter = require('./vehicleRoutes');
 const buildAdminRouter = require('./adminRoutes');
 const buildProductRouter = require('./productRoutes');
+const buildInventoryRouter = require('./inventoryRoutes');
 
 const router = express.Router();
 
@@ -17,5 +18,6 @@ router.use('/users', buildUserRouter());
 router.use('/vehicles', buildVehicleRouter());
 router.use('/admin', buildAdminRouter());
 router.use('/products', buildProductRouter());
+router.use('/inventory', buildInventoryRouter());
 
 module.exports = router;
