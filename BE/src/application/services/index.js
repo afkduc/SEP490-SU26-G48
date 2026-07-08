@@ -1,6 +1,6 @@
 const UserService = require('./UserService');
 const ProductService = require('./ProductService');
-const { InventoryService } = require('./InventoryService');
+const InventoryService = require('./InventoryService');
 const { makeUserRepository } = require('../../infrastructure/repositories');
 const { makeProductRepository } = require('../../infrastructure/repositories');
 const { makeInventoryRepository } = require('../../infrastructure/repositories');

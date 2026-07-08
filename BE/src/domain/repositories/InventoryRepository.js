@@ -45,13 +45,22 @@ class InventoryRepository {
 
   /**
    * Cap nhat so luong ton kho (dung cho nhap/xuat kho).
+   * Thuc hien trong transaction va co guard stock >= 0.
    * @param {number} productId
    * @param {number} branchId
    * @param {number} quantity - so luong thay doi (am = tru, duong = cong)
-   * @returns {Promise<Product>}
+   * @returns {Promise<Product|null>} null neu khong tim thay hoac stock se am
+   */
+  async adjustStock(productId, branchId, quantity) {
+    throw new Error('Method adjustStock() must be implemented');
+  }
+
+  /**
+   * Backward-compat alias.
+   * @deprecated Su dung adjustStock.
    */
   async updateStock(productId, branchId, quantity) {
-    throw new Error('Method updateStock() must be implemented');
+    return this.adjustStock(productId, branchId, quantity);
   }
 
   /**
