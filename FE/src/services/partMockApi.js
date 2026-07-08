@@ -165,3 +165,79 @@ export async function getStockHistoryApi(partId) {
   );
   return { data: clone(result) };
 }
+
+/**
+ * Lay danh sach ton kho theo chi nhanh (co filter search, category, lowStockOnly).
+ * @param {Object} params - { branchId, search?, category?, lowStockOnly?, page?, limit? }
+ * @returns {Promise<{ data: { items, total, page, limit } }>}
+ */
+export async function getStockListApi(params = {}) {
+  await delay();
+  let result = clone(partStore);
+  if (params.branchId) {
+    result = result.filter((p) => Number(p.branchId ?? 1) === Number(params.branchId));
+  }
+  if (params.lowStockOnly) {
+    result = result.filter((p) => p.stockQuantity <= p.minStock);
+  }
+  if (params.category) {
+    result = result.filter((p) => p.category === params.category);
+  }
+  if (params.search) {
+    const kw = String(params.search).toLowerCase();
+    result = result.filter(
+      (p) =>
+        p.partName.toLowerCase().includes(kw) ||
+        p.partCode.toLowerCase().includes(kw),
+    );
+  }
+  result.sort((a, b) => {
+    const aLow = a.stockQuantity <= a.minStock ? 0 : 1;
+    const bLow = b.stockQuantity <= b.minStock ? 0 : 1;
+    if (aLow !== bLow) return aLow - bLow;
+    return a.partName.localeCompare(b.partName);
+  });
+
+  const page = Math.max(1, Number(params.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(params.limit) || 20));
+  const total = result.length;
+  const items = result.slice((page - 1) * limit, page * limit);
+  return { data: { items, total, page, limit } };
+}
+
+/**
+ * Lay danh sach san pham co ton kho thap (<= minStock) theo chi nhanh.
+ * @param {number} branchId
+ * @returns {Promise<{ data: { items, total } }>}
+ */
+export async function getLowStockApi(branchId) {
+  await delay();
+  let result = clone(partStore).filter((p) => p.stockQuantity <= p.minStock);
+  if (branchId) {
+    result = result.filter((p) => Number(p.branchId ?? 1) === Number(branchId));
+  }
+  result.sort((a, b) => a.stockQuantity - b.stockQuantity);
+  return { data: { items: result, total: result.length } };
+}
+
+/**
+ * Lay tong hop ton kho theo category (cho dashboard).
+ * @returns {Promise<{ data: { summary, totalProducts, totalQuantity, totalValue } }>}
+ */
+export async function getStockSummaryByCategoryApi() {
+  await delay();
+  const groups = new Map();
+  for (const p of partStore) {
+    const key = p.category || 'Khong xac dinh';
+    const cur = groups.get(key) || { category: key, productCount: 0, totalQuantity: 0, totalValue: 0 };
+    cur.productCount += 1;
+    cur.totalQuantity += p.stockQuantity ?? 0;
+    cur.totalValue += (p.stockQuantity ?? 0) * (p.unitPrice ?? 0);
+    groups.set(key, cur);
+  }
+  const summary = Array.from(groups.values()).sort((a, b) => b.totalValue - a.totalValue);
+  const totalProducts = summary.reduce((s, c) => s + c.productCount, 0);
+  const totalQuantity = summary.reduce((s, c) => s + c.totalQuantity, 0);
+  const totalValue = summary.reduce((s, c) => s + c.totalValue, 0);
+  return { data: { summary, totalProducts, totalQuantity, totalValue } };
+}

@@ -18,6 +18,7 @@ const SupplierListPage = lazy(() => import('../pages/inventory/SupplierListPage'
 const SupplierDetailPage = lazy(() => import('../pages/inventory/SupplierDetailPage'));
 const PartListPage = lazy(() => import('../pages/inventory/PartListPage'));
 const PartDetailPage = lazy(() => import('../pages/inventory/PartDetailPage'));
+const StockPage = lazy(() => import('../pages/inventory/StockPage'));
 
 function Loading() {
   return (
@@ -158,6 +159,7 @@ function AppRoutes() {
           <Route path="suppliers/:id" element={<SupplierDetailPage />} />
           <Route path="parts" element={<PartListPage />} />
           <Route path="parts/:id" element={<PartDetailPage />} />
+          <Route path="stock" element={<StockPage />} />
         </Route>
 
         {/* Placeholder routes */}
