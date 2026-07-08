@@ -15,13 +15,31 @@ const DEFAULT_NAV = [
 ];
 
 const ADMIN_NAV = [
-  { label: 'Dashboard', path: '/dashboard' },
-  { label: 'Admin', path: '/admin/dashboard', icon: '🛡️' },
-  { label: 'Quyết toán sửa chữa', path: '/repair-settlement' },
-  { label: 'Bảo dưỡng', path: '/maintenance' },
-  { label: 'Chăm sóc khách hàng', path: '/customer-care' },
-  { label: 'Khách hàng', path: '/customers' },
-  { label: 'Dịch vụ', path: '/services' },
+  { label: 'Dashboard', path: '/admin/dashboard', icon: '📊' },
+  {
+    label: 'User',
+    icon: '👥',
+    children: [
+      { label: 'Danh sách User', path: '/admin/users' },
+      { label: 'Thêm User', path: '/admin/users/create' },
+    ],
+  },
+  {
+    label: 'Role',
+    icon: '🛡️',
+    children: [
+      { label: 'Danh sách Role', path: '/admin/roles' },
+      { label: 'Phân quyền', path: '/admin/roles/permissions' },
+    ],
+  },
+  {
+    label: 'Log',
+    icon: '📜',
+    children: [
+      { label: 'Nhật ký hoạt động', path: '/admin/logs' },
+      { label: 'Lịch sử đăng nhập', path: '/admin/logs/login' },
+    ],
+  },
 ];
 
 const SERVICE_ADVISOR_NAV = [
@@ -144,6 +162,7 @@ export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const navItems = NAV_ITEMS_BY_ROLE[user?.primaryRole] ?? DEFAULT_NAV;
+  const supportsDropdown = user?.primaryRole === 'service_advisor' || user?.primaryRole === ROLES.ADMIN;
   const isServiceAdvisor = user?.primaryRole === 'service_advisor';
   const isAdmin = user?.primaryRole === ROLES.ADMIN;
 
@@ -164,7 +183,7 @@ export default function Navbar() {
       </div>
 
       <nav className="navbar__nav">
-        {isServiceAdvisor
+        {supportsDropdown
           ? navItems.map((item) => (
               <NavDropdownItem key={item.label} item={item} />
             ))
