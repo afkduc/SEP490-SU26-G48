@@ -10,6 +10,10 @@ class GeneralDirectorApi {
     return httpClient.get(`/general-director/reports/settlements/${id}`);
   }
 
+  getBranches() {
+    return httpClient.get('/general-director/branches');
+  }
+
   getRevenueReports(params = {}) {
     const query = new URLSearchParams(params).toString();
     return httpClient.get(`/general-director/reports/revenue${query ? `?${query}` : ''}`);
