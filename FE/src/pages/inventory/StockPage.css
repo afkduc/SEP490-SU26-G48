@@ -1,0 +1,131 @@
+.stock-page {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stock-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stock-page__title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: #111827;
+}
+
+.stock-page__subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.stock-page__loading,
+.stock-page__error {
+  padding: 32px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.stock-page__error {
+  color: #dc2626;
+}
+
+.stock-page__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.kpi-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.kpi-card__label {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.kpi-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.kpi-card--accent {
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+}
+
+.kpi-card--warn {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+}
+
+.stock-alert,
+.stock-summary,
+.stock-list {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.stock-alert__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: #b45309;
+}
+
+.stock-alert__desc {
+  margin: 0 0 12px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.stock-summary__title,
+.stock-list__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: #111827;
+}
+
+.stock-list__filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.filter-low-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.stock-list__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stock-list__page-info {
+  font-size: 14px;
+  color: #6b7280;
+}

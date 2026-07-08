@@ -18,13 +18,14 @@ const TX_TYPE_LABELS = {
 export default function PartDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { part, history, loading, error } = usePartDetail(id);
-  const { update } = useParts();
+  const { part, history, loading, error, refetch } = usePartDetail(id);
+  const { update, remove } = useParts();
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   function startEdit() {
     setForm({
@@ -60,11 +61,24 @@ export default function PartDetailPage() {
       await update(id, payload);
       setEditing(false);
       setForm(null);
-      window.location.reload();
+      await refetch();
     } catch (err) {
       setFormError(err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm('Xac nhan xoa phu tung nay?')) return;
+    setDeleting(true);
+    setFormError('');
+    try {
+      await remove(id);
+      navigate('/inventory/parts', { replace: true });
+    } catch (err) {
+      setFormError(err.message);
+      setDeleting(false);
     }
   }
 
@@ -88,13 +102,10 @@ export default function PartDetailPage() {
                 <button className="btn btn--secondary" onClick={startEdit}>Sua</button>
                 <button
                   className="btn btn--ghost btn--danger"
-                  onClick={() => {
-                    if (window.confirm('Xac nhan xoa phu tung nay?')) {
-                      navigate('/inventory/parts', { replace: true });
-                    }
-                  }}
+                  onClick={handleDelete}
+                  disabled={deleting}
                 >
-                  Xoa
+                  {deleting ? 'Dang xoa...' : 'Xoa'}
                 </button>
               </>
             )}
