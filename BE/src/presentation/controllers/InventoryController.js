@@ -51,10 +51,17 @@ class InventoryController {
     try {
       const { productId } = req.params;
       const { branchId, quantity } = req.body;
+      const qtyNum = Number(quantity);
+      if (!Number.isFinite(qtyNum)) {
+        return res.status(400).json({
+          success: false,
+          message: 'quantity must be a finite number',
+        });
+      }
       const result = await this.inventoryService.adjustStock(
         Number(productId),
         Number(branchId),
-        Number(quantity)
+        qtyNum,
       );
       return success(res, result, 'Stock adjusted');
     } catch (err) {
