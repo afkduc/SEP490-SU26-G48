@@ -1,32 +1,5 @@
 const ApiError = require('../../utils/ApiError');
-
-class InventoryResponseDto {
-  static fromEntity(product) {
-    if (!product) return null;
-    return {
-      id: product.id,
-      productCode: product.productCode,
-      productName: product.productName,
-      category: product.category,
-      brandName: product.brandName,
-      unit: product.unit,
-      unitPrice: product.unitPrice,
-      stockQuantity: product.stockQuantity,
-      minStock: product.minStock,
-      supplierId: product.supplierId,
-      supplierName: product.supplierName,
-      location: product.location,
-      branchId: product.branchId,
-      status: product.status,
-      isLowStock: product.stockQuantity <= product.minStock,
-      stockGap: product.stockQuantity - product.minStock,
-    };
-  }
-
-  static fromEntityList(products) {
-    return products.map((p) => InventoryResponseDto.fromEntity(p));
-  }
-}
+const InventoryResponseDto = require('../dto/InventoryResponseDto');
 
 class InventoryService {
   constructor({ inventoryRepository }) {
@@ -35,15 +8,17 @@ class InventoryService {
 
   async getStockList({ branchId, search, category, lowStockOnly, page, limit } = {}) {
     if (!branchId) throw new ApiError(400, 'branchId is required');
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const [items, total] = await Promise.all([
-      this.inventoryRepository.getStockByBranch(branchId, { search, category, lowStockOnly, page, limit }),
+      this.inventoryRepository.getStockByBranch(branchId, { search, category, lowStockOnly, page: safePage, limit: safeLimit }),
       this.inventoryRepository.countStockByBranch(branchId, { search, category, lowStockOnly }),
     ]);
     return {
       items: InventoryResponseDto.fromEntityList(items),
       total,
-      page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      page: safePage,
+      limit: safeLimit,
     };
   }
 
@@ -64,21 +39,19 @@ class InventoryService {
     return InventoryResponseDto.fromEntity(product);
   }
 
-  async adjustStock(productId, branchId, quantity) {
+  async adjustStock(productId, branchId, quantity, options = {}) {
     if (!productId) throw new ApiError(400, 'productId is required');
     if (!branchId) throw new ApiError(400, 'branchId is required');
     if (typeof quantity !== 'number') throw new ApiError(400, 'quantity must be a number');
+    if (!Number.isFinite(quantity)) throw new ApiError(400, 'quantity must be finite');
 
-    const current = await this.inventoryRepository.getStockByProduct(productId, branchId);
-    if (!current) throw new ApiError(404, 'Product not found in this branch');
-
-    const newStock = current.stockQuantity + quantity;
-    if (newStock < 0) {
-      throw new ApiError(400, 'Stock cannot be negative');
+    // Atomically update inside a transaction with a guard in the WHERE clause.
+    // This avoids the read-modify-write race condition.
+    const result = await this.inventoryRepository.adjustStock(productId, branchId, quantity, options);
+    if (!result) {
+      throw new ApiError(404, 'Product not found in this branch or stock would go negative');
     }
-
-    const updated = await this.inventoryRepository.updateStock(productId, branchId, quantity);
-    return InventoryResponseDto.fromEntity(updated);
+    return InventoryResponseDto.fromEntity(result);
   }
 
   async getStockSummary(branchId) {
@@ -91,4 +64,4 @@ class InventoryService {
   }
 }
 
-module.exports = { InventoryService, InventoryResponseDto };
+module.exports = InventoryService;

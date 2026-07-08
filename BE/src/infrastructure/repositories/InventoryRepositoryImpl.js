@@ -1,6 +1,30 @@
 const InventoryRepository = require('../../domain/repositories/InventoryRepository');
 const Product = require('../../domain/entities/Product');
+const sql = require('mssql');
 const { query } = require('../database/sqlServer');
+const { runInTransaction } = require('../../utils/sqlTransaction');
+
+/**
+ * Build WHERE clause cho cac filter (search/category/lowStockOnly) dung chung
+ * giua cac ham getStockByBranch / countStockByBranch / getLowStock.
+ */
+function buildProductFilters(branchId, { search, category, lowStockOnly = false } = {}, { includeJoin = false } = {}) {
+  const where = ['p.branch_id = @branchId'];
+  const params = { branchId };
+  if (search) {
+    params.search = `%${search}%`;
+    where.push('(p.product_code LIKE @search OR p.product_name LIKE @search)');
+  }
+  if (category) {
+    params.category = category;
+    where.push('p.category = @category');
+  }
+  if (lowStockOnly) {
+    where.push('p.stock_quantity <= p.min_stock');
+  }
+  const join = includeJoin ? 'LEFT JOIN suppliers s ON p.supplier_id = s.id' : '';
+  return { join, where: where.join(' AND '), params };
+}
 
 class InventoryRepositoryImpl extends InventoryRepository {
   async getStockByBranch(branchId, {
@@ -10,31 +34,23 @@ class InventoryRepositoryImpl extends InventoryRepository {
     page = 1,
     limit = 20,
   } = {}) {
-    const offset = (page - 1) * limit;
-    let sql = `
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+    const offset = (safePage - 1) * safeLimit;
+    const { join, where, params } = buildProductFilters(
+      branchId,
+      { search, category, lowStockOnly },
+      { includeJoin: true },
+    );
+    const sql = `
       SELECT p.*, s.supplier_name
       FROM products p
-      LEFT JOIN suppliers s ON p.supplier_id = s.id
-      WHERE p.branch_id = @branchId
+      ${join}
+      WHERE ${where}
+      ORDER BY p.product_name ASC
+      OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
     `;
-    const params = { branchId, offset, limit };
-
-    if (search) {
-      params.search = `%${search}%`;
-      sql += ` AND (p.product_code LIKE @search OR p.product_name LIKE @search)`;
-    }
-    if (category) {
-      params.category = category;
-      sql += ` AND p.category = @category`;
-    }
-    if (lowStockOnly) {
-      sql += ` AND p.stock_quantity <= p.min_stock`;
-    }
-
-    sql += ` ORDER BY p.product_name ASC`;
-    sql += ` OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
-
-    const result = await query(sql, params);
+    const result = await query(sql, { ...params, offset, limit: safeLimit });
     return result.recordset.map((r) => {
       const product = Product.fromPersistence(r);
       product.supplierName = r.supplier_name;
@@ -43,36 +59,26 @@ class InventoryRepositoryImpl extends InventoryRepository {
   }
 
   async countStockByBranch(branchId, { search, category, lowStockOnly = false } = {}) {
-    let sql = `SELECT COUNT(*) AS total FROM products WHERE branch_id = @branchId`;
-    const params = { branchId };
-
-    if (search) {
-      params.search = `%${search}%`;
-      sql += ` AND (product_code LIKE @search OR product_name LIKE @search)`;
-    }
-    if (category) {
-      params.category = category;
-      sql += ` AND category = @category`;
-    }
-    if (lowStockOnly) {
-      sql += ` AND stock_quantity <= min_stock`;
-    }
-
+    const { where, params } = buildProductFilters(branchId, { search, category, lowStockOnly });
+    const sql = `SELECT COUNT(*) AS total FROM products p WHERE ${where}`;
     const result = await query(sql, params);
     return result.recordset[0].total;
   }
 
   async getLowStock(branchId) {
+    const { join, where, params } = buildProductFilters(
+      branchId,
+      { lowStockOnly: true },
+      { includeJoin: true },
+    );
     const sql = `
       SELECT p.*, s.supplier_name
       FROM products p
-      LEFT JOIN suppliers s ON p.supplier_id = s.id
-      WHERE p.branch_id = @branchId
-        AND p.stock_quantity <= p.min_stock
-        AND p.status = 'active'
+      ${join}
+      WHERE ${where} AND p.status = 'active'
       ORDER BY p.stock_quantity ASC
     `;
-    const result = await query(sql, { branchId });
+    const result = await query(sql, params);
     return result.recordset.map((r) => {
       const product = Product.fromPersistence(r);
       product.supplierName = r.supplier_name;
@@ -94,15 +100,51 @@ class InventoryRepositoryImpl extends InventoryRepository {
     return product;
   }
 
+  /**
+   * Atomically adjust stock in a transaction.
+   * - Guard: chỉ UPDATE khi stock_quantity + @quantity >= 0 (tránh âm).
+   * - Trả về record đã update kèm supplier_name (LEFT JOIN).
+   * - Transaction đảm bảo consistency nếu sau này có insert inventory_transactions.
+   */
+  async adjustStock(productId, branchId, quantity, _options = {}) {
+    return runInTransaction(async (tx) => {
+      const updateSql = `
+        UPDATE products
+        SET stock_quantity = stock_quantity + @quantity
+        WHERE id = @productId
+          AND branch_id = @branchId
+          AND stock_quantity + @quantity >= 0
+      `;
+      const updateResult = await tx.request()
+        .input('productId', sql.BigInt, productId)
+        .input('branchId', sql.BigInt, branchId)
+        .input('quantity', sql.Int, quantity)
+        .query(updateSql);
+
+      if (updateResult.rowsAffected[0] === 0) {
+        return null;
+      }
+
+      const selectResult = await tx.request()
+        .input('productId', sql.BigInt, productId)
+        .input('branchId', sql.BigInt, branchId)
+        .query(`
+          SELECT p.*, s.supplier_name
+          FROM products p
+          LEFT JOIN suppliers s ON p.supplier_id = s.id
+          WHERE p.id = @productId AND p.branch_id = @branchId
+        `);
+
+      const row = selectResult.recordset[0];
+      if (!row) return null;
+      const product = Product.fromPersistence(row);
+      product.supplierName = row.supplier_name;
+      return product;
+    });
+  }
+
   async updateStock(productId, branchId, quantity) {
-    const sql = `
-      UPDATE products
-      SET stock_quantity = stock_quantity + @quantity
-      WHERE id = @productId AND branch_id = @branchId;
-      SELECT * FROM products WHERE id = @productId;
-    `;
-    const result = await query(sql, { productId, branchId, quantity });
-    return Product.fromPersistence(result.recordset[0]);
+    return this.adjustStock(productId, branchId, quantity);
   }
 
   async getStockSummaryByCategory(branchId) {
