@@ -66,7 +66,174 @@ function mapSettlementRow(row) {
   };
 }
 
+function monthLabel(value) {
+  const date = normalizeDate(value);
+  if (!date || Number.isNaN(date.getTime())) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${month}/${year}`;
+}
+
 class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
+  async getRevenueReports(filters = {}) {
+    const branchId = filters.branchId && filters.branchId !== 'all' ? Number(filters.branchId) : null;
+    const monthsBack = Number(filters.monthsBack) || 6;
+
+    const summaryResult = await query(
+      `DECLARE @month_start DATE = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
+       DECLARE @next_month_start DATE = DATEADD(MONTH, 1, @month_start);
+
+       WITH current_orders AS (
+         SELECT so.id, so.total
+         FROM service_orders so
+         WHERE so.status = 'invoiced'
+           AND so.completed_date >= @month_start
+           AND so.completed_date < @next_month_start
+           AND (@branchId IS NULL OR so.branch_id = @branchId)
+       )
+       SELECT
+         ISNULL((SELECT SUM(co.total) FROM current_orders co), 0) AS current_month_total_revenue,
+         ISNULL((
+           SELECT SUM(soi.total)
+           FROM current_orders co
+           INNER JOIN service_order_items soi ON soi.service_order_id = co.id
+           WHERE soi.item_type = 'DV'
+         ), 0) AS current_month_service_revenue,
+         ISNULL((
+           SELECT SUM(i.amount - i.paid)
+           FROM invoices i
+           WHERE i.status = 'unpaid'
+             AND i.amount > i.paid
+             AND (@branchId IS NULL OR i.branch_id = @branchId)
+         ), 0) AS outstanding_receivables,
+         @month_start AS current_month_start`,
+      { branchId }
+    );
+
+    const trendResult = await query(
+      `DECLARE @current_month_start DATE = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
+
+       WITH month_series AS (
+         SELECT CAST(DATEADD(MONTH, -(@monthsBack - 1), @current_month_start) AS DATE) AS month_start
+         UNION ALL
+         SELECT DATEADD(MONTH, 1, month_start)
+         FROM month_series
+         WHERE month_start < @current_month_start
+       ),
+       monthly_orders AS (
+         SELECT
+           DATEFROMPARTS(YEAR(so.completed_date), MONTH(so.completed_date), 1) AS month_start,
+           SUM(so.total) AS total_revenue
+         FROM service_orders so
+         WHERE so.status = 'invoiced'
+           AND so.completed_date >= DATEADD(MONTH, -(@monthsBack - 1), @current_month_start)
+           AND so.completed_date < DATEADD(MONTH, 1, @current_month_start)
+           AND (@branchId IS NULL OR so.branch_id = @branchId)
+         GROUP BY DATEFROMPARTS(YEAR(so.completed_date), MONTH(so.completed_date), 1)
+       )
+       SELECT
+         ms.month_start,
+         ISNULL(mo.total_revenue, 0) AS total_revenue
+       FROM month_series ms
+       LEFT JOIN monthly_orders mo ON mo.month_start = ms.month_start
+       ORDER BY ms.month_start ASC
+       OPTION (MAXRECURSION 100);`,
+      { branchId, monthsBack }
+    );
+
+    const branchStatsResult = await query(
+      `DECLARE @month_start DATE = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
+       DECLARE @next_month_start DATE = DATEADD(MONTH, 1, @month_start);
+
+       WITH branch_scope AS (
+         SELECT b.id, b.branch_code, b.branch_name
+         FROM branches b
+         WHERE b.is_active = 1
+           AND (@branchId IS NULL OR b.id = @branchId)
+       ),
+       current_orders AS (
+         SELECT so.id, so.branch_id, so.total
+         FROM service_orders so
+         WHERE so.status = 'invoiced'
+           AND so.completed_date >= @month_start
+           AND so.completed_date < @next_month_start
+           AND (@branchId IS NULL OR so.branch_id = @branchId)
+       ),
+       branch_totals AS (
+         SELECT
+           bs.id,
+           bs.branch_code,
+           bs.branch_name,
+           ISNULL(SUM(co.total), 0) AS total_revenue
+         FROM branch_scope bs
+         LEFT JOIN current_orders co ON co.branch_id = bs.id
+         GROUP BY bs.id, bs.branch_code, bs.branch_name
+       ),
+       branch_service AS (
+         SELECT
+           co.branch_id,
+           ISNULL(SUM(CASE WHEN soi.item_type = 'DV' THEN soi.total ELSE 0 END), 0) AS service_revenue
+         FROM current_orders co
+         LEFT JOIN service_order_items soi ON soi.service_order_id = co.id
+         GROUP BY co.branch_id
+       ),
+       overall AS (
+         SELECT ISNULL(SUM(bt.total_revenue), 0) AS grand_total
+         FROM branch_totals bt
+       )
+       SELECT
+         bt.id AS branch_id,
+         bt.branch_code,
+         bt.branch_name,
+         ISNULL(bs.service_revenue, 0) AS service_revenue,
+         bt.total_revenue,
+         CASE
+           WHEN o.grand_total = 0 THEN 0
+           ELSE (bt.total_revenue * 100.0 / o.grand_total)
+         END AS percentage
+       FROM branch_totals bt
+       LEFT JOIN branch_service bs ON bs.branch_id = bt.id
+       CROSS JOIN overall o
+       ORDER BY bt.total_revenue DESC, bt.branch_name ASC;`,
+      { branchId }
+    );
+
+    const summaryRow = summaryResult.recordset[0] || {};
+
+    return {
+      summary: {
+        currentMonthTotalRevenue: Number(summaryRow.current_month_total_revenue || 0),
+        currentMonthServiceRevenue: Number(summaryRow.current_month_service_revenue || 0),
+        outstandingReceivables: Number(summaryRow.outstanding_receivables || 0),
+        currentMonthLabel: monthLabel(summaryRow.current_month_start),
+      },
+      monthlyTrend: trendResult.recordset.map((row) => {
+        const monthStart = normalizeDate(row.month_start);
+        const year = monthStart?.getFullYear() || null;
+        const month = monthStart ? monthStart.getMonth() + 1 : null;
+        return {
+          month: year && month ? `${year}-${String(month).padStart(2, '0')}` : null,
+          label: monthLabel(monthStart),
+          totalRevenue: Number(row.total_revenue || 0),
+        };
+      }),
+      branchStats: branchStatsResult.recordset.map((row) => ({
+        branch: {
+          id: row.branch_id,
+          code: row.branch_code,
+          name: row.branch_name,
+        },
+        serviceRevenue: Number(row.service_revenue || 0),
+        totalRevenue: Number(row.total_revenue || 0),
+        percentage: Number(row.percentage || 0),
+      })),
+      filters: {
+        branchId: branchId || 'all',
+        monthsBack,
+      },
+    };
+  }
+
   async listSettlementReports(filters = {}) {
     const params = {
       search: filters.search ? `%${filters.search.trim()}%` : null,
