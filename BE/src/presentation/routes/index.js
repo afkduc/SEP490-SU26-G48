@@ -6,6 +6,7 @@ const buildVehicleRouter = require('./vehicleRoutes');
 const buildAdminRouter = require('./adminRoutes');
 const buildProductRouter = require('./productRoutes');
 const buildCatalogRouter = require('./catalogRoutes');
+const buildRepairSettlementRouter = require('./repairSettlementRoutes');
 
 const router = express.Router();
 
@@ -19,5 +20,6 @@ router.use('/vehicles', buildVehicleRouter());
 router.use('/admin', buildAdminRouter());
 router.use('/products', buildProductRouter());
 router.use('/catalog', buildCatalogRouter());
+router.use('/repair-settlements', buildRepairSettlementRouter());
 
 module.exports = router;
