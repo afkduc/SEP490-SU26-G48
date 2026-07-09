@@ -82,6 +82,11 @@ function currency(value) {
   return formatCurrency(value || 0);
 }
 
+function percent(value) {
+  const safeValue = Number(value || 0);
+  return `${safeValue.toFixed(2)}%`;
+}
+
 function BranchBadge({ branch }) {
   if (!branch) return null;
   return (
@@ -298,18 +303,264 @@ function PlaceholderPanel({ title, uc, description, actions, children }) {
 }
 
 function RevenueOverviewPage() {
-  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [branches, setBranches] = useState([]);
+  const [branchId, setBranchId] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [report, setReport] = useState({
+    summary: {
+      currentMonthTotalRevenue: 0,
+      currentMonthServiceRevenue: 0,
+      outstandingReceivables: 0,
+      currentMonthLabel: '',
+    },
+    monthlyTrend: [],
+    branchStats: [],
+  });
+
+  const loadRevenueReport = async (currentBranchId) => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await generalDirectorApi.getRevenueReports({
+        branchId: currentBranchId,
+      });
+      setReport(response?.data || {
+        summary: {},
+        monthlyTrend: [],
+        branchStats: [],
+      });
+    } catch (err) {
+      setReport({
+        summary: {
+          currentMonthTotalRevenue: 0,
+          currentMonthServiceRevenue: 0,
+          outstandingReceivables: 0,
+          currentMonthLabel: '',
+        },
+        monthlyTrend: [],
+        branchStats: [],
+      });
+      setError(err.message || 'Không thể tải báo cáo doanh thu. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function bootstrap() {
+      try {
+        const response = await generalDirectorApi.getBranches();
+        if (!mounted) return;
+        setBranches(response?.data || []);
+      } catch {
+        if (!mounted) return;
+        setBranches([]);
+      }
+    }
+
+    bootstrap();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    loadRevenueReport(branchId);
+  }, [branchId]);
+
+  const summary = report?.summary || {};
+  const monthlyTrend = report?.monthlyTrend || [];
+  const branchStats = report?.branchStats || [];
+
+  const selectedBranchName = branchId === 'all'
+    ? 'Tất cả chi nhánh'
+    : branches.find((item) => String(item.id) === String(branchId))?.name || 'Chi nhánh';
+
+  const maxRevenue = monthlyTrend.reduce((max, item) => Math.max(max, Number(item.totalRevenue || 0)), 0);
 
   return (
-    <PlaceholderPanel
-      title="Báo cáo doanh thu"
-      uc="UC-50"
-      description="Giám đốc có thể bấm vào màn hình doanh thu toàn chuỗi hoặc doanh thu theo từng chi nhánh. Phần xử lý dữ liệu sẽ bổ sung sau."
-      actions={[
-        { label: 'Xem toàn hệ thống', onClick: () => navigate('/general-director/reports/revenue') },
-        { label: 'Lọc theo chi nhánh', variant: 'secondary', onClick: () => navigate('/general-director/reports/revenue') },
-      ]}
-    />
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Báo cáo doanh thu</h1>
+          <div className="breadcrumb">General Director / UC-49 / Báo cáo doanh thu toàn hệ thống</div>
+        </div>
+        <div className="page-header-right">
+          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
+        </div>
+      </div>
+
+      <ModuleActionBar />
+
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>UC49 - View Revenue Reports For All Branch</div>
+            <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Tổng quan tài chính theo doanh thu đã chốt hóa đơn</h2>
+            <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.8)' }}>
+              Dữ liệu đọc trực tiếp từ SQL Server theo trạng thái đã xuất hóa đơn, có thể lọc theo từng chi nhánh hoặc xem toàn hệ thống.
+            </p>
+          </div>
+          <div style={{ minWidth: 260, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 14 }}>
+            <label className="form-label" style={{ color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>Chi nhánh</label>
+            <select
+              className="form-select"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+              style={{ minWidth: 220, background: 'rgba(255,255,255,0.94)' }}
+            >
+              <option value="all">Tất cả chi nhánh</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>{branch.name}</option>
+              ))}
+            </select>
+            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.78 }}>Đang xem: {selectedBranchName}</div>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <span>{error}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => loadRevenueReport(branchId)}>
+            ↻ Tải lại
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+        {[
+          {
+            label: `Tổng doanh thu tháng ${summary.currentMonthLabel || ''}`.trim(),
+            value: currency(summary.currentMonthTotalRevenue),
+            color: '#0F766E',
+            background: '#ECFEFF',
+          },
+          {
+            label: 'Doanh thu dịch vụ',
+            value: currency(summary.currentMonthServiceRevenue),
+            color: '#1D4ED8',
+            background: '#EFF6FF',
+          },
+          {
+            label: 'Công nợ phải thu',
+            value: currency(summary.outstandingReceivables),
+            color: '#B45309',
+            background: '#FFFBEB',
+          },
+        ].map((card) => (
+          <div key={card.label} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16, boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)' }}>
+            <div style={{ fontSize: 12, color: '#6B7280' }}>{card.label}</div>
+            <div style={{ fontSize: 24, fontWeight: 900, marginTop: 8, color: card.color }}>{loading ? '...' : card.value}</div>
+            <div style={{ height: 4, width: '100%', marginTop: 12, borderRadius: 999, background: card.background }} />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontWeight: 800, fontSize: 16 }}>Doanh thu theo tháng</div>
+            <div style={{ fontSize: 12, color: '#6B7280' }}>Từ các phiếu đã xuất hóa đơn</div>
+          </div>
+
+          {loading && (
+            <div className="empty-state" style={{ minHeight: 220 }}>
+              <div className="empty-state-icon">⏳</div>
+              <h3>Đang tải biểu đồ</h3>
+            </div>
+          )}
+
+          {!loading && monthlyTrend.length === 0 && (
+            <div className="empty-state" style={{ minHeight: 220 }}>
+              <div className="empty-state-icon">📉</div>
+              <h3>Chưa có dữ liệu biểu đồ</h3>
+            </div>
+          )}
+
+          {!loading && monthlyTrend.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: 10, alignItems: 'end', minHeight: 240 }}>
+              {monthlyTrend.map((item) => {
+                const barHeight = maxRevenue > 0 ? Math.max(12, Math.round((Number(item.totalRevenue || 0) / maxRevenue) * 180)) : 12;
+                return (
+                  <div key={item.month || item.label} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#6B7280', marginBottom: 6 }}>{currency(item.totalRevenue)}</div>
+                    <div style={{ height: 190, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                      <div
+                        title={`${item.label}: ${currency(item.totalRevenue)}`}
+                        style={{
+                          width: 32,
+                          height: barHeight,
+                          borderRadius: '10px 10px 4px 4px',
+                          background: 'linear-gradient(180deg, #0EA5E9 0%, #0284C7 100%)',
+                          boxShadow: '0 8px 14px rgba(3, 105, 161, 0.25)',
+                        }}
+                      />
+                    </div>
+                    <div style={{ fontSize: 11, color: '#475569', marginTop: 6, fontWeight: 700 }}>{item.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+          <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>Theo chi nhánh (tháng hiện tại)</div>
+          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 10 }}>Service revenue, tổng doanh thu và tỷ trọng đóng góp.</div>
+
+          {loading && (
+            <div className="empty-state" style={{ minHeight: 220 }}>
+              <div className="empty-state-icon">⏳</div>
+              <h3>Đang tải thống kê chi nhánh</h3>
+            </div>
+          )}
+
+          {!loading && branchStats.length === 0 && (
+            <div className="empty-state" style={{ minHeight: 220 }}>
+              <div className="empty-state-icon">📭</div>
+              <h3>Không có dữ liệu chi nhánh</h3>
+            </div>
+          )}
+
+          {!loading && branchStats.length > 0 && (
+            <div className="table-wrapper" style={{ boxShadow: 'none', marginBottom: 0 }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Chi nhánh</th>
+                    <th>Doanh thu DV</th>
+                    <th>Tổng</th>
+                    <th>Tỷ trọng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {branchStats.map((row) => (
+                    <tr key={row.branch?.id || row.branch?.code}>
+                      <td style={{ fontWeight: 700 }}>{row.branch?.name || '—'}</td>
+                      <td>{currency(row.serviceRevenue)}</td>
+                      <td style={{ fontWeight: 700 }}>{currency(row.totalRevenue)}</td>
+                      <td>
+                        <div style={{ minWidth: 110 }}>
+                          <div style={{ fontWeight: 700 }}>{percent(row.percentage)}</div>
+                          <div style={{ marginTop: 4, height: 6, borderRadius: 999, background: '#E5E7EB', overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.min(100, Math.max(0, Number(row.percentage || 0)))}%`, height: '100%', background: '#0EA5E9' }} />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
