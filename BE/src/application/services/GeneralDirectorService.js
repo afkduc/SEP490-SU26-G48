@@ -5,6 +5,19 @@ class GeneralDirectorService {
     this.generalDirectorRepository = generalDirectorRepository;
   }
 
+  async getRevenueReports(filters = {}) {
+    const normalized = {
+      branchId: filters.branchId || 'all',
+      monthsBack: Number(filters.monthsBack) || 6,
+    };
+
+    if (normalized.monthsBack < 3 || normalized.monthsBack > 24) {
+      throw new ApiError(400, 'monthsBack phải nằm trong khoảng 3-24');
+    }
+
+    return this.generalDirectorRepository.getRevenueReports(normalized);
+  }
+
   async listSettlementReports(filters = {}) {
     return this.generalDirectorRepository.listSettlementReports(filters);
   }
