@@ -1,9 +1,13 @@
 const UserService = require('./UserService');
 const ProductService = require('./ProductService');
+const RepairSettlementService = require('./RepairSettlementService');
 const InventoryService = require('./InventoryService');
-const { makeUserRepository } = require('../../infrastructure/repositories');
-const { makeProductRepository } = require('../../infrastructure/repositories');
-const { makeInventoryRepository } = require('../../infrastructure/repositories');
+const {
+  makeUserRepository,
+  makeProductRepository,
+  makeRepairSettlementRepository,
+  makeInventoryRepository,
+} = require('../../infrastructure/repositories');
 
 function makeUserService() {
   return new UserService({ userRepository: makeUserRepository() });
@@ -13,6 +17,10 @@ function makeProductService() {
   return new ProductService({ productRepository: makeProductRepository() });
 }
 
+function makeRepairSettlementService() {
+  return new RepairSettlementService({ repairSettlementRepository: makeRepairSettlementRepository() });
+}
+
 function makeInventoryService() {
   return new InventoryService({ inventoryRepository: makeInventoryRepository() });
 }
@@ -20,8 +28,10 @@ function makeInventoryService() {
 module.exports = {
   UserService,
   ProductService,
+  RepairSettlementService,
   InventoryService,
   makeUserService,
   makeProductService,
+  makeRepairSettlementService,
   makeInventoryService,
 };
