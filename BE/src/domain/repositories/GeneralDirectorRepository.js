@@ -1,4 +1,8 @@
 class GeneralDirectorRepository {
+  async getRevenueReports() {
+    throw new Error('Not implemented');
+  }
+
   async listSettlementReports() {
     throw new Error('Not implemented');
   }
