@@ -7,6 +7,7 @@ const buildAdminRouter = require('./adminRoutes');
 const buildProductRouter = require('./productRoutes');
 const buildInventoryRouter = require('./inventoryRoutes');
 const buildCatalogRouter = require('./catalogRoutes');
+const buildRepairSettlementRouter = require('./repairSettlementRoutes');
 const buildGeneralDirectorRouter = require('./generalDirectorRoutes');
 
 const router = express.Router();
@@ -22,6 +23,7 @@ router.use('/admin', buildAdminRouter());
 router.use('/products', buildProductRouter());
 router.use('/inventory', buildInventoryRouter());
 router.use('/catalog', buildCatalogRouter());
+router.use('/repair-settlements', buildRepairSettlementRouter());
 router.use('/general-director', buildGeneralDirectorRouter());
 
 module.exports = router;
