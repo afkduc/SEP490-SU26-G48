@@ -12,6 +12,7 @@ function buildGeneralDirectorRouter() {
 
   router.use(authenticate, authorize('general_director', 'admin'));
 
+  router.get('/reports/revenue', controller.getRevenueReports);
   router.get('/reports/settlements', controller.getSettlementReports);
   router.get('/reports/settlements/:id', controller.getSettlementReportById);
   router.get('/branches', controller.getBranches);
