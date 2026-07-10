@@ -8,6 +8,7 @@ import { ROUTES } from '../constants/routes';
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
+const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
@@ -81,66 +82,6 @@ function AppRoutes() {
                     </ProtectedRoute>
                   }
                 />
-        
-                {/* Phiếu quyết toán sửa chữa */}
-                <Route
-                  path="/repair-settlement/*"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <RepairSettlementPage />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-        
-                {/* Inventory module */}
-                <Route
-                  path={ROUTES.INVENTORY}
-                  element={
-                    <ProtectedRoute roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ACCOUNTANT, ROLES.ADMIN]}>
-                      <AppLayout>
-                        <InventoryLayout />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route index element={<InventoryDashboardPage />} />
-                  <Route path="suppliers" element={<SupplierListPage />} />
-                  <Route path="suppliers/:id" element={<SupplierDetailPage />} />
-                </Route>
-        
-                {/* Placeholder routes */}
-                {['/repair-orders', '/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
-                  <Route
-                    key={path}
-                    path={path}
-                    element={
-                      <ProtectedRoute>
-                        <AppLayout>
-                          <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
-                            Trang đang phát triển...
-                          </div>
-                        </AppLayout>
-                      </ProtectedRoute>
-                    }
-                  />
-                ))}
-        
-
-        {/* Phiếu quyết toán sửa chữa – Cố vấn dịch vụ */}
-        {/* Giam doc - tam thoi comment, dang co nguoi lam
-        <Route
-          path="/general-director/*"
-          element={
-            <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR]}>
-              <AppLayout>
-                <GeneralDirectorPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        */}
 
         {/* Phiếu quyết toán sửa chữa */}
         <Route
@@ -149,6 +90,18 @@ function AppRoutes() {
             <ProtectedRoute>
               <AppLayout>
                 <RepairSettlementPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Lệnh sửa chữa */}
+        <Route
+          path="/repair-orders/*"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <RepairOrderPage />
               </AppLayout>
             </ProtectedRoute>
           }
@@ -174,7 +127,7 @@ function AppRoutes() {
         </Route>
 
         {/* Placeholder routes */}
-        {['/repair-orders', '/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
+        {['/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
           <Route
             key={path}
             path={path}
