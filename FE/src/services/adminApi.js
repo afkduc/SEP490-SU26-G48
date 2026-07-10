@@ -31,10 +31,33 @@ function buildQuery(params = {}) {
  *   - list(params): GET /api/admin/users voi filter + paging
  *     params: { search, branchId, roleId, status, page, pageSize }
  *     tra ve: { items: [{id, name, email, fullName, phone, branchId, branchName, status, roles, ...}], total, page, pageSize }
+ *
+ *   - getDetail(id): GET /api/admin/users/:id
+ *     tra ve: { id, name, email, fullName, phone, branchId, branchName, status, roles, ... }
+ *
+ *   - create(payload): POST /api/admin/users
+ *     payload: { name, email, password, fullName, phone, branchId, roleId }
+ *     tra ve: { id, email }
+ *
+ *   - update(payload): PUT /api/admin/users/:id
+ *     payload: { userId, status, roleId }
+ *     tra ve: { id, name, email, fullName, phone, branchId, branchName, status, roles, ... }
  */
 class AdminUsersApi {
   list(params = {}) {
     return httpClient.get(`/admin/users${buildQuery(params)}`);
+  }
+
+  getDetail(id) {
+    return httpClient.get(`/admin/users/${id}`);
+  }
+
+  create(payload) {
+    return httpClient.post('/admin/users', payload);
+  }
+
+  update(payload) {
+    return httpClient.put(`/admin/users/${payload.userId}`, payload);
   }
 }
 
