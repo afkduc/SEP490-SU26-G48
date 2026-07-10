@@ -11,6 +11,9 @@ class AdminController {
     this.listUsers = this.listUsers.bind(this);
     this.listBranches = this.listBranches.bind(this);
     this.listRoles = this.listRoles.bind(this);
+    this.createUser = this.createUser.bind(this);
+    this.updateUser = this.updateUser.bind(this);
+    this.getUserDetail = this.getUserDetail.bind(this);
   }
 
   getDashboardStats(req, res, next) {
@@ -57,6 +60,34 @@ class AdminController {
       next(err);
     }
   };
+
+  async createUser(req, res, next) {
+    try {
+      const user = await this.adminUserService.createUser(req.body);
+      return success(res, user, 'Tao nguoi dung thanh cong', 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateUser(req, res, next) {
+    try {
+      const { userId, status, roleId } = req.body;
+      const updated = await this.adminUserService.updateUser({ userId, status, roleId });
+      return success(res, updated, 'Cap nhat nguoi dung thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getUserDetail(req, res, next) {
+    try {
+      const user = await this.adminUserService.getUserDetail(req.params.id);
+      return success(res, user, 'Chi tiet nguoi dung');
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 module.exports = AdminController;
