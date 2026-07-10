@@ -7,6 +7,8 @@ class GeneralDirectorController {
     this.getSettlementReports = this.getSettlementReports.bind(this);
     this.getSettlementReportById = this.getSettlementReportById.bind(this);
     this.getBranches = this.getBranches.bind(this);
+    this.getEmployees = this.getEmployees.bind(this);
+    this.getEmployeeById = this.getEmployeeById.bind(this);
   }
 
   async getRevenueReports(req, res, next) {
@@ -47,6 +49,29 @@ class GeneralDirectorController {
     try {
       const data = await this.generalDirectorService.listBranches();
       return success(res, data, 'Lấy danh sách chi nhánh thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getEmployees(req, res, next) {
+    try {
+      const data = await this.generalDirectorService.listEmployees({
+        search: req.query.search || req.query.q || '',
+        branchId: req.query.branchId || 'all',
+        status: req.query.status || 'all',
+        role: req.query.role || 'all',
+      });
+      return success(res, data, 'Lấy danh sách nhân sự thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getEmployeeById(req, res, next) {
+    try {
+      const data = await this.generalDirectorService.getEmployeeById(req.params.id);
+      return success(res, data, 'Lấy chi tiết nhân sự thành công');
     } catch (err) {
       next(err);
     }
