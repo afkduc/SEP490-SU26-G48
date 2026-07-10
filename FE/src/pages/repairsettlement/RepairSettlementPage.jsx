@@ -543,9 +543,6 @@ function RepairSettlementList() {
           <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
             🏢 {user?.branchName || user?.branch || MOCK_BRANCH}
           </span>
-          {canManage && (
-            <Link to="/repair-settlement/create" className="btn btn-primary">➕ Tạo phiếu quyết toán</Link>
-          )}
         </div>
       </div>
 
@@ -584,16 +581,6 @@ function RepairSettlementList() {
         </div>
       )}
 
-      {tab === 'waiting_repair' && (
-        <div style={{ background: 'var(--orange-light)', border: '1px solid #FFCC80', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#E65100' }}>
-          ⏳ Phiếu chưa được gán tổ trưởng. Vào <b>Lệnh sửa chữa</b> để gán tổ trưởng — phiếu sẽ tự chuyển sang <b>Đang sửa chữa</b>.
-        </div>
-      )}
-      {tab === 'inprogress' && (
-        <div style={{ background: 'var(--blue-light)', border: '1px solid #90CAF9', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#1565C0' }}>
-          🔧 Nhấn <b>Hoàn thành</b> khi xe đã sửa xong. Phiếu sẽ chuyển sang <b>Chờ thanh toán</b> tự động.
-        </div>
-      )}
       {tab === 'waiting_payment' && counts.waiting_payment > 0 && (
         <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#2E7D32' }}>
           🧾 Nhấn <b>Xuất hóa đơn</b> để xem/in phiếu quyết toán và hoàn tất dịch vụ.
