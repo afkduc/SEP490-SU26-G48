@@ -4,6 +4,8 @@ import {
   adminBranchesApi,
   adminRolesApi,
 } from '../../services/adminApi';
+import UserFormModal from './users/UserFormModal';
+import UserDetailDrawer from './users/UserDetailDrawer';
 import './AdminUsersPage.css';
 
 const STATUS_OPTIONS = [
@@ -48,6 +50,10 @@ export default function AdminUsersPage() {
   const [roles, setRoles] = useState([]);
   const [branchesError, setBranchesError] = useState(null);
   const [rolesError, setRolesError] = useState(null);
+
+  const [showModal, setShowModal] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [detailUserId, setDetailUserId] = useState(null);
 
   // Tai dropdown options (branches, roles) - chi load 1 lan khi mount
   useEffect(() => {
@@ -106,6 +112,12 @@ export default function AdminUsersPage() {
             Danh sach tai khoan tren he thong (chi admin)
           </p>
         </div>
+        <button
+          className="btn btn--primary"
+          onClick={() => { setEditUser(null); setShowModal(true); }}
+        >
+          + Tao nguoi dung moi
+        </button>
       </div>
 
       {/* Filters */}
@@ -196,12 +208,13 @@ export default function AdminUsersPage() {
                   <th>Role</th>
                   <th>Trang thai</th>
                   <th>Dang nhap cuoi</th>
+                  <th style={{ width: 120 }}>Hanh dong</th>
                 </tr>
               </thead>
               <tbody>
                 {(!data.items || data.items.length === 0) ? (
                   <tr>
-                    <td colSpan={9} className="table__empty">
+                    <td colSpan={10} className="table__empty">
                       Khong co nguoi dung nao phu hop
                     </td>
                   </tr>
@@ -232,6 +245,24 @@ export default function AdminUsersPage() {
                       </td>
                       <td className="font-mono admin-users__date">
                         {formatDateTime(u.lastLoginAt)}
+                      </td>
+                      <td>
+                        <div className="action-btns">
+                          <button
+                            className="btn btn--sm btn--ghost"
+                            title="Xem chi tiet"
+                            onClick={() => setDetailUserId(u.id)}
+                          >
+                            Chi tiet
+                          </button>
+                          <button
+                            className="btn btn--sm btn--ghost"
+                            title="Sua"
+                            onClick={() => { setEditUser(u); setShowModal(true); }}
+                          >
+                            Sua
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -274,6 +305,21 @@ export default function AdminUsersPage() {
             </div>
           </div>
         </>
+      )}
+
+      {showModal && (
+        <UserFormModal
+          user={editUser}
+          onClose={() => { setShowModal(false); setEditUser(null); }}
+          onSuccess={() => setParams((p) => ({ ...p }))}
+        />
+      )}
+
+      {detailUserId && (
+        <UserDetailDrawer
+          userId={detailUserId}
+          onClose={() => setDetailUserId(null)}
+        />
       )}
     </div>
   );
