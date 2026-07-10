@@ -55,7 +55,7 @@ class AdminUserService {
   }
 
   async createUser(payload) {
-    const { name, email, password, branchId, roleId, fullName, phone } = payload;
+    const { name, email, password, branchId, roleId, firstName, lastName, phone } = payload;
 
     if (!name || !email || !password || !branchId || !roleId) {
       throw new ApiError(400, 'name, email, password, branchId, roleId la bat buoc');
@@ -81,7 +81,8 @@ class AdminUserService {
         name,
         email,
         passwordHash,
-        fullName: fullName || name,
+        firstName: firstName || name,
+        lastName: lastName || '',
         phone,
         branchId: Number(branchId),
         roleId: Number(roleId),

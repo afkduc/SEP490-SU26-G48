@@ -16,10 +16,56 @@ const STATUS_CLASS = {
 function formatDateTime(value) {
   if (!value) return '—';
   try {
-    return new Date(value).toLocaleString('vi-VN');
+    return new Date(value).toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   } catch {
     return value;
   }
+}
+
+function formatDate(value) {
+  if (!value) return '—';
+  try {
+    return new Date(value).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return value;
+  }
+}
+
+function getInitials(firstName, lastName) {
+  if (firstName || lastName) {
+    return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
+  }
+  return '?';
+}
+
+function DetailRow({ icon, label, value, badge }) {
+  return (
+    <div className="detail-list__item">
+      <dt>
+        {icon && (
+          <span style={{ opacity: 0.6 }}>{icon}</span>
+        )}
+        {label}
+      </dt>
+      <dd>
+        {badge ? (
+          <span className={`badge ${badge}`}>{value}</span>
+        ) : (
+          value || <span style={{ color: '#cbd5e1' }}>—</span>
+        )}
+      </dd>
+    </div>
+  );
 }
 
 export default function UserDetailDrawer({ userId, onClose }) {
@@ -47,74 +93,120 @@ export default function UserDetailDrawer({ userId, onClose }) {
     return () => { cancelled = true; };
   }, [userId]);
 
+  const fullName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || '—'
+    : '—';
+
   return (
     <div className="drawer-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className="drawer drawer--right">
+      <div className="drawer">
         <div className="drawer__header">
-          <h2 className="drawer__title">Chi tiet nguoi dung</h2>
-          <button className="drawer__close" onClick={onClose} type="button">✕</button>
+          <div className="drawer__title-block">
+            <div className="drawer__title-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <h2 className="drawer__title">Chi tiet nguoi dung</h2>
+          </div>
+          <button className="drawer__close" onClick={onClose} type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
 
         <div className="drawer__body">
           {loading ? (
-            <div className="drawer__loading">Dang tai chi tiet...</div>
+            <div className="drawer__loading">Dang tai chi tiet nguoi dung</div>
           ) : error ? (
             <div className="drawer__error">{error}</div>
           ) : user ? (
-            <dl className="detail-list">
-              <div className="detail-list__item">
-                <dt>ID</dt>
-                <dd><span className="font-mono">#{user.id}</span></dd>
+            <>
+              {/* User card */}
+              <div className="user-info-card">
+                <div className="user-info-card__avatar">
+                  {getInitials(user.firstName, user.lastName)}
+                </div>
+                <h3 className="user-info-card__name">{fullName}</h3>
+                <p className="user-info-card__username">
+                  @{user.name}
+                  {user.phone ? ` · ${user.phone}` : ''}
+                </p>
+                {user.roles?.length > 0 && (
+                  <div className="user-info-card__roles">
+                    {user.roles.map((r) => (
+                      <span key={r} className="badge badge--info">{r}</span>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="detail-list__item">
-                <dt>Ten dang nhap</dt>
-                <dd>{user.name || '—'}</dd>
-              </div>
-              <div className="detail-list__item">
-                <dt>Ho va ten</dt>
-                <dd>{user.fullName || '—'}</dd>
-              </div>
-              <div className="detail-list__item">
-                <dt>Email</dt>
-                <dd>{user.email}</dd>
-              </div>
-              <div className="detail-list__item">
-                <dt>So dien thoai</dt>
-                <dd>{user.phone || '—'}</dd>
-              </div>
-              <div className="detail-list__item">
-                <dt>Chi nhanh</dt>
-                <dd>{user.branchName || '—'}</dd>
-              </div>
-              <div className="detail-list__item">
-                <dt>Role</dt>
-                <dd>
-                  {user.roles?.length > 0 ? (
-                    user.roles.map((r) => (
-                      <span key={r} className="badge badge--info" style={{ marginRight: 4 }}>
-                        {r}
-                      </span>
-                    ))
-                  ) : '—'}
-                </dd>
-              </div>
-              <div className="detail-list__item">
-                <dt>Trang thai</dt>
-                <dd>
-                  <span className={`badge ${STATUS_CLASS[user.status] || ''}`}>
-                    {STATUS_LABELS[user.status] || user.status}
-                  </span>
-                </dd>
-              </div>
-              <div className="detail-list__item">
-                <dt>Dang nhap cuoi</dt>
-                <dd>{formatDateTime(user.lastLoginAt)}</dd>
-              </div>
-              <div className="detail-list__item">
-                <dt>Ngay tao</dt>
-                <dd>{formatDateTime(user.createdAt)}</dd>
-              </div>
-            </dl>
+
+              {/* Detail list */}
+              <dl className="detail-list">
+                <div className="detail-list__group">
+                  <div className="detail-list__group-title">Thong tin tai khoan</div>
+                </div>
+                <div className="detail-list__group">
+                  <DetailRow
+                    label="ID"
+                    value={<span className="font-mono">#{user.id}</span>}
+                  />
+                  <DetailRow
+                    label="Email"
+                    value={user.email}
+                  />
+                  <DetailRow
+                    label="Trang thai"
+                    value={STATUS_LABELS[user.status] || user.status}
+                    badge={STATUS_CLASS[user.status] || ''}
+                  />
+                </div>
+
+                <div className="detail-list__group">
+                  <div className="detail-list__group-title">Thong tin ca nhan</div>
+                </div>
+                <div className="detail-list__group">
+                  <DetailRow
+                    label="Ho"
+                    value={user.firstName || '—'}
+                  />
+                  <DetailRow
+                    label="Ten"
+                    value={user.lastName || '—'}
+                  />
+                  <DetailRow
+                    label="So dien thoai"
+                    value={user.phone || '—'}
+                  />
+                </div>
+
+                <div className="detail-list__group">
+                  <div className="detail-list__group-title">Phan cong</div>
+                </div>
+                <div className="detail-list__group">
+                  <DetailRow
+                    label="Chi nhanh"
+                    value={user.branchName || '—'}
+                  />
+                </div>
+
+                <div className="detail-list__group">
+                  <div className="detail-list__group-title">Lich su</div>
+                </div>
+                <div className="detail-list__group">
+                  <DetailRow
+                    label="Ngay tao"
+                    value={formatDateTime(user.createdAt)}
+                  />
+                  <DetailRow
+                    label="Dang nhap cuoi"
+                    value={user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Chua dang nhap'}
+                  />
+                </div>
+              </dl>
+            </>
           ) : null}
         </div>
       </div>
