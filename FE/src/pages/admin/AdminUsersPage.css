@@ -434,3 +434,28 @@
 .badge--info { background: #dbeafe; color: #1d4ed8; }
 
 .font-mono { font-family: monospace; }
+
+.admin-users__toggle-btn {
+  margin-left: 6px;
+  font-size: 0.78rem;
+}
+
+.btn--success-ghost {
+  background: #fff;
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.btn--success-ghost:hover:not(:disabled) {
+  background: #f0fdf4;
+}
+
+.btn--danger-ghost {
+  background: #fff;
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.btn--danger-ghost:hover:not(:disabled) {
+  background: #fef2f2;
+}
