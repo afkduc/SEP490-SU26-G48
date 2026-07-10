@@ -1,6 +1,9 @@
 const ApiError = require('../../utils/ApiError');
 const UserResponseDto = require('../dto/UserResponseDto');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^(0[0-9]{9,10})$/;
+
 class UserService {
   constructor({ userRepository }) {
     this.userRepository = userRepository;
@@ -51,9 +54,25 @@ class UserService {
     return UserResponseDto.fromEntity({ ...user, roles });
   }
 
-  async updateUser(id, payload) {
+  async updateUser(id, payload, currentUserId = null) {
     const existed = await this.userRepository.findById(id);
     if (!existed) throw new ApiError(404, 'User not found');
+
+    if (payload.email) {
+      if (!EMAIL_REGEX.test(payload.email)) {
+        throw new ApiError(400, 'Email khong dung dinh dang');
+      }
+      const emailOwner = await this.userRepository.findByEmail(payload.email);
+      if (emailOwner && emailOwner.id !== Number(id)) {
+        throw new ApiError(409, 'Email da duoc su dung boi nguoi khac');
+      }
+    }
+
+    if (payload.phone) {
+      if (!PHONE_REGEX.test(payload.phone)) {
+        throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
+      }
+    }
 
     const user = await this.userRepository.update(id, {
       name: payload.name ?? existed.name,
@@ -75,7 +94,7 @@ class UserService {
     return UserResponseDto.fromEntity({ ...user, roles });
   }
 
-  async deleteUser(id, currentUserId) {
+  async deleteUser(id, currentUserId = null) {
     if (Number(id) === Number(currentUserId)) {
       throw new ApiError(400, 'Khong the xoa chinh minh');
     }
