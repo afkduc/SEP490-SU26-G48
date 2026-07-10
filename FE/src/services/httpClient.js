@@ -30,6 +30,11 @@ class HttpClient {
       throw error;
     }
 
+    // BE wraps all responses in { success, message, data }
+    // Unwrap to return just the data so callers don't need .data everywhere
+    if (payload && typeof payload === 'object' && 'data' in payload) {
+      return payload.data;
+    }
     return payload;
   }
 
