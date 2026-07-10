@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import {
+  adminUsersApi,
   adminBranchesApi,
   adminRolesApi,
 } from '../../services/adminApi';
@@ -27,13 +28,24 @@ const STATUS_CLASS = {
   locked: 'badge--danger',
 };
 
-function formatDateTime(value) {
+function formatDate(value) {
   if (!value) return '—';
   try {
-    return new Date(value).toLocaleString('vi-VN');
+    return new Date(value).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
   } catch {
     return value;
   }
+}
+
+function getInitials(firstName, lastName) {
+  if (firstName || lastName) {
+    return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
+  }
+  return '?';
 }
 
 export default function AdminUsersPage() {
@@ -56,7 +68,6 @@ export default function AdminUsersPage() {
   const [detailUserId, setDetailUserId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
 
-  // Tai dropdown options (branches, roles) - chi load 1 lan khi mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -67,7 +78,7 @@ export default function AdminUsersPage() {
           setBranchesError(null);
         }
       } catch (err) {
-        if (!cancelled) setBranchesError(err.message || 'Khong tai duoc danh sach chi nhanh');
+        if (!cancelled) setBranchesError(err.message || 'Khong tai danh sach chi nhanh');
       }
       try {
         const rRes = await adminRolesApi.list();
@@ -76,22 +87,14 @@ export default function AdminUsersPage() {
           setRolesError(null);
         }
       } catch (err) {
-        if (!cancelled) setRolesError(err.message || 'Khong tai duoc danh sach role');
+        if (!cancelled) setRolesError(err.message || 'Khong tai danh sach role');
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  function applyFilters(e) {
-    e?.preventDefault();
-    // Hook tu dong call API khi params thay doi, nen khong can submit handler
-  }
-
   function resetFilters() {
-    setParams((p) => ({
-      ...p,
+    setParams(() => ({
       search: '',
       branchId: undefined,
       roleId: undefined,
@@ -100,8 +103,8 @@ export default function AdminUsersPage() {
     }));
   }
 
-  function handlePageChange(nextPage) {
-    updateParam('page', nextPage);
+  function handlePageChange(page) {
+    updateParam('page', page);
   }
 
   async function handleToggleStatus(userId, newStatus) {
@@ -110,223 +113,282 @@ export default function AdminUsersPage() {
       await adminUsersApi.update({ userId, status: newStatus });
       setParams((p) => ({ ...p }));
     } catch (_) {
-      // toggle failed, silently ignore
     } finally {
       setTogglingId(null);
     }
   }
 
+  const totalPages = data.total > 0 ? Math.ceil(data.total / (data.pageSize || 10)) : 1;
+  const currentPage = data.page || 1;
+
   return (
     <div className="admin-users">
+      {/* Header */}
       <div className="admin-users__header">
-        <div>
-          <h1 className="admin-users__title">Quan ly nguoi dung</h1>
-          <p className="admin-users__subtitle">
-            Danh sach tai khoan tren he thong (chi admin)
-          </p>
+        <div className="admin-users__title-block">
+          <div className="admin-users__title-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div className="admin-users__title-group">
+            <h1>Quan ly nguoi dung</h1>
+            <p className="admin-users__subtitle">
+              Danh sach tai khoan he thong
+            </p>
+          </div>
         </div>
-        <button
-          className="btn btn--primary"
-          onClick={() => { setEditUser(null); setShowModal(true); }}
-        >
-          + Tao nguoi dung moi
-        </button>
+        <div className="admin-users__actions">
+          {data.total > 0 && (
+            <span className="admin-users__total-badge">{data.total} tai khoan</span>
+          )}
+          <button
+            className="btn btn--primary"
+            onClick={() => { setEditUser(null); setShowModal(true); }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Tao nguoi dung moi
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
-      <form className="admin-users__filters" onSubmit={applyFilters}>
-        <input
-          className="input input--search"
-          type="text"
-          placeholder="Tim theo ten, email, so dien thoai..."
-          value={params.search || ''}
-          onChange={(e) => updateParam('search', e.target.value)}
-        />
+      <div className="filter-card">
+        <div className="filter-row">
+          <input
+            className="input input--search"
+            type="text"
+            placeholder="Tim theo ten, email, ho, ten..."
+            value={params.search || ''}
+            onChange={(e) => updateParam('search', e.target.value)}
+          />
 
-        <select
-          className="input input--select"
-          value={params.branchId ?? ''}
-          onChange={(e) =>
-            updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)
-          }
-          disabled={!!branchesError}
-        >
-          <option value="">
-            {branchesError ? `Loi: ${branchesError}` : 'Tat ca chi nhanh'}
-          </option>
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.branchName}
+          <select
+            className="input input--select"
+            value={params.branchId ?? ''}
+            onChange={(e) =>
+              updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)
+            }
+            disabled={!!branchesError}
+          >
+            <option value="">
+              {branchesError ? `Loi: ${branchesError}` : 'Tat ca chi nhanh'}
             </option>
-          ))}
-        </select>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.branchName}</option>
+            ))}
+          </select>
 
-        <select
-          className="input input--select"
-          value={params.roleId ?? ''}
-          onChange={(e) => updateParam('roleId', e.target.value || undefined)}
-          disabled={!!rolesError}
-        >
-          <option value="">
-            {rolesError ? `Loi: ${rolesError}` : 'Tat ca role'}
-          </option>
-          {roles.map((r) => (
-            <option key={r.id} value={r.roleName}>
-              {r.roleName}
+          <select
+            className="input input--select"
+            value={params.roleId ?? ''}
+            onChange={(e) => updateParam('roleId', e.target.value || undefined)}
+            disabled={!!rolesError}
+          >
+            <option value="">
+              {rolesError ? `Loi: ${rolesError}` : 'Tat ca role'}
             </option>
-          ))}
-        </select>
+            {roles.map((r) => (
+              <option key={r.id} value={r.id}>{r.roleName}</option>
+            ))}
+          </select>
 
-        <select
-          className="input input--select"
-          value={params.status ?? ''}
-          onChange={(e) => updateParam('status', e.target.value || undefined)}
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value || 'all'} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          <select
+            className="input input--select"
+            value={params.status ?? ''}
+            onChange={(e) => updateParam('status', e.target.value || undefined)}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value || 'all'} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
 
-        <button type="submit" className="btn btn--secondary">Loc</button>
-        <button
-          type="button"
-          className="btn btn--ghost"
-          onClick={resetFilters}
-        >
-          Dat lai
-        </button>
-      </form>
+          <button className="btn btn--ghost" onClick={resetFilters}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+            </svg>
+            Dat lai
+          </button>
+        </div>
+      </div>
 
       {/* Table */}
-      {loading ? (
-        <div className="admin-users__loading">Dang tai danh sach nguoi dung...</div>
-      ) : error ? (
-        <div className="admin-users__error">
-          Loi: {error.message || 'Khong the tai danh sach'}
+      <div className="table-card">
+        <div className="table-card__header">
+          <div className="table-card__title">Danh sach nguoi dung</div>
         </div>
-      ) : (
-        <>
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Ten dang nhap</th>
-                  <th>Ho va ten</th>
-                  <th>Email</th>
-                  <th>So dien thoai</th>
-                  <th>Chi nhanh</th>
-                  <th>Role</th>
-                  <th>Trang thai</th>
-                  <th>Dang nhap cuoi</th>
-                  <th style={{ width: 120 }}>Hanh dong</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(!data.items || data.items.length === 0) ? (
+
+        {loading ? (
+          <div className="admin-users__loading">Dang tai danh sach...</div>
+        ) : error ? (
+          <div className="admin-users__error">
+            <strong>Loi:</strong> {error.message || 'Khong the tai danh sach'}
+          </div>
+        ) : (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table">
+                <thead>
                   <tr>
-                    <td colSpan={10} className="table__empty">
-                      Khong co nguoi dung nao phu hop
-                    </td>
+                    <th>Nguoi dung</th>
+                    <th>Email</th>
+                    <th>Chi nhanh</th>
+                    <th>Role</th>
+                    <th>Trang thai</th>
+                    <th>Ngay tao</th>
+                    <th style={{ textAlign: 'right' }}>Hanh dong</th>
                   </tr>
-                ) : (
-                  data.items.map((u) => (
-                    <tr key={u.id}>
-                      <td><span className="font-mono">#{u.id}</span></td>
-                      <td>{u.name || u.userName || '—'}</td>
-                      <td>{u.fullName || '—'}</td>
-                      <td>{u.email}</td>
-                      <td>{u.phone || '—'}</td>
-                      <td>{u.branchName || '—'}</td>
-                      <td>
-                        {(u.roles && u.roles.length > 0) ? (
-                          u.roles.map((r) => (
-                            <span key={r} className="badge badge--info" style={{ marginRight: 4 }}>
-                              {r}
-                            </span>
-                          ))
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>
-                        <span className={`badge ${STATUS_CLASS[u.status] || ''}`}>
-                          {STATUS_LABELS[u.status] || u.status}
-                        </span>
-                        <button
-                          className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
-                          title={u.status === 'active' ? 'Khoa tai khoan' : 'Mo khoa tai khoan'}
-                          onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
-                          disabled={togglingId === u.id}
-                        >
-                          {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khoa' : 'Mo')}
-                        </button>
-                      </td>
-                      <td className="font-mono admin-users__date">
-                        {formatDateTime(u.lastLoginAt)}
-                      </td>
-                      <td>
-                        <div className="action-btns">
-                          <button
-                            className="btn btn--sm btn--ghost"
-                            title="Xem chi tiet"
-                            onClick={() => setDetailUserId(u.id)}
-                          >
-                            Chi tiet
-                          </button>
-                          <button
-                            className="btn btn--sm btn--ghost"
-                            title="Sua"
-                            onClick={() => { setEditUser(u); setShowModal(true); }}
-                          >
-                            Sua
-                          </button>
-                        </div>
+                </thead>
+                <tbody>
+                  {(!data.items || data.items.length === 0) ? (
+                    <tr>
+                      <td colSpan={7} className="table__empty">
+                        Khong co nguoi dung nao phu hop voi bo loc
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="admin-users__pagination">
-            <span className="admin-users__pagination-info">
-              Tong: <strong>{data.total}</strong> nguoi dung
-              {data.total > 0 && (
-                <>
-                  {' '}— Trang <strong>{data.page}</strong> /{' '}
-                  {Math.max(1, Math.ceil(data.total / (data.pageSize || 10)))}
-                </>
-              )}
-            </span>
-            <div className="admin-users__pagination-buttons">
-              <button
-                className="btn btn--ghost btn--sm"
-                type="button"
-                onClick={() => handlePageChange(Math.max(1, (data.page || 1) - 1))}
-                disabled={(data.page || 1) <= 1}
-              >
-                ← Truoc
-              </button>
-              <button
-                className="btn btn--ghost btn--sm"
-                type="button"
-                onClick={() => handlePageChange((data.page || 1) + 1)}
-                disabled={
-                  !data.total ||
-                  data.page >= Math.ceil(data.total / (data.pageSize || 10))
-                }
-              >
-                Sau →
-              </button>
+                  ) : (
+                    data.items.map((u) => (
+                      <tr key={u.id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div className="user-avatar">
+                              {getInitials(u.firstName, u.lastName)}
+                            </div>
+                            <div className="user-name-cell">
+                              <span className="user-name-cell__main">
+                                {u.firstName && u.lastName
+                                  ? `${u.firstName} ${u.lastName}`
+                                  : u.name || '—'}
+                              </span>
+                              <span className="user-name-cell__sub">
+                                <span className="font-mono">@{u.name}</span>
+                                {u.phone ? ` · ${u.phone}` : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ color: '#64748b', fontSize: '0.85rem' }}>{u.email || '—'}</td>
+                        <td style={{ color: '#64748b', fontSize: '0.85rem' }}>{u.branchName || '—'}</td>
+                        <td>
+                          {u.roles?.length > 0 ? (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                              {u.roles.map((r) => (
+                                <span key={r} className="badge badge--info">{r}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>—</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="user-status-cell">
+                            <span className={`badge ${STATUS_CLASS[u.status] || ''}`}>
+                              {STATUS_LABELS[u.status] || u.status}
+                            </span>
+                            <button
+                              className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
+                              title={u.status === 'active' ? 'Khoa tai khoan' : 'Mo khoa tai khoan'}
+                              onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
+                              disabled={togglingId === u.id}
+                            >
+                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khoa' : 'Mo')}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="admin-users__date">{formatDate(u.createdAt)}</td>
+                        <td>
+                          <div className="action-btns" style={{ justifyContent: 'flex-end' }}>
+                            <button
+                              className="btn btn--sm btn--view"
+                              onClick={() => setDetailUserId(u.id)}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                              </svg>
+                              Chi tiet
+                            </button>
+                            <button
+                              className="btn btn--sm btn--edit"
+                              onClick={() => { setEditUser(u); setShowModal(true); }}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              Sua
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </>
-      )}
+
+            {/* Pagination */}
+            {data.total > 0 && (
+              <div className="pagination">
+                <span className="pagination__info">
+                  Tong <strong>{data.total}</strong> tai khoan
+                  &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
+                </span>
+                <div className="pagination__controls">
+                  <button
+                    className="pagination__nav-btn"
+                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                    disabled={currentPage <= 1}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                    Truoc
+                  </button>
+
+                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 7) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 4) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 3) {
+                      pageNum = totalPages - 6 + i;
+                    } else {
+                      pageNum = currentPage - 3 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        className={`pagination__page-btn ${currentPage === pageNum ? 'active' : ''}`}
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    className="pagination__nav-btn"
+                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Sau
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {showModal && (
         <UserFormModal
