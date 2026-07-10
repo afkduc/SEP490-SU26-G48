@@ -1,7 +1,24 @@
 const express = require('express');
 const AdminController = require('../controllers/AdminController');
 const { authenticate, requireAdmin } = require('../../middlewares/auth');
+const { validateListUsersQuery } = require('../validators/adminUserValidator');
 
+/**
+ * Admin routes - chi danh cho user co role admin
+ *
+ * GET /api/admin/dashboard
+ *   - Tra ve thong ke tong quan cho admin
+ *
+ * GET /api/admin/users
+ *   Query params (all optional):
+ *     - search    : chuoi tim kiem theo user_name/email/full_name (LIKE)
+ *     - branchId  : ID chi nhanh (so nguyen duong)
+ *     - roleId    : ten role (role_name) - loc user co role do
+ *     - status    : active | inactive | locked
+ *     - page      : so trang (mac dinh 1, >= 1)
+ *     - pageSize  : so ban ghi moi trang (mac dinh 10, 1-100)
+ *   Response: { items, total, page, pageSize }
+ */
 function buildAdminRouter() {
   const router = express.Router();
   const controller = new AdminController();
@@ -9,7 +26,7 @@ function buildAdminRouter() {
   router.use(authenticate, requireAdmin);
 
   router.get('/dashboard', controller.getDashboardStats);
-  router.get('/users', controller.listUsers);
+  router.get('/users', validateListUsersQuery, controller.listUsers);
 
   return router;
 }
