@@ -7,14 +7,12 @@ const USER_BASE_COLUMNS = `
   id,
   user_name,
   email,
-  full_name,
+  first_name,
+  last_name,
   phone,
   branch_id,
   status,
-  last_login_at,
-  created_by,
-  created_at,
-  updated_at
+  created_at
 `;
 
 function toUserEntity(row) {
@@ -23,14 +21,12 @@ function toUserEntity(row) {
     id: row.id,
     name: row.user_name,
     email: row.email,
-    fullName: row.full_name,
+    firstName: row.first_name,
+    lastName: row.last_name,
     phone: row.phone,
     branchId: row.branch_id,
     status: row.status,
-    lastLoginAt: row.last_login_at,
-    createdBy: row.created_by,
     createdAt: row.created_at,
-    updatedAt: row.updated_at,
   });
 }
 
@@ -57,7 +53,7 @@ class UserRepositoryImpl extends UserRepository {
   async findUserRoles(userId) {
     const result = await query(
       `SELECT r.role_name
-       FROM   user_roles ur
+       FROM   user_role ur
        JOIN   roles r ON r.id = ur.role_id
        WHERE  ur.user_id = @userId`,
       { userId }
@@ -79,21 +75,20 @@ class UserRepositoryImpl extends UserRepository {
       : null;
 
     const result = await query(
-      `INSERT INTO users (user_name, email, user_password, full_name, phone, branch_id, status, created_by)
+      `INSERT INTO users (user_name, email, user_password, first_name, last_name, phone, branch_id, status)
        OUTPUT INSERTED.id, INSERTED.user_name, INSERTED.email,
-              INSERTED.full_name, INSERTED.phone, INSERTED.branch_id, INSERTED.status,
-              INSERTED.last_login_at, INSERTED.created_by,
-              INSERTED.created_at, INSERTED.updated_at
-       VALUES (@user_name, @email, @user_password, @full_name, @phone, @branch_id, @status, @created_by)`,
+              INSERTED.first_name, INSERTED.last_name, INSERTED.phone, INSERTED.branch_id, INSERTED.status,
+              INSERTED.created_at
+       VALUES (@user_name, @email, @user_password, @first_name, @last_name, @phone, @branch_id, @status)`,
       {
         user_name: userData.name,
         email: userData.email,
         user_password: hash,
-        full_name: userData.fullName ?? null,
+        first_name: userData.firstName ?? null,
+        last_name: userData.lastName ?? null,
         phone: userData.phone ?? null,
         branch_id: userData.branchId ?? null,
         status: userData.status ?? 'active',
-        created_by: userData.createdBy ?? null,
       }
     );
     return toUserEntity(result.recordset[0]);
@@ -102,22 +97,23 @@ class UserRepositoryImpl extends UserRepository {
   async update(id, userData) {
     const result = await query(
       `UPDATE users
-       SET    user_name = @user_name,
-              email     = @email,
-              full_name = @full_name,
-              phone     = @phone,
-              branch_id = @branch_id,
-              status    = @status
+       SET    user_name  = @user_name,
+              email      = @email,
+              first_name = @first_name,
+              last_name  = @last_name,
+              phone      = @phone,
+              branch_id  = @branch_id,
+              status     = @status
        OUTPUT INSERTED.id, INSERTED.user_name, INSERTED.email,
-              INSERTED.full_name, INSERTED.phone, INSERTED.branch_id, INSERTED.status,
-              INSERTED.last_login_at, INSERTED.created_by,
-              INSERTED.created_at, INSERTED.updated_at
+              INSERTED.first_name, INSERTED.last_name, INSERTED.phone, INSERTED.branch_id, INSERTED.status,
+              INSERTED.created_at
        WHERE  id = @id`,
       {
         id,
         user_name: userData.name,
         email: userData.email,
-        full_name: userData.fullName ?? null,
+        first_name: userData.firstName ?? null,
+        last_name: userData.lastName ?? null,
         phone: userData.phone ?? null,
         branch_id: userData.branchId ?? null,
         status: userData.status ?? 'active',
@@ -130,9 +126,8 @@ class UserRepositoryImpl extends UserRepository {
     const result = await query(
       `DELETE FROM users
        OUTPUT DELETED.id, DELETED.user_name, DELETED.email,
-              DELETED.full_name, DELETED.phone, DELETED.branch_id, DELETED.status,
-              DELETED.last_login_at, DELETED.created_by,
-              DELETED.created_at, DELETED.updated_at
+              DELETED.first_name, DELETED.last_name, DELETED.phone, DELETED.branch_id, DELETED.status,
+              DELETED.created_at
        WHERE  id = @id`,
       { id }
     );
@@ -147,15 +142,15 @@ class UserRepositoryImpl extends UserRepository {
     if (!roleResult.recordset[0]) return;
     const roleId = roleResult.recordset[0].id;
     await query(
-      `IF NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = @userId AND role_id = @roleId)
-       INSERT INTO user_roles (user_id, role_id) VALUES (@userId, @roleId)`,
+      `IF NOT EXISTS (SELECT 1 FROM user_role WHERE user_id = @userId AND role_id = @roleId)
+       INSERT INTO user_role (user_id, role_id) VALUES (@userId, @roleId)`,
       { userId, roleId }
     );
   }
 
   async clearUserRoles(userId) {
     await query(
-      `DELETE FROM user_roles WHERE user_id = @userId`,
+      `DELETE FROM user_role WHERE user_id = @userId`,
       { userId }
     );
   }

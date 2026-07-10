@@ -3,27 +3,23 @@ class User {
     id,
     name,
     email,
-    fullName,
+    firstName,
+    lastName,
     phone,
     branchId,
     status,
-    lastLoginAt,
-    createdBy,
     createdAt,
-    updatedAt,
     roles,
   } = {}) {
     this.id = id;
     this.name = name;
     this.email = email;
-    this.fullName = fullName;
+    this.firstName = firstName;
+    this.lastName = lastName;
     this.phone = phone;
     this.branchId = branchId;
     this.status = status;
-    this.lastLoginAt = lastLoginAt;
-    this.createdBy = createdBy;
     this.createdAt = createdAt;
-    this.updatedAt = updatedAt;
     this.roles = roles || [];
   }
 

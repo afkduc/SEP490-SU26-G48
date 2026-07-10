@@ -4,15 +4,13 @@ const ADMIN_USER_COLUMNS = `
   u.id,
   u.user_name,
   u.email,
-  u.full_name,
+  u.first_name,
+  u.last_name,
   u.phone,
   u.branch_id,
   b.branch_name,
   u.status,
-  u.last_login_at,
-  u.created_by,
-  u.created_at,
-  u.updated_at
+  u.created_at
 `;
 
 function toAdminUserRow(row) {
@@ -21,15 +19,13 @@ function toAdminUserRow(row) {
     id: row.id,
     name: row.user_name,
     email: row.email,
-    fullName: row.full_name,
+    firstName: row.first_name,
+    lastName: row.last_name,
     phone: row.phone,
     branchId: row.branch_id,
     branchName: row.branch_name,
     status: row.status,
-    lastLoginAt: row.last_login_at,
-    createdBy: row.created_by,
     createdAt: row.created_at,
-    updatedAt: row.updated_at,
     roles: [],
   };
 }
@@ -44,7 +40,8 @@ class AdminUserRepositoryImpl {
       conditions.push(`(
         u.user_name LIKE @p${paramIndex}
         OR u.email LIKE @p${paramIndex}
-        OR u.full_name LIKE @p${paramIndex}
+        OR u.first_name LIKE @p${paramIndex}
+        OR u.last_name LIKE @p${paramIndex}
       )`);
       params[`p${paramIndex}`] = `%${search}%`;
       paramIndex++;
@@ -58,7 +55,7 @@ class AdminUserRepositoryImpl {
 
     if (roleId) {
       conditions.push(`EXISTS (
-        SELECT 1 FROM user_roles ur
+        SELECT 1 FROM user_role ur
         JOIN roles r ON r.id = ur.role_id
         WHERE ur.user_id = u.id AND r.role_name = @p${paramIndex}
       )`);
@@ -100,7 +97,7 @@ class AdminUserRepositoryImpl {
       const userIds = users.map((u) => u.id);
       const rolesResult = await query(
         `SELECT ur.user_id, r.role_name
-         FROM   user_roles ur
+         FROM   user_role ur
          JOIN   roles r ON r.id = ur.role_id
          WHERE  ur.user_id IN (${userIds.map((_, i) => `@p${paramIndex + i}`).join(',')})`,
         Object.fromEntries(userIds.map((id, i) => [`p${paramIndex + i}`, id]))
@@ -169,7 +166,7 @@ class AdminUserRepositoryImpl {
     const user = toAdminUserRow(row);
     const rolesResult = await query(
       `SELECT r.role_name
-       FROM   user_roles ur
+       FROM   user_role ur
        JOIN   roles r ON r.id = ur.role_id
        WHERE  ur.user_id = @p1`,
       { p1: id }
@@ -186,17 +183,17 @@ class AdminUserRepositoryImpl {
     return result.recordset[0] || null;
   }
 
-  async create({ name, email, passwordHash, fullName, phone, branchId, roleId }) {
+  async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId }) {
     const result = await query(
-      `INSERT INTO users (user_name, email, user_password, full_name, phone, branch_id, status, created_by)
+      `INSERT INTO users (user_name, email, user_password, first_name, last_name, phone, branch_id, status)
        OUTPUT INSERTED.id
-       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 'active', NULL)`,
-      { p1: name, p2: email, p3: passwordHash, p4: fullName || name, p5: phone, p6: branchId }
+       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 'active')`,
+      { p1: name, p2: email, p3: passwordHash, p4: firstName || name, p5: lastName || '', p6: phone, p7: branchId }
     );
     const userId = result.recordset[0].id;
     if (roleId) {
       await query(
-        'INSERT INTO user_roles (user_id, role_id) VALUES (@p1, @p2)',
+        'INSERT INTO user_role (user_id, role_id) VALUES (@p1, @p2)',
         { p1: userId, p2: roleId }
       );
     }
@@ -223,10 +220,10 @@ class AdminUserRepositoryImpl {
     }
 
     if (roleId !== undefined) {
-      await query('DELETE FROM user_roles WHERE user_id = @p1', { p1: userId });
+      await query('DELETE FROM user_role WHERE user_id = @p1', { p1: userId });
       if (roleId) {
         await query(
-          'INSERT INTO user_roles (user_id, role_id) VALUES (@p1, @p2)',
+          'INSERT INTO user_role (user_id, role_id) VALUES (@p1, @p2)',
           { p1: userId, p2: roleId }
         );
       }
