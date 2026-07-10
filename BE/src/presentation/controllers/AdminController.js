@@ -1,7 +1,12 @@
 const { success } = require('../../utils/response');
+const AdminUserService = require('../../application/services/AdminUserService');
+const AdminUserRepositoryImpl = require('../../infrastructure/repositories/AdminUserRepositoryImpl');
 
 class AdminController {
   constructor() {
+    const adminUserRepository = new AdminUserRepositoryImpl();
+    this.adminUserService = new AdminUserService({ adminUserRepository });
+
     this.getDashboardStats = this.getDashboardStats.bind(this);
     this.listUsers = this.listUsers.bind(this);
   }
@@ -24,13 +29,14 @@ class AdminController {
     }
   }
 
-  listUsers(req, res, next) {
+  listUsers = async (req, res, next) => {
     try {
-      return success(res, [], 'Danh sách người dùng (chỉ admin)');
+      const result = await this.adminUserService.listUsers(req.query);
+      return success(res, result, 'Danh sach nguoi dung (chi admin)');
     } catch (err) {
       next(err);
     }
-  }
+  };
 }
 
 module.exports = AdminController;
