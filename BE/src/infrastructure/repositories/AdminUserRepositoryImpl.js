@@ -155,6 +155,85 @@ class AdminUserRepositoryImpl {
       roleName: row.role_name,
     }));
   }
+
+  async findById(id) {
+    const result = await query(
+      `SELECT ${ADMIN_USER_COLUMNS}
+       FROM   users u
+       LEFT   JOIN branches b ON b.id = u.branch_id
+       WHERE  u.id = @p1`,
+      { p1: id }
+    );
+    const row = result.recordset[0];
+    if (!row) return null;
+    const user = toAdminUserRow(row);
+    const rolesResult = await query(
+      `SELECT r.role_name
+       FROM   user_roles ur
+       JOIN   roles r ON r.id = ur.role_id
+       WHERE  ur.user_id = @p1`,
+      { p1: id }
+    );
+    user.roles = rolesResult.recordset.map((r) => r.role_name);
+    return user;
+  }
+
+  async findByEmail(email) {
+    const result = await query(
+      'SELECT TOP 1 id, email FROM users WHERE email = @p1',
+      { p1: email }
+    );
+    return result.recordset[0] || null;
+  }
+
+  async create({ name, email, passwordHash, fullName, phone, branchId, roleId }) {
+    const result = await query(
+      `INSERT INTO users (user_name, email, user_password, full_name, phone, branch_id, status, created_by)
+       OUTPUT INSERTED.id
+       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 'active', NULL)`,
+      { p1: name, p2: email, p3: passwordHash, p4: fullName || name, p5: phone, p6: branchId }
+    );
+    const userId = result.recordset[0].id;
+    if (roleId) {
+      await query(
+        'INSERT INTO user_roles (user_id, role_id) VALUES (@p1, @p2)',
+        { p1: userId, p2: roleId }
+      );
+    }
+    return { id: userId, email };
+  }
+
+  async updateUser({ userId, status, roleId }) {
+    const updates = [];
+    const params = {};
+    let p = 1;
+
+    if (status !== undefined) {
+      updates.push(`status = @p${p}`);
+      params[`p${p}`] = status;
+      p++;
+    }
+
+    if (updates.length > 0) {
+      params[`p${p}`] = userId;
+      await query(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = @p${p}`,
+        params
+      );
+    }
+
+    if (roleId !== undefined) {
+      await query('DELETE FROM user_roles WHERE user_id = @p1', { p1: userId });
+      if (roleId) {
+        await query(
+          'INSERT INTO user_roles (user_id, role_id) VALUES (@p1, @p2)',
+          { p1: userId, p2: roleId }
+        );
+      }
+    }
+
+    return this.findById(userId);
+  }
 }
 
 module.exports = AdminUserRepositoryImpl;
