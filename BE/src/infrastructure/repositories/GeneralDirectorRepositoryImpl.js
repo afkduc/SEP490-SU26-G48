@@ -74,6 +74,62 @@ function monthLabel(value) {
   return `${month}/${year}`;
 }
 
+function statusLabel(status) {
+  return status === 'active' ? 'Đang làm' : 'Nghỉ';
+}
+
+function aggregateEmployees(rows = []) {
+  const map = new Map();
+
+  rows.forEach((row) => {
+    const key = row.id;
+    if (!map.has(key)) {
+      map.set(key, {
+        id: row.id,
+        employeeId: row.pseudo_id || String(row.id),
+        fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+        firstName: row.first_name,
+        lastName: row.last_name,
+        email: row.email,
+        phone: row.phone,
+        status: row.status,
+        statusLabel: statusLabel(row.status),
+        specialty: row.specialty,
+        teamSize: row.team_size,
+        avatar: row.avatar,
+        notes: row.notes,
+        createdAt: normalizeDate(row.created_at),
+        branch: row.branch_id
+          ? {
+              id: row.branch_id,
+              code: row.branch_code,
+              name: row.branch_name,
+            }
+          : null,
+        roles: [],
+        roleLabels: [],
+        primaryRole: null,
+        primaryRoleLabel: null,
+      });
+    }
+
+    const employee = map.get(key);
+    if (row.role_name && !employee.roles.includes(row.role_name)) {
+      employee.roles.push(row.role_name);
+    }
+    if (row.role_label && !employee.roleLabels.includes(row.role_label)) {
+      employee.roleLabels.push(row.role_label);
+    }
+
+    if (!employee.primaryRole && row.role_name) {
+      employee.primaryRole = row.role_name;
+      employee.primaryRoleLabel = row.role_label || row.role_name;
+    }
+  });
+
+  return Array.from(map.values());
+}
+
 class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
   async getRevenueReports(filters = {}) {
     const branchId = filters.branchId && filters.branchId !== 'all' ? Number(filters.branchId) : null;
@@ -428,6 +484,105 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
       code: row.branch_code,
       name: row.branch_name,
     }));
+  }
+
+  async listEmployees(filters = {}) {
+    const params = {
+      search: filters.search ? `%${filters.search.trim()}%` : null,
+      branchId: filters.branchId && filters.branchId !== 'all' ? Number(filters.branchId) : null,
+      status: filters.status && filters.status !== 'all' ? filters.status : null,
+      role: filters.role && filters.role !== 'all' ? filters.role : null,
+    };
+
+    const result = await query(
+      `SELECT
+          u.id,
+          u.pseudo_id,
+          u.user_name,
+          u.first_name,
+          u.last_name,
+          u.email,
+          u.phone,
+          u.status,
+          u.specialty,
+          u.team_size,
+          u.avatar,
+          u.notes,
+          u.created_at,
+          u.branch_id,
+          b.branch_code,
+          b.branch_name,
+          r.role_name,
+          r.role_label
+       FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       LEFT JOIN user_role ur ON ur.user_id = u.id
+       LEFT JOIN roles r ON r.id = ur.role_id
+       WHERE r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'accountant', 'team_leader')
+         AND (@branchId IS NULL OR u.branch_id = @branchId)
+         AND (@status IS NULL OR u.status = @status)
+         AND (@role IS NULL OR r.role_name = @role)
+         AND (
+           @search IS NULL
+           OR u.pseudo_id LIKE @search
+           OR u.user_name LIKE @search
+           OR CAST(u.id AS VARCHAR(30)) LIKE @search
+           OR ISNULL(u.phone, '') LIKE @search
+           OR (ISNULL(u.first_name, '') + ' ' + ISNULL(u.last_name, '')) LIKE @search
+           OR (ISNULL(u.last_name, '') + ' ' + ISNULL(u.first_name, '')) LIKE @search
+         )
+       ORDER BY
+         CASE WHEN u.status = 'active' THEN 0 ELSE 1 END,
+         u.user_name ASC,
+         u.id ASC`,
+      params
+    );
+
+    return aggregateEmployees(result.recordset);
+  }
+
+  async getEmployeeById(id) {
+    const result = await query(
+      `SELECT
+          u.id,
+          u.pseudo_id,
+          u.user_name,
+          u.first_name,
+          u.last_name,
+          u.email,
+          u.phone,
+          u.status,
+          u.specialty,
+          u.team_size,
+          u.avatar,
+          u.notes,
+          u.created_at,
+          u.branch_id,
+          b.branch_code,
+          b.branch_name,
+          r.role_name,
+          r.role_label
+       FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       LEFT JOIN user_role ur ON ur.user_id = u.id
+       LEFT JOIN roles r ON r.id = ur.role_id
+       WHERE u.id = @id
+         AND r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'accountant', 'team_leader')
+       ORDER BY
+         CASE r.role_name
+           WHEN 'manager' THEN 1
+           WHEN 'service_advisor' THEN 2
+           WHEN 'team_leader' THEN 3
+           WHEN 'warehouse_staff' THEN 4
+           WHEN 'accountant' THEN 5
+           ELSE 99
+         END`,
+      { id: Number(id) }
+    );
+
+    const mapped = aggregateEmployees(result.recordset);
+    if (mapped.length === 0) return null;
+    return mapped[0];
   }
 }
 
