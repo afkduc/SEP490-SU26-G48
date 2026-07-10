@@ -38,6 +38,35 @@ class GeneralDirectorService {
   async listBranches() {
     return this.generalDirectorRepository.listBranches();
   }
+
+  async listEmployees(filters = {}) {
+    const normalized = {
+      search: (filters.search || '').trim(),
+      branchId: filters.branchId || 'all',
+      status: filters.status || 'all',
+      role: filters.role || 'all',
+    };
+
+    const validStatuses = ['all', 'active', 'inactive'];
+    if (!validStatuses.includes(normalized.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    return this.generalDirectorRepository.listEmployees(normalized);
+  }
+
+  async getEmployeeById(id) {
+    if (!id) {
+      throw new ApiError(400, 'Thiếu mã nhân sự');
+    }
+
+    const employee = await this.generalDirectorRepository.getEmployeeById(id);
+    if (!employee) {
+      throw new ApiError(404, 'Không tìm thấy nhân sự');
+    }
+
+    return employee;
+  }
 }
 
 module.exports = GeneralDirectorService;
