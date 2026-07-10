@@ -18,6 +18,10 @@ const { validateListUsersQuery } = require('../validators/adminUserValidator');
  *     - page      : so trang (mac dinh 1, >= 1)
  *     - pageSize  : so ban ghi moi trang (mac dinh 10, 1-100)
  *   Response: { items, total, page, pageSize }
+ *
+ * GET /api/admin/branches
+ *   - Tra ve danh sach chi nhanh (id, branchName) de dung cho filter dropdown
+ *   Response: { items: [{id, branchName}], total }
  */
 function buildAdminRouter() {
   const router = express.Router();
@@ -27,6 +31,7 @@ function buildAdminRouter() {
 
   router.get('/dashboard', controller.getDashboardStats);
   router.get('/users', validateListUsersQuery, controller.listUsers);
+  router.get('/branches', controller.listBranches);
 
   return router;
 }
