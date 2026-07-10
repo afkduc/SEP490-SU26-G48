@@ -11,6 +11,7 @@ const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/Repair
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
+const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
@@ -55,6 +56,16 @@ function AppRoutes() {
             <ProtectedRoute roles={[ROLES.ADMIN]}>
               <AppLayout>
                 <AdminDashboardPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AppLayout>
+                <AdminUsersPage />
               </AppLayout>
             </ProtectedRoute>
           }
