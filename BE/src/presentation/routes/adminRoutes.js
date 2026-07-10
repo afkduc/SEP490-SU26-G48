@@ -22,6 +22,11 @@ const { validateListUsersQuery } = require('../validators/adminUserValidator');
  * GET /api/admin/branches
  *   - Tra ve danh sach chi nhanh (id, branchName) de dung cho filter dropdown
  *   Response: { items: [{id, branchName}], total }
+ *
+ * GET /api/admin/roles
+ *   - Tra ve danh sach role (id, roleName) de dung cho filter dropdown
+ *   - Roles nay cung duoc dung chung cho UC-11 (phan quyen user)
+ *   Response: { items: [{id, roleName}], total }
  */
 function buildAdminRouter() {
   const router = express.Router();
@@ -32,6 +37,7 @@ function buildAdminRouter() {
   router.get('/dashboard', controller.getDashboardStats);
   router.get('/users', validateListUsersQuery, controller.listUsers);
   router.get('/branches', controller.listBranches);
+  router.get('/roles', controller.listRoles);
 
   return router;
 }

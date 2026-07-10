@@ -10,6 +10,7 @@ class AdminController {
     this.getDashboardStats = this.getDashboardStats.bind(this);
     this.listUsers = this.listUsers.bind(this);
     this.listBranches = this.listBranches.bind(this);
+    this.listRoles = this.listRoles.bind(this);
   }
 
   getDashboardStats(req, res, next) {
@@ -43,6 +44,15 @@ class AdminController {
     try {
       const result = await this.adminUserService.listBranches();
       return success(res, result, 'Danh sach chi nhanh (dropdown)');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listRoles = async (req, res, next) => {
+    try {
+      const result = await this.adminUserService.listRoles();
+      return success(res, result, 'Danh sach role (dropdown)');
     } catch (err) {
       next(err);
     }

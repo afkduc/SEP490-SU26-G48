@@ -139,6 +139,22 @@ class AdminUserRepositoryImpl {
       branchName: row.branch_name,
     }));
   }
+
+  /**
+   * Lay tat ca roles cho dropdown filter
+   * Tra ve id + role_name
+   */
+  async findAllRoles() {
+    const result = await query(
+      `SELECT id, role_name
+       FROM   roles
+       ORDER  BY role_name ASC`
+    );
+    return result.recordset.map((row) => ({
+      id: row.id,
+      roleName: row.role_name,
+    }));
+  }
 }
 
 module.exports = AdminUserRepositoryImpl;
