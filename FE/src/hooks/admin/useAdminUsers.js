@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { adminUsersApi } from '../../../services/adminApi';
+import { adminUsersApi } from '../../services/adminApi';
 
 const DEFAULT_PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 400;
