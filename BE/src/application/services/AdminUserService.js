@@ -32,6 +32,11 @@ class AdminUserService {
 
     return result;
   }
+
+  async listBranches() {
+    const branches = await this.adminUserRepository.findAllBranches();
+    return { items: branches, total: branches.length };
+  }
 }
 
 module.exports = AdminUserService;
