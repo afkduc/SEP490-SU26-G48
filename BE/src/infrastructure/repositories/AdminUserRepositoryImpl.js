@@ -122,6 +122,23 @@ class AdminUserRepositoryImpl {
     const result = await query('SELECT COUNT(*) AS total FROM users');
     return result.recordset[0].total;
   }
+
+  /**
+   * Lay tat ca branches cho dropdown filter
+   * Chi tra ve id + branch_name (toi uu cho UI dropdown)
+   */
+  async findAllBranches() {
+    const result = await query(
+      `SELECT id, branch_name
+       FROM   branches
+       WHERE  is_active = 1
+       ORDER  BY branch_name ASC`
+    );
+    return result.recordset.map((row) => ({
+      id: row.id,
+      branchName: row.branch_name,
+    }));
+  }
 }
 
 module.exports = AdminUserRepositoryImpl;
