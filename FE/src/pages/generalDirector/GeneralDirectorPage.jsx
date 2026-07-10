@@ -13,28 +13,28 @@ const GENERAL_DIRECTOR_ACTIONS = [
     description: 'Xem danh sách và chi tiết phiếu quyết toán của mọi chi nhánh.',
   },
   {
-    uc: 'UC-50',
+    uc: 'UC-49',
     label: 'Doanh thu',
     path: '/general-director/reports/revenue',
     icon: '📈',
     description: 'Xem tổng quan doanh thu toàn hệ thống hoặc theo từng chi nhánh.',
   },
   {
-    uc: 'UC-51',
+    uc: 'UC-50',
     label: 'Nhân sự vận hành',
     path: '/general-director/employees',
     icon: '👥',
     description: 'Xem danh sách toàn bộ nhân sự văn phòng và vận hành trên các chi nhánh.',
   },
   {
-    uc: 'UC-52',
+    uc: 'UC-51',
     label: 'Kỹ thuật viên',
     path: '/general-director/technicians',
     icon: '🛠️',
     description: 'Xem đội ngũ kỹ thuật theo chi nhánh và cấp độ tay nghề.',
   },
   {
-    uc: 'UC-53',
+    uc: 'UC-52',
     label: 'DS giám đốc chi nhánh',
     path: '/general-director/branch-managers',
     icon: '🏢',
@@ -70,6 +70,26 @@ const STATUS_META = {
   invoiced: { label: 'Đã xuất hóa đơn', color: '#424242', background: '#F5F5F5' },
 };
 
+const EMPLOYEE_STATUS_OPTIONS = [
+  { value: 'all', label: 'Tất cả trạng thái' },
+  { value: 'active', label: 'Đang làm' },
+  { value: 'inactive', label: 'Nghỉ' },
+];
+
+const EMPLOYEE_ROLE_OPTIONS = [
+  { value: 'all', label: 'Tất cả chức vụ' },
+  { value: 'manager', label: 'Giám đốc chi nhánh' },
+  { value: 'service_advisor', label: 'Cố vấn dịch vụ' },
+  { value: 'team_leader', label: 'Tổ trưởng kỹ thuật' },
+  { value: 'warehouse_staff', label: 'Nhân viên kho' },
+  { value: 'accountant', label: 'Kế toán' },
+];
+
+const EMPLOYEE_STATUS_META = {
+  active: { label: 'Đang làm', color: '#0F766E', background: '#ECFDF5' },
+  inactive: { label: 'Nghỉ', color: '#B91C1C', background: '#FEF2F2' },
+};
+
 function statusBadge(status) {
   const meta = STATUS_META[status] || STATUS_META.waiting_repair;
   return {
@@ -80,6 +100,10 @@ function statusBadge(status) {
 
 function currency(value) {
   return formatCurrency(value || 0);
+}
+
+function employeeStatusBadge(status) {
+  return EMPLOYEE_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
 }
 
 function percent(value) {
@@ -565,18 +589,302 @@ function RevenueOverviewPage() {
 }
 
 function EmployeeListPage() {
-  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [employees, setEmployees] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [search, setSearch] = useState('');
+  const [branchId, setBranchId] = useState('all');
+  const [status, setStatus] = useState('all');
+  const [role, setRole] = useState('all');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeEmployee, setActiveEmployee] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const searchTimer = useRef(null);
+  const requestSeq = useRef(0);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadBranches() {
+      try {
+        const response = await generalDirectorApi.getBranches();
+        if (mounted) setBranches(response?.data || []);
+      } catch {
+        if (mounted) setBranches([]);
+      }
+    }
+
+    loadBranches();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    clearTimeout(searchTimer.current);
+
+    searchTimer.current = setTimeout(async () => {
+      const seq = ++requestSeq.current;
+      setLoading(true);
+      setError('');
+
+      try {
+        const response = await generalDirectorApi.getEmployees({
+          search: search.trim(),
+          branchId,
+          status,
+          role,
+        });
+
+        if (seq !== requestSeq.current) return;
+        setEmployees(response?.data || []);
+      } catch (err) {
+        if (seq !== requestSeq.current) return;
+        setEmployees([]);
+        setError(err.message || 'Không tải được danh sách nhân sự');
+      } finally {
+        if (seq === requestSeq.current) setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(searchTimer.current);
+  }, [search, branchId, status, role]);
+
+  const openDetail = async (employee) => {
+    setActiveEmployee(employee);
+    setDetailError('');
+    setDetailLoading(true);
+
+    try {
+      const response = await generalDirectorApi.getEmployeeById(employee.id);
+      setActiveEmployee(response?.data || employee);
+    } catch (err) {
+      setDetailError(err.message || 'Không tải được hồ sơ nhân sự');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetail = () => {
+    setActiveEmployee(null);
+    setDetailError('');
+  };
+
+  const detailBadge = employeeStatusBadge(activeEmployee?.status);
 
   return (
-    <PlaceholderPanel
-      title="Danh sách nhân viên vận hành"
-      uc="UC-51"
-      description="Màn hình này là điểm vào để xem toàn bộ nhân sự văn phòng và vận hành tại tất cả chi nhánh."
-      actions={[
-        { label: 'Xem toàn bộ nhân viên', onClick: () => navigate('/general-director/employees') },
-        { label: 'Sang danh sách kỹ thuật viên', variant: 'secondary', onClick: () => navigate('/general-director/technicians') },
-      ]}
-    />
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Danh sách nhân sự</h1>
+          <div className="breadcrumb">General Director / UC-50 / View All Employee For All Branch</div>
+        </div>
+        <div className="page-header-right">
+          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
+        </div>
+      </div>
+
+      <ModuleActionBar />
+
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>UC50 - View All Employee For All Branch</div>
+            <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Danh sách nhân sự toàn hệ thống</h2>
+            <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.8)' }}>
+              Hiển thị đầy đủ nhân sự các phòng ban ở mọi chi nhánh, lấy trực tiếp từ SQL Server theo trạng thái tài khoản thực tế.
+            </p>
+          </div>
+          <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
+            <div style={{ fontSize: 12, opacity: 0.72 }}>Tổng nhân sự</div>
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{employees.length}</div>
+            <div style={{ fontSize: 12, opacity: 0.72, marginTop: 8 }}>Đang làm</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{employees.filter((item) => item.status === 'active').length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
+          <span className="search-icon">🔍</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Tìm kiếm tên, mã..."
+          />
+        </div>
+
+        <select className="form-select" value={branchId} onChange={(event) => setBranchId(event.target.value)} style={{ minWidth: 220, height: 42 }}>
+          <option value="all">Tất cả chi nhánh</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.name}</option>
+          ))}
+        </select>
+
+        <button type="button" className="btn btn-secondary" onClick={() => setShowAdvanced((prev) => !prev)}>
+          {showAdvanced ? 'Ẩn Filter' : 'Filter nâng cao'}
+        </button>
+      </div>
+
+      {showAdvanced && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginBottom: 14, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 12 }}>
+          <div>
+            <label className="form-label">Trạng thái</label>
+            <select className="form-select" value={status} onChange={(event) => setStatus(event.target.value)}>
+              {EMPLOYEE_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Chức vụ</label>
+            <select className="form-select" value={role} onChange={(event) => setRole(event.target.value)}>
+              {EMPLOYEE_ROLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          {error}
+        </div>
+      )}
+
+      <div className="table-wrapper">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Mã nhân viên</th>
+              <th>Họ và tên</th>
+              <th>Chức vụ</th>
+              <th>Chi nhánh</th>
+              <th>Số điện thoại</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={7}>
+                  <div className="empty-state" style={{ minHeight: 220 }}>
+                    <div className="empty-state-icon">⏳</div>
+                    <h3>Đang tải danh sách nhân sự</h3>
+                    <p>Dữ liệu đang được lấy trực tiếp từ SQL Server.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {!loading && employees.length === 0 && !error && (
+              <tr>
+                <td colSpan={7}>
+                  <div className="empty-state">
+                    <div className="empty-state-icon">📭</div>
+                    <h3>Không có dữ liệu nhân sự</h3>
+                    <p>Không tìm thấy nhân sự phù hợp với từ khóa hoặc bộ lọc hiện tại.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {!loading && employees.map((employee) => {
+              const badge = employeeStatusBadge(employee.status);
+              return (
+                <tr key={employee.id}>
+                  <td style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--primary-dark)' }}>{employee.employeeId || employee.id}</td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>{employee.fullName || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{employee.email || '—'}</div>
+                  </td>
+                  <td>{employee.primaryRoleLabel || '—'}</td>
+                  <td><BranchBadge branch={employee.branch} /></td>
+                  <td>{employee.phone || '—'}</td>
+                  <td>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
+                      {badge.label}
+                    </span>
+                  </td>
+                  <td>
+                    <button className="btn btn-info btn-sm" onClick={() => openDetail(employee)}>
+                      Xem chi tiết
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="pagination">
+          <span className="pagination-info">{employees.length} nhân sự</span>
+        </div>
+      </div>
+
+      {(activeEmployee || detailLoading || detailError) && (
+        <div className="modal-overlay" onClick={closeDetail}>
+          <div className="modal" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 760 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Chi tiết nhân sự</h3>
+              <button className="modal-close" onClick={closeDetail}>✕</button>
+            </div>
+
+            <div className="modal-body" style={{ maxHeight: '78vh', overflow: 'auto' }}>
+              {detailLoading && (
+                <div className="empty-state" style={{ minHeight: 220 }}>
+                  <div className="empty-state-icon">⏳</div>
+                  <h3>Đang tải hồ sơ nhân sự</h3>
+                </div>
+              )}
+
+              {!detailLoading && detailError && (
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
+                  {detailError}
+                </div>
+              )}
+
+              {!detailLoading && !detailError && activeEmployee && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+                    <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeEmployee.employeeId || '—'}</div>
+                    </div>
+                    <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#6B7280' }}>Chức vụ chính</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{activeEmployee.primaryRoleLabel || '—'}</div>
+                    </div>
+                    <div style={{ background: detailBadge.background, border: `1px solid ${detailBadge.color}33`, borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: detailBadge.color }}>Trạng thái</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: detailBadge.color, marginTop: 4 }}>{detailBadge.label}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+                    <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin hồ sơ</div>
+                    <DetailRow label="Họ và tên" value={activeEmployee.fullName} />
+                    <DetailRow label="Email" value={activeEmployee.email} />
+                    <DetailRow label="Số điện thoại" value={activeEmployee.phone} />
+                    <DetailRow label="Chi nhánh" value={activeEmployee.branch?.name || 'Chưa phân chi nhánh'} />
+                    <DetailRow label="Vai trò" value={(activeEmployee.roleLabels || []).join(', ') || '—'} />
+                    <DetailRow label="Chuyên môn" value={activeEmployee.specialty} />
+                    <DetailRow label="Quy mô tổ" value={activeEmployee.teamSize ? `${activeEmployee.teamSize} người` : '—'} />
+                    <DetailRow label="Ngày tạo tài khoản" value={formatDate(activeEmployee.createdAt)} />
+                    <DetailRow label="Ghi chú" value={activeEmployee.notes} />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
