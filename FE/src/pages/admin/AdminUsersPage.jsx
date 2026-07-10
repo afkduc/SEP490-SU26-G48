@@ -54,6 +54,7 @@ export default function AdminUsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [detailUserId, setDetailUserId] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   // Tai dropdown options (branches, roles) - chi load 1 lan khi mount
   useEffect(() => {
@@ -101,6 +102,18 @@ export default function AdminUsersPage() {
 
   function handlePageChange(nextPage) {
     updateParam('page', nextPage);
+  }
+
+  async function handleToggleStatus(userId, newStatus) {
+    setTogglingId(userId);
+    try {
+      await adminUsersApi.update({ userId, status: newStatus });
+      setParams((p) => ({ ...p }));
+    } catch (_) {
+      // toggle failed, silently ignore
+    } finally {
+      setTogglingId(null);
+    }
   }
 
   return (
@@ -242,6 +255,14 @@ export default function AdminUsersPage() {
                         <span className={`badge ${STATUS_CLASS[u.status] || ''}`}>
                           {STATUS_LABELS[u.status] || u.status}
                         </span>
+                        <button
+                          className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
+                          title={u.status === 'active' ? 'Khoa tai khoan' : 'Mo khoa tai khoan'}
+                          onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
+                          disabled={togglingId === u.id}
+                        >
+                          {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khoa' : 'Mo')}
+                        </button>
                       </td>
                       <td className="font-mono admin-users__date">
                         {formatDateTime(u.lastLoginAt)}
