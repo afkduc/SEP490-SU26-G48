@@ -16,6 +16,8 @@ function buildGeneralDirectorRouter() {
   router.get('/reports/settlements', controller.getSettlementReports);
   router.get('/reports/settlements/:id', controller.getSettlementReportById);
   router.get('/branches', controller.getBranches);
+  router.get('/employees', controller.getEmployees);
+  router.get('/employees/:id', controller.getEmployeeById);
 
   return router;
 }
