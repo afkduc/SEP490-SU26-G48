@@ -183,7 +183,7 @@ function PasswordInput({ label, id, value, onChange, placeholder, error }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AdminProfilePage() {
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -260,25 +260,17 @@ export default function AdminProfilePage() {
     setEditLoading(true);
 
     try {
-      const updated = await updateMyProfile({
-        email: editForm.email,
-        firstName: editForm.firstName,
-        lastName: editForm.lastName,
-        phone: editForm.phone,
-      });
+      const payload = {};
+      if (editForm.email.trim()) payload.email = editForm.email.trim();
+      if (editForm.firstName.trim()) payload.firstName = editForm.firstName.trim();
+      if (editForm.lastName.trim()) payload.lastName = editForm.lastName.trim();
+      if (editForm.phone.trim()) payload.phone = editForm.phone.trim();
+
+      const updated = await updateMyProfile(payload);
       setProfile(updated);
       setEditSuccess('Cap nhat thong tin thanh cong!');
 
-      // Sync user context
-      if (setUser) {
-        setUser((u) => ({
-          ...u,
-          email: updated.email,
-          name: `${updated.firstName || ''} ${updated.lastName || ''}`.trim(),
-        }));
-      }
-
-      // Update localStorage user
+      // Update localStorage user so Navbar/AppContext picks up the change on next reload
       try {
         const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
         if (raw) {
