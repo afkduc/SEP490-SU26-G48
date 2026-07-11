@@ -11,7 +11,9 @@ const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/Repair
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
+const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
+const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
@@ -60,6 +62,16 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AppLayout>
+                <AdminUsersPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
         {/* General Director settlement reports */}
                 <Route
                   path="/general-director/*"
@@ -71,6 +83,18 @@ function AppRoutes() {
                     </ProtectedRoute>
                   }
                 />
+
+        {/* Quản lý chi nhánh - Nhân viên / Thợ máy / Tổ trưởng */}
+        <Route
+          path="/manager/*"
+          element={
+            <ProtectedRoute roles={[ROLES.MANAGER, ROLES.ADMIN]}>
+              <AppLayout>
+                <ManagerPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* Phiếu quyết toán sửa chữa */}
         <Route
