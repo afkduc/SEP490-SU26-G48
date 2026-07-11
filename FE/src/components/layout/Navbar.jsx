@@ -21,7 +21,7 @@ const ADMIN_NAV = [
     icon: '👥',
     children: [
       { label: 'Danh sách User', path: '/admin/users' },
-      { label: 'Thêm User', path: '/admin/users/create' },
+      { label: 'Thêm User', path: '/admin/users?create=true' },
     ],
   },
   {
