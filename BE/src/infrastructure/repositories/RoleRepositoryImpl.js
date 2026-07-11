@@ -1,4 +1,4 @@
-const { query } = require('../../database/sqlServer');
+const { query } = require('../database/sqlServer');
 
 class RoleRepositoryImpl {
   /**
@@ -11,22 +11,16 @@ class RoleRepositoryImpl {
         r.id,
         r.role_name,
         r.role_label,
-        r.description,
-        r.is_active,
-        r.created_at,
         COUNT(ur.id) AS user_count
       FROM roles r
       LEFT JOIN user_role ur ON ur.role_id = r.id
-      GROUP BY r.id, r.role_name, r.role_label, r.description, r.is_active, r.created_at
+      GROUP BY r.id, r.role_name, r.role_label
       ORDER BY r.id ASC
     `);
     return result.recordset.map((row) => ({
       id: row.id,
       roleName: row.role_name,
       roleLabel: row.role_label,
-      description: row.description,
-      isActive: row.is_active,
-      createdAt: row.created_at,
       userCount: Number(row.user_count),
     }));
   }
@@ -41,15 +35,9 @@ class RoleRepositoryImpl {
       `SELECT
         r.id,
         r.role_name,
-        r.role_label,
-        r.description,
-        r.is_active,
-        r.created_at,
-        COUNT(ur.id) AS user_count
+        r.role_label
        FROM roles r
-       LEFT JOIN user_role ur ON ur.role_id = r.id
-       WHERE r.id = @p1
-       GROUP BY r.id, r.role_name, r.role_label, r.description, r.is_active, r.created_at`,
+       WHERE r.id = @p1`,
       { p1: roleId }
     );
     const row = result.recordset[0];
@@ -58,10 +46,6 @@ class RoleRepositoryImpl {
       id: row.id,
       roleName: row.role_name,
       roleLabel: row.role_label,
-      description: row.description,
-      isActive: row.is_active,
-      createdAt: row.created_at,
-      userCount: Number(row.user_count),
     };
   }
 }
