@@ -1,9 +1,9 @@
 -- ============================================================
--- Script tạo bảng login_sessions trong database sep490_g48
+-- Script tạo bảng login_sessions trong database AutoGaraDB
 -- Chạy file này trong SQL Server Management Studio (SSMS)
 -- ============================================================
 
-USE [sep490_g48]
+USE [AutoGaraDB]
 GO
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'login_sessions')
@@ -32,10 +32,10 @@ BEGIN
     CREATE NONCLUSTERED INDEX [idx_login_sessions_status] ON [dbo].[login_sessions]([status]);
     CREATE NONCLUSTERED INDEX [idx_login_sessions_login_time] ON [dbo].[login_sessions]([login_time] DESC);
 
-    PRINT 'Bang login_sessions da duoc tao thanh cong trong sep490_g48!';
+    PRINT 'Bang login_sessions da duoc tao thanh cong trong AutoGaraDB!';
 END
 ELSE
 BEGIN
-    PRINT 'Bang login_sessions da ton tai trong sep490_g48!';
+    PRINT 'Bang login_sessions da ton tai trong AutoGaraDB!';
 END
 GO

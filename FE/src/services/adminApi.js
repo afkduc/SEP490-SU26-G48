@@ -2,15 +2,17 @@ import httpClient from './httpClient';
 
 /**
  * Legacy named exports (giu de backward compat voi code cu)
+ *
+ * httpClient.get() da unwrap boi wrapper { success, message, data },
+ * tra ve thang phan data (object). Nen KHONG goi them .data o day.
+ * Tuong tu cho listAdminUsers.
  */
 export async function getAdminDashboardStats() {
-  const res = await httpClient.get('/admin/dashboard');
-  return res?.data;
+  return httpClient.get('/admin/dashboard');
 }
 
 export async function listAdminUsers() {
-  const res = await httpClient.get('/admin/users');
-  return res?.data;
+  return httpClient.get('/admin/users');
 }
 
 /**
@@ -120,6 +122,16 @@ class AdminUserRolesApi {
 }
 
 const adminUserRolesApi = new AdminUserRolesApi();
+
+/**
+ * Admin Login Sessions API (dashboard widget)
+ *   - getRecent(): GET /api/audit/login-sessions voi pageSize=8 (ko filter)
+ *     tra ve: { items: [{id, userName, actionType, ipAddress, loginTime, status, ...}], total, page, pageSize }
+ */
+export async function getRecentLoginSessions() {
+  const res = await httpClient.get('/audit/login-sessions?page=1&pageSize=8');
+  return res; // httpClient da unwrap, res = { items, total, page, pageSize }
+}
 
 export {
   AdminUsersApi,
