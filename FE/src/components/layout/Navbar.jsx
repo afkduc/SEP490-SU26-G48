@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
 import './Navbar.css';
@@ -120,7 +120,7 @@ function getInitials(name = '') {
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function NavDropdownItem({ item }) {
+function NavDropdownItem({ item, currentPath }) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef(null);
 
@@ -133,12 +133,28 @@ function NavDropdownItem({ item }) {
     timeoutRef.current = setTimeout(() => setOpen(false), 120);
   };
 
+  // So sanh exact match (bo qua query string o ca 2 phia) de tranh
+  // truong hop /admin/logs/login van khop voi child /admin/logs.
+  const isPathMatch = (configPath) => {
+    const [baseConfig] = configPath.split('?');
+    const [baseCurrent] = currentPath.split('?');
+    return baseConfig === baseCurrent;
+  };
+
+  // Khi dropdown co children, parent duoc active neu bat ky child nao khop currentPath.
+  const isParentActive = item.children
+    ? item.children.some((c) => isPathMatch(c.path))
+    : false;
+
+  // Tu dong mo dropdown neu parent dang active de nguoi dung thay minh dang o day.
+  const effectiveOpen = open || isParentActive;
+
   if (!item.children) {
     return (
       <NavLink
         to={item.path}
         className={({ isActive }) =>
-          'navbar__link' + (isActive ? ' navbar__link--active' : '')
+          'navbar__link' + ((isActive || isPathMatch(item.path)) ? ' navbar__link--active' : '')
         }
       >
         {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
@@ -149,30 +165,37 @@ function NavDropdownItem({ item }) {
 
   return (
     <div
-      className="navbar__dropdown-wrapper"
+      className={`navbar__dropdown-wrapper${isParentActive ? ' navbar__dropdown-wrapper--active' : ''}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <button className="navbar__link navbar__link-btn">
+      <button
+        className={
+          'navbar__link navbar__link-btn' + (isParentActive ? ' navbar__link--active' : '')
+        }
+      >
         {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
         {item.label}
         <span className="navbar__link-caret">▼</span>
       </button>
 
-      {open && (
+      {effectiveOpen && (
         <div className="navbar__nav-dropdown">
-          {item.children.map((child) => (
-            <NavLink
-              key={child.path}
-              to={child.path}
-              className={({ isActive }) =>
-                'navbar__nav-dropdown-item' + (isActive ? ' navbar__nav-dropdown-item--active' : '')
-              }
-              onClick={() => setOpen(false)}
-            >
-              {child.label}
-            </NavLink>
-          ))}
+          {item.children.map((child) => {
+            const childActive = isPathMatch(child.path);
+            return (
+              <NavLink
+                key={child.path}
+                to={child.path}
+                className={
+                  'navbar__nav-dropdown-item' + (childActive ? ' navbar__nav-dropdown-item--active' : '')
+                }
+                onClick={() => setOpen(false)}
+              >
+                {child.label}
+              </NavLink>
+            );
+          })}
         </div>
       )}
     </div>
@@ -182,6 +205,7 @@ function NavDropdownItem({ item }) {
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const navItems = NAV_ITEMS_BY_ROLE[user?.primaryRole] ?? DEFAULT_NAV;
@@ -211,7 +235,7 @@ export default function Navbar() {
       <nav className="navbar__nav">
         {supportsDropdown
           ? navItems.map((item) => (
-              <NavDropdownItem key={item.label} item={item} />
+              <NavDropdownItem key={item.label} item={item} currentPath={location.pathname} />
             ))
           : navItems.map((item) => (
               <NavLink
