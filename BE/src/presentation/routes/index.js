@@ -11,6 +11,7 @@ const buildRepairSettlementRouter = require('./repairSettlementRoutes');
 const buildRepairOrderRouter = require('./repairOrderRoutes');
 const buildGeneralDirectorRouter = require('./generalDirectorRoutes');
 const buildManagerRouter = require('./managerRoutes');
+const buildAuditRouter = require('./auditRoutes');
 
 const router = express.Router();
 
@@ -29,5 +30,6 @@ router.use('/repair-settlements', buildRepairSettlementRouter());
 router.use('/repair-orders', buildRepairOrderRouter());
 router.use('/general-director', buildGeneralDirectorRouter());
 router.use('/manager', buildManagerRouter());
+router.use('/audit', buildAuditRouter());
 
 module.exports = router;
