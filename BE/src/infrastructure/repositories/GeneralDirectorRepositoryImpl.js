@@ -130,6 +130,74 @@ function aggregateEmployees(rows = []) {
   return Array.from(map.values());
 }
 
+function normalizeSkills(specialty) {
+  if (!specialty) return [];
+  const normalized = String(specialty)
+    .split(/[,;/|]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return Array.from(new Set(normalized));
+}
+
+function inferSkillGroups(specialty) {
+  const text = (specialty || '').toLowerCase();
+  const groups = [];
+
+  if (/dong co|co khi|may|g(am|ầm)|phanh|treo/.test(text)) groups.push('mechanical');
+  if (/dien|điện|dien tu|điện tử|cam bien|cảm biến/.test(text)) groups.push('electrical');
+  if (/son|paint|dong son|đồng sơn|than vo|thân vỏ/.test(text)) groups.push('painting');
+  if (/chan doan|chu[nẩ]n đo[aá]n|diagnostic|scan|obu|obd/.test(text)) groups.push('diagnostic');
+  if (/bao duong|b[aả]o d[uư][oỡ]ng|dinh ky|định kỳ|oil|loc|lọc/.test(text)) groups.push('maintenance');
+
+  if (groups.length === 0) groups.push('other');
+  return Array.from(new Set(groups));
+}
+
+function skillGroupLabel(code) {
+  const labels = {
+    mechanical: 'Cơ khí',
+    electrical: 'Điện - Điện tử',
+    painting: 'Sơn - Đồng',
+    diagnostic: 'Chuẩn đoán',
+    maintenance: 'Bảo dưỡng',
+    other: 'Khác',
+  };
+  return labels[code] || 'Khác';
+}
+
+function mapTechnician(row) {
+  if (!row) return null;
+  const skills = normalizeSkills(row.specialty);
+  const skillGroups = inferSkillGroups(row.specialty);
+
+  return {
+    id: row.id,
+    employeeId: row.pseudo_id || String(row.id),
+    fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    statusLabel: statusLabel(row.status),
+    specialty: row.specialty,
+    teamSize: row.team_size,
+    avatar: row.avatar,
+    notes: row.notes,
+    createdAt: normalizeDate(row.created_at),
+    branch: row.branch_id
+      ? {
+          id: row.branch_id,
+          code: row.branch_code,
+          name: row.branch_name,
+        }
+      : null,
+    skills,
+    skillGroups,
+    skillGroupLabels: skillGroups.map(skillGroupLabel),
+  };
+}
+
 class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
   async getRevenueReports(filters = {}) {
     const branchId = filters.branchId && filters.branchId !== 'all' ? Number(filters.branchId) : null;
@@ -583,6 +651,181 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
     const mapped = aggregateEmployees(result.recordset);
     if (mapped.length === 0) return null;
     return mapped[0];
+  }
+
+  async listTechnicians(filters = {}) {
+    const params = {
+      search: filters.search ? `%${filters.search.trim()}%` : null,
+      branchId: filters.branchId && filters.branchId !== 'all' ? Number(filters.branchId) : null,
+      status: filters.status && filters.status !== 'all' ? filters.status : null,
+      skillGroup: filters.skillGroup && filters.skillGroup !== 'all' ? filters.skillGroup : null,
+    };
+
+    const skillCondition = {
+      mechanical: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%động cơ%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%co khi%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%cơ khí%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%gầm%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%phanh%')",
+      electrical: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%điện%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%dien%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%điện tử%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%cam bien%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%cảm biến%')",
+      painting: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%sơn%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%dong son%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%đồng sơn%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%than vo%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%thân vỏ%')",
+      diagnostic: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%chuẩn đoán%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%chuan doan%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%diagnostic%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%obd%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%scan%')",
+      maintenance: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%bảo dưỡng%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%bao duong%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%định kỳ%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%dinh ky%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%thay dầu%')",
+      other: "(ISNULL(u.specialty, '') = '')",
+    };
+
+    const result = await query(
+      `SELECT
+          u.id,
+          u.pseudo_id,
+          u.user_name,
+          u.first_name,
+          u.last_name,
+          u.email,
+          u.phone,
+          u.status,
+          u.specialty,
+          u.team_size,
+          u.avatar,
+          u.notes,
+          u.created_at,
+          u.branch_id,
+          b.branch_code,
+          b.branch_name
+       FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       INNER JOIN user_role ur ON ur.user_id = u.id
+       INNER JOIN roles r ON r.id = ur.role_id
+       WHERE r.role_name = 'team_leader'
+         AND (@branchId IS NULL OR u.branch_id = @branchId)
+         AND (@status IS NULL OR u.status = @status)
+         AND (
+           @search IS NULL
+           OR u.pseudo_id LIKE @search
+           OR u.user_name LIKE @search
+           OR CAST(u.id AS VARCHAR(30)) LIKE @search
+           OR ISNULL(u.phone, '') LIKE @search
+           OR ISNULL(u.specialty, '') LIKE @search
+           OR (ISNULL(u.first_name, '') + ' ' + ISNULL(u.last_name, '')) LIKE @search
+           OR (ISNULL(u.last_name, '') + ' ' + ISNULL(u.first_name, '')) LIKE @search
+         )
+         AND (
+           @skillGroup IS NULL
+           OR (
+             @skillGroup = 'mechanical' AND ${skillCondition.mechanical}
+           )
+           OR (
+             @skillGroup = 'electrical' AND ${skillCondition.electrical}
+           )
+           OR (
+             @skillGroup = 'painting' AND ${skillCondition.painting}
+           )
+           OR (
+             @skillGroup = 'diagnostic' AND ${skillCondition.diagnostic}
+           )
+           OR (
+             @skillGroup = 'maintenance' AND ${skillCondition.maintenance}
+           )
+           OR (
+             @skillGroup = 'other' AND ${skillCondition.other}
+           )
+         )
+       ORDER BY
+         CASE WHEN u.status = 'active' THEN 0 ELSE 1 END,
+         u.user_name ASC,
+         u.id ASC`,
+      params
+    );
+
+    return result.recordset.map(mapTechnician);
+  }
+
+  async getTechnicianById(id) {
+    const infoResult = await query(
+      `SELECT TOP 1
+          u.id,
+          u.pseudo_id,
+          u.user_name,
+          u.first_name,
+          u.last_name,
+          u.email,
+          u.phone,
+          u.status,
+          u.specialty,
+          u.team_size,
+          u.avatar,
+          u.notes,
+          u.created_at,
+          u.branch_id,
+          b.branch_code,
+          b.branch_name
+       FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       INNER JOIN user_role ur ON ur.user_id = u.id
+       INNER JOIN roles r ON r.id = ur.role_id
+       WHERE u.id = @id
+         AND r.role_name = 'team_leader'`,
+      { id: Number(id) }
+    );
+
+    const technician = mapTechnician(infoResult.recordset[0]);
+    if (!technician) return null;
+
+    const historyResult = await query(
+      `SELECT TOP 20
+          ro.id,
+          ro.repair_code,
+          ro.status,
+          ro.created_at,
+          ro.completed_at,
+          ro.notes,
+          so.order_code,
+          so.total,
+          so.completed_date,
+          b.id AS branch_id,
+          b.branch_code,
+          b.branch_name,
+          v.license_plate,
+          v.vehicle_model_text AS vehicle_model,
+          c.full_name AS customer_name
+       FROM repair_orders ro
+       LEFT JOIN service_orders so ON so.id = ro.service_order_id
+       LEFT JOIN branches b ON b.id = ro.branch_id
+       LEFT JOIN vehicles v ON v.id = ro.vehicle_id
+       LEFT JOIN customers c ON c.id = so.customer_id
+       WHERE ro.team_leader_id = @id
+       ORDER BY ro.created_at DESC, ro.id DESC`,
+      { id: Number(id) }
+    );
+
+    technician.repairHistory = historyResult.recordset.map((row) => ({
+      id: row.id,
+      repairCode: row.repair_code,
+      repairStatus: row.status,
+      createdAt: normalizeDate(row.created_at),
+      completedAt: normalizeDate(row.completed_at),
+      notes: row.notes,
+      orderCode: row.order_code,
+      settlementTotal: Number(row.total || 0),
+      settlementCompletedDate: normalizeDate(row.completed_date),
+      branch: row.branch_id
+        ? {
+            id: row.branch_id,
+            code: row.branch_code,
+            name: row.branch_name,
+          }
+        : null,
+      vehicle: {
+        licensePlate: row.license_plate,
+        model: row.vehicle_model,
+      },
+      customerName: row.customer_name,
+    }));
+
+    technician.repairSummary = {
+      total: technician.repairHistory.length,
+      completed: technician.repairHistory.filter((item) => item.repairStatus === 'completed').length,
+      inprogress: technician.repairHistory.filter((item) => item.repairStatus === 'inprogress').length,
+      cancelled: technician.repairHistory.filter((item) => item.repairStatus === 'cancelled').length,
+    };
+
+    return technician;
   }
 }
 
