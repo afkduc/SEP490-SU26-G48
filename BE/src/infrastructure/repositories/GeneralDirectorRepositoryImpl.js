@@ -834,6 +834,10 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
       completed: technician.repairHistory.filter((item) => item.repairStatus === 'completed').length,
       inprogress: technician.repairHistory.filter((item) => item.repairStatus === 'inprogress').length,
       cancelled: technician.repairHistory.filter((item) => item.repairStatus === 'cancelled').length,
+      latestCompletedAt: technician.repairHistory
+        .filter((item) => item.completedAt)
+        .map((item) => item.completedAt)
+        .sort((a, b) => b - a)[0] || null,
     };
 
     return technician;
