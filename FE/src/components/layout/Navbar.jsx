@@ -93,7 +93,7 @@ const MANAGER_NAV = [
       { label: 'Tổ trưởng', path: '/manager/team-leaders' },
     ],
   },
-  { label: 'Bảo dưỡng', path: '/maintenance' },
+  { label: 'Quyết toán sửa chữa', path: '/manager/settlements' },
   { label: 'Chăm sóc khách hàng', path: '/customer-care' },
   { label: 'Khách hàng', path: '/customers' },
   {
