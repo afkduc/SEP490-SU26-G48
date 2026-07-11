@@ -77,24 +77,57 @@ class AdminBranchesApi {
 const adminBranchesApi = new AdminBranchesApi();
 
 /**
- * Admin Roles API (dropdown filter)
- *   - list(): GET /api/admin/roles
- *     tra ve: { items: [{id, roleName}], total }
- *   - Note: Roles cung duoc dung chung cho UC-11 (phan quyen user)
+ * Admin Roles API (UC-11 + UC-12)
+ *   - list():         GET /api/admin/roles
+ *     tra ve: { items: [{id, roleName, roleLabel, description, isActive, userCount}], total }
+ *   - getDetail(id):  GET /api/admin/roles/:id
+ *     tra ve: { id, roleName, roleLabel, description, isActive, userCount }
  */
 class AdminRolesApi {
   list() {
     return httpClient.get('/admin/roles');
   }
+
+  getDetail(id) {
+    return httpClient.get(`/admin/roles/${id}`);
+  }
 }
 
 const adminRolesApi = new AdminRolesApi();
+
+/**
+ * Admin User Roles API (UC-12)
+ *   - getUserRoles(userId):   GET /api/admin/users/:userId/roles
+ *     tra ve: [{id, roleId, roleName, roleLabel}]
+ *   - assignRoles(payload):    POST /api/admin/users/:userId/roles
+ *     payload: { userId, roleIds: number[] }
+ *     tra ve: [{id, roleId, roleName, roleLabel}]
+ *   - revokeRole(userId, roleId): DELETE /api/admin/users/:userId/roles/:roleId
+ *     tra ve: [{id, roleId, roleName, roleLabel}]
+ */
+class AdminUserRolesApi {
+  getUserRoles(userId) {
+    return httpClient.get(`/admin/users/${userId}/roles`);
+  }
+
+  assignRoles(payload) {
+    return httpClient.post(`/admin/users/${payload.userId}/roles`, payload);
+  }
+
+  revokeRole(userId, roleId) {
+    return httpClient.delete(`/admin/users/${userId}/roles/${roleId}`);
+  }
+}
+
+const adminUserRolesApi = new AdminUserRolesApi();
 
 export {
   AdminUsersApi,
   AdminBranchesApi,
   AdminRolesApi,
+  AdminUserRolesApi,
   adminUsersApi,
   adminBranchesApi,
   adminRolesApi,
+  adminUserRolesApi,
 };
