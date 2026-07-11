@@ -9,6 +9,15 @@ class ManagerController {
     this.getEmployeeById = this.getEmployeeById.bind(this);
     this.createEmployee = this.createEmployee.bind(this);
     this.updateEmployee = this.updateEmployee.bind(this);
+    this.getServiceCategories = this.getServiceCategories.bind(this);
+    this.getServices = this.getServices.bind(this);
+    this.getServiceById = this.getServiceById.bind(this);
+    this.createService = this.createService.bind(this);
+    this.updateService = this.updateService.bind(this);
+    this.getServicePackages = this.getServicePackages.bind(this);
+    this.getServicePackageById = this.getServicePackageById.bind(this);
+    this.createServicePackage = this.createServicePackage.bind(this);
+    this.updateServicePackage = this.updateServicePackage.bind(this);
   }
 
   async getBranch(req, res, next) {
@@ -64,6 +73,94 @@ class ManagerController {
     try {
       const data = await this.managerService.updateEmployee(req.user.branchId, req.params.id, req.body);
       return success(res, data, 'Cập nhật nhân viên thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getServiceCategories(req, res, next) {
+    try {
+      const data = await this.managerService.listServiceCategories();
+      return success(res, data, 'Lấy danh sách danh mục dịch vụ thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getServices(req, res, next) {
+    try {
+      const data = await this.managerService.listServices(req.user.branchId, {
+        search: req.query.search || req.query.q || '',
+        status: req.query.status || 'all',
+        categoryId: req.query.categoryId || 'all',
+      });
+      return success(res, data, 'Lấy danh sách dịch vụ thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getServiceById(req, res, next) {
+    try {
+      const data = await this.managerService.getServiceById(req.user.branchId, req.params.id);
+      return success(res, data, 'Lấy chi tiết dịch vụ thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createService(req, res, next) {
+    try {
+      const data = await this.managerService.createService(req.user.branchId, req.body);
+      return success(res, data, 'Thêm dịch vụ thành công', 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateService(req, res, next) {
+    try {
+      const data = await this.managerService.updateService(req.user.branchId, req.params.id, req.body);
+      return success(res, data, 'Cập nhật dịch vụ thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getServicePackages(req, res, next) {
+    try {
+      const data = await this.managerService.listServicePackages(req.user.branchId, {
+        search: req.query.search || req.query.q || '',
+        status: req.query.status || 'all',
+      });
+      return success(res, data, 'Lấy danh sách gói dịch vụ thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getServicePackageById(req, res, next) {
+    try {
+      const data = await this.managerService.getServicePackageById(req.user.branchId, req.params.id);
+      return success(res, data, 'Lấy chi tiết gói dịch vụ thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createServicePackage(req, res, next) {
+    try {
+      const data = await this.managerService.createServicePackage(req.user.branchId, req.body);
+      return success(res, data, 'Thêm gói dịch vụ thành công', 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateServicePackage(req, res, next) {
+    try {
+      const data = await this.managerService.updateServicePackage(req.user.branchId, req.params.id, req.body);
+      return success(res, data, 'Cập nhật gói dịch vụ thành công');
     } catch (err) {
       next(err);
     }
