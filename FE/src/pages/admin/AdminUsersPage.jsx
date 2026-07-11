@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import {
   adminUsersApi,
@@ -58,6 +59,7 @@ export default function AdminUsersPage() {
     updateParam,
   } = useAdminUsers();
 
+  const [searchParams] = useSearchParams();
   const [branches, setBranches] = useState([]);
   const [roles, setRoles] = useState([]);
   const [branchesError, setBranchesError] = useState(null);
@@ -67,6 +69,13 @@ export default function AdminUsersPage() {
   const [editUser, setEditUser] = useState(null);
   const [detailUserId, setDetailUserId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
+
+  useEffect(() => {
+    if (searchParams.get('create') === 'true') {
+      setShowModal(true);
+      setEditUser(null);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -402,7 +411,7 @@ export default function AdminUsersPage() {
         <UserDetailDrawer
           userId={detailUserId}
           onClose={() => setDetailUserId(null)}
-          onRolesChanged={refetch}
+          onRolesChanged={() => setParams((p) => ({ ...p }))}
         />
       )}
     </div>

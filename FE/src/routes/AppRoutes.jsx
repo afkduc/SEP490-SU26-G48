@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
 import AppLayout from '../components/layout/AppLayout';
+import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 
@@ -16,6 +17,7 @@ const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
+const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
@@ -58,9 +60,9 @@ function AppRoutes() {
           path="/admin/dashboard"
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AppLayout>
+              <AdminLayout>
                 <AdminDashboardPage />
-              </AppLayout>
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -68,9 +70,9 @@ function AppRoutes() {
           path="/admin/users"
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AppLayout>
+              <AdminLayout>
                 <AdminUsersPage />
-              </AppLayout>
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -78,9 +80,29 @@ function AppRoutes() {
           path="/admin/roles"
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AppLayout>
+              <AdminLayout>
                 <AdminRolesPage />
-              </AppLayout>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/logs"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AuditLogsPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/logs/login"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AuditLogsPage />
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -177,4 +199,3 @@ function AppRoutes() {
 }
 
 export default AppRoutes;
-export { LoginPage, DashboardPage, NotFoundPage };
