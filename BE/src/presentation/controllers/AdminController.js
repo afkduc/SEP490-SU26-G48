@@ -99,8 +99,8 @@ class AdminController {
   // UC-12: gan role(s) cho user
   assignRoles = async (req, res, next) => {
     try {
-      const { userId, roleIds } = req.body;
-      const roles = await this.userRoleService.assignRoles(userId, roleIds);
+      const { roleIds } = req.body;
+      const roles = await this.userRoleService.assignRoles(req.params.userId, roleIds);
       return success(res, roles, 'Gan role thanh cong');
     } catch (err) {
       next(err);
