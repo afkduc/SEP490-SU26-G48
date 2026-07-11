@@ -8,9 +8,11 @@ import { ROUTES } from '../constants/routes';
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
+const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
-// const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage')); // TODO: dang co nguoi lam
+const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
+const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
@@ -18,6 +20,7 @@ const SupplierListPage = lazy(() => import('../pages/inventory/SupplierListPage'
 const SupplierDetailPage = lazy(() => import('../pages/inventory/SupplierDetailPage'));
 const PartListPage = lazy(() => import('../pages/inventory/PartListPage'));
 const PartDetailPage = lazy(() => import('../pages/inventory/PartDetailPage'));
+const StockPage = lazy(() => import('../pages/inventory/StockPage'));
 
 function Loading() {
   return (
@@ -58,20 +61,27 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
-        {/* Phiếu quyết toán sửa chữa – Cố vấn dịch vụ */}
-        {/* Giam doc - tam thoi comment, dang co nguoi lam
         <Route
-          path="/general-director/*"
+          path="/admin/users"
           element={
-            <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR]}>
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
               <AppLayout>
-                <GeneralDirectorPage />
+                <AdminUsersPage />
               </AppLayout>
             </ProtectedRoute>
           }
         />
-        */}
+        {/* General Director settlement reports */}
+                <Route
+                  path="/general-director/*"
+                  element={
+                    <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
+                      <AppLayout>
+                        <GeneralDirectorPage />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
 
         {/* Phiếu quyết toán sửa chữa */}
         <Route
@@ -80,6 +90,18 @@ function AppRoutes() {
             <ProtectedRoute>
               <AppLayout>
                 <RepairSettlementPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Lệnh sửa chữa */}
+        <Route
+          path="/repair-orders/*"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <RepairOrderPage />
               </AppLayout>
             </ProtectedRoute>
           }
@@ -101,10 +123,11 @@ function AppRoutes() {
           <Route path="suppliers/:id" element={<SupplierDetailPage />} />
           <Route path="parts" element={<PartListPage />} />
           <Route path="parts/:id" element={<PartDetailPage />} />
+          <Route path="stock" element={<StockPage />} />
         </Route>
 
         {/* Placeholder routes */}
-        {['/repair-orders', '/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
+        {['/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
           <Route
             key={path}
             path={path}

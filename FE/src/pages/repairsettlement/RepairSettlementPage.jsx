@@ -1,13 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
 import { formatCurrency } from '../../utils';
 import { searchVehiclesApi } from '../../services/vehicleApi';
-import { MOCK_BRANCH, STATUS_LABELS, mockAutoParts, mockRepairSettlements } from './mockData';
+import { searchCatalogApi } from '../../services/catalogApi';
+import {
+  listRepairSettlementsApi,
+  getRepairSettlementApi,
+  createRepairSettlementApi,
+  updateRepairSettlementApi,
+  updateRepairSettlementStatusApi,
+} from '../../services/repairSettlementApi';
+import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 
-const LHSC_OPTIONS = ['DV', 'PT', 'BH', 'HD'];
-const HTTT_OPTIONS = ['KHT', 'BH', 'HD', 'NB'];
+// Value giữ mã ngắn (khớp dữ liệu lưu/in phiếu), label hiển thị đầy đủ trên form nhập liệu.
+const LHSC_OPTIONS = [
+  { value: 'DV', label: 'Dịch vụ' },
+  { value: 'PT', label: 'Phụ tùng' },
+  { value: 'BH', label: 'Bảo hành' },
+  { value: 'HD', label: 'Hợp đồng' },
+];
+const HTTT_OPTIONS = [
+  { value: 'KHT', label: 'Khách hàng thanh toán' },
+  { value: 'BH', label: 'Bảo hiểm chi trả' },
+  { value: 'HD', label: 'Hợp đồng bảo dưỡng' },
+  { value: 'NB', label: 'Nội bộ chịu phí' },
+];
 
 const TABS = [
   { key: 'waiting_repair', label: 'Chờ sửa chữa', color: '#E65100' },
@@ -43,7 +63,7 @@ function numberToVietnamese(num) {
 }
 
 function emptyItem() {
-  return { code: '', description: '', lhsc: 'DV', httt: 'KHT', unit: 'Lần', qty: 1, unitPrice: 0, discount: 0, isFree: false, total: 0 };
+  return { code: '', serviceId: null, description: '', lhsc: 'DV', httt: 'KHT', unit: 'Lần', qty: 1, unitPrice: 0, discount: 0, isFree: false, total: 0 };
 }
 
 // Che dữ liệu nhạy cảm (điện thoại, email, CCCD) khi hiển thị dữ liệu đã tra cứu
@@ -467,11 +487,23 @@ function DetailModal({ order, onClose, onComplete, onPreview, canManage }) {
 function RepairSettlementList() {
   const { user } = useAuth();
   const canManage = user?.primaryRole !== ROLES.ADMIN;
-  const [orders, setOrders] = useState(mockRepairSettlements);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [tab, setTab] = useState('waiting_repair');
   const [search, setSearch] = useState('');
   const [view, setView] = useState(null);
   const [previewOrder, setPreviewOrder] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    listRepairSettlementsApi({ limit: 200 })
+      .then((result) => { if (alive) setOrders(result.items || []); })
+      .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được danh sách phiếu quyết toán'); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
 
   const counts = {
     waiting_repair: orders.filter((o) => o.status === 'waiting_repair').length,
@@ -488,13 +520,15 @@ function RepairSettlementList() {
       (o.vehicle?.licensePlate || '').toLowerCase().includes(search.toLowerCase()))
   );
 
-  const handleComplete = (id) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: 'waiting_payment' } : o)));
+  const handleComplete = async (id) => {
+    const updated = await updateRepairSettlementStatusApi(id, 'waiting_payment');
+    setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
     setTab('waiting_payment');
   };
 
-  const handleInvoice = (id) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: 'invoiced' } : o)));
+  const handleInvoice = async (id) => {
+    const updated = await updateRepairSettlementStatusApi(id, 'invoiced');
+    setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
     setTab('invoiced');
   };
 
@@ -509,9 +543,6 @@ function RepairSettlementList() {
           <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
             🏢 {user?.branchName || user?.branch || MOCK_BRANCH}
           </span>
-          {canManage && (
-            <Link to="/repair-settlement/create" className="btn btn-primary">➕ Tạo phiếu quyết toán</Link>
-          )}
         </div>
       </div>
 
@@ -544,16 +575,12 @@ function RepairSettlementList() {
         </div>
       </div>
 
-      {tab === 'waiting_repair' && (
-        <div style={{ background: 'var(--orange-light)', border: '1px solid #FFCC80', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#E65100' }}>
-          ⏳ Phiếu chưa được gán tổ trưởng. Vào <b>Lệnh sửa chữa</b> để gán tổ trưởng — phiếu sẽ tự chuyển sang <b>Đang sửa chữa</b>.
+      {loadError && (
+        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
+          ⚠️ {loadError}
         </div>
       )}
-      {tab === 'inprogress' && (
-        <div style={{ background: 'var(--blue-light)', border: '1px solid #90CAF9', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#1565C0' }}>
-          🔧 Nhấn <b>Hoàn thành</b> khi xe đã sửa xong. Phiếu sẽ chuyển sang <b>Chờ thanh toán</b> tự động.
-        </div>
-      )}
+
       {tab === 'waiting_payment' && counts.waiting_payment > 0 && (
         <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#2E7D32' }}>
           🧾 Nhấn <b>Xuất hóa đơn</b> để xem/in phiếu quyết toán và hoàn tất dịch vụ.
@@ -569,7 +596,14 @@ function RepairSettlementList() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {loading && (
+              <tr><td colSpan={8}>
+                <div className="empty-state">
+                  <p>Đang tải danh sách phiếu…</p>
+                </div>
+              </td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
               <tr><td colSpan={8}>
                 <div className="empty-state">
                   <div className="empty-state-icon">📭</div>
@@ -657,15 +691,37 @@ function RepairSettlementList() {
 }
 
 // ─── Form tạo / chỉnh sửa phiếu quyết toán sửa chữa ─────────────────
+// Wrapper: khi sửa phiếu mà không có sẵn `location.state.order` (vào thẳng
+// URL, ví dụ F5 lại trang), tự tải phiếu từ API theo :id trước khi mount form.
 function RepairSettlementForm({ isEdit }) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
+  const stateOrder = location.state?.order || null;
+  const [fetchedOrder, setFetchedOrder] = useState(null);
+  const [loadingOrder, setLoadingOrder] = useState(isEdit && !stateOrder);
+  const [loadOrderError, setLoadOrderError] = useState('');
 
-  const existingOrder = isEdit
-    ? location.state?.order || mockRepairSettlements.find((o) => String(o.id) === String(id))
-    : null;
+  useEffect(() => {
+    if (!isEdit || stateOrder || !id) return undefined;
+    let alive = true;
+    getRepairSettlementApi(id)
+      .then((order) => { if (alive) setFetchedOrder(order); })
+      .catch((err) => { if (alive) setLoadOrderError(err.message || 'Không tải được phiếu quyết toán'); })
+      .finally(() => { if (alive) setLoadingOrder(false); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, id]);
+
+  if (loadingOrder) return <div className="page-loading">Đang tải phiếu quyết toán…</div>;
+  if (loadOrderError) return <div className="page-loading">⚠️ {loadOrderError}</div>;
+
+  const existingOrder = stateOrder || fetchedOrder;
+  return <RepairSettlementFormInner key={existingOrder?.id || 'new'} isEdit={isEdit} existingOrder={existingOrder} />;
+}
+
+function RepairSettlementFormInner({ isEdit, existingOrder }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const nowStr = new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -689,8 +745,16 @@ function RepairSettlementForm({ isEdit }) {
   const [nextKm, setNextKm] = useState(existingOrder?.nextMaintenanceKm || '');
   const [nextDate, setNextDate] = useState(existingOrder?.nextMaintenanceDate || '');
   const [items, setItems] = useState(existingOrder?.items?.length ? existingOrder.items : [emptyItem()]);
-  const [partSuggestions, setPartSuggestions] = useState({});
+  // Tra cứu hạng mục công việc / gói combo thật trong DB khi gõ ô "Mã hạng mục".
+  const [activeCatalogIdx, setActiveCatalogIdx] = useState(null); // dòng nào đang mở dropdown gợi ý
+  const [catalogSuggestions, setCatalogSuggestions] = useState({}); // idx -> { services, packages }
+  // Toạ độ (viewport) của ô đang mở dropdown - dropdown render qua portal ra
+  // ngoài table-wrapper (vốn overflow:auto để cuộn ngang bảng) để không bị cắt/cuộn kẹt.
+  const [catalogDropdownRect, setCatalogDropdownRect] = useState(null);
+  const catalogSearchSeq = useRef(0);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Tra cứu khách hàng/xe thật trong DB theo tên, biển số, số khung hoặc số máy.
   // Debounce 300ms; searchSeq huỷ kết quả của lần tra cứu cũ nếu đã có lần mới hơn.
@@ -721,6 +785,30 @@ function RepairSettlementForm({ isEdit }) {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeField, customerQuery, plateQuery, vehicleInfo.frameNumber, vehicleInfo.engineNumber, customerInfo.phone]);
+
+  // Tra cứu hạng mục công việc / gói combo thật trong DB theo tên (hoặc mã),
+  // debounce 300ms giống các ô tra cứu khách hàng/xe ở trên. Auto lọc real-time
+  // theo đúng text đang gõ trong ô "Tên hạng mục / gói combo".
+  useEffect(() => {
+    if (activeCatalogIdx === null) return undefined;
+    const idx = activeCatalogIdx;
+    const term = (items[idx]?.description || '').trim();
+    if (term.length < 2) {
+      setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
+      return undefined;
+    }
+    const seq = ++catalogSearchSeq.current;
+    const timer = setTimeout(async () => {
+      try {
+        const result = await searchCatalogApi(term);
+        if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: result }));
+      } catch {
+        if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCatalogIdx, items[activeCatalogIdx]?.description]);
 
   const fillFromRow = (row) => {
     setCustomerInfo({
@@ -753,47 +841,91 @@ function RepairSettlementForm({ isEdit }) {
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
   const removeItem = (idx) => setItems((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
 
-  const handlePartCode = (idx, val) => {
-    setItem(idx, 'code', val);
-    if (val.length >= 2) {
-      const matches = mockAutoParts.filter((p) => p.code.toLowerCase().includes(val.toLowerCase()) || p.name.toLowerCase().includes(val.toLowerCase())).slice(0, 6);
-      setPartSuggestions((prev) => ({ ...prev, [idx]: matches }));
-    } else {
-      setPartSuggestions((prev) => ({ ...prev, [idx]: [] }));
-    }
+  const handleItemDescription = (idx, val) => {
+    setItem(idx, 'description', val);
+    setActiveCatalogIdx(idx);
   };
 
-  const selectPart = (idx, part) => {
+  const closeCatalogSuggestions = (idx) => {
+    setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
+    setActiveCatalogIdx((cur) => (cur === idx ? null : cur));
+    setCatalogDropdownRect(null);
+  };
+
+  const openCatalogDropdown = (idx, inputEl) => {
+    const rect = inputEl.getBoundingClientRect();
+    setCatalogDropdownRect({ top: rect.bottom, left: rect.left, width: rect.width });
+    setActiveCatalogIdx(idx);
+  };
+
+  // Chọn 1 hạng mục đơn lẻ từ catalog -> điền đúng dòng đang gõ, không giảm giá.
+  const selectCatalogService = (idx, svc) => {
     setItems((prev) => {
-      const n = [...prev];
-      n[idx] = recalcItem({ ...n[idx], code: part.code, description: part.name, unit: part.unit, unitPrice: part.sellPrice, lhsc: part.code.startsWith('PT') ? 'PT' : 'DV' });
-      return n;
+      const next = [...prev];
+      next[idx] = recalcItem({ ...next[idx], code: svc.code, serviceId: svc.id, description: svc.name, unitPrice: svc.unitPrice, lhsc: 'DV', discount: 0 });
+      return next;
     });
-    setPartSuggestions((prev) => ({ ...prev, [idx]: [] }));
+    closeCatalogSuggestions(idx);
+  };
+
+  // Chọn 1 gói combo -> gộp vào đúng 1 dòng, tên hạng mục là tên gói kèm
+  // danh sách hạng mục nhỏ bên trong mở ngoặc, đơn giá = giá trọn gói.
+  const selectCatalogPackage = (idx, pkg) => {
+    const itemNames = pkg.items.map((it) => it.serviceName).join(', ');
+    const description = `${pkg.name} (${itemNames})`;
+    setItems((prev) => {
+      const next = [...prev];
+      next[idx] = recalcItem({
+        ...next[idx],
+        code: pkg.code,
+        serviceId: null,
+        description,
+        unitPrice: pkg.totalPrice,
+        qty: 1,
+        lhsc: 'DV',
+        discount: 0,
+      });
+      return next;
+    });
+    closeCatalogSuggestions(idx);
   };
 
   const totals = calcTotals(items);
 
-  const buildOrder = () => ({
-    id: existingOrder?.id || Date.now(),
-    code: existingOrder?.code || `RO-NEW-${Date.now().toString().slice(-4)}`,
-    date: existingOrder?.date || new Date().toLocaleDateString('vi-VN'),
-    advisor: user?.name || existingOrder?.advisor || 'Cố vấn dịch vụ',
-    advisorPhone: user?.phone || existingOrder?.advisorPhone || '',
-    branch: user?.branchName || user?.branch || existingOrder?.branch || MOCK_BRANCH,
-    customer: customerInfo,
-    vehicle: vehicleInfo,
+  // Bắt buộc phải chọn khách hàng/xe từ gợi ý tra cứu (có id thật trong DB)
+  // trước khi cho lưu — không tự tạo khách hàng/xe mới ở phiếu này.
+  const canSave = Boolean(customerInfo.id) && Boolean(vehicleInfo.id);
+
+  const buildPayload = () => ({
+    customerId: customerInfo.id,
+    vehicleId: vehicleInfo.id,
     customerRequest,
+    currentKm: vehicleInfo.currentKm || null,
     items,
     ...totals,
     nextMaintenanceKm: nextKm ? Number(nextKm) : null,
     nextMaintenanceDate: nextDate,
-    teamLeader: existingOrder?.teamLeader || null,
-    status: existingOrder?.status || 'waiting_repair',
   });
 
-  const handleSave = (andPrintWorkList = false) => {
-    const order = buildOrder();
+  const handleSave = async (andPrintWorkList = false) => {
+    if (!canSave) {
+      setSaveError('Vui lòng chọn khách hàng và xe từ gợi ý tra cứu trước khi lưu.');
+      return;
+    }
+    setSaving(true);
+    setSaveError('');
+    let order;
+    try {
+      const payload = buildPayload();
+      order = isEdit
+        ? await updateRepairSettlementApi(existingOrder.id, payload)
+        : await createRepairSettlementApi(payload);
+    } catch (err) {
+      setSaveError(err.message || 'Lưu phiếu quyết toán thất bại');
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
     if (andPrintWorkList) printWorkList(order);
     setSaved(true);
     setTimeout(() => navigate('/repair-settlement'), andPrintWorkList ? 300 : 0);
@@ -812,7 +944,13 @@ function RepairSettlementForm({ isEdit }) {
 
       {saved && (
         <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#2E7D32' }}>
-          ✅ Đã lưu phiếu quyết toán (giao diện minh họa — chưa nối API). Đang quay lại danh sách…
+          ✅ Đã lưu phiếu quyết toán. Đang quay lại danh sách…
+        </div>
+      )}
+
+      {saveError && (
+        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#C62828' }}>
+          ⚠️ {saveError}
         </div>
       )}
 
@@ -913,7 +1051,7 @@ function RepairSettlementForm({ isEdit }) {
               <div className="form-grid form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Người liên hệ</label>
-                  <input className="form-input" value={customerInfo.contactPerson} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Nếu khác chủ xe (khách hàng công ty)" />
+                  <input className="form-input" value={customerInfo.contactPerson} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Tên người liên hệ" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Điện thoại liên hệ</label>
@@ -1017,48 +1155,67 @@ function RepairSettlementForm({ isEdit }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: 110 }}>Mã số</th>
-                  <th>Nội dung công việc</th>
-                  <th style={{ width: 70 }}>LHSC</th>
-                  <th style={{ width: 70 }}>HTTT</th>
-                  <th style={{ width: 70 }}>ĐVT</th>
-                  <th style={{ width: 60 }}>SL</th>
-                  <th style={{ width: 110 }}>Đơn giá</th>
-                  <th style={{ width: 70 }}>CK %</th>
-                  <th style={{ width: 60 }}>Miễn phí</th>
-                  <th style={{ width: 110 }}>Thành tiền</th>
+                  <th style={{ minWidth: 320 }}>Tên hạng mục / gói combo</th>
+                  <th style={{ width: 170 }}>Loại hình sửa chữa</th>
+                  <th style={{ width: 190 }}>Hình thức thanh toán</th>
+                  <th style={{ width: 90 }}>Đơn vị tính</th>
+                  <th style={{ width: 70 }}>Số lượng</th>
+                  <th style={{ width: 150 }}>Đơn giá</th>
+                  <th style={{ width: 110 }}>Chiết khấu (%)</th>
+                  <th style={{ width: 70 }}>Miễn phí</th>
+                  <th style={{ width: 130 }}>Thành tiền</th>
                   <th style={{ width: 40 }}></th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, idx) => (
+                {items.map((item, idx) => {
+                  const suggestion = catalogSuggestions[idx];
+                  const hasSuggestions = activeCatalogIdx === idx && suggestion && (suggestion.packages?.length > 0 || suggestion.services?.length > 0);
+                  return (
                   <tr key={idx}>
                     <td style={{ position: 'relative' }}>
-                      <input className="form-input" style={{ fontSize: 12 }} value={item.code}
-                        onChange={(e) => handlePartCode(idx, e.target.value)} placeholder="Mã..." />
-                      {partSuggestions[idx]?.length > 0 && (
-                        <div style={{ position: 'absolute', top: '100%', left: 0, minWidth: 260, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
-                          {partSuggestions[idx].map((p) => (
-                            <div key={p.code} onMouseDown={() => selectPart(idx, p)}
-                              style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
-                              <b>{p.code}</b> — {p.name} <span style={{ color: 'var(--gray-500)' }}>({formatCurrency(p.sellPrice)})</span>
+                      <input className="form-input" style={{ fontSize: 12 }} value={item.description}
+                        onChange={(e) => handleItemDescription(idx, e.target.value)}
+                        onFocus={(e) => openCatalogDropdown(idx, e.target)}
+                        onBlur={() => setTimeout(() => closeCatalogSuggestions(idx), 180)}
+                        placeholder="Nhập tên hạng mục / gói combo..." />
+                      {hasSuggestions && catalogDropdownRect && createPortal(
+                        <div style={{ position: 'fixed', top: catalogDropdownRect.top, left: catalogDropdownRect.left, width: 440, maxHeight: 420, overflowY: 'auto', background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000 }}>
+                          {suggestion.packages?.length > 0 && (
+                            <div>
+                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>🎁 Gói combo</div>
+                              {suggestion.packages.map((pkg) => (
+                                <div key={`pkg-${pkg.id}`} onMouseDown={() => selectCatalogPackage(idx, pkg)}
+                                  style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
+                                  <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pkg.name} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({pkg.items.length} hạng mục)</span></div>
+                                  <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{formatCurrency(pkg.totalPrice)}</div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          )}
+                          {suggestion.services?.length > 0 && (
+                            <div>
+                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>🔧 Hạng mục đơn lẻ</div>
+                              {suggestion.services.map((svc) => (
+                                <div key={`svc-${svc.id}`} onMouseDown={() => selectCatalogService(idx, svc)}
+                                  style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
+                                  <b>{svc.name}</b> <span style={{ color: 'var(--gray-500)' }}>({formatCurrency(svc.unitPrice)})</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>,
+                        document.body
                       )}
                     </td>
                     <td>
-                      <input className="form-input" style={{ fontSize: 12 }} value={item.description}
-                        onChange={(e) => setItem(idx, 'description', e.target.value)} placeholder="Nội dung công việc / phụ tùng" />
-                    </td>
-                    <td>
                       <select className="form-select" style={{ fontSize: 12 }} value={item.lhsc} onChange={(e) => setItem(idx, 'lhsc', e.target.value)}>
-                        {LHSC_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                        {LHSC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </td>
                     <td>
                       <select className="form-select" style={{ fontSize: 12 }} value={item.httt} onChange={(e) => setItem(idx, 'httt', e.target.value)}>
-                        {HTTT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                        {HTTT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </td>
                     <td>
@@ -1068,7 +1225,9 @@ function RepairSettlementForm({ isEdit }) {
                       <input className="form-input" style={{ fontSize: 12 }} type="number" min={1} value={item.qty} onChange={(e) => setItem(idx, 'qty', Number(e.target.value))} />
                     </td>
                     <td>
-                      <input className="form-input" style={{ fontSize: 12 }} type="number" min={0} value={item.unitPrice} onChange={(e) => setItem(idx, 'unitPrice', Number(e.target.value))} />
+                      <input className="form-input" style={{ fontSize: 12 }}
+                        value={(item.unitPrice || 0).toLocaleString('vi-VN')} readOnly
+                        title="Đơn giá lấy theo catalog, không chỉnh sửa trực tiếp trên form" />
                     </td>
                     <td>
                       <input className="form-input" style={{ fontSize: 12 }} type="number" min={0} max={100} value={item.discount} onChange={(e) => setItem(idx, 'discount', Number(e.target.value))} />
@@ -1081,7 +1240,8 @@ function RepairSettlementForm({ isEdit }) {
                       <button className="btn btn-danger btn-sm btn-icon" onClick={() => removeItem(idx)} title="Xóa dòng">🗑️</button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1121,13 +1281,21 @@ function RepairSettlementForm({ isEdit }) {
               Bằng chữ: {numberToVietnamese(totals.total)}
             </div>
 
+            {!canSave && (
+              <div style={{ fontSize: 12, color: '#E65100', marginBottom: 8 }}>
+                ⚠️ Vui lòng chọn khách hàng và xe từ gợi ý tra cứu để có thể lưu.
+              </div>
+            )}
+
             <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
+              disabled={!canSave || saving}
               onClick={() => handleSave(true)}>
               🖨️ Lưu & In danh sách công việc
             </button>
             <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
+              disabled={!canSave || saving}
               onClick={() => handleSave(false)}>
-              💾 Lưu phiếu quyết toán
+              💾 {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
             </button>
             <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
               onClick={() => navigate('/repair-settlement')}>
