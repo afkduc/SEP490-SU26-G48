@@ -106,3 +106,41 @@ src/
 | `qlcn1@autogara.vn` | Quản lý chi nhánh HN | 123456 |
 | `cvdvcn1nv1@autogara.vn` | Cố vấn dịch vụ HN | 123456 |
 | `nvkcn1nv1@autogara.vn` | Nhân viên kho HN | 123456 |
+
+---
+
+## Luồng Admin (13 Use Cases)
+
+Dự án triển khai đầy đủ 13 use case cho luồng quản trị hệ thống. Xem chi tiết tại [README_ADMIN.md](./README_ADMIN.md).
+
+### Danh sách 13 Use Cases
+
+| UC | Tên | Actor |
+|----|-----|-------|
+| UC-01 | Login | All Actor |
+| UC-02 | Logout | All Actor |
+| UC-03 | View Profile | All Actor |
+| UC-04 | Edit Profile | All Actor |
+| UC-05 | Change Password | All Actor |
+| UC-06 | Forgot Password | All Actor |
+| UC-07 | View All Users | Admin |
+| UC-08 | Add User | Admin |
+| UC-09 | Edit User | Admin |
+| UC-10 | Detail User | Admin |
+| UC-11 | View All Roles | Admin |
+| UC-12 | Assign Role | Admin |
+| UC-13 | View System Logs | Admin |
+
+### Tóm tắt kế hoạch implement
+
+- **70 commits trong 7 ngày**
+- Pattern: BE trước → FE sau, mỗi commit một việc rõ ràng
+- Ngày 1: Foundation + Auth/Profile (UC-01–04)
+- Ngày 2: Change Password + Forgot Password (UC-05, UC-06)
+- Ngày 3: View All Users (UC-07)
+- Ngày 4: Add/Edit/Detail User (UC-08, UC-09, UC-10)
+- Ngày 5: View Roles + Assign Role (UC-11, UC-12)
+- Ngày 6: System Logs (UC-13)
+- Ngày 7: Polish, tích hợp, tài liệu
+
+Chi tiết: [README_ADMIN.md](./README_ADMIN.md)

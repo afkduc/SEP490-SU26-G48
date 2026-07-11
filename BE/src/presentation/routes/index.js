@@ -10,6 +10,7 @@ const buildCatalogRouter = require('./catalogRoutes');
 const buildRepairSettlementRouter = require('./repairSettlementRoutes');
 const buildRepairOrderRouter = require('./repairOrderRoutes');
 const buildGeneralDirectorRouter = require('./generalDirectorRoutes');
+const buildManagerRouter = require('./managerRoutes');
 
 const router = express.Router();
 
@@ -27,5 +28,6 @@ router.use('/catalog', buildCatalogRouter());
 router.use('/repair-settlements', buildRepairSettlementRouter());
 router.use('/repair-orders', buildRepairOrderRouter());
 router.use('/general-director', buildGeneralDirectorRouter());
+router.use('/manager', buildManagerRouter());
 
 module.exports = router;

@@ -1,10 +1,26 @@
 class User {
-  constructor({ id, name, email, createdAt, updatedAt }) {
+  constructor({
+    id,
+    name,
+    email,
+    firstName,
+    lastName,
+    phone,
+    branchId,
+    status,
+    createdAt,
+    roles,
+  } = {}) {
     this.id = id;
     this.name = name;
     this.email = email;
+    this.firstName = firstName;
+    this.lastName = lastName;
+    this.phone = phone;
+    this.branchId = branchId;
+    this.status = status;
     this.createdAt = createdAt;
-    this.updatedAt = updatedAt;
+    this.roles = roles || [];
   }
 
   static fromPersistence(record) {

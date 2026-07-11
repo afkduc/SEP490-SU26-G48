@@ -24,9 +24,17 @@ class GeneralDirectorApi {
     return httpClient.get(`/general-director/employees${query ? `?${query}` : ''}`);
   }
 
+  getEmployeeById(id) {
+    return httpClient.get(`/general-director/employees/${id}`);
+  }
+
   getTechnicians(params = {}) {
     const query = new URLSearchParams(params).toString();
     return httpClient.get(`/general-director/technicians${query ? `?${query}` : ''}`);
+  }
+
+  getTechnicianById(id) {
+    return httpClient.get(`/general-director/technicians/${id}`);
   }
 
   getBranchManagers(params = {}) {
