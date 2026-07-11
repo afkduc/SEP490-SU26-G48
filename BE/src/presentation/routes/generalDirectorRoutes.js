@@ -18,6 +18,8 @@ function buildGeneralDirectorRouter() {
   router.get('/branches', controller.getBranches);
   router.get('/employees', controller.getEmployees);
   router.get('/employees/:id', controller.getEmployeeById);
+  router.get('/technicians', controller.getTechnicians);
+  router.get('/technicians/:id', controller.getTechnicianById);
 
   return router;
 }
