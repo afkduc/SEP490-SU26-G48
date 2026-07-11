@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
+import RoleAwareRedirect from '../components/RoleAwareRedirect';
 import AppLayout from '../components/layout/AppLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
@@ -14,6 +15,7 @@ const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralD
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
+const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
@@ -68,6 +70,16 @@ function AppRoutes() {
             <ProtectedRoute roles={[ROLES.ADMIN]}>
               <AppLayout>
                 <AdminUsersPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/roles"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AppLayout>
+                <AdminRolesPage />
               </AppLayout>
             </ProtectedRoute>
           }
@@ -157,7 +169,7 @@ function AppRoutes() {
         ))}
 
         {/* Redirects */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<RoleAwareRedirect />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
