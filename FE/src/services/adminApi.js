@@ -110,8 +110,8 @@ class AdminUserRolesApi {
     return httpClient.get(`/admin/users/${userId}/roles`);
   }
 
-  assignRoles(payload) {
-    return httpClient.post(`/admin/users/${payload.userId}/roles`, payload);
+  assignRoles(userId, roleIds) {
+    return httpClient.post(`/admin/users/${userId}/roles`, { roleIds });
   }
 
   revokeRole(userId, roleId) {
