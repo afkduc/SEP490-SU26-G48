@@ -10,7 +10,7 @@ const HEADER_SELECT = `
   SELECT ro.*,
          b.branch_name,
          tl.user_name   AS team_leader_name,
-         tl.specialty   AS team_leader_specialty,
+         tlspec.names   AS team_leader_specialty,
          creator.user_name AS created_by_name,
          v.license_plate    AS vehicle_license_plate,
          v.vehicle_model_text,
@@ -23,6 +23,12 @@ const HEADER_SELECT = `
   LEFT JOIN vehicles v       ON v.id = ro.vehicle_id
   LEFT JOIN service_orders so ON so.id = ro.service_order_id
   LEFT JOIN customers c       ON c.id = so.customer_id
+  OUTER APPLY (
+      SELECT STRING_AGG(sp.specialty_name, ', ') AS names
+      FROM   user_specialty us
+      JOIN   specialties sp ON sp.id = us.specialty_id
+      WHERE  us.user_id = tl.id
+  ) tlspec
 `;
 
 function genCode(prefix, id) {
@@ -53,11 +59,15 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
 
   async findTeamLeadersByBranch(branchId) {
     const result = await query(
-      `SELECT u.id, u.pseudo_id, u.user_name, u.phone, u.specialty, u.team_size
+      `SELECT u.id, u.pseudo_id, u.user_name, u.phone, u.team_size,
+              STRING_AGG(sp.specialty_name, ', ') AS specialty_names
        FROM   users u
        JOIN   user_role ur ON ur.user_id = u.id
        JOIN   roles r      ON r.id = ur.role_id AND r.role_name = 'team_leader'
+       LEFT JOIN user_specialty us ON us.user_id = u.id
+       LEFT JOIN specialties sp    ON sp.id = us.specialty_id
        WHERE  u.branch_id = @branchId AND u.status = 'active'
+       GROUP  BY u.id, u.pseudo_id, u.user_name, u.phone, u.team_size
        ORDER  BY u.user_name`,
       { branchId }
     );
@@ -66,7 +76,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
       pseudoId: r.pseudo_id,
       fullName: r.user_name,
       phone: r.phone,
-      specialty: r.specialty,
+      specialty: r.specialty_names,
       teamSize: r.team_size,
     }));
   }

@@ -63,6 +63,15 @@ class ManagerApi {
   updateServicePackage(id, payload) {
     return httpClient.put(`/manager/service-packages/${id}`, payload);
   }
+
+  getSettlementReports(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return httpClient.get(`/manager/settlements${query ? `?${query}` : ''}`);
+  }
+
+  getSettlementReportById(id) {
+    return httpClient.get(`/manager/settlements/${id}`);
+  }
 }
 
 const managerApi = new ManagerApi();
