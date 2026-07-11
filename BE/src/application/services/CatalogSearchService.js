@@ -7,15 +7,18 @@ class CatalogSearchService {
     this.catalogSearchRepository = catalogSearchRepository;
   }
 
-  async search(term) {
+  async search(term, branchId) {
     if (!term || term.trim().length < 2) {
       throw new ApiError(400, 'Từ khóa tìm kiếm phải có ít nhất 2 ký tự');
+    }
+    if (!branchId) {
+      throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
     }
     const needle = normalizeVietnamese(term.trim());
 
     const [allServices, allPackageRows] = await Promise.all([
-      this.catalogSearchRepository.findAllActiveServices(),
-      this.catalogSearchRepository.findAllActivePackagesWithItems(),
+      this.catalogSearchRepository.findAllActiveServices(branchId),
+      this.catalogSearchRepository.findAllActivePackagesWithItems(branchId),
     ]);
 
     const services = allServices
