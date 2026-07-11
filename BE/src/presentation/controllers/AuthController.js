@@ -1,4 +1,5 @@
 const { success } = require('../../utils/response');
+const { trackLogin, trackLoginFailed } = require('../../middlewares/loginSessionMiddleware');
 
 class AuthController {
   constructor(authService) {
@@ -11,8 +12,14 @@ class AuthController {
     try {
       const { email, password } = req.body;
       const result = await this.authService.login(email, password);
+      trackLogin(req, result.user || result).catch((e) =>
+        console.error('[AuthController] trackLogin error:', e.message)
+      );
       return success(res, result, 'Đăng nhập thành công');
     } catch (err) {
+      trackLoginFailed(req, email).catch((e) =>
+        console.error('[AuthController] trackLoginFailed error:', e.message)
+      );
       next(err);
     }
   }
