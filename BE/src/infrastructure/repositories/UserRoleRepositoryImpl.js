@@ -1,4 +1,4 @@
-const { query } = require('../../database/sqlServer');
+const { query } = require('../database/sqlServer');
 
 class UserRoleRepositoryImpl {
   /**
