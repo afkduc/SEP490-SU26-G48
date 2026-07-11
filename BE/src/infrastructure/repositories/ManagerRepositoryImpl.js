@@ -65,6 +65,34 @@ function aggregateEmployees(rows = []) {
   return Array.from(map.values());
 }
 
+function mapServiceRow(row) {
+  return {
+    id: row.id,
+    code: row.service_code,
+    name: row.service_name,
+    categoryId: row.category_id,
+    categoryName: row.category_name,
+    unitPrice: Number(row.unit_price || 0),
+    durationMin: row.duration_min,
+    description: row.description,
+    isActive: !!row.is_active,
+  };
+}
+
+function mapPackageRow(row) {
+  return {
+    id: row.id,
+    code: row.package_code,
+    name: row.package_name,
+    categoryId: row.category_id,
+    categoryName: row.category_name,
+    applicableKm: row.applicable_km,
+    totalPrice: Number(row.total_price || 0),
+    description: row.description,
+    isActive: !!row.is_active,
+  };
+}
+
 class ManagerRepositoryImpl {
   async getBranchById(branchId) {
     const result = await query(
@@ -244,6 +272,236 @@ class ManagerRepositoryImpl {
     }
 
     return this.getEmployeeById(branchId, id);
+  }
+
+  async listServiceCategories() {
+    const result = await query('SELECT id, category_name FROM service_categories ORDER BY category_name ASC');
+    return result.recordset.map((row) => ({ id: row.id, name: row.category_name }));
+  }
+
+  async nextServiceCode(branchId) {
+    const branch = await this.getBranchById(branchId);
+    const prefix = `DV-${branch.code}-`;
+    const result = await query(
+      `SELECT ISNULL(MAX(TRY_CAST(SUBSTRING(service_code, @prefixLen, 10) AS INT)), 0) + 1 AS next_num
+       FROM services WHERE service_code LIKE @likePattern`,
+      { prefixLen: prefix.length + 1, likePattern: `${prefix}%` }
+    );
+    const nextNum = result.recordset[0].next_num;
+    return `${prefix}${String(nextNum).padStart(3, '0')}`;
+  }
+
+  async nextPackageCode(branchId) {
+    const branch = await this.getBranchById(branchId);
+    const prefix = `GOI-${branch.code}-`;
+    const result = await query(
+      `SELECT ISNULL(MAX(TRY_CAST(SUBSTRING(package_code, @prefixLen, 10) AS INT)), 0) + 1 AS next_num
+       FROM service_packages WHERE package_code LIKE @likePattern`,
+      { prefixLen: prefix.length + 1, likePattern: `${prefix}%` }
+    );
+    const nextNum = result.recordset[0].next_num;
+    return `${prefix}${String(nextNum).padStart(3, '0')}`;
+  }
+
+  async listServices(branchId, filters = {}) {
+    const params = {
+      branchId: Number(branchId),
+      search: filters.search ? `%${filters.search.trim()}%` : null,
+      status: filters.status && filters.status !== 'all' ? (filters.status === 'active' ? 1 : 0) : null,
+      categoryId: filters.categoryId && filters.categoryId !== 'all' ? Number(filters.categoryId) : null,
+    };
+
+    const result = await query(
+      `SELECT s.id, s.service_code, s.service_name, s.category_id, c.category_name,
+              s.unit_price, s.duration_min, s.description, s.is_active
+       FROM services s
+       LEFT JOIN service_categories c ON c.id = s.category_id
+       WHERE s.branch_id = @branchId
+         AND (@status IS NULL OR s.is_active = @status)
+         AND (@categoryId IS NULL OR s.category_id = @categoryId)
+         AND (
+           @search IS NULL
+           OR s.service_code LIKE @search
+           OR s.service_name LIKE @search
+         )
+       ORDER BY s.service_name ASC`,
+      params
+    );
+
+    return result.recordset.map(mapServiceRow);
+  }
+
+  async getServiceById(branchId, id) {
+    const result = await query(
+      `SELECT s.id, s.service_code, s.service_name, s.category_id, c.category_name,
+              s.unit_price, s.duration_min, s.description, s.is_active
+       FROM services s
+       LEFT JOIN service_categories c ON c.id = s.category_id
+       WHERE s.id = @id AND s.branch_id = @branchId`,
+      { id: Number(id), branchId: Number(branchId) }
+    );
+    const row = result.recordset[0];
+    return row ? mapServiceRow(row) : null;
+  }
+
+  async createService({ branchId, serviceCode, serviceName, categoryId, unitPrice, durationMin, description }) {
+    const result = await query(
+      `INSERT INTO services (service_code, service_name, category_id, unit_price, duration_min, description, is_active, branch_id)
+       OUTPUT INSERTED.id
+       VALUES (@serviceCode, @serviceName, @categoryId, @unitPrice, @durationMin, @description, 1, @branchId)`,
+      {
+        serviceCode,
+        serviceName,
+        categoryId,
+        unitPrice,
+        durationMin,
+        description,
+        branchId: Number(branchId),
+      }
+    );
+    return this.getServiceById(branchId, result.recordset[0].id);
+  }
+
+  async updateService(branchId, id, { serviceName, categoryId, unitPrice, durationMin, description, isActive }) {
+    await query(
+      `UPDATE services
+       SET service_name = @serviceName,
+           category_id = @categoryId,
+           unit_price = @unitPrice,
+           duration_min = @durationMin,
+           description = @description,
+           is_active = @isActive
+       WHERE id = @id AND branch_id = @branchId`,
+      {
+        serviceName,
+        categoryId,
+        unitPrice,
+        durationMin,
+        description,
+        isActive: isActive ? 1 : 0,
+        id: Number(id),
+        branchId: Number(branchId),
+      }
+    );
+    return this.getServiceById(branchId, id);
+  }
+
+  async listServicePackages(branchId, filters = {}) {
+    const params = {
+      branchId: Number(branchId),
+      search: filters.search ? `%${filters.search.trim()}%` : null,
+      status: filters.status && filters.status !== 'all' ? (filters.status === 'active' ? 1 : 0) : null,
+    };
+
+    const result = await query(
+      `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
+              sp.applicable_km, sp.total_price, sp.description, sp.is_active,
+              (SELECT COUNT(*) FROM service_package_items spi WHERE spi.package_id = sp.id) AS item_count
+       FROM service_packages sp
+       LEFT JOIN service_categories c ON c.id = sp.category_id
+       WHERE sp.branch_id = @branchId
+         AND (@status IS NULL OR sp.is_active = @status)
+         AND (
+           @search IS NULL
+           OR sp.package_code LIKE @search
+           OR sp.package_name LIKE @search
+         )
+       ORDER BY sp.package_name ASC`,
+      params
+    );
+
+    return result.recordset.map((row) => ({ ...mapPackageRow(row), itemCount: row.item_count }));
+  }
+
+  async getServicePackageById(branchId, id) {
+    const result = await query(
+      `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
+              sp.applicable_km, sp.total_price, sp.description, sp.is_active
+       FROM service_packages sp
+       LEFT JOIN service_categories c ON c.id = sp.category_id
+       WHERE sp.id = @id AND sp.branch_id = @branchId`,
+      { id: Number(id), branchId: Number(branchId) }
+    );
+    const row = result.recordset[0];
+    if (!row) return null;
+
+    const itemsResult = await query(
+      `SELECT s.id, s.service_code, s.service_name, s.unit_price
+       FROM service_package_items spi
+       JOIN services s ON s.id = spi.service_id
+       WHERE spi.package_id = @id
+       ORDER BY s.service_name ASC`,
+      { id: Number(id) }
+    );
+
+    return {
+      ...mapPackageRow(row),
+      services: itemsResult.recordset.map((r) => ({
+        id: r.id,
+        code: r.service_code,
+        name: r.service_name,
+        unitPrice: Number(r.unit_price || 0),
+      })),
+    };
+  }
+
+  async _syncPackageItems(packageId, serviceIds = []) {
+    await query('DELETE FROM service_package_items WHERE package_id = @packageId', { packageId: Number(packageId) });
+    for (const serviceId of serviceIds) {
+      await query('INSERT INTO service_package_items (package_id, service_id) VALUES (@packageId, @serviceId)', {
+        packageId: Number(packageId),
+        serviceId: Number(serviceId),
+      });
+    }
+  }
+
+  async createServicePackage({ branchId, packageCode, packageName, categoryId, applicableKm, totalPrice, description, serviceIds }) {
+    const result = await query(
+      `INSERT INTO service_packages (package_code, package_name, category_id, applicable_km, total_price, description, is_active, branch_id)
+       OUTPUT INSERTED.id
+       VALUES (@packageCode, @packageName, @categoryId, @applicableKm, @totalPrice, @description, 1, @branchId)`,
+      {
+        packageCode,
+        packageName,
+        categoryId,
+        applicableKm,
+        totalPrice,
+        description,
+        branchId: Number(branchId),
+      }
+    );
+    const packageId = result.recordset[0].id;
+    await this._syncPackageItems(packageId, serviceIds);
+    return this.getServicePackageById(branchId, packageId);
+  }
+
+  async updateServicePackage(branchId, id, { packageName, categoryId, applicableKm, totalPrice, description, isActive, serviceIds }) {
+    await query(
+      `UPDATE service_packages
+       SET package_name = @packageName,
+           category_id = @categoryId,
+           applicable_km = @applicableKm,
+           total_price = @totalPrice,
+           description = @description,
+           is_active = @isActive
+       WHERE id = @id AND branch_id = @branchId`,
+      {
+        packageName,
+        categoryId,
+        applicableKm,
+        totalPrice,
+        description,
+        isActive: isActive ? 1 : 0,
+        id: Number(id),
+        branchId: Number(branchId),
+      }
+    );
+
+    if (serviceIds) {
+      await this._syncPackageItems(id, serviceIds);
+    }
+
+    return this.getServicePackageById(branchId, id);
   }
 }
 
