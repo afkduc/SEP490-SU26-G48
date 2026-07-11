@@ -251,11 +251,12 @@ class AdminUserRepositoryImpl {
     ]);
 
     const users = userStats.recordset[0];
-    let recentLogs = [];
 
+    // Recent audit logs (general activity)
+    let recentLogs = [];
     try {
       const logsResult = await query(`
-        SELECT TOP 5
+        SELECT TOP 8
           al.id,
           al.action,
           al.user_name,
@@ -263,6 +264,8 @@ class AdminUserRepositoryImpl {
           al.record_id,
           al.old_value,
           al.new_value,
+          al.ip_address,
+          al.response_status,
           al.logged_at
         FROM audit_logs al
         ORDER BY al.logged_at DESC
@@ -275,10 +278,97 @@ class AdminUserRepositoryImpl {
         targetId: row.record_id,
         oldValue: row.old_value,
         newValue: row.new_value,
+        ipAddress: row.ip_address,
+        responseStatus: row.response_status,
         createdAt: row.logged_at,
       }));
     } catch (_) {
       recentLogs = [];
+    }
+
+    // Login sessions (recent logins)
+    let recentLogins = [];
+    let todayLogins = 0;
+    let failedLogins = 0;
+    try {
+      const loginResult = await query(`
+        SELECT TOP 8
+          ls.id,
+          ls.user_name,
+          ls.action_type,
+          ls.ip_address,
+          ls.user_agent,
+          ls.login_time,
+          ls.logout_time,
+          ls.session_duration_seconds,
+          ls.status
+        FROM login_sessions ls
+        ORDER BY ls.login_time DESC
+      `);
+      recentLogins = loginResult.recordset.map((row) => ({
+        id: row.id,
+        userName: row.user_name,
+        actionType: row.action_type,
+        ipAddress: row.ip_address,
+        userAgent: row.user_agent,
+        loginTime: row.login_time,
+        logoutTime: row.logout_time,
+        sessionDuration: row.session_duration_seconds,
+        status: row.status,
+      }));
+
+      // Today's login count
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayResult = await query(`
+        SELECT COUNT(*) AS total
+        FROM login_sessions
+        WHERE login_time >= @p1
+      `, { p1: todayStart });
+      todayLogins = Number(todayResult.recordset[0].total);
+
+      // Failed logins count
+      const failedResult = await query(`
+        SELECT COUNT(*) AS total
+        FROM login_sessions
+        WHERE action_type = 'LOGIN_FAILED'
+      `);
+      failedLogins = Number(failedResult.recordset[0].total);
+    } catch (_) {
+      recentLogins = [];
+    }
+
+    // System alerts (based on data anomalies)
+    const alerts = [];
+    if (users.lockedCount > 0) {
+      alerts.push({
+        id: 'locked-users',
+        type: 'warning',
+        title: 'Tai khoan bi khoa',
+        message: `${users.lockedCount} tai khoan bi khoa can xu ly`,
+        icon: 'lock',
+        time: new Date().toISOString(),
+      });
+    }
+    if (failedLogins > 10) {
+      alerts.push({
+        id: 'failed-logins',
+        type: 'danger',
+        title: 'Nhieu lan dang nhap that bai',
+        message: `${failedLogins} lan dang nhap that bai - kiem tra an ninh`,
+        icon: 'alert',
+        time: new Date().toISOString(),
+      });
+    }
+    if (users.inactiveCount > users.activeCount * 0.3) {
+      alerts.push({
+        id: 'inactive-users',
+        type: 'info',
+        title: 'Nhieu tai khoan khong hoat dong',
+        message: `${users.inactiveCount} tai khoan khong hoat dong`,
+        icon: 'user',
+        time: new Date().toISOString(),
+      });
     }
 
     return {
@@ -289,6 +379,10 @@ class AdminUserRepositoryImpl {
       totalBranches: Number(branchCount.recordset[0].total),
       totalRoles: Number(roleCount.recordset[0].total),
       recentLogs,
+      recentLogins,
+      todayLogins,
+      failedLogins,
+      alerts,
     };
   }
 }
