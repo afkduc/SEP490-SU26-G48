@@ -1,0 +1,23 @@
+class RepairOrderRepository {
+  async findAll({ branchId } = {}) {
+    throw new Error('Method findAll() must be implemented');
+  }
+
+  async findById(id) {
+    throw new Error('Method findById() must be implemented');
+  }
+
+  async findTeamLeadersByBranch(branchId) {
+    throw new Error('Method findTeamLeadersByBranch() must be implemented');
+  }
+
+  async findEligibleServiceOrder(serviceOrderId, branchId) {
+    throw new Error('Method findEligibleServiceOrder() must be implemented');
+  }
+
+  async create(data, { branchId, createdBy }) {
+    throw new Error('Method create() must be implemented');
+  }
+}
+
+module.exports = RepairOrderRepository;
