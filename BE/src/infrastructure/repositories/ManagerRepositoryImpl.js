@@ -426,7 +426,7 @@ class ManagerRepositoryImpl {
     if (!row) return null;
 
     const itemsResult = await query(
-      `SELECT s.id, s.service_code, s.service_name, s.unit_price
+      `SELECT s.id, s.service_code, s.service_name, s.unit_price, s.is_active
        FROM service_package_items spi
        JOIN services s ON s.id = spi.service_id
        WHERE spi.package_id = @id
@@ -441,8 +441,20 @@ class ManagerRepositoryImpl {
         code: r.service_code,
         name: r.service_name,
         unitPrice: Number(r.unit_price || 0),
+        isActive: !!r.is_active,
       })),
     };
+  }
+
+  async listPackagesUsingService(branchId, serviceId) {
+    const result = await query(
+      `SELECT sp.id, sp.package_code, sp.package_name
+       FROM service_package_items spi
+       JOIN service_packages sp ON sp.id = spi.package_id
+       WHERE spi.service_id = @serviceId AND sp.branch_id = @branchId AND sp.is_active = 1`,
+      { serviceId: Number(serviceId), branchId: Number(branchId) }
+    );
+    return result.recordset.map((row) => ({ id: row.id, code: row.package_code, name: row.package_name }));
   }
 
   async _syncPackageItems(packageId, serviceIds = []) {
