@@ -16,7 +16,7 @@ class RepairOrder {
     this.vehicleId = data.vehicleId ?? null;
     this.createdBy = data.createdBy ?? null;
     this.createdByName = data.createdByName ?? null;
-    this.status = data.status ?? 'in_progress';
+    this.status = data.status ?? 'inprogress';
     this.notes = data.notes ?? null;
     this.createdAt = data.createdAt ?? null;
     this.completedAt = data.completedAt ?? null;
