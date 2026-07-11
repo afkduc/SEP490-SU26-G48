@@ -15,9 +15,13 @@ function buildGeneralDirectorRouter() {
   router.get('/reports/revenue', controller.getRevenueReports);
   router.get('/reports/settlements', controller.getSettlementReports);
   router.get('/reports/settlements/:id', controller.getSettlementReportById);
+
+  // Reference data + personnel modules
   router.get('/branches', controller.getBranches);
   router.get('/employees', controller.getEmployees);
   router.get('/employees/:id', controller.getEmployeeById);
+
+  // UC51 - technician coordination
   router.get('/technicians', controller.getTechnicians);
   router.get('/technicians/:id', controller.getTechnicianById);
 
