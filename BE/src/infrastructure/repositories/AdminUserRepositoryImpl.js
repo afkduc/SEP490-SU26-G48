@@ -235,7 +235,6 @@ class AdminUserRepositoryImpl {
   /**
    * Lay thong ke dashboard tong quan
    * Tra ve counts theo status cua users, so branches, so roles
-   * Neu bang system_logs chua ton tai thi recentLogs tra ve []
    */
   async getDashboardStats() {
     const [userStats, branchCount, roleCount] = await Promise.all([
@@ -257,26 +256,26 @@ class AdminUserRepositoryImpl {
     try {
       const logsResult = await query(`
         SELECT TOP 5
-          sl.id,
-          sl.action,
-          sl.actor_name,
-          sl.target_type,
-          sl.target_id,
-          sl.details,
-          sl.ip_address,
-          sl.created_at
-        FROM system_logs sl
-        ORDER BY sl.created_at DESC
+          al.id,
+          al.action,
+          al.user_name,
+          al.table_name,
+          al.record_id,
+          al.old_value,
+          al.new_value,
+          al.logged_at
+        FROM audit_logs al
+        ORDER BY al.logged_at DESC
       `);
       recentLogs = logsResult.recordset.map((row) => ({
         id: row.id,
         action: row.action,
-        actorName: row.actor_name,
-        targetType: row.target_type,
-        targetId: row.target_id,
-        details: row.details,
-        ipAddress: row.ip_address,
-        createdAt: row.created_at,
+        actorName: row.user_name,
+        targetType: row.table_name,
+        targetId: row.record_id,
+        oldValue: row.old_value,
+        newValue: row.new_value,
+        createdAt: row.logged_at,
       }));
     } catch (_) {
       recentLogs = [];
