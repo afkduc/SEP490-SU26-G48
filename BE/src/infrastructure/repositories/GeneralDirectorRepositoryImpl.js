@@ -195,6 +195,8 @@ function mapTechnician(row) {
     skills,
     skillGroups,
     skillGroupLabels: skillGroups.map(skillGroupLabel),
+    activeAssignments: Number(row.active_assignments || 0),
+    totalRepairs: Number(row.total_repairs || 0),
   };
 }
 
@@ -687,11 +689,20 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           u.created_at,
           u.branch_id,
           b.branch_code,
-          b.branch_name
+          b.branch_name,
+          ISNULL(stats.active_assignments, 0) AS active_assignments,
+          ISNULL(stats.total_repairs, 0) AS total_repairs
        FROM users u
        LEFT JOIN branches b ON b.id = u.branch_id
        INNER JOIN user_role ur ON ur.user_id = u.id
        INNER JOIN roles r ON r.id = ur.role_id
+       OUTER APPLY (
+         SELECT
+           SUM(CASE WHEN ro.status = 'inprogress' THEN 1 ELSE 0 END) AS active_assignments,
+           COUNT(1) AS total_repairs
+         FROM repair_orders ro
+         WHERE ro.team_leader_id = u.id
+       ) stats
        WHERE r.role_name = 'team_leader'
          AND (@branchId IS NULL OR u.branch_id = @branchId)
          AND (@status IS NULL OR u.status = @status)
