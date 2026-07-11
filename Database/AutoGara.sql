@@ -318,24 +318,12 @@ SET QUOTED_IDENTIFIER ON
 GO
 CREATE TABLE [dbo].[audit_logs](
 	[id] [bigint] IDENTITY(1,1) NOT NULL,
-	[user_id] [bigint] NULL,
 	[user_name] [nvarchar](128) NOT NULL,
-	[phone_number] [nvarchar](20) NULL,
 	[action] [varchar](10) NOT NULL,
 	[table_name] [varchar](50) NOT NULL,
-	[entity_name] [nvarchar](128) NULL,
-	[entity_code] [varchar](50) NULL,
 	[record_id] [bigint] NULL,
 	[old_value] [nvarchar](max) NULL,
 	[new_value] [nvarchar](max) NULL,
-	[ip_address] [varchar](45) NULL,
-	[request_method] [varchar](10) NULL,
-	[request_url] [nvarchar](512) NULL,
-	[request_body] [nvarchar](max) NULL,
-	[response_status] [int] NULL,
-	[duration_ms] [int] NULL,
-	[branch_id] [bigint] NULL,
-	[description] [nvarchar](512) NULL,
 	[logged_at] [datetime] NOT NULL,
  CONSTRAINT [audit_logs_pkey] PRIMARY KEY CLUSTERED 
 (
@@ -343,27 +331,7 @@ CREATE TABLE [dbo].[audit_logs](
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
 GO
-/****** Object:  Table [dbo].[entity_definitions]    Script Date: 7/8/2026 8:51:30 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE TABLE [dbo].[entity_definitions](
-	[id] [bigint] IDENTITY(1,1) NOT NULL,
-	[table_name] [varchar](50) NOT NULL,
-	[entity_name] [nvarchar](128) NOT NULL,
-	[prefix_code] [varchar](10) NOT NULL,
-	[icon] [nvarchar](64) NULL,
-	[is_active] [bit] NOT NULL DEFAULT (1),
-	[created_at] [datetime] NOT NULL DEFAULT (GETDATE()),
-	[updated_at] [datetime] NULL,
- CONSTRAINT [entity_definitions_pkey] PRIMARY KEY CLUSTERED
-(
-	[id] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY]
-GO
-/****** Object:  Table [dbo].[contracts]    Script Date: 7/8/2026 8:51:30 AM ******/
+/****** Object:  Table [dbo].[contracts]    Script Date: 7/12/2026 12:12:59 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -1582,38 +1550,7 @@ END;
 GO
 USE [master]
 GO
-ALTER DATABASE [AutoGaraDB] SET  READ_WRITE
-GO
-
--- ============================================================
---  PHẦN 11: LOGIN SESSIONS – Theo dõi đăng nhập / đăng xuất
--- ============================================================
-CREATE TABLE [dbo].[login_sessions](
-    [id] [bigint] IDENTITY(1,1) NOT NULL,
-    [action_type] [varchar](20) NOT NULL,        -- LOGIN | LOGIN_FAILED
-    [user_id] [bigint] NULL,
-    [user_name] [nvarchar](250) NULL,
-    [phone] [varchar](20) NULL,
-    [ip_address] [varchar](64) NULL,
-    [user_agent] [nvarchar](512) NULL,
-    [branch_id] [bigint] NULL,
-    [status] [varchar](20) NOT NULL,            -- active | ended | failed
-    [login_time] [datetime] NOT NULL DEFAULT GETDATE(),
-    [logout_time] [datetime] NULL,
-    [session_duration_seconds] [int] NULL,
-    CONSTRAINT [login_sessions_pkey] PRIMARY KEY CLUSTERED
-    (
-        [id] ASC
-    ) WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF,
-            ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY];
-
-ALTER TABLE [dbo].[login_sessions] ADD DEFAULT (getdate()) FOR [login_time];
-ALTER TABLE [dbo].[login_sessions] ADD DEFAULT ('active') FOR [status];
-
-CREATE NONCLUSTERED INDEX [idx_login_sessions_user_name] ON [dbo].[login_sessions]([user_name]);
-CREATE NONCLUSTERED INDEX [idx_login_sessions_status] ON [dbo].[login_sessions]([status]);
-CREATE NONCLUSTERED INDEX [idx_login_sessions_login_time] ON [dbo].[login_sessions]([login_time] DESC);
+ALTER DATABASE [AutoGaraDB] SET  READ_WRITE 
 GO
 
 
