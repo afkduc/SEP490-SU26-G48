@@ -116,6 +116,15 @@ function employeeStatusBadge(status) {
   return EMPLOYEE_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
 }
 
+function repairStatusLabel(status) {
+  const labels = {
+    inprogress: 'Đang sửa chữa',
+    completed: 'Hoàn thành',
+    cancelled: 'Đã hủy',
+  };
+  return labels[status] || status || 'Không rõ';
+}
+
 function percent(value) {
   const safeValue = Number(value || 0);
   return `${safeValue.toFixed(2)}%`;
@@ -1221,7 +1230,7 @@ function TechnicianListPage() {
                                 <div style={{ fontSize: 11, color: '#6B7280' }}>{item.vehicle?.model || ''}</div>
                               </td>
                               <td>{item.customerName || '—'}</td>
-                              <td>{item.repairStatus || '—'}</td>
+                              <td>{repairStatusLabel(item.repairStatus)}</td>
                               <td>{formatDate(item.createdAt)}</td>
                               <td>{formatDate(item.completedAt)}</td>
                             </tr>
