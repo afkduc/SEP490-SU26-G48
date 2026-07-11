@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminUsersApi } from '../../../services/adminApi';
+import AssignRoleModal from './AssignRoleModal';
 
 const STATUS_LABELS = {
   active: 'Hoat dong',
@@ -68,10 +69,11 @@ function DetailRow({ icon, label, value, badge }) {
   );
 }
 
-export default function UserDetailDrawer({ userId, onClose }) {
+export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showAssign, setShowAssign] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -209,7 +211,29 @@ export default function UserDetailDrawer({ userId, onClose }) {
             </>
           ) : null}
         </div>
+
+        <div className="drawer__footer">
+          <button className="drawer__btn-assign" onClick={() => setShowAssign(true)} type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <line x1="12" y1="8" x2="12" y2="16"/>
+              <line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+            Phan quyen
+          </button>
+        </div>
       </div>
+
+      {showAssign && user && (
+        <AssignRoleModal
+          userId={user.id}
+          onClose={() => setShowAssign(false)}
+          onSuccess={() => {
+            onRolesChanged?.();
+            onClose?.();
+          }}
+        />
+      )}
     </div>
   );
 }

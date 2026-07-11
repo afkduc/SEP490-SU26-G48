@@ -178,16 +178,16 @@ chore(db): add V2 migration for products table
 
 | # | Commit message | File/Thay đổi chính |
 |---|---------------|----------------------|
-| 41 | `feat(be): RoleRepository.findAll + findById + countUsersByRole` | Mới: `BE/src/infrastructure/repositories/RoleRepositoryImpl.js` |
-| 42 | `feat(be): RoleService.listRoles + getRoleDetail` | Mới: `BE/src/application/services/RoleService.js` |
-| 43 | `feat(be): GET /api/admin/roles + GET /api/admin/roles/:id (UC-11)` | Sửa `adminRoutes.js` + `AdminController.listRoles/getRoleDetail` |
-| 44 | `feat(be): UserRoleRepository.assignRole + removeRole + listByUser` | Mới: `BE/src/infrastructure/repositories/UserRoleRepositoryImpl.js` |
-| 45 | `feat(be): UserRoleService.assign + revoke` | Mới: `BE/src/application/services/UserRoleService.js` |
-| 46 | `feat(be): POST /api/admin/users/:userId/roles + DELETE /:userId/roles/:roleId (UC-12)` | Sửa `adminRoutes.js` |
-| 47 | `feat(fe): adminRolesApi.list + getDetail` | Sửa `FE/src/services/adminApi.js` |
-| 48 | `feat(fe): hook useAdminRoles` | Mới: `FE/src/hooks/admin/useAdminRoles.js` |
-| 49 | `feat(fe): AdminRolesPage dạng grid card (UC-11) + route /admin/roles` | Mới: `FE/src/pages/admin/roles/AdminRolesPage.jsx` |
-| 50 | `feat(fe): AssignRoleModal (multi-select checkbox) + nút "Phân quyền" trong UserDetailDrawer (UC-12)` | Mới: `FE/src/pages/admin/users/AssignRoleModal.jsx` |
+| 41 | `feat(admin): AdminDashboard redesign – getDashboardStats backend` | Sửa `AdminController.js`, `AdminUserService.js`, `AdminUserRepositoryImpl.js` |
+| 42 | `feat(fe): AdminDashboardPage layout (stats grid + actions + activity log)` | Mới: `FE/src/pages/admin/AdminDashboardPage.jsx` |
+| 43 | `feat(fe): AdminDashboardPage.css theo design system AdminUsersPage` | Mới: `FE/src/pages/admin/AdminDashboardPage.css` |
+| 44 | `feat(be): RoleRepository.findAll + findById + countUsersByRole` | Mới: `BE/src/infrastructure/repositories/RoleRepositoryImpl.js` |
+| 45 | `feat(be): RoleService.listRoles + getRoleDetail` | Mới: `BE/src/application/services/RoleService.js` |
+| 46 | `feat(be): UserRoleRepository.assignRole + removeRole + listByUser` | Mới: `BE/src/infrastructure/repositories/UserRoleRepositoryImpl.js` |
+| 47 | `feat(be): UserRoleService.assign + revoke + setUserRoles` | Mới: `BE/src/application/services/UserRoleService.js` |
+| 48 | `feat(be): UC-11/12 routes + controller methods` | Sửa `adminRoutes.js`, `AdminController.js` |
+| 49 | `feat(fe): AdminRolesPage grid card (UC-11) + AdminRolesPage.css` | Mới: `FE/src/pages/admin/AdminRolesPage.jsx`, `AdminRolesPage.css` |
+| 50 | `feat(fe): AssignRoleModal (multi-select) + nút "Phân quyền" trong UserDetailDrawer (UC-12)` | Mới: `FE/src/pages/admin/users/AssignRoleModal.jsx`, `AssignRoleModal.css` |
 
 **Checkpoint cuối ngày 5**: Admin xem danh sách role, phân quyền cho user qua drawer.
 

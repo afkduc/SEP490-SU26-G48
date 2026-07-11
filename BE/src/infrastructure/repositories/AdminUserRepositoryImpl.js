@@ -231,6 +231,67 @@ class AdminUserRepositoryImpl {
 
     return this.findById(userId);
   }
+
+  /**
+   * Lay thong ke dashboard tong quan
+   * Tra ve counts theo status cua users, so branches, so roles
+   * Neu bang system_logs chua ton tai thi recentLogs tra ve []
+   */
+  async getDashboardStats() {
+    const [userStats, branchCount, roleCount] = await Promise.all([
+      query(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN status = 'active'   THEN 1 ELSE 0 END) AS activeCount,
+          SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) AS inactiveCount,
+          SUM(CASE WHEN status = 'locked'   THEN 1 ELSE 0 END) AS lockedCount
+        FROM users
+      `),
+      query('SELECT COUNT(*) AS total FROM branches WHERE is_active = 1'),
+      query('SELECT COUNT(*) AS total FROM roles'),
+    ]);
+
+    const users = userStats.recordset[0];
+    let recentLogs = [];
+
+    try {
+      const logsResult = await query(`
+        SELECT TOP 5
+          sl.id,
+          sl.action,
+          sl.actor_name,
+          sl.target_type,
+          sl.target_id,
+          sl.details,
+          sl.ip_address,
+          sl.created_at
+        FROM system_logs sl
+        ORDER BY sl.created_at DESC
+      `);
+      recentLogs = logsResult.recordset.map((row) => ({
+        id: row.id,
+        action: row.action,
+        actorName: row.actor_name,
+        targetType: row.target_type,
+        targetId: row.target_id,
+        details: row.details,
+        ipAddress: row.ip_address,
+        createdAt: row.created_at,
+      }));
+    } catch (_) {
+      recentLogs = [];
+    }
+
+    return {
+      totalUsers: Number(users.total),
+      activeUsers: Number(users.activeCount),
+      inactiveUsers: Number(users.inactiveCount),
+      lockedUsers: Number(users.lockedCount),
+      totalBranches: Number(branchCount.recordset[0].total),
+      totalRoles: Number(roleCount.recordset[0].total),
+      recentLogs,
+    };
+  }
 }
 
 module.exports = AdminUserRepositoryImpl;

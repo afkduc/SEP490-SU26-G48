@@ -402,6 +402,7 @@ export default function AdminUsersPage() {
         <UserDetailDrawer
           userId={detailUserId}
           onClose={() => setDetailUserId(null)}
+          onRolesChanged={refetch}
         />
       )}
     </div>
