@@ -33,6 +33,10 @@ class GeneralDirectorApi {
     return httpClient.get(`/general-director/technicians${query ? `?${query}` : ''}`);
   }
 
+  getTechnicianById(id) {
+    return httpClient.get(`/general-director/technicians/${id}`);
+  }
+
   getBranchManagers(params = {}) {
     const query = new URLSearchParams(params).toString();
     return httpClient.get(`/general-director/branch-managers${query ? `?${query}` : ''}`);
