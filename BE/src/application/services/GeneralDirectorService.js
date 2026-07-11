@@ -38,6 +38,69 @@ class GeneralDirectorService {
   async listBranches() {
     return this.generalDirectorRepository.listBranches();
   }
+
+  async listEmployees(filters = {}) {
+    const normalized = {
+      search: (filters.search || '').trim(),
+      branchId: filters.branchId || 'all',
+      status: filters.status || 'all',
+      role: filters.role || 'all',
+    };
+
+    const validStatuses = ['all', 'active', 'inactive'];
+    if (!validStatuses.includes(normalized.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    return this.generalDirectorRepository.listEmployees(normalized);
+  }
+
+  async getEmployeeById(id) {
+    if (!id) {
+      throw new ApiError(400, 'Thiếu mã nhân sự');
+    }
+
+    const employee = await this.generalDirectorRepository.getEmployeeById(id);
+    if (!employee) {
+      throw new ApiError(404, 'Không tìm thấy nhân sự');
+    }
+
+    return employee;
+  }
+
+  async listTechnicians(filters = {}) {
+    const normalized = {
+      search: (filters.search || '').trim(),
+      branchId: filters.branchId || 'all',
+      skillGroup: filters.skillGroup || 'all',
+      status: filters.status || 'all',
+    };
+
+    const validStatuses = ['all', 'active', 'inactive'];
+    if (!validStatuses.includes(normalized.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    const validSkillGroups = ['all', 'mechanical', 'electrical', 'painting', 'diagnostic', 'maintenance', 'other'];
+    if (!validSkillGroups.includes(normalized.skillGroup)) {
+      throw new ApiError(400, 'Nhóm kỹ năng không hợp lệ');
+    }
+
+    return this.generalDirectorRepository.listTechnicians(normalized);
+  }
+
+  async getTechnicianById(id) {
+    if (!id) {
+      throw new ApiError(400, 'Thiếu mã kỹ thuật viên');
+    }
+
+    const technician = await this.generalDirectorRepository.getTechnicianById(id);
+    if (!technician) {
+      throw new ApiError(404, 'Không tìm thấy kỹ thuật viên');
+    }
+
+    return technician;
+  }
 }
 
 module.exports = GeneralDirectorService;
