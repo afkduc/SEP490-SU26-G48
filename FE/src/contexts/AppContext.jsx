@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { loginApi } from '../services/authApi';
+import { ROLES } from '../constants/roles';
 
 const AppContext = createContext(null);
 
@@ -12,6 +13,18 @@ function loadSession() {
     /* ignore */
   }
   return { token: null, user: null };
+}
+
+/**
+ * Tra ve path home phu hop nhat theo thu tu role (admin uu tien cao nhat)
+ */
+export function getRoleHome(user) {
+  if (!user?.roles?.length) return '/dashboard';
+  if (user.roles.includes(ROLES.ADMIN)) return '/admin/dashboard';
+  if (user.roles.includes(ROLES.GENERAL_DIRECTOR)) return '/general-director';
+  if (user.roles.includes(ROLES.MANAGER)) return '/manager';
+  if (user.roles.includes(ROLES.WAREHOUSE_STAFF) || user.roles.includes(ROLES.ACCOUNTANT)) return '/inventory';
+  return '/dashboard';
 }
 
 export function AppProvider({ children }) {
