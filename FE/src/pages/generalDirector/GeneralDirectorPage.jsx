@@ -1211,6 +1211,7 @@ function TechnicianListPage() {
                     <DetailRow label="Nhóm kỹ năng" value={(activeTechnician.skillGroupLabels || []).join(', ') || '—'} />
                     <DetailRow label="Kỹ năng chi tiết" value={(activeTechnician.skills || []).join(', ') || activeTechnician.specialty || '—'} />
                     <DetailRow label="Quy mô tổ" value={activeTechnician.teamSize ? `${activeTechnician.teamSize} người` : '—'} />
+                    <DetailRow label="Gần nhất hoàn thành" value={formatDate(activeTechnician.repairSummary?.latestCompletedAt)} />
                     <DetailRow label="Ngày tạo tài khoản" value={formatDate(activeTechnician.createdAt)} />
                     <DetailRow label="Ghi chú" value={activeTechnician.notes} />
                   </div>
