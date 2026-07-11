@@ -29,7 +29,7 @@ const ADMIN_NAV = [
     icon: '🛡️',
     children: [
       { label: 'Danh sách Role', path: '/admin/roles' },
-      { label: 'Phân quyền', path: '/admin/roles/permissions' },
+      { label: 'Phân quyền', path: '/admin/users' },
     ],
   },
   {
