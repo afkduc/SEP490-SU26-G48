@@ -991,6 +991,11 @@ function TechnicianListPage() {
     setDetailError('');
   };
 
+  const selectedBranchName = branchId === 'all'
+    ? 'Tất cả chi nhánh'
+    : branches.find((branch) => String(branch.id) === String(branchId))?.name || 'Chi nhánh';
+  const selectedSkillName = TECHNICIAN_SKILL_OPTIONS.find((option) => option.value === skillGroup)?.label || 'Tất cả kỹ năng';
+
   return (
     <div>
       <div className="page-header">
@@ -1051,6 +1056,10 @@ function TechnicianListPage() {
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
+      </div>
+
+      <div style={{ marginBottom: 12, fontSize: 12, color: '#64748B' }}>
+        Đang lọc: {selectedBranchName} · {selectedSkillName}
       </div>
 
       {error && (
