@@ -18,6 +18,7 @@ const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
+const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
@@ -102,6 +103,16 @@ function AppRoutes() {
             <ProtectedRoute roles={[ROLES.ADMIN]}>
               <AdminLayout>
                 <AuditLogsPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AdminProfilePage />
               </AdminLayout>
             </ProtectedRoute>
           }
