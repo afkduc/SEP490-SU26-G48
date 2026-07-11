@@ -727,6 +727,7 @@ CREATE TABLE [dbo].[service_packages](
 	[total_price] [decimal](18, 2) NOT NULL,
 	[description] [nvarchar](500) NULL,
 	[is_active] [bit] NOT NULL,
+	[branch_id] [bigint] NOT NULL,
  CONSTRAINT [sp_pkey] PRIMARY KEY CLUSTERED 
 (
 	[id] ASC
@@ -751,6 +752,7 @@ CREATE TABLE [dbo].[services](
 	[duration_min] [int] NULL,
 	[description] [nvarchar](500) NULL,
 	[is_active] [bit] NOT NULL,
+	[branch_id] [bigint] NOT NULL,
  CONSTRAINT [svc_pkey] PRIMARY KEY CLUSTERED 
 (
 	[id] ASC
@@ -896,6 +898,18 @@ CREATE NONCLUSTERED INDEX [idx_mr_due_date] ON [dbo].[maintenance_reminders]
 GO
 /****** Object:  Index [idx_products_branch]    Script Date: 7/8/2026 8:51:30 AM ******/
 CREATE NONCLUSTERED INDEX [idx_products_branch] ON [dbo].[products]
+(
+	[branch_id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+GO
+/****** Object:  Index [idx_services_branch] ******/
+CREATE NONCLUSTERED INDEX [idx_services_branch] ON [dbo].[services]
+(
+	[branch_id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+GO
+/****** Object:  Index [idx_service_packages_branch] ******/
+CREATE NONCLUSTERED INDEX [idx_service_packages_branch] ON [dbo].[service_packages]
 (
 	[branch_id] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
@@ -1365,10 +1379,20 @@ REFERENCES [dbo].[service_categories] ([id])
 GO
 ALTER TABLE [dbo].[service_packages] CHECK CONSTRAINT [sp_cat_fkey]
 GO
+ALTER TABLE [dbo].[service_packages]  WITH CHECK ADD  CONSTRAINT [service_packages_branch_fkey] FOREIGN KEY([branch_id])
+REFERENCES [dbo].[branches] ([id])
+GO
+ALTER TABLE [dbo].[service_packages] CHECK CONSTRAINT [service_packages_branch_fkey]
+GO
 ALTER TABLE [dbo].[services]  WITH CHECK ADD  CONSTRAINT [svc_cat_fkey] FOREIGN KEY([category_id])
 REFERENCES [dbo].[service_categories] ([id])
 GO
 ALTER TABLE [dbo].[services] CHECK CONSTRAINT [svc_cat_fkey]
+GO
+ALTER TABLE [dbo].[services]  WITH CHECK ADD  CONSTRAINT [services_branch_fkey] FOREIGN KEY([branch_id])
+REFERENCES [dbo].[branches] ([id])
+GO
+ALTER TABLE [dbo].[services] CHECK CONSTRAINT [services_branch_fkey]
 GO
 ALTER TABLE [dbo].[user_role]  WITH CHECK ADD  CONSTRAINT [ur_role_fkey] FOREIGN KEY([role_id])
 REFERENCES [dbo].[roles] ([id])
