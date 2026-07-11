@@ -366,7 +366,7 @@ const QUICK_ACTIONS = [
   { to: '/admin/users/create', icon: <IconUsers />, label: 'Them nguoi dung moi', desc: 'Tao tai khoan moi', accent: '#059669' },
   { to: '/admin/roles', icon: <IconRole />, label: 'Quan ly vai tro', desc: 'Phan quyen nguoi dung', accent: '#7c3aed' },
   { to: '/admin/logs', icon: <IconLog />, label: 'Nhat ky he thong', desc: 'Lich su thao tac', accent: '#d97706' },
-  { to: '/profile/edit', icon: <IconTerminal />, label: 'Ho so ca nhan', desc: 'Chinh sua thong tin', accent: '#db2777' },
+  { to: '/admin/profile', icon: <IconTerminal />, label: 'Ho so ca nhan', desc: 'Chinh sua thong tin', accent: '#db2777' },
 ];
 
 export default function AdminDashboardPage() {
