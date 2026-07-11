@@ -471,7 +471,6 @@ function AuditTable({ items }) {
     </table>
   );
 }
-
 /* ─── Login Session Table ─── */
 function SessionTable({ items }) {
   if (!items || items.length === 0) {
@@ -553,3 +552,4 @@ function SessionTable({ items }) {
     </table>
   );
 }
+
