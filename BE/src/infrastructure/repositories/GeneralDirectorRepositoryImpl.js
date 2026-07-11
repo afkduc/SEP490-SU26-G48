@@ -136,7 +136,7 @@ function normalizeSkills(specialty) {
     .split(/[,;/|]+/)
     .map((item) => item.trim())
     .filter(Boolean);
-  return Array.from(new Set(normalized));
+  return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b, 'vi'));
 }
 
 function inferSkillGroups(specialty) {
