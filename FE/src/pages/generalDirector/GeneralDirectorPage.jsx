@@ -928,6 +928,13 @@ function TechnicianListPage() {
     setReloadTick((value) => value + 1);
   };
 
+  const clearFilters = () => {
+    setSearch('');
+    setBranchId('all');
+    setSkillGroup('all');
+    setStatus('all');
+  };
+
   useEffect(() => {
     let mounted = true;
 
@@ -1061,6 +1068,10 @@ function TechnicianListPage() {
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
+
+        <button type="button" className="btn btn-secondary" onClick={clearFilters}>
+          Xóa bộ lọc
+        </button>
       </div>
 
       <div style={{ marginBottom: 12, fontSize: 12, color: '#64748B' }}>
