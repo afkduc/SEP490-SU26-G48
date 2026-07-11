@@ -143,6 +143,206 @@ class ManagerService {
       status: status || existing.status,
     });
   }
+
+  async listServiceCategories() {
+    return this.managerRepository.listServiceCategories();
+  }
+
+  async listServices(branchId, filters = {}) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    const normalized = {
+      search: (filters.search || '').trim(),
+      status: filters.status || 'all',
+      categoryId: filters.categoryId || 'all',
+    };
+
+    if (normalized.status !== 'all' && !VALID_STATUSES.includes(normalized.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    return this.managerRepository.listServices(branchId, normalized);
+  }
+
+  async getServiceById(branchId, id) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    if (!id) throw new ApiError(400, 'Thiếu mã dịch vụ');
+
+    const service = await this.managerRepository.getServiceById(branchId, id);
+    if (!service) throw new ApiError(404, 'Không tìm thấy dịch vụ');
+    return service;
+  }
+
+  async _validateServicePayload(payload) {
+    const { serviceName, categoryId, unitPrice, durationMin } = payload;
+
+    if (!serviceName || !categoryId || unitPrice === undefined || unitPrice === null || unitPrice === '') {
+      throw new ApiError(400, 'Tên dịch vụ, danh mục và đơn giá là bắt buộc');
+    }
+
+    const price = Number(unitPrice);
+    if (Number.isNaN(price) || price < 0) {
+      throw new ApiError(400, 'Đơn giá không hợp lệ');
+    }
+
+    let duration = null;
+    if (durationMin !== undefined && durationMin !== null && durationMin !== '') {
+      duration = Number(durationMin);
+      if (Number.isNaN(duration) || duration < 0) {
+        throw new ApiError(400, 'Thời gian thực hiện không hợp lệ');
+      }
+    }
+
+    const categories = await this.managerRepository.listServiceCategories();
+    if (!categories.some((c) => Number(c.id) === Number(categoryId))) {
+      throw new ApiError(400, 'Danh mục không hợp lệ');
+    }
+
+    return { price, duration };
+  }
+
+  async createService(branchId, payload) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    const { price, duration } = await this._validateServicePayload(payload);
+    const serviceCode = await this.managerRepository.nextServiceCode(branchId);
+
+    return this.managerRepository.createService({
+      branchId,
+      serviceCode,
+      serviceName: payload.serviceName.trim(),
+      categoryId: Number(payload.categoryId),
+      unitPrice: price,
+      durationMin: duration,
+      description: (payload.description || '').trim() || null,
+    });
+  }
+
+  async updateService(branchId, id, payload) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    if (!id) throw new ApiError(400, 'Thiếu mã dịch vụ');
+
+    const existing = await this.managerRepository.getServiceById(branchId, id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy dịch vụ');
+
+    const { price, duration } = await this._validateServicePayload(payload);
+
+    return this.managerRepository.updateService(branchId, id, {
+      serviceName: payload.serviceName.trim(),
+      categoryId: Number(payload.categoryId),
+      unitPrice: price,
+      durationMin: duration,
+      description: (payload.description || '').trim() || null,
+      isActive: payload.isActive !== undefined ? !!payload.isActive : existing.isActive,
+    });
+  }
+
+  async listServicePackages(branchId, filters = {}) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    const normalized = {
+      search: (filters.search || '').trim(),
+      status: filters.status || 'all',
+    };
+
+    if (normalized.status !== 'all' && !VALID_STATUSES.includes(normalized.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    return this.managerRepository.listServicePackages(branchId, normalized);
+  }
+
+  async getServicePackageById(branchId, id) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    if (!id) throw new ApiError(400, 'Thiếu mã gói dịch vụ');
+
+    const pkg = await this.managerRepository.getServicePackageById(branchId, id);
+    if (!pkg) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+    return pkg;
+  }
+
+  async _validateServicePackagePayload(branchId, payload, { requireServiceIds }) {
+    const { packageName, categoryId, applicableKm, totalPrice, serviceIds } = payload;
+
+    if (!packageName || !categoryId || totalPrice === undefined || totalPrice === null || totalPrice === '') {
+      throw new ApiError(400, 'Tên gói, danh mục và giá gói là bắt buộc');
+    }
+
+    const price = Number(totalPrice);
+    if (Number.isNaN(price) || price < 0) {
+      throw new ApiError(400, 'Giá gói không hợp lệ');
+    }
+
+    let km = null;
+    if (applicableKm !== undefined && applicableKm !== null && applicableKm !== '') {
+      km = Number(applicableKm);
+      if (Number.isNaN(km) || km < 0) {
+        throw new ApiError(400, 'Mốc km áp dụng không hợp lệ');
+      }
+    }
+
+    const categories = await this.managerRepository.listServiceCategories();
+    if (!categories.some((c) => Number(c.id) === Number(categoryId))) {
+      throw new ApiError(400, 'Danh mục không hợp lệ');
+    }
+
+    let normalizedServiceIds;
+    if (requireServiceIds || serviceIds !== undefined) {
+      if (!Array.isArray(serviceIds) || serviceIds.length === 0) {
+        throw new ApiError(400, 'Vui lòng chọn ít nhất 1 dịch vụ cho gói');
+      }
+      const branchServices = await this.managerRepository.listServices(branchId, {});
+      const validIds = new Set(branchServices.map((s) => s.id));
+      if (!serviceIds.every((sid) => validIds.has(Number(sid)))) {
+        throw new ApiError(400, 'Có dịch vụ không thuộc chi nhánh này');
+      }
+      normalizedServiceIds = serviceIds.map(Number);
+    }
+
+    return { price, km, serviceIds: normalizedServiceIds };
+  }
+
+  async createServicePackage(branchId, payload) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    const { price, km, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
+      requireServiceIds: true,
+    });
+    const packageCode = await this.managerRepository.nextPackageCode(branchId);
+
+    return this.managerRepository.createServicePackage({
+      branchId,
+      packageCode,
+      packageName: payload.packageName.trim(),
+      categoryId: Number(payload.categoryId),
+      applicableKm: km,
+      totalPrice: price,
+      description: (payload.description || '').trim() || null,
+      serviceIds,
+    });
+  }
+
+  async updateServicePackage(branchId, id, payload) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    if (!id) throw new ApiError(400, 'Thiếu mã gói dịch vụ');
+
+    const existing = await this.managerRepository.getServicePackageById(branchId, id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+
+    const { price, km, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
+      requireServiceIds: false,
+    });
+
+    return this.managerRepository.updateServicePackage(branchId, id, {
+      packageName: payload.packageName.trim(),
+      categoryId: Number(payload.categoryId),
+      applicableKm: km,
+      totalPrice: price,
+      description: (payload.description || '').trim() || null,
+      isActive: payload.isActive !== undefined ? !!payload.isActive : existing.isActive,
+      serviceIds,
+    });
+  }
 }
 
 module.exports = ManagerService;

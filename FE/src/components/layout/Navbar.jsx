@@ -96,7 +96,13 @@ const MANAGER_NAV = [
   { label: 'Bảo dưỡng', path: '/maintenance' },
   { label: 'Chăm sóc khách hàng', path: '/customer-care' },
   { label: 'Khách hàng', path: '/customers' },
-  { label: 'Dịch vụ', path: '/services' },
+  {
+    label: 'Dịch vụ',
+    children: [
+      { label: 'Dịch vụ lẻ', path: '/manager/services' },
+      { label: 'Gói dịch vụ', path: '/manager/service-packages' },
+    ],
+  },
 ];
 
 const NAV_ITEMS_BY_ROLE = {
