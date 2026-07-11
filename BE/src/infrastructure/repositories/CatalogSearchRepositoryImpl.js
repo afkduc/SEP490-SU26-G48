@@ -24,7 +24,7 @@ class CatalogSearchRepositoryImpl extends CatalogSearchRepository {
        FROM   service_packages sp
        JOIN   service_package_items spi ON spi.package_id = sp.id
        JOIN   services s ON s.id = spi.service_id
-       WHERE  sp.is_active = 1 AND sp.branch_id = @branchId
+       WHERE  sp.is_active = 1 AND s.is_active = 1 AND sp.branch_id = @branchId
        ORDER  BY sp.package_name, s.service_name`,
       { branchId: Number(branchId) }
     );
