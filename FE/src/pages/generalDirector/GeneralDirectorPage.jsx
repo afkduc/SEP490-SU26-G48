@@ -1137,13 +1137,22 @@ function TechnicianListPage() {
                   </td>
                   <td><BranchBadge branch={technician.branch} /></td>
                   <td>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {(technician.skillGroupLabels || []).map((item) => (
+                          <span key={item} style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999, background: '#ECFDF5', color: '#047857', fontSize: 10, fontWeight: 800 }}>
+                            {item}
+                          </span>
+                        ))}
+                      </div>
                       {(technician.skills || []).length > 0
-                        ? technician.skills.map((item) => (
-                            <span key={item} style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: 999, background: '#EFF6FF', color: '#1D4ED8', fontSize: 11, fontWeight: 700 }}>
-                              {item}
-                            </span>
-                          ))
+                        ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {technician.skills.map((item) => (
+                              <span key={item} style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: 999, background: '#EFF6FF', color: '#1D4ED8', fontSize: 11, fontWeight: 700 }}>
+                                {item}
+                              </span>
+                            ))}
+                          </div>
                         : <span style={{ color: '#6B7280' }}>—</span>}
                     </div>
                   </td>
