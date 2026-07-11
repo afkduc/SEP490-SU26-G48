@@ -22,6 +22,14 @@ class GeneralDirectorRepository {
   async getEmployeeById() {
     throw new Error('Not implemented');
   }
+
+  async listTechnicians() {
+    throw new Error('Not implemented');
+  }
+
+  async getTechnicianById() {
+    throw new Error('Not implemented');
+  }
 }
 
 module.exports = GeneralDirectorRepository;
