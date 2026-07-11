@@ -1084,6 +1084,8 @@ function TechnicianListPage() {
               <th>Họ và tên</th>
               <th>Chi nhánh</th>
               <th>Kỹ năng</th>
+              <th>Đang xử lý</th>
+              <th>Tổng lệnh</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
             </tr>
@@ -1091,7 +1093,7 @@ function TechnicianListPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={8}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
                     <div className="empty-state-icon">⏳</div>
                     <h3>Đang tải danh sách kỹ thuật viên</h3>
@@ -1103,7 +1105,7 @@ function TechnicianListPage() {
 
             {!loading && technicians.length === 0 && !error && (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={8}>
                   <div className="empty-state">
                     <div className="empty-state-icon">📭</div>
                     <h3>Không có dữ liệu kỹ thuật viên</h3>
@@ -1134,6 +1136,8 @@ function TechnicianListPage() {
                         : <span style={{ color: '#6B7280' }}>—</span>}
                     </div>
                   </td>
+                  <td style={{ fontWeight: 800, color: '#0F766E' }}>{technician.activeAssignments || 0}</td>
+                  <td style={{ fontWeight: 700 }}>{technician.totalRepairs || 0}</td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
                       {badge.label}
