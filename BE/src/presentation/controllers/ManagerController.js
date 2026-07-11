@@ -18,6 +18,8 @@ class ManagerController {
     this.getServicePackageById = this.getServicePackageById.bind(this);
     this.createServicePackage = this.createServicePackage.bind(this);
     this.updateServicePackage = this.updateServicePackage.bind(this);
+    this.getSettlementReports = this.getSettlementReports.bind(this);
+    this.getSettlementReportById = this.getSettlementReportById.bind(this);
   }
 
   async getBranch(req, res, next) {
@@ -161,6 +163,27 @@ class ManagerController {
     try {
       const data = await this.managerService.updateServicePackage(req.user.branchId, req.params.id, req.body);
       return success(res, data, 'Cập nhật gói dịch vụ thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getSettlementReports(req, res, next) {
+    try {
+      const data = await this.managerService.listSettlementReports(req.user.branchId, {
+        search: req.query.search || req.query.q || '',
+        status: req.query.status || 'all',
+      });
+      return success(res, data, 'Lấy danh sách phiếu quyết toán thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getSettlementReportById(req, res, next) {
+    try {
+      const data = await this.managerService.getSettlementReportById(req.user.branchId, req.params.id);
+      return success(res, data, 'Lấy chi tiết phiếu quyết toán thành công');
     } catch (err) {
       next(err);
     }
