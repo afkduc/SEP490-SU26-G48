@@ -85,6 +85,16 @@ const EMPLOYEE_ROLE_OPTIONS = [
   { value: 'accountant', label: 'Kế toán' },
 ];
 
+const TECHNICIAN_SKILL_OPTIONS = [
+  { value: 'all', label: 'Tất cả kỹ năng' },
+  { value: 'mechanical', label: 'Cơ khí' },
+  { value: 'electrical', label: 'Điện - Điện tử' },
+  { value: 'painting', label: 'Sơn - Đồng' },
+  { value: 'diagnostic', label: 'Chuẩn đoán' },
+  { value: 'maintenance', label: 'Bảo dưỡng' },
+  { value: 'other', label: 'Khác' },
+];
+
 const EMPLOYEE_STATUS_META = {
   active: { label: 'Đang làm', color: '#0F766E', background: '#ECFDF5' },
   inactive: { label: 'Nghỉ', color: '#B91C1C', background: '#FEF2F2' },
@@ -350,7 +360,7 @@ function RevenueOverviewPage() {
       const response = await generalDirectorApi.getRevenueReports({
         branchId: currentBranchId,
       });
-      setReport(response?.data || {
+      setReport(response || {
         summary: {},
         monthlyTrend: [],
         branchStats: [],
@@ -379,7 +389,7 @@ function RevenueOverviewPage() {
       try {
         const response = await generalDirectorApi.getBranches();
         if (!mounted) return;
-        setBranches(response?.data || []);
+        setBranches(response || []);
       } catch {
         if (!mounted) return;
         setBranches([]);
@@ -611,7 +621,7 @@ function EmployeeListPage() {
     async function loadBranches() {
       try {
         const response = await generalDirectorApi.getBranches();
-        if (mounted) setBranches(response?.data || []);
+        if (mounted) setBranches(response || []);
       } catch {
         if (mounted) setBranches([]);
       }
@@ -640,7 +650,7 @@ function EmployeeListPage() {
         });
 
         if (seq !== requestSeq.current) return;
-        setEmployees(response?.data || []);
+        setEmployees(response || []);
       } catch (err) {
         if (seq !== requestSeq.current) return;
         setEmployees([]);
@@ -660,7 +670,7 @@ function EmployeeListPage() {
 
     try {
       const response = await generalDirectorApi.getEmployeeById(employee.id);
-      setActiveEmployee(response?.data || employee);
+      setActiveEmployee(response || employee);
     } catch (err) {
       setDetailError(err.message || 'Không tải được hồ sơ nhân sự');
     } finally {
@@ -889,18 +899,344 @@ function EmployeeListPage() {
 }
 
 function TechnicianListPage() {
-  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [technicians, setTechnicians] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [search, setSearch] = useState('');
+  const [branchId, setBranchId] = useState('all');
+  const [skillGroup, setSkillGroup] = useState('all');
+  const [status, setStatus] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeTechnician, setActiveTechnician] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const searchTimer = useRef(null);
+  const requestSeq = useRef(0);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadBranches() {
+      try {
+        const response = await generalDirectorApi.getBranches();
+        if (mounted) setBranches(response || []);
+      } catch {
+        if (mounted) setBranches([]);
+      }
+    }
+
+    loadBranches();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    clearTimeout(searchTimer.current);
+
+    searchTimer.current = setTimeout(async () => {
+      const seq = ++requestSeq.current;
+      setLoading(true);
+      setError('');
+
+      try {
+        const response = await generalDirectorApi.getTechnicians({
+          search: search.trim(),
+          branchId,
+          skillGroup,
+          status,
+        });
+
+        if (seq !== requestSeq.current) return;
+        setTechnicians(response || []);
+      } catch (err) {
+        if (seq !== requestSeq.current) return;
+        setTechnicians([]);
+        setError(err.message || 'Không tải được danh sách kỹ thuật viên');
+      } finally {
+        if (seq === requestSeq.current) setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(searchTimer.current);
+  }, [search, branchId, skillGroup, status]);
+
+  const openDetail = async (technician) => {
+    setActiveTechnician(technician);
+    setDetailError('');
+    setDetailLoading(true);
+
+    try {
+      const response = await generalDirectorApi.getTechnicianById(technician.id);
+      setActiveTechnician(response || technician);
+    } catch (err) {
+      setDetailError(err.message || 'Không tải được hồ sơ kỹ thuật viên');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetail = () => {
+    setActiveTechnician(null);
+    setDetailError('');
+  };
 
   return (
-    <PlaceholderPanel
-      title="Danh sách kỹ thuật viên"
-      uc="UC-52"
-      description="Màn hình riêng cho đội kỹ thuật, để sau này bổ sung phân loại nghề và cấp độ tay nghề theo chi nhánh."
-      actions={[
-        { label: 'Xem kỹ thuật viên', onClick: () => navigate('/general-director/technicians') },
-        { label: 'Quay sang nhân viên vận hành', variant: 'secondary', onClick: () => navigate('/general-director/employees') },
-      ]}
-    />
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Danh sách kỹ thuật viên</h1>
+          <div className="breadcrumb">General Director / UC-51 / View All Technician For All Branch</div>
+        </div>
+        <div className="page-header-right">
+          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
+        </div>
+      </div>
+
+      <ModuleActionBar />
+
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>UC51 - View All Technician For All Branch</div>
+            <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Điều phối kỹ thuật viên toàn hệ thống</h2>
+            <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.8)' }}>
+              Hiển thị toàn bộ kỹ thuật viên theo chi nhánh và nhóm kỹ năng chuyên môn, hỗ trợ xem hồ sơ chi tiết và lịch sử sửa chữa.
+            </p>
+          </div>
+          <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
+            <div style={{ fontSize: 12, opacity: 0.72 }}>Tổng kỹ thuật viên</div>
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{technicians.length}</div>
+            <div style={{ fontSize: 12, opacity: 0.72, marginTop: 8 }}>Đang làm</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{technicians.filter((item) => item.status === 'active').length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
+          <span className="search-icon">🔍</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Tìm theo mã, tên, điện thoại, kỹ năng..."
+          />
+        </div>
+
+        <select className="form-select" value={branchId} onChange={(event) => setBranchId(event.target.value)} style={{ minWidth: 220, height: 42 }}>
+          <option value="all">Tất cả chi nhánh</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.name}</option>
+          ))}
+        </select>
+
+        <select className="form-select" value={skillGroup} onChange={(event) => setSkillGroup(event.target.value)} style={{ minWidth: 220, height: 42 }}>
+          {TECHNICIAN_SKILL_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+
+        <select className="form-select" value={status} onChange={(event) => setStatus(event.target.value)} style={{ minWidth: 180, height: 42 }}>
+          {EMPLOYEE_STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          {error}
+        </div>
+      )}
+
+      <div className="table-wrapper">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Mã nhân viên</th>
+              <th>Họ và tên</th>
+              <th>Chi nhánh</th>
+              <th>Kỹ năng</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={6}>
+                  <div className="empty-state" style={{ minHeight: 220 }}>
+                    <div className="empty-state-icon">⏳</div>
+                    <h3>Đang tải danh sách kỹ thuật viên</h3>
+                    <p>Dữ liệu đang được lấy trực tiếp từ SQL Server.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {!loading && technicians.length === 0 && !error && (
+              <tr>
+                <td colSpan={6}>
+                  <div className="empty-state">
+                    <div className="empty-state-icon">📭</div>
+                    <h3>Không có dữ liệu kỹ thuật viên</h3>
+                    <p>Không tìm thấy kỹ thuật viên phù hợp với bộ lọc chi nhánh và kỹ năng.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {!loading && technicians.map((technician) => {
+              const badge = employeeStatusBadge(technician.status);
+              return (
+                <tr key={technician.id}>
+                  <td style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--primary-dark)' }}>{technician.employeeId || technician.id}</td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>{technician.fullName || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{technician.phone || '—'}</div>
+                  </td>
+                  <td><BranchBadge branch={technician.branch} /></td>
+                  <td>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {(technician.skills || []).length > 0
+                        ? technician.skills.map((item) => (
+                            <span key={item} style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: 999, background: '#EFF6FF', color: '#1D4ED8', fontSize: 11, fontWeight: 700 }}>
+                              {item}
+                            </span>
+                          ))
+                        : <span style={{ color: '#6B7280' }}>—</span>}
+                    </div>
+                  </td>
+                  <td>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
+                      {badge.label}
+                    </span>
+                  </td>
+                  <td>
+                    <button className="btn btn-info btn-sm" onClick={() => openDetail(technician)}>
+                      Xem chi tiết
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="pagination">
+          <span className="pagination-info">{technicians.length} kỹ thuật viên</span>
+        </div>
+      </div>
+
+      {(activeTechnician || detailLoading || detailError) && (
+        <div className="modal-overlay" onClick={closeDetail}>
+          <div className="modal modal-lg" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 1000 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Chi tiết kỹ thuật viên</h3>
+              <button className="modal-close" onClick={closeDetail}>✕</button>
+            </div>
+
+            <div className="modal-body" style={{ maxHeight: '80vh', overflow: 'auto' }}>
+              {detailLoading && (
+                <div className="empty-state" style={{ minHeight: 220 }}>
+                  <div className="empty-state-icon">⏳</div>
+                  <h3>Đang tải hồ sơ kỹ thuật viên</h3>
+                </div>
+              )}
+
+              {!detailLoading && detailError && (
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
+                  {detailError}
+                </div>
+              )}
+
+              {!detailLoading && !detailError && activeTechnician && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+                    <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeTechnician.employeeId || '—'}</div>
+                    </div>
+                    <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#6B7280' }}>Chi nhánh</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{activeTechnician.branch?.name || '—'}</div>
+                    </div>
+                    <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#047857' }}>Lệnh sửa chữa đã xử lý</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: '#065F46', marginTop: 4 }}>{activeTechnician.repairSummary?.total || 0}</div>
+                    </div>
+                    <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#92400E' }}>Hoàn thành</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: '#B45309', marginTop: 4 }}>{activeTechnician.repairSummary?.completed || 0}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                    <div style={{ fontWeight: 800, marginBottom: 10 }}>Hồ sơ kỹ thuật viên</div>
+                    <DetailRow label="Họ và tên" value={activeTechnician.fullName} />
+                    <DetailRow label="Email" value={activeTechnician.email} />
+                    <DetailRow label="Số điện thoại" value={activeTechnician.phone} />
+                    <DetailRow label="Trạng thái" value={employeeStatusBadge(activeTechnician.status).label} />
+                    <DetailRow label="Nhóm kỹ năng" value={(activeTechnician.skillGroupLabels || []).join(', ') || '—'} />
+                    <DetailRow label="Kỹ năng chi tiết" value={(activeTechnician.skills || []).join(', ') || activeTechnician.specialty || '—'} />
+                    <DetailRow label="Quy mô tổ" value={activeTechnician.teamSize ? `${activeTechnician.teamSize} người` : '—'} />
+                    <DetailRow label="Ngày tạo tài khoản" value={formatDate(activeTechnician.createdAt)} />
+                    <DetailRow label="Ghi chú" value={activeTechnician.notes} />
+                  </div>
+
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+                    <div style={{ fontWeight: 800, marginBottom: 10 }}>Lịch sử sửa chữa</div>
+                    <div className="table-wrapper" style={{ boxShadow: 'none', marginBottom: 0 }}>
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Mã lệnh</th>
+                            <th>Mã phiếu</th>
+                            <th>Xe</th>
+                            <th>Khách hàng</th>
+                            <th>Trạng thái</th>
+                            <th>Ngày tạo</th>
+                            <th>Ngày hoàn thành</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(activeTechnician.repairHistory || []).length === 0 && (
+                            <tr>
+                              <td colSpan={7}>
+                                <div className="empty-state" style={{ minHeight: 180 }}>
+                                  <div className="empty-state-icon">📭</div>
+                                  <h3>Chưa có lịch sử sửa chữa</h3>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+
+                          {(activeTechnician.repairHistory || []).map((item) => (
+                            <tr key={item.id}>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 800 }}>{item.repairCode || '—'}</td>
+                              <td style={{ fontFamily: 'monospace' }}>{item.orderCode || '—'}</td>
+                              <td>
+                                <div style={{ fontWeight: 700 }}>{item.vehicle?.licensePlate || '—'}</div>
+                                <div style={{ fontSize: 11, color: '#6B7280' }}>{item.vehicle?.model || ''}</div>
+                              </td>
+                              <td>{item.customerName || '—'}</td>
+                              <td>{item.repairStatus || '—'}</td>
+                              <td>{formatDate(item.createdAt)}</td>
+                              <td>{formatDate(item.completedAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1096,7 +1432,7 @@ function SettlementReportsPage() {
     async function loadBranches() {
       try {
         const response = await generalDirectorApi.getBranches();
-        if (mounted) setBranches(response?.data || []);
+        if (mounted) setBranches(response || []);
       } catch {
         if (mounted) setBranches([]);
       }
@@ -1124,7 +1460,7 @@ function SettlementReportsPage() {
         });
 
         if (seq !== requestSeq.current) return;
-        setReports(response?.data || []);
+        setReports(response || []);
       } catch (err) {
         if (seq !== requestSeq.current) return;
         setReports([]);
@@ -1152,7 +1488,7 @@ function SettlementReportsPage() {
     setDetailError('');
     try {
       const response = await generalDirectorApi.getSettlementReportById(report.id);
-      setActiveReport(response?.data || report);
+      setActiveReport(response || report);
     } catch (err) {
       setDetailError(err.message || 'Không tải được chi tiết phiếu quyết toán');
       setActiveReport(report);
