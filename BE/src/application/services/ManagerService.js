@@ -226,15 +226,23 @@ class ManagerService {
     if (!existing) throw new ApiError(404, 'Không tìm thấy dịch vụ');
 
     const { price, duration } = await this._validateServicePayload(payload);
+    const newIsActive = payload.isActive !== undefined ? !!payload.isActive : existing.isActive;
 
-    return this.managerRepository.updateService(branchId, id, {
+    const updated = await this.managerRepository.updateService(branchId, id, {
       serviceName: payload.serviceName.trim(),
       categoryId: Number(payload.categoryId),
       unitPrice: price,
       durationMin: duration,
       description: (payload.description || '').trim() || null,
-      isActive: payload.isActive !== undefined ? !!payload.isActive : existing.isActive,
+      isActive: newIsActive,
     });
+
+    if (existing.isActive && !newIsActive) {
+      const usedInPackages = await this.managerRepository.listPackagesUsingService(branchId, id);
+      return { ...updated, usedInPackages };
+    }
+
+    return updated;
   }
 
   async listServicePackages(branchId, filters = {}) {
