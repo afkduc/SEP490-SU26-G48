@@ -68,7 +68,7 @@ class ProfileService {
       throw new ApiError(404, 'Không tìm thấy người dùng');
     }
 
-    const isMatch = await this._verifyPassword(currentPassword, user.password);
+    const isMatch = await this._verifyPassword(currentPassword, user.user_password);
     if (!isMatch) {
       throw new ApiError(401, 'Mật khẩu hiện tại không đúng');
     }
