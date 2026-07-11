@@ -920,8 +920,13 @@ function TechnicianListPage() {
   const [activeTechnician, setActiveTechnician] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
+  const [reloadTick, setReloadTick] = useState(0);
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
+
+  const reloadTechnicians = () => {
+    setReloadTick((value) => value + 1);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -969,7 +974,7 @@ function TechnicianListPage() {
     }, 300);
 
     return () => clearTimeout(searchTimer.current);
-  }, [search, branchId, skillGroup, status]);
+  }, [search, branchId, skillGroup, status, reloadTick]);
 
   const openDetail = async (technician) => {
     setActiveTechnician(technician);
@@ -1063,8 +1068,11 @@ function TechnicianListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
-          {error}
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <span>{error}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={reloadTechnicians}>
+            ↻ Tải lại
+          </button>
         </div>
       )}
 
