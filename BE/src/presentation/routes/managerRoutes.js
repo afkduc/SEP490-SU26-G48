@@ -20,6 +20,18 @@ function buildManagerRouter() {
   router.post('/employees', controller.createEmployee);
   router.put('/employees/:id', controller.updateEmployee);
 
+  router.get('/service-categories', controller.getServiceCategories);
+
+  router.get('/services', controller.getServices);
+  router.get('/services/:id', controller.getServiceById);
+  router.post('/services', controller.createService);
+  router.put('/services/:id', controller.updateService);
+
+  router.get('/service-packages', controller.getServicePackages);
+  router.get('/service-packages/:id', controller.getServicePackageById);
+  router.post('/service-packages', controller.createServicePackage);
+  router.put('/service-packages/:id', controller.updateServicePackage);
+
   return router;
 }
 
