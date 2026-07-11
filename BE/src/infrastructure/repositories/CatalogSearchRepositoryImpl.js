@@ -5,17 +5,18 @@ const { query } = require('../database/sqlServer');
 // roi loc/khong-dau-hoa o tang Service thay vi loc bang SQL LIKE - vi
 // COLLATE ..._CI_AI cua SQL Server khong gop ư/ơ ve u/o hay đ ve d.
 class CatalogSearchRepositoryImpl extends CatalogSearchRepository {
-  async findAllActiveServices() {
+  async findAllActiveServices(branchId) {
     const result = await query(
       `SELECT id, service_code, service_name, category_id, unit_price
        FROM services
-       WHERE is_active = 1
-       ORDER BY service_name`
+       WHERE is_active = 1 AND branch_id = @branchId
+       ORDER BY service_name`,
+      { branchId: Number(branchId) }
     );
     return result.recordset;
   }
 
-  async findAllActivePackagesWithItems() {
+  async findAllActivePackagesWithItems(branchId) {
     const result = await query(
       `SELECT sp.id AS package_id, sp.package_code, sp.package_name, sp.category_id,
               sp.applicable_km, sp.total_price,
@@ -23,8 +24,9 @@ class CatalogSearchRepositoryImpl extends CatalogSearchRepository {
        FROM   service_packages sp
        JOIN   service_package_items spi ON spi.package_id = sp.id
        JOIN   services s ON s.id = spi.service_id
-       WHERE  sp.is_active = 1
-       ORDER  BY sp.package_name, s.service_name`
+       WHERE  sp.is_active = 1 AND s.is_active = 1 AND sp.branch_id = @branchId
+       ORDER  BY sp.package_name, s.service_name`,
+      { branchId: Number(branchId) }
     );
     return result.recordset;
   }
