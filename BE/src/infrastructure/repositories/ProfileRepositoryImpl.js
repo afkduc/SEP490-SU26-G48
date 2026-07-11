@@ -84,7 +84,7 @@ class ProfileRepositoryImpl {
     const params = {};
     let p = 1;
 
-    if (email !== undefined) {
+    if (email !== undefined && email !== null && email !== '') {
       updates.push(`email = @p${p}`);
       params[`p${p}`] = email;
       p++;
