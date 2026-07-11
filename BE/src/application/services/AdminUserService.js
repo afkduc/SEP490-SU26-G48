@@ -93,6 +93,10 @@ class AdminUserService {
     }
   }
 
+  async getDashboardStats() {
+    return this.adminUserRepository.getDashboardStats();
+  }
+
   async updateUser(payload) {
     const { userId, status, roleId } = payload;
 
