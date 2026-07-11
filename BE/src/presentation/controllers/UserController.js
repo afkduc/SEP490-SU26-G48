@@ -34,7 +34,7 @@ class UserController {
 
   update = async (req, res, next) => {
     try {
-      const user = await this.userService.updateUser(req.params.id, req.body);
+      const user = await this.userService.updateUser(req.params.id, req.body, req.user.id);
       return success(res, user, 'User updated');
     } catch (err) {
       next(err);
@@ -43,7 +43,7 @@ class UserController {
 
   remove = async (req, res, next) => {
     try {
-      const user = await this.userService.deleteUser(req.params.id);
+      const user = await this.userService.deleteUser(req.params.id, req.user.id);
       return success(res, user, 'User deleted');
     } catch (err) {
       next(err);

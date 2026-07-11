@@ -22,7 +22,7 @@ export function useParts() {
 
   /**
    * Tai danh sach parts tu API voi bo loc hien tai.
-   * Tu dong goi khi params thay doi.
+   * Ham duoc tao lai moi khi params thay doi -> useEffect ben duoi se chay lai.
    */
   const fetch = useCallback(async (filters = params) => {
     setLoading(true);
@@ -35,11 +35,11 @@ export function useParts() {
     } finally {
       setLoading(false);
     }
-  }, [params]);
+  }, [params.search, params.status, params.category, params.lowStockOnly]);
 
   useEffect(() => {
     fetch();
-  }, []);
+  }, [fetch]);
 
   /**
    * Tao moi mot part, them vao state.
