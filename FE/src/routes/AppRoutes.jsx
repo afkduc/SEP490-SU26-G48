@@ -99,13 +99,7 @@ function AppRoutes() {
         />
         <Route
           path="/admin/logs/login"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AuditLogsPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/admin/logs?tab=login" replace />}
         />
         <Route
           path="/admin/profile"
