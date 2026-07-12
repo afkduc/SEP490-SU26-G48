@@ -51,10 +51,23 @@ class ProductRepositoryImpl extends ProductRepository {
     return Product.fromPersistence(result.recordset[0]);
   }
 
-  async findByCode(code) {
-    const sql = `SELECT * FROM products WHERE product_code = @code`;
-    const result = await query(sql, { code });
-    return Product.fromPersistence(result.recordset[0]);
+  async findByCode(code, branchId) {
+    // Ma phu tung la UNIQUE theo (product_code, branch_id) trong DB.
+    // Neu truyen branchId thi check trong dung chi nhanh do.
+    const where = branchId ? 'product_code = @code AND branch_id = @branchId' : 'product_code = @code';
+    const params = branchId ? { code, branchId } : { code };
+    const result = await query(
+      `SELECT p.*, s.supplier_name
+       FROM   products p
+       LEFT   JOIN suppliers s ON p.supplier_id = s.id
+       WHERE  ${where}`,
+      params
+    );
+    const row = result.recordset[0];
+    if (!row) return null;
+    const product = Product.fromPersistence(row);
+    product.supplierName = row.supplier_name;
+    return product;
   }
 
   async create(data) {
