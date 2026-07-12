@@ -167,6 +167,22 @@ class InventoryRepositoryImpl extends InventoryRepository {
       totalValue: Number(r.totalValue) || 0,
     }));
   }
+
+  async findAllActiveProducts(branchId) {
+    const result = await query(
+      `SELECT p.*, s.supplier_name
+       FROM   products p
+       LEFT JOIN suppliers s ON s.id = p.supplier_id
+       WHERE  p.branch_id = @branchId AND p.status = 'active'
+       ORDER  BY p.product_name`,
+      { branchId }
+    );
+    return result.recordset.map((r) => {
+      const product = Product.fromPersistence(r);
+      product.supplierName = r.supplier_name;
+      return product;
+    });
+  }
 }
 
 module.exports = InventoryRepositoryImpl;
