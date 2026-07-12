@@ -198,11 +198,18 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return this.findById(id);
   }
 
-  async updateStatus(id, status, { issuedBy } = {}) {
+  async updateStatus(id, status, { issuedBy, cancelReason } = {}) {
     await runInTransaction(async (tx) => {
       if (status === 'waiting_payment') {
         await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
           .query(`UPDATE service_orders SET status = @status, completed_date = GETDATE() WHERE id = @id`);
+        return;
+      }
+
+      if (status === 'cancelled') {
+        await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
+          .input('cancelReason', sql.NVarChar(500), cancelReason || null)
+          .query(`UPDATE service_orders SET status = @status, cancel_reason = @cancelReason WHERE id = @id`);
         return;
       }
 
