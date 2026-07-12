@@ -12,7 +12,7 @@ function mapSettlementRow(row) {
   return {
     id: row.id,
     code: row.order_code,
-    serviceType: 'Bảo dưỡng/Sửa chữa',
+    serviceType: row.service_type || 'Khác',
     status: row.status,
     intakeDate: normalizeDate(row.intake_date),
     completedDate: normalizeDate(row.completed_date),
@@ -391,6 +391,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
       `SELECT
           so.id,
           so.order_code,
+          service_type_info.service_type,
           so.branch_id,
           b.branch_code,
           b.branch_name,
@@ -430,6 +431,36 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           so.intake_date,
           so.completed_date
        FROM service_orders so
+       OUTER APPLY (
+         SELECT STRING_AGG(service_type_name, ', ') AS service_type
+         FROM (
+           SELECT DISTINCT service_type_name
+           FROM (
+             SELECT s.service_name AS service_type_name
+             FROM service_order_items soi
+             INNER JOIN services s ON s.id = soi.service_id
+             WHERE soi.service_order_id = so.id
+               AND (
+                 soi.lhsc = 'DV'
+                 OR soi.item_type IN ('DV', 'service')
+               )
+
+             UNION
+
+             SELECT ps.service_name AS service_type_name
+             FROM service_order_items soi
+             INNER JOIN service_packages sp ON sp.package_code = soi.item_code
+             INNER JOIN service_package_items spi ON spi.package_id = sp.id
+             INNER JOIN services ps ON ps.id = spi.service_id
+             WHERE soi.service_order_id = so.id
+               AND (
+                 soi.lhsc = 'DV'
+                 OR soi.item_type IN ('DV', 'service')
+               )
+           ) service_name_source
+           WHERE service_type_name IS NOT NULL
+         ) service_type_source
+       ) service_type_info
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
@@ -448,6 +479,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
       `SELECT TOP 1
           so.id,
           so.order_code,
+          service_type_info.service_type,
           so.branch_id,
           b.branch_code,
           b.branch_name,
@@ -487,6 +519,36 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           so.intake_date,
           so.completed_date
        FROM service_orders so
+       OUTER APPLY (
+         SELECT STRING_AGG(service_type_name, ', ') AS service_type
+         FROM (
+           SELECT DISTINCT service_type_name
+           FROM (
+             SELECT s.service_name AS service_type_name
+             FROM service_order_items soi
+             INNER JOIN services s ON s.id = soi.service_id
+             WHERE soi.service_order_id = so.id
+               AND (
+                 soi.lhsc = 'DV'
+                 OR soi.item_type IN ('DV', 'service')
+               )
+
+             UNION
+
+             SELECT ps.service_name AS service_type_name
+             FROM service_order_items soi
+             INNER JOIN service_packages sp ON sp.package_code = soi.item_code
+             INNER JOIN service_package_items spi ON spi.package_id = sp.id
+             INNER JOIN services ps ON ps.id = spi.service_id
+             WHERE soi.service_order_id = so.id
+               AND (
+                 soi.lhsc = 'DV'
+                 OR soi.item_type IN ('DV', 'service')
+               )
+           ) service_name_source
+           WHERE service_type_name IS NOT NULL
+         ) service_type_source
+       ) service_type_info
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
