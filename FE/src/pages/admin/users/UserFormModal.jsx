@@ -2,10 +2,36 @@ import { useEffect, useState } from 'react';
 import { adminBranchesApi, adminRolesApi, adminUsersApi } from '../../../services/adminApi';
 
 const STATUS_OPTIONS = [
-  { value: 'active', label: 'Hoat dong' },
-  { value: 'inactive', label: 'Ngung hoat dong' },
-  { value: 'locked', label: 'Bi khoa' },
+  { value: 'active', label: 'Hoạt động' },
+  { value: 'inactive', label: 'Ngừng hoạt động' },
+  { value: 'locked', label: 'Bị khóa' },
 ];
+
+/**
+ * Lay roleId tu user.roles (da hoac chua fetch roles list)
+ * @param {Array} userRoles - roles array tu user object (string[] hoac object[])
+ * @param {Array} allRoles  - roles tu API dropdown
+ * @returns {string} roleId hoac ''
+ */
+function resolveRoleId(userRoles, allRoles) {
+  if (!Array.isArray(userRoles) || userRoles.length === 0) return '';
+  const first = userRoles[0];
+
+  // Backend moi: { roleId, roleName }
+  if (typeof first === 'object' && first !== null) {
+    return first.roleId !== undefined && first.roleId !== null
+      ? String(first.roleId)
+      : '';
+  }
+
+  // Backend cu: ['Admin', ...] -> map ten -> id
+  if (typeof first === 'string') {
+    const match = allRoles.find((r) => r.roleName === first || String(r.id) === first);
+    return match ? String(match.id) : '';
+  }
+
+  return '';
+}
 
 export default function UserFormModal({ user, onClose, onSuccess }) {
   const isEdit = Boolean(user);
@@ -28,6 +54,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
+  // Load branches + roles dropdown
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -45,8 +72,13 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     return () => { cancelled = true; };
   }, []);
 
+  // Khi user object hoac roles list thay doi -> cap nhat form
   useEffect(() => {
     if (!user) return;
+
+    // Neu roles chua load xong, bo qua (effect tiep theo se trigger)
+    const resolvedRoleId = resolveRoleId(user.roles, roles);
+
     setForm({
       name: user.name || '',
       email: user.email || '',
@@ -54,25 +86,28 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       phone: user.phone || '',
-      branchId: user.branchId ? String(user.branchId) : '',
-      roleId: user.roles?.[0] ? String(user.roles[0]) : '',
+      branchId:
+        user.branchId !== undefined && user.branchId !== null
+          ? String(user.branchId)
+          : '',
+      roleId: resolvedRoleId,
       status: user.status || 'active',
     });
-  }, [user]);
+  }, [user, JSON.stringify(roles)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function validate() {
     const errs = {};
-    if (!isEdit && !form.name.trim()) errs.name = 'Ten dang nhap la bat buoc';
-    if (!isEdit && !form.email.trim()) errs.email = 'Email la bat buoc';
-    if (!isEdit && !form.password) errs.password = 'Mat khau la bat buoc';
+    if (!isEdit && !form.name.trim()) errs.name = 'Tên đăng nhập là bắt buộc';
+    if (!isEdit && !form.email.trim()) errs.email = 'Email là bắt buộc';
+    if (!isEdit && !form.password) errs.password = 'Mật khẩu là bắt buộc';
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errs.email = 'Email khong dung dinh dang';
+      errs.email = 'Email không đúng định dạng';
     }
     if (form.phone && !/^0[0-9]{9,10}$/.test(form.phone)) {
-      errs.phone = 'So dien thoai phai bat dau bang 0, 10-11 chu so';
+      errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
     }
-    if (!isEdit && !form.branchId) errs.branchId = 'Chi nhanh la bat buoc';
-    if (!isEdit && !form.roleId) errs.roleId = 'Role la bat buoc';
+    if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc';
+    if (!form.roleId) errs.roleId = 'Vai trò là bắt buộc';
     return errs;
   }
 
@@ -92,7 +127,8 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
         const payload = {
           userId: user.id,
           status: form.status,
-          roleId: form.roleId || null,
+          roleId: form.roleId ? Number(form.roleId) : null,
+          branchId: form.branchId ? Number(form.branchId) : null,
         };
         await adminUsersApi.update(payload);
       } else {
@@ -111,7 +147,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       onSuccess?.();
       onClose?.();
     } catch (err) {
-      setApiError(err?.response?.data?.message || err.message || 'Loi he thong');
+      setApiError(err?.response?.data?.message || err.message || 'Lỗi hệ thống');
     } finally {
       setLoading(false);
     }
@@ -133,7 +169,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                 <circle cx="12" cy="7" r="4"/>
               </svg>
             </div>
-            <h2 className="modal__title">{isEdit ? 'Chinh sua nguoi dung' : 'Tao nguoi dung moi'}</h2>
+            <h2 className="modal__title">{isEdit ? 'Chỉnh sửa người dùng' : 'Tạo người dùng mới'}</h2>
           </div>
           <button className="modal__close" onClick={onClose} type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -146,12 +182,12 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           {apiError && <div className="form-error">{apiError}</div>}
 
           <form onSubmit={handleSubmit}>
-            {/* Section: Thong tin dang nhap */}
+            {/* Section: Thông tin đăng nhập */}
             <div className="form__section">
-              <div className="form__section-title">Thong tin dang nhap</div>
+              <div className="form__section-title">Thông tin đăng nhập</div>
               <div className="form__row">
                 <div className="form__field">
-                  <label className="form__label">Ten dang nhap <span className="required">*</span></label>
+                  <label className="form__label">Tên đăng nhập <span className="required">*</span></label>
                   <input
                     className={`input ${errors.name ? 'input--error' : ''}`}
                     value={form.name}
@@ -177,45 +213,45 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
 
               {!isEdit && (
                 <div className="form__field">
-                  <label className="form__label">Mat khau <span className="required">*</span></label>
+                  <label className="form__label">Mật khẩu <span className="required">*</span></label>
                   <input
                     className={`input ${errors.password ? 'input--error' : ''}`}
                     type="password"
                     value={form.password}
                     onChange={(e) => handleChange('password', e.target.value)}
-                    placeholder="Nhap mat khau manh"
+                    placeholder="Nhập mật khẩu mạnh"
                   />
                   {errors.password && <span className="form__err">{errors.password}</span>}
                 </div>
               )}
             </div>
 
-            {/* Section: Thong tin ca nhan */}
+            {/* Section: Thông tin cá nhân */}
             <div className="form__section">
-              <div className="form__section-title">Thong tin ca nhan</div>
+              <div className="form__section-title">Thông tin cá nhân</div>
               <div className="form__row">
                 <div className="form__field">
-                  <label className="form__label">Ho</label>
+                  <label className="form__label">Họ</label>
                   <input
                     className="input"
                     value={form.firstName}
                     onChange={(e) => handleChange('firstName', e.target.value)}
-                    placeholder="Nguyen"
+                    placeholder="Nguyễn"
                   />
                 </div>
                 <div className="form__field">
-                  <label className="form__label">Ten <span className="required">*</span></label>
+                  <label className="form__label">Tên <span className="required">*</span></label>
                   <input
                     className="input"
                     value={form.lastName}
                     onChange={(e) => handleChange('lastName', e.target.value)}
-                    placeholder="Van A"
+                    placeholder="Văn A"
                   />
                 </div>
               </div>
 
               <div className="form__field">
-                <label className="form__label">So dien thoai</label>
+                <label className="form__label">Số điện thoại</label>
                 <input
                   className={`input ${errors.phone ? 'input--error' : ''}`}
                   value={form.phone}
@@ -226,19 +262,18 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
               </div>
             </div>
 
-            {/* Section: Phan cong */}
+            {/* Section: Phân công */}
             <div className="form__section">
-              <div className="form__section-title">Phan cong & trang thai</div>
+              <div className="form__section-title">Phân công & trạng thái</div>
               <div className="form__row">
                 <div className="form__field">
-                  <label className="form__label">Chi nhanh <span className="required">*</span></label>
+                  <label className="form__label">Chi nhánh <span className="required">*</span></label>
                   <select
                     className={`input input--select ${errors.branchId ? 'input--error' : ''}`}
                     value={form.branchId}
                     onChange={(e) => handleChange('branchId', e.target.value)}
-                    disabled={isEdit}
                   >
-                    <option value="">-- Chon chi nhanh --</option>
+                    <option value="">-- Chọn chi nhánh --</option>
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>{b.branchName}</option>
                     ))}
@@ -246,13 +281,13 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                   {errors.branchId && <span className="form__err">{errors.branchId}</span>}
                 </div>
                 <div className="form__field">
-                  <label className="form__label">Role <span className="required">*</span></label>
+                  <label className="form__label">Vai trò <span className="required">*</span></label>
                   <select
                     className={`input input--select ${errors.roleId ? 'input--error' : ''}`}
                     value={form.roleId}
                     onChange={(e) => handleChange('roleId', e.target.value)}
                   >
-                    <option value="">-- Chon role --</option>
+                    <option value="">-- Chọn vai trò --</option>
                     {roles.map((r) => (
                       <option key={r.id} value={r.id}>{r.roleName}</option>
                     ))}
@@ -263,7 +298,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
 
               {isEdit && (
                 <div className="form__field">
-                  <label className="form__label">Trang thai tai khoan</label>
+                  <label className="form__label">Trạng thái tài khoản</label>
                   <select
                     className="input input--select"
                     value={form.status}
@@ -281,7 +316,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
 
         <div className="modal__footer">
           <button type="button" className="btn btn--ghost" onClick={onClose} disabled={loading}>
-            Huy
+            Hủy
           </button>
           <button
             type="submit"
@@ -294,9 +329,9 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 0.7s linear infinite' }}>
                   <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                 </svg>
-                Dang xu ly...
+                Đang xử lý...
               </>
-            ) : (isEdit ? 'Luu thay doi' : 'Tao nguoi dung')}
+            ) : (isEdit ? 'Lưu thay đổi' : 'Tạo người dùng')}
           </button>
         </div>
       </div>

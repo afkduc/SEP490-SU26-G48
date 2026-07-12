@@ -92,11 +92,11 @@ class AdminUserRepositoryImpl {
 
     const users = dataResult.recordset.map(toAdminUserRow);
 
-    // Lay roles cho tung user
+    // Lay roles (name + id) cho tung user
     if (users.length > 0) {
       const userIds = users.map((u) => u.id);
       const rolesResult = await query(
-        `SELECT ur.user_id, r.role_name
+        `SELECT ur.user_id, r.id AS role_id, r.role_name
          FROM   user_role ur
          JOIN   roles r ON r.id = ur.role_id
          WHERE  ur.user_id IN (${userIds.map((_, i) => `@p${paramIndex + i}`).join(',')})`,
@@ -105,7 +105,7 @@ class AdminUserRepositoryImpl {
       const rolesByUser = {};
       for (const row of rolesResult.recordset) {
         if (!rolesByUser[row.user_id]) rolesByUser[row.user_id] = [];
-        rolesByUser[row.user_id].push(row.role_name);
+        rolesByUser[row.user_id].push({ roleId: row.role_id, roleName: row.role_name });
       }
       for (const user of users) {
         user.roles = rolesByUser[user.id] || [];
@@ -165,13 +165,16 @@ class AdminUserRepositoryImpl {
     if (!row) return null;
     const user = toAdminUserRow(row);
     const rolesResult = await query(
-      `SELECT r.role_name
+      `SELECT r.id AS role_id, r.role_name
        FROM   user_role ur
        JOIN   roles r ON r.id = ur.role_id
        WHERE  ur.user_id = @p1`,
       { p1: id }
     );
-    user.roles = rolesResult.recordset.map((r) => r.role_name);
+    user.roles = rolesResult.recordset.map((r) => ({
+      roleId: r.role_id,
+      roleName: r.role_name,
+    }));
     return user;
   }
 
@@ -200,7 +203,7 @@ class AdminUserRepositoryImpl {
     return { id: userId, email };
   }
 
-  async updateUser({ userId, status, roleId }) {
+  async updateUser({ userId, status, roleId, branchId }) {
     const updates = [];
     const params = {};
     let p = 1;
@@ -208,6 +211,12 @@ class AdminUserRepositoryImpl {
     if (status !== undefined) {
       updates.push(`status = @p${p}`);
       params[`p${p}`] = status;
+      p++;
+    }
+
+    if (branchId !== undefined) {
+      updates.push(`branch_id = @p${p}`);
+      params[`p${p}`] = branchId;
       p++;
     }
 
