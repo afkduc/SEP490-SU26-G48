@@ -9,6 +9,7 @@ const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
+const CustomerHistoryPage = lazy(() => import('../pages/customer/CustomerHistoryPage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
@@ -120,6 +121,18 @@ function AppRoutes() {
           }
         />
 
+        {/* Khách hàng - lịch sử bảo dưỡng theo khách hàng / theo xe */}
+        <Route
+          path="/customers/*"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <CustomerHistoryPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Inventory module */}
         <Route
           path={ROUTES.INVENTORY}
@@ -140,7 +153,7 @@ function AppRoutes() {
         </Route>
 
         {/* Placeholder routes */}
-        {['/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
+        {['/maintenance', '/customer-care', '/services'].map((path) => (
           <Route
             key={path}
             path={path}
