@@ -6,26 +6,21 @@ export async function listRepairSettlementsApi({ status, search, page = 1, limit
   if (search) params.set('search', search);
   params.set('page', page);
   params.set('limit', limit);
-  const data = await httpClient.get(`/repair-settlements?${params.toString()}`);
-  return data.data; // { items: [...], total, page, limit }
+  return httpClient.get(`/repair-settlements?${params.toString()}`); // { items: [...], total, page, limit }
 }
 
 export async function getRepairSettlementApi(id) {
-  const data = await httpClient.get(`/repair-settlements/${id}`);
-  return data.data;
+  return httpClient.get(`/repair-settlements/${id}`);
 }
 
 export async function createRepairSettlementApi(payload) {
-  const data = await httpClient.post('/repair-settlements', payload);
-  return data.data;
+  return httpClient.post('/repair-settlements', payload);
 }
 
 export async function updateRepairSettlementApi(id, payload) {
-  const data = await httpClient.put(`/repair-settlements/${id}`, payload);
-  return data.data;
+  return httpClient.put(`/repair-settlements/${id}`, payload);
 }
 
 export async function updateRepairSettlementStatusApi(id, status) {
-  const data = await httpClient.patch(`/repair-settlements/${id}/status`, { status });
-  return data.data;
+  return httpClient.patch(`/repair-settlements/${id}/status`, { status });
 }
