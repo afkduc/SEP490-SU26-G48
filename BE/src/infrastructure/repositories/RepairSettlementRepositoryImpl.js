@@ -245,12 +245,13 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .request()
         .input('serviceOrderId', sql.BigInt, serviceOrderId)
         .input('itemType', sql.VarChar(10), itemTypeFor(item.lhsc))
+        .input('productId', sql.BigInt, item.productId || null)
         .input('serviceId', sql.BigInt, item.serviceId || null)
         .input('itemCode', sql.VarChar(30), item.code || null)
         .input('itemDescription', sql.NVarChar(300), item.description)
         .input('lhsc', sql.VarChar(10), item.lhsc)
         .input('httt', sql.VarChar(10), item.httt)
-        .input('unit', sql.VarChar(20), item.unit || null)
+        .input('unit', sql.NVarChar(20), item.unit || null)
         .input('quantity', sql.Int, item.qty || 0)
         .input('unitPrice', sql.Decimal(18, 2), item.unitPrice || 0)
         .input('discountPct', sql.Decimal(5, 2), item.discount || 0)
@@ -262,7 +263,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             lhsc, httt, unit, quantity, unit_price, discount_pct, is_free, total
           )
           VALUES (
-            @serviceOrderId, @itemType, NULL, @serviceId, @itemCode, @itemDescription,
+            @serviceOrderId, @itemType, @productId, @serviceId, @itemCode, @itemDescription,
             @lhsc, @httt, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total
           )
         `);

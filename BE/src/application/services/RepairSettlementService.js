@@ -1,8 +1,10 @@
 const ApiError = require('../../utils/ApiError');
 const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
 
-const LHSC_VALUES = ['DV', 'PT', 'BH', 'HD'];
-const HTTT_VALUES = ['KHT', 'BH', 'HD', 'NB'];
+// LHSC chi con phan anh noi dung dong (cong/vat tu); "ai tra tien" da chuyen
+// het sang HTTT (tranh 2 truong cung dung ma 'BH' nhung nghia khac nhau).
+const LHSC_VALUES = ['DV', 'PT'];
+const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB'];
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced'];
 
 // FE gui "Ngay ke tiep" dang dd/mm/yyyy (o nhap tu do, khong phai <input type="date">).
