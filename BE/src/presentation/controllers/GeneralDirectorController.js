@@ -11,6 +11,10 @@ class GeneralDirectorController {
     this.getEmployeeById = this.getEmployeeById.bind(this);
     this.getTechnicians = this.getTechnicians.bind(this);
     this.getTechnicianById = this.getTechnicianById.bind(this);
+    this.getBranchManagers = this.getBranchManagers.bind(this);
+    this.getBranchManagerById = this.getBranchManagerById.bind(this);
+    this.createBranchManager = this.createBranchManager.bind(this);
+    this.updateBranchManager = this.updateBranchManager.bind(this);
   }
 
   async getRevenueReports(req, res, next) {
@@ -97,6 +101,46 @@ class GeneralDirectorController {
     try {
       const data = await this.generalDirectorService.getTechnicianById(req.params.id);
       return success(res, data, 'Lấy chi tiết kỹ thuật viên thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getBranchManagers(req, res, next) {
+    try {
+      const data = await this.generalDirectorService.listBranchManagers({
+        search: req.query.search || req.query.q || '',
+        branchId: req.query.branchId || 'all',
+        status: req.query.status || 'all',
+      });
+      return success(res, data, 'Lấy danh sách giám đốc chi nhánh thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getBranchManagerById(req, res, next) {
+    try {
+      const data = await this.generalDirectorService.getBranchManagerById(req.params.id);
+      return success(res, data, 'Lấy chi tiết giám đốc chi nhánh thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createBranchManager(req, res, next) {
+    try {
+      const data = await this.generalDirectorService.createBranchManager(req.body || {});
+      return success(res, data, 'Thêm giám đốc chi nhánh thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateBranchManager(req, res, next) {
+    try {
+      const data = await this.generalDirectorService.updateBranchManager(req.params.id, req.body || {});
+      return success(res, data, 'Cập nhật giám đốc chi nhánh thành công');
     } catch (err) {
       next(err);
     }
