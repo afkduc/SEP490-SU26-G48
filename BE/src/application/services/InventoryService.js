@@ -1,5 +1,6 @@
 const ApiError = require('../../utils/ApiError');
 const InventoryResponseDto = require('../dto/InventoryResponseDto');
+const { normalizeVietnamese } = require('../../utils/vietnamese');
 
 class InventoryService {
   constructor({ inventoryRepository }) {
@@ -61,6 +62,25 @@ class InventoryService {
     const totalQuantity = summary.reduce((sum, s) => sum + s.totalQuantity, 0);
     const totalValue = summary.reduce((sum, s) => sum + s.totalValue, 0);
     return { summary, totalProducts, totalQuantity, totalValue };
+  }
+
+  // Tra cuu phu tung dang active theo chi nhanh - dung khi tao phieu quyet
+  // toan sua chua (chon dong "Phu tung"). Fetch het roi loc khong-dau o day
+  // (giong CatalogSearchService), vi catalog phu tung cung chi vai chuc dong.
+  async searchProducts(term, branchId) {
+    if (!term || term.trim().length < 2) {
+      throw new ApiError(400, 'Từ khóa tìm kiếm phải có ít nhất 2 ký tự');
+    }
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    const needle = normalizeVietnamese(term.trim());
+    const allProducts = await this.inventoryRepository.findAllActiveProducts(branchId);
+    const matched = allProducts.filter(
+      (p) =>
+        normalizeVietnamese(p.productCode).includes(needle) ||
+        normalizeVietnamese(p.productName).includes(needle)
+    );
+    return InventoryResponseDto.fromEntityList(matched.slice(0, 10));
   }
 }
 
