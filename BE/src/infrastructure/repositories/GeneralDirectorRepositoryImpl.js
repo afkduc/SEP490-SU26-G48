@@ -1,5 +1,7 @@
 const GeneralDirectorRepository = require('../../domain/repositories/GeneralDirectorRepository');
 const { query } = require('../database/sqlServer');
+const { runInTransaction } = require('../../utils/sqlTransaction');
+const ApiError = require('../../utils/ApiError');
 
 function normalizeDate(value) {
   if (!value) return null;
@@ -200,6 +202,35 @@ function mapTechnician(row) {
   };
 }
 
+function mapBranchManagerRow(row) {
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    managerId: row.pseudo_id || String(row.id),
+    fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    createdAt: normalizeDate(row.created_at),
+    role: {
+      name: row.role_name,
+      label: row.role_label || row.role_name || 'Giám đốc chi nhánh',
+    },
+    branch: row.branch_id
+      ? {
+          id: row.branch_id,
+          code: row.branch_code,
+          name: row.branch_name,
+          address: row.branch_address,
+          phone: row.branch_phone,
+          email: row.branch_email,
+          isActive: row.branch_is_active === undefined ? null : Boolean(row.branch_is_active),
+        }
+      : null,
+  };
+}
+
 const USER_SPECIALTY_APPLY = `
   OUTER APPLY (
     SELECT STRING_AGG(sp.specialty_name, ', ') AS specialty
@@ -209,7 +240,79 @@ const USER_SPECIALTY_APPLY = `
   ) specialty_info
 `;
 
+const BRANCH_MANAGER_BRANCH_APPLY = `
+  OUTER APPLY (
+    SELECT TOP 1
+      b.id AS branch_id,
+      b.branch_code,
+      b.branch_name,
+      b.address AS branch_address,
+      b.phone AS branch_phone,
+      b.email AS branch_email,
+      b.is_active AS branch_is_active
+    FROM branches b
+    WHERE b.manager_id = u.id
+       OR (u.branch_id IS NOT NULL AND b.id = u.branch_id)
+    ORDER BY CASE WHEN b.manager_id = u.id THEN 0 ELSE 1 END, b.id ASC
+  ) branch_info
+`;
+
 class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
+  async findUserByEmail(email) {
+    const result = await query('SELECT TOP 1 id, email FROM users WHERE email = @email', { email });
+    return result.recordset[0] || null;
+  }
+
+  async getManagerRole() {
+    const result = await query(
+      `SELECT TOP 1 id, role_name, role_label
+       FROM roles
+       WHERE role_name = 'manager'`
+    );
+    return result.recordset[0] || null;
+  }
+
+  async getActiveBranchById(branchId) {
+    const result = await query(
+      `SELECT TOP 1 id, branch_code, branch_name, address, phone, email, manager_id, is_active
+       FROM branches
+       WHERE id = @branchId AND is_active = 1`,
+      { branchId: Number(branchId) }
+    );
+    return result.recordset[0] || null;
+  }
+
+  async getBranchManagerConflict(branchId, excludeUserId = null) {
+    const result = await query(
+      `SELECT TOP 1 b.id AS branch_id, b.manager_id, u.user_name, u.status
+       FROM branches b
+       LEFT JOIN users u ON u.id = b.manager_id
+       WHERE b.id = @branchId
+         AND b.manager_id IS NOT NULL
+         AND (@excludeUserId IS NULL OR b.manager_id <> @excludeUserId)`,
+      {
+        branchId: Number(branchId),
+        excludeUserId: excludeUserId ? Number(excludeUserId) : null,
+      }
+    );
+    return result.recordset[0] || null;
+  }
+
+  async nextBranchManagerPseudoId(branchId) {
+    const branch = await this.getActiveBranchById(branchId);
+    if (!branch) return null;
+
+    const prefix = `QL-${branch.branch_code}-`;
+    const result = await query(
+      `SELECT ISNULL(MAX(TRY_CAST(RIGHT(pseudo_id, 3) AS INT)), 0) + 1 AS next_num
+       FROM users
+       WHERE pseudo_id LIKE @prefixLike`,
+      { prefixLike: `${prefix}%` }
+    );
+
+    return `${prefix}${String(result.recordset[0].next_num || 1).padStart(3, '0')}`;
+  }
+
   async getRevenueReports(filters = {}) {
     const branchId = filters.branchId && filters.branchId !== 'all' ? Number(filters.branchId) : null;
     const monthsBack = Number(filters.monthsBack) || 6;
@@ -916,6 +1019,202 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
     };
 
     return technician;
+  }
+
+  async listBranchManagers(filters = {}) {
+    const params = {
+      search: filters.search ? `%${filters.search.trim()}%` : null,
+      branchId: filters.branchId && filters.branchId !== 'all' ? Number(filters.branchId) : null,
+      status: filters.status && filters.status !== 'all' ? filters.status : null,
+    };
+
+    const result = await query(
+      `SELECT
+          u.id,
+          u.pseudo_id,
+          u.user_name,
+          u.first_name,
+          u.last_name,
+          u.email,
+          u.phone,
+          u.status,
+          u.created_at,
+          r.role_name,
+          r.role_label,
+          branch_info.branch_id,
+          branch_info.branch_code,
+          branch_info.branch_name,
+          branch_info.branch_address,
+          branch_info.branch_phone,
+          branch_info.branch_email,
+          branch_info.branch_is_active
+       FROM users u
+       INNER JOIN user_role ur ON ur.user_id = u.id
+       INNER JOIN roles r ON r.id = ur.role_id AND r.role_name = 'manager'
+       ${BRANCH_MANAGER_BRANCH_APPLY}
+       WHERE (@branchId IS NULL OR branch_info.branch_id = @branchId)
+         AND (@status IS NULL OR u.status = @status)
+         AND (
+           @search IS NULL
+           OR u.pseudo_id LIKE @search
+           OR u.user_name LIKE @search
+           OR ISNULL(u.email, '') LIKE @search
+           OR ISNULL(u.phone, '') LIKE @search
+           OR ISNULL(branch_info.branch_name, '') LIKE @search
+         )
+       ORDER BY
+         CASE WHEN u.status = 'active' THEN 0 ELSE 1 END,
+         u.user_name ASC,
+         u.id ASC`,
+      params
+    );
+
+    return result.recordset.map(mapBranchManagerRow);
+  }
+
+  async getBranchManagerById(id) {
+    const result = await query(
+      `SELECT TOP 1
+          u.id,
+          u.pseudo_id,
+          u.user_name,
+          u.first_name,
+          u.last_name,
+          u.email,
+          u.phone,
+          u.status,
+          u.created_at,
+          r.role_name,
+          r.role_label,
+          branch_info.branch_id,
+          branch_info.branch_code,
+          branch_info.branch_name,
+          branch_info.branch_address,
+          branch_info.branch_phone,
+          branch_info.branch_email,
+          branch_info.branch_is_active
+       FROM users u
+       INNER JOIN user_role ur ON ur.user_id = u.id
+       INNER JOIN roles r ON r.id = ur.role_id AND r.role_name = 'manager'
+       ${BRANCH_MANAGER_BRANCH_APPLY}
+       WHERE u.id = @id`,
+      { id: Number(id) }
+    );
+
+    return mapBranchManagerRow(result.recordset[0]);
+  }
+
+  async createBranchManager({ fullName, email, phone, passwordHash, branchId, status }) {
+    const branch = await this.getActiveBranchById(branchId);
+    if (!branch) {
+      throw new ApiError(404, 'Không tìm thấy chi nhánh hoạt động');
+    }
+
+    const existed = await this.findUserByEmail(email);
+    if (existed) {
+      throw new ApiError(409, 'Email đã tồn tại');
+    }
+
+    const conflict = await this.getBranchManagerConflict(branchId);
+    if (conflict && conflict.status === 'active') {
+      throw new ApiError(409, 'Chi nhánh này đã có giám đốc đang hoạt động');
+    }
+
+    const role = await this.getManagerRole();
+    if (!role) {
+      throw new ApiError(500, 'Không tìm thấy vai trò giám đốc chi nhánh');
+    }
+
+    const pseudoId = await this.nextBranchManagerPseudoId(branchId);
+    if (!pseudoId) {
+      throw new ApiError(500, 'Không sinh được mã giám đốc chi nhánh');
+    }
+
+    const newId = await runInTransaction(async (tx) => {
+      const insertUser = await tx
+        .request()
+        .input('pseudoId', pseudoId)
+        .input('fullName', fullName)
+        .input('email', email)
+        .input('passwordHash', passwordHash)
+        .input('phone', phone || null)
+        .input('branchId', Number(branchId))
+        .input('status', status)
+        .query(`INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status, team_size, created_at)
+                OUTPUT INSERTED.id
+                VALUES (@pseudoId, @fullName, @email, @passwordHash, @fullName, '', @phone, @branchId, @status, 0, GETDATE())`);
+
+      const userId = insertUser.recordset[0].id;
+
+      await tx.request().input('userId', Number(userId)).input('roleId', Number(role.id)).query(
+        'INSERT INTO user_role (user_id, role_id) VALUES (@userId, @roleId)'
+      );
+
+      await tx.request().input('branchId', Number(branchId)).input('userId', Number(userId)).query(
+        'UPDATE branches SET manager_id = @userId WHERE id = @branchId'
+      );
+
+      return userId;
+    });
+
+    return this.getBranchManagerById(newId);
+  }
+
+  async updateBranchManager(id, { fullName, email, phone, branchId, status }) {
+    const existing = await this.getBranchManagerById(id);
+    if (!existing) {
+      return null;
+    }
+
+    const branch = await this.getActiveBranchById(branchId);
+    if (!branch) {
+      throw new ApiError(404, 'Không tìm thấy chi nhánh hoạt động');
+    }
+
+    const existed = await this.findUserByEmail(email);
+    if (existed && Number(existed.id) !== Number(id)) {
+      throw new ApiError(409, 'Email đã tồn tại');
+    }
+
+    const conflict = await this.getBranchManagerConflict(branchId, id);
+    if (conflict && conflict.status === 'active') {
+      throw new ApiError(409, 'Chi nhánh này đã có giám đốc đang hoạt động');
+    }
+
+    await runInTransaction(async (tx) => {
+      await tx
+        .request()
+        .input('id', Number(id))
+        .input('fullName', fullName)
+        .input('email', email)
+        .input('phone', phone || null)
+        .input('branchId', Number(branchId))
+        .input('status', status)
+        .query(`UPDATE users
+                SET user_name = @fullName,
+                    first_name = @fullName,
+                    email = @email,
+                    phone = @phone,
+                    branch_id = @branchId,
+                    status = @status
+                WHERE id = @id`);
+
+      if (existing.branch?.id && Number(existing.branch.id) !== Number(branchId)) {
+        await tx
+          .request()
+          .input('oldBranchId', Number(existing.branch.id))
+          .input('id', Number(id))
+          .query('UPDATE branches SET manager_id = NULL WHERE id = @oldBranchId AND manager_id = @id');
+      }
+
+      await tx
+        .request()
+        .input('branchId', Number(branchId))
+        .input('id', Number(id))
+        .query('UPDATE branches SET manager_id = @id WHERE id = @branchId');
+    });
+
+    return this.getBranchManagerById(id);
   }
 }
 
