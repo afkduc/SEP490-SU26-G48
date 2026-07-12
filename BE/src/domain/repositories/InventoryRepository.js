@@ -71,6 +71,16 @@ class InventoryRepository {
   async getStockSummaryByCategory(branchId) {
     throw new Error('Method getStockSummaryByCategory() must be implemented');
   }
+
+  /**
+   * Lay toan bo san pham dang active cua 1 chi nhanh (dung de tra cuu/tim kiem
+   * khi tao phieu quyet toan - loc khong dau o tang Service).
+   * @param {number} branchId
+   * @returns {Promise<Product[]>}
+   */
+  async findAllActiveProducts(branchId) {
+    throw new Error('Method findAllActiveProducts() must be implemented');
+  }
 }
 
 module.exports = InventoryRepository;
