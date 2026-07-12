@@ -371,6 +371,224 @@ class ManagerService {
     if (!report) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
     return report;
   }
+
+  async listSpecialties() {
+    return this.managerRepository.listSpecialties();
+  }
+
+  async listTeamLeaderOptions(branchId) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    return this.managerRepository.listTeamLeaderOptions(branchId);
+  }
+
+  async _validateStaffContact(payload, { requirePassword }) {
+    const { fullName, email, phone, password, confirmPassword } = payload;
+
+    if (!fullName || !email || !phone || (requirePassword && !password)) {
+      throw new ApiError(400, 'Họ tên, email, số điện thoại' + (requirePassword ? ' và mật khẩu' : '') + ' là bắt buộc');
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      throw new ApiError(400, 'Email không đúng định dạng');
+    }
+
+    if (!PHONE_REGEX.test(phone)) {
+      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+    }
+
+    if (requirePassword) {
+      if (password.length < 8) {
+        throw new ApiError(400, 'Mật khẩu tạm thời phải có ít nhất 8 ký tự');
+      }
+      if (confirmPassword !== undefined && confirmPassword !== password) {
+        throw new ApiError(400, 'Xác nhận mật khẩu không khớp');
+      }
+    }
+  }
+
+  async listTechnicians(branchId, filters = {}) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    const normalized = {
+      search: (filters.search || '').trim(),
+      status: filters.status || 'all',
+      teamLeaderId: filters.teamLeaderId || 'all',
+    };
+
+    if (normalized.status !== 'all' && !VALID_STATUSES.includes(normalized.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    return this.managerRepository.listTechnicians(branchId, normalized);
+  }
+
+  async getTechnicianById(branchId, id) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    if (!id) throw new ApiError(400, 'Thiếu mã thợ máy');
+
+    const technician = await this.managerRepository.getTechnicianById(branchId, id);
+    if (!technician) throw new ApiError(404, 'Không tìm thấy thợ máy');
+    return technician;
+  }
+
+  async _validateTeamLeaderAssignment(branchId, teamLeaderId) {
+    if (!teamLeaderId) {
+      throw new ApiError(400, 'Vui lòng chọn tổ trưởng phụ trách thợ này');
+    }
+    const options = await this.managerRepository.listTeamLeaderOptions(branchId);
+    if (!options.some((o) => Number(o.id) === Number(teamLeaderId))) {
+      throw new ApiError(400, 'Tổ trưởng không hợp lệ hoặc không thuộc chi nhánh này');
+    }
+  }
+
+  async _validateSpecialtyIds(specialtyIds) {
+    if (specialtyIds === undefined || specialtyIds === null) return undefined;
+    if (!Array.isArray(specialtyIds)) throw new ApiError(400, 'Danh sách chuyên môn không hợp lệ');
+    if (specialtyIds.length === 0) return [];
+
+    const all = await this.managerRepository.listSpecialties();
+    const validIds = new Set(all.map((s) => Number(s.id)));
+    if (!specialtyIds.every((sid) => validIds.has(Number(sid)))) {
+      throw new ApiError(400, 'Có chuyên môn không hợp lệ');
+    }
+    return specialtyIds.map(Number);
+  }
+
+  async createTechnician(branchId, payload) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    await this._validateStaffContact(payload, { requirePassword: true });
+    await this._validateTeamLeaderAssignment(branchId, payload.teamLeaderId);
+    const specialtyIds = await this._validateSpecialtyIds(payload.specialtyIds);
+
+    const normalizedStatus = payload.status && VALID_STATUSES.includes(payload.status) ? payload.status : 'active';
+
+    const existed = await this.managerRepository.findByEmail(payload.email);
+    if (existed) throw new ApiError(409, 'Email đã tồn tại');
+
+    const passwordHash = bcrypt.hashSync(payload.password, 10);
+    const pseudoId = await this.managerRepository.nextPseudoId();
+
+    return this.managerRepository.createTechnician({
+      branchId,
+      pseudoId,
+      fullName: payload.fullName.trim(),
+      email: payload.email.trim(),
+      phone: payload.phone.trim(),
+      passwordHash,
+      status: normalizedStatus,
+      teamLeaderId: Number(payload.teamLeaderId),
+      specialtyIds: specialtyIds || [],
+    });
+  }
+
+  async updateTechnician(branchId, id, payload) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    if (!id) throw new ApiError(400, 'Thiếu mã thợ máy');
+
+    const existing = await this.managerRepository.getTechnicianById(branchId, id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy thợ máy');
+
+    await this._validateStaffContact(payload, { requirePassword: false });
+    await this._validateTeamLeaderAssignment(branchId, payload.teamLeaderId);
+    const specialtyIds = await this._validateSpecialtyIds(payload.specialtyIds);
+
+    if (payload.status && !VALID_STATUSES.includes(payload.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    if (payload.email !== existing.email) {
+      const existed = await this.managerRepository.findByEmail(payload.email);
+      if (existed && Number(existed.id) !== Number(id)) {
+        throw new ApiError(409, 'Email đã tồn tại');
+      }
+    }
+
+    return this.managerRepository.updateTechnician(branchId, id, {
+      fullName: payload.fullName.trim(),
+      email: payload.email.trim(),
+      phone: payload.phone.trim(),
+      status: payload.status || existing.status,
+      teamLeaderId: Number(payload.teamLeaderId),
+      specialtyIds,
+    });
+  }
+
+  async listTeamLeaders(branchId, filters = {}) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    const normalized = {
+      search: (filters.search || '').trim(),
+      status: filters.status || 'all',
+    };
+
+    if (normalized.status !== 'all' && !VALID_STATUSES.includes(normalized.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    return this.managerRepository.listTeamLeaders(branchId, normalized);
+  }
+
+  async getTeamLeaderById(branchId, id) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    if (!id) throw new ApiError(400, 'Thiếu mã tổ trưởng');
+
+    const teamLeader = await this.managerRepository.getTeamLeaderById(branchId, id);
+    if (!teamLeader) throw new ApiError(404, 'Không tìm thấy tổ trưởng');
+    return teamLeader;
+  }
+
+  async createTeamLeader(branchId, payload) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    await this._validateStaffContact(payload, { requirePassword: true });
+
+    const normalizedStatus = payload.status && VALID_STATUSES.includes(payload.status) ? payload.status : 'active';
+
+    const existed = await this.managerRepository.findByEmail(payload.email);
+    if (existed) throw new ApiError(409, 'Email đã tồn tại');
+
+    const passwordHash = bcrypt.hashSync(payload.password, 10);
+    const pseudoId = await this.managerRepository.nextPseudoId();
+
+    return this.managerRepository.createTeamLeader({
+      branchId,
+      pseudoId,
+      fullName: payload.fullName.trim(),
+      email: payload.email.trim(),
+      phone: payload.phone.trim(),
+      passwordHash,
+      status: normalizedStatus,
+    });
+  }
+
+  async updateTeamLeader(branchId, id, payload) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    if (!id) throw new ApiError(400, 'Thiếu mã tổ trưởng');
+
+    const existing = await this.managerRepository.getTeamLeaderById(branchId, id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy tổ trưởng');
+
+    await this._validateStaffContact(payload, { requirePassword: false });
+
+    if (payload.status && !VALID_STATUSES.includes(payload.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    if (payload.email !== existing.email) {
+      const existed = await this.managerRepository.findByEmail(payload.email);
+      if (existed && Number(existed.id) !== Number(id)) {
+        throw new ApiError(409, 'Email đã tồn tại');
+      }
+    }
+
+    return this.managerRepository.updateTeamLeader(branchId, id, {
+      fullName: payload.fullName.trim(),
+      email: payload.email.trim(),
+      phone: payload.phone.trim(),
+      status: payload.status || existing.status,
+    });
+  }
 }
 
 module.exports = ManagerService;
