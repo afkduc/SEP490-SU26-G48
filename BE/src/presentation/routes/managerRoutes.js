@@ -35,6 +35,19 @@ function buildManagerRouter() {
   router.get('/settlements', controller.getSettlementReports);
   router.get('/settlements/:id', controller.getSettlementReportById);
 
+  router.get('/specialties', controller.getSpecialties);
+  router.get('/team-leaders/options', controller.getTeamLeaderOptions);
+
+  router.get('/technicians', controller.getTechnicians);
+  router.get('/technicians/:id', controller.getTechnicianById);
+  router.post('/technicians', controller.createTechnician);
+  router.put('/technicians/:id', controller.updateTechnician);
+
+  router.get('/team-leaders', controller.getTeamLeaders);
+  router.get('/team-leaders/:id', controller.getTeamLeaderById);
+  router.post('/team-leaders', controller.createTeamLeader);
+  router.put('/team-leaders/:id', controller.updateTeamLeader);
+
   return router;
 }
 
