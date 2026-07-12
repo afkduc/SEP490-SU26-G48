@@ -1,14 +1,13 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import './InventoryLayout.css';
 
+// Chi hien thi cac chuc nang da hoan thien. Phieu nhap / Xuat / Bao cao
+// se duoc them vao sau khi chuc nang nhap xuat kho duoc implement.
 const MENU = [
   { path: '', label: 'Tong quan', icon: '🏠', end: true },
-  { path: 'suppliers', label: 'Nha cung cap', icon: '🚚' },
   { path: 'parts', label: 'Phu tung', icon: '📦' },
   { path: 'stock', label: 'Ton kho', icon: '🗃️' },
-  { path: 'import-requests', label: 'Phieu nhap', icon: '📥' },
-  { path: 'warehouse-issues', label: 'Xuat kho', icon: '📤' },
-  { path: 'reports', label: 'Bao cao', icon: '📊' },
+  { path: 'suppliers', label: 'Nha cung cap', icon: '🚚' },
 ];
 
 export default function InventoryLayout() {
