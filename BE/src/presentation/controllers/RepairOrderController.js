@@ -43,6 +43,18 @@ class RepairOrderController {
       next(err);
     }
   };
+
+  updateStatus = async (req, res, next) => {
+    try {
+      const item = await this.repairOrderService.updateStatus(req.params.id, req.body.status, {
+        branchId: req.user.branchId,
+        cancelReason: req.body.reason,
+      });
+      return success(res, item, 'Repair order status updated');
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 module.exports = RepairOrderController;

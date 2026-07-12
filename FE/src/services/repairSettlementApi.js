@@ -21,6 +21,6 @@ export async function updateRepairSettlementApi(id, payload) {
   return httpClient.put(`/repair-settlements/${id}`, payload);
 }
 
-export async function updateRepairSettlementStatusApi(id, status) {
-  return httpClient.patch(`/repair-settlements/${id}/status`, { status });
+export async function updateRepairSettlementStatusApi(id, status, reason) {
+  return httpClient.patch(`/repair-settlements/${id}/status`, { status, reason });
 }
