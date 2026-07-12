@@ -25,6 +25,12 @@ function buildGeneralDirectorRouter() {
   router.get('/technicians', controller.getTechnicians);
   router.get('/technicians/:id', controller.getTechnicianById);
 
+  // UC52-55 - branch manager management
+  router.get('/branch-managers', controller.getBranchManagers);
+  router.get('/branch-managers/:id', controller.getBranchManagerById);
+  router.post('/branch-managers', controller.createBranchManager);
+  router.put('/branch-managers/:id', controller.updateBranchManager);
+
   return router;
 }
 
