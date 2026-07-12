@@ -1,6 +1,8 @@
 const ApiError = require('../../utils/ApiError');
 const RepairOrderResponseDto = require('../dto/RepairOrderDto');
 
+const UPDATABLE_STATUS_VALUES = ['completed', 'cancelled'];
+
 class RepairOrderService {
   constructor({ repairOrderRepository }) {
     this.repairOrderRepository = repairOrderRepository;
@@ -52,6 +54,26 @@ class RepairOrderService {
       },
       { branchId, createdBy }
     );
+    return RepairOrderResponseDto.fromEntity(entity);
+  }
+
+  async updateStatus(id, status, { branchId, cancelReason } = {}) {
+    if (!UPDATABLE_STATUS_VALUES.includes(status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+    if (status === 'cancelled' && !(cancelReason || '').trim()) {
+      throw new ApiError(400, 'Phải nhập lý do hủy');
+    }
+    const existing = await this.repairOrderRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
+    if (String(existing.branchId) !== String(branchId)) {
+      throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
+    }
+    if (existing.status !== 'in_progress') {
+      throw new ApiError(409, 'Lệnh đã kết thúc (hoàn thành/hủy), không thể đổi trạng thái nữa');
+    }
+
+    const entity = await this.repairOrderRepository.updateStatus(id, status, cancelReason);
     return RepairOrderResponseDto.fromEntity(entity);
   }
 }
