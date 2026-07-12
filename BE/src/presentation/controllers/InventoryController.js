@@ -80,6 +80,15 @@ class InventoryController {
       next(err);
     }
   };
+
+  searchProducts = async (req, res, next) => {
+    try {
+      const result = await this.inventoryService.searchProducts(req.query.q, req.user.branchId);
+      return success(res, result, 'Tìm kiếm phụ tùng thành công');
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 module.exports = InventoryController;
