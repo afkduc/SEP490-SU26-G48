@@ -1,4 +1,6 @@
 const { success } = require('../../utils/response');
+const jwt = require('jsonwebtoken');
+const config = require('../../config');
 const AdminUserService = require('../../application/services/AdminUserService');
 const AdminUserRepositoryImpl = require('../../infrastructure/repositories/AdminUserRepositoryImpl');
 const RoleService = require('../../application/services/RoleService');
@@ -131,8 +133,13 @@ class AdminController {
 
   async updateUser(req, res, next) {
     try {
-      const { userId, status, roleId } = req.body;
-      const updated = await this.adminUserService.updateUser({ userId, status, roleId });
+      const { userId, status, roleId, branchId } = req.body;
+      const updated = await this.adminUserService.updateUser({
+        userId,
+        status,
+        roleId,
+        branchId,
+      });
       return success(res, updated, 'Cap nhat nguoi dung thanh cong');
     } catch (err) {
       next(err);
@@ -147,6 +154,41 @@ class AdminController {
       next(err);
     }
   }
+
+  /**
+   * POST /api/admin/reissue-token
+   * Cap lai JWT cho user hien tai, lay roles tu DB de dam bao role admin
+   * co trong token (phong truong hop token cu khong co role admin).
+   * Endpoint nay dat TRUOC middleware requireAdmin trong adminRoutes.js,
+   * nen khong bi chan khi token cu thieu role admin.
+   */
+  reissueToken = async (req, res, next) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return next(new (require('../../utils/ApiError'))(401, 'Token khong hop le'));
+      }
+
+      const roles = await this.userRoleService.getUserRoles(userId);
+      const roleNames = roles.map((r) => r.roleName).filter(Boolean);
+
+      const newToken = jwt.sign(
+        {
+          userId,
+          email: req.user.email,
+          name: req.user.name,
+          roles: roleNames,
+          branchId: req.user.branchId,
+        },
+        config.jwtSecret,
+        { expiresIn: config.jwtExpiresIn }
+      );
+
+      return success(res, { token: newToken, roles: roleNames }, 'Cap lai token thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 module.exports = AdminController;

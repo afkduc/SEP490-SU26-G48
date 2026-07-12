@@ -10,33 +10,33 @@ const SECTION_AUDIT_ID = 'audit-section';
 const SECTION_LOGIN_ID = 'login-section';
 
 const ACTION_OPTIONS = [
-  { value: '', label: 'Tat ca hanh dong' },
+  { value: '', label: 'Tất cả hành động' },
   { value: 'CREATE', label: 'CREATE' },
   { value: 'UPDATE', label: 'UPDATE' },
   { value: 'DELETE', label: 'DELETE' },
 ];
 
-const ACTION_LABELS = { CREATE: 'Tao moi', UPDATE: 'Cap nhat', DELETE: 'Xoa' };
+const ACTION_LABELS = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa' };
 const ACTION_CLASS = { CREATE: 'badge--success', UPDATE: 'badge--info', DELETE: 'badge--danger' };
 
 const LOGIN_ACTION_OPTIONS = [
-  { value: '', label: 'Tat ca hanh dong' },
-  { value: 'LOGIN', label: 'Dang nhap' },
-  { value: 'LOGIN_FAILED', label: 'Dang nhap that bai' },
+  { value: '', label: 'Tất cả hành động' },
+  { value: 'LOGIN', label: 'Đăng nhập' },
+  { value: 'LOGIN_FAILED', label: 'Đăng nhập thất bại' },
 ];
 
 const LOGIN_ACTION_CLASS = { LOGIN: 'badge--success', LOGIN_FAILED: 'badge--danger' };
-const LOGIN_ACTION_LABEL = { LOGIN: 'Dang nhap', LOGIN_FAILED: 'That bai' };
+const LOGIN_ACTION_LABEL = { LOGIN: 'Đăng nhập', LOGIN_FAILED: 'Thất bại' };
 
 const SESSION_STATUS_OPTIONS = [
-  { value: '', label: 'Tat ca trang thai' },
-  { value: 'active', label: 'Dang hoat dong' },
-  { value: 'ended', label: 'Da dang xuat' },
-  { value: 'failed', label: 'That bai' },
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'active', label: 'Đang hoạt động' },
+  { value: 'ended', label: 'Đã đăng xuất' },
+  { value: 'failed', label: 'Thất bại' },
 ];
 
 const SESSION_STATUS_CLASS = { active: 'badge--success', ended: 'badge--secondary', failed: 'badge--danger' };
-const SESSION_STATUS_LABEL = { active: 'Dang hoat dong', ended: 'Da dang xuat', failed: 'That bai' };
+const SESSION_STATUS_LABEL = { active: 'Đang hoạt động', ended: 'Đã đăng xuất', failed: 'Thất bại' };
 
 function formatDate(value) {
   if (!value) return '—';
@@ -80,7 +80,7 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
   return (
     <div className="pagination">
       <span className="pagination__info">
-        Tong <strong>{total}</strong> ban ghi
+        Tổng <strong>{total}</strong> bản ghi
         &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
       </span>
       <div className="pagination__controls">
@@ -92,7 +92,7 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
-          Truoc
+          Trước
         </button>
 
         {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
@@ -148,7 +148,7 @@ function LogsTabSwitcher({ activeTab, onTabClick }) {
           <line x1="16" y1="17" x2="8" y2="17"/>
           <polyline points="10 9 9 9 8 9"/>
         </svg>
-        Nhat ky hoat dong
+        Nhật ký hoạt động
       </button>
       <button
         type="button"
@@ -163,7 +163,7 @@ function LogsTabSwitcher({ activeTab, onTabClick }) {
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
-        Lich su dang nhap
+        Lịch sử đăng nhập
       </button>
     </div>
   );
@@ -194,7 +194,7 @@ export default function AuditLogsPage() {
         const res = await adminApi.adminBranchesApi.list();
         if (!cancelled) setBranches(res?.items || []);
       } catch (err) {
-        if (!cancelled) setBranchesError(err.message || 'Khong tai duoc chi nhanh');
+        if (!cancelled) setBranchesError(err.message || 'Không tải được chi nhánh');
       }
     })();
     return () => { cancelled = true; };
@@ -320,8 +320,8 @@ export default function AuditLogsPage() {
             </svg>
           </div>
           <div className="admin-logs__title-group">
-            <h1>Nhat ky he thong</h1>
-            <p className="admin-logs__subtitle">Theo doi tat ca hoat dong va lich su dang nhap</p>
+            <h1>Nhật ký hệ thống</h1>
+            <p className="admin-logs__subtitle">Theo dõi tất cả hoạt động và lịch sử đăng nhập</p>
           </div>
         </div>
         <div className="admin-logs__actions">
@@ -341,7 +341,7 @@ export default function AuditLogsPage() {
               className="section-header__dot"
               style={{ background: 'linear-gradient(135deg, #4f46e5, #6366f1)' }}
             />
-            <h2 className="section-header__title">Nhat ky hoat dong</h2>
+            <h2 className="section-header__title">Nhật ký hoạt động</h2>
             {audit.data.total > 0 && (
               <span className="section-header__badge">{audit.data.total}</span>
             )}
@@ -354,14 +354,14 @@ export default function AuditLogsPage() {
             <input
               className="input input--search"
               type="text"
-              placeholder="Tim theo ten nguoi dung..."
+              placeholder="Tìm theo tên người dùng..."
               value={audit.params.userName || ''}
               onChange={(e) => audit.updateParam('userName', e.target.value)}
             />
             <input
             className="input input--search"
             type="text"
-            placeholder="Tim theo so dien thoai..."
+            placeholder="Tìm theo số điện thoại..."
             value={audit.params.phone || ''}
             onChange={(e) => audit.updateParam('phone', e.target.value)}
           />
@@ -378,7 +378,7 @@ export default function AuditLogsPage() {
             <input
               className="input input--search"
               type="text"
-              placeholder="Tim theo ma (VD: ND-001)..."
+              placeholder="Tìm theo mã (VD: ND-001)..."
               value={audit.params.entityCode || ''}
               onChange={(e) => audit.updateParam('entityCode', e.target.value)}
             />
@@ -388,14 +388,14 @@ export default function AuditLogsPage() {
             type="date"
             value={audit.params.startDate || ''}
             onChange={(e) => audit.updateParam('startDate', e.target.value)}
-            title="Tu ngay"
+            title="Từ ngày"
           />
           <input
             className="input input--date"
             type="date"
             value={audit.params.endDate || ''}
             onChange={(e) => audit.updateParam('endDate', e.target.value)}
-            title="Den ngay"
+            title="Đến ngày"
           />
 
           <select
@@ -407,7 +407,7 @@ export default function AuditLogsPage() {
             disabled={!!branchesError}
           >
             <option value="">
-              {branchesError ? `Loi: ${branchesError}` : 'Tat ca chi nhanh'}
+              {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
             </option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>{b.branchName}</option>
@@ -419,7 +419,7 @@ export default function AuditLogsPage() {
               <polyline points="1 4 1 10 7 10"/>
               <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
             </svg>
-            Dat lai
+            Đặt lại
           </button>
         </div>
       </div>
@@ -427,10 +427,10 @@ export default function AuditLogsPage() {
       {/* Table (Audit) */}
         <div className="table-card">
           {audit.loading ? (
-            <div className="admin-logs__loading">Dang tai danh sach...</div>
+            <div className="admin-logs__loading">Đang tải danh sách...</div>
           ) : audit.error ? (
             <div className="admin-logs__error">
-              <strong>Loi:</strong> {audit.error.message || 'Khong the tai danh sach'}
+              <strong>Lỗi:</strong> {audit.error.message || 'Không thể tải danh sách'}
             </div>
           ) : (
             <>
@@ -462,7 +462,7 @@ export default function AuditLogsPage() {
               className="section-header__dot"
               style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)' }}
             />
-            <h2 className="section-header__title">Lich su dang nhap</h2>
+            <h2 className="section-header__title">Lịch sử đăng nhập</h2>
             {sessions.data.total > 0 && (
               <span className="section-header__badge">{sessions.data.total}</span>
             )}
@@ -474,14 +474,14 @@ export default function AuditLogsPage() {
             <input
               className="input input--search"
               type="text"
-              placeholder="Tim theo ten nguoi dung..."
+              placeholder="Tìm theo tên người dùng..."
               value={sessions.params.userName || ''}
               onChange={(e) => sessions.updateParam('userName', e.target.value)}
             />
             <input
               className="input input--search"
               type="text"
-              placeholder="Tim theo so dien thoai..."
+              placeholder="Tìm theo số điện thoại..."
               value={sessions.params.phone || ''}
               onChange={(e) => sessions.updateParam('phone', e.target.value)}
             />
@@ -510,14 +510,14 @@ export default function AuditLogsPage() {
               type="date"
               value={sessions.params.startDate || ''}
               onChange={(e) => sessions.updateParam('startDate', e.target.value)}
-              title="Tu ngay"
+              title="Từ ngày"
             />
             <input
               className="input input--date"
               type="date"
               value={sessions.params.endDate || ''}
               onChange={(e) => sessions.updateParam('endDate', e.target.value)}
-              title="Den ngay"
+              title="Đến ngày"
             />
 
             <select
@@ -529,7 +529,7 @@ export default function AuditLogsPage() {
               disabled={!!branchesError}
             >
               <option value="">
-                {branchesError ? `Loi: ${branchesError}` : 'Tat ca chi nhanh'}
+                {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
               </option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>{b.branchName}</option>
@@ -541,7 +541,7 @@ export default function AuditLogsPage() {
                 <polyline points="1 4 1 10 7 10"/>
                 <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
               </svg>
-              Dat lai
+              Đặt lại
             </button>
           </div>
         </div>
@@ -549,10 +549,10 @@ export default function AuditLogsPage() {
         {/* Table (Login) */}
         <div className="table-card">
           {sessions.loading ? (
-            <div className="admin-logs__loading">Dang tai danh sach...</div>
+            <div className="admin-logs__loading">Đang tải danh sách...</div>
           ) : sessions.error ? (
             <div className="admin-logs__error">
-              <strong>Loi:</strong> {sessions.error.message || 'Khong the tai danh sach'}
+              <strong>Lỗi:</strong> {sessions.error.message || 'Không thể tải danh sách'}
             </div>
           ) : (
             <>
@@ -582,21 +582,21 @@ function AuditTable({ items }) {
       <table className="table">
         <thead>
           <tr>
-            <th>Thoi gian</th>
-            <th>Nguoi dung</th>
-            <th>Hanh dong</th>
-            <th>Bang</th>
-            <th>Ma / ID</th>
+            <th>Thời gian</th>
+            <th>Người dùng</th>
+            <th>Hành động</th>
+            <th>Bảng</th>
+            <th>Mã / ID</th>
             <th>IP</th>
-            <th>Phuong thuc</th>
-            <th>Thoi gian xu ly</th>
-            <th>Trang thai</th>
+            <th>Phương thức</th>
+            <th>Thời gian xử lý</th>
+            <th>Trạng thái</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td colSpan={9} className="table__empty">
-              Khong co nhat ky nao phu hop voi bo loc
+              Không có nhật ký nào phù hợp với bộ lọc
             </td>
           </tr>
         </tbody>
@@ -608,15 +608,15 @@ function AuditTable({ items }) {
     <table className="table">
       <thead>
         <tr>
-          <th>Thoi gian</th>
-          <th>Nguoi dung</th>
-          <th>Hanh dong</th>
-          <th>Bang</th>
-          <th>Ma / ID</th>
+          <th>Thời gian</th>
+          <th>Người dùng</th>
+          <th>Hành động</th>
+          <th>Bảng</th>
+          <th>Mã / ID</th>
           <th>IP</th>
-          <th>Phuong thuc</th>
-          <th>Thoi gian xu ly</th>
-          <th>Trang thai</th>
+          <th>Phương thức</th>
+          <th>Thời gian xử lý</th>
+          <th>Trạng thái</th>
         </tr>
       </thead>
       <tbody>
@@ -668,21 +668,21 @@ function SessionTable({ items }) {
       <table className="table">
         <thead>
           <tr>
-            <th>Thoi gian dang nhap</th>
-            <th>Nguoi dung</th>
-            <th>So dien thoai</th>
-            <th>Hanh dong</th>
-            <th>Trang thai</th>
+            <th>Thời gian đăng nhập</th>
+            <th>Người dùng</th>
+            <th>Số điện thoại</th>
+            <th>Hành động</th>
+            <th>Trạng thái</th>
             <th>IP</th>
-            <th>Trinh duyet</th>
-            <th>Thoi gian dang xuat</th>
-            <th>Thoi luong</th>
+            <th>Trình duyệt</th>
+            <th>Thời gian đăng xuất</th>
+            <th>Thời lượng</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td colSpan={9} className="table__empty">
-              Khong co lich su dang nhap nao phu hop voi bo loc
+              Không có lịch sử đăng nhập nào phù hợp với bộ lọc
             </td>
           </tr>
         </tbody>
@@ -694,15 +694,15 @@ function SessionTable({ items }) {
     <table className="table">
       <thead>
         <tr>
-          <th>Thoi gian dang nhap</th>
-          <th>Nguoi dung</th>
-          <th>So dien thoai</th>
-          <th>Hanh dong</th>
-          <th>Trang thai</th>
+          <th>Thời gian đăng nhập</th>
+          <th>Người dùng</th>
+          <th>Số điện thoại</th>
+          <th>Hành động</th>
+          <th>Trạng thái</th>
           <th>IP</th>
-          <th>Trinh duyet</th>
-          <th>Thoi gian dang xuat</th>
-          <th>Thoi luong</th>
+          <th>Trình duyệt</th>
+          <th>Thời gian đăng xuất</th>
+          <th>Thời lượng</th>
         </tr>
       </thead>
       <tbody>
