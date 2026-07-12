@@ -15,3 +15,7 @@ export async function listTeamLeadersApi() {
 export async function createRepairOrderApi(payload) {
   return httpClient.post('/repair-orders', payload);
 }
+
+export async function updateRepairOrderStatusApi(id, status, reason) {
+  return httpClient.patch(`/repair-orders/${id}/status`, { status, reason });
+}

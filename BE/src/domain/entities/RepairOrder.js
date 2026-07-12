@@ -20,6 +20,7 @@ class RepairOrder {
     this.notes = data.notes ?? null;
     this.createdAt = data.createdAt ?? null;
     this.completedAt = data.completedAt ?? null;
+    this.cancelReason = data.cancelReason ?? null;
 
     this.customer = data.customer ?? null; // { id, fullName }
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel }
@@ -44,6 +45,7 @@ class RepairOrder {
       notes: headerRow.notes,
       createdAt: headerRow.created_at,
       completedAt: headerRow.completed_at,
+      cancelReason: headerRow.cancel_reason,
       customer: {
         id: headerRow.customer_id,
         fullName: headerRow.customer_full_name,

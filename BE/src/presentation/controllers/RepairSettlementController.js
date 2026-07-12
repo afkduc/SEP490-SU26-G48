@@ -55,6 +55,7 @@ class RepairSettlementController {
     try {
       const item = await this.repairSettlementService.updateStatus(req.params.id, req.body.status, {
         issuedBy: req.user.userId,
+        cancelReason: req.body.reason,
       });
       return success(res, item, 'Repair settlement status updated');
     } catch (err) {
