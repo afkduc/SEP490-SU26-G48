@@ -49,10 +49,25 @@ function itemTypeFor(lhsc) {
 }
 
 class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
-  async findAll({ branchId, status, search, page = 1, limit = 20 } = {}) {
+  // customerId/vehicleId dung cho man "Lich su bao duong" (theo khach hang / theo
+  // xe) - xem toan bo lich su bat ke chi nhanh nao, nen KHONG loc theo branchId
+  // trong 2 truong hop nay. Khi khong truyen customerId/vehicleId (man danh sach
+  // phieu quyet toan cua co van dich vu) thi van bat buoc loc theo branchId nhu cu.
+  async findAll({ branchId, status, search, customerId, vehicleId, page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
-    let sqlText = `${HEADER_SELECT} WHERE so.branch_id = @branchId`;
-    const params = { branchId };
+    const params = {};
+    let sqlText = `${HEADER_SELECT} WHERE `;
+
+    if (customerId) {
+      params.customerId = customerId;
+      sqlText += `so.customer_id = @customerId`;
+    } else if (vehicleId) {
+      params.vehicleId = vehicleId;
+      sqlText += `so.vehicle_id = @vehicleId`;
+    } else {
+      params.branchId = branchId;
+      sqlText += `so.branch_id = @branchId`;
+    }
 
     if (status) {
       params.status = status;
@@ -71,15 +86,25 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.recordset.map((row) => RepairSettlement.fromPersistence(row, []));
   }
 
-  async count({ branchId, status, search } = {}) {
+  async count({ branchId, status, search, customerId, vehicleId } = {}) {
+    const params = {};
     let sqlText = `
       SELECT COUNT(*) AS total
       FROM   service_orders so
       JOIN   customers c ON c.id = so.customer_id
       JOIN   vehicles  v ON v.id = so.vehicle_id
-      WHERE  so.branch_id = @branchId
-    `;
-    const params = { branchId };
+      WHERE  `;
+
+    if (customerId) {
+      params.customerId = customerId;
+      sqlText += `so.customer_id = @customerId`;
+    } else if (vehicleId) {
+      params.vehicleId = vehicleId;
+      sqlText += `so.vehicle_id = @vehicleId`;
+    } else {
+      params.branchId = branchId;
+      sqlText += `so.branch_id = @branchId`;
+    }
 
     if (status) {
       params.status = status;
