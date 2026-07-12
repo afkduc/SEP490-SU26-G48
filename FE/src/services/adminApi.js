@@ -4,13 +4,11 @@ import httpClient from './httpClient';
  * Legacy named exports (giu de backward compat voi code cu)
  */
 export async function getAdminDashboardStats() {
-  const res = await httpClient.get('/admin/dashboard');
-  return res?.data;
+  return httpClient.get('/admin/dashboard');
 }
 
 export async function listAdminUsers() {
-  const res = await httpClient.get('/admin/users');
-  return res?.data;
+  return httpClient.get('/admin/users');
 }
 
 /**
