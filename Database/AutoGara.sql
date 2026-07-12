@@ -522,8 +522,7 @@ CREATE TABLE [dbo].[products](
 	[product_name] [nvarchar](200) NOT NULL,
 	[category] [nvarchar](100) NULL,
 	[brand_name] [nvarchar](100) NULL,
-	[compatible_brand_id] [bigint] NULL,
-	[unit] [varchar](20) NOT NULL,
+	[unit] [nvarchar](20) NOT NULL,
 	[supplier_id] [bigint] NULL,
 	[location] [varchar](50) NULL,
 	[branch_id] [bigint] NOT NULL,
@@ -656,7 +655,7 @@ CREATE TABLE [dbo].[service_order_items](
 	[item_description] [nvarchar](300) NOT NULL,
 	[lhsc] [varchar](10) NULL,
 	[httt] [varchar](10) NULL,
-	[unit] [varchar](20) NULL,
+	[unit] [nvarchar](20) NULL,
 	[quantity] [int] NOT NULL,
 	[unit_price] [decimal](18, 2) NOT NULL,
 	[discount_pct] [decimal](5, 2) NOT NULL,
@@ -1330,11 +1329,6 @@ ALTER TABLE [dbo].[products]  WITH CHECK ADD  CONSTRAINT [products_branch_fkey] 
 REFERENCES [dbo].[branches] ([id])
 GO
 ALTER TABLE [dbo].[products] CHECK CONSTRAINT [products_branch_fkey]
-GO
-ALTER TABLE [dbo].[products]  WITH CHECK ADD  CONSTRAINT [products_brand_fkey] FOREIGN KEY([compatible_brand_id])
-REFERENCES [dbo].[brands] ([id])
-GO
-ALTER TABLE [dbo].[products] CHECK CONSTRAINT [products_brand_fkey]
 GO
 ALTER TABLE [dbo].[products]  WITH CHECK ADD  CONSTRAINT [products_sup_fkey] FOREIGN KEY([supplier_id])
 REFERENCES [dbo].[suppliers] ([id])
