@@ -16,6 +16,7 @@ function buildRepairOrderRouter() {
   router.get('/team-leaders', controller.getTeamLeaders);
   router.get('/:id', controller.getById);
   router.post('/', controller.create);
+  router.patch('/:id/status', controller.updateStatus);
 
   return router;
 }
