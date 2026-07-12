@@ -25,7 +25,7 @@ class ProfileService {
         errors.push('Email không đúng định dạng');
       }
       const existing = await this.profileRepository.findByEmail(payload.email);
-      if (existing && existing.id !== Number(userId)) {
+      if (existing && Number(existing.id) !== Number(userId)) {
         errors.push('Email đã được sử dụng bởi người khác');
       }
     }
