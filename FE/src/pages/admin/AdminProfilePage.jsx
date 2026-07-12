@@ -128,9 +128,9 @@ function getInitials(firstName, lastName) {
 }
 
 const STATUS_LABELS = {
-  active: 'Hoat dong',
-  inactive: 'Ngung hoat dong',
-  locked: 'Bi khoa',
+  active: 'Hoạt động',
+  inactive: 'Ngừng hoạt động',
+  locked: 'Bị khóa',
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -231,7 +231,7 @@ export default function AdminProfilePage() {
           });
         }
       } catch (err) {
-        if (!cancelled) setLoadError(err.message || 'Khong the tai thong tin ca nhan');
+        if (!cancelled) setLoadError(err.message || 'Không thể tải thông tin cá nhân');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -268,7 +268,7 @@ export default function AdminProfilePage() {
 
       const updated = await updateMyProfile(payload);
       setProfile(updated);
-      setEditSuccess('Cap nhat thong tin thanh cong!');
+      setEditSuccess('Cập nhật thông tin thành công!');
 
       // Update localStorage user so Navbar/AppContext picks up the change on next reload
       try {
@@ -287,7 +287,7 @@ export default function AdminProfilePage() {
 
       setTimeout(() => setEditSuccess(null), 3000);
     } catch (err) {
-      setEditError(err.message || 'Khong the cap nhat thong tin');
+      setEditError(err.message || 'Không thể cập nhật thông tin');
     } finally {
       setEditLoading(false);
     }
@@ -306,11 +306,11 @@ export default function AdminProfilePage() {
     setPwSuccess(null);
 
     const errors = {};
-    if (!pwForm.currentPassword) errors.currentPassword = 'Vui long nhap mat khau hien tai';
-    if (!pwForm.newPassword) errors.newPassword = 'Vui long nhap mat khau moi';
-    else if (pwForm.newPassword.length < 6) errors.newPassword = 'Mat khau moi phai it nhat 6 ky tu';
-    if (!pwForm.confirmPassword) errors.confirmPassword = 'Vui long xac nhan mat khau moi';
-    else if (pwForm.newPassword !== pwForm.confirmPassword) errors.confirmPassword = 'Mat khau xac nhan khong khop';
+    if (!pwForm.currentPassword) errors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại';
+    if (!pwForm.newPassword) errors.newPassword = 'Vui lòng nhập mật khẩu mới';
+    else if (pwForm.newPassword.length < 6) errors.newPassword = 'Mật khẩu mới phải ít nhất 6 ký tự';
+    if (!pwForm.confirmPassword) errors.confirmPassword = 'Vui lòng xác nhận mật khẩu mới';
+    else if (pwForm.newPassword !== pwForm.confirmPassword) errors.confirmPassword = 'Mật khẩu xác nhận không khớp';
 
     if (Object.keys(errors).length > 0) {
       setPwErrors(errors);
@@ -324,10 +324,10 @@ export default function AdminProfilePage() {
         newPassword: pwForm.newPassword,
       });
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setPwSuccess('Doi mat khau thanh cong!');
+      setPwSuccess('Đổi mật khẩu thành công!');
       setTimeout(() => setPwSuccess(null), 4000);
     } catch (err) {
-      setPwErrors({ global: err.message || 'Khong the doi mat khau' });
+      setPwErrors({ global: err.message || 'Không thể đổi mật khẩu' });
     } finally {
       setPwLoading(false);
     }
@@ -350,8 +350,8 @@ export default function AdminProfilePage() {
             <IconUser size={22} />
           </div>
           <div>
-            <h1>Ho so ca nhan</h1>
-            <p className="admin-profile__subtitle">Xem va chinh sua thong tin tai khoan</p>
+            <h1>Hồ sơ cá nhân</h1>
+            <p className="admin-profile__subtitle">Xem và chỉnh sửa thông tin tài khoản</p>
           </div>
         </div>
       </div>
@@ -360,7 +360,7 @@ export default function AdminProfilePage() {
       {loading && (
         <div className="admin-profile__loading">
           <div className="loading-spinner" />
-          <span>Đang tai thong tin...</span>
+          <span>Đang tải thông tin...</span>
         </div>
       )}
 
@@ -423,7 +423,7 @@ export default function AdminProfilePage() {
               onClick={() => handleTabChange('edit')}
             >
               <IconEdit />
-              Chinh sua ho so
+              Chỉnh sửa hồ sơ
             </button>
           </div>
 
@@ -436,21 +436,21 @@ export default function AdminProfilePage() {
                 onClick={() => handleTabChange('view')}
               >
                 <IconUser size={15} />
-                Thong tin
+                Thông tin
               </button>
               <button
                 className={`profile-tabs__btn ${activeTab === 'edit' ? 'profile-tabs__btn--active' : ''}`}
                 onClick={() => handleTabChange('edit')}
               >
                 <IconEdit size={15} />
-                Chinh sua
+                Chỉnh sửa
               </button>
               <button
                 className={`profile-tabs__btn ${activeTab === 'password' ? 'profile-tabs__btn--active' : ''}`}
                 onClick={() => handleTabChange('password')}
               >
                 <IconLock size={15} />
-                Doi mat khau
+                Đổi mật khẩu
               </button>
             </div>
 
@@ -459,11 +459,11 @@ export default function AdminProfilePage() {
               <div className="profile-tab-content">
                 <div className="profile-info-grid">
                   <div className="profile-info-item">
-                    <span className="profile-info-item__label">Ho</span>
+                    <span className="profile-info-item__label">Họ</span>
                     <span className="profile-info-item__value">{profile.firstName || '—'}</span>
                   </div>
                   <div className="profile-info-item">
-                    <span className="profile-info-item__label">Ten</span>
+                    <span className="profile-info-item__label">Tên</span>
                     <span className="profile-info-item__value">{profile.lastName || '—'}</span>
                   </div>
                   <div className="profile-info-item profile-info-item--full">
@@ -471,19 +471,19 @@ export default function AdminProfilePage() {
                     <span className="profile-info-item__value">{profile.email || '—'}</span>
                   </div>
                   <div className="profile-info-item">
-                    <span className="profile-info-item__label">So dien thoai</span>
+                    <span className="profile-info-item__label">Số điện thoại</span>
                     <span className="profile-info-item__value">{profile.phone || '—'}</span>
                   </div>
                   <div className="profile-info-item">
-                    <span className="profile-info-item__label">Chi nhanh</span>
+                    <span className="profile-info-item__label">Chi nhánh</span>
                     <span className="profile-info-item__value">{profile.branchName || '—'}</span>
                   </div>
                   <div className="profile-info-item">
-                    <span className="profile-info-item__label">Ten dang nhap</span>
+                    <span className="profile-info-item__label">Tên đăng nhập</span>
                     <span className="profile-info-item__value profile-info-item__value--mono">@{profile.userName}</span>
                   </div>
                   <div className="profile-info-item">
-                    <span className="profile-info-item__label">Trang thai</span>
+                    <span className="profile-info-item__label">Trạng thái</span>
                     <span className="profile-info-item__value">
                       <span className={`status-badge status-badge--${profile.status}`}>
                         {STATUS_LABELS[profile.status] || profile.status}
@@ -491,11 +491,11 @@ export default function AdminProfilePage() {
                     </span>
                   </div>
                   <div className="profile-info-item">
-                    <span className="profile-info-item__label">Ngay tao</span>
+                    <span className="profile-info-item__label">Ngày tạo</span>
                     <span className="profile-info-item__value">{formatDateTime(profile.createdAt)}</span>
                   </div>
                   <div className="profile-info-item">
-                    <span className="profile-info-item__label">Cap nhat lan cuoi</span>
+                    <span className="profile-info-item__label">Cập nhật lần cuối</span>
                     <span className="profile-info-item__value">{formatDateTime(profile.createdAt)}</span>
                   </div>
                   <div className="profile-info-item profile-info-item--full">
@@ -527,7 +527,7 @@ export default function AdminProfilePage() {
                 <form className="profile-form" onSubmit={handleEditSubmit}>
                   <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label" htmlFor="firstName">Ho</label>
+                      <label className="form-label" htmlFor="firstName">Họ</label>
                       <input
                         id="firstName"
                         name="firstName"
@@ -535,11 +535,11 @@ export default function AdminProfilePage() {
                         className="form-input"
                         value={editForm.firstName}
                         onChange={handleEditChange}
-                        placeholder="Nhap ho"
+                        placeholder="Nhập họ"
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="lastName">Ten</label>
+                      <label className="form-label" htmlFor="lastName">Tên</label>
                       <input
                         id="lastName"
                         name="lastName"
@@ -547,7 +547,7 @@ export default function AdminProfilePage() {
                         className="form-input"
                         value={editForm.lastName}
                         onChange={handleEditChange}
-                        placeholder="Nhap ten"
+                        placeholder="Nhập tên"
                       />
                     </div>
                   </div>
@@ -570,7 +570,7 @@ export default function AdminProfilePage() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label" htmlFor="phone">So dien thoai</label>
+                    <label className="form-label" htmlFor="phone">Số điện thoại</label>
                     <div className="input-wrapper">
                       <span className="input-icon"><IconPhone /></span>
                       <input
@@ -587,17 +587,17 @@ export default function AdminProfilePage() {
 
                   <div className="profile-form__readonly">
                     <div className="form-group">
-                      <label className="form-label">Ten dang nhap</label>
+                      <label className="form-label">Tên đăng nhập</label>
                       <input
                         type="text"
                         className="form-input form-input--readonly"
                         value={profile.userName}
                         readOnly
-                        title="Ten dang nhap khong the thay doi"
+                        title="Tên đăng nhập không thể thay đổi"
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Chi nhanh</label>
+                      <label className="form-label">Chi nhánh</label>
                       <input
                         type="text"
                         className="form-input form-input--readonly"
@@ -613,7 +613,7 @@ export default function AdminProfilePage() {
                       className="btn btn--primary"
                       disabled={editLoading}
                     >
-                      {editLoading ? 'Đang luu...' : 'Luu thay doi'}
+                      {editLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
                     </button>
                   </div>
                 </form>
@@ -632,34 +632,34 @@ export default function AdminProfilePage() {
 
                 <div className="password-hint">
                   <IconLock size={16} />
-                  <span>Mat khau phai co it nhat <strong>6 ky tu</strong>. Khong su dung mat khau da tung su dung truoc do.</span>
+                  <span>Mật khẩu phải có ít nhất <strong>6 ký tự</strong>. Không sử dụng mật khẩu đã từng sử dụng trước đó.</span>
                 </div>
 
                 <form className="profile-form" onSubmit={handlePwSubmit}>
                   <PasswordInput
                     id="currentPassword"
-                    label="Mat khau hien tai"
+                    label="Mật khẩu hiện tại"
                     value={pwForm.currentPassword}
                     onChange={handlePwChange}
-                    placeholder="Nhap mat khau hien tai"
+                    placeholder="Nhập mật khẩu hiện tại"
                     error={pwErrors.currentPassword}
                   />
 
                   <PasswordInput
                     id="newPassword"
-                    label="Mat khau moi"
+                    label="Mật khẩu mới"
                     value={pwForm.newPassword}
                     onChange={handlePwChange}
-                    placeholder="It nhat 6 ky tu"
+                    placeholder="Ít nhất 6 ký tự"
                     error={pwErrors.newPassword}
                   />
 
                   <PasswordInput
                     id="confirmPassword"
-                    label="Xac nhan mat khau moi"
+                    label="Xác nhận mật khẩu mới"
                     value={pwForm.confirmPassword}
                     onChange={handlePwChange}
-                    placeholder="Nhap lai mat khau moi"
+                    placeholder="Nhập lại mật khẩu mới"
                     error={pwErrors.confirmPassword}
                   />
 
@@ -669,7 +669,7 @@ export default function AdminProfilePage() {
                       className="btn btn--primary"
                       disabled={pwLoading}
                     >
-                      {pwLoading ? 'Đang doi mat khau...' : 'Doi mat khau'}
+                      {pwLoading ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu'}
                     </button>
                   </div>
                 </form>
