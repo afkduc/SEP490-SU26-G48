@@ -16,6 +16,34 @@ function activeBadge(isActive) {
     : { label: 'Ngừng áp dụng', className: 'badge-inactive' };
 }
 
+const SETTLEMENT_STATUS_TABS = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'waiting_repair', label: 'Chờ sửa chữa' },
+  { value: 'inprogress', label: 'Đang sửa chữa' },
+  { value: 'waiting_payment', label: 'Chờ thanh toán' },
+  { value: 'invoiced', label: 'Đã xuất hóa đơn' },
+];
+
+const SETTLEMENT_STATUS_META = {
+  waiting_repair: { label: 'Chờ sửa chữa', color: '#E65100', background: '#FFF3E0' },
+  inprogress: { label: 'Đang sửa chữa', color: '#1565C0', background: '#E3F2FD' },
+  waiting_payment: { label: 'Chờ thanh toán', color: '#2E7D32', background: '#E8F5E9' },
+  invoiced: { label: 'Đã xuất hóa đơn', color: '#424242', background: '#F5F5F5' },
+};
+
+function settlementStatusBadge(status) {
+  return SETTLEMENT_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 8, padding: '7px 0', borderBottom: '1px solid #ECEFF1' }}>
+      <div style={{ color: '#6B7280', fontSize: 12, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 13, color: '#111827' }}>{value || '—'}</div>
+    </div>
+  );
+}
+
 function exportCsv(filename, header, rows) {
   const csv = [header, ...rows]
     .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
@@ -1117,8 +1145,8 @@ function ServicePackageListPage() {
             className="btn btn-secondary"
             onClick={() => exportCsv(
               'danh-sach-goi-dich-vu.csv',
-              ['Mã gói', 'Tên gói', 'Danh mục', 'Số dịch vụ', 'Mốc km', 'Giá gói', 'Trạng thái'],
-              packages.map((p) => [p.code, p.name, p.categoryName, p.itemCount, p.applicableKm, p.totalPrice, activeBadge(p.isActive).label])
+              ['Mã gói', 'Tên gói', 'Danh mục', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
+              packages.map((p) => [p.code, p.name, p.categoryName, p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
             )}
           >
             📊 Xuất Excel
@@ -1165,7 +1193,6 @@ function ServicePackageListPage() {
               <th>Tên gói</th>
               <th>Danh mục</th>
               <th>Số dịch vụ</th>
-              <th>Mốc km</th>
               <th>Giá gói</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
@@ -1173,7 +1200,7 @@ function ServicePackageListPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8}>
+              <tr><td colSpan={7}>
                 <div className="empty-state">
                   <div className="empty-state-icon">⏳</div>
                   <h3>Đang tải danh sách gói dịch vụ</h3>
@@ -1182,7 +1209,7 @@ function ServicePackageListPage() {
             )}
 
             {!loading && pageItems.length === 0 && !error && (
-              <tr><td colSpan={8}>
+              <tr><td colSpan={7}>
                 <div className="empty-state">
                   <div className="empty-state-icon">📭</div>
                   <h3>Không có gói dịch vụ phù hợp</h3>
@@ -1199,7 +1226,6 @@ function ServicePackageListPage() {
                   <td style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{pkg.name}</td>
                   <td>{pkg.categoryName || '—'}</td>
                   <td>{pkg.itemCount}</td>
-                  <td>{pkg.applicableKm ? `${pkg.applicableKm} km` : '—'}</td>
                   <td>{formatCurrency(pkg.totalPrice)}</td>
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
@@ -1299,9 +1325,6 @@ function ServicePackageFormPage({ mode }) {
     if (!form.categoryId) errors.categoryId = 'Vui lòng chọn danh mục';
     if (form.totalPrice === '' || Number.isNaN(Number(form.totalPrice)) || Number(form.totalPrice) < 0) {
       errors.totalPrice = 'Giá gói không hợp lệ';
-    }
-    if (form.applicableKm !== '' && (Number.isNaN(Number(form.applicableKm)) || Number(form.applicableKm) < 0)) {
-      errors.applicableKm = 'Mốc km không hợp lệ';
     }
     if (form.serviceIds.length === 0) errors.serviceIds = 'Vui lòng chọn ít nhất 1 dịch vụ cho gói';
     setFieldErrors(errors);
@@ -1403,12 +1426,6 @@ function ServicePackageFormPage({ mode }) {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Mốc km áp dụng</label>
-              <input type="number" min="0" className="form-input" value={form.applicableKm} onChange={(e) => setField('applicableKm', e.target.value)} placeholder="Ví dụ: 10000" />
-              {fieldErrors.applicableKm && <span className="form-error">{fieldErrors.applicableKm}</span>}
-            </div>
-
-            <div className="form-group">
               <label className="form-label required">Giá gói (VND)</label>
               <input type="number" min="0" className="form-input" value={form.totalPrice} onChange={(e) => setField('totalPrice', e.target.value)} placeholder="0" />
               {fieldErrors.totalPrice && <span className="form-error">{fieldErrors.totalPrice}</span>}
@@ -1483,6 +1500,322 @@ function ServicePackageFormPage({ mode }) {
   );
 }
 
+function SettlementDetailModal({ report, onClose }) {
+  if (!report) return null;
+  const badge = settlementStatusBadge(report.status);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 1040 }}>
+        <div className="modal-header">
+          <h3 className="modal-title">Chi tiết phiếu quyết toán {report.code}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body" style={{ maxHeight: '80vh', overflow: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+            <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 12, color: '#54708A' }}>Mã phiếu</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{report.code}</div>
+            </div>
+            <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 12, color: '#6B7280' }}>Chi nhánh</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{report.branch?.name || '—'}</div>
+            </div>
+            <div style={{ background: badge.background, border: `1px solid ${badge.color}33`, borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 12, color: badge.color }}>Trạng thái</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: badge.color, marginTop: 4 }}>{badge.label}</div>
+            </div>
+            <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 12, color: '#9A3412' }}>Tổng thanh toán</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#C2410C', marginTop: 4 }}>{formatCurrency(report.total)}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, marginBottom: 18 }}>
+            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin phiếu</div>
+              <DetailRow label="Ngày tiếp nhận" value={formatDate(report.intakeDate)} />
+              <DetailRow label="Ngày hoàn thành" value={formatDate(report.completedDate)} />
+              <DetailRow label="Tư vấn dịch vụ" value={`${report.advisor?.name || '—'}${report.advisor?.phone ? ` · ${report.advisor.phone}` : ''}`} />
+              <DetailRow label="Tổ trưởng" value={report.teamLeader?.name || 'Chưa gán'} />
+              <DetailRow label="Yêu cầu khách hàng" value={report.customerRequest} />
+            </div>
+
+            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontWeight: 800, marginBottom: 10 }}>Khách hàng & xe</div>
+              <DetailRow label="Khách hàng" value={report.customer?.fullName} />
+              <DetailRow label="Điện thoại" value={report.customer?.phone} />
+              <DetailRow label="Địa chỉ" value={report.customer?.address} />
+              <DetailRow label="Biển số" value={report.vehicle?.licensePlate} />
+              <DetailRow label="Dòng xe / Năm" value={`${report.vehicle?.vehicleModel || '—'}${report.vehicle?.manufactureYear ? ` · ${report.vehicle.manufactureYear}` : ''}`} />
+              <DetailRow label="Số khung / số máy" value={`${report.vehicle?.frameNumber || '—'} / ${report.vehicle?.engineNumber || '—'}`} />
+            </div>
+          </div>
+
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontWeight: 800, marginBottom: 10 }}>Bảng hạng mục</div>
+            <div className="table-wrapper" style={{ boxShadow: 'none', marginBottom: 0 }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Mã</th>
+                    <th>Nội dung</th>
+                    <th>Loại</th>
+                    <th>HTTT</th>
+                    <th>ĐVT</th>
+                    <th>SL</th>
+                    <th>Đơn giá</th>
+                    <th>CK %</th>
+                    <th>Miễn phí</th>
+                    <th>Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(report.items || []).length === 0 && (
+                    <tr>
+                      <td colSpan={10}>
+                        <div className="empty-state" style={{ minHeight: 160 }}>
+                          <div className="empty-state-icon">📭</div>
+                          <h3>Không có hạng mục</h3>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {(report.items || []).map((item) => (
+                    <tr key={item.id}>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{item.code || '—'}</td>
+                      <td>{item.description}</td>
+                      <td>{item.lhsc || '—'}</td>
+                      <td>{item.httt || '—'}</td>
+                      <td>{item.unit || '—'}</td>
+                      <td>{item.qty || 0}</td>
+                      <td>{formatCurrency(item.unitPrice)}</td>
+                      <td>{item.discount || 0}%</td>
+                      <td>{item.isFree ? 'Có' : ''}</td>
+                      <td style={{ fontWeight: 700 }}>{formatCurrency(item.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
+            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontWeight: 800, marginBottom: 10 }}>Tổng hợp tài chính</div>
+              <DetailRow label="Tổng trước giảm giá" value={formatCurrency(report.subtotal)} />
+              <DetailRow label="Tổng giảm giá" value={formatCurrency(report.discountAmount)} />
+              <DetailRow label="Tổng sau giảm giá" value={formatCurrency(report.afterDiscount)} />
+              <DetailRow label="Thuế GTGT" value={formatCurrency(report.vat)} />
+              <DetailRow label="Miễn phí" value={formatCurrency(report.freeAmount)} />
+            </div>
+            <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', borderRadius: 12, padding: 16, color: 'white' }}>
+              <div style={{ fontSize: 13, opacity: 0.8 }}>Tổng thanh toán</div>
+              <div style={{ fontSize: 28, fontWeight: 900, margin: '8px 0 6px' }}>{formatCurrency(report.total)}</div>
+              <div style={{ fontSize: 12, opacity: 0.75 }}>Dữ liệu lấy trực tiếp từ SQL Server.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettlementReportsPage() {
+  const [reports, setReports] = useState([]);
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeReport, setActiveReport] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const searchTimer = useRef(null);
+  const requestSeq = useRef(0);
+
+  const reload = () => {
+    const seq = ++requestSeq.current;
+    setLoading(true);
+    setError('');
+    managerApi
+      .getSettlementReports({ search: search.trim() })
+      .then((data) => {
+        if (seq !== requestSeq.current) return;
+        setReports(data || []);
+      })
+      .catch((err) => {
+        if (seq !== requestSeq.current) return;
+        setReports([]);
+        setError(err.message || 'Không tải được danh sách phiếu quyết toán');
+      })
+      .finally(() => {
+        if (seq === requestSeq.current) setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(reload, 300);
+    return () => clearTimeout(searchTimer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  const counts = reports.reduce(
+    (acc, r) => {
+      acc.all += 1;
+      acc[r.status] = (acc[r.status] || 0) + 1;
+      return acc;
+    },
+    { all: 0 }
+  );
+
+  const filteredReports = activeTab === 'all' ? reports : reports.filter((r) => r.status === activeTab);
+
+  const openDetail = (report) => {
+    setActiveReport(report);
+    setDetailError('');
+    setDetailLoading(true);
+    managerApi
+      .getSettlementReportById(report.id)
+      .then((data) => setActiveReport(data || report))
+      .catch((err) => setDetailError(err.message || 'Không tải được chi tiết phiếu quyết toán'))
+      .finally(() => setDetailLoading(false));
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Quyết toán sửa chữa</h1>
+          <div className="breadcrumb">Trang chủ / Quyết toán sửa chữa</div>
+        </div>
+      </div>
+
+      <div className="filter-bar">
+        <div className="search-input" style={{ maxWidth: 420 }}>
+          <span className="search-icon">🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm mã phiếu, biển số, khách hàng, số điện thoại..."
+          />
+        </div>
+      </div>
+
+      <div className="tabs">
+        {SETTLEMENT_STATUS_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            className={`tab-btn ${activeTab === tab.value ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.value)}
+          >
+            {tab.label} ({counts[tab.value] || 0})
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <span>{error}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
+        </div>
+      )}
+
+      <div className="table-wrapper">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Mã phiếu</th>
+              <th>Xe</th>
+              <th>Khách hàng</th>
+              <th>Tư vấn</th>
+              <th>Tiếp nhận</th>
+              <th>Hoàn thành</th>
+              <th>Chi phí</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr><td colSpan={9}>
+                <div className="empty-state">
+                  <div className="empty-state-icon">⏳</div>
+                  <h3>Đang tải danh sách phiếu quyết toán</h3>
+                </div>
+              </td></tr>
+            )}
+
+            {!loading && filteredReports.length === 0 && !error && (
+              <tr><td colSpan={9}>
+                <div className="empty-state">
+                  <div className="empty-state-icon">📭</div>
+                  <h3>Không có phiếu quyết toán phù hợp</h3>
+                  <p>Thử thay đổi từ khóa tìm kiếm hoặc chọn trạng thái khác.</p>
+                </div>
+              </td></tr>
+            )}
+
+            {!loading && filteredReports.map((report) => {
+              const badge = settlementStatusBadge(report.status);
+              return (
+                <tr key={report.id}>
+                  <td style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--primary-dark)' }}>{report.code}</td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>{report.vehicle?.licensePlate || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>
+                      {report.vehicle?.vehicleModel || '—'}{report.vehicle?.manufactureYear ? ` · ${report.vehicle.manufactureYear}` : ''}
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>{report.customer?.fullName || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{report.customer?.phone || '—'}</div>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>{report.advisor?.name || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{report.advisor?.phone || ''}</div>
+                  </td>
+                  <td style={{ fontSize: 12 }}>{formatDate(report.intakeDate)}</td>
+                  <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>
+                  <td style={{ fontWeight: 800, color: '#C62828' }}>{formatCurrency(report.total)}</td>
+                  <td>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
+                      {badge.label}
+                    </span>
+                  </td>
+                  <td>
+                    <button className="btn btn-info btn-sm" onClick={() => openDetail(report)}>Xem chi tiết</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="pagination">
+          <span className="pagination-info">{filteredReports.length} phiếu</span>
+        </div>
+      </div>
+
+      {detailError && (
+        <div style={{ marginTop: 12, background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', borderRadius: 10, padding: '12px 14px' }}>
+          {detailError}
+        </div>
+      )}
+
+      {detailLoading && (
+        <div style={{ marginTop: 12, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#334155', borderRadius: 10, padding: '12px 14px' }}>
+          Đang tải chi tiết phiếu quyết toán...
+        </div>
+      )}
+
+      {!detailLoading && activeReport && <SettlementDetailModal report={activeReport} onClose={() => setActiveReport(null)} />}
+    </div>
+  );
+}
+
 function ComingSoonPanel({ title }) {
   return (
     <div>
@@ -1516,6 +1849,7 @@ export default function ManagerPage() {
       <Route path="service-packages" element={<ServicePackageListPage />} />
       <Route path="service-packages/create" element={<ServicePackageFormPage mode="create" />} />
       <Route path="service-packages/:id/edit" element={<ServicePackageFormPage mode="edit" />} />
+      <Route path="settlements" element={<SettlementReportsPage />} />
       <Route path="*" element={<Navigate to="employees" replace />} />
     </Routes>
   );

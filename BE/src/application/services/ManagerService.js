@@ -300,7 +300,7 @@ class ManagerService {
         throw new ApiError(400, 'Vui lòng chọn ít nhất 1 dịch vụ cho gói');
       }
       const branchServices = await this.managerRepository.listServices(branchId, {});
-      const validIds = new Set(branchServices.map((s) => s.id));
+      const validIds = new Set(branchServices.map((s) => Number(s.id)));
       if (!serviceIds.every((sid) => validIds.has(Number(sid)))) {
         throw new ApiError(400, 'Có dịch vụ không thuộc chi nhánh này');
       }
@@ -350,6 +350,26 @@ class ManagerService {
       isActive: payload.isActive !== undefined ? !!payload.isActive : existing.isActive,
       serviceIds,
     });
+  }
+
+  async listSettlementReports(branchId, filters = {}) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+
+    const normalized = {
+      search: (filters.search || '').trim(),
+      status: filters.status || 'all',
+    };
+
+    return this.managerRepository.listSettlementReports(branchId, normalized);
+  }
+
+  async getSettlementReportById(branchId, id) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    if (!id) throw new ApiError(400, 'Thiếu mã phiếu quyết toán');
+
+    const report = await this.managerRepository.getSettlementReportById(branchId, id);
+    if (!report) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
+    return report;
   }
 }
 
