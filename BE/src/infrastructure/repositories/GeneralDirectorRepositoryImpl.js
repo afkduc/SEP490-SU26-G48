@@ -200,6 +200,15 @@ function mapTechnician(row) {
   };
 }
 
+const USER_SPECIALTY_APPLY = `
+  OUTER APPLY (
+    SELECT STRING_AGG(sp.specialty_name, ', ') AS specialty
+    FROM user_specialty us
+    JOIN specialties sp ON sp.id = us.specialty_id
+    WHERE us.user_id = u.id
+  ) specialty_info
+`;
+
 class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
   async getRevenueReports(filters = {}) {
     const branchId = filters.branchId && filters.branchId !== 'all' ? Number(filters.branchId) : null;
@@ -636,7 +645,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           u.email,
           u.phone,
           u.status,
-          u.specialty,
+          specialty_info.specialty,
           u.team_size,
           u.avatar,
           u.notes,
@@ -650,6 +659,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN branches b ON b.id = u.branch_id
        LEFT JOIN user_role ur ON ur.user_id = u.id
        LEFT JOIN roles r ON r.id = ur.role_id
+       ${USER_SPECIALTY_APPLY}
        WHERE r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'accountant', 'team_leader')
          AND (@branchId IS NULL OR u.branch_id = @branchId)
          AND (@status IS NULL OR u.status = @status)
@@ -684,7 +694,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           u.email,
           u.phone,
           u.status,
-          u.specialty,
+          specialty_info.specialty,
           u.team_size,
           u.avatar,
           u.notes,
@@ -698,6 +708,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN branches b ON b.id = u.branch_id
        LEFT JOIN user_role ur ON ur.user_id = u.id
        LEFT JOIN roles r ON r.id = ur.role_id
+       ${USER_SPECIALTY_APPLY}
        WHERE u.id = @id
          AND r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'accountant', 'team_leader')
        ORDER BY
@@ -726,12 +737,12 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
     };
 
     const skillCondition = {
-      mechanical: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%động cơ%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%co khi%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%cơ khí%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%gầm%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%phanh%')",
-      electrical: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%điện%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%dien%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%điện tử%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%cam bien%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%cảm biến%')",
-      painting: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%sơn%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%dong son%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%đồng sơn%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%than vo%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%thân vỏ%')",
-      diagnostic: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%chuẩn đoán%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%chuan doan%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%diagnostic%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%obd%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%scan%')",
-      maintenance: "(LOWER(ISNULL(u.specialty, '')) LIKE N'%bảo dưỡng%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%bao duong%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%định kỳ%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%dinh ky%' OR LOWER(ISNULL(u.specialty, '')) LIKE N'%thay dầu%')",
-      other: "(ISNULL(u.specialty, '') = '' OR (LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%động cơ%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%co khi%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%cơ khí%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%gầm%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%phanh%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%điện%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%dien%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%điện tử%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%cam bien%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%cảm biến%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%sơn%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%dong son%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%đồng sơn%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%than vo%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%thân vỏ%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%chuẩn đoán%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%chuan doan%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%diagnostic%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%obd%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%scan%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%bảo dưỡng%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%bao duong%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%định kỳ%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%dinh ky%' AND LOWER(ISNULL(u.specialty, '')) NOT LIKE N'%thay dầu%'))",
+      mechanical: "(LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%động cơ%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%co khi%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%cơ khí%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%gầm%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%phanh%')",
+      electrical: "(LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%điện%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%dien%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%điện tử%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%cam bien%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%cảm biến%')",
+      painting: "(LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%sơn%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%dong son%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%đồng sơn%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%than vo%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%thân vỏ%')",
+      diagnostic: "(LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%chuẩn đoán%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%chuan doan%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%diagnostic%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%obd%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%scan%')",
+      maintenance: "(LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%bảo dưỡng%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%bao duong%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%định kỳ%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%dinh ky%' OR LOWER(ISNULL(specialty_info.specialty, '')) LIKE N'%thay dầu%')",
+      other: "(ISNULL(specialty_info.specialty, '') = '' OR (LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%động cơ%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%co khi%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%cơ khí%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%gầm%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%phanh%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%điện%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%dien%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%điện tử%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%cam bien%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%cảm biến%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%sơn%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%dong son%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%đồng sơn%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%than vo%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%thân vỏ%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%chuẩn đoán%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%chuan doan%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%diagnostic%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%obd%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%scan%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%bảo dưỡng%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%bao duong%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%định kỳ%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%dinh ky%' AND LOWER(ISNULL(specialty_info.specialty, '')) NOT LIKE N'%thay dầu%'))",
     };
 
     const result = await query(
@@ -744,7 +755,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           u.email,
           u.phone,
           u.status,
-          u.specialty,
+          specialty_info.specialty,
           u.team_size,
           u.avatar,
           u.notes,
@@ -758,6 +769,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN branches b ON b.id = u.branch_id
        INNER JOIN user_role ur ON ur.user_id = u.id
        INNER JOIN roles r ON r.id = ur.role_id
+       ${USER_SPECIALTY_APPLY}
        OUTER APPLY (
          SELECT
            SUM(CASE WHEN ro.status = 'inprogress' THEN 1 ELSE 0 END) AS active_assignments,
@@ -774,7 +786,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
            OR u.user_name LIKE @search
            OR CAST(u.id AS VARCHAR(30)) LIKE @search
            OR ISNULL(u.phone, '') LIKE @search
-           OR ISNULL(u.specialty, '') LIKE @search
+           OR ISNULL(specialty_info.specialty, '') LIKE @search
            OR (ISNULL(u.first_name, '') + ' ' + ISNULL(u.last_name, '')) LIKE @search
            OR (ISNULL(u.last_name, '') + ' ' + ISNULL(u.first_name, '')) LIKE @search
          )
@@ -820,7 +832,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           u.email,
           u.phone,
           u.status,
-          u.specialty,
+         specialty_info.specialty,
           u.team_size,
           u.avatar,
           u.notes,
@@ -832,6 +844,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN branches b ON b.id = u.branch_id
        INNER JOIN user_role ur ON ur.user_id = u.id
        INNER JOIN roles r ON r.id = ur.role_id
+       ${USER_SPECIALTY_APPLY}
        WHERE u.id = @id
          AND r.role_name = 'team_leader'`,
       { id: Number(id) }
