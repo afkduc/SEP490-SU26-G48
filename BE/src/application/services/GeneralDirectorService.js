@@ -1,4 +1,9 @@
+const bcrypt = require('bcryptjs');
 const ApiError = require('../../utils/ApiError');
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^(0[0-9]{9,10})$/;
+const VALID_STATUSES = ['active', 'inactive'];
 
 class GeneralDirectorService {
   constructor(generalDirectorRepository) {
@@ -47,8 +52,7 @@ class GeneralDirectorService {
       role: filters.role || 'all',
     };
 
-    const validStatuses = ['all', 'active', 'inactive'];
-    if (!validStatuses.includes(normalized.status)) {
+    if (!['all', ...VALID_STATUSES].includes(normalized.status)) {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
     }
 
@@ -76,8 +80,7 @@ class GeneralDirectorService {
       status: filters.status || 'all',
     };
 
-    const validStatuses = ['all', 'active', 'inactive'];
-    if (!validStatuses.includes(normalized.status)) {
+    if (!['all', ...VALID_STATUSES].includes(normalized.status)) {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
     }
 
@@ -100,6 +103,104 @@ class GeneralDirectorService {
     }
 
     return technician;
+  }
+
+  async listBranchManagers(filters = {}) {
+    const normalized = {
+      search: (filters.search || '').trim(),
+      branchId: filters.branchId || 'all',
+      status: filters.status || 'all',
+    };
+
+    if (!['all', ...VALID_STATUSES].includes(normalized.status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    return this.generalDirectorRepository.listBranchManagers(normalized);
+  }
+
+  async getBranchManagerById(id) {
+    if (!id) {
+      throw new ApiError(400, 'Thiếu mã giám đốc chi nhánh');
+    }
+
+    const manager = await this.generalDirectorRepository.getBranchManagerById(id);
+    if (!manager) {
+      throw new ApiError(404, 'Không tìm thấy giám đốc chi nhánh');
+    }
+
+    return manager;
+  }
+
+  async createBranchManager(payload = {}) {
+    const { fullName, email, phone, password, confirmPassword, branchId, status } = payload;
+
+    if (!fullName || !email || !phone || !password || !branchId) {
+      throw new ApiError(400, 'Họ tên, email, số điện thoại, mật khẩu và chi nhánh là bắt buộc');
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      throw new ApiError(400, 'Email không đúng định dạng');
+    }
+
+    if (!PHONE_REGEX.test(phone)) {
+      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+    }
+
+    if (password.length < 8) {
+      throw new ApiError(400, 'Mật khẩu phải có ít nhất 8 ký tự');
+    }
+
+    if (confirmPassword !== undefined && confirmPassword !== password) {
+      throw new ApiError(400, 'Xác nhận mật khẩu không khớp');
+    }
+
+    const normalizedStatus = VALID_STATUSES.includes(status) ? status : 'active';
+    const passwordHash = bcrypt.hashSync(password, 10);
+
+    return this.generalDirectorRepository.createBranchManager({
+      fullName: fullName.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      passwordHash,
+      branchId: Number(branchId),
+      status: normalizedStatus,
+    });
+  }
+
+  async updateBranchManager(id, payload = {}) {
+    if (!id) {
+      throw new ApiError(400, 'Thiếu mã giám đốc chi nhánh');
+    }
+
+    const { fullName, email, phone, branchId, status } = payload;
+
+    if (!fullName || !email || !phone || !branchId) {
+      throw new ApiError(400, 'Họ tên, email, số điện thoại và chi nhánh là bắt buộc');
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      throw new ApiError(400, 'Email không đúng định dạng');
+    }
+
+    if (!PHONE_REGEX.test(phone)) {
+      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+    }
+
+    const normalizedStatus = VALID_STATUSES.includes(status) ? status : 'active';
+
+    const existing = await this.generalDirectorRepository.getBranchManagerById(id);
+    if (!existing) {
+      throw new ApiError(404, 'Không tìm thấy giám đốc chi nhánh');
+    }
+
+    return this.generalDirectorRepository.updateBranchManager(id, {
+      fullName: fullName.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      branchId: Number(branchId),
+      status: normalizedStatus,
+    });
   }
 }
 
