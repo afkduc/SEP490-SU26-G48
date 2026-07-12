@@ -32,6 +32,9 @@ function buildManagerRouter() {
   router.post('/service-packages', controller.createServicePackage);
   router.put('/service-packages/:id', controller.updateServicePackage);
 
+  router.get('/settlements', controller.getSettlementReports);
+  router.get('/settlements/:id', controller.getSettlementReportById);
+
   return router;
 }
 
