@@ -37,7 +37,6 @@ const ADMIN_NAV = [
     icon: '📜',
     children: [
       { label: 'Nhật ký hoạt động', path: '/admin/logs' },
-      { label: 'Lịch sử đăng nhập', path: '/admin/logs/login' },
     ],
   },
 ];
@@ -134,7 +133,7 @@ function NavDropdownItem({ item, currentPath }) {
   };
 
   // So sanh exact match (bo qua query string o ca 2 phia) de tranh
-  // truong hop /admin/logs/login van khop voi child /admin/logs.
+  // truong hop /admin/logs?tab=login khong bi match nham voi child /admin/logs.
   const isPathMatch = (configPath) => {
     const [baseConfig] = configPath.split('?');
     const [baseCurrent] = currentPath.split('?');
