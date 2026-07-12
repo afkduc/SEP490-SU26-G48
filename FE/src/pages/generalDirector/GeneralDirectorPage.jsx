@@ -892,7 +892,6 @@ function EmployeeListPage() {
                     <DetailRow label="Số điện thoại" value={activeEmployee.phone} />
                     <DetailRow label="Chi nhánh" value={activeEmployee.branch?.name || 'Chưa phân chi nhánh'} />
                     <DetailRow label="Vai trò" value={(activeEmployee.roleLabels || []).join(', ') || '—'} />
-                    <DetailRow label="Chuyên môn" value={activeEmployee.specialty} />
                     <DetailRow label="Quy mô tổ" value={activeEmployee.teamSize ? `${activeEmployee.teamSize} người` : '—'} />
                     <DetailRow label="Ngày tạo tài khoản" value={formatDate(activeEmployee.createdAt)} />
                     <DetailRow label="Ghi chú" value={activeEmployee.notes} />
@@ -1136,26 +1135,7 @@ function TechnicianListPage() {
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{technician.phone || '—'}</div>
                   </td>
                   <td><BranchBadge branch={technician.branch} /></td>
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {(technician.skillGroupLabels || []).map((item) => (
-                          <span key={item} style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999, background: '#ECFDF5', color: '#047857', fontSize: 10, fontWeight: 800 }}>
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                      {(technician.skills || []).length > 0
-                        ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {technician.skills.map((item) => (
-                              <span key={item} style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: 999, background: '#EFF6FF', color: '#1D4ED8', fontSize: 11, fontWeight: 700 }}>
-                                {item}
-                              </span>
-                            ))}
-                          </div>
-                        : <span style={{ color: '#6B7280' }}>—</span>}
-                    </div>
-                  </td>
+                  <td>{technician.specialty || '—'}</td>
                   <td style={{ fontWeight: 800, color: '#0F766E' }}>{technician.activeAssignments || 0}</td>
                   <td style={{ fontWeight: 700 }}>{technician.totalRepairs || 0}</td>
                   <td>
@@ -1203,7 +1183,7 @@ function TechnicianListPage() {
 
               {!detailLoading && !detailError && activeTechnician && (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
                     <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
                       <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeTechnician.employeeId || '—'}</div>
@@ -1211,14 +1191,6 @@ function TechnicianListPage() {
                     <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: '#6B7280' }}>Chi nhánh</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{activeTechnician.branch?.name || '—'}</div>
-                    </div>
-                    <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#047857' }}>Lệnh sửa chữa đã xử lý</div>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: '#065F46', marginTop: 4 }}>{activeTechnician.repairSummary?.total || 0}</div>
-                    </div>
-                    <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#92400E' }}>Hoàn thành</div>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: '#B45309', marginTop: 4 }}>{activeTechnician.repairSummary?.completed || 0}</div>
                     </div>
                   </div>
 
@@ -1228,10 +1200,8 @@ function TechnicianListPage() {
                     <DetailRow label="Email" value={activeTechnician.email} />
                     <DetailRow label="Số điện thoại" value={activeTechnician.phone} />
                     <DetailRow label="Trạng thái" value={employeeStatusBadge(activeTechnician.status).label} />
-                    <DetailRow label="Nhóm kỹ năng" value={(activeTechnician.skillGroupLabels || []).join(', ') || '—'} />
-                    <DetailRow label="Kỹ năng chi tiết" value={(activeTechnician.skills || []).join(', ') || activeTechnician.specialty || '—'} />
+                    <DetailRow label="Chuyên môn" value={activeTechnician.specialty || '—'} />
                     <DetailRow label="Quy mô tổ" value={activeTechnician.teamSize ? `${activeTechnician.teamSize} người` : '—'} />
-                    <DetailRow label="Gần nhất hoàn thành" value={formatDate(activeTechnician.repairSummary?.latestCompletedAt)} />
                     <DetailRow label="Ngày tạo tài khoản" value={formatDate(activeTechnician.createdAt)} />
                     <DetailRow label="Ghi chú" value={activeTechnician.notes} />
                   </div>
