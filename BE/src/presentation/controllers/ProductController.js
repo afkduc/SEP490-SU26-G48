@@ -33,7 +33,12 @@ class ProductController {
 
   create = async (req, res, next) => {
     try {
-      const product = await this.productService.createProduct(req.body);
+      const payload = { ...req.body };
+      // Neu client khong truyen branchId thi lay tu token (neu co).
+      if (!payload.branchId && req.user?.branchId) {
+        payload.branchId = req.user.branchId;
+      }
+      const product = await this.productService.createProduct(payload);
       return success(res, product, 'Product created', 201);
     } catch (err) {
       next(err);
