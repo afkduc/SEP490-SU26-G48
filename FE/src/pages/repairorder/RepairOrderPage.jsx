@@ -1,32 +1,399 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Route, Routes, useNavigate } from 'react-router-dom';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { formatCurrency } from '../../utils';
-import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
-import { listTeamLeadersApi, listRepairOrdersApi, createRepairOrderApi } from '../../services/repairOrderApi';
+import { listRepairSettlementsApi, getRepairSettlementApi, updateRepairSettlementStatusApi } from '../../services/repairSettlementApi';
+import {
+  listTeamLeadersApi,
+  listRepairOrdersApi,
+  createRepairOrderApi,
+  getRepairOrderApi,
+  updateRepairOrderStatusApi,
+} from '../../services/repairOrderApi';
 
 const LHSC_LABELS = { DV: 'Dịch vụ', PT: 'Phụ tùng', BH: 'Bảo hành', HD: 'Hợp đồng' };
+// "pending_assignment" là trạng thái ảo (không lưu ở BE) cho các phiếu quyết
+// toán đã ở trạng thái "Chờ sửa chữa" nhưng CHƯA có lệnh sửa chữa/tổ trưởng.
 const STATUS_LABELS = {
+  pending_assignment: { label: 'Đang chờ phân công', badge: 'badge-pending' },
   in_progress: { label: 'Đang sửa chữa', badge: 'badge-inprogress' },
   completed: { label: 'Hoàn thành', badge: 'badge-completed' },
+  cancelled: { label: 'Hủy', badge: 'badge-cancelled' },
 };
+// Cùng 1 chiều cao/kiểu cho mọi nút trong cột Thao tác (dù nút có icon+chữ
+// hay chỉ icon) để hàng lối thẳng hàng, không bị lệch cao thấp giữa các nút.
+const ACTION_BTN_STYLE = { height: 28, padding: '0 10px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' };
+const ACTION_ICON_BTN_STYLE = { ...ACTION_BTN_STYLE, width: 28, padding: 0, justifyContent: 'center' };
 
-// ─── Danh sách lệnh sửa chữa ──────────────────────────────────────────
-function RepairOrderList() {
-  const { user } = useAuth();
-  const [orders, setOrders] = useState([]);
+// ─── Modal xem chi tiết phiếu quyết toán (dòng đang chờ phân công) ───
+function PendingSettlementDetailModal({ settlementId, onClose }) {
+  const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    listRepairOrdersApi()
-      .then((result) => { if (alive) setOrders(result || []); })
-      .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được danh sách lệnh sửa chữa'); })
+    getRepairSettlementApi(settlementId)
+      .then((result) => { if (alive) setDetail(result); })
+      .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được chi tiết phiếu'); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
+  }, [settlementId]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">📋 Phiếu quyết toán {detail?.code || ''}</h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span className="badge badge-pending">Đang chờ phân công</span>
+            <button className="modal-close" onClick={onClose}>✕</button>
+          </div>
+        </div>
+        <div className="modal-body">
+          {loading && <p>Đang tải…</p>}
+          {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
+          {detail && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <div className="form-section-title">Khách hàng & xe</div>
+                  {[
+                    ['Khách hàng', detail.customer?.fullName],
+                    ['Điện thoại', detail.customer?.phone],
+                    ['Biển số xe', detail.vehicle?.licensePlate],
+                    ['Loại xe', detail.vehicle?.vehicleModel],
+                  ].map(([l, v]) => (
+                    <div key={l} className="detail-row">
+                      <div className="detail-label" style={{ width: 130, fontSize: 11 }}>{l}</div>
+                      <div className="detail-value" style={{ fontSize: 12 }}>{v || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div className="form-section-title">Thông tin phiếu</div>
+                  {[
+                    ['Cố vấn dịch vụ', detail.advisor],
+                    ['Ngày tiếp nhận', detail.date],
+                    ['Tổng cộng', formatCurrency(detail.total)],
+                  ].map(([l, v]) => (
+                    <div key={l} className="detail-row">
+                      <div className="detail-label" style={{ width: 130, fontSize: 11 }}>{l}</div>
+                      <div className="detail-value" style={{ fontSize: 12 }}>{v || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-section-title">Yêu cầu khách hàng</div>
+              <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
+                {detail.customerRequest || '—'}
+              </div>
+
+              {detail.cancelReason && (
+                <>
+                  <div className="form-section-title">Lý do hủy</div>
+                  <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#C62828' }}>
+                    {detail.cancelReason}
+                  </div>
+                </>
+              )}
+
+              <div className="form-section-title">Hạng mục công việc / phụ tùng</div>
+              <div className="table-wrapper" style={{ marginBottom: 0 }}>
+                <table className="data-table" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr><th>#</th><th>Nội dung</th><th>Loại</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th></tr>
+                  </thead>
+                  <tbody>
+                    {(detail.items || []).map((item, i) => (
+                      <tr key={i}>
+                        <td style={{ textAlign: 'center' }}>{i + 1}</td>
+                        <td>{item.description}</td>
+                        <td><span className="tag">{LHSC_LABELS[item.lhsc] || item.lhsc}</span></td>
+                        <td style={{ textAlign: 'center' }}>{item.qty}</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(item.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal xem chi tiết lệnh sửa chữa ────────────────────────────────
+function RepairOrderDetailModal({ orderId, onClose }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    getRepairOrderApi(orderId)
+      .then((result) => { if (alive) setDetail(result); })
+      .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được chi tiết lệnh sửa chữa'); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [orderId]);
+
+  const st = detail && (STATUS_LABELS[detail.status] || { label: detail.status, badge: 'badge-inactive' });
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">🔧 Lệnh sửa chữa {detail?.code || ''}</h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {st && <span className={`badge ${st.badge}`}>{st.label}</span>}
+            <button className="modal-close" onClick={onClose}>✕</button>
+          </div>
+        </div>
+        <div className="modal-body">
+          {loading && <p>Đang tải…</p>}
+          {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
+          {detail && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <div className="form-section-title">Khách hàng & xe</div>
+                  {[
+                    ['Khách hàng', detail.customer?.fullName],
+                    ['Biển số xe', detail.vehicle?.licensePlate],
+                    ['Loại xe', detail.vehicle?.vehicleModel],
+                  ].map(([l, v]) => (
+                    <div key={l} className="detail-row">
+                      <div className="detail-label" style={{ width: 130, fontSize: 11 }}>{l}</div>
+                      <div className="detail-value" style={{ fontSize: 12 }}>{v || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div className="form-section-title">Phụ trách</div>
+                  {[
+                    ['Tổ trưởng', detail.teamLeader?.fullName],
+                    ['Chuyên môn', detail.teamLeader?.specialty],
+                    ['Người tạo lệnh', detail.createdByName],
+                    ['Ngày tạo', detail.createdAt],
+                    ['Ngày hoàn thành', detail.completedAt || '—'],
+                  ].map(([l, v]) => (
+                    <div key={l} className="detail-row">
+                      <div className="detail-label" style={{ width: 130, fontSize: 11 }}>{l}</div>
+                      <div className="detail-value" style={{ fontSize: 12 }}>{v || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {detail.notes && (
+                <>
+                  <div className="form-section-title">Ghi chú cho tổ trưởng</div>
+                  <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
+                    {detail.notes}
+                  </div>
+                </>
+              )}
+
+              {detail.cancelReason && (
+                <>
+                  <div className="form-section-title">Lý do hủy</div>
+                  <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#C62828' }}>
+                    {detail.cancelReason}
+                  </div>
+                </>
+              )}
+
+              <div className="form-section-title">Hạng mục công việc</div>
+              <div className="table-wrapper" style={{ marginBottom: 0 }}>
+                <table className="data-table" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr><th>#</th><th>Nội dung</th><th>Loại</th><th>SL</th><th>Đơn giá</th><th>Xong</th></tr>
+                  </thead>
+                  <tbody>
+                    {(detail.tasks || []).map((t, i) => (
+                      <tr key={t.id}>
+                        <td style={{ textAlign: 'center' }}>{i + 1}</td>
+                        <td>{t.taskName}</td>
+                        <td><span className="tag">{t.taskTypeLabel}</span></td>
+                        <td style={{ textAlign: 'center' }}>{t.quantity}</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(t.unitPrice)}</td>
+                        <td style={{ textAlign: 'center' }}>{t.isDone ? '✅' : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal nhập lý do hủy (thay cho window.confirm) ──────────────────
+function CancelReasonModal({ title, onConfirm, onClose }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleConfirm = async () => {
+    if (!reason.trim()) {
+      setError('Vui lòng nhập lý do hủy');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await onConfirm(reason.trim());
+    } catch (err) {
+      setError(err.message || 'Hủy thất bại');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">🚫 {title}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label required">Lý do hủy</label>
+            <textarea
+              className="form-textarea"
+              placeholder="Nhập lý do khách hủy…"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              autoFocus
+            />
+          </div>
+          {error && <div className="form-error" style={{ marginTop: 6 }}>{error}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>← Trở lại</button>
+          <button className="btn btn-danger" onClick={handleConfirm} disabled={submitting}>
+            {submitting ? 'Đang xử lý…' : '✔ Xác nhận hủy'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Danh sách lệnh sửa chữa ──────────────────────────────────────────
+// Gộp 2 nguồn dữ liệu vào 1 danh sách duy nhất: (1) phiếu quyết toán đang
+// "Chờ sửa chữa" nhưng CHƯA có lệnh sửa chữa/tổ trưởng -> hiển thị trạng thái
+// ảo "Đang chờ phân công"; (2) các lệnh sửa chữa thật đã tạo (Đang sửa chữa /
+// Hoàn thành / Hủy). Nhờ vậy cố vấn dịch vụ thấy toàn bộ luồng và thao tác
+// được ngay trên 1 màn hình, không cần nút "Tạo lệnh sửa chữa" riêng nữa.
+function RepairOrderList() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [pendingSettlements, setPendingSettlements] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [busyId, setBusyId] = useState(null);
+  const [viewOrderId, setViewOrderId] = useState(null);
+  const [viewSettlementId, setViewSettlementId] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null); // { kind: 'order' | 'pending', id }
+
+  const loadAll = () => {
+    setLoading(true);
+    return Promise.all([
+      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100 }),
+      listRepairSettlementsApi({ status: 'cancelled', limit: 100 }),
+      listRepairOrdersApi(),
+    ])
+      .then(([waitingResult, cancelledResult, orderResult]) => {
+        setPendingSettlements([...(waitingResult.items || []), ...(cancelledResult.items || [])]);
+        setOrders(orderResult || []);
+      })
+      .catch((err) => setLoadError(err.message || 'Không tải được danh sách lệnh sửa chữa'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    let alive = true;
+    loadAll().then(() => {}).catch(() => {});
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const rows = useMemo(() => {
+    const pendingRows = pendingSettlements.map((s) => ({
+      kind: 'pending',
+      id: s.id,
+      code: s.code,
+      customer: s.customer,
+      vehicle: s.vehicle,
+      teamLeader: null,
+      status: s.status === 'cancelled' ? 'cancelled' : 'pending_assignment',
+      date: s.date,
+    }));
+    const orderRows = orders.map((o) => ({
+      kind: 'order',
+      id: o.id,
+      code: o.code,
+      customer: o.customer,
+      vehicle: o.vehicle,
+      teamLeader: o.teamLeader,
+      status: o.status,
+      date: o.createdAt,
+    }));
+    return [...pendingRows, ...orderRows];
+  }, [pendingSettlements, orders]);
+
+  const handleAssign = (settlementId) => {
+    navigate('/repair-orders/create', { state: { settlementId } });
+  };
+
+  const handleMarkComplete = async (id) => {
+    setBusyId(id);
+    setActionError('');
+    try {
+      await updateRepairOrderStatusApi(id, 'completed');
+      await loadAll();
+    } catch (err) {
+      setActionError(err.message || 'Không đánh dấu hoàn thành được');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleConfirmCancel = async (reason) => {
+    const { kind, id } = cancelTarget;
+    setBusyId(id);
+    setActionError('');
+    try {
+      if (kind === 'pending') {
+        await updateRepairSettlementStatusApi(id, 'cancelled', reason);
+      } else {
+        await updateRepairOrderStatusApi(id, 'cancelled', reason);
+      }
+      setCancelTarget(null);
+      await loadAll();
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <div>
@@ -39,13 +406,12 @@ function RepairOrderList() {
           <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
             🏢 {user?.branchName || user?.branch}
           </span>
-          <Link to="/repair-orders/create" className="btn btn-primary">➕ Tạo lệnh sửa chữa</Link>
         </div>
       </div>
 
-      {loadError && (
+      {(loadError || actionError) && (
         <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
-          ⚠️ {loadError}
+          ⚠️ {loadError || actionError}
         </div>
       )}
 
@@ -53,46 +419,85 @@ function RepairOrderList() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Số lệnh</th><th>Khách hàng</th><th>Xe</th>
-              <th>Tổ trưởng phụ trách</th><th>Trạng thái</th><th>Ngày tạo</th>
+              <th>Số lệnh / phiếu</th><th>Khách hàng</th><th>Xe</th>
+              <th>Tổ trưởng phụ trách</th><th>Trạng thái</th><th>Ngày</th><th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={6}>
+              <tr><td colSpan={7}>
                 <div className="empty-state"><p>Đang tải danh sách lệnh sửa chữa…</p></div>
               </td></tr>
             )}
-            {!loading && orders.length === 0 && (
-              <tr><td colSpan={6}>
+            {!loading && rows.length === 0 && (
+              <tr><td colSpan={7}>
                 <div className="empty-state">
                   <div className="empty-state-icon">📭</div>
                   <h3>Chưa có lệnh sửa chữa nào</h3>
-                  <p>Nhấn "Tạo lệnh sửa chữa" để phân công tổ trưởng cho một phiếu quyết toán đang chờ sửa chữa.</p>
+                  <p>Chưa có phiếu quyết toán nào đang chờ sửa chữa, và chưa có lệnh sửa chữa nào được tạo.</p>
                 </div>
               </td></tr>
             )}
-            {orders.map((o) => {
-              const st = STATUS_LABELS[o.status] || { label: o.status, badge: 'badge-inactive' };
+            {rows.map((r) => {
+              const st = STATUS_LABELS[r.status] || { label: r.status, badge: 'badge-inactive' };
+              const isBusy = busyId === r.id;
               return (
-                <tr key={o.id}>
-                  <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{o.code}</span></td>
-                  <td>{o.customer?.fullName}</td>
+                <tr key={`${r.kind}-${r.id}`}>
+                  <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{r.code}</span></td>
+                  <td>{r.customer?.fullName}</td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{o.vehicle?.licensePlate}</div>
-                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{o.vehicle?.vehicleModel}</div>
+                    <div style={{ fontWeight: 600 }}>{r.vehicle?.licensePlate}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{r.vehicle?.vehicleModel}</div>
                   </td>
                   <td style={{ fontSize: 12 }}>
-                    {o.teamLeader ? <span>👨‍🔧 {o.teamLeader.fullName}</span> : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa gán</span>}
+                    {r.teamLeader ? <span>👨‍🔧 {r.teamLeader.fullName}</span> : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa phân công</span>}
                   </td>
                   <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
-                  <td style={{ fontSize: 12 }}>{o.createdAt}</td>
+                  <td style={{ fontSize: 12 }}>{r.date}</td>
+                  <td>
+                    <div className="table-actions" style={{ flexWrap: 'nowrap' }}>
+                      {r.kind === 'pending' && r.status === 'pending_assignment' && (
+                        <>
+                          <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} onClick={() => handleAssign(r.id)}>📋 Phân công</button>
+                          <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'pending', id: r.id })}>🚫 Hủy</button>
+                          <button className="btn btn-secondary btn-sm" style={ACTION_ICON_BTN_STYLE} title="Xem chi tiết phiếu" onClick={() => setViewSettlementId(r.id)}>👁️</button>
+                        </>
+                      )}
+                      {r.kind === 'pending' && r.status === 'cancelled' && (
+                        <button className="btn btn-secondary btn-sm" style={ACTION_ICON_BTN_STYLE} title="Xem chi tiết phiếu" onClick={() => setViewSettlementId(r.id)}>👁️</button>
+                      )}
+                      {r.kind === 'order' && r.status === 'in_progress' && (
+                        <>
+                          <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => handleMarkComplete(r.id)}>✅ Hoàn thành</button>
+                          <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'order', id: r.id })}>🚫 Hủy</button>
+                          <button className="btn btn-secondary btn-sm" style={ACTION_ICON_BTN_STYLE} title="Xem chi tiết lệnh" onClick={() => setViewOrderId(r.id)}>👁️</button>
+                        </>
+                      )}
+                      {r.kind === 'order' && r.status !== 'in_progress' && (
+                        <button className="btn btn-secondary btn-sm" style={ACTION_ICON_BTN_STYLE} title="Xem chi tiết lệnh" onClick={() => setViewOrderId(r.id)}>👁️</button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {viewOrderId && (
+        <RepairOrderDetailModal orderId={viewOrderId} onClose={() => setViewOrderId(null)} />
+      )}
+      {viewSettlementId && (
+        <PendingSettlementDetailModal settlementId={viewSettlementId} onClose={() => setViewSettlementId(null)} />
+      )}
+      {cancelTarget && (
+        <CancelReasonModal
+          title={cancelTarget.kind === 'pending' ? 'Hủy phiếu quyết toán' : 'Hủy lệnh sửa chữa'}
+          onConfirm={handleConfirmCancel}
+          onClose={() => setCancelTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -100,6 +505,8 @@ function RepairOrderList() {
 // ─── Tạo lệnh sửa chữa: gán tổ trưởng phụ trách ──────────────────────
 function RepairOrderCreate() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const preselectedSettlementId = location.state?.settlementId ?? null;
   const [pendingSettlements, setPendingSettlements] = useState([]);
   const [teamLeaders, setTeamLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +532,8 @@ function RepairOrderCreate() {
         const items = settlementResult.items || [];
         setPendingSettlements(items);
         setTeamLeaders(teamLeaderResult || []);
-        setSelectedSettlementId(items[0]?.id ?? null);
+        const preselected = preselectedSettlementId && items.some((s) => s.id === preselectedSettlementId);
+        setSelectedSettlementId(preselected ? preselectedSettlementId : (items[0]?.id ?? null));
       })
       .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được dữ liệu'); })
       .finally(() => { if (alive) setLoading(false); });

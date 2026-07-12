@@ -149,6 +149,41 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
 
     return this.findById(newId);
   }
+
+  async updateStatus(id, status, cancelReason) {
+    await runInTransaction(async (tx) => {
+      await tx
+        .request()
+        .input('id', sql.BigInt, id)
+        .input('status', sql.VarChar(20), status)
+        .input('cancelReason', sql.NVarChar(500), cancelReason || null)
+        .query(`
+          UPDATE repair_orders
+          SET    status = @status,
+                 completed_at = CASE WHEN @status = 'completed' THEN GETDATE() ELSE completed_at END,
+                 cancel_reason = CASE WHEN @status = 'cancelled' THEN @cancelReason ELSE cancel_reason END
+          WHERE  id = @id
+        `);
+
+      // Khach huy giua chung -> tra phieu quyet toan goc ve "Cho sua chua" va
+      // bo to truong da gan, de co the phan cong lai tu dau (khong de phieu bi
+      // ket lai o trang thai "inprogress" ma khong ai thuc su dang lam).
+      if (status === 'cancelled') {
+        await tx
+          .request()
+          .input('id', sql.BigInt, id)
+          .query(`
+            UPDATE so
+            SET    so.team_leader_id = NULL,
+                   so.status = 'waiting_repair'
+            FROM   service_orders so
+            JOIN   repair_orders ro ON ro.service_order_id = so.id
+            WHERE  ro.id = @id
+          `);
+      }
+    });
+    return this.findById(id);
+  }
 }
 
 module.exports = RepairOrderRepositoryImpl;

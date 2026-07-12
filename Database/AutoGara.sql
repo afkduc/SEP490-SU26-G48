@@ -578,7 +578,8 @@ CREATE TABLE [dbo].[repair_orders](
 	[notes] [nvarchar](500) NULL,
 	[created_at] [datetime] NOT NULL,
 	[completed_at] [datetime] NULL,
- CONSTRAINT [ro_pkey] PRIMARY KEY CLUSTERED 
+	[cancel_reason] [nvarchar](500) NULL,
+ CONSTRAINT [ro_pkey] PRIMARY KEY CLUSTERED
 (
 	[id] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY],
@@ -695,7 +696,8 @@ CREATE TABLE [dbo].[service_orders](
 	[intake_date] [datetime] NOT NULL,
 	[completed_date] [datetime] NULL,
 	[delivery_date] [date] NULL,
- CONSTRAINT [so_pkey] PRIMARY KEY CLUSTERED 
+	[cancel_reason] [nvarchar](500) NULL,
+ CONSTRAINT [so_pkey] PRIMARY KEY CLUSTERED
 (
 	[id] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY],
