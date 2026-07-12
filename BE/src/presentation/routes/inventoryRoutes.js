@@ -17,7 +17,9 @@ function buildInventoryRouter() {
   // Dat truoc /:productId/:branchId de khong bi nuot mat bo dinh tuyen.
   router.get('/products/search', authenticate, controller.searchProducts);
   router.get('/:productId/:branchId', controller.getStockDetail);
-  router.patch('/:productId/adjust', controller.adjustStock);
+  // PATCH /:productId/adjust - tam thoi KHONG mount, vi stock se duoc dieu chinh
+  // thong qua phieu nhap / phieu xuat o phase sau.
+  // router.patch('/:productId/adjust', controller.adjustStock);
 
   return router;
 }
