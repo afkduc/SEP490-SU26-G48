@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AppContext';
 import { useParts } from '../../hooks/inventory/useParts';
 import './PartListPage.css';
 
@@ -22,7 +23,6 @@ function emptyForm() {
     category: '',
     unit: 'Cai',
     unitPrice: '',
-    stockQuantity: 0,
     minStock: 5,
     supplierId: '',
     location: '',
@@ -32,11 +32,13 @@ function emptyForm() {
 }
 
 export default function PartListPage() {
+  const { user } = useAuth();
+  const branchId = user?.branchId;
   const {
     parts, loading, error,
     params, setParams,
     create, update, remove,
-  } = useParts();
+  } = useParts({ branchId });
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -60,16 +62,15 @@ export default function PartListPage() {
   function openEdit(p) {
     setEditing(p);
     setForm({
-      partCode: p.partCode,
-      partName: p.partName,
+      partCode: p.productCode ?? p.partCode ?? '',
+      partName: p.productName ?? p.partName ?? '',
       category: p.category || '',
       unit: p.unit || 'Cai',
       unitPrice: p.unitPrice ?? '',
-      stockQuantity: p.stockQuantity ?? 0,
       minStock: p.minStock ?? 5,
       supplierId: p.supplierId ?? '',
       location: p.location || '',
-      status: p.status,
+      status: p.status || 'active',
       note: p.note || '',
     });
     setFormError('');
@@ -86,12 +87,18 @@ export default function PartListPage() {
     setFormError('');
     try {
       const payload = {
-        ...form,
+        productCode: form.partCode,
+        productName: form.partName,
+        category: form.category,
+        unit: form.unit,
         unitPrice: form.unitPrice === '' ? null : Number(form.unitPrice),
-        stockQuantity: Number(form.stockQuantity),
         minStock: Number(form.minStock),
         supplierId: form.supplierId === '' ? null : Number(form.supplierId),
+        location: form.location,
+        status: form.status,
+        note: form.note,
       };
+      // Luu y: KHONG gui stockQuantity len BE - stock chi duoc thay doi qua phieu nhap/xuat.
       if (editing) {
         await update(editing.id, payload);
       } else {
@@ -117,12 +124,20 @@ export default function PartListPage() {
     if (e.key === 'Enter') applyFilters();
   }
 
+  if (!branchId) {
+    return (
+      <div className="part-list__error">
+        Tai khoan chua duoc gan chi nhanh - lien quan admin de duoc cap nhat.
+      </div>
+    );
+  }
+
   return (
     <div className="part-list">
       <div className="part-list__header">
         <div>
           <h1 className="part-list__title">Danh sach phu tung</h1>
-          <p className="part-list__subtitle">Quan ly thong tin phu tung va ton kho</p>
+          <p className="part-list__subtitle">Quan ly thong tin phu tung (so luong ton duoc cap nhat qua phieu nhap/xuat)</p>
         </div>
         <button className="btn btn--primary" onClick={openCreate}>
           + Them phu tung
@@ -202,20 +217,22 @@ export default function PartListPage() {
                 </tr>
               ) : (
                 parts.map((p) => {
-                  const isLow = p.stockQuantity < p.minStock;
+                  const stock = Number(p.stockQuantity ?? 0);
+                  const min = Number(p.minStock ?? 0);
+                  const isLow = stock <= min;
                   return (
                     <tr key={p.id} className={isLow ? 'row--low-stock' : ''}>
-                      <td><span className="font-mono">{p.partCode}</span></td>
-                      <td>{p.partName}</td>
+                      <td><span className="font-mono">{p.productCode ?? p.partCode}</span></td>
+                      <td>{p.productName ?? p.partName}</td>
                       <td>{p.category || '—'}</td>
                       <td>{p.unit}</td>
                       <td className="text-right">
-                        {p.unitPrice != null ? p.unitPrice.toLocaleString('vi-VN') + ' đ' : '—'}
+                        {p.unitPrice != null ? Number(p.unitPrice).toLocaleString('vi-VN') + ' đ' : '—'}
                       </td>
                       <td className={`text-right ${isLow ? 'text-danger' : 'text-success'}`}>
-                        {p.stockQuantity}
+                        {stock}
                       </td>
-                      <td className="text-right">{p.minStock}</td>
+                      <td className="text-right">{min}</td>
                       <td>
                         <span className={`badge ${STATUS_CLASS[p.status] || ''}`}>
                           {STATUS_LABELS[p.status] || p.status}
@@ -304,17 +321,18 @@ export default function PartListPage() {
                     placeholder="0" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">So luong ton</label>
-                  <input className="input" type="number" min="0" value={form.stockQuantity}
-                    onChange={(e) => setForm({ ...form, stockQuantity: e.target.value })} />
+                  <label className="form-label">Ton toi thieu</label>
+                  <input className="input" type="number" min="0" value={form.minStock}
+                    onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Ton toi thieu</label>
-                  <input className="input" type="number" min="0" value={form.minStock}
-                    onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
+                  <label className="form-label">Nha cung cap</label>
+                  <input className="input" type="number" min="0" value={form.supplierId}
+                    onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
+                    placeholder="ID nha cung cap (so)" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Vi tri (Kho)</label>
