@@ -1,10 +1,11 @@
 /* ── Page wrapper ──────────────────────────────────────────────────── */
 .admin-users {
-  padding: 32px 36px;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 28px 32px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #1e293b;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 /* ── Header ────────────────────────────────────────────────────────── */
@@ -792,6 +793,34 @@
   flex: 1;
   overflow-y: auto;
   padding: 0;
+}
+
+.drawer__footer {
+  padding: 14px 20px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.drawer__btn-assign {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1.5px solid #4f46e5;
+  background: transparent;
+  color: #4f46e5;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.drawer__btn-assign:hover {
+  background: #f0f3ff;
 }
 
 /* User info card in drawer */
