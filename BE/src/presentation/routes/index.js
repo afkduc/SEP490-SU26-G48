@@ -13,6 +13,7 @@ const buildRepairOrderRouter = require('./repairOrderRoutes');
 const buildGeneralDirectorRouter = require('./generalDirectorRoutes');
 const buildManagerRouter = require('./managerRoutes');
 const buildAuditRouter = require('./auditRoutes');
+const buildImportRequestRouter = require('./importRequestRoutes');
 
 const router = express.Router();
 
@@ -33,5 +34,6 @@ router.use('/repair-orders', buildRepairOrderRouter());
 router.use('/general-director', buildGeneralDirectorRouter());
 router.use('/manager', buildManagerRouter());
 router.use('/audit', buildAuditRouter());
+router.use('/import-requests', buildImportRequestRouter());
 
 module.exports = router;
