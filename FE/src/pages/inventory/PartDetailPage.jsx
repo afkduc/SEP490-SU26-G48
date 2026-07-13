@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { usePartDetail } from '../../hooks/inventory/usePartDetail';
 import { useParts } from '../../hooks/inventory/useParts';
+import { useAuth } from '../../contexts/AppContext';
 import './PartDetailPage.css';
 
 const STATUS_LABELS = {
@@ -10,16 +11,13 @@ const STATUS_LABELS = {
   inactive: 'Tam ngung',
 };
 
-const TX_TYPE_LABELS = {
-  import: 'Nhap kho',
-  export: 'Xuat kho',
-};
-
 export default function PartDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const branchId = user?.branchId;
   const { part, history, loading, error, refetch } = usePartDetail(id);
-  const { update, remove } = useParts();
+  const { update, remove } = useParts({ branchId });
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
@@ -29,13 +27,14 @@ export default function PartDetailPage() {
 
   function startEdit() {
     setForm({
-      partName: part.partName,
+      productName: part.productName,
       category: part.category || '',
       unit: part.unit || 'Cai',
       unitPrice: part.unitPrice ?? '',
       minStock: part.minStock ?? 5,
+      supplierId: part.supplierId ?? '',
       location: part.location || '',
-      status: part.status,
+      status: part.status || 'active',
       note: part.note || '',
     });
     setFormError('');
@@ -57,6 +56,7 @@ export default function PartDetailPage() {
         ...form,
         unitPrice: form.unitPrice === '' ? null : Number(form.unitPrice),
         minStock: Number(form.minStock),
+        supplierId: form.supplierId === '' || form.supplierId == null ? null : Number(form.supplierId),
       };
       await update(id, payload);
       setEditing(false);
@@ -86,15 +86,17 @@ export default function PartDetailPage() {
   if (error) return <div className="detail-error">Loi: {error}</div>;
   if (!part) return <div className="detail-error">Khong tim thay phu tung</div>;
 
-  const isLow = part.stockQuantity < part.minStock;
+  const stock = Number(part.stockQuantity ?? 0);
+  const min = Number(part.minStock ?? 0);
+  const isLow = stock <= min;
 
   return (
     <div className="part-detail">
       <div className="part-detail__header">
         <div className="part-detail__title-row">
           <div>
-            <h1 className="part-detail__title">{part.partName}</h1>
-            <p className="part-detail__code font-mono">{part.partCode}</p>
+            <h1 className="part-detail__title">{part.productName}</h1>
+            <p className="part-detail__code font-mono">{part.productCode}</p>
           </div>
           <div className="part-detail__actions">
             {!editing && (
@@ -128,8 +130,8 @@ export default function PartDetailPage() {
 
               <div className="form-group">
                 <label className="form-label">Ten phu tung <span className="required">*</span></label>
-                <input className="input" value={form.partName}
-                  onChange={(e) => setForm({ ...form, partName: e.target.value })} required />
+                <input className="input" value={form.productName}
+                  onChange={(e) => setForm({ ...form, productName: e.target.value })} required />
               </div>
 
               <div className="form-row">
@@ -165,11 +167,19 @@ export default function PartDetailPage() {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Vi tri kho</label>
-                <input className="input" value={form.location}
-                  onChange={(e) => setForm({ ...form, location: e.target.value })}
-                  placeholder="VD: K1-A1" />
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Nha cung cap (ID)</label>
+                  <input className="input" type="number" min="0" value={form.supplierId ?? ''}
+                    onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
+                    placeholder="ID nha cung cap" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Vi tri kho</label>
+                  <input className="input" value={form.location}
+                    onChange={(e) => setForm({ ...form, location: e.target.value })}
+                    placeholder="VD: K1-A1" />
+                </div>
               </div>
 
               <div className="form-group">
@@ -197,43 +207,47 @@ export default function PartDetailPage() {
             </form>
           ) : (
             <div className="detail-info-list">
-              <DetailRow label="Ma phu tung" value={<span className="font-mono">{part.partCode}</span>} />
-              <DetailRow label="Ten phu tung" value={part.partName} />
+              <DetailRow label="Ma phu tung" value={<span className="font-mono">{part.productCode}</span>} />
+              <DetailRow label="Ten phu tung" value={part.productName} />
               <DetailRow label="Loai" value={part.category || '—'} />
               <DetailRow label="Thuong hieu" value={part.brandName || '—'} />
               <DetailRow label="Don vi" value={part.unit || '—'} />
-              <DetailRow label="Nha cung cap" value={part.supplierName || '—'} />
+              <DetailRow label="Nha cung cap" value={part.supplierName || part.supplierId || '—'} />
             </div>
           )}
         </div>
 
         <div className="detail-card">
-          <h3 className="detail-card__title">Ton kho</h3>
+          <h3 className="detail-card__title">Ton kho (chi doc)</h3>
           <div className={`stock-highlight ${isLow ? 'stock-highlight--warn' : 'stock-highlight--ok'}`}>
-            <span className="stock-highlight__number">{part.stockQuantity}</span>
+            <span className="stock-highlight__number">{stock}</span>
             <span className="stock-highlight__unit">{part.unit || 'Cai'}</span>
           </div>
-          {!editing && (
-            <div className="detail-info-list">
-              <DetailRow label="Ton toi thieu" value={part.minStock} />
-              <DetailRow
-                label="Gia tri ton kho"
-                value={
-                  part.unitPrice != null
-                    ? (part.stockQuantity * part.unitPrice).toLocaleString('vi-VN') + ' đ'
-                    : '—'
-                }
-              />
-              <DetailRow label="Don gia" value={part.unitPrice != null ? part.unitPrice.toLocaleString('vi-VN') + ' đ' : '—'} />
-              <DetailRow label="Vi tri" value={part.location || '—'} />
-              <DetailRow
-                label="Trang thai"
-                value={<span className={`badge ${isLow ? 'badge--warning' : 'badge--success'}`}>
-                  {isLow ? 'Sap het' : 'Con hang'}
-                </span>}
-              />
-            </div>
-          )}
+          <div className="detail-info-list">
+            <DetailRow label="Ton toi thieu" value={min} />
+            <DetailRow
+              label="Gia tri ton kho"
+              value={
+                part.unitPrice != null
+                  ? (stock * Number(part.unitPrice)).toLocaleString('vi-VN') + ' đ'
+                  : '—'
+              }
+            />
+            <DetailRow
+              label="Don gia"
+              value={part.unitPrice != null ? Number(part.unitPrice).toLocaleString('vi-VN') + ' đ' : '—'}
+            />
+            <DetailRow label="Vi tri" value={part.location || '—'} />
+            <DetailRow
+              label="Trang thai"
+              value={<span className={`badge ${isLow ? 'badge--warning' : 'badge--success'}`}>
+                {isLow ? 'Sap het' : 'Con hang'}
+              </span>}
+            />
+          </div>
+          <p className="detail-hint">
+            So luong ton chi duoc thay doi qua phieu nhap/xuat kho (se them o phase sau).
+          </p>
         </div>
       </div>
 
@@ -241,7 +255,9 @@ export default function PartDetailPage() {
       <div className="detail-card detail-card--full">
         <h3 className="detail-card__title">Lich su ton kho</h3>
         {history.length === 0 ? (
-          <p className="detail-empty">Chua co giao dich nao</p>
+          <p className="detail-empty">
+            Chua co giao dich nao (lich su se hien thi khi co phieu nhap/xuat).
+          </p>
         ) : (
           <div className="table-responsive">
             <table className="table">
@@ -259,11 +275,7 @@ export default function PartDetailPage() {
                 {history.map((tx) => (
                   <tr key={tx.id}>
                     <td><span className="font-mono">{tx.transactionCode}</span></td>
-                    <td>
-                      <span className={`badge ${tx.transactionType === 'import' ? 'badge--success' : 'badge--warning'}`}>
-                        {TX_TYPE_LABELS[tx.transactionType] || tx.transactionType}
-                      </span>
-                    </td>
+                    <td>{tx.transactionType}</td>
                     <td className="text-right">
                       {tx.transactionType === 'import' ? '+' : '-'}{tx.quantity}
                     </td>

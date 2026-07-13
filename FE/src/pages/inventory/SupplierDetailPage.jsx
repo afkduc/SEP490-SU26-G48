@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useSupplierDetail } from '../../hooks/inventory/useSupplierDetail';
 import './SupplierDetailPage.css';
 
@@ -7,7 +6,7 @@ const STATUS_LABELS = { active: 'Hoat dong', inactive: 'Tam ngung' };
 const STATUS_CLASS = { active: 'badge--success', inactive: 'badge--danger' };
 
 function InfoRow({ label, value }) {
-  if (!value) return null;
+  if (value === null || value === undefined || value === '') return null;
   return (
     <div className="info-row">
       <dt className="info-row__label">{label}</dt>
@@ -18,34 +17,7 @@ function InfoRow({ label, value }) {
 
 export default function SupplierDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { supplier, loading, error, saving, save } = useSupplierDetail(id);
-
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({});
-  const [formError, setFormError] = useState('');
-
-  function startEdit() {
-    setForm({ ...supplier });
-    setEditing(true);
-    setFormError('');
-  }
-
-  function cancelEdit() {
-    setEditing(false);
-    setFormError('');
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setFormError('');
-    try {
-      await save(form);
-      setEditing(false);
-    } catch (err) {
-      setFormError(err.message);
-    }
-  }
+  const { supplier, partsFromSupplier, loading, error } = useSupplierDetail(id);
 
   if (loading) return <div className="sup-detail__loading">Dang tai...</div>;
   if (error) return <div className="sup-detail__error">Loi: {error}</div>;
@@ -61,97 +33,58 @@ export default function SupplierDetailPage() {
             {STATUS_LABELS[supplier.status] || supplier.status}
           </span>
         </div>
-        <div className="sup-detail__header-right">
-          {!editing ? (
-            <button className="btn btn--secondary" onClick={startEdit}>
-              Chinh sua
-            </button>
-          ) : (
-            <>
-              <button className="btn btn--secondary" onClick={cancelEdit}>Huy</button>
-              <button className="btn btn--primary" form="detail-form" type="submit" disabled={saving}>
-                {saving ? 'Dang luu...' : 'Luu'}
-              </button>
-            </>
-          )}
-        </div>
       </div>
-
-      {formError && <div className="form-error">{formError}</div>}
 
       <div className="sup-detail__body">
         {/* Thong tin co ban */}
         <div className="sup-detail__section">
-          <h2 className="sup-detail__section-title">Thong tin co ban</h2>
-          {editing ? (
-            <form id="detail-form" onSubmit={handleSubmit} className="detail-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Ma NCC</label>
-                  <input className="input" value={form.supplierCode || ''}
-                    onChange={(e) => setForm({ ...form, supplierCode: e.target.value })} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Ten NCC</label>
-                  <input className="input" value={form.supplierName || ''}
-                    onChange={(e) => setForm({ ...form, supplierName: e.target.value })} required />
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Nguoi lien he</label>
-                  <input className="input" value={form.contactName || ''}
-                    onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">So dien thoai</label>
-                  <input className="input" type="tel" value={form.phone || ''}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Email</label>
-                  <input className="input" type="email" value={form.email || ''}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Ma so thue</label>
-                  <input className="input" value={form.taxCode || ''}
-                    onChange={(e) => setForm({ ...form, taxCode: e.target.value })} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Dia chi</label>
-                <input className="input" value={form.address || ''}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Trang thai</label>
-                  <select className="input input--select" value={form.status || 'active'}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                    <option value="active">Hoat dong</option>
-                    <option value="inactive">Tam ngung</option>
-                  </select>
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Ghi chu</label>
-                <textarea className="input" rows={3} value={form.note || ''}
-                  onChange={(e) => setForm({ ...form, note: e.target.value })} />
-              </div>
-            </form>
+          <h2 className="sup-detail__section-title">Thong tin lien he</h2>
+          <dl className="info-list">
+            <InfoRow label="Ma NCC" value={supplier.supplierCode} />
+            <InfoRow label="Nguoi lien he" value={supplier.contactName} />
+            <InfoRow label="So dien thoai" value={supplier.phone} />
+            <InfoRow label="Email" value={supplier.email} />
+            <InfoRow label="Dia chi" value={supplier.address} />
+            <InfoRow label="Ma so thue" value={supplier.taxCode} />
+          </dl>
+        </div>
+
+        {/* Phu tung dang cung cap */}
+        <div className="sup-detail__section">
+          <h2 className="sup-detail__section-title">
+            Phu tung dang cung cap ({partsFromSupplier.length})
+          </h2>
+          {partsFromSupplier.length === 0 ? (
+            <p className="sup-detail__empty">NCC chua cung cap phu tung nao trong he thong.</p>
           ) : (
-            <dl className="info-list">
-              <InfoRow label="Ma NCC" value={supplier.supplierCode} />
-              <InfoRow label="Nguoi lien he" value={supplier.contactName} />
-              <InfoRow label="So dien thoai" value={supplier.phone} />
-              <InfoRow label="Email" value={supplier.email} />
-              <InfoRow label="Dia chi" value={supplier.address} />
-              <InfoRow label="Ma so thue" value={supplier.taxCode} />
-              <InfoRow label="Ghi chu" value={supplier.note} />
-            </dl>
+            <div className="table-responsive">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Ma PT</th>
+                    <th>Ten phu tung</th>
+                    <th>Loai</th>
+                    <th>Don vi</th>
+                    <th>SL ton</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {partsFromSupplier.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <Link to={`/inventory/parts/${p.id}`} className="font-mono">
+                          {p.productCode}
+                        </Link>
+                      </td>
+                      <td>{p.productName}</td>
+                      <td>{p.category || '—'}</td>
+                      <td>{p.unit || '—'}</td>
+                      <td className="text-right">{p.stockQuantity ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

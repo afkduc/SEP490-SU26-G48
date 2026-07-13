@@ -9,7 +9,7 @@ class ProductRepository {
     throw new Error('Method findById() must be implemented');
   }
 
-  async findByCode(code) {
+  async findByCode(code, branchId) {
     throw new Error('Method findByCode() must be implemented');
   }
 

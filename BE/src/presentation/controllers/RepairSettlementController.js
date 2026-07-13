@@ -7,11 +7,13 @@ class RepairSettlementController {
 
   getAll = async (req, res, next) => {
     try {
-      const { status, search, page = 1, limit = 20 } = req.query;
+      const { status, search, customerId, vehicleId, page = 1, limit = 20 } = req.query;
       const result = await this.repairSettlementService.getAll({
         branchId: req.user.branchId,
         status,
         search,
+        customerId,
+        vehicleId,
         page: Number(page),
         limit: Number(limit),
       });
@@ -55,6 +57,7 @@ class RepairSettlementController {
     try {
       const item = await this.repairSettlementService.updateStatus(req.params.id, req.body.status, {
         issuedBy: req.user.userId,
+        cancelReason: req.body.reason,
       });
       return success(res, item, 'Repair settlement status updated');
     } catch (err) {

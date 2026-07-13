@@ -29,6 +29,7 @@ class RepairSettlement {
     this.intakeDate = data.intakeDate ?? null;
     this.completedDate = data.completedDate ?? null;
     this.deliveryDate = data.deliveryDate ?? null;
+    this.cancelReason = data.cancelReason ?? null;
 
     this.customer = data.customer ?? null; // { id, fullName, phone, address, taxCode, cccd, email, contactPerson, contactPhone }
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel, frameNumber, engineNumber, purchaseDate, currentKm }
@@ -63,6 +64,7 @@ class RepairSettlement {
       intakeDate: headerRow.intake_date,
       completedDate: headerRow.completed_date,
       deliveryDate: headerRow.delivery_date,
+      cancelReason: headerRow.cancel_reason,
       customer: {
         id: headerRow.customer_id,
         fullName: headerRow.customer_full_name,

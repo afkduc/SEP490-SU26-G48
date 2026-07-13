@@ -1053,15 +1053,15 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        INNER JOIN roles r ON r.id = ur.role_id AND r.role_name = 'manager'
        ${BRANCH_MANAGER_BRANCH_APPLY}
        WHERE (@branchId IS NULL OR branch_info.branch_id = @branchId)
-         AND (@status IS NULL OR u.status = @status)
-         AND (
-           @search IS NULL
-           OR u.pseudo_id LIKE @search
-           OR u.user_name LIKE @search
-           OR ISNULL(u.email, '') LIKE @search
-           OR ISNULL(u.phone, '') LIKE @search
-           OR ISNULL(branch_info.branch_name, '') LIKE @search
-         )
+        AND (@status IS NULL OR u.status = @status)
+        AND (
+          @search IS NULL
+          OR u.pseudo_id LIKE @search
+          OR u.user_name LIKE @search
+          OR ISNULL(u.email, '') LIKE @search
+          OR ISNULL(u.phone, '') LIKE @search
+          OR ISNULL(branch_info.branch_name, '') LIKE @search
+        )
        ORDER BY
          CASE WHEN u.status = 'active' THEN 0 ELSE 1 END,
          u.user_name ASC,
