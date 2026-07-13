@@ -11,16 +11,16 @@ import UserDetailDrawer from './users/UserDetailDrawer';
 import './AdminUsersPage.css';
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'Tat ca trang thai' },
-  { value: 'active', label: 'Hoat dong' },
-  { value: 'inactive', label: 'Ngung hoat dong' },
-  { value: 'locked', label: 'Bi khoa' },
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'active', label: 'Hoạt động' },
+  { value: 'inactive', label: 'Ngừng hoạt động' },
+  { value: 'locked', label: 'Bị khóa' },
 ];
 
 const STATUS_LABELS = {
-  active: 'Hoat dong',
-  inactive: 'Ngung hoat dong',
-  locked: 'Bi khoa',
+  active: 'Hoạt động',
+  inactive: 'Ngừng hoạt động',
+  locked: 'Bị khóa',
 };
 
 const STATUS_CLASS = {
@@ -57,6 +57,7 @@ export default function AdminUsersPage() {
     params,
     setParams,
     updateParam,
+    refresh,
   } = useAdminUsers();
 
   const [searchParams] = useSearchParams();
@@ -87,7 +88,7 @@ export default function AdminUsersPage() {
           setBranchesError(null);
         }
       } catch (err) {
-        if (!cancelled) setBranchesError(err.message || 'Khong tai danh sach chi nhanh');
+        if (!cancelled) setBranchesError(err.message || 'Không tải được danh sách chi nhánh');
       }
       try {
         const rRes = await adminRolesApi.list();
@@ -96,7 +97,7 @@ export default function AdminUsersPage() {
           setRolesError(null);
         }
       } catch (err) {
-        if (!cancelled) setRolesError(err.message || 'Khong tai danh sach role');
+        if (!cancelled) setRolesError(err.message || 'Không tải được danh sách vai trò');
       }
     })();
     return () => { cancelled = true; };
@@ -120,7 +121,7 @@ export default function AdminUsersPage() {
     setTogglingId(userId);
     try {
       await adminUsersApi.update({ userId, status: newStatus });
-      setParams((p) => ({ ...p }));
+      refresh();
     } catch (_) {
     } finally {
       setTogglingId(null);
@@ -144,15 +145,15 @@ export default function AdminUsersPage() {
             </svg>
           </div>
           <div className="admin-users__title-group">
-            <h1>Quan ly nguoi dung</h1>
+            <h1>Quản lý người dùng</h1>
             <p className="admin-users__subtitle">
-              Danh sach tai khoan he thong
+              Danh sách tài khoản hệ thống
             </p>
           </div>
         </div>
         <div className="admin-users__actions">
           {data.total > 0 && (
-            <span className="admin-users__total-badge">{data.total} tai khoan</span>
+            <span className="admin-users__total-badge">{data.total} tài khoản</span>
           )}
           <button
             className="btn btn--primary"
@@ -161,7 +162,7 @@ export default function AdminUsersPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            Tao nguoi dung moi
+            Tạo người dùng mới
           </button>
         </div>
       </div>
@@ -172,7 +173,7 @@ export default function AdminUsersPage() {
           <input
             className="input input--search"
             type="text"
-            placeholder="Tim theo ten, email, ho, ten..."
+            placeholder="Tìm theo tên, email, họ, tên..."
             value={params.search || ''}
             onChange={(e) => updateParam('search', e.target.value)}
           />
@@ -186,7 +187,7 @@ export default function AdminUsersPage() {
             disabled={!!branchesError}
           >
             <option value="">
-              {branchesError ? `Loi: ${branchesError}` : 'Tat ca chi nhanh'}
+              {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
             </option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>{b.branchName}</option>
@@ -200,7 +201,7 @@ export default function AdminUsersPage() {
             disabled={!!rolesError}
           >
             <option value="">
-              {rolesError ? `Loi: ${rolesError}` : 'Tat ca role'}
+              {rolesError ? `Lỗi: ${rolesError}` : 'Tất cả vai trò'}
             </option>
             {roles.map((r) => (
               <option key={r.id} value={r.id}>{r.roleName}</option>
@@ -221,7 +222,7 @@ export default function AdminUsersPage() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
             </svg>
-            Dat lai
+            Đặt lại
           </button>
         </div>
       </div>
@@ -229,14 +230,14 @@ export default function AdminUsersPage() {
       {/* Table */}
       <div className="table-card">
         <div className="table-card__header">
-          <div className="table-card__title">Danh sach nguoi dung</div>
+          <div className="table-card__title">Danh sách người dùng</div>
         </div>
 
         {loading ? (
-          <div className="admin-users__loading">Dang tai danh sach...</div>
+          <div className="admin-users__loading">Đang tải danh sách...</div>
         ) : error ? (
           <div className="admin-users__error">
-            <strong>Loi:</strong> {error.message || 'Khong the tai danh sach'}
+            <strong>Lỗi:</strong> {error.message || 'Không thể tải danh sách'}
           </div>
         ) : (
           <>
@@ -244,20 +245,20 @@ export default function AdminUsersPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Nguoi dung</th>
+                    <th>Người dùng</th>
                     <th>Email</th>
-                    <th>Chi nhanh</th>
-                    <th>Role</th>
-                    <th>Trang thai</th>
-                    <th>Ngay tao</th>
-                    <th style={{ textAlign: 'right' }}>Hanh dong</th>
+                    <th>Chi nhánh</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th>Ngày tạo</th>
+                    <th style={{ textAlign: 'right' }}>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(!data.items || data.items.length === 0) ? (
                     <tr>
                       <td colSpan={7} className="table__empty">
-                        Khong co nguoi dung nao phu hop voi bo loc
+                        Không có người dùng nào phù hợp với bộ lọc
                       </td>
                     </tr>
                   ) : (
@@ -286,9 +287,12 @@ export default function AdminUsersPage() {
                         <td>
                           {u.roles?.length > 0 ? (
                             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                              {u.roles.map((r) => (
-                                <span key={r} className="badge badge--info">{r}</span>
-                              ))}
+                              {u.roles.map((r) => {
+                                const name = typeof r === 'object' && r !== null ? r.roleName : r;
+                                return (
+                                  <span key={typeof r === 'object' && r !== null ? r.roleId : r} className="badge badge--info">{name}</span>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>—</span>
@@ -301,11 +305,11 @@ export default function AdminUsersPage() {
                             </span>
                             <button
                               className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
-                              title={u.status === 'active' ? 'Khoa tai khoan' : 'Mo khoa tai khoan'}
+                              title={u.status === 'active' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
                               onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
                               disabled={togglingId === u.id}
                             >
-                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khoa' : 'Mo')}
+                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khóa' : 'Mở')}
                             </button>
                           </div>
                         </td>
@@ -320,7 +324,18 @@ export default function AdminUsersPage() {
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                                 <circle cx="12" cy="12" r="3"/>
                               </svg>
-                              Chi tiet
+                              Chi tiết
+                            </button>
+                            <button
+                              className="btn btn--sm btn--role"
+                              onClick={() => setAssignUserId(u.id)}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                <line x1="12" y1="8" x2="12" y2="16"/>
+                                <line x1="8" y1="12" x2="16" y2="12"/>
+                              </svg>
+                              Phân quyền
                             </button>
                             <button
                               className="btn btn--sm btn--edit"
@@ -330,7 +345,7 @@ export default function AdminUsersPage() {
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                               </svg>
-                              Sua
+                              Sửa
                             </button>
                           </div>
                         </td>
@@ -345,7 +360,7 @@ export default function AdminUsersPage() {
             {data.total > 0 && (
               <div className="pagination">
                 <span className="pagination__info">
-                  Tong <strong>{data.total}</strong> tai khoan
+                  Tổng <strong>{data.total}</strong> tài khoản
                   &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
                 </span>
                 <div className="pagination__controls">
@@ -357,7 +372,7 @@ export default function AdminUsersPage() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="15 18 9 12 15 6"/>
                     </svg>
-                    Truoc
+                    Trước
                   </button>
 
                   {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
@@ -403,7 +418,7 @@ export default function AdminUsersPage() {
         <UserFormModal
           user={editUser}
           onClose={() => { setShowModal(false); setEditUser(null); }}
-          onSuccess={() => setParams((p) => ({ ...p }))}
+          onSuccess={() => refresh()}
         />
       )}
 
@@ -411,7 +426,7 @@ export default function AdminUsersPage() {
         <UserDetailDrawer
           userId={detailUserId}
           onClose={() => setDetailUserId(null)}
-          onRolesChanged={() => setParams((p) => ({ ...p }))}
+          onRolesChanged={() => refresh()}
         />
       )}
     </div>
