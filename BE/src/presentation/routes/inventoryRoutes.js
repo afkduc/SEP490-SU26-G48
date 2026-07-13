@@ -1,6 +1,7 @@
 const express = require('express');
 const { makeInventoryService } = require('../../application/services');
 const InventoryController = require('../controllers/InventoryController');
+const { authenticate } = require('../../middlewares/auth');
 
 function makeInventoryController() {
   return new InventoryController({ inventoryService: makeInventoryService() });
@@ -13,8 +14,12 @@ function buildInventoryRouter() {
   router.get('/', controller.getStockList);
   router.get('/low-stock', controller.getLowStock);
   router.get('/summary', controller.getStockSummary);
+  // Dat truoc /:productId/:branchId de khong bi nuot mat bo dinh tuyen.
+  router.get('/products/search', authenticate, controller.searchProducts);
   router.get('/:productId/:branchId', controller.getStockDetail);
-  router.patch('/:productId/adjust', controller.adjustStock);
+  // PATCH /:productId/adjust - tam thoi KHONG mount, vi stock se duoc dieu chinh
+  // thong qua phieu nhap / phieu xuat o phase sau.
+  // router.patch('/:productId/adjust', controller.adjustStock);
 
   return router;
 }

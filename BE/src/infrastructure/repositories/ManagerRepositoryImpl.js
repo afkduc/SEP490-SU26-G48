@@ -1,6 +1,8 @@
 const { query } = require('../database/sqlServer');
 
 const EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'accountant'];
+const TECHNICIAN_ROLE = 'technician';
+const TEAM_LEADER_ROLE = 'team_leader';
 
 function normalizeDate(value) {
   if (!value) return null;
@@ -27,7 +29,6 @@ function aggregateEmployees(rows = []) {
         phone: row.phone,
         status: row.status,
         statusLabel: statusLabel(row.status),
-        specialty: row.specialty,
         teamSize: row.team_size,
         avatar: row.avatar,
         notes: row.notes,
@@ -116,6 +117,44 @@ function mapSettlementRow(row) {
   };
 }
 
+function mapTechnicianRow(row) {
+  return {
+    id: row.id,
+    employeeId: row.pseudo_id || String(row.id),
+    fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    statusLabel: statusLabel(row.status),
+    notes: row.notes,
+    createdAt: normalizeDate(row.created_at),
+    branch: row.branch_id
+      ? { id: row.branch_id, code: row.branch_code, name: row.branch_name }
+      : null,
+    teamLeaderId: row.team_leader_id,
+    teamLeaderName: row.team_leader_name || null,
+    specialties: [],
+  };
+}
+
+function mapTeamLeaderRow(row) {
+  return {
+    id: row.id,
+    employeeId: row.pseudo_id || String(row.id),
+    fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    statusLabel: statusLabel(row.status),
+    notes: row.notes,
+    createdAt: normalizeDate(row.created_at),
+    branch: row.branch_id
+      ? { id: row.branch_id, code: row.branch_code, name: row.branch_name }
+      : null,
+    teamMemberCount: row.team_member_count || 0,
+  };
+}
+
 function mapServiceRow(row) {
   return {
     id: row.id,
@@ -184,7 +223,6 @@ class ManagerRepositoryImpl {
           u.email,
           u.phone,
           u.status,
-          u.specialty,
           u.team_size,
           u.avatar,
           u.notes,
@@ -231,7 +269,6 @@ class ManagerRepositoryImpl {
           u.email,
           u.phone,
           u.status,
-          u.specialty,
           u.team_size,
           u.avatar,
           u.notes,
@@ -718,6 +755,298 @@ class ManagerRepositoryImpl {
     }));
 
     return order;
+  }
+
+  async listSpecialties() {
+    const result = await query('SELECT id, specialty_code, specialty_name FROM specialties ORDER BY specialty_name ASC');
+    return result.recordset.map((row) => ({ id: row.id, code: row.specialty_code, name: row.specialty_name }));
+  }
+
+  async listTeamLeaderOptions(branchId) {
+    const result = await query(
+      `SELECT u.id, u.pseudo_id, u.user_name
+       FROM users u
+       WHERE u.branch_id = @branchId
+         AND u.status = 'active'
+         AND EXISTS (
+           SELECT 1 FROM user_role ur JOIN roles r ON r.id = ur.role_id
+           WHERE ur.user_id = u.id AND r.role_name = '${TEAM_LEADER_ROLE}'
+         )
+       ORDER BY u.user_name ASC`,
+      { branchId: Number(branchId) }
+    );
+    return result.recordset.map((row) => ({ id: row.id, employeeId: row.pseudo_id, fullName: row.user_name }));
+  }
+
+  async _fetchSpecialtiesByUserIds(userIds) {
+    if (!userIds.length) return new Map();
+    const inClause = userIds.map((_, i) => `@id${i}`).join(',');
+    const params = {};
+    userIds.forEach((id, i) => { params[`id${i}`] = Number(id); });
+
+    const result = await query(
+      `SELECT us.user_id, s.id, s.specialty_code, s.specialty_name
+       FROM user_specialty us
+       JOIN specialties s ON s.id = us.specialty_id
+       WHERE us.user_id IN (${inClause})
+       ORDER BY s.specialty_name ASC`,
+      params
+    );
+
+    const map = new Map();
+    result.recordset.forEach((row) => {
+      if (!map.has(row.user_id)) map.set(row.user_id, []);
+      map.get(row.user_id).push({ id: row.id, code: row.specialty_code, name: row.specialty_name });
+    });
+    return map;
+  }
+
+  async _syncTechnicianSpecialties(userId, specialtyIds = []) {
+    await query('DELETE FROM user_specialty WHERE user_id = @userId', { userId: Number(userId) });
+    for (const specialtyId of specialtyIds) {
+      await query('INSERT INTO user_specialty (user_id, specialty_id) VALUES (@userId, @specialtyId)', {
+        userId: Number(userId),
+        specialtyId: Number(specialtyId),
+      });
+    }
+  }
+
+  async listTechnicians(branchId, filters = {}) {
+    const params = {
+      branchId: Number(branchId),
+      search: filters.search ? `%${filters.search.trim()}%` : null,
+      status: filters.status && filters.status !== 'all' ? filters.status : null,
+      teamLeaderId: filters.teamLeaderId && filters.teamLeaderId !== 'all' ? Number(filters.teamLeaderId) : null,
+    };
+
+    const result = await query(
+      `SELECT
+          u.id, u.pseudo_id, u.user_name, u.first_name, u.last_name, u.email, u.phone,
+          u.status, u.notes, u.created_at, u.branch_id, b.branch_code, b.branch_name,
+          u.team_leader_id, tl.user_name AS team_leader_name
+       FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       LEFT JOIN users tl ON tl.id = u.team_leader_id
+       WHERE u.branch_id = @branchId
+         AND EXISTS (
+           SELECT 1 FROM user_role ur JOIN roles r ON r.id = ur.role_id
+           WHERE ur.user_id = u.id AND r.role_name = '${TECHNICIAN_ROLE}'
+         )
+         AND (@status IS NULL OR u.status = @status)
+         AND (@teamLeaderId IS NULL OR u.team_leader_id = @teamLeaderId)
+         AND (
+           @search IS NULL
+           OR u.pseudo_id LIKE @search
+           OR u.user_name LIKE @search
+           OR ISNULL(u.email, '') LIKE @search
+           OR ISNULL(u.phone, '') LIKE @search
+         )
+       ORDER BY
+         CASE WHEN u.status = 'active' THEN 0 ELSE 1 END,
+         u.user_name ASC,
+         u.id ASC`,
+      params
+    );
+
+    const technicians = result.recordset.map(mapTechnicianRow);
+    const specialtiesByUser = await this._fetchSpecialtiesByUserIds(technicians.map((t) => t.id));
+    technicians.forEach((t) => { t.specialties = specialtiesByUser.get(t.id) || []; });
+    return technicians;
+  }
+
+  async getTechnicianById(branchId, id) {
+    const result = await query(
+      `SELECT
+          u.id, u.pseudo_id, u.user_name, u.first_name, u.last_name, u.email, u.phone,
+          u.status, u.notes, u.created_at, u.branch_id, b.branch_code, b.branch_name,
+          u.team_leader_id, tl.user_name AS team_leader_name
+       FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       LEFT JOIN users tl ON tl.id = u.team_leader_id
+       WHERE u.id = @id AND u.branch_id = @branchId
+         AND EXISTS (
+           SELECT 1 FROM user_role ur JOIN roles r ON r.id = ur.role_id
+           WHERE ur.user_id = u.id AND r.role_name = '${TECHNICIAN_ROLE}'
+         )`,
+      { id: Number(id), branchId: Number(branchId) }
+    );
+
+    const row = result.recordset[0];
+    if (!row) return null;
+
+    const technician = mapTechnicianRow(row);
+    const specialtiesByUser = await this._fetchSpecialtiesByUserIds([technician.id]);
+    technician.specialties = specialtiesByUser.get(technician.id) || [];
+    return technician;
+  }
+
+  async createTechnician({ branchId, pseudoId, fullName, email, phone, passwordHash, status, teamLeaderId, specialtyIds }) {
+    const result = await query(
+      `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status, team_size, team_leader_id, created_at)
+       OUTPUT INSERTED.id
+       VALUES (@pseudoId, @fullName, @email, @passwordHash, @fullName, '', @phone, @branchId, @status, 0, @teamLeaderId, GETDATE())`,
+      {
+        pseudoId,
+        fullName,
+        email,
+        passwordHash,
+        phone: phone || null,
+        branchId: Number(branchId),
+        status,
+        teamLeaderId: Number(teamLeaderId),
+      }
+    );
+    const userId = result.recordset[0].id;
+    await query(
+      `INSERT INTO user_role (user_id, role_id) SELECT @userId, id FROM roles WHERE role_name = '${TECHNICIAN_ROLE}'`,
+      { userId }
+    );
+    await this._syncTechnicianSpecialties(userId, specialtyIds);
+    return this.getTechnicianById(branchId, userId);
+  }
+
+  async updateTechnician(branchId, id, { fullName, email, phone, status, teamLeaderId, specialtyIds }) {
+    await query(
+      `UPDATE users
+       SET user_name = @fullName,
+           first_name = @fullName,
+           email = @email,
+           phone = @phone,
+           status = @status,
+           team_leader_id = @teamLeaderId
+       WHERE id = @id AND branch_id = @branchId`,
+      {
+        fullName,
+        email,
+        phone: phone || null,
+        status,
+        teamLeaderId: Number(teamLeaderId),
+        id: Number(id),
+        branchId: Number(branchId),
+      }
+    );
+
+    if (specialtyIds !== undefined) {
+      await this._syncTechnicianSpecialties(id, specialtyIds);
+    }
+
+    return this.getTechnicianById(branchId, id);
+  }
+
+  async listTeamLeaders(branchId, filters = {}) {
+    const params = {
+      branchId: Number(branchId),
+      search: filters.search ? `%${filters.search.trim()}%` : null,
+      status: filters.status && filters.status !== 'all' ? filters.status : null,
+    };
+
+    const result = await query(
+      `SELECT
+          u.id, u.pseudo_id, u.user_name, u.first_name, u.last_name, u.email, u.phone,
+          u.status, u.notes, u.created_at, u.branch_id, b.branch_code, b.branch_name,
+          (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count
+       FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       WHERE u.branch_id = @branchId
+         AND EXISTS (
+           SELECT 1 FROM user_role ur JOIN roles r ON r.id = ur.role_id
+           WHERE ur.user_id = u.id AND r.role_name = '${TEAM_LEADER_ROLE}'
+         )
+         AND (@status IS NULL OR u.status = @status)
+         AND (
+           @search IS NULL
+           OR u.pseudo_id LIKE @search
+           OR u.user_name LIKE @search
+           OR ISNULL(u.email, '') LIKE @search
+           OR ISNULL(u.phone, '') LIKE @search
+         )
+       ORDER BY
+         CASE WHEN u.status = 'active' THEN 0 ELSE 1 END,
+         u.user_name ASC,
+         u.id ASC`,
+      params
+    );
+
+    return result.recordset.map(mapTeamLeaderRow);
+  }
+
+  async getTeamLeaderById(branchId, id) {
+    const result = await query(
+      `SELECT
+          u.id, u.pseudo_id, u.user_name, u.first_name, u.last_name, u.email, u.phone,
+          u.status, u.notes, u.created_at, u.branch_id, b.branch_code, b.branch_name,
+          (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count
+       FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       WHERE u.id = @id AND u.branch_id = @branchId
+         AND EXISTS (
+           SELECT 1 FROM user_role ur JOIN roles r ON r.id = ur.role_id
+           WHERE ur.user_id = u.id AND r.role_name = '${TEAM_LEADER_ROLE}'
+         )`,
+      { id: Number(id), branchId: Number(branchId) }
+    );
+
+    const row = result.recordset[0];
+    if (!row) return null;
+
+    const teamLeader = mapTeamLeaderRow(row);
+
+    const membersResult = await query(
+      `SELECT id, pseudo_id, user_name FROM users WHERE team_leader_id = @id ORDER BY user_name ASC`,
+      { id: Number(id) }
+    );
+    teamLeader.members = membersResult.recordset.map((r) => ({
+      id: r.id,
+      employeeId: r.pseudo_id,
+      fullName: r.user_name,
+    }));
+
+    return teamLeader;
+  }
+
+  async createTeamLeader({ branchId, pseudoId, fullName, email, phone, passwordHash, status }) {
+    const result = await query(
+      `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status, team_size, created_at)
+       OUTPUT INSERTED.id
+       VALUES (@pseudoId, @fullName, @email, @passwordHash, @fullName, '', @phone, @branchId, @status, 0, GETDATE())`,
+      {
+        pseudoId,
+        fullName,
+        email,
+        passwordHash,
+        phone: phone || null,
+        branchId: Number(branchId),
+        status,
+      }
+    );
+    const userId = result.recordset[0].id;
+    await query(
+      `INSERT INTO user_role (user_id, role_id) SELECT @userId, id FROM roles WHERE role_name = '${TEAM_LEADER_ROLE}'`,
+      { userId }
+    );
+    return this.getTeamLeaderById(branchId, userId);
+  }
+
+  async updateTeamLeader(branchId, id, { fullName, email, phone, status }) {
+    await query(
+      `UPDATE users
+       SET user_name = @fullName,
+           first_name = @fullName,
+           email = @email,
+           phone = @phone,
+           status = @status
+       WHERE id = @id AND branch_id = @branchId`,
+      {
+        fullName,
+        email,
+        phone: phone || null,
+        status,
+        id: Number(id),
+        branchId: Number(branchId),
+      }
+    );
+
+    return this.getTeamLeaderById(branchId, id);
   }
 }
 

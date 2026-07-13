@@ -38,6 +38,7 @@ class RepairSettlementResponseDto {
       nextMaintenanceDate: toDDMMYYYY(entity.nextMaintenanceDate),
       teamLeader: entity.teamLeaderName,
       status: entity.status,
+      cancelReason: entity.cancelReason,
     };
   }
 
