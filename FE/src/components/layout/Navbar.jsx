@@ -61,11 +61,8 @@ const SERVICE_ADVISOR_NAV = [
   },
   {
     label: 'Khách hàng',
+    path: '/customers',
     icon: '👤',
-    children: [
-      { label: 'Danh sách khách hàng', path: '/customers' },
-      { label: 'Lịch sử bảo dưỡng', path: '/customers/history' },
-    ],
   },
 ];
 
