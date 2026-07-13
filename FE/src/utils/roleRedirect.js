@@ -1,4 +1,5 @@
 import { ROLES, ROUTES, DEFAULT_ROUTE } from '../constants';
+import { getRoleHome } from '../contexts/AppContext';
 
 const ROLE_TO_DEFAULT_ROUTE = Object.freeze({
   [ROLES.ADMIN]: ROUTES.ADMIN_DASHBOARD,
@@ -24,6 +25,5 @@ export function hasRole(user, allowedRoles) {
 }
 
 export function routeAfterLogin(user) {
-  const primaryRole = user?.primaryRole ?? user?.role ?? user?.roles?.[0];
-  return getDefaultRouteByRole(primaryRole);
+  return getRoleHome(user);
 }

@@ -92,11 +92,11 @@ class AdminUserRepositoryImpl {
 
     const users = dataResult.recordset.map(toAdminUserRow);
 
-    // Lay roles cho tung user
+    // Lay roles (name + id) cho tung user
     if (users.length > 0) {
       const userIds = users.map((u) => u.id);
       const rolesResult = await query(
-        `SELECT ur.user_id, r.role_name
+        `SELECT ur.user_id, r.id AS role_id, r.role_name
          FROM   user_role ur
          JOIN   roles r ON r.id = ur.role_id
          WHERE  ur.user_id IN (${userIds.map((_, i) => `@p${paramIndex + i}`).join(',')})`,
@@ -105,7 +105,7 @@ class AdminUserRepositoryImpl {
       const rolesByUser = {};
       for (const row of rolesResult.recordset) {
         if (!rolesByUser[row.user_id]) rolesByUser[row.user_id] = [];
-        rolesByUser[row.user_id].push(row.role_name);
+        rolesByUser[row.user_id].push({ roleId: row.role_id, roleName: row.role_name });
       }
       for (const user of users) {
         user.roles = rolesByUser[user.id] || [];
@@ -165,13 +165,16 @@ class AdminUserRepositoryImpl {
     if (!row) return null;
     const user = toAdminUserRow(row);
     const rolesResult = await query(
-      `SELECT r.role_name
+      `SELECT r.id AS role_id, r.role_name
        FROM   user_role ur
        JOIN   roles r ON r.id = ur.role_id
        WHERE  ur.user_id = @p1`,
       { p1: id }
     );
-    user.roles = rolesResult.recordset.map((r) => r.role_name);
+    user.roles = rolesResult.recordset.map((r) => ({
+      roleId: r.role_id,
+      roleName: r.role_name,
+    }));
     return user;
   }
 
@@ -200,7 +203,7 @@ class AdminUserRepositoryImpl {
     return { id: userId, email };
   }
 
-  async updateUser({ userId, status, roleId }) {
+  async updateUser({ userId, status, roleId, branchId }) {
     const updates = [];
     const params = {};
     let p = 1;
@@ -208,6 +211,12 @@ class AdminUserRepositoryImpl {
     if (status !== undefined) {
       updates.push(`status = @p${p}`);
       params[`p${p}`] = status;
+      p++;
+    }
+
+    if (branchId !== undefined) {
+      updates.push(`branch_id = @p${p}`);
+      params[`p${p}`] = branchId;
       p++;
     }
 
@@ -230,6 +239,160 @@ class AdminUserRepositoryImpl {
     }
 
     return this.findById(userId);
+  }
+
+  /**
+   * Lay thong ke dashboard tong quan
+   * Tra ve counts theo status cua users, so branches, so roles
+   */
+  async getDashboardStats() {
+    const [userStats, branchCount, roleCount] = await Promise.all([
+      query(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN status = 'active'   THEN 1 ELSE 0 END) AS activeCount,
+          SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) AS inactiveCount,
+          SUM(CASE WHEN status = 'locked'   THEN 1 ELSE 0 END) AS lockedCount
+        FROM users
+      `),
+      query('SELECT COUNT(*) AS total FROM branches WHERE is_active = 1'),
+      query('SELECT COUNT(*) AS total FROM roles'),
+    ]);
+
+    const users = userStats.recordset[0];
+
+    // Recent audit logs (general activity)
+    let recentLogs = [];
+    try {
+      const logsResult = await query(`
+        SELECT TOP 8
+          al.id,
+          al.action,
+          al.user_name,
+          al.table_name,
+          al.record_id,
+          al.old_value,
+          al.new_value,
+          al.ip_address,
+          al.response_status,
+          al.logged_at
+        FROM audit_logs al
+        ORDER BY al.logged_at DESC
+      `);
+      recentLogs = logsResult.recordset.map((row) => ({
+        id: row.id,
+        action: row.action,
+        actorName: row.user_name,
+        targetType: row.table_name,
+        targetId: row.record_id,
+        oldValue: row.old_value,
+        newValue: row.new_value,
+        ipAddress: row.ip_address,
+        responseStatus: row.response_status,
+        createdAt: row.logged_at,
+      }));
+    } catch (_) {
+      recentLogs = [];
+    }
+
+    // Login sessions (recent logins)
+    let recentLogins = [];
+    let todayLogins = 0;
+    let failedLogins = 0;
+    try {
+      const loginResult = await query(`
+        SELECT TOP 8
+          ls.id,
+          ls.user_name,
+          ls.action_type,
+          ls.ip_address,
+          ls.user_agent,
+          ls.login_time,
+          ls.logout_time,
+          ls.session_duration_seconds,
+          ls.status
+        FROM login_sessions ls
+        ORDER BY ls.login_time DESC
+      `);
+      recentLogins = loginResult.recordset.map((row) => ({
+        id: row.id,
+        userName: row.user_name,
+        actionType: row.action_type,
+        ipAddress: row.ip_address,
+        userAgent: row.user_agent,
+        loginTime: row.login_time,
+        logoutTime: row.logout_time,
+        sessionDuration: row.session_duration_seconds,
+        status: row.status,
+      }));
+
+      // Today's login count
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayResult = await query(`
+        SELECT COUNT(*) AS total
+        FROM login_sessions
+        WHERE login_time >= @p1
+      `, { p1: todayStart });
+      todayLogins = Number(todayResult.recordset[0].total);
+
+      // Failed logins count
+      const failedResult = await query(`
+        SELECT COUNT(*) AS total
+        FROM login_sessions
+        WHERE action_type = 'LOGIN_FAILED'
+      `);
+      failedLogins = Number(failedResult.recordset[0].total);
+    } catch (_) {
+      recentLogins = [];
+    }
+
+    // System alerts (based on data anomalies)
+    const alerts = [];
+    if (users.lockedCount > 0) {
+      alerts.push({
+        id: 'locked-users',
+        type: 'warning',
+        title: 'Tai khoan bi khoa',
+        message: `${users.lockedCount} tai khoan bi khoa can xu ly`,
+        icon: 'lock',
+        time: new Date().toISOString(),
+      });
+    }
+    if (failedLogins > 10) {
+      alerts.push({
+        id: 'failed-logins',
+        type: 'danger',
+        title: 'Nhieu lan dang nhap that bai',
+        message: `${failedLogins} lan dang nhap that bai - kiem tra an ninh`,
+        icon: 'alert',
+        time: new Date().toISOString(),
+      });
+    }
+    if (users.inactiveCount > users.activeCount * 0.3) {
+      alerts.push({
+        id: 'inactive-users',
+        type: 'info',
+        title: 'Nhieu tai khoan khong hoat dong',
+        message: `${users.inactiveCount} tai khoan khong hoat dong`,
+        icon: 'user',
+        time: new Date().toISOString(),
+      });
+    }
+
+    return {
+      totalUsers: Number(users.total),
+      activeUsers: Number(users.activeCount),
+      inactiveUsers: Number(users.inactiveCount),
+      lockedUsers: Number(users.lockedCount),
+      totalBranches: Number(branchCount.recordset[0].total),
+      totalRoles: Number(roleCount.recordset[0].total),
+      recentLogs,
+      recentLogins,
+      todayLogins,
+      failedLogins,
+      alerts,
+    };
   }
 }
 

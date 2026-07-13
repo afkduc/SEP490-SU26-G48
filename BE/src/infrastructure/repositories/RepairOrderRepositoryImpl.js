@@ -105,7 +105,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
         .input('teamLeaderId', sql.BigInt, data.teamLeaderId)
         .input('vehicleId', sql.BigInt, data.vehicleId)
         .input('createdBy', sql.BigInt, createdBy)
-        .input('status', sql.VarChar(20), 'in_progress')
+        .input('status', sql.VarChar(20), 'inprogress')
         .input('notes', sql.NVarChar(500), data.notes || null)
         .query(`
           INSERT INTO repair_orders (
