@@ -31,6 +31,7 @@ class RepairOrderResponseDto {
       notes: entity.notes,
       createdAt: toDDMMYYYY(entity.createdAt),
       completedAt: toDDMMYYYY(entity.completedAt),
+      cancelReason: entity.cancelReason,
       tasks: entity.tasks.map((t) => ({
         ...t,
         taskTypeLabel: TASK_TYPE_LABELS[t.taskType] || t.taskType,

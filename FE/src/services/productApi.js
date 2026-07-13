@@ -1,0 +1,62 @@
+import httpClient from './httpClient';
+
+/**
+ * Product (Phu tung) API - module Kho.
+ * Luu y: KHONG truyen stockQuantity len BE (BE se tu dong bo qua).
+ *
+ *   - list(params): GET /api/products voi filter { branchId, status, search, category, page, limit }.
+ *     tra ve: { items: [{ id, productCode, productName, category, brandName, unit, unitPrice,
+ *                         stockQuantity, minStock, supplierId, supplierName, location, branchId, status, isLowStock }],
+ *               total, page, limit }
+ *
+ *   - getDetail(id): GET /api/products/:id
+ *
+ *   - create(payload): POST /api/products  (payload KHONG bao gom stockQuantity)
+ *   - update(id, payload): PUT /api/products/:id (payload KHONG bao gom stockQuantity)
+ *   - remove(id): DELETE /api/products/:id
+ */
+function buildQuery(params = {}) {
+  const sp = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return;
+    sp.append(k, String(v));
+  });
+  const qs = sp.toString();
+  return qs ? `?${qs}` : '';
+}
+
+const STOCK_KEYS = ['stockQuantity', 'stock_quantity'];
+
+function stripStock(payload) {
+  const out = { ...payload };
+  for (const k of STOCK_KEYS) delete out[k];
+  return out;
+}
+
+export async function getProductsApi(params = {}) {
+  return httpClient.get(`/products${buildQuery(params)}`);
+}
+
+export async function getProductByIdApi(id) {
+  return httpClient.get(`/products/${id}`);
+}
+
+export async function createProductApi(payload) {
+  return httpClient.post('/products', stripStock(payload));
+}
+
+export async function updateProductApi(id, payload) {
+  return httpClient.put(`/products/${id}`, stripStock(payload));
+}
+
+export async function deleteProductApi(id) {
+  return httpClient.delete(`/products/${id}`);
+}
+
+/**
+ * Tra cuu phu tung theo tu khoa (dung o trang quyet toan sua chua).
+ * BE: GET /api/inventory/products/search?q=...
+ */
+export async function searchProductsApi(term) {
+  return httpClient.get(`/inventory/products/search?q=${encodeURIComponent(term)}`);
+}
