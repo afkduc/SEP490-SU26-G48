@@ -1,4 +1,4 @@
-/* ─────────────────────────────────────────────────────────
+﻿/* ─────────────────────────────────────────────────────────
    Admin Dashboard – Professional Modern Design
    Font: Inter, Gradient accents, Glassmorphism
 ───────────────────────────────────────────────────────── */
@@ -9,7 +9,7 @@
 /* ── Page wrapper ─────────────────────────────────────── */
 .admin-dashboard {
   padding: 24px 28px;
-  max-width: 1600px;
+  max-width: 100%;
   margin: 0 auto;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #1e293b;
@@ -18,6 +18,12 @@
   gap: 20px;
   background: #f8fafc;
   min-height: calc(100vh - 64px);
+}
+
+@media (min-width: 1600px) {
+  .admin-dashboard {
+    padding: 28px 40px;
+  }
 }
 
 /* ── Header ───────────────────────────────────────────── */
@@ -323,9 +329,16 @@
 /* ── Row 2 layout ────────────────────────────────────── */
 .dash-row-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1.4fr;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
+}
+
+@media (min-width: 1600px) {
+  .dash-row-2 {
+    grid-template-columns: 1fr 1.6fr;
+    gap: 24px;
+  }
 }
 
 /* ── Widget ────────────────────────────────────────────── */
@@ -341,6 +354,18 @@
 
 .dash-widget--span-2 {
   grid-column: 1 / -1;
+}
+
+/* ── Scroll target cho tab navigation ──────────────────── */
+/* scroll-margin giup scrollIntoView dat section ngay sau header (neu co) */
+.dash-widget--scroll-target {
+  scroll-margin-top: 16px;
+  transition: box-shadow 0.3s;
+}
+
+/* Highlight nhe section dang duoc active (chi chay khi class duoc set boi JS) */
+.dash-widget--scroll-target.is-active {
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18), 0 4px 18px rgba(79, 70, 229, 0.08);
 }
 
 .dash-widget__topbar {
@@ -510,13 +535,16 @@
 .dash-widget__body {
   padding: 8px 0;
   overflow-y: auto;
-  max-height: 340px;
+  max-height: 640px;
+  min-height: 0;
+  flex: 1;
 }
 
 .dash-widget__body--qa {
   padding: 0;
   overflow-y: visible;
   max-height: none;
+  flex: 0 0 auto;
 }
 
 /* ── Empty state ───────────────────────────────────────── */
@@ -556,6 +584,32 @@
   font-weight: 500;
 }
 
+.empty-state__hint {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  font-style: italic;
+  max-width: 260px;
+  text-align: center;
+  line-height: 1.45;
+}
+
+/* ── Stagger fade-in cho logs items ───────────────────────────── */
+@keyframes dashLogsItemFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dash-logs-item {
+  animation: dashLogsItemFadeIn 0.32s ease-out both;
+}
+
 /* ── Alert item ────────────────────────────────────────── */
 .alert-item {
   display: flex;
@@ -564,7 +618,20 @@
   padding: 12px 20px;
   border-left: 3px solid transparent;
   border-bottom: 1px solid transparent;
-  transition: background 0.12s;
+  transition: background 0.12s, transform 0.12s;
+  position: relative;
+  animation: dashLogsItemFadeIn 0.32s ease-out both;
+}
+
+.alert-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--alert-accent, transparent);
+  border-radius: 0 2px 2px 0;
 }
 
 .alert-item:last-child {
@@ -573,6 +640,7 @@
 
 .alert-item:hover {
   filter: brightness(0.98);
+  transform: translateX(2px);
 }
 
 .alert-item__icon {
@@ -583,6 +651,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
 }
 
 .alert-item__content {
@@ -601,7 +670,11 @@
   color: #64748b;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .alert-item__time {
@@ -609,6 +682,7 @@
   color: #94a3b8;
   white-space: nowrap;
   flex-shrink: 0;
+  text-align: right;
 }
 
 /* ── Activity item ─────────────────────────────────────── */
@@ -675,7 +749,11 @@
   color: #64748b;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .activity-item__meta {
@@ -718,6 +796,26 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+  position: relative;
+}
+
+.login-item__avatar::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--login-status-dot, #10b981);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+.login-item__avatar svg {
+  width: 18px;
+  height: 18px;
 }
 
 .login-item__body {
@@ -895,3 +993,244 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Logs widget (gom 2 section trong 1 widget) ──────── */
+.dash-widget--logs {
+  /* Cho widget Logs cao hon de hien thi du 2 section */
+}
+
+.dash-widget__body--logs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 680px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.dash-logs-section {
+  padding: 14px 0 6px;
+}
+
+.dash-logs-section + .dash-logs-section {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 16px;
+}
+
+.dash-logs-section--scroll-target {
+  scroll-margin-top: 16px;
+}
+
+.dash-logs-section__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 20px 10px;
+  color: #4f46e5;
+}
+
+.dash-logs-section__header svg {
+  flex-shrink: 0;
+}
+
+.dash-logs-section__header h3 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: -0.1px;
+}
+
+.dash-logs-section__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  margin-left: auto;
+  background: #eef2ff;
+  color: #4338ca;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.dash-logs-section__body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Alert item (mo rong: severity, chip, time abs) ───── */
+.alert-item {
+  align-items: flex-start;
+}
+
+.alert-item__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.alert-item__severity {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.alert-item__title {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-item__message {
+  white-space: normal;
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+
+.alert-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.alert-item__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: rgba(15, 23, 42, 0.06);
+  color: #475569;
+  white-space: nowrap;
+}
+
+.alert-item__chip--mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(15, 23, 42, 0.08);
+  color: #1e293b;
+  font-size: 0.7rem;
+}
+
+.alert-item__time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+.alert-item__time-rel {
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.alert-item__time-abs {
+  font-size: 0.66rem;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+/* ── Activity item (mo rong: status code, method, table) ─ */
+.activity-item__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.activity-item__method {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.activity-item__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.activity-item__meta-item--strong {
+  font-weight: 600;
+  color: #475569;
+}
+
+.activity-item__meta-item--code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 1px 6px;
+  background: #eef2ff;
+  color: #4338ca;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* ── Login item (them phone fallback) ─────────────────── */
+.login-item__phone {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+/* ── Responsive: Logs widget ──────────────────────────── */
+@media (max-width: 1024px) {
+  .dash-widget--logs {
+    grid-column: 1 / -1;
+  }
+
+  .dash-widget__body--logs {
+    max-height: 560px;
+  }
+
+  .dash-widget__body {
+    max-height: 560px;
+  }
+
+  .dash-row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Responsive: tablet/medium ───────────────────────── */
+@media (min-width: 1025px) and (max-width: 1400px) {
+  .dash-widget__body {
+    max-height: 540px;
+  }
+  .dash-widget__body--logs {
+    max-height: 580px;
+  }
+}
+

@@ -98,7 +98,7 @@ class AdminUserService {
   }
 
   async updateUser(payload) {
-    const { userId, status, roleId } = payload;
+    const { userId, status, roleId, branchId } = payload;
 
     if (!userId) {
       throw new ApiError(400, 'userId la bat buoc');
@@ -114,11 +114,30 @@ class AdminUserService {
       throw new ApiError(400, 'status khong hop le: active, inactive, locked');
     }
 
+    // Validate branchId neu co
+    let parsedBranchId;
+    if (branchId !== undefined && branchId !== null && branchId !== '') {
+      parsedBranchId = Number(branchId);
+      if (!Number.isInteger(parsedBranchId) || parsedBranchId <= 0) {
+        throw new ApiError(400, 'branchId khong hop le');
+      }
+    }
+
+    // Validate roleId neu co
+    let parsedRoleId;
+    if (roleId !== undefined && roleId !== null && roleId !== '') {
+      parsedRoleId = Number(roleId);
+      if (!Number.isInteger(parsedRoleId) || parsedRoleId <= 0) {
+        throw new ApiError(400, 'roleId khong hop le');
+      }
+    }
+
     try {
       const updated = await this.adminUserRepository.updateUser({
         userId: Number(userId),
         status,
-        roleId: roleId !== undefined ? (roleId ? Number(roleId) : null) : undefined,
+        roleId: parsedRoleId,
+        branchId: parsedBranchId,
       });
       return updated;
     } catch (err) {
