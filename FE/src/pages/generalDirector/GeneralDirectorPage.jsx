@@ -1,44 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
-import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
 
 const GENERAL_DIRECTOR_ACTIONS = [
   {
-    uc: 'UC-49',
     label: 'Phiếu quyết toán',
     path: '/general-director/reports/settlements',
     icon: '📑',
-    description: 'Xem danh sách và chi tiết phiếu quyết toán của mọi chi nhánh.',
   },
   {
-    uc: 'UC-49',
     label: 'Doanh thu',
     path: '/general-director/reports/revenue',
     icon: '📈',
-    description: 'Xem tổng quan doanh thu toàn hệ thống hoặc theo từng chi nhánh.',
   },
   {
-    uc: 'UC-50',
     label: 'Nhân sự vận hành',
     path: '/general-director/employees',
     icon: '👥',
-    description: 'Xem danh sách toàn bộ nhân sự văn phòng và vận hành trên các chi nhánh.',
   },
   {
-    uc: 'UC-51',
     label: 'Kỹ thuật viên',
     path: '/general-director/technicians',
     icon: '🛠️',
-    description: 'Xem đội ngũ kỹ thuật theo chi nhánh và cấp độ tay nghề.',
   },
   {
-    uc: 'UC-52',
     label: 'DS giám đốc chi nhánh',
     path: '/general-director/branch-managers',
     icon: '🏢',
-    description: 'Vào màn danh sách để xem chi tiết, thêm mới và chỉnh sửa giám đốc chi nhánh.',
   },
 ];
 
@@ -262,7 +252,7 @@ function DetailModal({ report, onClose }) {
             <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', borderRadius: 12, padding: 16, color: 'white' }}>
               <div style={{ fontSize: 13, opacity: 0.8 }}>Tổng thanh toán</div>
               <div style={{ fontSize: 28, fontWeight: 900, margin: '8px 0 6px' }}>{currency(report.total)}</div>
-              <div style={{ fontSize: 12, opacity: 0.75 }}>Dữ liệu lấy trực tiếp từ SQL Server.</div>
+              <div style={{ fontSize: 12, opacity: 0.75 }}>Tổng giá trị thanh toán của phiếu.</div>
             </div>
           </div>
         </div>
@@ -290,9 +280,7 @@ function ModuleActionBar() {
               {item.icon}
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#0F766E', letterSpacing: 0.4 }}>{item.uc}</div>
-              <div style={{ fontWeight: 800, marginTop: 2 }}>{item.label}</div>
-              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>{item.description}</div>
+              <div style={{ fontWeight: 800 }}>{item.label}</div>
             </div>
           </NavLink>
         ))}
@@ -307,14 +295,14 @@ function PlaceholderPanel({ title, uc, description, actions, children }) {
       <div className="page-header">
         <div className="page-header-left">
           <h1>{title}</h1>
-          <div className="breadcrumb">General Director / {uc} / {title}</div>
+          <div className="breadcrumb">General Director / {title}</div>
         </div>
       </div>
 
       <ModuleActionBar />
 
       <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
-        <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>{uc}</div>
+          <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>{title}</div>
         <h2 style={{ margin: '8px 0', fontSize: 28, lineHeight: 1.15 }}>{title}</h2>
         <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.82)' }}>{description}</p>
       </div>
@@ -430,7 +418,7 @@ function RevenueOverviewPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Báo cáo doanh thu</h1>
-          <div className="breadcrumb">General Director / UC-49 / Báo cáo doanh thu toàn hệ thống</div>
+          <div className="breadcrumb">General Director / Báo cáo doanh thu</div>
         </div>
         <div className="page-header-right">
           <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
@@ -442,10 +430,9 @@ function RevenueOverviewPage() {
       <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>UC49 - View Revenue Reports For All Branch</div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Tổng quan tài chính theo doanh thu đã chốt hóa đơn</h2>
             <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.8)' }}>
-              Dữ liệu đọc trực tiếp từ SQL Server theo trạng thái đã xuất hóa đơn, có thể lọc theo từng chi nhánh hoặc xem toàn hệ thống.
+              Theo dõi tình hình doanh thu toàn hệ thống và lọc nhanh theo từng chi nhánh.
             </p>
           </div>
           <div style={{ minWidth: 260, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 14 }}>
@@ -699,7 +686,7 @@ function EmployeeListPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Danh sách nhân sự</h1>
-          <div className="breadcrumb">General Director / UC-50 / View All Employee For All Branch</div>
+          <div className="breadcrumb">General Director / Danh sách nhân sự</div>
         </div>
         <div className="page-header-right">
           <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
@@ -711,10 +698,9 @@ function EmployeeListPage() {
       <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>UC50 - View All Employee For All Branch</div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Danh sách nhân sự toàn hệ thống</h2>
             <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.8)' }}>
-              Hiển thị đầy đủ nhân sự các phòng ban ở mọi chi nhánh, lấy trực tiếp từ SQL Server theo trạng thái tài khoản thực tế.
+              Theo dõi đầy đủ nhân sự các bộ phận ở mọi chi nhánh theo trạng thái hiện tại.
             </p>
           </div>
           <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
@@ -795,7 +781,7 @@ function EmployeeListPage() {
                   <div className="empty-state" style={{ minHeight: 220 }}>
                     <div className="empty-state-icon">⏳</div>
                     <h3>Đang tải danh sách nhân sự</h3>
-                    <p>Dữ liệu đang được lấy trực tiếp từ SQL Server.</p>
+                    <p>Vui lòng chờ trong giây lát.</p>
                   </div>
                 </td>
               </tr>
@@ -892,7 +878,6 @@ function EmployeeListPage() {
                     <DetailRow label="Số điện thoại" value={activeEmployee.phone} />
                     <DetailRow label="Chi nhánh" value={activeEmployee.branch?.name || 'Chưa phân chi nhánh'} />
                     <DetailRow label="Vai trò" value={(activeEmployee.roleLabels || []).join(', ') || '—'} />
-                    <DetailRow label="Chuyên môn" value={activeEmployee.specialty} />
                     <DetailRow label="Quy mô tổ" value={activeEmployee.teamSize ? `${activeEmployee.teamSize} người` : '—'} />
                     <DetailRow label="Ngày tạo tài khoản" value={formatDate(activeEmployee.createdAt)} />
                     <DetailRow label="Ghi chú" value={activeEmployee.notes} />
@@ -1013,7 +998,7 @@ function TechnicianListPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Danh sách kỹ thuật viên</h1>
-          <div className="breadcrumb">General Director / UC-51 / View All Technician For All Branch</div>
+          <div className="breadcrumb">General Director / Danh sách kỹ thuật viên</div>
         </div>
         <div className="page-header-right">
           <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
@@ -1025,10 +1010,9 @@ function TechnicianListPage() {
       <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>UC51 - View All Technician For All Branch</div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Điều phối kỹ thuật viên toàn hệ thống</h2>
             <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.8)' }}>
-              Hiển thị toàn bộ kỹ thuật viên theo chi nhánh và nhóm kỹ năng chuyên môn, hỗ trợ xem hồ sơ chi tiết và lịch sử sửa chữa.
+              Theo dõi kỹ thuật viên theo chi nhánh và nhóm kỹ năng chuyên môn.
             </p>
           </div>
           <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
@@ -1108,7 +1092,7 @@ function TechnicianListPage() {
                   <div className="empty-state" style={{ minHeight: 220 }}>
                     <div className="empty-state-icon">⏳</div>
                     <h3>Đang tải danh sách kỹ thuật viên</h3>
-                    <p>Dữ liệu đang được lấy trực tiếp từ SQL Server.</p>
+                    <p>Vui lòng chờ trong giây lát.</p>
                   </div>
                 </td>
               </tr>
@@ -1136,26 +1120,7 @@ function TechnicianListPage() {
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{technician.phone || '—'}</div>
                   </td>
                   <td><BranchBadge branch={technician.branch} /></td>
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {(technician.skillGroupLabels || []).map((item) => (
-                          <span key={item} style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999, background: '#ECFDF5', color: '#047857', fontSize: 10, fontWeight: 800 }}>
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                      {(technician.skills || []).length > 0
-                        ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {technician.skills.map((item) => (
-                              <span key={item} style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: 999, background: '#EFF6FF', color: '#1D4ED8', fontSize: 11, fontWeight: 700 }}>
-                                {item}
-                              </span>
-                            ))}
-                          </div>
-                        : <span style={{ color: '#6B7280' }}>—</span>}
-                    </div>
-                  </td>
+                  <td>{technician.specialty || '—'}</td>
                   <td style={{ fontWeight: 800, color: '#0F766E' }}>{technician.activeAssignments || 0}</td>
                   <td style={{ fontWeight: 700 }}>{technician.totalRepairs || 0}</td>
                   <td>
@@ -1203,7 +1168,7 @@ function TechnicianListPage() {
 
               {!detailLoading && !detailError && activeTechnician && (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
                     <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
                       <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeTechnician.employeeId || '—'}</div>
@@ -1211,14 +1176,6 @@ function TechnicianListPage() {
                     <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: '#6B7280' }}>Chi nhánh</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{activeTechnician.branch?.name || '—'}</div>
-                    </div>
-                    <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#047857' }}>Lệnh sửa chữa đã xử lý</div>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: '#065F46', marginTop: 4 }}>{activeTechnician.repairSummary?.total || 0}</div>
-                    </div>
-                    <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#92400E' }}>Hoàn thành</div>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: '#B45309', marginTop: 4 }}>{activeTechnician.repairSummary?.completed || 0}</div>
                     </div>
                   </div>
 
@@ -1228,10 +1185,8 @@ function TechnicianListPage() {
                     <DetailRow label="Email" value={activeTechnician.email} />
                     <DetailRow label="Số điện thoại" value={activeTechnician.phone} />
                     <DetailRow label="Trạng thái" value={employeeStatusBadge(activeTechnician.status).label} />
-                    <DetailRow label="Nhóm kỹ năng" value={(activeTechnician.skillGroupLabels || []).join(', ') || '—'} />
-                    <DetailRow label="Kỹ năng chi tiết" value={(activeTechnician.skills || []).join(', ') || activeTechnician.specialty || '—'} />
+                    <DetailRow label="Chuyên môn" value={activeTechnician.specialty || '—'} />
                     <DetailRow label="Quy mô tổ" value={activeTechnician.teamSize ? `${activeTechnician.teamSize} người` : '—'} />
-                    <DetailRow label="Gần nhất hoàn thành" value={formatDate(activeTechnician.repairSummary?.latestCompletedAt)} />
                     <DetailRow label="Ngày tạo tài khoản" value={formatDate(activeTechnician.createdAt)} />
                     <DetailRow label="Ghi chú" value={activeTechnician.notes} />
                   </div>
@@ -1292,173 +1247,555 @@ function TechnicianListPage() {
 }
 
 function BranchManagerListPage() {
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [branchManagers, setBranchManagers] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [search, setSearch] = useState('');
+  const [branchId, setBranchId] = useState('all');
+  const [status, setStatus] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const searchTimer = useRef(null);
+  const requestSeq = useRef(0);
 
-  const previewRows = [
-    { id: 1, name: 'Nguyen Van A', branch: 'Chi nhánh Quận 1', username: 'gdc_q1' },
-    { id: 2, name: 'Tran Thi B', branch: 'Chi nhánh Gò Vấp', username: 'gdc_gv' },
-    { id: 3, name: 'Le Van C', branch: 'Chi nhánh Bình Thạnh', username: 'gdc_bt' },
-  ];
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadBranches() {
+      try {
+        const response = await generalDirectorApi.getBranches();
+        if (mounted) setBranches(response || []);
+      } catch {
+        if (mounted) setBranches([]);
+      }
+    }
+
+    loadBranches();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    clearTimeout(searchTimer.current);
+
+    searchTimer.current = setTimeout(async () => {
+      const seq = ++requestSeq.current;
+      setLoading(true);
+      setError('');
+
+      try {
+        const response = await generalDirectorApi.getBranchManagers({
+          search: search.trim(),
+          branchId,
+          status,
+        });
+        if (seq !== requestSeq.current) return;
+        setBranchManagers(response || []);
+      } catch (err) {
+        if (seq !== requestSeq.current) return;
+        setBranchManagers([]);
+        setError(err.message || 'Không tải được danh sách giám đốc chi nhánh');
+      } finally {
+        if (seq === requestSeq.current) setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(searchTimer.current);
+  }, [search, branchId, status]);
 
   return (
-    <PlaceholderPanel
-      title="Danh sách giám đốc chi nhánh"
-      uc="UC-53"
-      description="Danh sách mẫu để bạn bấm qua các action xem chi tiết, thêm mới và chỉnh sửa giám đốc chi nhánh trước khi cài logic thật."
-      actions={[
-        { label: 'Thêm giám đốc chi nhánh', onClick: () => navigate('/general-director/branch-managers/create') },
-      ]}
-    >
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Danh sách giám đốc chi nhánh</h1>
+          <div className="breadcrumb">General Director / Danh sách giám đốc chi nhánh</div>
+        </div>
+        <div className="page-header-right">
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/general-director/branch-managers/create')}>
+            + Thêm Giám đốc chi nhánh
+          </button>
+        </div>
+      </div>
+
+      <ModuleActionBar />
+
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Danh sách giám đốc chi nhánh toàn hệ thống</h2>
+            <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.8)' }}>
+              Theo dõi giám đốc đang phụ trách từng chi nhánh và quản lý thay đổi nhân sự phụ trách.
+            </p>
+          </div>
+          <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
+            <div style={{ fontSize: 12, opacity: 0.72 }}>Tổng giám đốc chi nhánh</div>
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{branchManagers.length}</div>
+            <div style={{ fontSize: 12, opacity: 0.72, marginTop: 8 }}>Đang hoạt động</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{branchManagers.filter((item) => item.status === 'active').length}</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>👤 {user?.name || 'General Director'}</div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
+          <span className="search-icon">🔍</span>
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo mã, tên, email, điện thoại..." />
+        </div>
+
+        <select className="form-select" value={branchId} onChange={(event) => setBranchId(event.target.value)} style={{ minWidth: 220, height: 42 }}>
+          <option value="all">Tất cả chi nhánh</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.name}</option>
+          ))}
+        </select>
+
+        <select className="form-select" value={status} onChange={(event) => setStatus(event.target.value)} style={{ minWidth: 180, height: 42 }}>
+          {EMPLOYEE_STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          {error}
+        </div>
+      )}
+
       <div className="table-wrapper">
         <table className="data-table">
           <thead>
             <tr>
-              <th>Họ tên</th>
+              <th>Mã quản lý</th>
+              <th>Họ và tên</th>
               <th>Chi nhánh</th>
-              <th>Tài khoản</th>
+              <th>Số điện thoại</th>
+              <th>Email</th>
+              <th>Trạng thái</th>
               <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
-            {previewRows.map((row) => (
-              <tr key={row.id}>
-                <td style={{ fontWeight: 700 }}>{row.name}</td>
-                <td>{row.branch}</td>
-                <td>{row.username}</td>
-                <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button type="button" className="btn btn-info btn-sm" onClick={() => navigate('/general-director/branch-managers/detail')}>
-                    Xem chi tiết
-                  </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate('/general-director/branch-managers/edit')}>
-                    Chỉnh sửa
-                  </button>
+            {loading && (
+              <tr>
+                <td colSpan={7}>
+                  <div className="empty-state" style={{ minHeight: 220 }}>
+                    <div className="empty-state-icon">⏳</div>
+                    <h3>Đang tải danh sách giám đốc chi nhánh</h3>
+                    <p>Vui lòng chờ trong giây lát.</p>
+                  </div>
                 </td>
               </tr>
-            ))}
+            )}
+
+            {!loading && branchManagers.length === 0 && !error && (
+              <tr>
+                <td colSpan={7}>
+                  <div className="empty-state">
+                    <div className="empty-state-icon">📭</div>
+                    <h3>Không có dữ liệu giám đốc chi nhánh</h3>
+                    <p>Không tìm thấy dữ liệu phù hợp với bộ lọc hiện tại.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {!loading && branchManagers.map((row) => {
+              const badge = employeeStatusBadge(row.status);
+              return (
+                <tr key={row.id}>
+                  <td style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--primary-dark)' }}>{row.managerId || row.id}</td>
+                  <td style={{ fontWeight: 700 }}>{row.fullName || '—'}</td>
+                  <td><BranchBadge branch={row.branch} /></td>
+                  <td>{row.phone || '—'}</td>
+                  <td>{row.email || '—'}</td>
+                  <td>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
+                      {badge.label}
+                    </span>
+                  </td>
+                  <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-info btn-sm" onClick={() => navigate(`/general-director/branch-managers/${row.id}`)}>
+                      Xem
+                    </button>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(`/general-director/branch-managers/${row.id}/edit`)}>
+                      Sửa
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+
+        <div className="pagination">
+          <span className="pagination-info">{branchManagers.length} giám đốc chi nhánh</span>
+        </div>
       </div>
-    </PlaceholderPanel>
+    </div>
   );
 }
 
 function BranchManagerDetailPage() {
+  const { id } = useParams();
   const navigate = useNavigate();
+  const [manager, setManager] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadDetail() {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await generalDirectorApi.getBranchManagerById(id);
+        if (!mounted) return;
+        setManager(response || null);
+      } catch (err) {
+        if (!mounted) return;
+        setManager(null);
+        setError(err.message || 'Không tải được chi tiết giám đốc chi nhánh');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    loadDetail();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   return (
-    <PlaceholderPanel
-      title="Chi tiết giám đốc chi nhánh"
-      uc="UC-54"
-      description="Màn hình đích cho action xem chi tiết từ danh sách giám đốc chi nhánh."
-      actions={[
-        { label: 'Quay về danh sách', onClick: () => navigate('/general-director/branch-managers') },
-        { label: 'Sửa thông tin', variant: 'secondary', onClick: () => navigate('/general-director/branch-managers/edit') },
-      ]}
-    >
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
-        <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin cá nhân</div>
-          <DetailRow label="Họ tên" value="Nguyen Van A" />
-          <DetailRow label="Email" value="gdc.q1@autogara.vn" />
-          <DetailRow label="Số điện thoại" value="0901 234 567" />
-          <DetailRow label="Tài khoản" value="gdc_q1" />
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Chi tiết giám đốc chi nhánh</h1>
+          <div className="breadcrumb">General Director / Chi tiết giám đốc chi nhánh</div>
         </div>
-        <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Phân công quản lý</div>
-          <DetailRow label="Chi nhánh" value="Chi nhánh Quận 1" />
-          <DetailRow label="Ngày nhận nhiệm vụ" value="08/07/2026" />
-          <DetailRow label="Trạng thái" value="Đang quản lý" />
+        <div className="page-header-right" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/general-director/branch-managers')}>
+            Quay về danh sách
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => navigate(`/general-director/branch-managers/${id}/edit`)}>
+            Chỉnh sửa
+          </button>
         </div>
       </div>
-    </PlaceholderPanel>
+
+      <ModuleActionBar />
+
+      {loading && (
+        <div className="empty-state" style={{ minHeight: 280, background: 'white', borderRadius: 16, border: '1px solid #E5E7EB' }}>
+          <div className="empty-state-icon">⏳</div>
+          <h3>Đang tải hồ sơ giám đốc chi nhánh</h3>
+        </div>
+      )}
+
+      {!loading && error && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && manager && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 16 }}>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+            <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin cá nhân</div>
+            <DetailRow label="Mã quản lý" value={manager.managerId} />
+            <DetailRow label="Họ tên" value={manager.fullName} />
+            <DetailRow label="Email" value={manager.email} />
+            <DetailRow label="Số điện thoại" value={manager.phone} />
+          </div>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+            <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin công việc</div>
+            <DetailRow label="Chức vụ" value={manager.role?.label || 'Giám đốc chi nhánh'} />
+            <DetailRow label="Chi nhánh" value={manager.branch?.name || '—'} />
+            <DetailRow label="Trạng thái" value={employeeStatusBadge(manager.status).label} />
+            <DetailRow label="Ngày tạo tài khoản" value={formatDate(manager.createdAt)} />
+          </div>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+            <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin tài khoản</div>
+            <DetailRow label="Email đăng nhập" value={manager.email} />
+            <DetailRow label="Vai trò" value={manager.role?.label || 'Giám đốc chi nhánh'} />
+            <DetailRow label="Mã chi nhánh" value={manager.branch?.code || '—'} />
+            <DetailRow label="Địa chỉ chi nhánh" value={manager.branch?.address || '—'} />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 function BranchManagerCreatePage() {
   const navigate = useNavigate();
+  const [branches, setBranches] = useState([]);
+  const [form, setForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+    branchId: '',
+    status: 'active',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadBranches() {
+      setLoading(true);
+      try {
+        const response = await generalDirectorApi.getBranches();
+        if (!mounted) return;
+        setBranches(response || []);
+      } catch (err) {
+        if (!mounted) return;
+        setBranches([]);
+        setError(err.message || 'Không tải được danh sách chi nhánh');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    loadBranches();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleChange = (field) => (event) => {
+    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+
+    try {
+      const created = await generalDirectorApi.createBranchManager(form);
+      navigate(`/general-director/branch-managers/${created.id}`);
+    } catch (err) {
+      setError(err.message || 'Thêm giám đốc chi nhánh thất bại');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <PlaceholderPanel
-      title="Thêm giám đốc chi nhánh"
-      uc="UC-55"
-      description="Form placeholder để nối luồng tạo mới giám đốc chi nhánh và cấp tài khoản hệ thống."
-      actions={[
-        { label: 'Lưu tạm giao diện', onClick: () => navigate('/general-director/branch-managers') },
-        { label: 'Quay về danh sách', variant: 'secondary', onClick: () => navigate('/general-director/branch-managers') },
-      ]}
-    >
-      <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Thêm giám đốc chi nhánh</h1>
+          <div className="breadcrumb">General Director / Thêm giám đốc chi nhánh</div>
+        </div>
+        <div className="page-header-right">
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/general-director/branch-managers')}>
+            Quay về danh sách
+          </button>
+        </div>
+      </div>
+
+      <ModuleActionBar />
+
+      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
+        <div style={{ fontSize: 13, color: '#475569', marginBottom: 14 }}>Tài khoản đăng nhập của giám đốc chi nhánh sử dụng email trong hệ thống hiện tại.</div>
+        {error && (
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+            {error}
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           <div>
             <label className="form-label">Họ tên</label>
-            <input className="form-input" placeholder="Nhập họ tên" readOnly />
+            <input className="form-input" value={form.fullName} onChange={handleChange('fullName')} placeholder="Nhập họ tên" />
           </div>
           <div>
             <label className="form-label">Email</label>
-            <input className="form-input" placeholder="Nhập email" readOnly />
+            <input className="form-input" value={form.email} onChange={handleChange('email')} placeholder="Nhập email" type="email" />
           </div>
           <div>
-            <label className="form-label">Tên đăng nhập</label>
-            <input className="form-input" placeholder="Nhập username" readOnly />
-          </div>
-          <div>
-            <label className="form-label">Mật khẩu</label>
-            <input className="form-input" placeholder="Nhập mật khẩu" readOnly />
+            <label className="form-label">Số điện thoại</label>
+            <input className="form-input" value={form.phone} onChange={handleChange('phone')} placeholder="Nhập số điện thoại" />
           </div>
           <div>
             <label className="form-label">Chi nhánh phụ trách</label>
-            <select className="form-select" disabled>
-              <option>Chọn chi nhánh</option>
+            <select className="form-select" value={form.branchId} onChange={handleChange('branchId')} disabled={loading}>
+              <option value="">Chọn chi nhánh</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>{branch.name}</option>
+              ))}
             </select>
           </div>
           <div>
+            <label className="form-label">Mật khẩu</label>
+            <input className="form-input" value={form.password} onChange={handleChange('password')} placeholder="Nhập mật khẩu" type="password" />
+          </div>
+          <div>
+            <label className="form-label">Xác nhận mật khẩu</label>
+            <input className="form-input" value={form.confirmPassword} onChange={handleChange('confirmPassword')} placeholder="Nhập lại mật khẩu" type="password" />
+          </div>
+          <div>
             <label className="form-label">Trạng thái</label>
-            <select className="form-select" disabled>
-              <option>Kích hoạt</option>
+            <select className="form-select" value={form.status} onChange={handleChange('status')}>
+              <option value="active">Đang làm</option>
+              <option value="inactive">Nghỉ</option>
             </select>
           </div>
         </div>
-      </div>
-    </PlaceholderPanel>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/general-director/branch-managers')}>
+            Hủy
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={saving || loading}>
+            {saving ? 'Đang lưu...' : 'Thêm Giám đốc'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
 function BranchManagerEditPage() {
+  const { id } = useParams();
   const navigate = useNavigate();
+  const [branches, setBranches] = useState([]);
+  const [form, setForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    branchId: '',
+    status: 'active',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadData() {
+      setLoading(true);
+      setError('');
+      try {
+        const [branchResponse, managerResponse] = await Promise.all([
+          generalDirectorApi.getBranches(),
+          generalDirectorApi.getBranchManagerById(id),
+        ]);
+        if (!mounted) return;
+        setBranches(branchResponse || []);
+        setForm({
+          fullName: managerResponse?.fullName || '',
+          email: managerResponse?.email || '',
+          phone: managerResponse?.phone || '',
+          branchId: managerResponse?.branch?.id ? String(managerResponse.branch.id) : '',
+          status: managerResponse?.status || 'active',
+        });
+      } catch (err) {
+        if (!mounted) return;
+        setError(err.message || 'Không tải được thông tin giám đốc chi nhánh');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    loadData();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  const handleChange = (field) => (event) => {
+    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await generalDirectorApi.updateBranchManager(id, form);
+      navigate(`/general-director/branch-managers/${id}`);
+    } catch (err) {
+      setError(err.message || 'Cập nhật giám đốc chi nhánh thất bại');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <PlaceholderPanel
-      title="Chỉnh sửa giám đốc chi nhánh"
-      uc="UC-56"
-      description="Form placeholder để nối luồng cập nhật thông tin hoặc điều chuyển giám đốc sang chi nhánh khác."
-      actions={[
-        { label: 'Cập nhật giả lập', onClick: () => navigate('/general-director/branch-managers/detail') },
-        { label: 'Quay về chi tiết', variant: 'secondary', onClick: () => navigate('/general-director/branch-managers/detail') },
-      ]}
-    >
-      <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Chỉnh sửa giám đốc chi nhánh</h1>
+          <div className="breadcrumb">General Director / Chỉnh sửa giám đốc chi nhánh</div>
+        </div>
+        <div className="page-header-right">
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(`/general-director/branch-managers/${id}`)}>
+            Quay về chi tiết
+          </button>
+        </div>
+      </div>
+
+      <ModuleActionBar />
+
+      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
+        {error && (
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+            {error}
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           <div>
             <label className="form-label">Họ tên</label>
-            <input className="form-input" defaultValue="Nguyen Van A" readOnly />
+            <input className="form-input" value={form.fullName} onChange={handleChange('fullName')} disabled={loading} />
           </div>
           <div>
             <label className="form-label">Email</label>
-            <input className="form-input" defaultValue="gdc.q1@autogara.vn" readOnly />
+            <input className="form-input" value={form.email} onChange={handleChange('email')} disabled={loading} type="email" />
           </div>
           <div>
-            <label className="form-label">Chi nhánh hiện tại</label>
-            <input className="form-input" defaultValue="Chi nhánh Quận 1" readOnly />
+            <label className="form-label">Số điện thoại</label>
+            <input className="form-input" value={form.phone} onChange={handleChange('phone')} disabled={loading} />
           </div>
           <div>
-            <label className="form-label">Điều chuyển sang</label>
-            <select className="form-select" disabled>
-              <option>Chọn chi nhánh mới</option>
+            <label className="form-label">Chi nhánh</label>
+            <select className="form-select" value={form.branchId} onChange={handleChange('branchId')} disabled={loading}>
+              <option value="">Chọn chi nhánh</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>{branch.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Trạng thái</label>
+            <select className="form-select" value={form.status} onChange={handleChange('status')} disabled={loading}>
+              <option value="active">Đang làm</option>
+              <option value="inactive">Nghỉ</option>
             </select>
           </div>
         </div>
-      </div>
-    </PlaceholderPanel>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(`/general-director/branch-managers/${id}`)}>
+            Hủy
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={saving || loading}>
+            {saving ? 'Đang cập nhật...' : 'Cập nhật thông tin'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -1575,7 +1912,7 @@ function SettlementReportsPage() {
             <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>General Director</div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Xem tất cả phiếu quyết toán từ mọi chi nhánh</h2>
             <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.8)' }}>
-              Dữ liệu được tải trực tiếp từ SQL Server, có tìm kiếm theo mã phiếu, biển số, khách hàng và lọc theo trạng thái/chi nhánh.
+              Theo dõi phiếu quyết toán trên toàn hệ thống với bộ lọc theo mã phiếu, khách hàng, trạng thái và chi nhánh.
             </p>
           </div>
           <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
@@ -1655,7 +1992,7 @@ function SettlementReportsPage() {
                 <td colSpan={11}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
                     <div className="empty-state-icon">⏳</div>
-                    <h3>Đang tải dữ liệu từ SQL Server</h3>
+                    <h3>Đang tải dữ liệu</h3>
                     <p>Vui lòng chờ trong giây lát.</p>
                   </div>
                 </td>
@@ -1745,9 +2082,9 @@ export default function GeneralDirectorPage() {
       <Route path="employees" element={<EmployeeListPage />} />
       <Route path="technicians" element={<TechnicianListPage />} />
       <Route path="branch-managers" element={<BranchManagerListPage />} />
-      <Route path="branch-managers/detail" element={<BranchManagerDetailPage />} />
       <Route path="branch-managers/create" element={<BranchManagerCreatePage />} />
-      <Route path="branch-managers/edit" element={<BranchManagerEditPage />} />
+      <Route path="branch-managers/:id" element={<BranchManagerDetailPage />} />
+      <Route path="branch-managers/:id/edit" element={<BranchManagerEditPage />} />
       <Route path="*" element={<Navigate to="reports/settlements" replace />} />
     </Routes>
   );

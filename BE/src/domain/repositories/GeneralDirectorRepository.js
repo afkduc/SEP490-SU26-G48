@@ -30,6 +30,22 @@ class GeneralDirectorRepository {
   async getTechnicianById() {
     throw new Error('Not implemented');
   }
+
+  async listBranchManagers() {
+    throw new Error('Not implemented');
+  }
+
+  async getBranchManagerById() {
+    throw new Error('Not implemented');
+  }
+
+  async createBranchManager() {
+    throw new Error('Not implemented');
+  }
+
+  async updateBranchManager() {
+    throw new Error('Not implemented');
+  }
 }
 
 module.exports = GeneralDirectorRepository;

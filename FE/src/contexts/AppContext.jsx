@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { loginApi } from '../services/authApi';
+import { ROLES } from '../constants/roles';
 
 const AppContext = createContext(null);
 
@@ -12,6 +13,31 @@ function loadSession() {
     /* ignore */
   }
   return { token: null, user: null };
+}
+
+/**
+ * Chuyen roles ve dang array of string, ho tro ca 2 format:
+ * - `['admin']` (string array)
+ * - `[{ roleId: 1, roleName: 'admin' }]` (object array)
+ */
+export function normalizeRoles(roles) {
+  if (!Array.isArray(roles)) return [];
+  return roles
+    .map((r) => (typeof r === 'string' ? r : r?.roleName))
+    .filter((name) => typeof name === 'string' && name.trim().length > 0);
+}
+
+/**
+ * Tra ve path home phu hop nhat theo thu tu role (admin uu tien cao nhat)
+ */
+export function getRoleHome(user) {
+  const roles = normalizeRoles(user?.roles);
+  if (!roles.length) return '/dashboard';
+  if (roles.includes(ROLES.ADMIN)) return '/admin/dashboard';
+  if (roles.includes(ROLES.GENERAL_DIRECTOR)) return '/general-director';
+  if (roles.includes(ROLES.MANAGER)) return '/manager';
+  if (roles.includes(ROLES.WAREHOUSE_STAFF) || roles.includes(ROLES.ACCOUNTANT)) return '/inventory';
+  return '/dashboard';
 }
 
 export function AppProvider({ children }) {
