@@ -6,41 +6,48 @@ const { validateListUsersQuery } = require('../validators/adminUserValidator');
 /**
  * Admin routes - chi danh cho user co role admin
  *
- * GET /api/admin/dashboard
- *   - Tra ve thong ke tong quan cho admin
- *
- * GET /api/admin/users
- *   Query params (all optional):
- *     - search    : chuoi tim kiem theo user_name/email/full_name (LIKE)
- *     - branchId  : ID chi nhanh (so nguyen duong)
- *     - roleId    : ten role (role_name) - loc user co role do
- *     - status    : active | inactive | locked
- *     - page      : so trang (mac dinh 1, >= 1)
- *     - pageSize  : so ban ghi moi trang (mac dinh 10, 1-100)
- *   Response: { items, total, page, pageSize }
- *
- * GET /api/admin/branches
- *   - Tra ve danh sach chi nhanh (id, branchName) de dung cho filter dropdown
- *   Response: { items: [{id, branchName}], total }
- *
- * GET /api/admin/roles
- *   - Tra ve danh sach role (id, roleName) de dung cho filter dropdown
- *   - Roles nay cung duoc dung chung cho UC-11 (phan quyen user)
- *   Response: { items: [{id, roleName}], total }
+ * POST /api/admin/reissue-token       -- cap lai JWT voi day du roles tu DB
+ * GET  /api/admin/dashboard
+ * GET  /api/admin/users
+ * GET  /api/admin/users/:id
+ * POST /api/admin/users
+ * PUT  /api/admin/users/:id
+ * GET  /api/admin/branches
+ * GET  /api/admin/roles              -- UC-11: list all roles
+ * GET  /api/admin/roles/:id         -- UC-11: role detail
+ * GET  /api/admin/users/:userId/roles       -- UC-12: roles of user
+ * POST /api/admin/users/:userId/roles       -- UC-12: assign role(s) to user
+ * DEL  /api/admin/users/:userId/roles/:roleId -- UC-12: revoke 1 role
  */
 function buildAdminRouter() {
   const router = express.Router();
   const controller = new AdminController();
 
+  // Endpoint reissue-token dat TRUOC requireAdmin de user co token cu (thieu role admin)
+  // van co the goi va lay token moi co day du roles tu DB.
+  router.post('/reissue-token', authenticate, controller.reissueToken);
+
   router.use(authenticate, requireAdmin);
 
   router.get('/dashboard', controller.getDashboardStats);
+
+  // Users
   router.get('/users', validateListUsersQuery, controller.listUsers);
   router.get('/users/:id', controller.getUserDetail);
   router.post('/users', controller.createUser);
   router.put('/users/:id', controller.updateUser);
+
+  // Branches
   router.get('/branches', controller.listBranches);
+
+  // Roles (UC-11)
   router.get('/roles', controller.listRoles);
+  router.get('/roles/:id', controller.getRoleDetail);
+
+  // User roles (UC-12)
+  router.get('/users/:userId/roles', controller.getUserRoles);
+  router.post('/users/:userId/roles', controller.assignRoles);
+  router.delete('/users/:userId/roles/:roleId', controller.revokeRole);
 
   return router;
 }

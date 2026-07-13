@@ -1,6 +1,21 @@
 const ApiError = require('../../utils/ApiError');
 const ProductResponseDto = require('../dto/ProductResponseDto');
 
+/**
+ * ProductService - quan ly phu tung.
+ * Luu y: KHONG cap nhat stock_quantity qua service nay - stock chi duoc
+ * thay doi qua cac thao tac nhap/xuat kho (se lam o phase sau).
+ */
+const STOCK_FIELDS_NOT_ALLOWED = ['stockQuantity', 'stock_quantity'];
+
+function stripStockFields(payload) {
+  const out = { ...payload };
+  for (const f of STOCK_FIELDS_NOT_ALLOWED) {
+    delete out[f];
+  }
+  return out;
+}
+
 class ProductService {
   constructor({ productRepository }) {
     this.productRepository = productRepository;
@@ -25,8 +40,8 @@ class ProductService {
     return ProductResponseDto.fromEntity(product);
   }
 
-  async getProductByCode(code) {
-    const product = await this.productRepository.findByCode(code);
+  async getProductByCode(code, branchId) {
+    const product = await this.productRepository.findByCode(code, branchId);
     if (!product) throw new ApiError(404, 'Product not found');
     return ProductResponseDto.fromEntity(product);
   }
@@ -38,11 +53,16 @@ class ProductService {
     if (!payload.productCode) {
       throw new ApiError(400, 'Product code is required');
     }
-    const existing = await this.productRepository.findByCode(payload.productCode);
-    if (existing) {
-      throw new ApiError(409, 'Product code already exists');
+    if (!payload.branchId) {
+      throw new ApiError(400, 'branchId is required');
     }
-    const product = await this.productRepository.create(payload);
+    const existing = await this.productRepository.findByCode(payload.productCode, payload.branchId);
+    if (existing) {
+      throw new ApiError(409, 'Product code already exists in this branch');
+    }
+    // Dam bao stock_quantity luon bat dau tu 0 khi tao moi (khi chua co phieu nhap).
+    const safePayload = stripStockFields(payload);
+    const product = await this.productRepository.create(safePayload);
     return ProductResponseDto.fromEntity(product);
   }
 
@@ -51,11 +71,16 @@ class ProductService {
     if (!existing) throw new ApiError(404, 'Product not found');
 
     if (payload.productCode && payload.productCode !== existing.productCode) {
-      const dup = await this.productRepository.findByCode(payload.productCode);
-      if (dup) throw new ApiError(409, 'Product code already exists');
+      const dup = await this.productRepository.findByCode(
+        payload.productCode,
+        existing.branchId,
+      );
+      if (dup) throw new ApiError(409, 'Product code already exists in this branch');
     }
 
-    const product = await this.productRepository.update(id, payload);
+    // Loai bo stock khoi payload de khong cho sua qua API nay.
+    const safePayload = stripStockFields(payload);
+    const product = await this.productRepository.update(id, safePayload);
     return ProductResponseDto.fromEntity(product);
   }
 

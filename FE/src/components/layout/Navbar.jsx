@@ -1,19 +1,10 @@
-import { useState, useRef } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+﻿import { useState, useRef } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
 import './Navbar.css';
 
-const DEFAULT_NAV = [
-  { label: 'Dashboard', path: '/dashboard' },
-  { label: 'Kho', path: '/inventory' },
-  { label: 'Quyết toán sửa chữa', path: '/repair-settlement' },
-  { label: 'Bảo dưỡng', path: '/maintenance' },
-  { label: 'Chăm sóc khách hàng', path: '/customer-care' },
-  { label: 'Khách hàng', path: '/customers' },
-  { label: 'Dịch vụ', path: '/services' },
-];
-
+// ===== Admin =====
 const ADMIN_NAV = [
   { label: 'Dashboard', path: '/admin/dashboard', icon: '📊' },
   {
@@ -21,7 +12,7 @@ const ADMIN_NAV = [
     icon: '👥',
     children: [
       { label: 'Danh sách User', path: '/admin/users' },
-      { label: 'Thêm User', path: '/admin/users/create' },
+      { label: 'Thêm User', path: '/admin/users?create=true' },
     ],
   },
   {
@@ -29,7 +20,7 @@ const ADMIN_NAV = [
     icon: '🛡️',
     children: [
       { label: 'Danh sách Role', path: '/admin/roles' },
-      { label: 'Phân quyền', path: '/admin/roles/permissions' },
+      { label: 'Phân quyền', path: '/admin/users' },
     ],
   },
   {
@@ -37,17 +28,13 @@ const ADMIN_NAV = [
     icon: '📜',
     children: [
       { label: 'Nhật ký hoạt động', path: '/admin/logs' },
-      { label: 'Lịch sử đăng nhập', path: '/admin/logs/login' },
     ],
   },
 ];
 
+// ===== Service Advisor =====
 const SERVICE_ADVISOR_NAV = [
-  {
-    label: 'Dashboard',
-    path: '/dashboard',
-    icon: '📊',
-  },
+  { label: 'Dashboard', path: '/dashboard', icon: '📊' },
   {
     label: 'Quyết toán sửa chữa',
     icon: '📋',
@@ -79,6 +66,7 @@ const SERVICE_ADVISOR_NAV = [
   },
 ];
 
+// ===== Manager =====
 const MANAGER_NAV = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Kho', path: '/inventory' },
@@ -102,14 +90,51 @@ const MANAGER_NAV = [
   },
 ];
 
+// ===== Warehouse Staff (Nhan vien kho) - chi thay cac chuc nang lien quan den kho =====
+const WAREHOUSE_STAFF_NAV = [
+  { label: 'Tong quan kho', path: '/inventory', icon: '🏠', end: true },
+  {
+    label: 'Phu tung',
+    icon: '📦',
+    children: [
+      { label: 'Danh sach phu tung', path: '/inventory/parts' },
+    ],
+  },
+  { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
+  { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
+];
+
+// ===== Accountant (Ke toan) - chi xem kho, khong dropdown =====
+const ACCOUNTANT_NAV = [
+  { label: 'Tong quan kho', path: '/inventory', icon: '🏠' },
+  { label: 'Phu tung', path: '/inventory/parts', icon: '📦' },
+  { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
+  { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
+];
+
+// ===== General Director (Giam doc) - xem bao cao tong quan, co dropdown =====
+const GENERAL_DIRECTOR_NAV = [
+  { label: 'Tong quan kho', path: '/inventory', icon: '🏠', end: true },
+  { label: 'Phu tung', path: '/inventory/parts', icon: '📦' },
+  { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
+  { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
+];
+
 const NAV_ITEMS_BY_ROLE = {
   [ROLES.ADMIN]: ADMIN_NAV,
-  general_director: DEFAULT_NAV,
+  general_director: GENERAL_DIRECTOR_NAV,
   manager: MANAGER_NAV,
   service_advisor: SERVICE_ADVISOR_NAV,
-  warehouse_staff: DEFAULT_NAV,
-  accountant: DEFAULT_NAV,
+  warehouse_staff: WAREHOUSE_STAFF_NAV,
+  accountant: ACCOUNTANT_NAV,
 };
+
+// Cac role co dropdown (vi cac role khac chi co 1-2 muc khong can dropdown).
+const ROLES_WITH_DROPDOWN = new Set([
+  ROLES.ADMIN,
+  'service_advisor',
+  'manager',
+]);
 
 function getInitials(name = '') {
   const parts = name.trim().split(' ');
@@ -117,7 +142,7 @@ function getInitials(name = '') {
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function NavDropdownItem({ item }) {
+function NavDropdownItem({ item, currentPath }) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef(null);
 
@@ -130,12 +155,29 @@ function NavDropdownItem({ item }) {
     timeoutRef.current = setTimeout(() => setOpen(false), 120);
   };
 
+  // So sanh exact match (bo qua query string o ca 2 phia) de tranh
+  // truong hop /admin/logs?tab=login khong bi match nham voi child /admin/logs.
+  const isPathMatch = (configPath) => {
+    const [baseConfig] = configPath.split('?');
+    const [baseCurrent] = currentPath.split('?');
+    return baseConfig === baseCurrent;
+  };
+
+  // Khi dropdown co children, parent duoc active neu bat ky child nao khop currentPath.
+  const isParentActive = item.children
+    ? item.children.some((c) => isPathMatch(c.path))
+    : false;
+
+  // Tu dong mo dropdown neu parent dang active de nguoi dung thay minh dang o day.
+  const effectiveOpen = open || isParentActive;
+
   if (!item.children) {
     return (
       <NavLink
         to={item.path}
+        end={item.end}
         className={({ isActive }) =>
-          'navbar__link' + (isActive ? ' navbar__link--active' : '')
+          'navbar__link' + ((isActive || isPathMatch(item.path)) ? ' navbar__link--active' : '')
         }
       >
         {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
@@ -146,30 +188,37 @@ function NavDropdownItem({ item }) {
 
   return (
     <div
-      className="navbar__dropdown-wrapper"
+      className={`navbar__dropdown-wrapper${isParentActive ? ' navbar__dropdown-wrapper--active' : ''}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <button className="navbar__link navbar__link-btn">
+      <button
+        className={
+          'navbar__link navbar__link-btn' + (isParentActive ? ' navbar__link--active' : '')
+        }
+      >
         {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
         {item.label}
         <span className="navbar__link-caret">▼</span>
       </button>
 
-      {open && (
+      {effectiveOpen && (
         <div className="navbar__nav-dropdown">
-          {item.children.map((child) => (
-            <NavLink
-              key={child.path}
-              to={child.path}
-              className={({ isActive }) =>
-                'navbar__nav-dropdown-item' + (isActive ? ' navbar__nav-dropdown-item--active' : '')
-              }
-              onClick={() => setOpen(false)}
-            >
-              {child.label}
-            </NavLink>
-          ))}
+          {item.children.map((child) => {
+            const childActive = isPathMatch(child.path);
+            return (
+              <NavLink
+                key={child.path}
+                to={child.path}
+                className={
+                  'navbar__nav-dropdown-item' + (childActive ? ' navbar__nav-dropdown-item--active' : '')
+                }
+                onClick={() => setOpen(false)}
+              >
+                {child.label}
+              </NavLink>
+            );
+          })}
         </div>
       )}
     </div>
@@ -179,15 +228,12 @@ function NavDropdownItem({ item }) {
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const navItems = NAV_ITEMS_BY_ROLE[user?.primaryRole] ?? DEFAULT_NAV;
-  const supportsDropdown =
-    user?.primaryRole === 'service_advisor' ||
-    user?.primaryRole === ROLES.ADMIN ||
-    user?.primaryRole === 'manager';
-  const isServiceAdvisor = user?.primaryRole === 'service_advisor';
-  const isAdmin = user?.primaryRole === ROLES.ADMIN;
+  const role = user?.primaryRole;
+  const navItems = NAV_ITEMS_BY_ROLE[role] ?? [];
+  const supportsDropdown = ROLES_WITH_DROPDOWN.has(role);
 
   const handleLogout = () => {
     logout();
@@ -208,12 +254,13 @@ export default function Navbar() {
       <nav className="navbar__nav">
         {supportsDropdown
           ? navItems.map((item) => (
-              <NavDropdownItem key={item.label} item={item} />
+              <NavDropdownItem key={item.label} item={item} currentPath={location.pathname} />
             ))
           : navItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
+                end={item.end}
                 className={({ isActive }) =>
                   'navbar__link' + (isActive ? ' navbar__link--active' : '')
                 }
