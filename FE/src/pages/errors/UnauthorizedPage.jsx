@@ -2,29 +2,32 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common';
 import './UnauthorizedPage.css';
+import { useAuth } from '../../contexts/AppContext';
+import { getRoleHome } from '../../contexts/AppContext';
 
 export default function UnauthorizedPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    document.title = 'Không có quyền truy cập | SEP490-G48';
+    document.title = 'Khong co quyen truy cap | SEP490-G48';
   }, []);
 
   const handleGoHome = () => {
-    navigate('/dashboard');
+    navigate(getRoleHome(user), { replace: true });
   };
 
   return (
     <div className="unauthorized-page">
       <div className="unauthorized-card">
         <div className="unauthorized-icon" aria-hidden="true">🚫</div>
-        <h1 className="unauthorized-title">Không có quyền truy cập</h1>
+        <h1 className="unauthorized-title">Khong co quyen truy cap</h1>
         <p className="unauthorized-desc">
-          Bạn không có quyền truy cập vào trang này. Vui lòng liên hệ quản trị viên
-          nếu bạn cho rằng đây là sai sót.
+          Ban khong co quyen truy cap vao trang nay. Vui long lien he quan tri vien
+          neu ban cho rang day la sai sot.
         </p>
         <Button variant="primary" onClick={handleGoHome}>
-          Về trang chủ
+          Ve trang chu
         </Button>
       </div>
     </div>

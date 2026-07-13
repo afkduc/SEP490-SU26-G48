@@ -20,6 +20,16 @@ class ManagerController {
     this.updateServicePackage = this.updateServicePackage.bind(this);
     this.getSettlementReports = this.getSettlementReports.bind(this);
     this.getSettlementReportById = this.getSettlementReportById.bind(this);
+    this.getSpecialties = this.getSpecialties.bind(this);
+    this.getTeamLeaderOptions = this.getTeamLeaderOptions.bind(this);
+    this.getTechnicians = this.getTechnicians.bind(this);
+    this.getTechnicianById = this.getTechnicianById.bind(this);
+    this.createTechnician = this.createTechnician.bind(this);
+    this.updateTechnician = this.updateTechnician.bind(this);
+    this.getTeamLeaders = this.getTeamLeaders.bind(this);
+    this.getTeamLeaderById = this.getTeamLeaderById.bind(this);
+    this.createTeamLeader = this.createTeamLeader.bind(this);
+    this.updateTeamLeader = this.updateTeamLeader.bind(this);
   }
 
   async getBranch(req, res, next) {
@@ -184,6 +194,103 @@ class ManagerController {
     try {
       const data = await this.managerService.getSettlementReportById(req.user.branchId, req.params.id);
       return success(res, data, 'Lấy chi tiết phiếu quyết toán thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getSpecialties(req, res, next) {
+    try {
+      const data = await this.managerService.listSpecialties();
+      return success(res, data, 'Lấy danh sách chuyên môn thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getTeamLeaderOptions(req, res, next) {
+    try {
+      const data = await this.managerService.listTeamLeaderOptions(req.user.branchId);
+      return success(res, data, 'Lấy danh sách tổ trưởng thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getTechnicians(req, res, next) {
+    try {
+      const data = await this.managerService.listTechnicians(req.user.branchId, {
+        search: req.query.search || req.query.q || '',
+        status: req.query.status || 'all',
+        teamLeaderId: req.query.teamLeaderId || 'all',
+      });
+      return success(res, data, 'Lấy danh sách thợ máy thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getTechnicianById(req, res, next) {
+    try {
+      const data = await this.managerService.getTechnicianById(req.user.branchId, req.params.id);
+      return success(res, data, 'Lấy chi tiết thợ máy thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createTechnician(req, res, next) {
+    try {
+      const data = await this.managerService.createTechnician(req.user.branchId, req.body);
+      return success(res, data, 'Thêm thợ máy thành công', 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateTechnician(req, res, next) {
+    try {
+      const data = await this.managerService.updateTechnician(req.user.branchId, req.params.id, req.body);
+      return success(res, data, 'Cập nhật thợ máy thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getTeamLeaders(req, res, next) {
+    try {
+      const data = await this.managerService.listTeamLeaders(req.user.branchId, {
+        search: req.query.search || req.query.q || '',
+        status: req.query.status || 'all',
+      });
+      return success(res, data, 'Lấy danh sách tổ trưởng thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getTeamLeaderById(req, res, next) {
+    try {
+      const data = await this.managerService.getTeamLeaderById(req.user.branchId, req.params.id);
+      return success(res, data, 'Lấy chi tiết tổ trưởng thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createTeamLeader(req, res, next) {
+    try {
+      const data = await this.managerService.createTeamLeader(req.user.branchId, req.body);
+      return success(res, data, 'Thêm tổ trưởng thành công', 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateTeamLeader(req, res, next) {
+    try {
+      const data = await this.managerService.updateTeamLeader(req.user.branchId, req.params.id, req.body);
+      return success(res, data, 'Cập nhật tổ trưởng thành công');
     } catch (err) {
       next(err);
     }

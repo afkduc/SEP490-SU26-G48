@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
+import RoleAwareRedirect from '../components/RoleAwareRedirect';
 import AppLayout from '../components/layout/AppLayout';
+import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 
@@ -15,6 +17,11 @@ const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralD
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
+const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
+const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
+const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
+const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
+const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
@@ -57,9 +64,9 @@ function AppRoutes() {
           path="/admin/dashboard"
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AppLayout>
+              <AdminLayout>
                 <AdminDashboardPage />
-              </AppLayout>
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -67,9 +74,63 @@ function AppRoutes() {
           path="/admin/users"
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AppLayout>
+              <AdminLayout>
                 <AdminUsersPage />
-              </AppLayout>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/roles"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AdminRolesPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/logs"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AuditLogsPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/logs/login"
+          element={<Navigate to="/admin/logs?tab=login" replace />}
+        />
+        <Route
+          path="/admin/profile"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AdminProfilePage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile/devices"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <LoginSessionsPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile/notifications"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AdminProfileNotificationsPage />
+              </AdminLayout>
             </ProtectedRoute>
           }
         />
@@ -170,7 +231,7 @@ function AppRoutes() {
         ))}
 
         {/* Redirects */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<RoleAwareRedirect />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
@@ -178,4 +239,3 @@ function AppRoutes() {
 }
 
 export default AppRoutes;
-export { LoginPage, DashboardPage, NotFoundPage };
