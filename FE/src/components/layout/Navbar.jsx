@@ -94,25 +94,12 @@ const MANAGER_NAV = [
   },
 ];
 
-// ===== Warehouse Staff (Nhan vien kho) - chi thay cac chuc nang lien quan den kho =====
+// ===== Warehouse Staff (Nhan vien kho) - menu phang, khong dropdown =====
 const WAREHOUSE_STAFF_NAV = [
   { label: 'Tong quan kho', path: '/inventory', icon: '🏠', end: true },
-  {
-    label: 'Phu tung',
-    icon: '📦',
-    children: [
-      { label: 'Danh sach phu tung', path: '/inventory/parts' },
-    ],
-  },
+  { label: 'Phu tung', path: '/inventory/parts', icon: '📦' },
   { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
-  {
-    label: 'Phieu nhap',
-    icon: '📥',
-    children: [
-      { label: 'Danh sach phieu nhap', path: '/inventory/import-requests' },
-      { label: 'Tao phieu nhap', path: '/inventory/import-requests/new' },
-    ],
-  },
+  { label: 'Phieu nhap', path: '/inventory/import-requests', icon: '📥' },
   { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
 ];
 
