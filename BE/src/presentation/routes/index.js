@@ -12,6 +12,7 @@ const buildRepairSettlementRouter = require('./repairSettlementRoutes');
 const buildRepairOrderRouter = require('./repairOrderRoutes');
 const buildGeneralDirectorRouter = require('./generalDirectorRoutes');
 const buildManagerRouter = require('./managerRoutes');
+const buildCustomerRouter = require('./customerRoutes');
 const buildAuditRouter = require('./auditRoutes');
 const buildProfileRouter = require('./profileRoutes');
 
@@ -33,6 +34,7 @@ router.use('/repair-settlements', buildRepairSettlementRouter());
 router.use('/repair-orders', buildRepairOrderRouter());
 router.use('/general-director', buildGeneralDirectorRouter());
 router.use('/manager', buildManagerRouter());
+router.use('/customers', buildCustomerRouter());
 router.use('/audit', buildAuditRouter());
 router.use('/profile', buildProfileRouter());
 
