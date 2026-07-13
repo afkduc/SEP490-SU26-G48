@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AppContext';
 import { useStock } from '../../hooks/inventory/useStock';
 import './StockPage.css';
 
@@ -11,10 +12,20 @@ function formatVND(value) {
 }
 
 export default function StockPage() {
+  const { user } = useAuth();
+  const branchId = user?.branchId;
   const {
     stockList, lowStock, summary, loading, error,
     params, setSearch, setCategory, setLowStockOnly, setPage, refetch,
-  } = useStock();
+  } = useStock(branchId);
+
+  if (!branchId) {
+    return (
+      <div className="stock-page__error">
+        Tai khoan chua duoc gan chi nhanh - lien quan admin de duoc cap nhat.
+      </div>
+    );
+  }
 
   if (loading && !stockList.items.length) {
     return <div className="stock-page__loading">Dang tai du lieu ton kho...</div>;
@@ -78,9 +89,9 @@ export default function StockPage() {
               <tbody>
                 {lowStock.slice(0, 5).map((p) => (
                   <tr key={p.id}>
-                    <td><span className="font-mono">{p.partCode}</span></td>
+                    <td><span className="font-mono">{p.productCode ?? p.partCode}</span></td>
                     <td>
-                      <Link to={`/inventory/parts/${p.id}`}>{p.partName}</Link>
+                      <Link to={`/inventory/parts/${p.id}`}>{p.productName ?? p.partName}</Link>
                     </td>
                     <td className="text-right text-danger">{p.stockQuantity}</td>
                     <td className="text-right">{p.minStock}</td>
@@ -180,9 +191,9 @@ export default function StockPage() {
                   const isLow = p.stockQuantity <= p.minStock;
                   return (
                     <tr key={p.id} className={isLow ? 'row--low-stock' : ''}>
-                      <td><span className="font-mono">{p.partCode}</span></td>
+                      <td><span className="font-mono">{p.productCode ?? p.partCode}</span></td>
                       <td>
-                        <Link to={`/inventory/parts/${p.id}`}>{p.partName}</Link>
+                        <Link to={`/inventory/parts/${p.id}`}>{p.productName ?? p.partName}</Link>
                       </td>
                       <td>{p.category || '—'}</td>
                       <td>{p.unit || '—'}</td>

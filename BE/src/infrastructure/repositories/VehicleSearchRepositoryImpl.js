@@ -2,9 +2,12 @@ const VehicleSearchRepository = require('../../domain/repositories/VehicleSearch
 const { query } = require('../database/sqlServer');
 
 class VehicleSearchRepositoryImpl extends VehicleSearchRepository {
-  async searchByCustomerOrVehicle(term) {
+  // Lay het (khong loc WHERE) - viec loc khong-dau tieng Viet lam o tang
+  // Service bang normalizeVietnamese, vi SQL Server LIKE phan biet dau
+  // (Vietnamese_CI_AS chi bo dau co ban, khong gop u/ơ ve u/o hay đ ve d).
+  async findAllCustomerVehicleRows() {
     const result = await query(
-      `SELECT TOP 10
+      `SELECT TOP 500
               c.id            AS customer_id,
               c.full_name,
               c.phone,
@@ -29,13 +32,7 @@ class VehicleSearchRepositoryImpl extends VehicleSearchRepository {
            WHERE  w.vehicle_id = v.id
            ORDER  BY w.purchase_date DESC
        ) wr
-       WHERE  c.full_name     LIKE @term
-          OR  c.phone         LIKE @term
-          OR  v.license_plate LIKE @term
-          OR  v.frame_number  LIKE @term
-          OR  v.engine_number LIKE @term
-       ORDER  BY c.full_name`,
-      { term: `%${term}%` }
+       ORDER  BY c.full_name`
     );
     return result.recordset;
   }

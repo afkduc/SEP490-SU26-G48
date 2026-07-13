@@ -18,6 +18,10 @@ class RepairOrderRepository {
   async create(data, { branchId, createdBy }) {
     throw new Error('Method create() must be implemented');
   }
+
+  async updateStatus(id, status) {
+    throw new Error('Method updateStatus() must be implemented');
+  }
 }
 
 module.exports = RepairOrderRepository;

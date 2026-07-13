@@ -1,5 +1,5 @@
 class VehicleSearchRepository {
-  async searchByCustomerOrVehicle(term) {
+  async findAllCustomerVehicleRows() {
     throw new Error('Not implemented');
   }
 }
