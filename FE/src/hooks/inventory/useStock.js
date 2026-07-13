@@ -2,10 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   getStockListApi,
   getLowStockApi,
-  getStockSummaryByCategoryApi,
-} from '../../services/partMockApi';
-
-const DEFAULT_BRANCH_ID = 1;
+  getStockSummaryApi,
+} from '../../services/inventoryApi';
 
 /**
  * Quan ly trang thai trang Ton kho:
@@ -15,7 +13,7 @@ const DEFAULT_BRANCH_ID = 1;
  *
  * Tat ca cac query dong thoi khi mount / khi params thay doi (Promise.all).
  */
-export function useStock(initialBranchId = DEFAULT_BRANCH_ID) {
+export function useStock(initialBranchId) {
   const [params, setParams] = useState({
     branchId: initialBranchId,
     search: '',
@@ -27,24 +25,35 @@ export function useStock(initialBranchId = DEFAULT_BRANCH_ID) {
 
   const [stockList, setStockList] = useState({ items: [], total: 0, page: 1, limit: 20 });
   const [lowStock, setLowStock] = useState([]);
-  const [summary, setSummary] = useState({ summary: [], totalProducts: 0, totalQuantity: 0, totalValue: 0 });
+  const [summary, setSummary] = useState({
+    summary: [],
+    totalProducts: 0,
+    totalQuantity: 0,
+    totalValue: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const { branchId, search, category, lowStockOnly, page, limit } = params;
 
   const fetchAll = useCallback(async () => {
+    if (!branchId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const [listRes, lowRes, summaryRes] = await Promise.all([
         getStockListApi({ branchId, search, category, lowStockOnly, page, limit }),
         getLowStockApi(branchId),
-        getStockSummaryByCategoryApi(),
+        getStockSummaryApi(branchId),
       ]);
-      setStockList(listRes.data);
-      setLowStock(lowRes.data.items);
-      setSummary(summaryRes.data);
+      setStockList(listRes || { items: [], total: 0, page, limit });
+      setLowStock((lowRes && lowRes.items) || []);
+      setSummary(
+        summaryRes || { summary: [], totalProducts: 0, totalQuantity: 0, totalValue: 0 },
+      );
     } catch (err) {
       setError(err.message);
     } finally {

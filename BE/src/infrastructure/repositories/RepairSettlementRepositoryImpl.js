@@ -49,10 +49,25 @@ function itemTypeFor(lhsc) {
 }
 
 class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
-  async findAll({ branchId, status, search, page = 1, limit = 20 } = {}) {
+  // customerId/vehicleId dung cho man "Lich su bao duong" (theo khach hang / theo
+  // xe) - xem toan bo lich su bat ke chi nhanh nao, nen KHONG loc theo branchId
+  // trong 2 truong hop nay. Khi khong truyen customerId/vehicleId (man danh sach
+  // phieu quyet toan cua co van dich vu) thi van bat buoc loc theo branchId nhu cu.
+  async findAll({ branchId, status, search, customerId, vehicleId, page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
-    let sqlText = `${HEADER_SELECT} WHERE so.branch_id = @branchId`;
-    const params = { branchId };
+    const params = {};
+    let sqlText = `${HEADER_SELECT} WHERE `;
+
+    if (customerId) {
+      params.customerId = customerId;
+      sqlText += `so.customer_id = @customerId`;
+    } else if (vehicleId) {
+      params.vehicleId = vehicleId;
+      sqlText += `so.vehicle_id = @vehicleId`;
+    } else {
+      params.branchId = branchId;
+      sqlText += `so.branch_id = @branchId`;
+    }
 
     if (status) {
       params.status = status;
@@ -71,15 +86,25 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.recordset.map((row) => RepairSettlement.fromPersistence(row, []));
   }
 
-  async count({ branchId, status, search } = {}) {
+  async count({ branchId, status, search, customerId, vehicleId } = {}) {
+    const params = {};
     let sqlText = `
       SELECT COUNT(*) AS total
       FROM   service_orders so
       JOIN   customers c ON c.id = so.customer_id
       JOIN   vehicles  v ON v.id = so.vehicle_id
-      WHERE  so.branch_id = @branchId
-    `;
-    const params = { branchId };
+      WHERE  `;
+
+    if (customerId) {
+      params.customerId = customerId;
+      sqlText += `so.customer_id = @customerId`;
+    } else if (vehicleId) {
+      params.vehicleId = vehicleId;
+      sqlText += `so.vehicle_id = @vehicleId`;
+    } else {
+      params.branchId = branchId;
+      sqlText += `so.branch_id = @branchId`;
+    }
 
     if (status) {
       params.status = status;
@@ -198,11 +223,18 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return this.findById(id);
   }
 
-  async updateStatus(id, status, { issuedBy } = {}) {
+  async updateStatus(id, status, { issuedBy, cancelReason } = {}) {
     await runInTransaction(async (tx) => {
       if (status === 'waiting_payment') {
         await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
           .query(`UPDATE service_orders SET status = @status, completed_date = GETDATE() WHERE id = @id`);
+        return;
+      }
+
+      if (status === 'cancelled') {
+        await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
+          .input('cancelReason', sql.NVarChar(500), cancelReason || null)
+          .query(`UPDATE service_orders SET status = @status, cancel_reason = @cancelReason WHERE id = @id`);
         return;
       }
 
@@ -245,12 +277,13 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .request()
         .input('serviceOrderId', sql.BigInt, serviceOrderId)
         .input('itemType', sql.VarChar(10), itemTypeFor(item.lhsc))
+        .input('productId', sql.BigInt, item.productId || null)
         .input('serviceId', sql.BigInt, item.serviceId || null)
         .input('itemCode', sql.VarChar(30), item.code || null)
         .input('itemDescription', sql.NVarChar(300), item.description)
         .input('lhsc', sql.VarChar(10), item.lhsc)
         .input('httt', sql.VarChar(10), item.httt)
-        .input('unit', sql.VarChar(20), item.unit || null)
+        .input('unit', sql.NVarChar(20), item.unit || null)
         .input('quantity', sql.Int, item.qty || 0)
         .input('unitPrice', sql.Decimal(18, 2), item.unitPrice || 0)
         .input('discountPct', sql.Decimal(5, 2), item.discount || 0)
@@ -262,7 +295,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             lhsc, httt, unit, quantity, unit_price, discount_pct, is_free, total
           )
           VALUES (
-            @serviceOrderId, @itemType, NULL, @serviceId, @itemCode, @itemDescription,
+            @serviceOrderId, @itemType, @productId, @serviceId, @itemCode, @itemDescription,
             @lhsc, @httt, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total
           )
         `);
