@@ -1,4 +1,4 @@
-const GeneralDirectorRepository = require('../../domain/repositories/GeneralDirectorRepository');
+﻿const GeneralDirectorRepository = require('../../domain/repositories/GeneralDirectorRepository');
 const { query } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
 const ApiError = require('../../utils/ApiError');
@@ -1041,27 +1041,27 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           u.created_at,
           r.role_name,
           r.role_label,
-          b.id AS branch_id,
-          b.branch_code,
-          b.branch_name,
-          b.address AS branch_address,
-          b.phone AS branch_phone,
-          b.email AS branch_email,
-          b.is_active AS branch_is_active
+          branch_info.branch_id,
+          branch_info.branch_code,
+          branch_info.branch_name,
+          branch_info.branch_address,
+          branch_info.branch_phone,
+          branch_info.branch_email,
+          branch_info.branch_is_active
        FROM users u
        INNER JOIN user_role ur ON ur.user_id = u.id
        INNER JOIN roles r ON r.id = ur.role_id AND r.role_name = 'manager'
-       INNER JOIN branches b ON b.manager_id = u.id
-       WHERE (@branchId IS NULL OR b.id = @branchId)
-         AND (@status IS NULL OR u.status = @status)
-         AND (
-           @search IS NULL
-           OR u.pseudo_id LIKE @search
-           OR u.user_name LIKE @search
-           OR ISNULL(u.email, '') LIKE @search
-           OR ISNULL(u.phone, '') LIKE @search
-           OR ISNULL(b.branch_name, '') LIKE @search
-         )
+       ${BRANCH_MANAGER_BRANCH_APPLY}
+       WHERE (@branchId IS NULL OR branch_info.branch_id = @branchId)
+        AND (@status IS NULL OR u.status = @status)
+        AND (
+          @search IS NULL
+          OR u.pseudo_id LIKE @search
+          OR u.user_name LIKE @search
+          OR ISNULL(u.email, '') LIKE @search
+          OR ISNULL(u.phone, '') LIKE @search
+          OR ISNULL(branch_info.branch_name, '') LIKE @search
+        )
        ORDER BY
          CASE WHEN u.status = 'active' THEN 0 ELSE 1 END,
          u.user_name ASC,
@@ -1086,17 +1086,17 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           u.created_at,
           r.role_name,
           r.role_label,
-           b.id AS branch_id,
-           b.branch_code,
-           b.branch_name,
-           b.address AS branch_address,
-           b.phone AS branch_phone,
-           b.email AS branch_email,
-           b.is_active AS branch_is_active
+          branch_info.branch_id,
+          branch_info.branch_code,
+          branch_info.branch_name,
+          branch_info.branch_address,
+          branch_info.branch_phone,
+          branch_info.branch_email,
+          branch_info.branch_is_active
        FROM users u
        INNER JOIN user_role ur ON ur.user_id = u.id
        INNER JOIN roles r ON r.id = ur.role_id AND r.role_name = 'manager'
-         INNER JOIN branches b ON b.manager_id = u.id
+       ${BRANCH_MANAGER_BRANCH_APPLY}
        WHERE u.id = @id`,
       { id: Number(id) }
     );

@@ -6,6 +6,7 @@ const { validateListUsersQuery } = require('../validators/adminUserValidator');
 /**
  * Admin routes - chi danh cho user co role admin
  *
+ * POST /api/admin/reissue-token       -- cap lai JWT voi day du roles tu DB
  * GET  /api/admin/dashboard
  * GET  /api/admin/users
  * GET  /api/admin/users/:id
@@ -21,6 +22,10 @@ const { validateListUsersQuery } = require('../validators/adminUserValidator');
 function buildAdminRouter() {
   const router = express.Router();
   const controller = new AdminController();
+
+  // Endpoint reissue-token dat TRUOC requireAdmin de user co token cu (thieu role admin)
+  // van co the goi va lay token moi co day du roles tu DB.
+  router.post('/reissue-token', authenticate, controller.reissueToken);
 
   router.use(authenticate, requireAdmin);
 
