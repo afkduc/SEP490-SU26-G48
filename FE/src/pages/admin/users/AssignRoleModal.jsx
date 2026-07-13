@@ -30,7 +30,7 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
         setUserRoles(current);
         setSelected(new Set(current.map((r) => r.roleId)));
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Khong the tai danh sach role');
+        if (!cancelled) setError(err.message || 'Không thể tải danh sách vai trò');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -73,7 +73,7 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
       onSuccess?.();
       onClose?.();
     } catch (err) {
-      setError(err.message || 'Luu that bai');
+      setError(err.message || 'Lưu thất bại');
     } finally {
       setSaving(false);
     }
@@ -96,8 +96,8 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
             </svg>
           </div>
           <div>
-            <h2 className="assign-role-header__title">Phan quyen nguoi dung</h2>
-            <p className="assign-role-header__sub">Chon vai tro de gan cho nguoi dung nay</p>
+            <h2 className="assign-role-header__title">Phân quyền người dùng</h2>
+            <p className="assign-role-header__sub">Chọn vai trò để gán cho người dùng này</p>
           </div>
           <button className="assign-role-close" onClick={onClose}>×</button>
         </div>
@@ -107,7 +107,7 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
           {loading && (
             <div className="assign-role-loading">
               <div className="spinner" />
-              <span>Dang tai...</span>
+              <span>Đang tải...</span>
             </div>
           )}
 
@@ -116,7 +116,7 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
           )}
 
           {!loading && !error && allRoles.length === 0 && (
-            <div className="assign-role-empty">Chua co vai tro nao</div>
+            <div className="assign-role-empty">Chưa có vai trò nào</div>
           )}
 
           {!loading && !error && allRoles.length > 0 && (
@@ -167,11 +167,11 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
         {/* Footer */}
         <div className="assign-role-footer">
           <span className="assign-role-selected-count">
-            {selected.size} vai tro duoc chon
+            {selected.size} vai trò được chọn
           </span>
           <div className="assign-role-footer__actions">
             <button className="btn-cancel" onClick={onClose} disabled={saving}>
-              Huy
+              Hủy
             </button>
             <button
               className="btn-save"
@@ -181,9 +181,9 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
               {saving ? (
                 <>
                   <div className="spinner spinner--sm" />
-                  Dang luu...
+                  Đang lưu...
                 </>
-              ) : 'Luu thay doi'}
+              ) : 'Lưu thay đổi'}
             </button>
           </div>
         </div>

@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import {
   getAdminDashboardStats,
-  getRecentLoginSessions,
+  reissueAdminToken,
 } from '../../services/adminApi';
 import './AdminDashboardPage.css';
 
@@ -165,27 +165,124 @@ function getActionColor(action) {
   return '#6b7280';
 }
 
+function formatActionLabel(action) {
+  if (!action) return null;
+  // Chuan hoa: "TAO_MOI" / "create user" / "Change_Password" deu thanh "TAO MOI" / "CHANGE PASSWORD"
+  const cleaned = String(action)
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+  return cleaned || null;
+}
+
 function getActionBadge(action) {
+  const fallbackLabel = formatActionLabel(action) || 'UNKNOWN';
   if (!action) return { label: 'UNKNOWN', bg: '#f1f5f9', color: '#64748b' };
-  const upper = action.toUpperCase();
-  if (upper.includes('CREATE') || upper.includes('INSERT')) return { label: 'TAO MOI', bg: '#dcfce7', color: '#15803d' };
-  if (upper.includes('UPDATE') || upper.includes('EDIT')) return { label: 'CAP NHAT', bg: '#eef2ff', color: '#4338ca' };
-  if (upper.includes('DELETE')) return { label: 'XOA', bg: '#fee2e2', color: '#dc2626' };
-  if (upper.includes('LOGIN_FAILED')) return { label: 'DANG NHAP THAT BAI', bg: '#fee2e2', color: '#dc2626' };
-  if (upper.includes('LOGIN') || upper.includes('LOGOUT')) return { label: upper.includes('LOGIN') ? 'DANG NHAP' : 'DANG XUAT', bg: '#e0f2fe', color: '#0369a1' };
-  if (upper.includes('ASSIGN')) return { label: 'GAN QUYEN', bg: '#f3e8ff', color: '#7c3aed' };
-  if (upper.includes('REVOKE')) return { label: 'THU HOI', bg: '#fef3c7', color: '#b45309' };
-  if (upper.includes('PASSWORD')) return { label: 'DOI MK', bg: '#fce7f3', color: '#be185d' };
-  return { label: action.toUpperCase(), bg: '#f1f5f9', color: '#475569' };
+
+  const upper = String(action).toUpperCase();
+
+  // Tao moi / Insert
+  if (upper.includes('CREATE') || upper.includes('INSERT') || upper.includes('ADD')) {
+    return { label: 'TAO MOI', bg: '#dcfce7', color: '#15803d' };
+  }
+  // Cap nhat / Edit
+  if (upper.includes('UPDATE') || upper.includes('EDIT') || upper.includes('MODIFY') || upper.includes('PATCH')) {
+    return { label: 'CAP NHAT', bg: '#eef2ff', color: '#4338ca' };
+  }
+  // Xoa
+  if (upper.includes('DELETE') || upper.includes('REMOVE')) {
+    return { label: 'XOA', bg: '#fee2e2', color: '#dc2626' };
+  }
+  // Dang nhap that bai
+  if (upper.includes('LOGIN_FAILED') || upper.includes('LOGINFAIL') || upper.includes('LOGIN FAIL')) {
+    return { label: 'DANG NHAP THAT BAI', bg: '#fee2e2', color: '#dc2626' };
+  }
+  // Dang nhap / Dang xuat
+  if (upper.includes('LOGOUT') || upper.includes('SIGNOUT')) {
+    return { label: 'ĐĂNG XUẤT', bg: '#e0f2fe', color: '#0369a1' };
+  }
+  if (upper.includes('LOGIN')) {
+    return { label: 'ĐĂNG NHẬP', bg: '#e0f2fe', color: '#0369a1' };
+  }
+  // Phan quyen
+  if (upper.includes('ASSIGN') || upper.includes('GRANT')) {
+    return { label: 'GÁN QUYỀN', bg: '#f3e8ff', color: '#7c3aed' };
+  }
+  if (upper.includes('REVOKE') || upper.includes('UNASSIGN')) {
+    return { label: 'THU HỒI', bg: '#fef3c7', color: '#b45309' };
+  }
+  // Mat khau
+  if (upper.includes('PASSWORD') || upper.includes('RESET_PASS')) {
+    return { label: 'ĐỔI MK', bg: '#fce7f3', color: '#be185d' };
+  }
+  // Trang thai (active/lock/toggle)
+  if (upper.includes('ACTIVATE') || upper.includes('ENABLE')) {
+    return { label: 'KÍCH HOẠT', bg: '#dcfce7', color: '#15803d' };
+  }
+  if (upper.includes('DEACTIVATE') || upper.includes('DISABLE')) {
+    return { label: 'NGỪNG HOẠT ĐỘNG', bg: '#f1f5f9', color: '#64748b' };
+  }
+  if (upper.includes('LOCK')) {
+    return { label: 'KHÓA', bg: '#fee2e2', color: '#dc2626' };
+  }
+  if (upper.includes('UNLOCK')) {
+    return { label: 'MỞ KHÓA', bg: '#dcfce7', color: '#15803d' };
+  }
+  if (upper.includes('TOGGLE') || upper.includes('SWITCH') || upper.includes('STATUS')) {
+    return { label: 'ĐỔI TRẠNG THÁI', bg: '#eef2ff', color: '#4338ca' };
+  }
+  // Import / Export
+  if (upper.includes('IMPORT')) {
+    return { label: 'NHẬP', bg: '#dbeafe', color: '#1d4ed8' };
+  }
+  if (upper.includes('EXPORT')) {
+    return { label: 'XUẤT', bg: '#dbeafe', color: '#1d4ed8' };
+  }
+  // Upload / Download
+  if (upper.includes('UPLOAD')) {
+    return { label: 'TẢI LÊN', bg: '#fef3c7', color: '#b45309' };
+  }
+  if (upper.includes('DOWNLOAD')) {
+    return { label: 'TẢI XUỐNG', bg: '#fef3c7', color: '#b45309' };
+  }
+  // Approve / Reject
+  if (upper.includes('APPROVE')) {
+    return { label: 'DUYỆT', bg: '#dcfce7', color: '#15803d' };
+  }
+  if (upper.includes('REJECT')) {
+    return { label: 'TỪ CHỐI', bg: '#fee2e2', color: '#dc2626' };
+  }
+  // Cancel / Complete
+  if (upper.includes('CANCEL')) {
+    return { label: 'HỦY', bg: '#fee2e2', color: '#dc2626' };
+  }
+  if (upper.includes('COMPLETE') || upper.includes('FINISH') || upper.includes('DONE')) {
+    return { label: 'HOÀN TẤT', bg: '#dcfce7', color: '#15803d' };
+  }
+  // View / Read
+  if (upper.includes('VIEW') || upper.includes('READ')) {
+    return { label: 'XEM', bg: '#e0e7ff', color: '#4338ca' };
+  }
+  // Fallback: hien thi goc (viet hoa, thay _ -> space) thay vi "UNKNOWN"
+  return { label: fallbackLabel, bg: '#f1f5f9', color: '#475569' };
+}
+
+function getResponseBadge(status) {
+  if (status == null) return null;
+  if (status >= 200 && status < 300) return { label: status, bg: '#dcfce7', color: '#15803d' };
+  if (status >= 400 && status < 500) return { label: status, bg: '#fef3c7', color: '#b45309' };
+  if (status >= 500) return { label: status, bg: '#fee2e2', color: '#dc2626' };
+  return { label: status, bg: '#f1f5f9', color: '#475569' };
 }
 
 function getStatusBadge(status) {
   if (!status) return { label: '—', bg: '#f1f5f9', color: '#64748b' };
   const upper = status.toUpperCase();
-  if (upper === 'SUCCESS' || upper === 'ACTIVE') return { label: 'Thanh cong', bg: '#dcfce7', color: '#15803d' };
-  if (upper === 'FAILED' || upper === 'FAIL') return { label: 'That bai', bg: '#fee2e2', color: '#dc2626' };
-  if (upper === 'LOCKED') return { label: 'Bi khoa', bg: '#fee2e2', color: '#dc2626' };
-  if (upper === 'INACTIVE') return { label: 'Ngung hoat dong', bg: '#f1f5f9', color: '#64748b' };
+  if (upper === 'SUCCESS' || upper === 'ACTIVE') return { label: 'Thành công', bg: '#dcfce7', color: '#15803d' };
+  if (upper === 'FAILED' || upper === 'FAIL') return { label: 'Thất bại', bg: '#fee2e2', color: '#dc2626' };
+  if (upper === 'LOCKED') return { label: 'Bị khóa', bg: '#fee2e2', color: '#dc2626' };
+  if (upper === 'INACTIVE') return { label: 'Ngừng hoạt động', bg: '#f1f5f9', color: '#64748b' };
   return { label: status, bg: '#f1f5f9', color: '#475569' };
 }
 
@@ -207,7 +304,28 @@ function getAlertStyle(type) {
   }
 }
 
-// ─── Sub-components ─────────────────────────────────────────────────────────
+// Severity: danh gia muc do nghiem trong cua canh bao
+const SEVERITY_LABELS = {
+  critical: 'Nghiêm trọng',
+  high: 'Cao',
+  medium: 'Trung bình',
+  low: 'Thấp',
+};
+const SEVERITY_STYLES = {
+  critical: { label: 'CRITICAL', bg: '#dc2626', color: '#ffffff' },
+  high: { label: 'HIGH', bg: '#f97316', color: '#ffffff' },
+  medium: { label: 'MEDIUM', bg: '#eab308', color: '#1f2937' },
+  low: { label: 'LOW', bg: '#10b981', color: '#ffffff' },
+};
+
+// Category: phan loai canh bao
+const CATEGORY_LABELS = {
+  security: 'Bảo mật',
+  user: 'Người dùng',
+  system: 'Hệ thống',
+  data: 'Dữ liệu',
+  performance: 'Hiệu năng',
+};
 
 function StatCard({ icon, label, value, sub, accent, trend }) {
   return (
@@ -241,31 +359,300 @@ function SectionHeader({ dot, title, badge, link, linkLabel }) {
       </div>
       {link && (
         <Link to={link} className="section-header__link">
-          {linkLabel || 'Xem tat ca'} <IconArrowRight />
+          {linkLabel || 'Xem tất cả'} <IconArrowRight />
         </Link>
       )}
     </div>
   );
 }
 
+// Phan loai category tu khoa xuat hien trong title/affectedEntity/message
+function inferCategory(alert) {
+  const haystack = `${alert?.title || ''} ${alert?.message || ''} ${alert?.affectedEntity || ''}`.toLowerCase();
+  if (!haystack.trim()) return null;
+  if (/(login|dang nhap|password|mat khau|lock|khoa|permission|quyen)/.test(haystack)) return 'security';
+  if (/(user|nguoi dung|account|tai khoan|role|vai tro)/.test(haystack)) return 'user';
+  if (/(database|table|record|du lieu|data|backup)/.test(haystack)) return 'data';
+  if (/(system|server|service|he thong|api|deploy)/.test(haystack)) return 'system';
+  if (/(slow|latency|timeout|performance|hieu nang)/.test(haystack)) return 'performance';
+  return 'system';
+}
+
+// Severity inference: du vao type va noi dung
+function inferSeverity(alert) {
+  if (alert.severity) return alert.severity.toLowerCase();
+  if (alert.type === 'danger') return 'high';
+  if (alert.type === 'warning') return 'medium';
+  return 'low';
+}
+
+// Lay ten actor (nguoi gay ra canh bao) tu nhieu truong co the
+function resolveAlertActor(alert) {
+  return (
+    alert.actor ||
+    alert.actorName ||
+    alert.user_name ||
+    alert.userName ||
+    (alert.affectedEntity ? `Hệ thống (${alert.affectedEntity})` : null)
+  );
+}
+
 function AlertItem({ alert }) {
   const style = getAlertStyle(alert.type);
+  const category = inferCategory(alert);
+  const severity = inferSeverity(alert);
+  const severityStyle = SEVERITY_STYLES[severity];
+  const categoryLabel = category ? CATEGORY_LABELS[category] : null;
+
+  // Fallback noi dung chinh: uu tien alert.message, neu trong thi dung title + affectedEntity
+  const title = alert.title || 'Cảnh báo hệ thống';
+  const message =
+    alert.message ||
+    alert.description ||
+    (alert.affectedEntity ? `Liên quan đến ${alert.affectedEntity}` : null);
+
+  const actor = resolveAlertActor(alert);
+
   return (
-    <div className="alert-item" style={{ background: style.bg, borderColor: style.border }}>
+    <div
+      className="alert-item"
+      style={{
+        background: style.bg,
+        borderColor: style.border,
+        '--alert-accent': style.color,
+      }}
+    >
       <div className="alert-item__icon" style={{ background: style.iconBg, color: style.color }}>
         {getAlertIcon(alert.icon)}
       </div>
       <div className="alert-item__content">
-        <div className="alert-item__title" style={{ color: style.color }}>{alert.title}</div>
-        <div className="alert-item__message">{alert.message}</div>
+        <div className="alert-item__header">
+          <div className="alert-item__title" style={{ color: style.color }}>{title}</div>
+          {severityStyle && (
+            <span
+              className="alert-item__severity"
+              style={{ background: severityStyle.bg, color: severityStyle.color }}
+              title={SEVERITY_LABELS[severity] || severity}
+            >
+              {severityStyle.label}
+            </span>
+          )}
+        </div>
+        {message && <div className="alert-item__message">{message}</div>}
+        <div className="alert-item__meta">
+          {categoryLabel && (
+            <span className="alert-item__chip">{categoryLabel}</span>
+          )}
+          {alert.affectedEntity && (
+            <span className="alert-item__chip alert-item__chip--mono">
+              {alert.affectedEntity}
+            </span>
+          )}
+          {actor && (
+            <span className="alert-item__chip">Bởi: {actor}</span>
+          )}
+        </div>
       </div>
-      <div className="alert-item__time">{formatRelativeTime(alert.time)}</div>
+      <div className="alert-item__time">
+        <div className="alert-item__time-rel">{formatRelativeTime(alert.time)}</div>
+        {alert.time && (
+          <div className="alert-item__time-abs">{formatDateTime(alert.time)}</div>
+        )}
+      </div>
     </div>
   );
 }
 
+// Tao noi dung mo ta chi tiet tu data co san khi backend khong tra "details" / "description".
+function buildActivityDetails(log) {
+  const targetType = log.tableName || log.table_name || log.targetType;
+  const targetCode = log.entityCode || log.entity_code;
+  const oldVal = log.oldValue;
+  const newVal = log.newValue;
+  const recordId = log.recordId || log.record_id;
+
+  const pieces = [];
+
+  if (targetType) {
+    const friendly = String(targetType)
+      .replace(/[_-]+/g, ' ')
+      .trim();
+    pieces.push(targetCode ? `${friendly} ${targetCode}` : friendly);
+  } else if (targetCode) {
+    pieces.push(targetCode);
+  }
+
+  // Mo ta su thay doi (UPDATE) hoac noi dung (CREATE)
+  const rawBody = oldVal || newVal;
+  if (rawBody) {
+    let label = null;
+    try {
+      const parsed = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
+      if (parsed && typeof parsed === 'object') {
+        // Lay 1-2 truong co thong tin nhat
+        const candidates = ['name', 'userName', 'code', 'status', 'roleName', 'branchName'];
+        for (const k of candidates) {
+          if (parsed[k]) {
+            label = String(parsed[k]);
+            break;
+          }
+        }
+        if (!label) {
+          // Neu khong match, lay key value dau tien
+          const firstKey = Object.keys(parsed)[0];
+          if (firstKey) label = String(parsed[firstKey]);
+        }
+      } else {
+        label = String(parsed);
+      }
+    } catch {
+      label = String(rawBody).slice(0, 80);
+    }
+    if (label && label !== 'null') pieces.push(label);
+  } else if (recordId && !targetCode) {
+    pieces.push(`#${recordId}`);
+  }
+
+  return pieces.length > 0 ? pieces.join(' — ') : null;
+}
+
+// Sinh thong bao tu dong tu stats hien co, dam bao widget khong bao gio trong.
+// Dung de fallback khi backend khong tra ve alerts (vi du DB chua co du lieu canh bao).
+function generateAlertsFromStats(stats) {
+  if (!stats) return [];
+  const out = [];
+  const nowIso = new Date().toISOString();
+
+  // 1. Tai khoan dang bi khoa
+  if (stats.lockedUsers > 0) {
+    out.push({
+      id: 'auto-locked-users',
+      type: 'warning',
+      severity: 'high',
+      category: 'security',
+      icon: 'lock',
+      title: 'Tài khoản đang bị khóa',
+      message: `${stats.lockedUsers} tài khoản đang bị khóa, cần xem xét mở khóa hoặc xóa`,
+      affectedEntity: 'users',
+      time: nowIso,
+    });
+  }
+
+  // 2. Nhieu lan dang nhap that bai
+  if (stats.failedLogins > 0) {
+    const severity = stats.failedLogins > 10 ? 'critical' : 'medium';
+    const type = stats.failedLogins > 10 ? 'danger' : 'warning';
+    out.push({
+      id: 'auto-failed-logins',
+      type,
+      severity,
+      category: 'security',
+      icon: 'alert',
+      title: 'Đăng nhập thất bại',
+      message: `${stats.failedLogins} lần đăng nhập thất bại${stats.failedLogins > 10 ? ' - kiểm tra an ninh ngay' : ''}`,
+      affectedEntity: 'auth',
+      time: nowIso,
+    });
+  }
+
+  // 3. Dang nhap thanh cong hom nay
+  if (stats.todayLogins > 0) {
+    out.push({
+      id: 'auto-today-logins',
+      type: 'info',
+      severity: 'low',
+      category: 'user',
+      icon: 'user',
+      title: 'Hoạt động đăng nhập',
+      message: `${stats.todayLogins} lượt đăng nhập thành công trong ngày hôm nay`,
+      affectedEntity: 'sessions',
+      time: nowIso,
+    });
+  }
+
+  // 4. Ti le ngung hoat dong cao
+  if (
+    stats.totalUsers > 0 &&
+    stats.inactiveUsers > stats.totalUsers * 0.3
+  ) {
+    out.push({
+      id: 'auto-inactive-ratio',
+      type: 'warning',
+      severity: 'medium',
+      category: 'user',
+      icon: 'user',
+      title: 'Tỉ lệ tài khoản ngừng hoạt động cao',
+      message: `${stats.inactiveUsers}/${stats.totalUsers} tài khoản đang ngừng hoạt động (>30%)`,
+      affectedEntity: 'users',
+      time: nowIso,
+    });
+  }
+
+  // 5. Khong co du lieu audit_log
+  if (!stats.recentLogs || stats.recentLogs.length === 0) {
+    out.push({
+      id: 'auto-no-audit',
+      type: 'info',
+      severity: 'low',
+      category: 'data',
+      icon: 'info',
+      title: 'Chưa có nhật ký hoạt động',
+      message: 'Hệ thống chưa ghi nhận audit log nào. Hãy thao tác trên hệ thống để tạo log',
+      affectedEntity: 'audit_logs',
+      time: nowIso,
+    });
+  }
+
+  return out;
+}
+
+// Gop audit_logs + login_sessions thanh mot danh sach thoi gian thong nhat,
+// dam bao widget nhat ky khong bao gio trong neu it nhat mot trong hai co du lieu.
+function buildCombinedActivity(recentLogs, recentLogins) {
+  const items = [];
+
+  (recentLogs || []).forEach((log) => {
+    items.push({
+      kind: 'audit',
+      id: `audit-${log.id}`,
+      time: log.createdAt || log.logged_at,
+      payload: log,
+    });
+  });
+
+  (recentLogins || []).forEach((s) => {
+    items.push({
+      kind: 'login_session',
+      id: `session-${s.id}`,
+      time: s.login_time || s.logout_time,
+      payload: s,
+    });
+  });
+
+  items.sort((a, b) => {
+    const ta = a.time ? new Date(a.time).getTime() : 0;
+    const tb = b.time ? new Date(b.time).getTime() : 0;
+    return tb - ta;
+  });
+
+  return items.slice(0, 10);
+}
+
 function ActivityItem({ log }) {
   const badge = getActionBadge(log.action);
+  const respBadge = getResponseBadge(log.responseStatus ?? log.response_status);
+
+  // Lay ten actor voi fallback an toan
+  const actor =
+    log.actorName || log.user_name || log.userName || log.actor || 'He thong';
+
+  // Lay details: uu tien log.details / log.description, fallback tu data khac
+  const details =
+    log.details ||
+    log.description ||
+    buildActivityDetails(log) ||
+    (log.ipAddress ? `Tu ${log.ipAddress}` : null);
+
   return (
     <div className="activity-item">
       <div className="activity-item__bar" style={{ background: badge.color }} />
@@ -274,14 +661,52 @@ function ActivityItem({ log }) {
           <span className="activity-item__badge" style={{ background: badge.bg, color: badge.color }}>
             {badge.label}
           </span>
-          <span className="activity-item__actor">{log.actorName || 'He thong'}</span>
+          <span className="activity-item__actor">{actor}</span>
+          {respBadge && (
+            <span
+              className="activity-item__status"
+              style={{ background: respBadge.bg, color: respBadge.color }}
+            >
+              {respBadge.label}
+            </span>
+          )}
+          {log.requestMethod && (
+            <span className="activity-item__method">{log.requestMethod}</span>
+          )}
         </div>
-        {log.details && (
-          <div className="activity-item__details">{log.details}</div>
-        )}
+
+        {details && <div className="activity-item__details">{details}</div>}
+
         <div className="activity-item__meta">
-          {log.ipAddress && <span><IconGlobe /> {log.ipAddress}</span>}
-          <span><IconClock /> {formatRelativeTime(log.createdAt)}</span>
+          {(log.tableName || log.table_name) && (
+            <span className="activity-item__meta-item activity-item__meta-item--strong">
+              <IconTerminal />
+              <span>{log.tableName || log.table_name}</span>
+            </span>
+          )}
+          {(log.entityCode || log.entity_code) && (
+            <span className="activity-item__meta-item activity-item__meta-item--code">
+              {log.entityCode || log.entity_code}
+            </span>
+          )}
+          {!log.entityCode && !log.entity_code && (log.recordId ?? log.record_id) != null && (
+            <span className="activity-item__meta-item activity-item__meta-item--code">
+              #{log.recordId ?? log.record_id}
+            </span>
+          )}
+          {log.ipAddress && (
+            <span className="activity-item__meta-item">
+              <IconGlobe /> {log.ipAddress}
+            </span>
+          )}
+          {log.durationMs != null && (
+            <span className="activity-item__meta-item">
+              <IconClock /> {log.durationMs}ms
+            </span>
+          )}
+          <span className="activity-item__meta-item">
+            <IconCalendar /> {formatDateTime(log.createdAt || log.logged_at)}
+          </span>
         </div>
       </div>
     </div>
@@ -291,23 +716,53 @@ function ActivityItem({ log }) {
 function LoginItem({ item }) {
   const statusBadge = getStatusBadge(item.status);
   const actionBadge = getActionBadge(item.actionType);
+
+  // Fallback thong minh: uu tien userName > phone > userId > email > "Nguoi dung #id"
+  const displayName =
+    item.userName ||
+    item.user_name ||
+    (item.phoneNumber || item.phone_number
+      ? `SDT: ${item.phoneNumber || item.phone_number}`
+      : null) ||
+    (item.email ? item.email : null) ||
+    (item.userId || item.user_id
+      ? `Người dùng #${item.userId || item.user_id}`
+      : 'Người dùng');
+
+  // Color cho status dot (xanh = active/thanh cong, do = fail, xam = ended)
+  const loginStatusDot = (() => {
+    if (item.actionType === 'LOGIN_FAILED' || item.status === 'failed') return '#ef4444';
+    if (item.status === 'ended' || item.logoutTime || item.logout_time) return '#94a3b8';
+    return '#10b981';
+  })();
+
   return (
     <div className="login-item">
-      <div className="login-item__avatar" style={{ background: actionBadge.color + '20', color: actionBadge.color }}>
+      <div
+        className="login-item__avatar"
+        style={{
+          background: actionBadge.color + '20',
+          color: actionBadge.color,
+          '--login-status-dot': loginStatusDot,
+        }}
+      >
         <IconLogin />
       </div>
       <div className="login-item__body">
         <div className="login-item__top">
-          <span className="login-item__user">{item.userName || 'Unknown'}</span>
+          <span className="login-item__user">{displayName}</span>
           <span className="login-item__status" style={{ background: statusBadge.bg, color: statusBadge.color }}>
             {statusBadge.label}
           </span>
         </div>
         <div className="login-item__meta">
-          <span><IconGlobe /> {item.ipAddress || '—'}</span>
-          <span><IconClock /> {formatDateTime(item.loginTime)}</span>
-          {item.sessionDuration > 0 && (
-            <span><IconCalendar /> {formatDuration(item.sessionDuration)}</span>
+          <span><IconGlobe /> {item.ipAddress || item.ip_address || '—'}</span>
+          <span><IconClock /> {formatDateTime(item.loginTime || item.login_time)}</span>
+          {(item.sessionDuration || item.session_duration_seconds) > 0 && (
+            <span><IconCalendar /> {formatDuration(item.sessionDuration || item.session_duration_seconds)}</span>
+          )}
+          {(item.phoneNumber || item.phone_number) && item.userName && (
+            <span className="login-item__phone">{item.phoneNumber || item.phone_number}</span>
           )}
         </div>
       </div>
@@ -328,9 +783,15 @@ function QuickAction({ to, icon, label, desc, accent }) {
   );
 }
 
-// Tab switcher noi bo: chi mot tab active tai mot thoi diem.
-// Click chuyen tab se cap nhat state va doi noi dung ben duoi.
-function LogsTabSwitcher({ activeTab, onChange, auditCount, loginCount }) {
+// Tab navigation noi bo: chi mot tab active tai mot thoi diem.
+// Click vao tab se smooth-scroll den section tuong ung.
+// Trang thai active cung duoc dong bo tu dong boi IntersectionObserver
+// khi nguoi dung cuon trang thu cong.
+function LogsTabSwitcher({ activeTab, onTabClick, auditCount, loginCount }) {
+  const handleClick = (tabId, sectionId) => {
+    onTabClick(tabId, sectionId);
+  };
+
   return (
     <div className="logs-tab-bar" role="tablist" aria-label="Loai nhat ky">
       <button
@@ -338,10 +799,10 @@ function LogsTabSwitcher({ activeTab, onChange, auditCount, loginCount }) {
         role="tab"
         aria-selected={activeTab === 'activity'}
         className={'logs-tab-btn' + (activeTab === 'activity' ? ' logs-tab-btn--active' : '')}
-        onClick={() => onChange('activity')}
+        onClick={() => handleClick('activity', 'logs-activity-section')}
       >
         <IconLog />
-        <span>Nhat ky hoat dong</span>
+        <span>Nhật ký hoạt động</span>
         <span className="logs-tab-btn__badge">{auditCount}</span>
       </button>
       <button
@@ -349,10 +810,10 @@ function LogsTabSwitcher({ activeTab, onChange, auditCount, loginCount }) {
         role="tab"
         aria-selected={activeTab === 'login'}
         className={'logs-tab-btn' + (activeTab === 'login' ? ' logs-tab-btn--active' : '')}
-        onClick={() => onChange('login')}
+        onClick={() => handleClick('login', 'logs-login-section')}
       >
         <IconLogin />
-        <span>Lich su dang nhap</span>
+        <span>Lịch sử đăng nhập</span>
         <span className="logs-tab-btn__badge">{loginCount}</span>
       </button>
     </div>
@@ -362,11 +823,11 @@ function LogsTabSwitcher({ activeTab, onChange, auditCount, loginCount }) {
 // ─── Main component ─────────────────────────────────────────────────────────
 
 const QUICK_ACTIONS = [
-  { to: '/admin/users', icon: <IconUsers />, label: 'Quan ly nguoi dung', desc: 'Xem & chinh sua tai khoan', accent: '#4f46e5' },
-  { to: '/admin/users/create', icon: <IconUsers />, label: 'Them nguoi dung moi', desc: 'Tao tai khoan moi', accent: '#059669' },
-  { to: '/admin/roles', icon: <IconRole />, label: 'Quan ly vai tro', desc: 'Phan quyen nguoi dung', accent: '#7c3aed' },
-  { to: '/admin/logs', icon: <IconLog />, label: 'Nhat ky he thong', desc: 'Lich su thao tac', accent: '#d97706' },
-  { to: '/profile/edit', icon: <IconTerminal />, label: 'Ho so ca nhan', desc: 'Chinh sua thong tin', accent: '#db2777' },
+  { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem & chỉnh sửa tài khoản', accent: '#4f46e5' },
+  { to: '/admin/users/create', icon: <IconUsers />, label: 'Thêm người dùng mới', desc: 'Tạo tài khoản mới', accent: '#059669' },
+  { to: '/admin/roles', icon: <IconRole />, label: 'Quản lý vai trò', desc: 'Phân quyền người dùng', accent: '#7c3aed' },
+  { to: '/admin/logs', icon: <IconLog />, label: 'Nhật ký hệ thống', desc: 'Lịch sử thao tác', accent: '#d97706' },
+  { to: '/admin/profile', icon: <IconTerminal />, label: 'Hồ sơ cá nhân', desc: 'Chỉnh sửa thông tin', accent: '#db2777' },
 ];
 
 export default function AdminDashboardPage() {
@@ -374,27 +835,48 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [loginSessions, setLoginSessions] = useState([]);
   // Tab hien tai cua widget "Nhat ky". Mac dinh la activity (nhat ky hoat dong).
   const [logsTab, setLogsTab] = useState('activity');
+  // Refs toi 2 section de scroll va observe
+  const activitySectionRef = useRef(null);
+  const loginSectionRef = useRef(null);
+  // Flag de tranh observer "nhay" tab khi dang thuc hien smooth-scroll do click
+  const programmaticScrollRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [statsData, loginData] = await Promise.all([
-          getAdminDashboardStats(),
-          getRecentLoginSessions().catch(() => null),
-        ]);
+        // Reissue token truoc de dam bao JWT co day du roles tu DB (phong TH
+        // token cu bi cache va thieu role admin sau khi admin moi duoc them role).
+        try {
+          const reissued = await reissueAdminToken();
+          if (reissued?.token) {
+            localStorage.setItem('token', reissued.token);
+            if (Array.isArray(reissued.roles)) {
+              try {
+                const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
+                if (raw) {
+                  const cached = JSON.parse(raw);
+                  const updated = { ...cached, roles: reissued.roles };
+                  localStorage.setItem('user', JSON.stringify(updated));
+                  sessionStorage.setItem('user', JSON.stringify(updated));
+                }
+              } catch {
+                /* ignore parse error */
+              }
+            }
+          }
+        } catch {
+          // Bo qua loi reissue (co the do token het han) -> trang se redirect login
+        }
+
+        const statsData = await getAdminDashboardStats();
         if (!cancelled) {
           setStats(statsData);
-          // loginData da duoc unwrap boi httpClient, la { items, total, page, pageSize }
-          if (loginData?.items) {
-            setLoginSessions(loginData.items);
-          }
         }
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Khong the tai thong ke');
+        if (!cancelled) setError(err.message || 'Không thể tải thống kê');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -402,11 +884,79 @@ export default function AdminDashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // IntersectionObserver: tu dong cap nhat active tab dua tren section
+  // dang hien thi tren man hinh khi nguoi dung cuon thu cong.
+  useEffect(() => {
+    if (!activitySectionRef.current || !loginSectionRef.current) return undefined;
+
+    const visibility = new Map();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          visibility.set(entry.target.id, entry.intersectionRatio);
+        });
+        if (programmaticScrollRef.current) return;
+
+        const activityRatio = visibility.get('logs-activity-section') || 0;
+        const loginRatio = visibility.get('logs-login-section') || 0;
+        const visibleRatio = Math.max(activityRatio, loginRatio);
+        if (visibleRatio < 0.15) return;
+
+        if (loginRatio > activityRatio) {
+          setLogsTab('login');
+        } else {
+          setLogsTab('activity');
+        }
+      },
+      {
+        threshold: [0, 0.15, 0.3, 0.5, 0.75, 1],
+        rootMargin: '-80px 0px -40% 0px',
+      }
+    );
+
+    observer.observe(activitySectionRef.current);
+    observer.observe(loginSectionRef.current);
+
+    return () => observer.disconnect();
+  }, [stats]);
+
+  // Xu ly khi click tab: smooth-scroll den section tuong ung va cap nhat state
+  const handleTabClick = (tabId, sectionId) => {
+    programmaticScrollRef.current = true;
+    setLogsTab(tabId);
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    window.setTimeout(() => {
+      programmaticScrollRef.current = false;
+    }, 800);
+  };
+
+  // Gop alerts tu backend voi alerts tu sinh (auto) de widget luon co noi dung.
+  // Uu tien alerts backend, sau do them alerts auto neu can.
+  const derivedAlerts = (() => {
+    if (!stats) return [];
+    const backendAlerts = Array.isArray(stats.alerts) ? stats.alerts : [];
+    if (backendAlerts.length > 0) return backendAlerts;
+
+    // Sinh alerts tu stats neu backend tra rong
+    const autoAlerts = generateAlertsFromStats(stats);
+    return autoAlerts;
+  })();
+
+  // Gop nhat ky hoat dong voi login sessions, sort theo thoi gian moi nhat.
+  const combinedActivity = stats ? buildCombinedActivity(
+    stats.recentLogs || [],
+    stats.recentLogins || [],
+  ) : [];
+
   const greeting = (() => {
     const h = new Date().getHours();
-    if (h < 12) return 'Chao buoi sang';
-    if (h < 18) return 'Chao buoi chieu';
-    return 'Chao buoi toi';
+    if (h < 12) return 'Chào buổi sáng';
+    if (h < 18) return 'Chào buổi chiều';
+    return 'Chào buổi tối';
   })();
 
   const todayStr = new Date().toLocaleDateString('vi-VN', {
@@ -426,7 +976,7 @@ export default function AdminDashboardPage() {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
-              Quan tri he thong
+              Quản trị hệ thống
             </span>
             <span className="dash-header__email">{user?.email}</span>
             <span className="dash-header__date">{todayStr}</span>
@@ -436,7 +986,7 @@ export default function AdminDashboardPage() {
           <div className="dash-header__live-dot" />
           <span className="dash-header__live-label">Live</span>
           <span className="dash-header__update">
-            Cap nhat: {stats?.generatedAt ? formatDateTime(stats.generatedAt) : '...'}
+            Cập nhật: {stats?.generatedAt ? formatDateTime(stats.generatedAt) : '...'}
           </span>
         </div>
       </div>
@@ -445,7 +995,7 @@ export default function AdminDashboardPage() {
       {loading && (
         <div className="dash-loading">
           <div className="dash-loading__spinner" />
-          <span>Dang tai thong ke...</span>
+          <span>Đang tải thống kê...</span>
         </div>
       )}
       {error && !loading && (
@@ -463,14 +1013,14 @@ export default function AdminDashboardPage() {
             <StatCard
               accent="#4f46e5"
               icon={<IconUsers />}
-              label="Tong nguoi dung"
+              label="Tổng người dùng"
               value={stats.totalUsers}
               sub={
                 <span className="stat-chip-row">
-                  <span className="stat-chip stat-chip--green">{stats.activeUsers} hoat dong</span>
-                  <span className="stat-chip stat-chip--gray">{stats.inactiveUsers} ngung</span>
+                  <span className="stat-chip stat-chip--green">{stats.activeUsers} hoạt động</span>
+                  <span className="stat-chip stat-chip--gray">{stats.inactiveUsers} ngừng</span>
                   {stats.lockedUsers > 0 && (
-                    <span className="stat-chip stat-chip--red">{stats.lockedUsers} bi khoa</span>
+                    <span className="stat-chip stat-chip--red">{stats.lockedUsers} bị khóa</span>
                   )}
                 </span>
               }
@@ -478,38 +1028,38 @@ export default function AdminDashboardPage() {
             <StatCard
               accent="#059669"
               icon={<IconBranch />}
-              label="Chi nhanh"
+              label="Chi nhánh"
               value={stats.totalBranches}
-              sub="Dang hoat dong"
+              sub="Đang hoạt động"
             />
             <StatCard
               accent="#7c3aed"
               icon={<IconRole />}
-              label="Vai tro"
+              label="Vai trò"
               value={stats.totalRoles}
-              sub="Vai tro hien co"
+              sub="Vai trò hiện có"
             />
             <StatCard
               accent="#0891b2"
               icon={<IconLogin />}
-              label="Dang nhap hom nay"
+              label="Đăng nhập hôm nay"
               value={stats.todayLogins}
-              sub={`${stats.failedLogins} lan that bai`}
+              sub={`${stats.failedLogins} lần thất bại`}
             />
           </div>
 
-          {/* ── Row 2: Alerts + Logs Widget (with tabs) ────────────── */}
+          {/* ── Row 2: Alerts + Logs widget ────────────────────── */}
           <div className="dash-row-2">
             {/* Alerts widget */}
             <div className="dash-widget">
               <SectionHeader
                 dot="linear-gradient(135deg, #ef4444, #f97316)"
-                title="Thong bao he thong"
-                badge={stats.alerts?.length || 0}
+                title="Thông báo hệ thống"
+                badge={derivedAlerts.length}
               />
               <div className="dash-widget__body">
-                {stats.alerts && stats.alerts.length > 0 ? (
-                  stats.alerts.map((alert) => (
+                {derivedAlerts.length > 0 ? (
+                  derivedAlerts.map((alert) => (
                     <AlertItem key={alert.id} alert={alert} />
                   ))
                 ) : (
@@ -517,69 +1067,117 @@ export default function AdminDashboardPage() {
                     <div className="empty-state__icon" style={{ color: '#10b981' }}>
                       <IconCheck />
                     </div>
-                    <p>Tat ca hoat dong binh thuong</p>
+                    <p>Tất cả hoạt động bình thường</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Logs widget with tab switcher */}
-            <div className="dash-widget">
+            {/* Logs widget: gom 2 section (Activity + Login) vao chung 1 widget */}
+            <div className="dash-widget dash-widget--logs">
               <div className="dash-widget__topbar">
                 <LogsTabSwitcher
                   activeTab={logsTab}
-                  onChange={setLogsTab}
-                  auditCount={stats.recentLogs?.length || 0}
-                  loginCount={loginSessions.length || stats.recentLogins?.length || 0}
+                  onTabClick={handleTabClick}
+                  auditCount={combinedActivity.length}
+                  loginCount={stats.recentLogins?.length || 0}
                 />
                 <Link
-                  to={logsTab === 'activity' ? '/admin/logs' : '/admin/logs/login'}
+                  to={logsTab === 'login' ? '/admin/logs?tab=login' : '/admin/logs'}
                   className="section-header__link"
                 >
-                  Xem tat ca <IconArrowRight />
+                  Xem tất cả <IconArrowRight />
                 </Link>
               </div>
 
-              {logsTab === 'activity' ? (
-                <div className="dash-widget__body">
-                  {stats.recentLogs && stats.recentLogs.length > 0 ? (
-                    stats.recentLogs.map((log) => (
-                      <ActivityItem key={log.id} log={log} />
-                    ))
-                  ) : (
-                    <div className="empty-state">
-                      <div className="empty-state__icon" style={{ color: '#94a3b8' }}>
-                        <IconLog />
+              <div className="dash-widget__body dash-widget__body--logs">
+                {/* Activity section */}
+                <div
+                  id="logs-activity-section"
+                  ref={activitySectionRef}
+                  className="dash-logs-section dash-logs-section--scroll-target"
+                >
+                  <div className="dash-logs-section__header">
+                    <IconLog />
+                    <h3>Nhật ký hoạt động gần đây</h3>
+                    {combinedActivity.length > 0 && (
+                      <span className="dash-logs-section__count">
+                        {combinedActivity.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="dash-logs-section__body">
+                    {combinedActivity.length > 0 ? (
+                      combinedActivity.map((entry, idx) => (
+                        <div
+                          key={entry.id}
+                          className="dash-logs-item"
+                          style={{ animationDelay: `${idx * 40}ms` }}
+                        >
+                          {entry.kind === 'audit' ? (
+                            <ActivityItem log={entry.payload} />
+                          ) : (
+                            <LoginItem item={entry.payload} />
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="empty-state">
+                        <div className="empty-state__icon" style={{ color: '#94a3b8' }}>
+                          <IconLog />
+                        </div>
+                        <p>Chưa có hoạt động nào được ghi nhận</p>
+                        <span className="empty-state__hint">
+                          Hãy thao tác trên hệ thống để tạo nhật ký đầu tiên
+                        </span>
                       </div>
-                      <p>Chua co nhat ky nao</p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <div className="dash-widget__body">
-                  {(loginSessions.length > 0 ? loginSessions : (stats.recentLogins || [])).length > 0 ? (
-                    (loginSessions.length > 0 ? loginSessions : stats.recentLogins).map((item) => (
-                      <LoginItem key={item.id} item={item} />
-                    ))
-                  ) : (
-                    <div className="empty-state">
-                      <div className="empty-state__icon" style={{ color: '#94a3b8' }}>
-                        <IconLogin />
+
+                {/* Login section */}
+                <div
+                  id="logs-login-section"
+                  ref={loginSectionRef}
+                  className="dash-logs-section dash-logs-section--scroll-target"
+                >
+                  <div className="dash-logs-section__header">
+                    <IconLogin />
+                    <h3>Lịch sử đăng nhập gần đây</h3>
+                    {(stats.recentLogins?.length || 0) > 0 && (
+                      <span className="dash-logs-section__count">
+                        {stats.recentLogins.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="dash-logs-section__body">
+                    {(stats.recentLogins || []).length > 0 ? (
+                      stats.recentLogins.map((item) => (
+                        <LoginItem key={item.id} item={item} />
+                      ))
+                    ) : (
+                      <div className="empty-state">
+                        <div className="empty-state__icon" style={{ color: '#94a3b8' }}>
+                          <IconLogin />
+                        </div>
+                        <p>Chưa có lịch sử đăng nhập</p>
+                        <span className="empty-state__hint">
+                          Login session sẽ được ghi lại khi người dùng đăng nhập
+                        </span>
                       </div>
-                      <p>Chua co lich su dang nhap</p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* ── Row 3: Quick Actions ──────────────────────────────── */}
+          {/* ── Row 4: Quick Actions ──────────────────────────────── */}
           <div className="dash-row-2">
             <div className="dash-widget dash-widget--span-2">
               <SectionHeader
                 dot="linear-gradient(135deg, #4f46e5, #7c3aed)"
-                title="Thao tac nhanh"
+                title="Thao tác nhanh"
                 badge={QUICK_ACTIONS.length}
               />
               <div className="dash-widget__body dash-widget__body--qa">
@@ -594,3 +1192,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
