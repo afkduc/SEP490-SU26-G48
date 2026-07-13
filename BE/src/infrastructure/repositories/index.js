@@ -4,6 +4,7 @@ const RepairSettlementRepositoryImpl = require('./RepairSettlementRepositoryImpl
 const RepairOrderRepositoryImpl = require('./RepairOrderRepositoryImpl');
 const InventoryRepositoryImpl = require('./InventoryRepositoryImpl');
 const SupplierRepositoryImpl = require('./SupplierRepositoryImpl');
+const ImportRequestRepositoryImpl = require('./ImportRequestRepositoryImpl');
 
 function makeUserRepository() {
   return new UserRepositoryImpl();
@@ -29,6 +30,10 @@ function makeSupplierRepository() {
   return new SupplierRepositoryImpl();
 }
 
+function makeImportRequestRepository() {
+  return new ImportRequestRepositoryImpl();
+}
+
 module.exports = {
   makeUserRepository,
   makeProductRepository,
@@ -36,4 +41,5 @@ module.exports = {
   makeRepairOrderRepository,
   makeInventoryRepository,
   makeSupplierRepository,
+  makeImportRequestRepository,
 };
