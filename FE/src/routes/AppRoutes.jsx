@@ -121,9 +121,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Khách hàng - lịch sử bảo dưỡng theo khách hàng / theo xe */}
+        {/* Khách hàng - danh sách khách hàng, lịch sử dịch vụ, hợp đồng mua xe */}
         <Route
-          path="/customers/*"
+          path="/customers"
           element={
             <ProtectedRoute>
               <AppLayout>
