@@ -72,6 +72,48 @@ class ManagerApi {
   getSettlementReportById(id) {
     return httpClient.get(`/manager/settlements/${id}`);
   }
+
+  getSpecialties() {
+    return httpClient.get('/manager/specialties');
+  }
+
+  getTeamLeaderOptions() {
+    return httpClient.get('/manager/team-leaders/options');
+  }
+
+  getTechnicians(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return httpClient.get(`/manager/technicians${query ? `?${query}` : ''}`);
+  }
+
+  getTechnicianById(id) {
+    return httpClient.get(`/manager/technicians/${id}`);
+  }
+
+  createTechnician(payload) {
+    return httpClient.post('/manager/technicians', payload);
+  }
+
+  updateTechnician(id, payload) {
+    return httpClient.put(`/manager/technicians/${id}`, payload);
+  }
+
+  getTeamLeaders(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return httpClient.get(`/manager/team-leaders${query ? `?${query}` : ''}`);
+  }
+
+  getTeamLeaderById(id) {
+    return httpClient.get(`/manager/team-leaders/${id}`);
+  }
+
+  createTeamLeader(payload) {
+    return httpClient.post('/manager/team-leaders', payload);
+  }
+
+  updateTeamLeader(id, payload) {
+    return httpClient.put(`/manager/team-leaders/${id}`, payload);
+  }
 }
 
 const managerApi = new ManagerApi();
