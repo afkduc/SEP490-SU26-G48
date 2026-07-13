@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
@@ -263,6 +263,7 @@ export default function Navbar() {
               <NavLink
                 key={item.path}
                 to={item.path}
+                end={item.end}
                 className={({ isActive }) =>
                   'navbar__link' + (isActive ? ' navbar__link--active' : '')
                 }

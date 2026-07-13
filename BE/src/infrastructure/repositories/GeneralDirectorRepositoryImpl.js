@@ -1,4 +1,4 @@
-const GeneralDirectorRepository = require('../../domain/repositories/GeneralDirectorRepository');
+﻿const GeneralDirectorRepository = require('../../domain/repositories/GeneralDirectorRepository');
 const { query } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
 const ApiError = require('../../utils/ApiError');
