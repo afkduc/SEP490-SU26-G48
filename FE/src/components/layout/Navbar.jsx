@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
@@ -28,7 +28,6 @@ const ADMIN_NAV = [
     icon: '📜',
     children: [
       { label: 'Nhật ký hoạt động', path: '/admin/logs' },
-      { label: 'Lịch sử đăng nhập', path: '/admin/logs/login' },
     ],
   },
 ];
@@ -62,11 +61,8 @@ const SERVICE_ADVISOR_NAV = [
   },
   {
     label: 'Khách hàng',
+    path: '/customers',
     icon: '👤',
-    children: [
-      { label: 'Danh sách khách hàng', path: '/customers' },
-      { label: 'Thêm khách hàng', path: '/customers/create' },
-    ],
   },
 ];
 
@@ -157,7 +153,7 @@ function NavDropdownItem({ item, currentPath }) {
   };
 
   // So sanh exact match (bo qua query string o ca 2 phia) de tranh
-  // truong hop /admin/logs/login van khop voi child /admin/logs.
+  // truong hop /admin/logs?tab=login khong bi match nham voi child /admin/logs.
   const isPathMatch = (configPath) => {
     const [baseConfig] = configPath.split('?');
     const [baseCurrent] = currentPath.split('?');
@@ -253,23 +249,23 @@ export default function Navbar() {
       </div>
 
       <nav className="navbar__nav">
-        {navItems.map((item) =>
-          supportsDropdown ? (
-            <NavDropdownItem key={item.label} item={item} currentPath={location.pathname} />
-          ) : (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.end}
-              className={({ isActive }) =>
-                'navbar__link' + (isActive ? ' navbar__link--active' : '')
-              }
-            >
-              {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
-              {item.label}
-            </NavLink>
-          ),
-        )}
+        {supportsDropdown
+          ? navItems.map((item) => (
+              <NavDropdownItem key={item.label} item={item} currentPath={location.pathname} />
+            ))
+          : navItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.end}
+                className={({ isActive }) =>
+                  'navbar__link' + (isActive ? ' navbar__link--active' : '')
+                }
+              >
+                {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
+                {item.label}
+              </NavLink>
+            ))}
       </nav>
 
       <div className="navbar__right">

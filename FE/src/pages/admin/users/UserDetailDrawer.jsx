@@ -3,9 +3,9 @@ import { adminUsersApi } from '../../../services/adminApi';
 import AssignRoleModal from './AssignRoleModal';
 
 const STATUS_LABELS = {
-  active: 'Hoat dong',
-  inactive: 'Ngung hoat dong',
-  locked: 'Bi khoa',
+  active: 'Hoạt động',
+  inactive: 'Ngừng hoạt động',
+  locked: 'Bị khóa',
 };
 
 const STATUS_CLASS = {
@@ -86,7 +86,7 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
         const res = await adminUsersApi.getDetail(userId);
         if (!cancelled) setUser(res);
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Khong tai duoc chi tiet nguoi dung');
+        if (!cancelled) setError(err.message || 'Không tải được chi tiết người dùng');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -110,7 +110,7 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                 <circle cx="12" cy="7" r="4"/>
               </svg>
             </div>
-            <h2 className="drawer__title">Chi tiet nguoi dung</h2>
+            <h2 className="drawer__title">Chi tiết người dùng</h2>
           </div>
           <button className="drawer__close" onClick={onClose} type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -121,7 +121,7 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
 
         <div className="drawer__body">
           {loading ? (
-            <div className="drawer__loading">Dang tai chi tiet nguoi dung</div>
+            <div className="drawer__loading">Đang tải chi tiết người dùng</div>
           ) : error ? (
             <div className="drawer__error">{error}</div>
           ) : user ? (
@@ -138,9 +138,13 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                 </p>
                 {user.roles?.length > 0 && (
                   <div className="user-info-card__roles">
-                    {user.roles.map((r) => (
-                      <span key={r} className="badge badge--info">{r}</span>
-                    ))}
+                    {user.roles.map((r) => {
+                      const name = typeof r === 'object' && r !== null ? r.roleName : r;
+                      const key = typeof r === 'object' && r !== null ? r.roleId : r;
+                      return (
+                        <span key={key} className="badge badge--info">{name}</span>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -148,7 +152,7 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
               {/* Detail list */}
               <dl className="detail-list">
                 <div className="detail-list__group">
-                  <div className="detail-list__group-title">Thong tin tai khoan</div>
+                  <div className="detail-list__group-title">Thông tin tài khoản</div>
                 </div>
                 <div className="detail-list__group">
                   <DetailRow
@@ -160,51 +164,51 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                     value={user.email}
                   />
                   <DetailRow
-                    label="Trang thai"
+                    label="Trạng thái"
                     value={STATUS_LABELS[user.status] || user.status}
                     badge={STATUS_CLASS[user.status] || ''}
                   />
                 </div>
 
                 <div className="detail-list__group">
-                  <div className="detail-list__group-title">Thong tin ca nhan</div>
+                  <div className="detail-list__group-title">Thông tin cá nhân</div>
                 </div>
                 <div className="detail-list__group">
                   <DetailRow
-                    label="Ho"
+                    label="Họ"
                     value={user.firstName || '—'}
                   />
                   <DetailRow
-                    label="Ten"
+                    label="Tên"
                     value={user.lastName || '—'}
                   />
                   <DetailRow
-                    label="So dien thoai"
+                    label="Số điện thoại"
                     value={user.phone || '—'}
                   />
                 </div>
 
                 <div className="detail-list__group">
-                  <div className="detail-list__group-title">Phan cong</div>
+                  <div className="detail-list__group-title">Phân công</div>
                 </div>
                 <div className="detail-list__group">
                   <DetailRow
-                    label="Chi nhanh"
+                    label="Chi nhánh"
                     value={user.branchName || '—'}
                   />
                 </div>
 
                 <div className="detail-list__group">
-                  <div className="detail-list__group-title">Lich su</div>
+                  <div className="detail-list__group-title">Lịch sử</div>
                 </div>
                 <div className="detail-list__group">
                   <DetailRow
-                    label="Ngay tao"
+                    label="Ngày tạo"
                     value={formatDateTime(user.createdAt)}
                   />
                   <DetailRow
-                    label="Dang nhap cuoi"
-                    value={user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Chua dang nhap'}
+                    label="Đăng nhập cuối"
+                    value={user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Chưa có dữ liệu'}
                   />
                 </div>
               </dl>
@@ -219,7 +223,7 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
               <line x1="12" y1="8" x2="12" y2="16"/>
               <line x1="8" y1="12" x2="16" y2="12"/>
             </svg>
-            Phan quyen
+            Phân quyền
           </button>
         </div>
       </div>

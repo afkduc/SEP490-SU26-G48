@@ -11,6 +11,7 @@ const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
+const CustomerHistoryPage = lazy(() => import('../pages/customer/CustomerHistoryPage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
@@ -18,6 +19,9 @@ const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
+const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
+const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
+const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
@@ -101,10 +105,34 @@ function AppRoutes() {
         />
         <Route
           path="/admin/logs/login"
+          element={<Navigate to="/admin/logs?tab=login" replace />}
+        />
+        <Route
+          path="/admin/profile"
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
               <AdminLayout>
-                <AuditLogsPage />
+                <AdminProfilePage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile/devices"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <LoginSessionsPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile/notifications"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AdminProfileNotificationsPage />
               </AdminLayout>
             </ProtectedRoute>
           }
@@ -157,6 +185,18 @@ function AppRoutes() {
           }
         />
 
+        {/* Khách hàng - danh sách khách hàng, lịch sử dịch vụ, hợp đồng mua xe */}
+        <Route
+          path="/customers"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <CustomerHistoryPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Inventory module */}
         <Route
           path={ROUTES.INVENTORY}
@@ -180,7 +220,7 @@ function AppRoutes() {
         </Route>
 
         {/* Placeholder routes */}
-        {['/maintenance', '/customer-care', '/customers', '/services'].map((path) => (
+        {['/maintenance', '/customer-care', '/services'].map((path) => (
           <Route
             key={path}
             path={path}
