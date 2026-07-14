@@ -93,11 +93,44 @@ export function useAdminUsers(initialParams = {}) {
     }));
   }, []);
 
+  /**
+   * Helper: refetch NGAY LAP TUC khong doi debounce.
+   * Dung sau mutation (create/update/toggle status/doi role).
+   * Force-flush debouncedSearch ve gia tri search hien tai truoc khi fetch
+   * de dam bao goi dung search dang dung.
+   */
+  const refresh = useCallback(async () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setDebouncedSearch(params.search ?? '');
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminUsersApi.list({
+        search: params.search || undefined,
+        branchId: params.branchId,
+        roleId: params.roleId,
+        status: params.status,
+        page: params.page,
+        pageSize: params.pageSize,
+      });
+      setData(res || { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE });
+    } catch (err) {
+      setError(err);
+      setData({ items: [], total: 0, page: params.page, pageSize: params.pageSize });
+    } finally {
+      setLoading(false);
+    }
+  }, [params.search, params.branchId, params.roleId, params.status, params.page, params.pageSize]);
+
   return {
     data,
     loading,
     error,
     refetch: fetch,
+    refresh,
     params,
     setParams,
     updateParam,

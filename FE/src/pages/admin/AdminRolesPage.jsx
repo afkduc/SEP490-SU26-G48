@@ -1,7 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAdminRoles, useRoleDetail } from '../../hooks/admin/useAdminRoles';
-import AssignRoleModal from './users/AssignRoleModal';
 import './AdminRolesPage.css';
 
 const ROLE_ACCENT_COLORS = [
@@ -41,34 +39,34 @@ function RoleDetailModal({ roleId, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Chi tiet vai tro</h2>
+          <h2 className="modal-title">Chi tiết vai trò</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        {loading && <div className="modal-loading">Dang tai...</div>}
+        {loading && <div className="modal-loading">Đang tải...</div>}
         {error && <div className="modal-error">{error}</div>}
         {role && (
           <div className="modal-body">
             <div className="detail-grid">
               <div className="detail-row">
-                <span className="detail-label">Ten role</span>
+                <span className="detail-label">Tên vai trò</span>
                 <span className="detail-value">{role.roleName}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Nhan</span>
+                <span className="detail-label">Nhãn</span>
                 <span className="detail-value">{role.roleLabel || '—'}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Mo ta</span>
+                <span className="detail-label">Mô tả</span>
                 <span className="detail-value">{role.description || '—'}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Trang thai</span>
+                <span className="detail-label">Trạng thái</span>
                 <span className={`status-badge status-badge--${role.isActive ? 'active' : 'inactive'}`}>
-                  {role.isActive ? 'Hoat dong' : 'Khong hoat dong'}
+                  {role.isActive ? 'Hoạt động' : 'Không hoạt động'}
                 </span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">So nguoi dung</span>
+                <span className="detail-label">Số người dùng</span>
                 <span className="detail-value" style={{ fontWeight: 700, color: '#4f46e5' }}>
                   {role.userCount ?? 0}
                 </span>
@@ -82,14 +80,8 @@ function RoleDetailModal({ roleId, onClose }) {
 }
 
 export default function AdminRolesPage() {
-  const navigate = useNavigate();
   const { roles, total, loading, error, refetch } = useAdminRoles();
   const [detailRoleId, setDetailRoleId] = useState(null);
-  const [assignUserId, setAssignUserId] = useState(null);
-
-  const handleAssignRoles = useCallback((userId) => {
-    setAssignUserId(userId);
-  }, []);
 
   return (
     <div className="admin-roles">
@@ -102,18 +94,18 @@ export default function AdminRolesPage() {
             </svg>
           </div>
           <div>
-            <h1 className="admin-roles__title">Quan ly vai tro</h1>
-            <p className="admin-roles__subtitle">Xem danh sach & phan quyen nguoi dung</p>
+            <h1 className="admin-roles__title">Quản lý vai trò</h1>
+            <p className="admin-roles__subtitle">Xem danh sách & phân quyền người dùng</p>
           </div>
         </div>
         <div className="admin-roles__actions">
-          <span className="admin-roles__total-badge">{total} vai tro</span>
+          <span className="admin-roles__total-badge">{total} vai trò</span>
           <button className="btn btn--outline" onClick={refetch}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="23 4 23 10 17 10"/>
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
             </svg>
-            Tai lai
+            Tải lại
           </button>
         </div>
       </div>
@@ -134,7 +126,7 @@ export default function AdminRolesPage() {
       {loading && (
         <div className="roles-loading">
           <div className="roles-spinner" />
-          <span>Dang tai danh sach vai tro...</span>
+          <span>Đang tải danh sách vai trò...</span>
         </div>
       )}
 
@@ -146,7 +138,7 @@ export default function AdminRolesPage() {
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
-              <p>Chua co vai tro nao</p>
+              <p>Chưa có vai trò nào</p>
             </div>
           ) : (
             <div className="roles-grid">
@@ -161,7 +153,7 @@ export default function AdminRolesPage() {
                       <RoleCardIcon index={index} />
                     </div>
                     <div className={`role-card__badge ${role.isActive ? 'active' : 'inactive'}`}>
-                      {role.isActive ? 'Hoat dong' : 'Ngung'}
+                      {role.isActive ? 'Hoạt động' : 'Ngừng'}
                     </div>
                   </div>
 
@@ -179,13 +171,13 @@ export default function AdminRolesPage() {
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                         <circle cx="9" cy="7" r="4"/>
                       </svg>
-                      <span>{role.userCount ?? 0} nguoi dung</span>
+                      <span>{role.userCount ?? 0} người dùng</span>
                     </div>
                     <div className="role-card__actions">
                       <button
                         className="role-card__btn role-card__btn--detail"
                         onClick={() => setDetailRoleId(role.id)}
-                        title="Xem chi tiet"
+                        title="Xem chi tiết"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <circle cx="11" cy="11" r="8"/>
@@ -197,7 +189,7 @@ export default function AdminRolesPage() {
                       <button
                         className="role-card__btn role-card__btn--assign"
                         onClick={() => navigate('/admin/users')}
-                        title="Phan quyen"
+                        title="Phân quyền"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -217,15 +209,6 @@ export default function AdminRolesPage() {
       {/* ── Role Detail Modal ──────────────────────────────────── */}
       {detailRoleId && (
         <RoleDetailModal roleId={detailRoleId} onClose={() => setDetailRoleId(null)} />
-      )}
-
-      {/* ── Assign Role Modal (for user detail drawer) ────────── */}
-      {assignUserId && (
-        <AssignRoleModal
-          userId={assignUserId}
-          onClose={() => setAssignUserId(null)}
-          onSuccess={refetch}
-        />
       )}
     </div>
   );

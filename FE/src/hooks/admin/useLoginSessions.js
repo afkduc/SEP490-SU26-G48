@@ -1,115 +1,61 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { auditApi } from '../../services/auditApi';
+import { useState, useEffect, useCallback } from 'react';
+import { adminLoginSessionsApi, adminBranchesApi } from '../../services/adminApi';
 
-const DEFAULT_PAGE_SIZE = 20;
-const SEARCH_DEBOUNCE_MS = 400;
+const DEFAULT_PARAMS = {
+  userName: '',
+  phone: '',
+  actionType: '',
+  status: '',
+  startDate: '',
+  endDate: '',
+  branchId: undefined,
+  page: 1,
+  pageSize: 20,
+};
 
-/**
- * Hook lay danh sach login sessions (lich su dang nhap).
- *
- * Params (object):
- *   - userName     : chuoi tim kiem theo ten user
- *   - phone        : chuoi tim kiem theo so dien thoai
- *   - actionType   : LOGIN | LOGIN_FAILED
- *   - status       : active | ended | failed
- *   - startDate    : ngay bat dau (ISO string)
- *   - endDate      : ngay ket thuc (ISO string)
- *   - branchId     : ID chi nhanh
- *   - page         : so trang (mac dinh 1)
- *   - pageSize     : so ban ghi moi trang (mac dinh 20)
- *
- * Tra ve:
- *   - data       : { items, total, page, pageSize }
- *   - loading    : boolean
- *   - error      : Error | null
- *   - refetch()  : goi lai API
- *   - params     : params hien tai
- *   - setParams  : cap nhat params
- *   - updateParam: cap nhat mot filter, reset page ve 1
- */
-export function useLoginSessions(initialParams = {}) {
-  const [params, setParams] = useState({
-    userName: '',
-    phone: '',
-    actionType: '',
-    status: '',
-    startDate: '',
-    endDate: '',
-    branchId: undefined,
-    page: 1,
-    pageSize: DEFAULT_PAGE_SIZE,
-    ...initialParams,
-  });
-
-  const [data, setData] = useState({
-    items: [],
-    total: 0,
-    page: 1,
-    pageSize: DEFAULT_PAGE_SIZE,
-  });
-  const [loading, setLoading] = useState(true);
+export function useLoginSessions() {
+  const [data, setData] = useState({ items: [], total: 0, page: 1, pageSize: 20 });
+  const [params, setParamsState] = useState(DEFAULT_PARAMS);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const [debouncedUserName, setDebouncedUserName] = useState(params.userName);
-  const [debouncedPhone, setDebouncedPhone] = useState(params.phone);
-  const debounceUserNameRef = useRef(null);
-  const debouncePhoneRef = useRef(null);
+  const setParams = useCallback((updater) => {
+    setParamsState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return { ...prev, ...next, page: next.page ?? 1 };
+    });
+  }, []);
 
-  useEffect(() => {
-    if (debounceUserNameRef.current) clearTimeout(debounceUserNameRef.current);
-    debounceUserNameRef.current = setTimeout(() => setDebouncedUserName(params.userName), SEARCH_DEBOUNCE_MS);
-    return () => { if (debounceUserNameRef.current) clearTimeout(debounceUserNameRef.current); };
-  }, [params.userName]);
-
-  useEffect(() => {
-    if (debouncePhoneRef.current) clearTimeout(debouncePhoneRef.current);
-    debouncePhoneRef.current = setTimeout(() => setDebouncedPhone(params.phone), SEARCH_DEBOUNCE_MS);
-    return () => { if (debouncePhoneRef.current) clearTimeout(debouncePhoneRef.current); };
-  }, [params.phone]);
+  const updateParam = useCallback((key, value) => {
+    setParamsState((prev) => ({ ...prev, [key]: value, page: 1 }));
+  }, []);
 
   const fetch = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await auditApi.getLoginSessions({
-        userName: debouncedUserName || undefined,
-        phone: debouncedPhone || undefined,
-        actionType: params.actionType || undefined,
-        status: params.status || undefined,
-        startDate: params.startDate || undefined,
-        endDate: params.endDate || undefined,
-        branchId: params.branchId,
-        page: params.page,
-        pageSize: params.pageSize,
+      const qs = {};
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') qs[k] = v;
       });
-      setData(res || { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE });
+      const res = await adminLoginSessionsApi.list(qs);
+      const items = res?.items ?? res ?? [];
+      setData({
+        items: Array.isArray(items) ? items : [],
+        total: Array.isArray(items) ? items.length : (res?.total ?? 0),
+        page: Number(res?.page || params.page || 1),
+        pageSize: Number(res?.pageSize || params.pageSize || 20),
+      });
     } catch (err) {
-      setError(err);
-      setData({ items: [], total: 0, page: params.page, pageSize: params.pageSize });
+      setError(err.message || 'Không thể tải danh sách');
     } finally {
       setLoading(false);
     }
-  }, [
-    debouncedUserName,
-    debouncedPhone,
-    params.actionType,
-    params.status,
-    params.startDate,
-    params.endDate,
-    params.branchId,
-    params.page,
-    params.pageSize,
-  ]);
+  }, [params]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
 
-  const updateParam = useCallback((key, value) => {
-    setParams((prev) => ({
-      ...prev,
-      [key]: value,
-      page: key === 'page' ? value : 1,
-    }));
-  }, []);
-
-  return { data, loading, error, refetch: fetch, params, setParams, updateParam };
+  return { data, params, setParams, updateParam, loading, error, refetch: fetch };
 }
