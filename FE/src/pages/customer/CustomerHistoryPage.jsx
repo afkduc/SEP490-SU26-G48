@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency, formatDate } from '../../utils';
 import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
-import { listCustomersApi, getCustomerApi, updateCustomerApi } from '../../services/customerApi';
+import { listCustomersApi, getCustomerApi, updateCustomerApi, importCustomersApi } from '../../services/customerApi';
 import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi } from '../../services/vehicleApi';
 import { STATUS_LABELS } from '../repairsettlement/mockData';
+import { useAuth } from '../../contexts';
+import { normalizeRoles } from '../../contexts/AppContext';
+import { ROLES } from '../../constants/roles';
+
+const IMPORT_ALLOWED_ROLES = [ROLES.MANAGER];
 
 // ─── Modal xem chi tiết 1 phiếu quyết toán trong lịch sử ─────────────
 function SettlementDetailModal({ settlementId, onClose }) {
@@ -38,7 +43,20 @@ function SettlementDetailModal({ settlementId, onClose }) {
           {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
           {detail && (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+                {[
+                  ['Chi nhánh', detail.branch || '—'],
+                  ['Ngày vào', detail.date || '—'],
+                  ['Ngày ra', detail.paidDate || 'Chờ khách thanh toán'],
+                ].map(([l, v]) => (
+                  <div key={l} style={{ background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', marginBottom: 4 }}>{l}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-900)' }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginBottom: 16 }}>
                 <div>
                   <div className="form-section-title">Khách hàng</div>
                   {[
@@ -255,7 +273,7 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
   return (
     <>
       <div className="modal-overlay" onClick={onClose}>
-        <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal modal-xl" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1200 }}>
           <div className="modal-header">
             <h3 className="modal-title">🚗 Lịch sử xe – {vehicle.licensePlate}</h3>
             <button className="modal-close" onClick={onClose}>✕</button>
@@ -265,8 +283,10 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
             <div style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
               <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 16, color: 'var(--primary-dark)', marginBottom: 4 }}>{vehicle.licensePlate}</div>
               <div style={{ fontWeight: 600, marginBottom: 8 }}>{vehicle.vehicleModel || '—'}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 12, color: 'var(--gray-600)' }}>
-                <div>Số khung: <b>{vehicle.frameNumber || '—'}</b></div>
+              <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 6 }}>
+                Số khung: <b>{vehicle.frameNumber || '—'}</b>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 12, color: 'var(--gray-600)' }}>
                 <div>Số máy: <b>{vehicle.engineNumber || '—'}</b></div>
                 <div>Km hiện tại: <b>{(vehicle.currentKm || 0).toLocaleString('vi-VN')} km</b></div>
               </div>
@@ -320,13 +340,13 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
             {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
             <div className="table-wrapper">
               <table className="data-table">
-                <thead><tr><th>Số phiếu</th><th>Ngày</th><th>Khách hàng</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
+                <thead><tr><th>Số phiếu</th><th>Chi nhánh</th><th>Ngày</th><th>Khách hàng</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
                 <tbody>
                   {loading && (
-                    <tr><td colSpan={6}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
+                    <tr><td colSpan={7}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
                   )}
                   {!loading && history.length === 0 && (
-                    <tr><td colSpan={6}>
+                    <tr><td colSpan={7}>
                       <div className="empty-state">
                         <div className="empty-state-icon">📭</div>
                         <h3>Chưa có lịch sử</h3>
@@ -337,10 +357,11 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
                     const st = STATUS_LABELS[h.status] || { label: h.status, badge: 'badge-inactive' };
                     return (
                       <tr key={h.id}>
-                        <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{h.code}</span></td>
-                        <td style={{ fontSize: 12 }}>{h.date}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{h.code}</span></td>
+                        <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{h.branch || '—'}</td>
+                        <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{h.date}</td>
                         <td style={{ fontSize: 12 }}>{h.customer?.fullName || '—'}</td>
-                        <td style={{ fontWeight: 700 }}>{formatCurrency(h.total)}</td>
+                        <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(h.total)}</td>
                         <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
                         <td><button className="btn btn-secondary btn-sm btn-icon" title="Xem chi tiết" onClick={() => setViewId(h.id)}>👁️</button></td>
                       </tr>
@@ -470,7 +491,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
   return (
     <>
       <div className="modal-overlay" onClick={onClose}>
-        <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal modal-xl" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1200 }}>
           <div className="modal-header">
             <h3 className="modal-title">👤 {customer?.fullName || 'Khách hàng'}</h3>
             <button className="modal-close" onClick={onClose}>✕</button>
@@ -501,7 +522,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
 
             {customer && tab === 'info' && !editing && (
               <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+                <div style={{ border: '1px solid var(--gray-200)', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
                   {[
                     ['Họ và tên', customer.fullName],
                     ['Số điện thoại', customer.phone],
@@ -511,7 +532,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                     ['Địa chỉ', customer.address || '—'],
                   ].map(([l, v]) => (
                     <div key={l} className="detail-row">
-                      <div className="detail-label">{l}</div>
+                      <div className="detail-label" style={{ width: 140 }}>{l}</div>
                       <div className="detail-value">{v}</div>
                     </div>
                   ))}
@@ -528,8 +549,10 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                       <button className="btn btn-info btn-sm" onClick={() => setVehicleView(v)}>🔍 Lịch sử xe</button>
                     </div>
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>{v.vehicleModel || '—'}</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 12, color: 'var(--gray-600)' }}>
-                      <div>Số khung: <b>{v.frameNumber || '—'}</b></div>
+                    <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 6 }}>
+                      Số khung: <b>{v.frameNumber || '—'}</b>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 12, color: 'var(--gray-600)' }}>
                       <div>Số máy: <b>{v.engineNumber || '—'}</b></div>
                       <div>Km hiện tại: <b>{(v.currentKm || 0).toLocaleString('vi-VN')} km</b></div>
                     </div>
@@ -628,13 +651,13 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
 
                 <div className="table-wrapper">
                   <table className="data-table">
-                    <thead><tr><th>Số phiếu</th><th>Ngày</th><th>Xe</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
+                    <thead><tr><th>Số phiếu</th><th>Chi nhánh</th><th>Ngày</th><th>Xe</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
                     <tbody>
                       {loadingHistory && (
-                        <tr><td colSpan={6}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
+                        <tr><td colSpan={7}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
                       )}
                       {!loadingHistory && history.length === 0 && (
-                        <tr><td colSpan={6}>
+                        <tr><td colSpan={7}>
                           <div className="empty-state">
                             <div className="empty-state-icon">📭</div>
                             <h3>Chưa có lịch sử dịch vụ</h3>
@@ -646,13 +669,14 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                         const st = STATUS_LABELS[h.status] || { label: h.status, badge: 'badge-inactive' };
                         return (
                           <tr key={h.id}>
-                            <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{h.code}</span></td>
-                            <td style={{ fontSize: 12 }}>{h.date}</td>
+                            <td style={{ whiteSpace: 'nowrap' }}><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{h.code}</span></td>
+                            <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{h.branch || '—'}</td>
+                            <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{h.date}</td>
                             <td>
-                              <div style={{ fontWeight: 600 }}>{h.vehicle?.licensePlate}</div>
-                              <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{h.vehicle?.vehicleModel}</div>
+                              <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{h.vehicle?.licensePlate}</div>
+                              <div style={{ fontSize: 11, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>{h.vehicle?.vehicleModel}</div>
                             </td>
-                            <td style={{ fontWeight: 700 }}>{formatCurrency(h.total)}</td>
+                            <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(h.total)}</td>
                             <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
                             <td><button className="btn btn-secondary btn-sm btn-icon" title="Xem chi tiết" onClick={() => setViewSettlementId(h.id)}>👁️</button></td>
                           </tr>
@@ -715,6 +739,122 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
   );
 }
 
+// ─── Modal nhập khách hàng (kèm 1 xe/dòng) từ file Excel ──────────────
+function ImportCustomersModal({ onClose, onImported }) {
+  const [file, setFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files?.[0] || null);
+    setResult(null);
+    setError('');
+  };
+
+  const handleSubmit = async () => {
+    if (!file) {
+      setError('Vui lòng chọn file Excel (.xlsx)');
+      return;
+    }
+    setImporting(true);
+    setError('');
+    try {
+      const data = await importCustomersApi(file);
+      setResult(data);
+      onImported?.();
+    } catch (err) {
+      setError(err.message || 'Import thất bại');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">📥 Nhập khách hàng từ Excel</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body">
+          <div style={{ background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>File Excel cần có (dòng đầu tiên là tiêu đề cột):</div>
+            <div style={{ marginBottom: 4 }}><b>Bắt buộc:</b> Họ và tên, Số điện thoại, Biển số</div>
+            <div>
+              <b>Tùy chọn:</b> CCCD, Ngày sinh, Email, Địa chỉ, Mã số thuế, Người liên hệ, SĐT người liên hệ,
+              Dòng xe, Số khung, Số máy, Năm sản xuất, Màu, Số km hiện tại
+            </div>
+            <div style={{ marginTop: 6, color: 'var(--gray-500)' }}>
+              Mỗi dòng = 1 khách hàng + 1 xe. Số điện thoại đã tồn tại sẽ được gán thêm xe mới (không tạo trùng khách hàng); biển số đã tồn tại sẽ được báo lại và bỏ qua.
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label required">Chọn file Excel (.xlsx)</label>
+            <input type="file" accept=".xlsx" onChange={handleFileChange} />
+          </div>
+
+          {error && (
+            <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#C62828' }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {result && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 12 }}>
+                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#047857' }}>{result.customersCreated}</div>
+                  <div style={{ fontSize: 11, color: '#047857' }}>KH mới</div>
+                </div>
+                <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#1D4ED8' }}>{result.customersReused}</div>
+                  <div style={{ fontSize: 11, color: '#1D4ED8' }}>KH đã có</div>
+                </div>
+                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#047857' }}>{result.vehiclesCreated}</div>
+                  <div style={{ fontSize: 11, color: '#047857' }}>Xe mới</div>
+                </div>
+                <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#C2410C' }}>{result.errors.length}</div>
+                  <div style={{ fontSize: 11, color: '#C2410C' }}>Dòng lỗi/bỏ qua</div>
+                </div>
+              </div>
+
+              {result.errors.length > 0 && (
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead><tr><th style={{ width: 80 }}>Dòng</th><th>Lý do</th></tr></thead>
+                    <tbody>
+                      {result.errors.map((e, i) => (
+                        <tr key={i}>
+                          <td>{e.row}</td>
+                          <td style={{ color: '#C62828', fontSize: 12 }}>{e.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>{result ? 'Đóng' : 'Hủy'}</button>
+          {!result && (
+            <button className="btn btn-primary" onClick={handleSubmit} disabled={!file || importing}>
+              {importing ? 'Đang nhập…' : '📥 Nhập dữ liệu'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Danh sách khách hàng (dữ liệu thật, tìm theo tên/SĐT/biển số) ────
 function CustomerList() {
   const [search, setSearch] = useState('');
@@ -724,6 +864,10 @@ function CustomerList() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+
+  const { user } = useAuth();
+  const canImport = normalizeRoles(user?.roles).some((r) => IMPORT_ALLOWED_ROLES.includes(r));
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -751,6 +895,13 @@ function CustomerList() {
           <h1>Khách hàng</h1>
           <div className="breadcrumb">Trang chủ / Khách hàng / Danh sách khách hàng</div>
         </div>
+        {canImport && (
+          <div className="page-header-right">
+            <button type="button" className="btn btn-primary" onClick={() => setShowImport(true)}>
+              + Thêm khách hàng
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20, maxWidth: 560 }}>
@@ -833,6 +984,10 @@ function CustomerList() {
 
       {selectedId && (
         <CustomerDetailModal customerId={selectedId} onClose={() => setSelectedId(null)} onUpdated={load} />
+      )}
+
+      {showImport && (
+        <ImportCustomersModal onClose={() => setShowImport(false)} onImported={load} />
       )}
     </div>
   );
