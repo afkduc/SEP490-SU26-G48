@@ -5,16 +5,16 @@ class HttpClient {
     this.baseURL = baseURL;
   }
 
-  async request(path, { method = 'GET', body, headers = {} } = {}) {
+  async request(path, { method = 'GET', body, headers = {}, isForm = false } = {}) {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     const response = await fetch(`${this.baseURL}${path}`, {
       method,
       headers: {
-        'Content-Type': 'application/json',
+        ...(isForm ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: isForm ? body : body ? JSON.stringify(body) : undefined,
     });
 
     const contentType = response.headers.get('content-type') || '';
@@ -44,6 +44,10 @@ class HttpClient {
 
   post(path, body) {
     return this.request(path, { method: 'POST', body });
+  }
+
+  postForm(path, formData) {
+    return this.request(path, { method: 'POST', body: formData, isForm: true });
   }
 
   put(path, body) {
