@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency, formatDate } from '../../utils';
 import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
-import { listCustomersApi, getCustomerApi, updateCustomerApi } from '../../services/customerApi';
+import { listCustomersApi, getCustomerApi, updateCustomerApi, importCustomersApi } from '../../services/customerApi';
 import { STATUS_LABELS } from '../repairsettlement/mockData';
+import { useAuth } from '../../contexts';
+import { normalizeRoles } from '../../contexts/AppContext';
+import { ROLES } from '../../constants/roles';
+
+const IMPORT_ALLOWED_ROLES = [ROLES.MANAGER];
 
 // ─── Modal xem chi tiết 1 phiếu quyết toán trong lịch sử ─────────────
 function SettlementDetailModal({ settlementId, onClose }) {
@@ -444,6 +449,122 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
   );
 }
 
+// ─── Modal nhập khách hàng (kèm 1 xe/dòng) từ file Excel ──────────────
+function ImportCustomersModal({ onClose, onImported }) {
+  const [file, setFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files?.[0] || null);
+    setResult(null);
+    setError('');
+  };
+
+  const handleSubmit = async () => {
+    if (!file) {
+      setError('Vui lòng chọn file Excel (.xlsx)');
+      return;
+    }
+    setImporting(true);
+    setError('');
+    try {
+      const data = await importCustomersApi(file);
+      setResult(data);
+      onImported?.();
+    } catch (err) {
+      setError(err.message || 'Import thất bại');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">📥 Nhập khách hàng từ Excel</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body">
+          <div style={{ background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>File Excel cần có (dòng đầu tiên là tiêu đề cột):</div>
+            <div style={{ marginBottom: 4 }}><b>Bắt buộc:</b> Họ và tên, Số điện thoại, Biển số</div>
+            <div>
+              <b>Tùy chọn:</b> CCCD, Ngày sinh, Email, Địa chỉ, Mã số thuế, Người liên hệ, SĐT người liên hệ,
+              Dòng xe, Số khung, Số máy, Năm sản xuất, Màu, Số km hiện tại
+            </div>
+            <div style={{ marginTop: 6, color: 'var(--gray-500)' }}>
+              Mỗi dòng = 1 khách hàng + 1 xe. Số điện thoại đã tồn tại sẽ được gán thêm xe mới (không tạo trùng khách hàng); biển số đã tồn tại sẽ được báo lại và bỏ qua.
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label required">Chọn file Excel (.xlsx)</label>
+            <input type="file" accept=".xlsx" onChange={handleFileChange} />
+          </div>
+
+          {error && (
+            <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#C62828' }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {result && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 12 }}>
+                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#047857' }}>{result.customersCreated}</div>
+                  <div style={{ fontSize: 11, color: '#047857' }}>KH mới</div>
+                </div>
+                <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#1D4ED8' }}>{result.customersReused}</div>
+                  <div style={{ fontSize: 11, color: '#1D4ED8' }}>KH đã có</div>
+                </div>
+                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#047857' }}>{result.vehiclesCreated}</div>
+                  <div style={{ fontSize: 11, color: '#047857' }}>Xe mới</div>
+                </div>
+                <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#C2410C' }}>{result.errors.length}</div>
+                  <div style={{ fontSize: 11, color: '#C2410C' }}>Dòng lỗi/bỏ qua</div>
+                </div>
+              </div>
+
+              {result.errors.length > 0 && (
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead><tr><th style={{ width: 80 }}>Dòng</th><th>Lý do</th></tr></thead>
+                    <tbody>
+                      {result.errors.map((e, i) => (
+                        <tr key={i}>
+                          <td>{e.row}</td>
+                          <td style={{ color: '#C62828', fontSize: 12 }}>{e.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>{result ? 'Đóng' : 'Hủy'}</button>
+          {!result && (
+            <button className="btn btn-primary" onClick={handleSubmit} disabled={!file || importing}>
+              {importing ? 'Đang nhập…' : '📥 Nhập dữ liệu'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Danh sách khách hàng (dữ liệu thật, tìm theo tên/SĐT/biển số) ────
 function CustomerList() {
   const [search, setSearch] = useState('');
@@ -453,6 +574,10 @@ function CustomerList() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+
+  const { user } = useAuth();
+  const canImport = normalizeRoles(user?.roles).some((r) => IMPORT_ALLOWED_ROLES.includes(r));
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -480,6 +605,13 @@ function CustomerList() {
           <h1>Khách hàng</h1>
           <div className="breadcrumb">Trang chủ / Khách hàng / Danh sách khách hàng</div>
         </div>
+        {canImport && (
+          <div className="page-header-right">
+            <button type="button" className="btn btn-primary" onClick={() => setShowImport(true)}>
+              + Thêm khách hàng
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20, maxWidth: 560 }}>
@@ -562,6 +694,10 @@ function CustomerList() {
 
       {selectedId && (
         <CustomerDetailModal customerId={selectedId} onClose={() => setSelectedId(null)} onUpdated={load} />
+      )}
+
+      {showImport && (
+        <ImportCustomersModal onClose={() => setShowImport(false)} onImported={load} />
       )}
     </div>
   );
