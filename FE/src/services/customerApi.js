@@ -15,3 +15,9 @@ export async function getCustomerApi(id) {
 export async function updateCustomerApi(id, data) {
   return httpClient.put(`/customers/${id}`, data);
 }
+
+export async function importCustomersApi(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return httpClient.postForm('/customers/import', formData);
+}

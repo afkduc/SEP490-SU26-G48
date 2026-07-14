@@ -1,5 +1,6 @@
 const ApiError = require('../../utils/ApiError');
 const { normalizeVietnamese } = require('../../utils/vietnamese');
+const { parseCustomerImportFile } = require('./customerImportParser');
 
 class CustomerService {
   constructor({ customerRepository }) {
@@ -58,6 +59,49 @@ class CustomerService {
     if (!existing) throw new ApiError(404, 'Không tìm thấy khách hàng');
 
     return this.customerRepository.update(id, data);
+  }
+
+  // Import khach hang + xe tu file Excel: moi dong = 1 khach hang + 1 xe.
+  // SDT trung -> dung lai khach hang cu (khong tao trung); bien so/so khung/so may
+  // trung -> bo qua phan tao xe cua dong do (khach hang van duoc tao/dung neu hop le).
+  async importFromExcel(buffer) {
+    const rows = await parseCustomerImportFile(buffer);
+
+    const result = {
+      totalRows: rows.length,
+      customersCreated: 0,
+      customersReused: 0,
+      vehiclesCreated: 0,
+      vehiclesSkipped: 0,
+      errors: [],
+    };
+
+    for (const row of rows) {
+      if (row.errors.length > 0) {
+        result.errors.push({ row: row.rowNumber, reason: row.errors.join('; ') });
+        continue;
+      }
+
+      try {
+        const outcome = await this.customerRepository.importCustomerVehicleRow(row.payload);
+        if (outcome.customerCreated) result.customersCreated += 1;
+        else result.customersReused += 1;
+
+        if (outcome.vehicleCreated) {
+          result.vehiclesCreated += 1;
+        } else if (outcome.vehicleSkipped) {
+          result.vehiclesSkipped += 1;
+          result.errors.push({
+            row: row.rowNumber,
+            reason: `Bỏ qua xe: ${outcome.vehicleSkipReason || 'thông tin xe đã tồn tại trong hệ thống'}`,
+          });
+        }
+      } catch (err) {
+        result.errors.push({ row: row.rowNumber, reason: err.message || 'Lỗi không xác định khi lưu dữ liệu' });
+      }
+    }
+
+    return result;
   }
 }
 
