@@ -1,4 +1,5 @@
 const { success } = require('../../utils/response');
+const ApiError = require('../../utils/ApiError');
 
 class CustomerController {
   constructor({ customerService }) {
@@ -28,6 +29,16 @@ class CustomerController {
     try {
       const item = await this.customerService.update(req.params.id, req.body);
       return success(res, item, 'Customer updated');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  importExcel = async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError(400, 'Vui lòng chọn file Excel (.xlsx)');
+      const result = await this.customerService.importFromExcel(req.file.buffer);
+      return success(res, result, 'Import khách hàng hoàn tất');
     } catch (err) {
       next(err);
     }
