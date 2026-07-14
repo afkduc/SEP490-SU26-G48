@@ -1,4 +1,4 @@
-import httpClient from './httpClient';
+﻿import httpClient from './httpClient';
 
 /**
  * Legacy named exports (giu de backward compat voi code cu)
@@ -124,13 +124,33 @@ class AdminUserRolesApi {
 const adminUserRolesApi = new AdminUserRolesApi();
 
 /**
- * Admin Login Sessions API (dashboard widget)
- *   - getRecent(): GET /api/audit/login-sessions voi pageSize=8 (ko filter)
- *     tra ve: { items: [{id, userName, actionType, ipAddress, loginTime, status, ...}], total, page, pageSize }
+ * Admin Login Sessions API
+ *   - list(params): GET /api/audit/login-sessions
+ *     params: { userName, phone, actionType, status, startDate, endDate, branchId, page, pageSize }
+ *     tra ve: { items, total, page, pageSize }
+ *   - getRecent(): GET /api/audit/login-sessions?page=1&pageSize=8
  */
+class AdminLoginSessionsApi {
+  list(params = {}) {
+    return httpClient.get(`/audit/login-sessions${buildQuery(params)}`);
+  }
+}
+
+const adminLoginSessionsApi = new AdminLoginSessionsApi();
+
 export async function getRecentLoginSessions() {
   const res = await httpClient.get('/audit/login-sessions?page=1&pageSize=8');
-  return res; // httpClient da unwrap, res = { items, total, page, pageSize }
+  return res;
+}
+
+/**
+ * POST /api/admin/reissue-token
+ * Cap lai JWT voi day du roles tu DB. Dung khi token cu thieu role admin
+ * (vi du: user moi duoc them role admin nhung token cu van con cache).
+ * Tra ve: { token, roles }
+ */
+export async function reissueAdminToken() {
+  return httpClient.post('/admin/reissue-token', {});
 }
 
 export {
@@ -142,4 +162,5 @@ export {
   adminBranchesApi,
   adminRolesApi,
   adminUserRolesApi,
+  adminLoginSessionsApi,
 };
