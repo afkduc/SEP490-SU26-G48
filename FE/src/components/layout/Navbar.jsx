@@ -90,17 +90,12 @@ const MANAGER_NAV = [
   },
 ];
 
-// ===== Warehouse Staff (Nhan vien kho) - chi thay cac chuc nang lien quan den kho =====
+// ===== Warehouse Staff (Nhan vien kho) - menu phang, khong dropdown =====
 const WAREHOUSE_STAFF_NAV = [
   { label: 'Tong quan kho', path: '/inventory', icon: '🏠', end: true },
-  {
-    label: 'Phu tung',
-    icon: '📦',
-    children: [
-      { label: 'Danh sach phu tung', path: '/inventory/parts' },
-    ],
-  },
+  { label: 'Phu tung', path: '/inventory/parts', icon: '📦' },
   { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
+  { label: 'Phieu nhap', path: '/inventory/import-requests', icon: '📥' },
   { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
 ];
 
@@ -109,6 +104,7 @@ const ACCOUNTANT_NAV = [
   { label: 'Tong quan kho', path: '/inventory', icon: '🏠' },
   { label: 'Phu tung', path: '/inventory/parts', icon: '📦' },
   { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
+  { label: 'Phieu nhap', path: '/inventory/import-requests', icon: '📥' },
   { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
 ];
 
@@ -117,6 +113,7 @@ const GENERAL_DIRECTOR_NAV = [
   { label: 'Tong quan kho', path: '/inventory', icon: '🏠', end: true },
   { label: 'Phu tung', path: '/inventory/parts', icon: '📦' },
   { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
+  { label: 'Phieu nhap', path: '/inventory/import-requests', icon: '📥' },
   { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
 ];
 
