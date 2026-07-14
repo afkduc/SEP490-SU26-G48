@@ -1,0 +1,138 @@
+.ir-form {
+  padding: 24px 32px;
+}
+
+.ir-form__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.ir-form__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: #1f2937;
+}
+
+.ir-form__subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+  max-width: 640px;
+}
+
+.ir-form__body {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.ir-form__info {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.ir-form__info-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.ir-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ir-form__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ir-form__hint {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.ir-form__hint--error {
+  color: #dc2626;
+}
+
+.ir-form__items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ir-form__items-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.ir-form__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 30;
+  margin-top: 4px;
+}
+
+.ir-form__dropdown-item {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.ir-form__dropdown-item--clickable {
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ir-form__dropdown-item--clickable:hover {
+  background: #f3f4f6;
+}
+
+.ir-form__dropdown-meta {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.ir-form__error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.ir-form__actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.text-right {
+  text-align: right;
+}
