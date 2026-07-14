@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { formatCurrency, formatDate } from '../../utils';
 import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
 import { listCustomersApi, getCustomerApi, updateCustomerApi } from '../../services/customerApi';
+import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi } from '../../services/vehicleApi';
 import { STATUS_LABELS } from '../repairsettlement/mockData';
 
 // ─── Modal xem chi tiết 1 phiếu quyết toán trong lịch sử ─────────────
@@ -115,12 +116,121 @@ function SettlementDetailModal({ settlementId, onClose }) {
   );
 }
 
+// ─── Form chuyển nhượng xe cho khách hàng khác (tìm khách theo tên/SĐT) ──
+function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
+  const [search, setSearch] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [transferDate, setTransferDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const term = search.trim();
+    if (term.length < 2) { setSuggestions([]); return undefined; }
+    const timer = setTimeout(() => {
+      listCustomersApi({ search: term, limit: 5 })
+        .then((result) => setSuggestions((result.items || []).filter((c) => String(c.id) !== String(currentOwnerId))))
+        .catch(() => setSuggestions([]));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, currentOwnerId]);
+
+  const submit = async () => {
+    if (!selected) { setError('Vui lòng chọn khách hàng nhận chuyển nhượng'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await transferVehicleOwnerApi(vehicleId, { newCustomerId: selected.id, transferDate, notes });
+      onDone();
+    } catch (err) {
+      setError(err.message || 'Chuyển nhượng thất bại');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ border: '1px solid var(--primary-light)', background: 'var(--primary-very-light)', borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>
+      <div style={{ fontWeight: 700, marginBottom: 10, color: 'var(--primary-dark)' }}>🔄 Chuyển nhượng xe cho khách hàng khác</div>
+      {error && (
+        <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#C62828' }}>⚠️ {error}</div>
+      )}
+
+      {!selected ? (
+        <div style={{ position: 'relative', marginBottom: 10 }}>
+          <input
+            className="form-input"
+            placeholder="Tìm khách hàng theo tên hoặc số điện thoại…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {suggestions.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 6, boxShadow: 'var(--shadow-lg)', maxHeight: 220, overflowY: 'auto' }}>
+              {suggestions.map((c) => (
+                <div
+                  key={c.id}
+                  onMouseDown={() => { setSelected(c); setSuggestions([]); setSearch(''); }}
+                  style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--gray-100)' }}
+                >
+                  <div style={{ fontWeight: 600 }}>{c.fullName}</div>
+                  <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{c.phone}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ marginBottom: 10, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <b>Khách hàng mới:</b> {selected.fullName} ({selected.phone})
+          <button className="btn btn-secondary btn-sm" onClick={() => setSelected(null)}>Đổi</button>
+        </div>
+      )}
+
+      <div className="form-grid form-grid-2">
+        <div className="form-group">
+          <label className="form-label">Ngày chuyển nhượng</label>
+          <input className="form-input" type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Ghi chú</label>
+          <input className="form-input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="VD: bán lại xe cũ…" />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button className="btn btn-secondary" onClick={onCancel} disabled={saving}>Hủy</button>
+        <button className="btn btn-primary" onClick={submit} disabled={saving || !selected}>
+          {saving ? 'Đang lưu…' : 'Xác nhận chuyển nhượng'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal xem lịch sử dịch vụ của 1 chiếc xe (mở từ chi tiết khách hàng) ──
-function VehicleHistoryModal({ vehicle, onClose }) {
+// Xe co the doi chu (ban lai) nen: lich su dich vu luon gan voi vehicle_id
+// (hien thi du, khong phu thuoc ai dang so huu), kem cot "Khach hang" vi moi
+// phieu co the thuoc ve chu cu hoac chu moi khac nhau; rieng "lich su chu xe"
+// lay tu bang vehicle_owners de biet chinh xac giai doan ai so huu.
+function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [viewId, setViewId] = useState(null);
+
+  const [owners, setOwners] = useState([]);
+  const [loadingOwners, setLoadingOwners] = useState(true);
+  const [showTransferForm, setShowTransferForm] = useState(false);
+
+  const loadOwners = () => {
+    setLoadingOwners(true);
+    getVehicleOwnerHistoryApi(vehicle.id)
+      .then((result) => setOwners(result || []))
+      .catch(() => setOwners([]))
+      .finally(() => setLoadingOwners(false));
+  };
 
   useEffect(() => {
     let alive = true;
@@ -129,8 +239,18 @@ function VehicleHistoryModal({ vehicle, onClose }) {
       .then((result) => { if (alive) setHistory(result.items || []); })
       .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được lịch sử xe'); })
       .finally(() => { if (alive) setLoading(false); });
+    loadOwners();
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle.id]);
+
+  const currentOwner = owners.find((o) => !o.endDate);
+
+  const handleTransferDone = () => {
+    setShowTransferForm(false);
+    loadOwners();
+    onTransferred?.();
+  };
 
   return (
     <>
@@ -152,17 +272,61 @@ function VehicleHistoryModal({ vehicle, onClose }) {
               </div>
             </div>
 
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="form-section-title" style={{ marginBottom: 0 }}>
+                Lịch sử chủ xe <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--gray-500)' }}>({owners.length} chủ)</span>
+              </div>
+              {!showTransferForm && (
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowTransferForm(true)}>🔄 Đổi chủ xe</button>
+              )}
+            </div>
+
+            {showTransferForm && (
+              <TransferOwnerForm
+                vehicleId={vehicle.id}
+                currentOwnerId={currentOwner?.customerId}
+                onDone={handleTransferDone}
+                onCancel={() => setShowTransferForm(false)}
+              />
+            )}
+
+            <div style={{ marginBottom: 16, marginTop: 10 }}>
+              {loadingOwners && <p style={{ fontSize: 13, color: 'var(--gray-500)' }}>Đang tải…</p>}
+              {!loadingOwners && owners.map((o) => (
+                <div
+                  key={o.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '8px 14px',
+                    border: '1px solid var(--gray-200)', borderRadius: 8, marginBottom: 6,
+                    background: !o.endDate ? 'var(--primary-very-light)' : '#fff',
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{o.customerName}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{o.customerPhone}</div>
+                    {o.notes && <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{o.notes}</div>}
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--gray-500)' }}>
+                    <div>{formatDate(o.startDate) || 'Không rõ ngày'} → {o.endDate ? formatDate(o.endDate) : 'hiện tại'}</div>
+                    {!o.endDate && (
+                      <span className="badge badge-active" style={{ marginTop: 4, display: 'inline-block' }}>Chủ hiện tại</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
             <div className="form-section-title">Lịch sử bảo dưỡng &amp; sửa chữa</div>
             {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
             <div className="table-wrapper">
               <table className="data-table">
-                <thead><tr><th>Số phiếu</th><th>Ngày</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
+                <thead><tr><th>Số phiếu</th><th>Ngày</th><th>Khách hàng</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
                 <tbody>
                   {loading && (
-                    <tr><td colSpan={5}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
+                    <tr><td colSpan={6}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
                   )}
                   {!loading && history.length === 0 && (
-                    <tr><td colSpan={5}>
+                    <tr><td colSpan={6}>
                       <div className="empty-state">
                         <div className="empty-state-icon">📭</div>
                         <h3>Chưa có lịch sử</h3>
@@ -175,6 +339,7 @@ function VehicleHistoryModal({ vehicle, onClose }) {
                       <tr key={h.id}>
                         <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{h.code}</span></td>
                         <td style={{ fontSize: 12 }}>{h.date}</td>
+                        <td style={{ fontSize: 12 }}>{h.customer?.fullName || '—'}</td>
                         <td style={{ fontWeight: 700 }}>{formatCurrency(h.total)}</td>
                         <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
                         <td><button className="btn btn-secondary btn-sm btn-icon" title="Xem chi tiết" onClick={() => setViewId(h.id)}>👁️</button></td>
@@ -210,6 +375,13 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [viewSettlementId, setViewSettlementId] = useState(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyVehicleId, setHistoryVehicleId] = useState('');
+  const [historyStatus, setHistoryStatus] = useState('');
+  const [historyFromDate, setHistoryFromDate] = useState('');
+  const [historyToDate, setHistoryToDate] = useState('');
+  const HISTORY_PAGE_SIZE = 5;
 
   useEffect(() => {
     let alive = true;
@@ -221,16 +393,52 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
     return () => { alive = false; };
   }, [customerId]);
 
+  // Sau khi doi chu xe (co the xe da chuyen sang khach khac), load lai thong
+  // tin khach hang nay (danh sach xe co the thay doi) + bao cho CustomerList
+  // reload de cap nhat luon so xe/lich su o man danh sach.
+  const reloadAfterTransfer = () => {
+    getCustomerApi(customerId)
+      .then((result) => setCustomer(result))
+      .catch(() => {});
+    onUpdated?.();
+  };
+
   useEffect(() => {
     if (tab !== 'history') return undefined;
     let alive = true;
     setLoadingHistory(true);
-    listRepairSettlementsApi({ customerId, limit: 100 })
-      .then((result) => { if (alive) setHistory(result.items || []); })
-      .catch(() => { if (alive) setHistory([]); })
+    listRepairSettlementsApi({
+      customerId,
+      vehicleId: historyVehicleId || undefined,
+      status: historyStatus || undefined,
+      fromDate: historyFromDate || undefined,
+      toDate: historyToDate || undefined,
+      page: historyPage,
+      limit: HISTORY_PAGE_SIZE,
+    })
+      .then((result) => {
+        if (!alive) return;
+        setHistory(result.items || []);
+        setHistoryTotal(result.total || 0);
+      })
+      .catch(() => { if (alive) { setHistory([]); setHistoryTotal(0); } })
       .finally(() => { if (alive) setLoadingHistory(false); });
     return () => { alive = false; };
-  }, [tab, customerId]);
+  }, [tab, customerId, historyVehicleId, historyStatus, historyFromDate, historyToDate, historyPage]);
+
+  const setHistoryFilterAndResetPage = (setter) => (value) => {
+    setter(value);
+    setHistoryPage(1);
+  };
+  const clearHistoryFilters = () => {
+    setHistoryVehicleId('');
+    setHistoryStatus('');
+    setHistoryFromDate('');
+    setHistoryToDate('');
+    setHistoryPage(1);
+  };
+  const hasHistoryFilters = Boolean(historyVehicleId || historyStatus || historyFromDate || historyToDate);
+  const historyTotalPages = Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 
   const startEdit = () => { setForm({ ...customer }); setSaveError(''); setEditing(true); };
   const cancelEdit = () => { setEditing(false); setForm(null); setSaveError(''); };
@@ -367,39 +575,115 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
             )}
 
             {tab === 'history' && (
-              <div className="table-wrapper">
-                <table className="data-table">
-                  <thead><tr><th>Số phiếu</th><th>Ngày</th><th>Xe</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
-                  <tbody>
-                    {loadingHistory && (
-                      <tr><td colSpan={6}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
-                    )}
-                    {!loadingHistory && history.length === 0 && (
-                      <tr><td colSpan={6}>
-                        <div className="empty-state">
-                          <div className="empty-state-icon">📭</div>
-                          <h3>Chưa có lịch sử dịch vụ</h3>
-                        </div>
-                      </td></tr>
-                    )}
-                    {history.map((h) => {
-                      const st = STATUS_LABELS[h.status] || { label: h.status, badge: 'badge-inactive' };
-                      return (
-                        <tr key={h.id}>
-                          <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{h.code}</span></td>
-                          <td style={{ fontSize: 12 }}>{h.date}</td>
-                          <td>
-                            <div style={{ fontWeight: 600 }}>{h.vehicle?.licensePlate}</div>
-                            <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{h.vehicle?.vehicleModel}</div>
-                          </td>
-                          <td style={{ fontWeight: 700 }}>{formatCurrency(h.total)}</td>
-                          <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
-                          <td><button className="btn btn-secondary btn-sm btn-icon" title="Xem chi tiết" onClick={() => setViewSettlementId(h.id)}>👁️</button></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+                  <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
+                    <label className="form-label">Xe</label>
+                    <select
+                      className="form-select"
+                      value={historyVehicleId}
+                      onChange={(e) => setHistoryFilterAndResetPage(setHistoryVehicleId)(e.target.value)}
+                    >
+                      <option value="">Tất cả xe</option>
+                      {(customer?.vehicles || []).map((v) => (
+                        <option key={v.id} value={v.id}>{v.licensePlate}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0, minWidth: 160 }}>
+                    <label className="form-label">Trạng thái</label>
+                    <select
+                      className="form-select"
+                      value={historyStatus}
+                      onChange={(e) => setHistoryFilterAndResetPage(setHistoryStatus)(e.target.value)}
+                    >
+                      <option value="">Tất cả trạng thái</option>
+                      {Object.entries(STATUS_LABELS).map(([key, v]) => (
+                        <option key={key} value={key}>{v.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Từ ngày</label>
+                    <input
+                      className="form-input"
+                      type="date"
+                      value={historyFromDate}
+                      onChange={(e) => setHistoryFilterAndResetPage(setHistoryFromDate)(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Đến ngày</label>
+                    <input
+                      className="form-input"
+                      type="date"
+                      value={historyToDate}
+                      onChange={(e) => setHistoryFilterAndResetPage(setHistoryToDate)(e.target.value)}
+                    />
+                  </div>
+                  {hasHistoryFilters && (
+                    <button className="btn btn-secondary btn-sm" onClick={clearHistoryFilters}>Xóa lọc</button>
+                  )}
+                </div>
+
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead><tr><th>Số phiếu</th><th>Ngày</th><th>Xe</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
+                    <tbody>
+                      {loadingHistory && (
+                        <tr><td colSpan={6}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
+                      )}
+                      {!loadingHistory && history.length === 0 && (
+                        <tr><td colSpan={6}>
+                          <div className="empty-state">
+                            <div className="empty-state-icon">📭</div>
+                            <h3>Chưa có lịch sử dịch vụ</h3>
+                            {hasHistoryFilters && <p>Không có phiếu nào khớp bộ lọc đang chọn.</p>}
+                          </div>
+                        </td></tr>
+                      )}
+                      {history.map((h) => {
+                        const st = STATUS_LABELS[h.status] || { label: h.status, badge: 'badge-inactive' };
+                        return (
+                          <tr key={h.id}>
+                            <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{h.code}</span></td>
+                            <td style={{ fontSize: 12 }}>{h.date}</td>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{h.vehicle?.licensePlate}</div>
+                              <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{h.vehicle?.vehicleModel}</div>
+                            </td>
+                            <td style={{ fontWeight: 700 }}>{formatCurrency(h.total)}</td>
+                            <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
+                            <td><button className="btn btn-secondary btn-sm btn-icon" title="Xem chi tiết" onClick={() => setViewSettlementId(h.id)}>👁️</button></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {historyTotal > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 12, color: 'var(--gray-500)' }}>
+                    <div>Tổng {historyTotal} phiếu</div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        disabled={historyPage <= 1}
+                        onClick={() => setHistoryPage((p) => p - 1)}
+                      >
+                        ‹ Trước
+                      </button>
+                      <span>Trang {historyPage}/{historyTotalPages}</span>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        disabled={historyPage >= historyTotalPages}
+                        onClick={() => setHistoryPage((p) => p + 1)}
+                      >
+                        Sau ›
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -419,7 +703,13 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
         </div>
       </div>
 
-      {vehicleView && <VehicleHistoryModal vehicle={vehicleView} onClose={() => setVehicleView(null)} />}
+      {vehicleView && (
+        <VehicleHistoryModal
+          vehicle={vehicleView}
+          onClose={() => setVehicleView(null)}
+          onTransferred={reloadAfterTransfer}
+        />
+      )}
       {viewSettlementId && <SettlementDetailModal settlementId={viewSettlementId} onClose={() => setViewSettlementId(null)} />}
     </>
   );

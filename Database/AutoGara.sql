@@ -217,6 +217,42 @@ CREATE TABLE [dbo].[vehicles](
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
+/****** Object:  Table [dbo].[vehicle_owners] ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[vehicle_owners](
+	[id] [bigint] IDENTITY(1,1) NOT NULL,
+	[vehicle_id] [bigint] NOT NULL,
+	[customer_id] [bigint] NOT NULL,
+	[start_date] [date] NULL,
+	[end_date] [date] NULL,
+	[notes] [nvarchar](500) NULL,
+	[created_at] [datetime] NOT NULL,
+ CONSTRAINT [vo_pkey] PRIMARY KEY CLUSTERED
+(
+	[id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+ALTER TABLE [dbo].[vehicle_owners] ADD CONSTRAINT [vo_created_at_default]  DEFAULT (getdate()) FOR [created_at]
+GO
+ALTER TABLE [dbo].[vehicle_owners]  WITH CHECK ADD  CONSTRAINT [vo_vehicle_fkey] FOREIGN KEY([vehicle_id])
+REFERENCES [dbo].[vehicles] ([id])
+GO
+ALTER TABLE [dbo].[vehicle_owners] CHECK CONSTRAINT [vo_vehicle_fkey]
+GO
+ALTER TABLE [dbo].[vehicle_owners]  WITH CHECK ADD  CONSTRAINT [vo_customer_fkey] FOREIGN KEY([customer_id])
+REFERENCES [dbo].[customers] ([id])
+GO
+ALTER TABLE [dbo].[vehicle_owners] CHECK CONSTRAINT [vo_customer_fkey]
+GO
+CREATE NONCLUSTERED INDEX [idx_vo_vehicle] ON [dbo].[vehicle_owners]
+(
+	[vehicle_id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+GO
 /****** Object:  Table [dbo].[warranty_records]    Script Date: 7/12/2026 12:12:59 AM ******/
 SET ANSI_NULLS ON
 GO
