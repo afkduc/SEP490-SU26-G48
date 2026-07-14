@@ -3,12 +3,20 @@ const { authenticate, authorize } = require('../../middlewares/auth');
 const ManagerController = require('../controllers/ManagerController');
 const ManagerService = require('../../application/services/ManagerService');
 const ManagerRepositoryImpl = require('../../infrastructure/repositories/ManagerRepositoryImpl');
+const ManagerImportRequestController = require('../controllers/ManagerImportRequestController');
+const { makeImportRequestService } = require('../../application/services');
+const { requirePerm } = require('../../middlewares/inventory/rbac');
 
 function buildManagerRouter() {
   const router = express.Router();
   const repository = new ManagerRepositoryImpl();
   const service = new ManagerService(repository);
   const controller = new ManagerController(service);
+
+  // Controller rieng cho phieu nhap (manager vao day de duyet/tu choi).
+  const importRequestController = new ManagerImportRequestController({
+    importRequestService: makeImportRequestService(),
+  });
 
   router.use(authenticate, authorize('manager', 'admin'));
 
@@ -47,6 +55,33 @@ function buildManagerRouter() {
   router.get('/team-leaders/:id', controller.getTeamLeaderById);
   router.post('/team-leaders', controller.createTeamLeader);
   router.put('/team-leaders/:id', controller.updateTeamLeader);
+
+  // ===== Phieu nhap kho (Manager) =====
+  // Manager truy cap /manager/import-requests ... de xem va duyet phieu
+  // cua chi nhanh minh quan ly.
+  // Quyen truy cap thong qua permission trong bang role_permissions:
+  //   - import_requests:read    (xem danh sach + chi tiet)
+  //   - import_requests:approve (duyet / tu choi)
+  router.get(
+    '/import-requests',
+    requirePerm('import_requests:read'),
+    importRequestController.list,
+  );
+  router.get(
+    '/import-requests/:id',
+    requirePerm('import_requests:read'),
+    importRequestController.getById,
+  );
+  router.put(
+    '/import-requests/:id/approve',
+    requirePerm('import_requests:approve'),
+    importRequestController.approve,
+  );
+  router.put(
+    '/import-requests/:id/reject',
+    requirePerm('import_requests:approve'),
+    importRequestController.reject,
+  );
 
   return router;
 }
