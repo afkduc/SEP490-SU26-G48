@@ -21,10 +21,10 @@ class RepairSettlementService {
     this.repairSettlementRepository = repairSettlementRepository;
   }
 
-  async getAll({ branchId, status, search, customerId, vehicleId, page, limit } = {}) {
+  async getAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, page, limit } = {}) {
     const [items, total] = await Promise.all([
-      this.repairSettlementRepository.findAll({ branchId, status, search, customerId, vehicleId, page, limit }),
-      this.repairSettlementRepository.count({ branchId, status, search, customerId, vehicleId }),
+      this.repairSettlementRepository.findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, page, limit }),
+      this.repairSettlementRepository.count({ branchId, status, search, customerId, vehicleId, fromDate, toDate }),
     ]);
     return {
       items: RepairSettlementResponseDto.fromEntityList(items),
