@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
@@ -6,10 +6,9 @@ import './Navbar.css';
 
 // ===== Admin =====
 const ADMIN_NAV = [
-  { label: 'Dashboard', path: '/admin/dashboard', icon: '📊' },
+  { label: 'Dashboard', path: '/admin/dashboard' },
   {
     label: 'User',
-    icon: '👥',
     children: [
       { label: 'Danh sách User', path: '/admin/users' },
       { label: 'Thêm User', path: '/admin/users?create=true' },
@@ -17,7 +16,6 @@ const ADMIN_NAV = [
   },
   {
     label: 'Role',
-    icon: '🛡️',
     children: [
       { label: 'Danh sách Role', path: '/admin/roles' },
       { label: 'Phân quyền', path: '/admin/users' },
@@ -25,7 +23,6 @@ const ADMIN_NAV = [
   },
   {
     label: 'Log',
-    icon: '📜',
     children: [
       { label: 'Nhật ký hoạt động', path: '/admin/logs' },
     ],
@@ -34,10 +31,9 @@ const ADMIN_NAV = [
 
 // ===== Service Advisor =====
 const SERVICE_ADVISOR_NAV = [
-  { label: 'Dashboard', path: '/dashboard', icon: '📊' },
+  { label: 'Dashboard', path: '/dashboard' },
   {
     label: 'Quyết toán sửa chữa',
-    icon: '📋',
     children: [
       { label: 'Danh sách quyết toán', path: '/repair-settlement' },
       { label: 'Tạo quyết toán', path: '/repair-settlement/create' },
@@ -45,7 +41,6 @@ const SERVICE_ADVISOR_NAV = [
   },
   {
     label: 'Lệnh sửa chữa',
-    icon: '🔧',
     children: [
       { label: 'Danh sách lệnh sửa chữa', path: '/repair-orders' },
       { label: 'Tạo lệnh sửa chữa', path: '/repair-orders/create' },
@@ -53,7 +48,6 @@ const SERVICE_ADVISOR_NAV = [
   },
   {
     label: 'Chăm sóc khách hàng',
-    icon: '💚',
     children: [
       { label: 'Lịch hẹn', path: '/customer-care/appointments' },
       { label: 'Nhắc nhở', path: '/customer-care/reminders' },
@@ -62,7 +56,6 @@ const SERVICE_ADVISOR_NAV = [
   {
     label: 'Khách hàng',
     path: '/customers',
-    icon: '👤',
   },
 ];
 
@@ -92,32 +85,31 @@ const MANAGER_NAV = [
 
 // ===== Warehouse Staff (Nhan vien kho) - chi thay cac chuc nang lien quan den kho =====
 const WAREHOUSE_STAFF_NAV = [
-  { label: 'Tong quan kho', path: '/inventory', icon: '🏠', end: true },
+  { label: 'Tong quan kho', path: '/inventory', end: true },
   {
     label: 'Phu tung',
-    icon: '📦',
     children: [
       { label: 'Danh sach phu tung', path: '/inventory/parts' },
     ],
   },
-  { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
-  { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
+  { label: 'Ton kho', path: '/inventory/stock' },
+  { label: 'Nha cung cap', path: '/inventory/suppliers' },
 ];
 
 // ===== Accountant (Ke toan) - chi xem kho, khong dropdown =====
 const ACCOUNTANT_NAV = [
-  { label: 'Tong quan kho', path: '/inventory', icon: '🏠' },
-  { label: 'Phu tung', path: '/inventory/parts', icon: '📦' },
-  { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
-  { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
+  { label: 'Tong quan kho', path: '/inventory' },
+  { label: 'Phu tung', path: '/inventory/parts' },
+  { label: 'Ton kho', path: '/inventory/stock' },
+  { label: 'Nha cung cap', path: '/inventory/suppliers' },
 ];
 
 // ===== General Director (Giam doc) - xem bao cao tong quan, co dropdown =====
 const GENERAL_DIRECTOR_NAV = [
-  { label: 'Tong quan kho', path: '/inventory', icon: '🏠', end: true },
-  { label: 'Phu tung', path: '/inventory/parts', icon: '📦' },
-  { label: 'Ton kho', path: '/inventory/stock', icon: '🗃️' },
-  { label: 'Nha cung cap', path: '/inventory/suppliers', icon: '🚚' },
+  { label: 'Tong quan kho', path: '/inventory', end: true },
+  { label: 'Phu tung', path: '/inventory/parts' },
+  { label: 'Ton kho', path: '/inventory/stock' },
+  { label: 'Nha cung cap', path: '/inventory/suppliers' },
 ];
 
 const NAV_ITEMS_BY_ROLE = {
@@ -164,12 +156,11 @@ function NavDropdownItem({ item, currentPath }) {
   };
 
   // Khi dropdown co children, parent duoc active neu bat ky child nao khop currentPath.
+  // Chi dung de TO MAU nut cha - KHONG dung de ep mo dropdown, neu khong dropdown se
+  // khong bao gio tu dong (rê chuột ra khỏi menu) sau khi da vao 1 trang con cua no.
   const isParentActive = item.children
     ? item.children.some((c) => isPathMatch(c.path))
     : false;
-
-  // Tu dong mo dropdown neu parent dang active de nguoi dung thay minh dang o day.
-  const effectiveOpen = open || isParentActive;
 
   if (!item.children) {
     return (
@@ -180,7 +171,6 @@ function NavDropdownItem({ item, currentPath }) {
           'navbar__link' + ((isActive || isPathMatch(item.path)) ? ' navbar__link--active' : '')
         }
       >
-        {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
         {item.label}
       </NavLink>
     );
@@ -188,7 +178,7 @@ function NavDropdownItem({ item, currentPath }) {
 
   return (
     <div
-      className={`navbar__dropdown-wrapper${isParentActive ? ' navbar__dropdown-wrapper--active' : ''}`}
+      className="navbar__dropdown-wrapper"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -197,12 +187,11 @@ function NavDropdownItem({ item, currentPath }) {
           'navbar__link navbar__link-btn' + (isParentActive ? ' navbar__link--active' : '')
         }
       >
-        {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
         {item.label}
-        <span className="navbar__link-caret">▼</span>
+        <span className="navbar__link-caret">▾</span>
       </button>
 
-      {effectiveOpen && (
+      {open && (
         <div className="navbar__nav-dropdown">
           {item.children.map((child) => {
             const childActive = isPathMatch(child.path);
@@ -265,7 +254,6 @@ export default function Navbar() {
                   'navbar__link' + (isActive ? ' navbar__link--active' : '')
                 }
               >
-                {item.icon && <span className="navbar__link-icon">{item.icon}</span>}
                 {item.label}
               </NavLink>
             ))}
@@ -277,7 +265,7 @@ export default function Navbar() {
         <div className="navbar__user" onClick={() => setDropdownOpen((v) => !v)}>
           <div className="navbar__avatar">{initials}</div>
           <span className="navbar__display-name">{displayName}</span>
-          <span className="navbar__caret">▼</span>
+          <span className="navbar__caret">▾</span>
         </div>
 
         {dropdownOpen && (
@@ -288,7 +276,7 @@ export default function Navbar() {
             </div>
             <hr />
             <button className="navbar__dropdown-item" onClick={handleLogout}>
-              🚪 Đăng xuất
+              Đăng xuất
             </button>
           </div>
         )}
