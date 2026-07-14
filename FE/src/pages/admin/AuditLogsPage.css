@@ -113,6 +113,20 @@
 }
 
 /* ── Loading / Error ── */
+.admin-logs__section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Smooth scroll den section: scroll-margin giup section khong bi che boi topbar */
+.admin-logs__section--scroll-target {
+  scroll-margin-top: 24px;
+}
+
+.admin-logs__section > .section-header {
+  border-radius: 12px 12px 0 0;
+}
 .audit-logs__loading {
   padding: 32px;
   text-align: center;

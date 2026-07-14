@@ -5,7 +5,7 @@ const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
 // het sang HTTT (tranh 2 truong cung dung ma 'BH' nhung nghia khac nhau).
 const LHSC_VALUES = ['DV', 'PT'];
 const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB'];
-const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced'];
+const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
 
 // FE gui "Ngay ke tiep" dang dd/mm/yyyy (o nhap tu do, khong phai <input type="date">).
 function parseDDMMYYYY(value) {
@@ -21,10 +21,10 @@ class RepairSettlementService {
     this.repairSettlementRepository = repairSettlementRepository;
   }
 
-  async getAll({ branchId, status, search, page, limit } = {}) {
+  async getAll({ branchId, status, search, customerId, vehicleId, page, limit } = {}) {
     const [items, total] = await Promise.all([
-      this.repairSettlementRepository.findAll({ branchId, status, search, page, limit }),
-      this.repairSettlementRepository.count({ branchId, status, search }),
+      this.repairSettlementRepository.findAll({ branchId, status, search, customerId, vehicleId, page, limit }),
+      this.repairSettlementRepository.count({ branchId, status, search, customerId, vehicleId }),
     ]);
     return {
       items: RepairSettlementResponseDto.fromEntityList(items),
@@ -58,7 +58,7 @@ class RepairSettlementService {
     return RepairSettlementResponseDto.fromEntity(entity);
   }
 
-  async updateStatus(id, status, { issuedBy } = {}) {
+  async updateStatus(id, status, { issuedBy, cancelReason } = {}) {
     if (!STATUS_VALUES.includes(status)) {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
     }
@@ -67,8 +67,16 @@ class RepairSettlementService {
     if (existing.status === 'invoiced') {
       throw new ApiError(409, 'Phiếu đã xuất hóa đơn, không thể đổi trạng thái');
     }
+    if (status === 'cancelled') {
+      if (existing.status !== 'waiting_repair') {
+        throw new ApiError(409, 'Chỉ có thể hủy phiếu khi đang ở trạng thái chờ sửa chữa (chưa phân công tổ trưởng)');
+      }
+      if (!(cancelReason || '').trim()) {
+        throw new ApiError(400, 'Phải nhập lý do hủy');
+      }
+    }
 
-    const entity = await this.repairSettlementRepository.updateStatus(id, status, { issuedBy });
+    const entity = await this.repairSettlementRepository.updateStatus(id, status, { issuedBy, cancelReason });
     return RepairSettlementResponseDto.fromEntity(entity);
   }
 
