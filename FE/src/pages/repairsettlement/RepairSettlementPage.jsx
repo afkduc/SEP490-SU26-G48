@@ -866,7 +866,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     setVehicleInfo({
       id: row.vehicleId, licensePlate: row.licensePlate, vehicleModel: row.vehicleModel || '',
       frameNumber: row.frameNumber || '', engineNumber: row.engineNumber || '',
-      purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : '', currentKm: row.currentKm || '',
+      purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : '', currentKm: '',
     });
     setCustomerQuery(row.fullName);
     setPlateQuery(row.licensePlate);
@@ -876,6 +876,20 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
   const cInfoSet = (k, v) => setCustomerInfo((p) => ({ ...p, [k]: v }));
   const vInfoSet = (k, v) => setVehicleInfo((p) => ({ ...p, [k]: v }));
+
+  // Xoa toan bo thong tin da autofill (khach hang + xe) de tim lai tu dau -
+  // dung khi chon nham khach hang, vi cac truong da bi khoa (readOnly) sau
+  // khi autofill nen khong the sua tay duoc nua.
+  const resetLookup = () => {
+    setCustomerInfo({ fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' });
+    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '' });
+    setCustomerQuery('');
+    setPlateQuery('');
+    setIsFromLookup(false);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setActiveField('customer');
+  };
 
   const setItem = (idx, key, val) => {
     setItems((prev) => {
@@ -1064,7 +1078,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       {/* SECTION 1: Khách hàng & xe */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
-          <span className="card-title">📋 Thông tin khách hàng & xe</span>
+          <span className="card-title">Thông tin khách hàng & xe</span>
+          {isFromLookup && (
+            <button className="btn btn-secondary btn-sm" onClick={resetLookup}>Chọn lại khách hàng</button>
+          )}
         </div>
         <div className="card-body">
           <div className="form-grid form-grid-2">
@@ -1073,8 +1090,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 <label className="form-label required">Tên khách hàng</label>
                 <input className="form-input"
                   value={customerQuery}
+                  readOnly={isFromLookup}
                   onChange={(e) => { setCustomerQuery(e.target.value); cInfoSet('fullName', e.target.value); setIsFromLookup(false); setActiveField('customer'); setShowSuggestions(true); }}
-                  onFocus={() => { setActiveField('customer'); setShowSuggestions(true); }}
+                  onFocus={() => { if (!isFromLookup) { setActiveField('customer'); setShowSuggestions(true); } }}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
                   placeholder="Nhập tên" />
                 {activeField === 'customer' && showSuggestions && suggestions.length > 0 && (
@@ -1092,11 +1110,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
               <div className="form-group" style={{ marginBottom: 12 }}>
                 <label className="form-label">Địa chỉ</label>
-                <input className="form-input" value={customerInfo.address} onChange={(e) => cInfoSet('address', e.target.value)} placeholder="Địa chỉ khách hàng" />
+                <input className="form-input" value={customerInfo.address} readOnly={isFromLookup} onChange={(e) => cInfoSet('address', e.target.value)} placeholder="Địa chỉ khách hàng" />
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group" style={{ position: 'relative' }}>
-                  <label className="form-label required">Điện thoại {isFromLookup && <span title="Đã che 1 phần để bảo mật dữ liệu cá nhân">🔒</span>}</label>
+                  <label className="form-label required">Điện thoại</label>
                   <input className="form-input"
                     value={isFromLookup ? maskLast4(customerInfo.phone) : customerInfo.phone}
                     readOnly={isFromLookup}
@@ -1118,12 +1136,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Mã Số Thuế</label>
-                  <input className="form-input" value={customerInfo.taxCode} onChange={(e) => cInfoSet('taxCode', e.target.value)} placeholder="Mã số thuế" />
+                  <input className="form-input" value={customerInfo.taxCode} readOnly={isFromLookup} onChange={(e) => cInfoSet('taxCode', e.target.value)} placeholder="Mã số thuế" />
                 </div>
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group">
-                  <label className="form-label">CCCD {isFromLookup && <span title="Đã che 1 phần để bảo mật dữ liệu cá nhân">🔒</span>}</label>
+                  <label className="form-label">CCCD</label>
                   <input className="form-input"
                     value={isFromLookup ? maskLast4(customerInfo.cccd) : customerInfo.cccd}
                     readOnly={isFromLookup}
@@ -1131,7 +1149,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                     placeholder="Số CCCD / CMND" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Email {isFromLookup && <span title="Đã che 1 phần để bảo mật dữ liệu cá nhân">🔒</span>}</label>
+                  <label className="form-label">Email</label>
                   <input className="form-input"
                     value={isFromLookup ? maskLast4(customerInfo.email) : customerInfo.email}
                     readOnly={isFromLookup}
@@ -1142,11 +1160,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               <div className="form-grid form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Người liên hệ</label>
-                  <input className="form-input" value={customerInfo.contactPerson} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Tên người liên hệ" />
+                  <input className="form-input" value={customerInfo.contactPerson} readOnly={isFromLookup} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Tên người liên hệ" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Điện thoại liên hệ</label>
-                  <input className="form-input" value={customerInfo.contactPhone} onChange={(e) => cInfoSet('contactPhone', e.target.value)} placeholder="SĐT người liên hệ" />
+                  <input className="form-input" value={customerInfo.contactPhone} readOnly={isFromLookup} onChange={(e) => cInfoSet('contactPhone', e.target.value)} placeholder="SĐT người liên hệ" />
                 </div>
               </div>
             </div>
@@ -1156,8 +1174,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 <label className="form-label required">Biển số xe</label>
                 <input className="form-input"
                   value={plateQuery}
+                  readOnly={isFromLookup}
                   onChange={(e) => { setPlateQuery(e.target.value); vInfoSet('licensePlate', e.target.value); setIsFromLookup(false); setActiveField('plate'); setShowSuggestions(true); }}
-                  onFocus={() => { setActiveField('plate'); setShowSuggestions(true); }}
+                  onFocus={() => { if (!isFromLookup) { setActiveField('plate'); setShowSuggestions(true); } }}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
                   placeholder="Nhập biển số xe" />
                 {activeField === 'plate' && showSuggestions && suggestions.length > 0 && (
@@ -1175,14 +1194,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
               <div className="form-group" style={{ marginBottom: 12 }}>
                 <label className="form-label">Loại xe</label>
-                <input className="form-input" value={vehicleInfo.vehicleModel} onChange={(e) => vInfoSet('vehicleModel', e.target.value)} placeholder=" " />
+                <input className="form-input" value={vehicleInfo.vehicleModel} readOnly={isFromLookup} onChange={(e) => vInfoSet('vehicleModel', e.target.value)} placeholder=" " />
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Số khung</label>
                   <input className="form-input" value={vehicleInfo.frameNumber}
+                    readOnly={isFromLookup}
                     onChange={(e) => { vInfoSet('frameNumber', e.target.value); setIsFromLookup(false); setActiveField('frame'); setShowSuggestions(true); }}
-                    onFocus={() => { setActiveField('frame'); setShowSuggestions(true); }}
+                    onFocus={() => { if (!isFromLookup) { setActiveField('frame'); setShowSuggestions(true); } }}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 180)} />
                   {activeField === 'frame' && showSuggestions && suggestions.length > 0 && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
@@ -1199,8 +1219,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Số máy</label>
                   <input className="form-input" value={vehicleInfo.engineNumber}
+                    readOnly={isFromLookup}
                     onChange={(e) => { vInfoSet('engineNumber', e.target.value); setIsFromLookup(false); setActiveField('engine'); setShowSuggestions(true); }}
-                    onFocus={() => { setActiveField('engine'); setShowSuggestions(true); }}
+                    onFocus={() => { if (!isFromLookup) { setActiveField('engine'); setShowSuggestions(true); } }}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 180)} />
                   {activeField === 'engine' && showSuggestions && suggestions.length > 0 && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
@@ -1218,7 +1239,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               <div className="form-grid form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Ngày mua</label>
-                  <input className="form-input" type="date" value={vehicleInfo.purchaseDate} onChange={(e) => vInfoSet('purchaseDate', e.target.value)} />
+                  <input className="form-input" type="date" value={vehicleInfo.purchaseDate} readOnly={isFromLookup} onChange={(e) => vInfoSet('purchaseDate', e.target.value)} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Số Km hiện tại</label>
