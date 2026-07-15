@@ -21,6 +21,7 @@ class RepairSettlementResponseDto {
       id: entity.id,
       code: entity.code,
       date: toDDMMYYYY(entity.intakeDate),
+      paidDate: entity.paidAt ? toDDMMYYYY(entity.paidAt) : null,
       advisor: entity.advisor?.name || null,
       advisorPhone: entity.advisor?.phone || null,
       branch: entity.branchName,
