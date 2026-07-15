@@ -7,13 +7,15 @@ class RepairSettlementController {
 
   getAll = async (req, res, next) => {
     try {
-      const { status, search, customerId, vehicleId, page = 1, limit = 20 } = req.query;
+      const { status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 20 } = req.query;
       const result = await this.repairSettlementService.getAll({
         branchId: req.user.branchId,
         status,
         search,
         customerId,
         vehicleId,
+        fromDate,
+        toDate,
         page: Number(page),
         limit: Number(limit),
       });

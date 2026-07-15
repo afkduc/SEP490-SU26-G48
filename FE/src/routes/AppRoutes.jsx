@@ -30,6 +30,9 @@ const SupplierDetailPage = lazy(() => import('../pages/inventory/SupplierDetailP
 const PartListPage = lazy(() => import('../pages/inventory/PartListPage'));
 const PartDetailPage = lazy(() => import('../pages/inventory/PartDetailPage'));
 const StockPage = lazy(() => import('../pages/inventory/StockPage'));
+const ImportRequestListPage = lazy(() => import('../pages/inventory/ImportRequestListPage'));
+const ImportRequestFormPage = lazy(() => import('../pages/inventory/ImportRequestFormPage'));
+const ImportRequestDetailPage = lazy(() => import('../pages/inventory/ImportRequestDetailPage'));
 
 function Loading() {
   return (
@@ -182,9 +185,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Khách hàng - lịch sử bảo dưỡng theo khách hàng / theo xe */}
+        {/* Khách hàng - danh sách khách hàng, lịch sử dịch vụ, hợp đồng mua xe */}
         <Route
-          path="/customers/*"
+          path="/customers"
           element={
             <ProtectedRoute>
               <AppLayout>
@@ -211,6 +214,9 @@ function AppRoutes() {
           <Route path="parts" element={<PartListPage />} />
           <Route path="parts/:id" element={<PartDetailPage />} />
           <Route path="stock" element={<StockPage />} />
+          <Route path="import-requests" element={<ImportRequestListPage />} />
+          <Route path="import-requests/new" element={<ImportRequestFormPage />} />
+          <Route path="import-requests/:id" element={<ImportRequestDetailPage />} />
         </Route>
 
         {/* Placeholder routes */}
