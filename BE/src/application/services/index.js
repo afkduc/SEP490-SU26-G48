@@ -5,6 +5,7 @@ const RepairOrderService = require('./RepairOrderService');
 const InventoryService = require('./InventoryService');
 const ImportRequestService = require('./ImportRequestService');
 const CustomerService = require('./CustomerService');
+const DashboardService = require('./DashboardService');
 const {
   makeUserRepository,
   makeProductRepository,
@@ -13,6 +14,7 @@ const {
   makeInventoryRepository,
   makeImportRequestRepository,
   makeCustomerRepository,
+  makeDashboardRepository,
 } = require('../../infrastructure/repositories');
 
 function makeUserService() {
@@ -44,6 +46,10 @@ function makeCustomerService() {
   return new CustomerService({ customerRepository: makeCustomerRepository() });
 }
 
+function makeDashboardService() {
+  return new DashboardService({ dashboardRepository: makeDashboardRepository() });
+}
+
 module.exports = {
   UserService,
   ProductService,
@@ -52,6 +58,7 @@ module.exports = {
   InventoryService,
   ImportRequestService,
   CustomerService,
+  DashboardService,
   makeUserService,
   makeProductService,
   makeRepairSettlementService,
@@ -59,4 +66,5 @@ module.exports = {
   makeInventoryService,
   makeImportRequestService,
   makeCustomerService,
+  makeDashboardService,
 };
