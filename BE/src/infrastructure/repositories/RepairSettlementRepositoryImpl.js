@@ -24,7 +24,8 @@ const HEADER_SELECT = `
          wr.purchase_date     AS vehicle_purchase_date,
          adv.user_name AS advisor_name,
          adv.phone     AS advisor_phone,
-         tl.user_name  AS team_leader_name
+         tl.user_name  AS team_leader_name,
+         inv.issued_at AS invoice_issued_at
   FROM   service_orders so
   JOIN   branches  b   ON b.id = so.branch_id
   JOIN   customers c   ON c.id = so.customer_id
@@ -37,6 +38,12 @@ const HEADER_SELECT = `
       WHERE  w.vehicle_id = so.vehicle_id
       ORDER  BY w.purchase_date DESC
   ) wr
+  OUTER APPLY (
+      SELECT TOP 1 i.issued_at
+      FROM   invoices i
+      WHERE  i.service_order_id = so.id
+      ORDER  BY i.issued_at DESC
+  ) inv
 `;
 
 function genCode(prefix, id) {
