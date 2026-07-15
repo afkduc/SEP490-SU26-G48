@@ -8,6 +8,7 @@ import {
 } from '../../services/adminApi';
 import UserFormModal from './users/UserFormModal';
 import UserDetailDrawer from './users/UserDetailDrawer';
+import AssignRoleModal from './users/AssignRoleModal';
 import './AdminUsersPage.css';
 
 const STATUS_OPTIONS = [
@@ -69,6 +70,7 @@ export default function AdminUsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [detailUserId, setDetailUserId] = useState(null);
+  const [assignUserId, setAssignUserId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
 
   useEffect(() => {
@@ -427,6 +429,14 @@ export default function AdminUsersPage() {
           userId={detailUserId}
           onClose={() => setDetailUserId(null)}
           onRolesChanged={() => refresh()}
+        />
+      )}
+
+      {assignUserId && (
+        <AssignRoleModal
+          userId={assignUserId}
+          onClose={() => setAssignUserId(null)}
+          onSuccess={() => refresh()}
         />
       )}
     </div>
