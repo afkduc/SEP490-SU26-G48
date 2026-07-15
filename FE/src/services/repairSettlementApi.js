@@ -1,11 +1,13 @@
 import httpClient from './httpClient';
 
-export async function listRepairSettlementsApi({ status, search, customerId, vehicleId, page = 1, limit = 100 } = {}) {
+export async function listRepairSettlementsApi({ status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 100 } = {}) {
   const params = new URLSearchParams();
   if (status) params.set('status', status);
   if (search) params.set('search', search);
   if (customerId) params.set('customerId', customerId);
   if (vehicleId) params.set('vehicleId', vehicleId);
+  if (fromDate) params.set('fromDate', fromDate);
+  if (toDate) params.set('toDate', toDate);
   params.set('page', page);
   params.set('limit', limit);
   return httpClient.get(`/repair-settlements?${params.toString()}`); // { items: [...], total, page, limit }

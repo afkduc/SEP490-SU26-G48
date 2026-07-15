@@ -24,7 +24,8 @@ const HEADER_SELECT = `
          wr.purchase_date     AS vehicle_purchase_date,
          adv.user_name AS advisor_name,
          adv.phone     AS advisor_phone,
-         tl.user_name  AS team_leader_name
+         tl.user_name  AS team_leader_name,
+         inv.issued_at AS invoice_issued_at
   FROM   service_orders so
   JOIN   branches  b   ON b.id = so.branch_id
   JOIN   customers c   ON c.id = so.customer_id
@@ -37,6 +38,12 @@ const HEADER_SELECT = `
       WHERE  w.vehicle_id = so.vehicle_id
       ORDER  BY w.purchase_date DESC
   ) wr
+  OUTER APPLY (
+      SELECT TOP 1 i.issued_at
+      FROM   invoices i
+      WHERE  i.service_order_id = so.id
+      ORDER  BY i.issued_at DESC
+  ) inv
 `;
 
 function genCode(prefix, id) {
@@ -48,37 +55,54 @@ function itemTypeFor(lhsc) {
   return lhsc === 'PT' ? 'product' : 'service';
 }
 
+// Dung chung cho findAll/count - tra ve mang cac dieu kien WHERE + gan params.
+// customerId va vehicleId co the ket hop CUNG LUC (vd: man "Lich su dich vu"
+// cua 1 khach hang loc theo 1 xe cu the cua ho) - khac voi truoc day chi cho
+// dung 1 trong 2. Neu khong truyen ca 2 (man danh sach cua co van dich vu) thi
+// bat buoc loc theo branchId nhu cu.
+function buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate }) {
+  const params = {};
+  const conditions = [];
+
+  if (customerId) {
+    params.customerId = customerId;
+    conditions.push('so.customer_id = @customerId');
+  }
+  if (vehicleId) {
+    params.vehicleId = vehicleId;
+    conditions.push('so.vehicle_id = @vehicleId');
+  }
+  if (!customerId && !vehicleId) {
+    params.branchId = branchId;
+    conditions.push('so.branch_id = @branchId');
+  }
+
+  if (status) {
+    params.status = status;
+    conditions.push('so.status = @status');
+  }
+  if (search) {
+    params.search = `%${search}%`;
+    conditions.push('(so.order_code LIKE @search OR c.full_name LIKE @search OR v.license_plate LIKE @search)');
+  }
+  if (fromDate) {
+    params.fromDate = fromDate;
+    conditions.push('so.intake_date >= @fromDate');
+  }
+  if (toDate) {
+    params.toDate = toDate;
+    conditions.push('so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE))');
+  }
+
+  return { params, conditions };
+}
+
 class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
-  // customerId/vehicleId dung cho man "Lich su bao duong" (theo khach hang / theo
-  // xe) - xem toan bo lich su bat ke chi nhanh nao, nen KHONG loc theo branchId
-  // trong 2 truong hop nay. Khi khong truyen customerId/vehicleId (man danh sach
-  // phieu quyet toan cua co van dich vu) thi van bat buoc loc theo branchId nhu cu.
-  async findAll({ branchId, status, search, customerId, vehicleId, page = 1, limit = 20 } = {}) {
+  async findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
-    const params = {};
-    let sqlText = `${HEADER_SELECT} WHERE `;
+    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate });
 
-    if (customerId) {
-      params.customerId = customerId;
-      sqlText += `so.customer_id = @customerId`;
-    } else if (vehicleId) {
-      params.vehicleId = vehicleId;
-      sqlText += `so.vehicle_id = @vehicleId`;
-    } else {
-      params.branchId = branchId;
-      sqlText += `so.branch_id = @branchId`;
-    }
-
-    if (status) {
-      params.status = status;
-      sqlText += ` AND so.status = @status`;
-    }
-    if (search) {
-      params.search = `%${search}%`;
-      sqlText += ` AND (so.order_code LIKE @search OR c.full_name LIKE @search OR v.license_plate LIKE @search)`;
-    }
-
-    sqlText += ` ORDER BY so.id DESC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
+    const sqlText = `${HEADER_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY so.id DESC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
     params.offset = offset;
     params.limit = limit;
 
@@ -86,34 +110,16 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.recordset.map((row) => RepairSettlement.fromPersistence(row, []));
   }
 
-  async count({ branchId, status, search, customerId, vehicleId } = {}) {
-    const params = {};
-    let sqlText = `
+  async count({ branchId, status, search, customerId, vehicleId, fromDate, toDate } = {}) {
+    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate });
+
+    const sqlText = `
       SELECT COUNT(*) AS total
       FROM   service_orders so
       JOIN   customers c ON c.id = so.customer_id
       JOIN   vehicles  v ON v.id = so.vehicle_id
-      WHERE  `;
-
-    if (customerId) {
-      params.customerId = customerId;
-      sqlText += `so.customer_id = @customerId`;
-    } else if (vehicleId) {
-      params.vehicleId = vehicleId;
-      sqlText += `so.vehicle_id = @vehicleId`;
-    } else {
-      params.branchId = branchId;
-      sqlText += `so.branch_id = @branchId`;
-    }
-
-    if (status) {
-      params.status = status;
-      sqlText += ` AND so.status = @status`;
-    }
-    if (search) {
-      params.search = `%${search}%`;
-      sqlText += ` AND (so.order_code LIKE @search OR c.full_name LIKE @search OR v.license_plate LIKE @search)`;
-    }
+      WHERE  ${conditions.join(' AND ')}
+    `;
 
     const result = await query(sqlText, params);
     return result.recordset[0].total;
