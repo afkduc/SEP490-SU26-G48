@@ -33,6 +33,9 @@ const StockPage = lazy(() => import('../pages/inventory/StockPage'));
 const ImportRequestListPage = lazy(() => import('../pages/inventory/ImportRequestListPage'));
 const ImportRequestFormPage = lazy(() => import('../pages/inventory/ImportRequestFormPage'));
 const ImportRequestDetailPage = lazy(() => import('../pages/inventory/ImportRequestDetailPage'));
+const ExportRequestListPage = lazy(() => import('../pages/inventory/ExportRequestListPage'));
+const ExportRequestFormPage = lazy(() => import('../pages/inventory/ExportRequestFormPage'));
+const ExportRequestDetailPage = lazy(() => import('../pages/inventory/ExportRequestDetailPage'));
 
 function Loading() {
   return (
@@ -217,6 +220,9 @@ function AppRoutes() {
           <Route path="import-requests" element={<ImportRequestListPage />} />
           <Route path="import-requests/new" element={<ImportRequestFormPage />} />
           <Route path="import-requests/:id" element={<ImportRequestDetailPage />} />
+          <Route path="export-requests" element={<ExportRequestListPage />} />
+          <Route path="export-requests/new" element={<ExportRequestFormPage />} />
+          <Route path="export-requests/:id" element={<ExportRequestDetailPage />} />
         </Route>
 
         {/* Placeholder routes */}
