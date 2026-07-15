@@ -4,7 +4,8 @@ const ManagerController = require('../controllers/ManagerController');
 const ManagerService = require('../../application/services/ManagerService');
 const ManagerRepositoryImpl = require('../../infrastructure/repositories/ManagerRepositoryImpl');
 const ManagerImportRequestController = require('../controllers/ManagerImportRequestController');
-const { makeImportRequestService } = require('../../application/services');
+const ManagerExportRequestController = require('../controllers/ManagerExportRequestController');
+const { makeImportRequestService, makeExportRequestService } = require('../../application/services');
 const { requirePerm } = require('../../middlewares/inventory/rbac');
 
 function buildManagerRouter() {
@@ -16,6 +17,11 @@ function buildManagerRouter() {
   // Controller rieng cho phieu nhap (manager vao day de duyet/tu choi).
   const importRequestController = new ManagerImportRequestController({
     importRequestService: makeImportRequestService(),
+  });
+
+  // Controller rieng cho phieu xuat (manager vao day de xem/audit - NVKho tu xuat).
+  const exportRequestController = new ManagerExportRequestController({
+    exportRequestService: makeExportRequestService(),
   });
 
   router.use(authenticate, authorize('manager', 'admin'));
@@ -81,6 +87,20 @@ function buildManagerRouter() {
     '/import-requests/:id/reject',
     requirePerm('import_requests:approve'),
     importRequestController.reject,
+  );
+
+  // ===== Phieu xuat kho (Manager) =====
+  // Manager truy cap /manager/export-requests ... de xem lich su xuat kho (read-only).
+  // NVKho tu xuat truc tiep - khong can Manager duyet.
+  router.get(
+    '/export-requests',
+    requirePerm('export_requests:read'),
+    exportRequestController.list,
+  );
+  router.get(
+    '/export-requests/:id',
+    requirePerm('export_requests:read'),
+    exportRequestController.getById,
   );
 
   return router;
