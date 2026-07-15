@@ -15,6 +15,7 @@ const buildManagerRouter = require('./managerRoutes');
 const buildCustomerRouter = require('./customerRoutes');
 const buildAuditRouter = require('./auditRoutes');
 const buildImportRequestRouter = require('./importRequestRoutes');
+const buildExportRequestRouter = require('./exportRequestRoutes');
 const buildProfileRouter = require('./profileRoutes');
 
 const router = express.Router();
@@ -38,6 +39,7 @@ router.use('/manager', buildManagerRouter());
 router.use('/customers', buildCustomerRouter());
 router.use('/audit', buildAuditRouter());
 router.use('/import-requests', buildImportRequestRouter());
+router.use('/export-requests', buildExportRequestRouter());
 router.use('/profile', buildProfileRouter());
 
 module.exports = router;

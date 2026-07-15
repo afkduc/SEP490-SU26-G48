@@ -10,12 +10,17 @@
  */
 const ROLE_PERMISSIONS = {
   admin: ['*'],
-  general_director: ['parts:read', 'stock:read', 'suppliers:read', 'reports:read'],
+  general_director: [
+    'parts:read', 'stock:read', 'suppliers:read',
+    'import_requests:read', 'export_requests:read',
+    'reports:read',
+  ],
   manager: [
     'parts:read', 'parts:write',
     'stock:read', 'stock:write',
     'suppliers:read', 'suppliers:write',
     'import_requests:read', 'import_requests:approve',
+    'export_requests:read',
     'reports:read',
   ],
   warehouse_staff: [
@@ -23,8 +28,13 @@ const ROLE_PERMISSIONS = {
     'stock:read', 'stock:write',
     'suppliers:read',
     'import_requests:read', 'import_requests:create',
+    'export_requests:read', 'export_requests:create',
   ],
-  accountant: ['parts:read', 'stock:read', 'suppliers:read', 'reports:read'],
+  accountant: [
+    'parts:read', 'stock:read', 'suppliers:read',
+    'import_requests:read', 'export_requests:read',
+    'reports:read',
+  ],
 };
 
 function can(role, perm) {
