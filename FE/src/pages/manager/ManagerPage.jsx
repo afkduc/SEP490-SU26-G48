@@ -3,6 +3,10 @@ import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-do
 import { useAuth } from '../../contexts/AppContext';
 import { formatCurrency, formatDate } from '../../utils';
 import managerApi from '../../services/managerApi';
+import ManagerImportRequestListPage from './ManagerImportRequestListPage';
+import ManagerImportRequestDetailPage from './ManagerImportRequestDetailPage';
+import ManagerExportRequestListPage from './ManagerExportRequestListPage';
+import ManagerExportRequestDetailPage from './ManagerExportRequestDetailPage';
 
 const SERVICE_STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -2778,6 +2782,10 @@ export default function ManagerPage() {
       <Route path="service-packages/create" element={<ServicePackageFormPage mode="create" />} />
       <Route path="service-packages/:id/edit" element={<ServicePackageFormPage mode="edit" />} />
       <Route path="settlements" element={<SettlementReportsPage />} />
+      <Route path="import-requests" element={<ManagerImportRequestListPage />} />
+      <Route path="import-requests/:id" element={<ManagerImportRequestDetailPage />} />
+      <Route path="export-requests" element={<ManagerExportRequestListPage />} />
+      <Route path="export-requests/:id" element={<ManagerExportRequestDetailPage />} />
       <Route path="*" element={<Navigate to="employees" replace />} />
     </Routes>
   );
