@@ -6,6 +6,7 @@ const InventoryService = require('./InventoryService');
 const ImportRequestService = require('./ImportRequestService');
 const CustomerService = require('./CustomerService');
 const DashboardService = require('./DashboardService');
+const MaintenanceReminderService = require('./MaintenanceReminderService');
 const {
   makeUserRepository,
   makeProductRepository,
@@ -15,6 +16,7 @@ const {
   makeImportRequestRepository,
   makeCustomerRepository,
   makeDashboardRepository,
+  makeMaintenanceReminderRepository,
 } = require('../../infrastructure/repositories');
 
 function makeUserService() {
@@ -50,6 +52,10 @@ function makeDashboardService() {
   return new DashboardService({ dashboardRepository: makeDashboardRepository() });
 }
 
+function makeMaintenanceReminderService() {
+  return new MaintenanceReminderService({ maintenanceReminderRepository: makeMaintenanceReminderRepository() });
+}
+
 module.exports = {
   UserService,
   ProductService,
@@ -59,6 +65,7 @@ module.exports = {
   ImportRequestService,
   CustomerService,
   DashboardService,
+  MaintenanceReminderService,
   makeUserService,
   makeProductService,
   makeRepairSettlementService,
@@ -67,4 +74,5 @@ module.exports = {
   makeImportRequestService,
   makeCustomerService,
   makeDashboardService,
+  makeMaintenanceReminderService,
 };
