@@ -144,6 +144,86 @@ class AdminUserService {
       throw new ApiError(400, err.message || 'Cap nhat nguoi dung that bai');
     }
   }
+
+  /**
+   * Generate mat khau ngau nhien (12 ky tu: hoa + thuong + so + dac biet)
+   * Dam bao moi nhom ky tu deu co it nhat 1 ky tu
+   */
+  generateRandomPassword() {
+    const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const LOWER = 'abcdefghijklmnopqrstuvwxyz';
+    const DIGITS = '0123456789';
+    const SPECIAL = '!@#$%^&*';
+    const ALL = UPPER + LOWER + DIGITS + SPECIAL;
+
+    // 4 ky tu bat buoc (moi nhom 1) + 8 ky tu random tu ALL
+    const required = [
+      UPPER[Math.floor(Math.random() * UPPER.length)],
+      LOWER[Math.floor(Math.random() * LOWER.length)],
+      DIGITS[Math.floor(Math.random() * DIGITS.length)],
+      SPECIAL[Math.floor(Math.random() * SPECIAL.length)],
+    ];
+
+    const remaining = [];
+    for (let i = 0; i < 8; i++) {
+      remaining.push(ALL[Math.floor(Math.random() * ALL.length)]);
+    }
+
+    // Tron mang va ghep thanh chuoi (tranh cac ky tu required luon o dau)
+    const combined = [...required, ...remaining];
+    for (let i = combined.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [combined[i], combined[j]] = [combined[j], combined[i]];
+    }
+    return combined.join('');
+  }
+
+  /**
+   * Admin reset mat khau cho user
+   * - Generate MK ngau nhien, hash bcrypt, luu DB
+   * - Dat must_change_password = true de user phai doi MK lan dang nhap sau
+   * - Tra ve MK plain text 1 lan duy nhat (controller se gui cho FE)
+   */
+  async resetPassword({ userId, mustChangePassword = true }) {
+    if (!userId) {
+      throw new ApiError(400, 'userId la bat buoc');
+    }
+
+    // Kiem tra user ton tai
+    const existing = await this.adminUserRepository.findById(Number(userId));
+    if (!existing) {
+      throw new ApiError(404, 'Nguoi dung khong ton tai');
+    }
+
+    // Khong reset MK cho chinh admin dang thuc hien (tranh tu khoa tai khoan)
+    // (Controller se xu ly truong hop nay neu can, o service chi check don gian)
+
+    // Generate MK plain text
+    const plainPassword = this.generateRandomPassword();
+
+    // Hash MK
+    const passwordHash = bcrypt.hashSync(plainPassword, 10);
+
+    // Update DB
+    const ok = await this.adminUserRepository.updatePassword(
+      Number(userId),
+      passwordHash,
+      mustChangePassword
+    );
+
+    if (!ok) {
+      throw new ApiError(500, 'Reset mat khau that bai');
+    }
+
+    return {
+      userId: Number(userId),
+      newPassword: plainPassword, // plain text - chi tra 1 lan
+      mustChangePassword: Boolean(mustChangePassword),
+      message: mustChangePassword
+        ? 'Mat khau da duoc dat lai. User phai doi mat khau khi dang nhap lan sau.'
+        : 'Mat khau da duoc dat lai thanh cong.',
+    };
+  }
 }
 
 module.exports = AdminUserService;
