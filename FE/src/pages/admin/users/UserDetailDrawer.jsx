@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminUsersApi } from '../../../services/adminApi';
 import AssignRoleModal from './AssignRoleModal';
-import './UserDetailDrawer.css';
+import '../components/AdminDrawer.css';
 
 const STATUS_LABELS = {
   active: 'Hoạt động',

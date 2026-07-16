@@ -1,5 +1,6 @@
 import UserDetailDrawer from './users/UserDetailDrawer';
 import { useState } from 'react';
+import './components/AdminDrawer.css';
 import './AdminLogDrawers.css';
 
 const ACTION_LABELS = {
