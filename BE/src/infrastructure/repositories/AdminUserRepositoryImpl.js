@@ -56,10 +56,9 @@ class AdminUserRepositoryImpl {
     if (roleId) {
       conditions.push(`EXISTS (
         SELECT 1 FROM user_role ur
-        JOIN roles r ON r.id = ur.role_id
-        WHERE ur.user_id = u.id AND r.role_name = @p${paramIndex}
+        WHERE ur.user_id = u.id AND ur.role_id = @p${paramIndex}
       )`);
-      params[`p${paramIndex}`] = roleId;
+      params[`p${paramIndex}`] = Number(roleId);
       paramIndex++;
     }
 
@@ -188,9 +187,9 @@ class AdminUserRepositoryImpl {
 
   async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId }) {
     const result = await query(
-      `INSERT INTO users (user_name, email, user_password, first_name, last_name, phone, branch_id, status)
+      `INSERT INTO users (user_name, email, user_password, first_name, last_name, phone, branch_id, team_size, status, created_at)
        OUTPUT INSERTED.id
-       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 'active')`,
+       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0, 'active', GETDATE())`,
       { p1: name, p2: email, p3: passwordHash, p4: firstName || name, p5: lastName || '', p6: phone, p7: branchId }
     );
     const userId = result.recordset[0].id;
@@ -204,27 +203,17 @@ class AdminUserRepositoryImpl {
   }
 
   async updateUser({ userId, status, roleId, branchId }) {
-    const updates = [];
-    const params = {};
-    let p = 1;
-
     if (status !== undefined) {
-      updates.push(`status = @p${p}`);
-      params[`p${p}`] = status;
-      p++;
+      await query(
+        `UPDATE users SET status = @p1 WHERE id = @p2`,
+        { p1: status, p2: userId }
+      );
     }
 
     if (branchId !== undefined) {
-      updates.push(`branch_id = @p${p}`);
-      params[`p${p}`] = branchId;
-      p++;
-    }
-
-    if (updates.length > 0) {
-      params[`p${p}`] = userId;
       await query(
-        `UPDATE users SET ${updates.join(', ')} WHERE id = @p${p}`,
-        params
+        `UPDATE users SET branch_id = @p1 WHERE id = @p2`,
+        { p1: branchId, p2: userId }
       );
     }
 

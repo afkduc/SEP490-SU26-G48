@@ -104,8 +104,14 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/admin/logs/login"
-          element={<Navigate to="/admin/logs?tab=login" replace />}
+          path="/admin/login-sessions"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <LoginSessionsPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/admin/profile"
@@ -119,13 +125,7 @@ function AppRoutes() {
         />
         <Route
           path="/admin/profile/devices"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <LoginSessionsPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/admin/login-sessions" replace />}
         />
         <Route
           path="/admin/profile/notifications"
