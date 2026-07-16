@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { adminApi } from '../../services';
 import UserDetailDrawer from './users/UserDetailDrawer';
+import AuditLogDetailDrawer from './AuditLogDetailDrawer';
+import AdminPagination from './components/AdminPagination';
 import './AuditLogsPage.css';
 
 const ACTION_OPTIONS = [
@@ -35,40 +37,15 @@ function getResponseBadge(status) {
 }
 
 function Pagination({ currentPage, totalPages, total, onChange, loading }) {
-  if (total === 0) return null;
-  function handlePageChange(page) {
-    if (page < 1 || page > totalPages || loading) return;
-    onChange(page);
-  }
   return (
-    <div className="pagination">
-      <span className="pagination__info">
-        Tổng <strong>{total}</strong> bản ghi
-        &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
-      </span>
-      <div className="pagination__controls">
-        <button className="pagination__nav-btn" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage <= 1 || loading}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
-          Trước
-        </button>
-        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-          let pageNum;
-          if (totalPages <= 7) pageNum = i + 1;
-          else if (currentPage <= 4) pageNum = i + 1;
-          else if (currentPage >= totalPages - 3) pageNum = totalPages - 6 + i;
-          else pageNum = currentPage - 3 + i;
-          return (
-            <button key={pageNum} className={`pagination__page-btn ${currentPage === pageNum ? 'active' : ''}`} onClick={() => handlePageChange(pageNum)} disabled={loading}>
-              {pageNum}
-            </button>
-          );
-        })}
-        <button className="pagination__nav-btn" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage >= totalPages || loading}>
-          Sau
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>
-    </div>
+    <AdminPagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      total={total}
+      onChange={onChange}
+      loading={loading}
+      accent="indigo"
+    />
   );
 }
 
@@ -76,8 +53,10 @@ export default function AuditLogsPage() {
   const audit = useAuditLogs();
   const [branches, setBranches] = useState([]);
   const [branchesError, setBranchesError] = useState(null);
-  // userId dang xem chi tiet (mo drawer)
+  // userId dang xem chi tiet (mo drawer user)
   const [detailUserId, setDetailUserId] = useState(null);
+  // log dang xem chi tiet (mo drawer log)
+  const [detailLog, setDetailLog] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,11 +82,11 @@ export default function AuditLogsPage() {
       endDate: '',
       branchId: undefined,
       page: 1,
-      pageSize: 20,
+      pageSize: 10,
     }));
   }
 
-  const totalPages = audit.data.total > 0 ? Math.ceil(audit.data.total / (audit.data.pageSize || 20)) : 1;
+  const totalPages = audit.data.total > 0 ? Math.ceil(audit.data.total / (audit.data.pageSize || 10)) : 1;
 
   return (
     <div className="admin-logs">
@@ -210,7 +189,11 @@ export default function AuditLogsPage() {
         ) : (
           <>
             <div style={{ overflowX: 'auto' }}>
-              <AuditTable items={audit.data.items} onViewUser={setDetailUserId} />
+              <AuditTable
+                items={audit.data.items}
+                onViewUser={setDetailUserId}
+                onViewLog={setDetailLog}
+              />
             </div>
             <Pagination
               currentPage={audit.data.page || 1}
@@ -230,11 +213,19 @@ export default function AuditLogsPage() {
           onClose={() => setDetailUserId(null)}
         />
       )}
+
+      {/* Log detail drawer */}
+      {detailLog && (
+        <AuditLogDetailDrawer
+          log={detailLog}
+          onClose={() => setDetailLog(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AuditTable({ items, onViewUser }) {
+function AuditTable({ items, onViewUser, onViewLog }) {
   if (!items || items.length === 0) {
     return (
       <table className="table">
@@ -249,7 +240,7 @@ function AuditTable({ items, onViewUser }) {
             <th>Phương thức</th>
             <th>Thời gian xử lý</th>
             <th>Trạng thái</th>
-            <th></th>
+            <th>Thao tác</th>
           </tr>
         </thead>
         <tbody>
@@ -274,7 +265,7 @@ function AuditTable({ items, onViewUser }) {
           <th>Phương thức</th>
           <th>Thời gian xử lý</th>
           <th>Trạng thái</th>
-          <th></th>
+          <th>Thao tác</th>
         </tr>
       </thead>
       <tbody>
@@ -307,20 +298,36 @@ function AuditTable({ items, onViewUser }) {
                 {resp ? <span className={`badge ${resp.cls}`}>{resp.label}</span> : '—'}
               </td>
               <td>
-                {item.user_id && (
+                <div className="admin-logs__row-actions">
                   <button
                     type="button"
-                    className="admin-logs__view-btn"
-                    onClick={() => onViewUser(item.user_id)}
-                    title="Xem chi tiết người dùng"
+                    className="admin-logs__action-btn admin-logs__action-btn--primary"
+                    onClick={() => onViewLog?.(item)}
+                    title="Xem chi tiết nhật ký"
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                      <circle cx="12" cy="12" r="3"/>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
                     </svg>
-                    Chi tiết
+                    Log
                   </button>
-                )}
+                  {item.user_id && (
+                    <button
+                      type="button"
+                      className="admin-logs__action-btn"
+                      onClick={() => onViewUser?.(item.user_id)}
+                      title="Xem chi tiết người dùng"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                      </svg>
+                      User
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           );

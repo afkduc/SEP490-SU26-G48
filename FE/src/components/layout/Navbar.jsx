@@ -17,8 +17,7 @@ const ADMIN_NAV = [
   {
     label: 'Role',
     children: [
-      { label: 'Danh sách Role', path: '/admin/roles' },
-      { label: 'Phân quyền', path: '/admin/users' },
+      { label: 'Phân quyền người dùng', path: '/admin/users' },
     ],
   },
   {
