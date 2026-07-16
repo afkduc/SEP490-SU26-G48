@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import UserDetailDrawer from './users/UserDetailDrawer';
-import './AdminLogDrawers.css';
+import './components/AdminDrawer.css';
 
 const ACTION_LABELS = {
   LOGIN: 'Đăng nhập',

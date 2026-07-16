@@ -231,6 +231,24 @@ class AdminUserRepositoryImpl {
   }
 
   /**
+   * Update mat khau user (admin reset password)
+   * @param {number} userId - ID user can reset
+   * @param {string} passwordHash - mat khau da hash (bcrypt)
+   * @param {boolean} mustChangePassword - co bat buoc doi lan dang nhap sau khong
+   * @returns {Promise<boolean>} true neu update thanh cong
+   */
+  async updatePassword(userId, passwordHash, mustChangePassword) {
+    const result = await query(
+      `UPDATE users
+       SET    user_password       = @p1,
+              must_change_password = @p2
+       WHERE  id = @p3`,
+      { p1: passwordHash, p2: mustChangePassword ? 1 : 0, p3: userId }
+    );
+    return result.rowsAffected[0] > 0;
+  }
+
+  /**
    * Lay thong ke dashboard tong quan
    * Tra ve counts theo status cua users, so branches, so roles
    */

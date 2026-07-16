@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { adminLoginSessionsApi, adminBranchesApi } from '../../services/adminApi';
+import { adminLoginSessionsApi } from '../../services/adminApi';
+import { usePaginatedList } from './usePaginatedList';
 
 const DEFAULT_PARAMS = {
   userName: '',
@@ -13,52 +14,31 @@ const DEFAULT_PARAMS = {
   pageSize: 10,
 };
 
+/**
+ * Hook lấy danh sách phiên đăng nhập (login sessions) cho admin.
+ * Trả về cùng shape với usePaginatedList + helper setParams hỗ trợ function updater.
+ */
 export function useLoginSessions() {
-  const [data, setData] = useState({ items: [], total: 0, page: 1, pageSize: 10 });
-  const [params, setParamsState] = useState(DEFAULT_PARAMS);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const list = usePaginatedList({
+    apiFn: adminLoginSessionsApi.list,
+    defaultParams: DEFAULT_PARAMS,
+  });
 
   const setParams = useCallback((updater) => {
-    setParamsState((prev) => {
+    list.setParams((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       return { ...prev, ...next };
     });
-  }, []);
+  }, [list]);
 
-  const updateParam = useCallback((key, value) => {
-    setParamsState((prev) => {
-      if (key === 'page') return { ...prev, [key]: value };
-      return { ...prev, [key]: value, page: 1 };
-    });
-  }, []);
-
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = {};
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== '') qs[k] = v;
-      });
-      const res = await adminLoginSessionsApi.list(qs);
-      const items = res?.items ?? res ?? [];
-      setData({
-        items: Array.isArray(items) ? items : [],
-        total: res?.total ?? (Array.isArray(items) ? items.length : 0),
-        page: Number(res?.page || params.page || 1),
-        pageSize: Number(res?.pageSize || params.pageSize || 10),
-      });
-    } catch (err) {
-      setError(err.message || 'Không thể tải danh sách');
-    } finally {
-      setLoading(false);
-    }
-  }, [params]);
-
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
-
-  return { data, params, setParams, updateParam, loading, error, refetch: fetch };
+  return {
+    data: list.data,
+    loading: list.loading,
+    error: list.error,
+    params: list.params,
+    setParams,
+    updateParam: list.updateParam,
+    refetch: list.refetch,
+    refresh: list.refresh,
+  };
 }
