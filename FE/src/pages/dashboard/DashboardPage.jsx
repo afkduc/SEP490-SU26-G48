@@ -75,7 +75,6 @@ function RevenueLineChart({ data }) {
   if (!data || data.length === 0) {
     return (
       <div className="empty-state" style={{ minHeight: 220 }}>
-        <div className="empty-state-icon">📉</div>
         <h3>Chưa có dữ liệu</h3>
       </div>
     );
@@ -164,7 +163,6 @@ function StatusStackedBarChart({ data }) {
   if (!data || data.length === 0) {
     return (
       <div className="empty-state" style={{ minHeight: 220 }}>
-        <div className="empty-state-icon">📊</div>
         <h3>Chưa có dữ liệu</h3>
       </div>
     );
@@ -242,7 +240,6 @@ function StatusDonutChart({ data, total }) {
   if (nonZero.length === 0) {
     return (
       <div className="empty-state" style={{ minHeight: 180 }}>
-        <div className="empty-state-icon">🍩</div>
         <h3>Chưa có dữ liệu</h3>
       </div>
     );
@@ -311,7 +308,6 @@ function CategoryBarChart({ data }) {
   if (!data || data.length === 0) {
     return (
       <div className="empty-state" style={{ minHeight: 180 }}>
-        <div className="empty-state-icon">📦</div>
         <h3>Chưa có dữ liệu</h3>
       </div>
     );
@@ -371,7 +367,7 @@ export default function DashboardPage() {
   return (
     <div className="dashboard">
       <div className="dashboard__welcome">
-        <h1>Xin chào, {user?.name} 👋</h1>
+        <h1>Xin chào, {user?.name}</h1>
         <p>
           Vai trò: <strong>{user?.roleLabels?.join(', ') || user?.roles?.join(', ')}</strong>
           {user?.branchId && <span> · Chi nhánh #{user.branchId}</span>}
@@ -390,7 +386,7 @@ export default function DashboardPage() {
           <option value="">Tất cả danh mục</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <button className="btn btn-secondary btn-sm" onClick={() => setRefreshKey((k) => k + 1)}>↻ Làm mới</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => setRefreshKey((k) => k + 1)}>Làm mới</button>
         <div className="dash-filterbar__count">
           {loading ? 'Đang tải…' : `Đang hiển thị ${kpis.totalOrders} phiếu`}
         </div>
@@ -398,7 +394,7 @@ export default function DashboardPage() {
 
       {error && (
         <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#C62828' }}>
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -451,7 +447,6 @@ export default function DashboardPage() {
               {!loading && categoryPerformance.length === 0 && (
                 <tr><td colSpan={5}>
                   <div className="empty-state">
-                    <div className="empty-state-icon">📭</div>
                     <h3>Chưa có dữ liệu</h3>
                   </div>
                 </td></tr>

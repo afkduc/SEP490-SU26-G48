@@ -117,7 +117,9 @@ function calcTotals(items) {
 }
 
 // ─── In danh sách công việc (cho KTV) ────────────────────────────────
-function printWorkList(order) {
+// Export de dung chung o man Lenh sua chua (RepairOrderPage) - in danh sach
+// cong viec cho to truong sau khi phan cong xong, cung 1 mau in nhu o day.
+export function printWorkList(order) {
   const rows = (order.items || []).map((item, i) => `
     <tr>
       <td style="border:1px solid #ccc;padding:4px 7px;text-align:center">${i + 1}</td>
@@ -180,7 +182,7 @@ function printSettlement(order) {
       <td style="text-align:center">${item.qty}</td>
       <td style="text-align:right">${(item.unitPrice || 0).toLocaleString('vi-VN')}</td>
       <td style="text-align:center">${item.discount || 0}%</td>
-      <td style="text-align:center">${item.isFree ? '✓' : ''}</td>
+      <td style="text-align:center">${item.isFree ? 'Có' : ''}</td>
       <td style="text-align:right"><b>${(item.total || 0).toLocaleString('vi-VN')}</b></td>
     </tr>`).join('');
 
@@ -283,7 +285,7 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 860 }}>
         <div className="modal-header">
-          <h3 className="modal-title">📋 Quyết toán sửa chữa — {order.code}</h3>
+          <h3 className="modal-title">Quyết toán sửa chữa — {order.code}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -392,10 +394,10 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
 
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
-          <button className="btn btn-secondary" onClick={() => printSettlement(order)}>🖨️ In phiếu quyết toán</button>
+          <button className="btn btn-secondary" onClick={() => printSettlement(order)}>In phiếu quyết toán</button>
           {canConfirm && (
             <button className="btn btn-primary" onClick={() => { onConfirm(order.id); onClose(); }}>
-              ✅ Xác nhận xuất hóa đơn
+              Xác nhận xuất hóa đơn
             </button>
           )}
         </div>
@@ -414,7 +416,7 @@ function DetailModal({ order, onClose, onComplete, onPreview, canManage }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-xl" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900 }}>
         <div className="modal-header">
-          <h3 className="modal-title">📋 Quyết toán sửa chữa – {order.code}</h3>
+          <h3 className="modal-title">Quyết toán sửa chữa – {order.code}</h3>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span className={`badge ${st?.badge}`}>{st?.label}</span>
             <button className="modal-close" onClick={onClose}>✕</button>
@@ -505,15 +507,15 @@ function DetailModal({ order, onClose, onComplete, onPreview, canManage }) {
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
           {order.status === 'inprogress' && (<>
-            <button className="btn btn-secondary" onClick={() => { onClose(); printWorkList(order); }}>🖨️ In DS công việc</button>
+            <button className="btn btn-secondary" onClick={() => { onClose(); printWorkList(order); }}>In danh sách công việc</button>
             {canManage && (
-              <button className="btn btn-primary" onClick={() => { onClose(); onComplete(order.id); }}>✅ Đánh dấu hoàn thành</button>
+              <button className="btn btn-primary" onClick={() => { onClose(); onComplete(order.id); }}>Đánh dấu hoàn thành</button>
             )}
           </>)}
           {(order.status === 'waiting_payment' || order.status === 'invoiced') && (
             <button className="btn btn-primary" style={{ background: '#2E7D32', borderColor: '#2E7D32' }}
               onClick={() => { onClose(); onPreview(order); }}>
-              🖨️ Xem / In phiếu quyết toán
+              Xem / In phiếu quyết toán
             </button>
           )}
         </div>
@@ -580,7 +582,7 @@ function RepairSettlementList() {
         </div>
         <div className="page-header-right">
           <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
-            🏢 {user?.branchName || user?.branch || MOCK_BRANCH}
+            {user?.branchName || user?.branch || MOCK_BRANCH}
           </span>
         </div>
       </div>
@@ -609,20 +611,19 @@ function RepairSettlementList() {
           );
         })}
         <div className="search-input" style={{ marginLeft: 'auto', minWidth: 260 }}>
-          <span className="search-icon">🔍</span>
-          <input placeholder="Mã RO, biển số, tên khách hàng..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input style={{ paddingLeft: 12 }} placeholder="Mã RO, biển số, tên khách hàng..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
 
       {loadError && (
         <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
-          ⚠️ {loadError}
+          {loadError}
         </div>
       )}
 
       {tab === 'waiting_payment' && counts.waiting_payment > 0 && (
         <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#2E7D32' }}>
-          🧾 Nhấn <b>Xuất hóa đơn</b> để xem/in phiếu quyết toán và hoàn tất dịch vụ.
+          Nhấn <b>Xuất hóa đơn</b> để xem/in phiếu quyết toán và hoàn tất dịch vụ.
         </div>
       )}
 
@@ -645,7 +646,6 @@ function RepairSettlementList() {
             {!loading && filtered.length === 0 && (
               <tr><td colSpan={8}>
                 <div className="empty-state">
-                  <div className="empty-state-icon">📭</div>
                   <h3>Chưa có phiếu quyết toán nào</h3>
                   <p>Không có phiếu nào ở trạng thái này.</p>
                 </div>
@@ -665,35 +665,35 @@ function RepairSettlementList() {
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{o.vehicle?.vehicleModel}</div>
                   </td>
                   <td style={{ fontSize: 12 }}>
-                    {o.teamLeader ? <span>👨‍🔧 {o.teamLeader}</span> : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa gán</span>}
+                    {o.teamLeader ? <span>{o.teamLeader}</span> : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa gán</span>}
                   </td>
                   <td style={{ fontSize: 12 }}>{o.date}</td>
                   <td style={{ fontWeight: 700, color: '#C62828' }}>{formatCurrency(o.total)}</td>
                   <td><span className={`badge ${st?.badge}`}>{st?.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button className="btn btn-info btn-sm btn-icon" title="Xem chi tiết" onClick={() => setView(o)}>👁️</button>
+                      <button className="btn btn-info btn-sm" style={{ fontSize: 11 }} onClick={() => setView(o)}>Xem chi tiết</button>
 
                       {o.status === 'inprogress' && (<>
-                        <button className="btn btn-secondary btn-sm btn-icon" title="In danh sách CV" onClick={() => printWorkList(o)}>🖨️</button>
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => printWorkList(o)}>In danh sách CV</button>
                         {canManage && (
-                          <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => handleComplete(o.id)}>✅ Hoàn thành</button>
+                          <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => handleComplete(o.id)}>Hoàn thành</button>
                         )}
                       </>)}
 
                       {o.status === 'waiting_payment' && (
                         <button className="btn btn-primary btn-sm" style={{ fontSize: 11, background: '#2E7D32', borderColor: '#2E7D32' }}
                           onClick={() => setPreviewOrder(o)}>
-                          🧾 Xuất HĐ
+                          Xuất hóa đơn
                         </button>
                       )}
 
                       {o.status === 'invoiced' && (
-                        <button className="btn btn-secondary btn-sm btn-icon" title="Xem / In lại" onClick={() => setPreviewOrder(o)}>🖨️</button>
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setPreviewOrder(o)}>Xem / In lại</button>
                       )}
 
                       {canManage && o.status !== 'invoiced' && (
-                        <Link to={`/repair-settlement/edit/${o.id}`} state={{ order: o }} className="btn btn-warning btn-sm btn-icon" title="Chỉnh sửa">✏️</Link>
+                        <Link to={`/repair-settlement/edit/${o.id}`} state={{ order: o }} className="btn btn-warning btn-sm" style={{ fontSize: 11 }}>Chỉnh sửa</Link>
                       )}
                     </div>
                   </td>
@@ -752,7 +752,7 @@ function RepairSettlementForm({ isEdit }) {
   }, [isEdit, id]);
 
   if (loadingOrder) return <div className="page-loading">Đang tải phiếu quyết toán…</div>;
-  if (loadOrderError) return <div className="page-loading">⚠️ {loadOrderError}</div>;
+  if (loadOrderError) return <div className="page-loading">{loadOrderError}</div>;
 
   const existingOrder = stateOrder || fetchedOrder;
   return <RepairSettlementFormInner key={existingOrder?.id || 'new'} isEdit={isEdit} existingOrder={existingOrder} />;
@@ -1012,28 +1012,28 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     nextMaintenanceDate: nextDate,
   });
 
-  const handleSave = async (andPrintWorkList = false) => {
+  const handleSave = async () => {
     if (!canSave) {
       setSaveError('Vui lòng chọn khách hàng và xe từ gợi ý tra cứu trước khi lưu.');
       return;
     }
     setSaving(true);
     setSaveError('');
-    let order;
     try {
       const payload = buildPayload();
-      order = isEdit
-        ? await updateRepairSettlementApi(existingOrder.id, payload)
-        : await createRepairSettlementApi(payload);
+      if (isEdit) {
+        await updateRepairSettlementApi(existingOrder.id, payload);
+      } else {
+        await createRepairSettlementApi(payload);
+      }
     } catch (err) {
       setSaveError(err.message || 'Lưu phiếu quyết toán thất bại');
       setSaving(false);
       return;
     }
     setSaving(false);
-    if (andPrintWorkList) printWorkList(order);
     setSaved(true);
-    setTimeout(() => navigate('/repair-settlement'), andPrintWorkList ? 300 : 0);
+    navigate('/repair-settlement');
   };
 
   return (
@@ -1049,28 +1049,25 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
       {saved && (
         <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#2E7D32' }}>
-          ✅ Đã lưu phiếu quyết toán. Đang quay lại danh sách…
+          Đã lưu phiếu quyết toán. Đang quay lại danh sách…
         </div>
       )}
 
       {saveError && (
         <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#C62828' }}>
-          ⚠️ {saveError}
+          {saveError}
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { icon: '👤', label: 'Cố vấn dịch vụ', value: user?.name || 'Cố vấn dịch vụ' },
-          { icon: '🏢', label: 'Chi nhánh', value: user?.branchName || user?.branch || MOCK_BRANCH },
-          { icon: '🕐', label: 'Ngày tiếp nhận', value: existingOrder?.date || nowStr, mono: true },
+          { label: 'Cố vấn dịch vụ', value: user?.name || 'Cố vấn dịch vụ' },
+          { label: 'Chi nhánh', value: user?.branchName || user?.branch || MOCK_BRANCH },
+          { label: 'Ngày tiếp nhận', value: existingOrder?.date || nowStr, mono: true },
         ].map((b) => (
-          <div key={b.label} style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 8, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 22 }}>{b.icon}</span>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{b.label}</div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--primary-dark)', fontFamily: b.mono ? 'monospace' : undefined }}>{b.value}</div>
-            </div>
+          <div key={b.label} style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 8, padding: '10px 16px' }}>
+            <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{b.label}</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--primary-dark)', fontFamily: b.mono ? 'monospace' : undefined }}>{b.value}</div>
           </div>
         ))}
       </div>
@@ -1259,8 +1256,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       {/* SECTION 2: Hạng mục công việc */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
-          <span className="card-title">🔧 Hạng mục công việc / phụ tùng</span>
-          <button className="btn btn-secondary btn-sm" onClick={addItem}>➕ Thêm dòng</button>
+          <span className="card-title">Hạng mục công việc / phụ tùng</span>
+          <button className="btn btn-secondary btn-sm" onClick={addItem}>Thêm dòng</button>
         </div>
         <div className="card-body" style={{ padding: 0 }}>
           <div className="table-wrapper" style={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
@@ -1304,7 +1301,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         <div style={{ position: 'fixed', top: catalogDropdownRect.top, left: catalogDropdownRect.left, width: 440, maxHeight: 420, overflowY: 'auto', background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000 }}>
                           {suggestion.type === 'product' && suggestion.products?.length > 0 && (
                             <div>
-                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>🔩 Phụ tùng trong kho</div>
+                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Phụ tùng trong kho</div>
                               {suggestion.products.map((p) => (
                                 <div key={`prod-${p.id}`} onMouseDown={() => selectProduct(idx, p)}
                                   style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
@@ -1319,7 +1316,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                           )}
                           {suggestion.type === 'catalog' && suggestion.packages?.length > 0 && (
                             <div>
-                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>🎁 Gói combo</div>
+                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Gói combo</div>
                               {suggestion.packages.map((pkg) => (
                                 <div key={`pkg-${pkg.id}`} onMouseDown={() => selectCatalogPackage(idx, pkg)}
                                   style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
@@ -1331,7 +1328,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                           )}
                           {suggestion.type === 'catalog' && suggestion.services?.length > 0 && (
                             <div>
-                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>🔧 Hạng mục đơn lẻ</div>
+                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Hạng mục đơn lẻ</div>
                               {suggestion.services.map((svc) => (
                                 <div key={`svc-${svc.id}`} onMouseDown={() => selectCatalogService(idx, svc)}
                                   style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
@@ -1367,7 +1364,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                     </td>
                     <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{(item.total || 0).toLocaleString('vi-VN')}</td>
                     <td>
-                      <button className="btn btn-danger btn-sm btn-icon" onClick={() => removeItem(idx)} title="Xóa dòng">🗑️</button>
+                      <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => removeItem(idx)}>Xóa</button>
                     </td>
                   </tr>
                   );
@@ -1381,7 +1378,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
         {/* Lịch bảo dưỡng kế tiếp */}
         <div className="card">
-          <div className="card-header"><span className="card-title">🔔 Lịch bảo dưỡng kế tiếp</span></div>
+          <div className="card-header"><span className="card-title">Lịch bảo dưỡng kế tiếp</span></div>
           <div className="card-body">
             <div className="form-grid form-grid-2">
               <div className="form-group">
@@ -1398,12 +1395,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
         {/* Tổng kết */}
         <div className="card" style={{ position: 'sticky', top: 70, alignSelf: 'start' }}>
-          <div className="card-header"><span className="card-title">💰 Tổng kết thanh toán</span></div>
+          <div className="card-header"><span className="card-title">Tổng kết thanh toán</span></div>
           <div className="card-body">
             <div className="summary-box" style={{ marginBottom: 14 }}>
               <div className="summary-row"><span>Tổng trước giảm giá:</span><span>{totals.subtotal.toLocaleString('vi-VN')} đ</span></div>
               <div className="summary-row"><span>Tổng giảm giá:</span><span>{totals.discountAmount.toLocaleString('vi-VN')} đ</span></div>
-              <div className="summary-row"><span>Thuế GTGT (8%):</span><span>{totals.vat.toLocaleString('vi-VN')} đ</span></div>
+              <div className="summary-row"><span>Thuế giá trị gia tăng (8%):</span><span>{totals.vat.toLocaleString('vi-VN')} đ</span></div>
               {totals.freeAmount > 0 && (
                 <div className="summary-row"><span>Miễn phí:</span><span>{totals.freeAmount.toLocaleString('vi-VN')} đ</span></div>
               )}
@@ -1420,23 +1417,18 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
             {!canSave && (
               <div style={{ fontSize: 12, color: '#E65100', marginBottom: 8 }}>
-                ⚠️ Vui lòng chọn khách hàng và xe từ gợi ý tra cứu để có thể lưu.
+                Vui lòng chọn khách hàng và xe từ gợi ý tra cứu để có thể lưu.
               </div>
             )}
 
-            <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
-              disabled={!canSave || saving}
-              onClick={() => handleSave(true)}>
-              🖨️ Lưu & In danh sách công việc
-            </button>
             <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
               disabled={!canSave || saving}
-              onClick={() => handleSave(false)}>
-              💾 {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
+              onClick={handleSave}>
+              {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
             </button>
             <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
               onClick={() => navigate('/repair-settlement')}>
-              ← Quay lại
+              Quay lại
             </button>
           </div>
         </div>
