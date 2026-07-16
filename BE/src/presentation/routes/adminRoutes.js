@@ -12,6 +12,7 @@ const { validateListUsersQuery } = require('../validators/adminUserValidator');
  * GET  /api/admin/users/:id
  * POST /api/admin/users
  * PUT  /api/admin/users/:id
+ * POST /api/admin/users/:id/reset-password  -- Admin reset MK cho user
  * GET  /api/admin/branches
  * GET  /api/admin/roles              -- UC-11: list all roles
  * GET  /api/admin/roles/:id         -- UC-11: role detail
@@ -36,6 +37,7 @@ function buildAdminRouter() {
   router.get('/users/:id', controller.getUserDetail);
   router.post('/users', controller.createUser);
   router.put('/users/:id', controller.updateUser);
+  router.post('/users/:id/reset-password', controller.resetPassword);
 
   // Branches
   router.get('/branches', controller.listBranches);

@@ -31,6 +31,7 @@ class AdminController {
     this.createUser = this.createUser.bind(this);
     this.updateUser = this.updateUser.bind(this);
     this.getUserDetail = this.getUserDetail.bind(this);
+    this.resetPassword = this.resetPassword.bind(this);
   }
 
   getDashboardStats = async (req, res, next) => {
@@ -150,6 +151,37 @@ class AdminController {
     try {
       const user = await this.adminUserService.getUserDetail(req.params.id);
       return success(res, user, 'Chi tiet nguoi dung');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/admin/users/:id/reset-password
+   * Admin reset mat khau cho user bat ky (tru chinh admin dang dang nhap).
+   * Tra ve mat khau plain text 1 lan duy nhat de admin gui cho user.
+   */
+  async resetPassword(req, res, next) {
+    try {
+      const targetUserId = Number(req.params.id);
+      const currentUserId = req.user?.userId;
+
+      // Khong cho admin tu reset MK chinh minh (tranh tu khoa tai khoan)
+      if (currentUserId && targetUserId === currentUserId) {
+        return next(new (require('../../utils/ApiError'))(
+          400,
+          'Khong the tu reset mat khau cua chinh minh. Hay lien he admin khac.'
+        ));
+      }
+
+      // `mustChangePassword` mac dinh true (co the client override qua body)
+      const mustChangePassword = req.body?.mustChangePassword !== false;
+
+      const result = await this.adminUserService.resetPassword({
+        userId: targetUserId,
+        mustChangePassword,
+      });
+      return success(res, result, result.message);
     } catch (err) {
       next(err);
     }
