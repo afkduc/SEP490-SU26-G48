@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
-import { adminLoginSessionsApi, adminBranchesApi } from '../../services/adminApi';
+import { adminBranchesApi } from '../../services/adminApi';
+import UserDetailDrawer from './users/UserDetailDrawer';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -86,7 +87,7 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
   );
 }
 
-function SessionTable({ items }) {
+function SessionTable({ items, onViewUser }) {
   if (!items || items.length === 0) {
     return (
       <table className="table">
@@ -101,11 +102,12 @@ function SessionTable({ items }) {
             <th>Trình duyệt</th>
             <th>Thời gian đăng xuất</th>
             <th>Thời lượng</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td colSpan={9} className="table__empty">
+            <td colSpan={10} className="table__empty">
               Không có lịch sử đăng nhập nào phù hợp với bộ lọc
             </td>
           </tr>
@@ -126,6 +128,7 @@ function SessionTable({ items }) {
           <th>Trình duyệt</th>
           <th>Thời gian đăng xuất</th>
           <th>Thời lượng</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -157,6 +160,22 @@ function SessionTable({ items }) {
             </td>
             <td className="admin-logs__date">{formatDate(item.logout_time)}</td>
             <td className="admin-logs__duration">{formatDuration(item.session_duration_seconds)}</td>
+            <td>
+              {item.user_id && (
+                <button
+                  type="button"
+                  className="admin-logs__view-btn"
+                  onClick={() => onViewUser(item.user_id)}
+                  title="Xem chi tiết người dùng"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  Chi tiết
+                </button>
+              )}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -168,6 +187,8 @@ export default function AdminLoginSessionsPage() {
   const sessions = useLoginSessions();
   const [branches, setBranches] = useState([]);
   const [branchesError, setBranchesError] = useState(null);
+  // userId dang xem chi tiet (mo drawer)
+  const [detailUserId, setDetailUserId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -195,8 +216,8 @@ export default function AdminLoginSessionsPage() {
             </svg>
           </div>
           <div className="admin-logs__title-group">
-            <h1>Thiết bị đăng nhập</h1>
-            <p className="admin-logs__subtitle">Theo dõi các thiết bị đã đăng nhập vào hệ thống</p>
+            <h1>Lịch sử đăng nhập</h1>
+            <p className="admin-logs__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
           </div>
         </div>
       </div>
@@ -292,7 +313,7 @@ export default function AdminLoginSessionsPage() {
         ) : (
           <>
             <div style={{ overflowX: 'auto' }}>
-              <SessionTable items={sessions.data.items} />
+              <SessionTable items={sessions.data.items} onViewUser={setDetailUserId} />
             </div>
             <Pagination
               currentPage={sessions.data.page || 1}
@@ -304,6 +325,13 @@ export default function AdminLoginSessionsPage() {
           </>
         )}
       </div>
+
+      {detailUserId && (
+        <UserDetailDrawer
+          userId={detailUserId}
+          onClose={() => setDetailUserId(null)}
+        />
+      )}
     </div>
   );
 }
