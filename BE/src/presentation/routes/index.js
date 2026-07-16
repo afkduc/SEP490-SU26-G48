@@ -17,6 +17,7 @@ const buildAuditRouter = require('./auditRoutes');
 const buildImportRequestRouter = require('./importRequestRoutes');
 const buildProfileRouter = require('./profileRoutes');
 const buildDashboardRouter = require('./dashboardRoutes');
+const buildMaintenanceReminderRouter = require('./maintenanceReminderRoutes');
 
 const router = express.Router();
 
@@ -41,5 +42,6 @@ router.use('/audit', buildAuditRouter());
 router.use('/import-requests', buildImportRequestRouter());
 router.use('/profile', buildProfileRouter());
 router.use('/dashboard', buildDashboardRouter());
+router.use('/maintenance-reminders', buildMaintenanceReminderRouter());
 
 module.exports = router;

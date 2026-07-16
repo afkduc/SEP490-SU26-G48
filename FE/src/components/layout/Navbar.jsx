@@ -47,10 +47,7 @@ const SERVICE_ADVISOR_NAV = [
   },
   {
     label: 'Chăm sóc khách hàng',
-    children: [
-      { label: 'Lịch hẹn', path: '/customer-care/appointments' },
-      { label: 'Nhắc nhở', path: '/customer-care/reminders' },
-    ],
+    path: '/customer-care',
   },
   {
     label: 'Khách hàng',
