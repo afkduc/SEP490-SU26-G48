@@ -17,7 +17,6 @@ const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralD
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
-const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
@@ -84,16 +83,6 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/admin/roles"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminRolesPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/admin/logs"
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
@@ -122,10 +111,6 @@ function AppRoutes() {
               </AdminLayout>
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/admin/profile/devices"
-          element={<Navigate to="/admin/login-sessions" replace />}
         />
         <Route
           path="/admin/profile/notifications"

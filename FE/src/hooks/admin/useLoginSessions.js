@@ -10,11 +10,11 @@ const DEFAULT_PARAMS = {
   endDate: '',
   branchId: undefined,
   page: 1,
-  pageSize: 20,
+  pageSize: 10,
 };
 
 export function useLoginSessions() {
-  const [data, setData] = useState({ items: [], total: 0, page: 1, pageSize: 20 });
+  const [data, setData] = useState({ items: [], total: 0, page: 1, pageSize: 10 });
   const [params, setParamsState] = useState(DEFAULT_PARAMS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -22,12 +22,15 @@ export function useLoginSessions() {
   const setParams = useCallback((updater) => {
     setParamsState((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      return { ...prev, ...next, page: next.page ?? 1 };
+      return { ...prev, ...next };
     });
   }, []);
 
   const updateParam = useCallback((key, value) => {
-    setParamsState((prev) => ({ ...prev, [key]: value, page: 1 }));
+    setParamsState((prev) => {
+      if (key === 'page') return { ...prev, [key]: value };
+      return { ...prev, [key]: value, page: 1 };
+    });
   }, []);
 
   const fetch = useCallback(async () => {
@@ -42,9 +45,9 @@ export function useLoginSessions() {
       const items = res?.items ?? res ?? [];
       setData({
         items: Array.isArray(items) ? items : [],
-        total: Array.isArray(items) ? items.length : (res?.total ?? 0),
+        total: res?.total ?? (Array.isArray(items) ? items.length : 0),
         page: Number(res?.page || params.page || 1),
-        pageSize: Number(res?.pageSize || params.pageSize || 20),
+        pageSize: Number(res?.pageSize || params.pageSize || 10),
       });
     } catch (err) {
       setError(err.message || 'Không thể tải danh sách');

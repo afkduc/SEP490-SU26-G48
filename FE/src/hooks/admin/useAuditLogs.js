@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { auditApi } from '../../services/auditApi';
 
-const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 400;
 
 /**

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { adminBranchesApi } from '../../services/adminApi';
 import UserDetailDrawer from './users/UserDetailDrawer';
+import SessionDetailDrawer from './SessionDetailDrawer';
+import AdminPagination from './components/AdminPagination';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -36,58 +38,54 @@ function formatDate(value) {
 }
 
 function formatDuration(seconds) {
-  if (seconds === undefined || seconds === null) return '—';
-  if (seconds < 0) return '—';
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds === undefined || seconds === null) return null;
+  if (seconds < 0) return null;
+  if (seconds < 60) return `${seconds} giây`;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  const parts = [];
+  if (h > 0) parts.push(`${h} giờ`);
+  if (remM > 0) parts.push(`${remM} phút`);
+  if (s > 0 && h === 0) parts.push(`${s} giây`); // chỉ hiện giây khi < 1 giờ
+  return parts.join(' ') || '0 phút';
+}
+
+/** Tính "thời lượng hiện tại" của phiên active = now - login_time (giây) */
+function liveDurationSeconds(loginTime) {
+  if (!loginTime) return null;
+  const t = new Date(loginTime).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 1000));
+}
+
+/** Hook: tick mỗi 30s để cập nhật duration cho phiên active (re-render bảng) */
+function useDurationTicker(intervalMs = 30000) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
 }
 
 function Pagination({ currentPage, totalPages, total, onChange, loading }) {
-  if (total === 0) return null;
   return (
-    <div className="pagination">
-      <span className="pagination__info">
-        Tổng <strong>{total}</strong> bản ghi
-        &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
-      </span>
-      <div className="pagination__controls">
-        <button className="pagination__nav-btn" onClick={() => onChange(currentPage - 1)} disabled={currentPage <= 1 || loading}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Trước
-        </button>
-        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-          let pageNum;
-          if (totalPages <= 7) pageNum = i + 1;
-          else if (currentPage <= 4) pageNum = i + 1;
-          else if (currentPage >= totalPages - 3) pageNum = totalPages - 6 + i;
-          else pageNum = currentPage - 3 + i;
-          return (
-            <button
-              key={pageNum}
-              className={`pagination__page-btn ${currentPage === pageNum ? 'active' : ''}`}
-              onClick={() => onChange(pageNum)}
-              disabled={loading}
-            >
-              {pageNum}
-            </button>
-          );
-        })}
-        <button className="pagination__nav-btn" onClick={() => onChange(currentPage + 1)} disabled={currentPage >= totalPages || loading}>
-          Sau
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-      </div>
-    </div>
+    <AdminPagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      total={total}
+      onChange={onChange}
+      loading={loading}
+      accent="cyan"
+    />
   );
 }
 
-function SessionTable({ items, onViewUser }) {
+function SessionTable({ items, onViewUser, onViewSession }) {
+  // Tick mỗi 30s để cập nhật "thời lượng hiện tại" của các phiên đang active
+  useDurationTicker(30000);
+
   if (!items || items.length === 0) {
     return (
       <table className="table">
@@ -95,19 +93,18 @@ function SessionTable({ items, onViewUser }) {
           <tr>
             <th>Thời gian đăng nhập</th>
             <th>Người dùng</th>
-            <th>Số điện thoại</th>
+            <th className="col-hide-md">Số điện thoại</th>
             <th>Hành động</th>
             <th>Trạng thái</th>
-            <th>IP</th>
-            <th>Trình duyệt</th>
-            <th>Thời gian đăng xuất</th>
-            <th>Thời lượng</th>
-            <th></th>
+            <th className="col-hide-md">IP</th>
+            <th className="col-hide-md">Trình duyệt</th>
+            <th className="col-hide-md">Thời lượng</th>
+            <th>Thao tác</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td colSpan={10} className="table__empty">
+            <td colSpan={9} className="table__empty">
               Không có lịch sử đăng nhập nào phù hợp với bộ lọc
             </td>
           </tr>
@@ -121,14 +118,13 @@ function SessionTable({ items, onViewUser }) {
         <tr>
           <th>Thời gian đăng nhập</th>
           <th>Người dùng</th>
-          <th>Số điện thoại</th>
+          <th className="col-hide-md">Số điện thoại</th>
           <th>Hành động</th>
           <th>Trạng thái</th>
-          <th>IP</th>
-          <th>Trình duyệt</th>
-          <th>Thời gian đăng xuất</th>
-          <th>Thời lượng</th>
-          <th></th>
+          <th className="col-hide-md">IP</th>
+          <th className="col-hide-md">Trình duyệt</th>
+          <th className="col-hide-md">Thời lượng</th>
+          <th>Thao tác</th>
         </tr>
       </thead>
       <tbody>
@@ -136,7 +132,7 @@ function SessionTable({ items, onViewUser }) {
           <tr key={item.id}>
             <td className="admin-logs__date">{formatDate(item.login_time)}</td>
             <td className="admin-logs__user-name">{item.user_name || '—'}</td>
-            <td className="admin-logs__phone">{item.phone_number || '—'}</td>
+            <td className="admin-logs__phone col-hide-md">{item.phone_number || '—'}</td>
             <td>
               {item.action_type ? (
                 <span className={`badge ${ACTION_CLASS[item.action_type] || 'badge--secondary'}`}>
@@ -151,30 +147,51 @@ function SessionTable({ items, onViewUser }) {
                 </span>
               ) : '—'}
             </td>
-            <td className="admin-logs__ip">{item.ip_address || '—'}</td>
-            <td className="admin-logs__user-agent" title={item.user_agent}>
+            <td className="admin-logs__ip col-hide-md">{item.ip_address || '—'}</td>
+            <td className="admin-logs__user-agent col-hide-md" title={item.user_agent}>
               {item.user_agent ? (() => {
                 const match = item.user_agent.match(/Chrome\/[\d.]+|Firefox\/[\d.]+|Safari\/[\d.]+/);
                 return match ? match[0] : `${item.user_agent.slice(0, 30)}...`;
               })() : '—'}
             </td>
-            <td className="admin-logs__date">{formatDate(item.logout_time)}</td>
-            <td className="admin-logs__duration">{formatDuration(item.session_duration_seconds)}</td>
+            <td className="admin-logs__duration col-hide-md">
+              {item.status === 'active' ? (
+                <span style={{ color: '#0891b2', fontWeight: 600 }} title="Đang hoạt động">
+                  {formatDuration(liveDurationSeconds(item.login_time)) || '—'}
+                </span>
+              ) : (
+                formatDuration(item.session_duration_seconds) || '—'
+              )}
+            </td>
             <td>
-              {item.user_id && (
+              <div className="admin-logs__row-actions">
                 <button
                   type="button"
-                  className="admin-logs__view-btn"
-                  onClick={() => onViewUser(item.user_id)}
-                  title="Xem chi tiết người dùng"
+                  className="admin-logs__action-btn admin-logs__action-btn--primary"
+                  onClick={() => onViewSession?.(item)}
+                  title="Xem chi tiết phiên"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
-                  Chi tiết
+                  Phiên
                 </button>
-              )}
+                {item.user_id && (
+                  <button
+                    type="button"
+                    className="admin-logs__action-btn"
+                    onClick={() => onViewUser?.(item.user_id)}
+                    title="Xem chi tiết người dùng"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                      <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    User
+                  </button>
+                )}
+              </div>
             </td>
           </tr>
         ))}
@@ -187,8 +204,10 @@ export default function AdminLoginSessionsPage() {
   const sessions = useLoginSessions();
   const [branches, setBranches] = useState([]);
   const [branchesError, setBranchesError] = useState(null);
-  // userId dang xem chi tiet (mo drawer)
+  // userId dang xem chi tiet (mo drawer user)
   const [detailUserId, setDetailUserId] = useState(null);
+  // session dang xem chi tiet (mo drawer session)
+  const [detailSession, setDetailSession] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,7 +222,7 @@ export default function AdminLoginSessionsPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 20)) : 1;
+  const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
 
   return (
     <div className="admin-logs">
@@ -292,7 +311,7 @@ export default function AdminLoginSessionsPage() {
             endDate: '',
             branchId: undefined,
             page: 1,
-            pageSize: 20,
+            pageSize: 10,
           }))}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="1 4 1 10 7 10" />
@@ -313,7 +332,11 @@ export default function AdminLoginSessionsPage() {
         ) : (
           <>
             <div style={{ overflowX: 'auto' }}>
-              <SessionTable items={sessions.data.items} onViewUser={setDetailUserId} />
+              <SessionTable
+                items={sessions.data.items}
+                onViewUser={setDetailUserId}
+                onViewSession={setDetailSession}
+              />
             </div>
             <Pagination
               currentPage={sessions.data.page || 1}
@@ -330,6 +353,13 @@ export default function AdminLoginSessionsPage() {
         <UserDetailDrawer
           userId={detailUserId}
           onClose={() => setDetailUserId(null)}
+        />
+      )}
+
+      {detailSession && (
+        <SessionDetailDrawer
+          session={detailSession}
+          onClose={() => setDetailSession(null)}
         />
       )}
     </div>

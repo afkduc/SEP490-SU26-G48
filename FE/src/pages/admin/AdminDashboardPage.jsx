@@ -786,9 +786,8 @@ function QuickAction({ to, icon, label, desc, accent }) {
 // ─── Main component ─────────────────────────────────────────────────────────
 
 const QUICK_ACTIONS = [
-  { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem & chỉnh sửa tài khoản', accent: '#4f46e5' },
+  { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem, chỉnh sửa & phân quyền', accent: '#4f46e5' },
   { to: '/admin/users/create', icon: <IconUsers />, label: 'Thêm người dùng mới', desc: 'Tạo tài khoản mới', accent: '#059669' },
-  { to: '/admin/roles', icon: <IconRole />, label: 'Quản lý vai trò', desc: 'Phân quyền người dùng', accent: '#7c3aed' },
   { to: '/admin/logs', icon: <IconLog />, label: 'Nhật ký hoạt động', desc: 'Lịch sử thao tác', accent: '#d97706' },
   { to: '/admin/login-sessions', icon: <IconLogin />, label: 'Lịch sử đăng nhập', desc: 'Theo dõi thiết bị & phiên', accent: '#0891b2' },
   { to: '/admin/profile', icon: <IconTerminal />, label: 'Hồ sơ cá nhân', desc: 'Chỉnh sửa thông tin', accent: '#db2777' },

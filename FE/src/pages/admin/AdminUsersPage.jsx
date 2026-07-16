@@ -9,6 +9,7 @@ import {
 import UserFormModal from './users/UserFormModal';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import AssignRoleModal from './users/AssignRoleModal';
+import AdminPagination from './components/AdminPagination';
 import './AdminUsersPage.css';
 
 const STATUS_OPTIONS = [
@@ -360,57 +361,14 @@ export default function AdminUsersPage() {
 
             {/* Pagination */}
             {data.total > 0 && (
-              <div className="pagination">
-                <span className="pagination__info">
-                  Tổng <strong>{data.total}</strong> tài khoản
-                  &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
-                </span>
-                <div className="pagination__controls">
-                  <button
-                    className="pagination__nav-btn"
-                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                    disabled={currentPage <= 1}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="15 18 9 12 15 6"/>
-                    </svg>
-                    Trước
-                  </button>
-
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 7) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 4) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 3) {
-                      pageNum = totalPages - 6 + i;
-                    } else {
-                      pageNum = currentPage - 3 + i;
-                    }
-                    return (
-                      <button
-                        key={pageNum}
-                        className={`pagination__page-btn ${currentPage === pageNum ? 'active' : ''}`}
-                        onClick={() => handlePageChange(pageNum)}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    className="pagination__nav-btn"
-                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage >= totalPages}
-                  >
-                    Sau
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="9 18 15 12 9 6"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <AdminPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                total={data.total}
+                onChange={handlePageChange}
+                loading={loading}
+                accent="indigo"
+              />
             )}
           </>
         )}

@@ -299,31 +299,80 @@
   color: #1e293b;
 }
 
-/* View user detail button (trong table row) */
-.admin-logs__view-btn {
+/* Action buttons trong table row (Log / Phiên / User) */
+.admin-logs__row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.admin-logs__action-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 10px;
-  font-size: 0.78rem;
+  padding: 5px 9px;
+  font-size: 0.76rem;
   font-weight: 500;
-  color: #4f46e5;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  color: #475569;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
 }
 
-.admin-logs__view-btn:hover {
+.admin-logs__action-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+.admin-logs__action-btn--primary {
+  color: #4f46e5;
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.admin-logs__action-btn--primary:hover {
   background: #4f46e5;
   color: #fff;
   border-color: #4f46e5;
 }
 
-.admin-logs__view-btn svg {
+.admin-logs__action-btn svg {
   flex-shrink: 0;
+}
+
+/* JSON block (request body / response body / old/new value) trong detail drawer */
+.audit-detail__json {
+  margin: 0;
+  padding: 12px 14px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  border-radius: 8px;
+  border: 1px solid #1e293b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}
+
+/* Scrollbar cho json block */
+.audit-detail__json::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.audit-detail__json::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+.audit-detail__json::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
 }
 
 /* ── Table card ── */
@@ -425,84 +474,7 @@
 .admin-logs .badge--warning { background: #fef9c3; color: #a16207; }
 .admin-logs .badge--secondary { background: #f1f5f9; color: #64748b; }
 
-/* ── Pagination ── */
-.admin-logs .pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border-top: 1px solid #f1f5f9;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.admin-logs .pagination__info {
-  font-size: 0.82rem;
-  color: #64748b;
-}
-
-.admin-logs .pagination__info strong {
-  color: #1e293b;
-}
-
-.admin-logs .pagination__controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.admin-logs .pagination__page-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #475569;
-  font-size: 0.82rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  padding: 0;
-}
-
-.admin-logs .pagination__page-btn:hover:not(:disabled) {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-}
-
-.admin-logs .pagination__page-btn.active {
-  background: #4f46e5;
-  border-color: #4f46e5;
-  color: #fff;
-  font-weight: 600;
-}
-
-.admin-logs .pagination__page-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.admin-logs .pagination__nav-btn {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #475569;
-  font-size: 0.82rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  transition: all 0.15s;
-}
-
-.admin-logs .pagination__nav-btn:hover:not(:disabled) {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-}
+/* ── Pagination moved to components/AdminPagination.css ── */
 
 /* ── Responsive ── */
 @media (max-width: 900px) {

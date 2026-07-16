@@ -35,15 +35,6 @@ const ADMIN_SIDEBAR = [
         ),
         badge: 'He thong',
       },
-      {
-        label: 'Vai tro',
-        path: '/admin/roles',
-        icon: (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-        ),
-      },
     ],
   },
   {
@@ -84,17 +75,6 @@ const ADMIN_SIDEBAR = [
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
             <circle cx="12" cy="7" r="4"/>
-          </svg>
-        ),
-      },
-      {
-        label: 'Thiet bi dang nhap',
-        path: '/admin/profile/devices',
-        icon: (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-            <line x1="8" y1="21" x2="16" y2="21"/>
-            <line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
         ),
       },
