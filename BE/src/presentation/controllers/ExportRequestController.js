@@ -6,8 +6,8 @@ const ApiError = require('../../utils/ApiError');
  * Khac ImportRequest:
  *   - KHONG co approve/reject (NV tu xuat).
  *   - Co them 2 endpoint dac thu:
- *     GET  /service-orders/exportable  - list SO co the xuat
- *     GET  /service-orders/:id/for-export - lay 1 SO + items de fill form
+ *     GET  /repair-orders/exportable  - list RO co the xuat
+ *     GET  /repair-orders/:id/for-export - lay 1 RO + tasks (PART) de fill form
  */
 class ExportRequestController {
   constructor({ exportRequestService }) {
@@ -16,14 +16,14 @@ class ExportRequestController {
 
   list = async (req, res, next) => {
     try {
-      const { branchId, status, serviceOrderId, fromDate, toDate, search, page, limit } = req.query;
+      const { branchId, status, repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit } = req.query;
       const branchIdToUse = branchId ? Number(branchId) : req.user?.branchId;
       if (!branchIdToUse) {
         throw new ApiError(400, 'branchId is required');
       }
       const result = await this.exportRequestService.list({
         branchId: branchIdToUse,
-        status, serviceOrderId, fromDate, toDate, search, page, limit,
+        status, repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit,
       });
       return success(res, result, 'Export requests retrieved');
     } catch (err) {
@@ -58,34 +58,34 @@ class ExportRequestController {
   };
 
   /**
-   * GET /api/export-requests/service-orders/exportable
-   * List cac Service Order co the xuat kho.
+   * GET /api/export-requests/repair-orders/exportable
+   * List cac Repair Order co the xuat kho.
    */
-  listExportableServiceOrders = async (req, res, next) => {
+  listExportableRepairOrders = async (req, res, next) => {
     try {
       const { branchId, search, page, limit } = req.query;
       const branchIdToUse = branchId ? Number(branchId) : req.user?.branchId;
       if (!branchIdToUse) {
         throw new ApiError(400, 'branchId is required');
       }
-      const result = await this.exportRequestService.listExportableServiceOrders({
+      const result = await this.exportRequestService.listExportableRepairOrders({
         branchId: branchIdToUse,
         search, page, limit,
       });
-      return success(res, result, 'Exportable service orders retrieved');
+      return success(res, result, 'Exportable repair orders retrieved');
     } catch (err) {
       next(err);
     }
   };
 
   /**
-   * GET /api/export-requests/service-orders/:id/for-export
-   * Lay chi tiet 1 SO + cac phu tung (PART) de fill form xuat.
+   * GET /api/export-requests/repair-orders/:id/for-export
+   * Lay chi tiet 1 RO + cac phu tung (PART) de fill form xuat.
    */
-  getServiceOrderForExport = async (req, res, next) => {
+  getRepairOrderForExport = async (req, res, next) => {
     try {
-      const data = await this.exportRequestService.getServiceOrderForExport(req.params.id);
-      return success(res, data, 'Service order for export retrieved');
+      const data = await this.exportRequestService.getRepairOrderForExport(req.params.id);
+      return success(res, data, 'Repair order for export retrieved');
     } catch (err) {
       next(err);
     }

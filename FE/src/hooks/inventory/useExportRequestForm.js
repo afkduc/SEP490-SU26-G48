@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   getNextExportRequestCodeApi,
-  listExportableServiceOrdersApi,
-  getServiceOrderForExportApi,
+  listExportableRepairOrdersApi,
+  getRepairOrderForExportApi,
   createExportRequestApi,
 } from '../../services/exportRequestApi';
 
 /**
  * Hook phu trach trang Tao phieu xuat kho moi (NV Kho):
  * - Auto load ma phieu tiep theo (EXB-{branchId}-{YYYYMMDD}-{seq}).
- * - listServiceOrders(search, page): goi API lay cac SO co the xuat.
- * - loadServiceOrder(id): goi API lay chi tiet 1 SO + items (de fill form).
+ * - listRepairOrders(search, page): goi API lay cac RO co the xuat.
+ * - loadRepairOrder(id): goi API lay chi tiet 1 RO + tasks (PART) de fill form.
  * - submit(payload): tao phieu xuat (tru stock + ghi log).
  */
 export function useExportRequestForm(branchId) {
@@ -55,41 +55,43 @@ export function useExportRequestForm(branchId) {
     }
   }, []);
 
-  // Service Order helpers
-  const [serviceOrders, setServiceOrders] = useState([]);
-  const [loadingServiceOrders, setLoadingServiceOrders] = useState(false);
-  const [serviceOrdersError, setServiceOrdersError] = useState(null);
+  // Repair Order helpers
+  const [repairOrders, setRepairOrders] = useState([]);
+  const [loadingRepairOrders, setLoadingRepairOrders] = useState(false);
+  const [repairOrdersError, setRepairOrdersError] = useState(null);
+  const [repairOrdersTotal, setRepairOrdersTotal] = useState(0);
 
-  const fetchServiceOrders = useCallback(async (search = '') => {
+  const fetchRepairOrders = useCallback(async (search = '') => {
     if (!branchId) return;
-    setLoadingServiceOrders(true);
-    setServiceOrdersError(null);
+    setLoadingRepairOrders(true);
+    setRepairOrdersError(null);
     try {
-      const res = await listExportableServiceOrdersApi({ branchId, search });
-      setServiceOrders(res?.items || []);
+      const res = await listExportableRepairOrdersApi({ branchId, search });
+      setRepairOrders(res?.items || []);
+      setRepairOrdersTotal(res?.total || 0);
     } catch (err) {
-      setServiceOrdersError(err.message);
-      setServiceOrders([]);
+      setRepairOrdersError(err.message);
+      setRepairOrders([]);
     } finally {
-      setLoadingServiceOrders(false);
+      setLoadingRepairOrders(false);
     }
   }, [branchId]);
 
-  const [loadingSoDetail, setLoadingSoDetail] = useState(false);
-  const [soDetailError, setSoDetailError] = useState(null);
+  const [loadingRoDetail, setLoadingRoDetail] = useState(false);
+  const [roDetailError, setRoDetailError] = useState(null);
 
-  const loadServiceOrder = useCallback(async (id) => {
+  const loadRepairOrder = useCallback(async (id) => {
     if (!id) return null;
-    setLoadingSoDetail(true);
-    setSoDetailError(null);
+    setLoadingRoDetail(true);
+    setRoDetailError(null);
     try {
-      const res = await getServiceOrderForExportApi(id);
+      const res = await getRepairOrderForExportApi(id);
       return res;
     } catch (err) {
-      setSoDetailError(err.message);
+      setRoDetailError(err.message);
       throw err;
     } finally {
-      setLoadingSoDetail(false);
+      setLoadingRoDetail(false);
     }
   }, []);
 
@@ -102,12 +104,13 @@ export function useExportRequestForm(branchId) {
     submitting,
     submitError,
     submit,
-    serviceOrders,
-    loadingServiceOrders,
-    serviceOrdersError,
-    fetchServiceOrders,
-    loadingSoDetail,
-    soDetailError,
-    loadServiceOrder,
+    repairOrders,
+    loadingRepairOrders,
+    repairOrdersError,
+    repairOrdersTotal,
+    fetchRepairOrders,
+    loadingRoDetail,
+    roDetailError,
+    loadRepairOrder,
   };
 }
