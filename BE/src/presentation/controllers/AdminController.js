@@ -54,6 +54,7 @@ class AdminController {
     this.createRole = this.createRole.bind(this);
     this.updateRole = this.updateRole.bind(this);
     this.deleteRole = this.deleteRole.bind(this);
+    this.toggleRoleStatus = this.toggleRoleStatus.bind(this);
     this.listDevices = this.listDevices.bind(this);
     this.listUserDevices = this.listUserDevices.bind(this);
     this.forceLogoutDevice = this.forceLogoutDevice.bind(this);
@@ -62,6 +63,7 @@ class AdminController {
     this.createSpecialty = this.createSpecialty.bind(this);
     this.updateSpecialty = this.updateSpecialty.bind(this);
     this.deleteSpecialty = this.deleteSpecialty.bind(this);
+    this.toggleSpecialtyStatus = this.toggleSpecialtyStatus.bind(this);
     this.getUserSpecialties = this.getUserSpecialties.bind(this);
     this.setUserSpecialties = this.setUserSpecialties.bind(this);
     this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
@@ -303,6 +305,15 @@ class AdminController {
     }
   };
 
+  toggleRoleStatus = async (req, res, next) => {
+    try {
+      const role = await this.roleService.toggleStatus(req.params.id);
+      return success(res, role, 'Cap nhat trang thai vai tro thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   // Devices
   listDevices = async (req, res, next) => {
     try {
@@ -379,6 +390,15 @@ class AdminController {
     try {
       const result = await this.specialtyService.delete(req.params.id);
       return success(res, result, 'Xoa chuyen mon thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  toggleSpecialtyStatus = async (req, res, next) => {
+    try {
+      const specialty = await this.specialtyService.toggleStatus(req.params.id);
+      return success(res, specialty, 'Cap nhat trang thai chuyen mon thanh cong');
     } catch (err) {
       next(err);
     }

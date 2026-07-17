@@ -331,13 +331,11 @@ export default function AdminLoginSessionsPage() {
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <SessionTable
-                items={sessions.data.items}
-                onViewUser={setDetailUserId}
-                onViewSession={setDetailSession}
-              />
-            </div>
+            <SessionTable
+              items={sessions.data.items}
+              onViewUser={setDetailUserId}
+              onViewSession={setDetailSession}
+            />
             <Pagination
               currentPage={sessions.data.page || 1}
               totalPages={sessionTotalPages}

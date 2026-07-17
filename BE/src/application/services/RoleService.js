@@ -111,6 +111,12 @@ class RoleService {
     }
     return { deleted: true, roleId: Number(roleId) };
   }
+
+  async toggleStatus(roleId) {
+    const role = await this.roleRepository.findById(Number(roleId));
+    if (!role) throw new ApiError(404, 'Role khong ton tai');
+    return this.roleRepository.toggleStatus(roleId);
+  }
 }
 
 module.exports = RoleService;

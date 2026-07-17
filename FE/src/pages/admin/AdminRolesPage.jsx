@@ -193,13 +193,18 @@ function RoleUsersModal({ role, users, onClose }) {
 
 // ─── Role Card ──────────────────────────────────────────────────
 
-function RoleCard({ role, onEdit, onDelete, onUsers }) {
+function RoleCard({ role, onEdit, onToggleStatus, onUsers }) {
   return (
-    <div className="role-card">
+    <div className={`role-card ${role.isActive ? '' : 'role-card--inactive'}`}>
       <div className="role-card__header">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <span className="role-card__badge">{role.roleName}</span>
+            <span className={`role-card__badge ${role.isActive ? '' : 'role-card__badge--inactive'}`}>
+              {role.roleName}
+            </span>
+            <span className={`role-card__status-chip ${role.isActive ? 'role-card__status-chip--active' : 'role-card__status-chip--inactive'}`}>
+              {role.isActive ? 'Active' : 'Disabled'}
+            </span>
           </div>
           <div className="role-card__name">{role.roleLabel}</div>
         </div>
@@ -217,33 +222,13 @@ function RoleCard({ role, onEdit, onDelete, onUsers }) {
         <button className="btn btn--sm btn--secondary" onClick={() => onEdit(role)} title="Chỉnh sửa">
           <IconEdit /> Sửa
         </button>
-        <button className="btn btn--sm btn--danger" onClick={() => onDelete(role)} title="Xóa">
-          <IconTrash /> Xóa
+        <button
+          className={`btn btn--sm ${role.isActive ? 'btn--warning' : 'btn--success-outline'}`}
+          onClick={() => onToggleStatus(role)}
+          title={role.isActive ? 'Tắt vai trò' : 'Kích hoạt vai trò'}
+        >
+          {role.isActive ? 'Tắt' : 'Kích hoạt'}
         </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Confirm Delete ─────────────────────────────────────────────
-
-function ConfirmDeleteModal({ role, onClose, onConfirm, loading }) {
-  return (
-    <div className="confirm-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="confirm-modal">
-        <div className="confirm-modal__icon"><IconAlert /></div>
-        <h3 className="confirm-modal__title">Xóa vai trò "{role?.roleLabel}"?</h3>
-        <p className="confirm-modal__body">
-          {(role?.userCount ?? 0) > 0
-            ? `Vai trò này đang được gán cho ${role.userCount} người dùng. Không thể xóa.`
-            : 'Vai trò sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.'}
-        </p>
-        <div className="confirm-modal__footer">
-          <button className="btn btn--secondary" onClick={onClose} disabled={loading}>Hủy</button>
-          <button className="btn btn--danger" onClick={onConfirm} disabled={loading || (role?.userCount ?? 0) > 0}>
-            {loading ? 'Đang xóa...' : 'Xóa vai trò'}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -351,8 +336,6 @@ export default function AdminRolesPage() {
   // Modals
   const [showForm, setShowForm] = useState(false);
   const [editRole, setEditRole] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [usersModal, setUsersModal] = useState(null); // { role, users }
 
   async function loadRoles() {
@@ -424,17 +407,12 @@ export default function AdminRolesPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleteLoading(true);
+  async function handleToggleStatus(role) {
     try {
-      await adminRolesApi.delete(deleteTarget.id);
-      setDeleteTarget(null);
+      await adminRolesApi.toggleStatus(role.id);
       loadRoles();
     } catch (err) {
-      alert(err.message || 'Lỗi khi xóa vai trò');
-    } finally {
-      setDeleteLoading(false);
+      alert(err.message || 'Lỗi khi cập nhật trạng thái');
     }
   }
 
@@ -522,7 +500,7 @@ export default function AdminRolesPage() {
                   key={role.id}
                   role={role}
                   onEdit={(r) => { setEditRole(r); setShowForm(true); }}
-                  onDelete={(r) => setDeleteTarget(r)}
+                  onToggleStatus={handleToggleStatus}
                   onUsers={handleUsersModal}
                 />
               ))}
@@ -563,15 +541,6 @@ export default function AdminRolesPage() {
           role={editRole}
           onClose={() => { setShowForm(false); setEditRole(null); }}
           onSuccess={() => { setShowForm(false); setEditRole(null); loadRoles(); }}
-        />
-      )}
-
-      {deleteTarget && (
-        <ConfirmDeleteModal
-          role={deleteTarget}
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={handleDelete}
-          loading={deleteLoading}
         />
       )}
 

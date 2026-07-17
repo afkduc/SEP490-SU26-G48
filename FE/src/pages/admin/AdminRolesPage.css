@@ -100,8 +100,9 @@
 /* ── Cards ─────────────────────────────────────────────────────────── */
 .admin-roles__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+  max-width: 100%;
 }
 
 .role-card {
@@ -113,6 +114,7 @@
   flex-direction: column;
   gap: 12px;
   transition: box-shadow 0.2s, border-color 0.2s;
+  min-width: 0;
 }
 
 .role-card:hover {
@@ -138,6 +140,35 @@
   background: #eef2ff;
   color: #4f46e5;
   white-space: nowrap;
+}
+
+.role-card__badge--inactive {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.role-card__status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.role-card__status-chip--active {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.role-card__status-chip--inactive {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.role-card--inactive {
+  opacity: 0.6;
+  background: #fafafa;
 }
 
 .role-card__name {
@@ -171,6 +202,7 @@
   gap: 8px;
   padding-top: 4px;
   border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
 }
 
 /* ── Matrix ────────────────────────────────────────────────────────── */
@@ -421,6 +453,20 @@
   border: 1.5px solid #fecaca;
 }
 .btn--danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
+
+.btn--warning {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1.5px solid #fde68a;
+}
+.btn--warning:hover:not(:disabled) { background: #fef3c7; border-color: #f59e0b; }
+
+.btn--success-outline {
+  background: #fff;
+  color: #16a34a;
+  border: 1.5px solid #bbf7d0;
+}
+.btn--success-outline:hover:not(:disabled) { background: #f0fdf4; border-color: #16a34a; }
 
 .btn--sm { padding: 6px 12px; font-size: 0.8rem; }
 .btn--ghost {

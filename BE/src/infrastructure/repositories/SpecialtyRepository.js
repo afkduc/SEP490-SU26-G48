@@ -6,7 +6,7 @@ class SpecialtyRepository {
    */
   async findAll() {
     const result = await query(`
-      SELECT id, specialty_code, specialty_name
+      SELECT id, specialty_code, specialty_name, is_active
       FROM specialties
       ORDER BY specialty_code ASC
     `);
@@ -14,6 +14,7 @@ class SpecialtyRepository {
       id: row.id,
       specialtyCode: row.specialty_code,
       specialtyName: row.specialty_name,
+      isActive: row.is_active ?? true,
     }));
   }
 
@@ -22,7 +23,7 @@ class SpecialtyRepository {
    */
   async findById(id) {
     const result = await query(
-      'SELECT id, specialty_code, specialty_name FROM specialties WHERE id = @p1',
+      'SELECT id, specialty_code, specialty_name, is_active FROM specialties WHERE id = @p1',
       { p1: id }
     );
     const row = result.recordset[0];
@@ -31,6 +32,7 @@ class SpecialtyRepository {
       id: row.id,
       specialtyCode: row.specialty_code,
       specialtyName: row.specialty_name,
+      isActive: row.is_active ?? true,
     };
   }
 
@@ -46,13 +48,13 @@ class SpecialtyRepository {
   }
 
   /**
-   * Tao specialty moi
+   * Tao specialty moi (mac dinh active)
    */
   async create({ specialtyCode, specialtyName }) {
     const result = await query(
-      `INSERT INTO specialties (specialty_code, specialty_name)
+      `INSERT INTO specialties (specialty_code, specialty_name, is_active)
        OUTPUT INSERTED.id
-       VALUES (@p1, @p2)`,
+       VALUES (@p1, @p2, 1)`,
       { p1: specialtyCode, p2: specialtyName }
     );
     return result.recordset[0].id;
@@ -65,6 +67,17 @@ class SpecialtyRepository {
     await query(
       'UPDATE specialties SET specialty_name = @p2 WHERE id = @p1',
       { p1: id, p2: specialtyName }
+    );
+    return this.findById(id);
+  }
+
+  /**
+   * Toggle trang thai active/inactive
+   */
+  async toggleStatus(id) {
+    await query(
+      'UPDATE specialties SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = @p1',
+      { p1: id }
     );
     return this.findById(id);
   }

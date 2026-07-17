@@ -23,13 +23,6 @@ const IconEdit = () => (
   </svg>
 );
 
-const IconTrash = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"/>
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-  </svg>
-);
-
 const IconAlert = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -119,28 +112,6 @@ function SpecialtyFormModal({ specialty, onClose, onSuccess }) {
   );
 }
 
-// ─── Confirm Delete Modal ────────────────────────────────────────
-
-function ConfirmDeleteModal({ specialty, onClose, onConfirm, loading }) {
-  return (
-    <div className="confirm-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="confirm-modal">
-        <div className="confirm-modal__icon"><IconAlert /></div>
-        <h3 className="confirm-modal__title">Xóa chuyên môn "{specialty?.specialtyName}"?</h3>
-        <p className="confirm-modal__body">
-          Chuyên môn sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác.
-        </p>
-        <div className="confirm-modal__footer">
-          <button className="btn btn--secondary" onClick={onClose} disabled={loading}>Hủy</button>
-          <button className="btn btn--danger" onClick={onConfirm} disabled={loading}>
-            {loading ? 'Đang xóa...' : 'Xóa chuyên môn'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Component ──────────────────────────────────────────────────
 
 export default function AdminSpecialtiesPage() {
@@ -150,8 +121,6 @@ export default function AdminSpecialtiesPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [editSpecialty, setEditSpecialty] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -168,23 +137,13 @@ export default function AdminSpecialtiesPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleteLoading(true);
+  async function handleToggleStatus(specialty) {
     try {
-      await adminSpecialtiesApi.delete(deleteTarget.id);
-      setDeleteTarget(null);
+      await adminSpecialtiesApi.toggleStatus(specialty.id);
       loadData();
     } catch (err) {
-      alert(err.message || 'Lỗi khi xóa chuyên môn');
-    } finally {
-      setDeleteLoading(false);
+      alert(err.message || 'Lỗi khi cập nhật trạng thái');
     }
-  }
-
-  function formatDate(dateStr) {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('vi-VN');
   }
 
   return (
@@ -245,14 +204,20 @@ export default function AdminSpecialtiesPage() {
                   <tr>
                     <th style={{ width: '140px' }}>Mã</th>
                     <th>Tên chuyên môn</th>
-                    <th style={{ width: '120px' }}>Thao tác</th>
+                    <th style={{ width: '120px' }}>Trạng thái</th>
+                    <th style={{ width: '160px' }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {specialties.map((s) => (
-                    <tr key={s.id}>
+                    <tr key={s.id} className={s.isActive ? '' : 'row--inactive'}>
                       <td><span className="specialty-code">{s.specialtyCode}</span></td>
                       <td><span className="specialty-name">{s.specialtyName}</span></td>
+                      <td>
+                        <span className={`specialty-status-badge ${s.isActive ? 'specialty-status-badge--active' : 'specialty-status-badge--inactive'}`}>
+                          {s.isActive ? 'Active' : 'Disabled'}
+                        </span>
+                      </td>
                       <td>
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button
@@ -263,11 +228,11 @@ export default function AdminSpecialtiesPage() {
                             <IconEdit /> Sửa
                           </button>
                           <button
-                            className="btn btn--danger btn--sm"
-                            onClick={() => setDeleteTarget(s)}
-                            title="Xóa"
+                            className={`btn btn--sm ${s.isActive ? 'btn--warning' : 'btn--success-outline'}`}
+                            onClick={() => handleToggleStatus(s)}
+                            title={s.isActive ? 'Tắt chuyên môn' : 'Kích hoạt chuyên môn'}
                           >
-                            <IconTrash /> Xóa
+                            {s.isActive ? 'Tắt' : 'Kích hoạt'}
                           </button>
                         </div>
                       </td>
@@ -286,15 +251,6 @@ export default function AdminSpecialtiesPage() {
           specialty={editSpecialty}
           onClose={() => { setShowForm(false); setEditSpecialty(null); }}
           onSuccess={() => { setShowForm(false); setEditSpecialty(null); loadData(); }}
-        />
-      )}
-
-      {deleteTarget && (
-        <ConfirmDeleteModal
-          specialty={deleteTarget}
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={handleDelete}
-          loading={deleteLoading}
         />
       )}
     </div>
