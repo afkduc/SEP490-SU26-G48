@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { getMyProfile, updateMyProfile, changePassword } from '../../services/profileApi';
 import './AdminProfilePage.css';
@@ -184,13 +185,21 @@ function PasswordInput({ label, id, value, onChange, placeholder, error }) {
 
 export default function AdminProfilePage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
+  // Hien thi banner neu bi redirect tu login vi mustChangePassword=true
+  const forcedChange = searchParams.get('reason') === 'forced';
+
   // Tab: 'view' | 'edit' | 'password'
-  const [activeTab, setActiveTab] = useState('view');
+  // Doc tu query param ?tab=password de auto switch khi redirect tu login
+  const initialTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(
+    initialTab === 'password' || initialTab === 'edit' ? initialTab : 'view'
+  );
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -246,6 +255,10 @@ export default function AdminProfilePage() {
     setEditSuccess(null);
     setPwSuccess(null);
     setPwErrors({});
+    // Clear query param ?tab= khi user tu chuyen tab (giu URL sach)
+    if (searchParams.get('tab') || searchParams.get('reason')) {
+      setSearchParams({}, { replace: true });
+    }
   }
 
   // Edit form handlers
@@ -623,6 +636,12 @@ export default function AdminProfilePage() {
             {/* ── Tab: Password ───────────────────────────── */}
             {activeTab === 'password' && (
               <div className="profile-tab-content">
+                {forcedChange && !pwSuccess && (
+                  <AlertBanner
+                    type="error"
+                    message="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống. Mật khẩu hiện tại là mật khẩu tạm do quản trị viên cấp."
+                  />
+                )}
                 {pwErrors.global && (
                   <AlertBanner type="error" message={pwErrors.global} onClose={() => setPwErrors({})} />
                 )}

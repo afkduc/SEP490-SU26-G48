@@ -182,7 +182,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
         <div className="modal__body">
           {apiError && <div className="form-error">{apiError}</div>}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} autoComplete="off">
             {/* Section: Thông tin đăng nhập */}
             <div className="form__section">
               <div className="form__section-title">Thông tin đăng nhập</div>
@@ -195,6 +195,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                     onChange={(e) => handleChange('name', e.target.value)}
                     disabled={isEdit}
                     placeholder="nguyen_van_a"
+                    autoComplete="off"
                   />
                   {errors.name && <span className="form__err">{errors.name}</span>}
                 </div>
@@ -207,6 +208,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                     onChange={(e) => handleChange('email', e.target.value)}
                     disabled={isEdit}
                     placeholder="user@autogara.vn"
+                    autoComplete="off"
                   />
                   {errors.email && <span className="form__err">{errors.email}</span>}
                 </div>
@@ -221,6 +223,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                     value={form.password}
                     onChange={(e) => handleChange('password', e.target.value)}
                     placeholder="Nhập mật khẩu mạnh"
+                    autoComplete="new-password"
                   />
                   {errors.password && <span className="form__err">{errors.password}</span>}
                 </div>
@@ -238,6 +241,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                     value={form.firstName}
                     onChange={(e) => handleChange('firstName', e.target.value)}
                     placeholder="Nguyễn"
+                    autoComplete="off"
                   />
                 </div>
                 <div className="form__field">
@@ -247,6 +251,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                     value={form.lastName}
                     onChange={(e) => handleChange('lastName', e.target.value)}
                     placeholder="Văn A"
+                    autoComplete="off"
                   />
                 </div>
               </div>
@@ -258,6 +263,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                   value={form.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
                   placeholder="0912345678"
+                  autoComplete="tel"
                 />
                 {errors.phone && <span className="form__err">{errors.phone}</span>}
               </div>
