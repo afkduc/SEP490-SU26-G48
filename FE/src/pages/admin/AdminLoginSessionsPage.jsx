@@ -178,12 +178,12 @@ function SessionTable({ items, onViewUser, onViewSession }) {
                   Phiên
                 </button>
                 {item.user_id && (
-                  <button
-                    type="button"
-                    className="admin-logs__action-btn"
-                    onClick={() => onViewUser?.(item.user_id)}
-                    title="Xem chi tiết người dùng"
-                  >
+                <button
+                  type="button"
+                  className="admin-logs__action-btn admin-logs__action-btn--outline"
+                  onClick={() => onViewUser?.(item.user_id)}
+                  title="Xem chi tiết người dùng"
+                >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                       <circle cx="12" cy="7" r="4"/>
