@@ -37,6 +37,17 @@ const HTTT_OPTIONS = [
 const UNIT_OPTIONS = ['Lần', 'Cái', 'Bộ', 'Lít', 'Chai', 'Bình'];
 const DEFAULT_UNIT_BY_LHSC = { DV: 'Lần', PT: 'Cái' };
 
+// Còn bảo hành khi CẢ HAI điều kiện thỏa: còn trong thời hạn (warrantyEndDate)
+// VÀ còn trong hạn km (warrantyKmLimit so với km hiện tại đang nhập cho lần vào
+// xưởng này) - khớp logic BE (_checkWarranty trong RepairSettlementRepositoryImpl).
+function getWarrantyStatus({ warrantyEndDate, warrantyKmLimit, currentKm }) {
+  if (!warrantyEndDate || warrantyKmLimit == null) return null; // không có hồ sơ bảo hành
+  const withinPeriod = new Date() <= new Date(warrantyEndDate);
+  const km = Number(currentKm);
+  const withinKm = currentKm === '' || currentKm == null || Number.isNaN(km) ? true : km <= warrantyKmLimit;
+  return withinPeriod && withinKm;
+}
+
 const TABS = [
   { key: 'waiting_repair', label: 'Chờ sửa chữa', color: '#E65100' },
   { key: 'inprogress', label: 'Đang sửa chữa', color: '#1565C0' },
@@ -128,8 +139,6 @@ export function printWorkList(order) {
       <td style="border:1px solid #ccc;padding:4px 7px;text-align:center">${item.lhsc}</td>
       <td style="border:1px solid #ccc;padding:4px 7px;text-align:center">${item.unit}</td>
       <td style="border:1px solid #ccc;padding:4px 7px;text-align:center">${item.qty}</td>
-      <td style="border:1px solid #ccc;padding:4px 7px;text-align:right">${(item.unitPrice || 0).toLocaleString('vi-VN')}</td>
-      <td style="border:1px solid #ccc;padding:4px 7px;text-align:right">${(item.total || 0).toLocaleString('vi-VN')}</td>
       <td style="border:1px solid #ccc;padding:4px 7px"></td>
     </tr>`).join('');
   const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
@@ -151,7 +160,7 @@ export function printWorkList(order) {
   </tr>
 </table>
 <table>
-  <thead><tr><th style="width:28px">STT</th><th style="width:75px">Mã số</th><th>Nội dung công việc</th><th style="width:45px">LHSC</th><th style="width:45px">ĐVT</th><th style="width:32px">SL</th><th style="width:95px">Đơn giá</th><th style="width:95px">Thành tiền</th><th style="width:70px">Ký xác nhận</th></tr></thead>
+  <thead><tr><th style="width:28px">STT</th><th style="width:80px">Mã số</th><th>Nội dung công việc</th><th style="width:55px">LHSC</th><th style="width:55px">ĐVT</th><th style="width:40px">SL</th><th style="width:160px">Ký xác nhận</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>
 <p style="font-size:10px;font-style:italic;margin-top:6px">KTV ký xác nhận từng hạng mục sau khi hoàn thành.</p>
@@ -535,6 +544,8 @@ function RepairSettlementList() {
   const [search, setSearch] = useState('');
   const [view, setView] = useState(null);
   const [previewOrder, setPreviewOrder] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     let alive = true;
@@ -560,6 +571,11 @@ function RepairSettlementList() {
       (o.customer?.fullName || '').toLowerCase().includes(search.toLowerCase()) ||
       (o.vehicle?.licensePlate || '').toLowerCase().includes(search.toLowerCase()))
   );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paginated = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [tab, search]);
 
   const handleComplete = async (id) => {
     const updated = await updateRepairSettlementStatusApi(id, 'waiting_payment');
@@ -651,7 +667,7 @@ function RepairSettlementList() {
                 </div>
               </td></tr>
             )}
-            {filtered.map((o) => {
+            {paginated.map((o) => {
               const st = STATUS_LABELS[o.status];
               return (
                 <tr key={o.id} style={{ background: o.status === 'waiting_payment' ? '#F9FBE7' : undefined }}>
@@ -702,10 +718,18 @@ function RepairSettlementList() {
             })}
           </tbody>
         </table>
-        <div className="pagination">
-          <span className="pagination-info">{filtered.length}/{orders.length} phiếu</span>
-        </div>
       </div>
+
+      {filtered.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 12, color: 'var(--gray-500)' }}>
+          <div>Tổng {filtered.length} phiếu</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-secondary btn-sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => p - 1)}>Trước</button>
+            <span>Trang {pageSafe}/{totalPages}</span>
+            <button className="btn btn-secondary btn-sm" disabled={pageSafe >= totalPages} onClick={() => setPage((p) => p + 1)}>Sau</button>
+          </div>
+        </div>
+      )}
 
       {view && (
         <DetailModal
@@ -778,6 +802,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   });
   const [vehicleInfo, setVehicleInfo] = useState(existingOrder?.vehicle || {
     licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '',
+    warrantyEndDate: '', warrantyKmLimit: null,
   });
 
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
@@ -794,6 +819,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  // Sau khi lưu 1 phiếu ĐANG chỉnh sửa (VD: khách yêu cầu sửa thêm), giữ lại
+  // bản ghi vừa lưu để cho in lại ngay tại chỗ, không bắt quay về danh sách
+  // rồi tìm lại phiếu để in.
+  const [savedOrder, setSavedOrder] = useState(null);
 
   // Tra cứu khách hàng/xe thật trong DB theo tên, biển số, số khung hoặc số máy.
   // Debounce 300ms; searchSeq huỷ kết quả của lần tra cứu cũ nếu đã có lần mới hơn.
@@ -867,6 +896,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       id: row.vehicleId, licensePlate: row.licensePlate, vehicleModel: row.vehicleModel || '',
       frameNumber: row.frameNumber || '', engineNumber: row.engineNumber || '',
       purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : '', currentKm: '',
+      warrantyEndDate: row.warrantyEndDate ? String(row.warrantyEndDate).slice(0, 10) : '',
+      warrantyKmLimit: row.warrantyKmLimit ?? null,
     });
     setCustomerQuery(row.fullName);
     setPlateQuery(row.licensePlate);
@@ -882,7 +913,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // khi autofill nen khong the sua tay duoc nua.
   const resetLookup = () => {
     setCustomerInfo({ fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' });
-    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '' });
+    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null });
     setCustomerQuery('');
     setPlateQuery('');
     setIsFromLookup(false);
@@ -1022,10 +1053,13 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     try {
       const payload = buildPayload();
       if (isEdit) {
-        await updateRepairSettlementApi(existingOrder.id, payload);
-      } else {
-        await createRepairSettlementApi(payload);
+        const result = await updateRepairSettlementApi(existingOrder.id, payload);
+        setSaving(false);
+        setSaved(true);
+        setSavedOrder(result);
+        return;
       }
+      await createRepairSettlementApi(payload);
     } catch (err) {
       setSaveError(err.message || 'Lưu phiếu quyết toán thất bại');
       setSaving(false);
@@ -1049,7 +1083,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
       {saved && (
         <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#2E7D32' }}>
-          Đã lưu phiếu quyết toán. Đang quay lại danh sách…
+          {savedOrder ? 'Đã lưu thay đổi phiếu quyết toán.' : 'Đã lưu phiếu quyết toán. Đang quay lại danh sách…'}
         </div>
       )}
 
@@ -1243,6 +1277,21 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   <input className="form-input" type="number" value={vehicleInfo.currentKm} onChange={(e) => vInfoSet('currentKm', e.target.value)} />
                 </div>
               </div>
+              {(() => {
+                const warrantyStatus = getWarrantyStatus(vehicleInfo);
+                if (warrantyStatus === null) return null;
+                return (
+                  <div
+                    style={{
+                      marginTop: 10, fontSize: 12, fontWeight: 700, borderRadius: 6, padding: '6px 10px',
+                      background: warrantyStatus ? '#E8F5E9' : '#F5F5F5',
+                      color: warrantyStatus ? '#2E7D32' : '#757575',
+                    }}
+                  >
+                    {warrantyStatus ? 'Xe còn bảo hành' : 'Xe đã hết bảo hành'}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -1421,15 +1470,34 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               </div>
             )}
 
-            <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
-              disabled={!canSave || saving}
-              onClick={handleSave}>
-              {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
-            </button>
-            <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
-              onClick={() => navigate('/repair-settlement')}>
-              Quay lại
-            </button>
+            {savedOrder ? (
+              <>
+                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
+                  onClick={() => printSettlement(savedOrder)}>
+                  In lại phiếu quyết toán
+                </button>
+                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
+                  onClick={() => printWorkList(savedOrder)}>
+                  In danh sách công việc
+                </button>
+                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => navigate('/repair-settlement')}>
+                  Quay lại danh sách
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
+                  disabled={!canSave || saving}
+                  onClick={handleSave}>
+                  {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
+                </button>
+                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
+                  onClick={() => navigate('/repair-settlement')}>
+                  Quay lại
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

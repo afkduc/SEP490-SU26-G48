@@ -120,11 +120,15 @@ export default function CustomerCarePage() {
   const [actionError, setActionError] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [confirmTarget, setConfirmTarget] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => { setPage(1); }, [status, debouncedSearch]);
 
   const load = () => {
     setLoading(true);
@@ -149,6 +153,10 @@ export default function CustomerCarePage() {
       setBusyId(null);
     }
   };
+
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paginatedItems = items.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   return (
     <div>
@@ -199,7 +207,7 @@ export default function CustomerCarePage() {
                 </div>
               </td></tr>
             )}
-            {items.map((r) => {
+            {paginatedItems.map((r) => {
               const st = STATUS_BADGE[reminderStatusOf(r)];
               const dueMeta = dueDateMeta(r.dueDate);
               const kmMeta = dueKmMeta(r.dueKm, r.vehicle?.currentKm);
@@ -250,6 +258,17 @@ export default function CustomerCarePage() {
           </tbody>
         </table>
       </div>
+
+      {items.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 12, color: 'var(--gray-500)' }}>
+          <div>Tổng {items.length} nhắc nhở</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-secondary btn-sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => p - 1)}>Trước</button>
+            <span>Trang {pageSafe}/{totalPages}</span>
+            <button className="btn btn-secondary btn-sm" disabled={pageSafe >= totalPages} onClick={() => setPage((p) => p + 1)}>Sau</button>
+          </div>
+        </div>
+      )}
 
       {confirmTarget && (
         <ConfirmReminderModal
