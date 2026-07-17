@@ -8,6 +8,6 @@ export async function getVehicleOwnerHistoryApi(vehicleId) {
   return httpClient.get(`/vehicles/${vehicleId}/owners`);
 }
 
-export async function transferVehicleOwnerApi(vehicleId, { newCustomerId, transferDate, notes } = {}) {
-  return httpClient.post(`/vehicles/${vehicleId}/transfer`, { newCustomerId, transferDate, notes });
+export async function transferVehicleOwnerApi(vehicleId, { newCustomerId, newCustomer, transferDate, notes } = {}) {
+  return httpClient.post(`/vehicles/${vehicleId}/transfer`, { newCustomerId, newCustomer, transferDate, notes });
 }

@@ -7,7 +7,11 @@ class RepairOrderController {
 
   getAll = async (req, res, next) => {
     try {
-      const result = await this.repairOrderService.getAll({ branchId: req.user.branchId });
+      const isServiceAdvisor = req.user.roles?.includes('service_advisor');
+      const result = await this.repairOrderService.getAll({
+        branchId: req.user.branchId,
+        advisorId: isServiceAdvisor ? req.user.userId : undefined,
+      });
       return success(res, result, 'Repair orders retrieved');
     } catch (err) {
       next(err);
@@ -16,7 +20,10 @@ class RepairOrderController {
 
   getById = async (req, res, next) => {
     try {
-      const item = await this.repairOrderService.getById(req.params.id);
+      const item = await this.repairOrderService.getById(req.params.id, {
+        requesterId: req.user.userId,
+        isServiceAdvisor: req.user.roles?.includes('service_advisor'),
+      });
       return success(res, item, 'Repair order retrieved');
     } catch (err) {
       next(err);

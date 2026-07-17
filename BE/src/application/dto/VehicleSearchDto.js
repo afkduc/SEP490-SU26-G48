@@ -16,6 +16,8 @@ function toVehicleSearchDto(row) {
     engineNumber: row.engine_number,
     currentKm: row.current_km,
     purchaseDate: row.purchase_date,
+    warrantyEndDate: row.warranty_end_date,
+    warrantyKmLimit: row.warranty_km_limit,
   };
 }
 
