@@ -109,7 +109,7 @@ function writeRows(worksheet, startRow, columns, items, rowMapper) {
   if (!items || items.length === 0) return startRow;
   items.forEach((item, idx) => {
     const row = worksheet.getRow(startRow + idx);
-    const values = rowMapper(item);
+    const values = rowMapper(item, idx);
     columns.forEach((col, cIdx) => {
       const cell = row.getCell(cIdx + 1);
       const raw = values[cIdx];
