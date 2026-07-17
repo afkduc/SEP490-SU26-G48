@@ -44,6 +44,14 @@ function buildQuery(params = {}) {
  *   - update(payload): PUT /api/admin/users/:id
  *     payload: { userId, status, roleId }
  *     tra ve: { id, name, email, fullName, phone, branchId, branchName, status, roles, ... }
+ *
+ *   - resetPassword(userId, options): POST /api/admin/users/:id/reset-password
+ *     options: { mustChangePassword?: boolean, newPassword?: string }
+ *       mustChangePassword: mac dinh true (co the client override qua body)
+ *       newPassword:
+ *         - undefined/empty -> BE sinh MK random 12 ky tu (hoa+thuong+so+dac biet)
+ *         - co gia tri      -> BE validate (>=6 ky tu) va dung MK do
+ *     tra ve: { userId, newPassword, isManual, mustChangePassword, message }
  */
 class AdminUsersApi {
   list(params = {}) {
@@ -60,6 +68,14 @@ class AdminUsersApi {
 
   update(payload) {
     return httpClient.put(`/admin/users/${payload.userId}`, payload);
+  }
+
+  resetPassword(userId, { mustChangePassword = true, newPassword } = {}) {
+    const body = { mustChangePassword };
+    if (newPassword !== undefined && newPassword !== null && newPassword !== '') {
+      body.newPassword = newPassword;
+    }
+    return httpClient.post(`/admin/users/${userId}/reset-password`, body);
   }
 }
 

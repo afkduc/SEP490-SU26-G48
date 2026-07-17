@@ -148,6 +148,35 @@
   cursor: not-allowed;
 }
 
+/* Secondary button (outline) — dùng cho các hành động phụ trong drawer footer
+   (ví dụ: "Đặt lại mật khẩu" cạnh nút primary "Phân quyền") */
+.drawer__btn-secondary {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: transparent;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.drawer__btn-secondary:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.drawer__btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── User info card (top of drawer) ── */
 .user-info-card {
   padding: 22px;
