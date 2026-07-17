@@ -10,8 +10,8 @@ class DeviceService {
     return this.deviceRepository.findByUserId(Number(userId));
   }
 
-  async listAll({ userId, search, page, pageSize }) {
-    return this.deviceRepository.findAll({ userId, search, page, pageSize });
+  async listAll({ userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize }) {
+    return this.deviceRepository.findAll({ userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize });
   }
 
   async forceLogoutDevice(deviceId) {

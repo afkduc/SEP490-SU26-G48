@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
-import { adminBranchesApi } from '../../services/adminApi';
+import { useSharedBranches } from '../../contexts/SharedDataContext';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
+import TableSkeleton from './components/TableSkeleton';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -202,25 +203,11 @@ function SessionTable({ items, onViewUser, onViewSession }) {
 
 export default function AdminLoginSessionsPage() {
   const sessions = useLoginSessions();
-  const [branches, setBranches] = useState([]);
-  const [branchesError, setBranchesError] = useState(null);
+  const { branches, branchesError } = useSharedBranches();
   // userId dang xem chi tiet (mo drawer user)
   const [detailUserId, setDetailUserId] = useState(null);
   // session dang xem chi tiet (mo drawer session)
   const [detailSession, setDetailSession] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await adminBranchesApi.list();
-        if (!cancelled) setBranches(res?.items || []);
-      } catch (err) {
-        if (!cancelled) setBranchesError(err.message || 'Không tải được chi nhánh');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
 
@@ -324,7 +311,24 @@ export default function AdminLoginSessionsPage() {
 
       <div className="table-card">
         {sessions.loading ? (
-          <div className="admin-logs__loading">Đang tải danh sách...</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Thời gian đăng nhập</th>
+                  <th>Người dùng</th>
+                  <th className="col-hide-md">Số điện thoại</th>
+                  <th>Hành động</th>
+                  <th>Trạng thái</th>
+                  <th className="col-hide-md">IP</th>
+                  <th className="col-hide-md">Trình duyệt</th>
+                  <th className="col-hide-md">Thời lượng</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <TableSkeleton rows={6} />
+            </table>
+          </div>
         ) : sessions.error ? (
           <div className="admin-logs__error">
             <strong>Lỗi:</strong> {sessions.error.message || 'Không thể tải danh sách'}

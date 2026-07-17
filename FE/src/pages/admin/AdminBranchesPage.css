@@ -66,6 +66,65 @@
   font-weight: 600;
 }
 
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s, border-color 0.15s, color 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn--primary {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+.btn--primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857, #059669);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+}
+
+.btn--secondary {
+  background: #fff;
+  color: #374151;
+  border-color: #d1d5db;
+}
+.btn--secondary:hover:not(:disabled) { background: #f9fafb; border-color: #9ca3af; }
+
+.btn--danger {
+  background: #fff;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+.btn--danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
+
+.btn--sm { padding: 6px 12px; font-size: 0.8rem; }
+
+.btn--icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
+.btn--ghost {
+  background: transparent;
+  color: #64748b;
+  border-color: transparent;
+}
+.btn--ghost:hover { background: #f1f5f9; color: #1e293b; }
+
 /* ── Stats Row ────────────────────────────────────────────────────── */
 .admin-branches__stats-row {
   display: grid;
@@ -176,15 +235,8 @@
   white-space: nowrap;
 }
 
-.branch-card__status-badge--active {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.branch-card__status-badge--inactive {
-  background: #f1f5f9;
-  color: #64748b;
-}
+.branch-card__status-badge--active { background: #dcfce7; color: #15803d; }
+.branch-card__status-badge--inactive { background: #f1f5f9; color: #64748b; }
 
 .branch-card__body {
   display: flex;
@@ -263,7 +315,6 @@
 
 .branch-card__stats {
   display: flex;
-  gap: 0;
   border-top: 1px solid #f1f5f9;
   padding-top: 14px;
 }
@@ -310,6 +361,12 @@
   justify-content: center;
   z-index: 1000;
   padding: 20px;
+  animation: overlayIn 0.18s ease-out;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .branch-modal {
@@ -322,6 +379,12 @@
   flex-direction: column;
   max-height: 90vh;
   overflow: hidden;
+  animation: modalIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.94) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .branch-modal__header {
@@ -372,6 +435,7 @@
   border-top: 1px solid #e2e8f0;
 }
 
+/* ── Forms ────────────────────────────────────────────────────────── */
 .form-group {
   display: flex;
   flex-direction: column;
@@ -407,8 +471,8 @@
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
 }
 
 .form-group input:disabled,
@@ -423,69 +487,6 @@
   color: #94a3b8;
   margin: 0;
 }
-
-/* ── Buttons ─────────────────────────────────────────────────────── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 16px;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
-  font-family: inherit;
-  white-space: nowrap;
-  text-decoration: none;
-}
-
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.btn--primary {
-  background: linear-gradient(135deg, #059669, #10b981);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
-}
-.btn--primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #047857, #059669);
-  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
-}
-
-.btn--secondary {
-  background: #fff;
-  color: #374151;
-  border: 1.5px solid #d1d5db;
-}
-.btn--secondary:hover:not(:disabled) { background: #f9fafb; border-color: #9ca3af; }
-
-.btn--danger {
-  background: #fff;
-  color: #dc2626;
-  border: 1.5px solid #fecaca;
-}
-.btn--danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
-
-.btn--sm {
-  padding: 6px 12px;
-  font-size: 0.8rem;
-}
-
-.btn--icon {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  justify-content: center;
-}
-
-.btn--ghost {
-  background: transparent;
-  color: #64748b;
-  border: none;
-  padding: 6px 10px;
-}
-.btn--ghost:hover { background: #f1f5f9; color: #1e293b; }
 
 /* ── Empty / Loading / Error ─────────────────────────────────────── */
 .admin-branches__loading,
@@ -509,28 +510,31 @@
   to { transform: rotate(360deg); }
 }
 
-/* ── Deactivate confirm ─────────────────────────────────────────── */
+/* ── Confirm Modal ─────────────────────────────────────────────── */
 .confirm-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
   padding: 20px;
+  animation: overlayIn 0.18s ease-out;
 }
 
 .confirm-modal {
   background: #fff;
   border-radius: 14px;
   padding: 24px;
-  max-width: 400px;
+  max-width: 420px;
   width: 100%;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   gap: 16px;
+  animation: modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .confirm-modal__icon {
@@ -543,6 +547,11 @@
   align-items: center;
   justify-content: center;
   align-self: center;
+}
+
+.confirm-modal__icon--warning {
+  background: #fffbeb;
+  color: #d97706;
 }
 
 .confirm-modal__title {
@@ -558,6 +567,7 @@
   color: #475569;
   text-align: center;
   margin: 0;
+  line-height: 1.5;
 }
 
 .confirm-modal__footer {

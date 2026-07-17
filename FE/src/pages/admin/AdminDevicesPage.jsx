@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { adminDevicesApi } from '../../services/adminApi';
+import { useToast } from '../../components/common/ToastContext';
 import './AdminDevicesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -40,6 +41,18 @@ const IconRefresh = () => (
   </svg>
 );
 
+const IconFilter = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+  </svg>
+);
+
+const IconChevronDown = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
+
 // ─── Browser icon helper ────────────────────────────────────────────
 
 function getBrowserIcon(browser) {
@@ -59,6 +72,51 @@ function formatDate(dateStr) {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+// ─── Filter Options ────────────────────────────────────────────────
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'true', label: '● Hiện tại' },
+  { value: 'false', label: '○ Không hoạt động' },
+];
+
+const BROWSER_OPTIONS = [
+  { value: '', label: 'Tất cả trình duyệt' },
+  { value: 'Chrome', label: 'Chrome' },
+  { value: 'Firefox', label: 'Firefox' },
+  { value: 'Safari', label: 'Safari' },
+  { value: 'Edge', label: 'Edge' },
+  { value: 'Opera', label: 'Opera' },
+];
+
+const OS_OPTIONS = [
+  { value: '', label: 'Tất cả hệ điều hành' },
+  { value: 'Windows', label: 'Windows' },
+  { value: 'Mac', label: 'macOS' },
+  { value: 'Linux', label: 'Linux' },
+  { value: 'Android', label: 'Android' },
+  { value: 'iOS', label: 'iOS' },
+];
+
+// ─── Select component ───────────────────────────────────────────────
+
+function SelectFilter({ value, options, onChange, placeholder }) {
+  return (
+    <div className="select-filter-wrapper">
+      <select
+        className="select-filter"
+        value={value}
+        onChange={onChange}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <span className="select-filter-arrow"><IconChevronDown /></span>
+    </div>
+  );
 }
 
 // ─── Confirm Modal ─────────────────────────────────────────────────
@@ -134,6 +192,7 @@ function Pagination({ page, pageSize, total, onPageChange }) {
 // ─── Main Component ──────────────────────────────────────────────────
 
 export default function AdminDevicesPage() {
+  const toast = useToast();
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -142,20 +201,34 @@ export default function AdminDevicesPage() {
   const [search, setSearch] = useState('');
   const [searchTimer, setSearchTimer] = useState(null);
 
+  const [statusFilter, setStatusFilter] = useState('');
+  const [browserFilter, setBrowserFilter] = useState('');
+  const [osFilter, setOsFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   const [logoutTarget, setLogoutTarget] = useState(null);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
   const PAGE_SIZE = 20;
 
-  const loadData = useCallback(async (pageNum = 1, searchQuery = '') => {
+  const loadData = useCallback(async (pageNum = 1, extraParams = {}) => {
     setLoading(true);
     setError('');
     try {
-      const data = await adminDevicesApi.list({
+      const params = {
         page: pageNum,
         pageSize: PAGE_SIZE,
-        search: searchQuery || undefined,
-      });
+        search: search || undefined,
+        ...extraParams,
+      };
+      if (statusFilter) params.isCurrent = statusFilter;
+      if (browserFilter) params.browser = browserFilter;
+      if (osFilter) params.os = osFilter;
+      if (dateFrom) params.dateFrom = dateFrom;
+      if (dateTo) params.dateTo = dateTo;
+
+      const data = await adminDevicesApi.list(params);
       setDevices(data?.items || []);
       setTotal(data?.total || 0);
       setPage(pageNum);
@@ -164,22 +237,36 @@ export default function AdminDevicesPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search, statusFilter, browserFilter, osFilter, dateFrom, dateTo]);
 
-  useEffect(() => { loadData(1, ''); }, [loadData]);
+  useEffect(() => { loadData(1); }, []);
 
   function handleSearchChange(e) {
     const val = e.target.value;
     setSearch(val);
     clearTimeout(searchTimer);
     const timer = setTimeout(() => {
-      loadData(1, val);
+      loadData(1);
     }, 400);
     setSearchTimer(timer);
   }
 
+  function handleFilterChange() {
+    loadData(1);
+  }
+
+  function handleClearFilters() {
+    setSearch('');
+    setStatusFilter('');
+    setBrowserFilter('');
+    setOsFilter('');
+    setDateFrom('');
+    setDateTo('');
+    loadData(1);
+  }
+
   function handlePageChange(newPage) {
-    loadData(newPage, search);
+    loadData(newPage);
   }
 
   async function handleForceLogout() {
@@ -187,14 +274,17 @@ export default function AdminDevicesPage() {
     setLogoutLoading(true);
     try {
       await adminDevicesApi.forceLogout(logoutTarget.id);
+      toast.success(`Đã đăng xuất thiết bị "${logoutTarget.deviceName}"`);
       setLogoutTarget(null);
-      loadData(page, search);
+      loadData(page);
     } catch (err) {
-      alert(err.message || 'Lỗi khi đăng xuất thiết bị');
+      toast.error(err.message || 'Lỗi khi đăng xuất thiết bị');
     } finally {
       setLogoutLoading(false);
     }
   }
+
+  const hasActiveFilters = statusFilter || browserFilter || osFilter || dateFrom || dateTo || search;
 
   return (
     <div className="admin-devices">
@@ -210,7 +300,7 @@ export default function AdminDevicesPage() {
           </div>
         </div>
         <div className="admin-devices__actions">
-          <button className="btn btn--ghost btn--sm" onClick={() => loadData(page, search)} title="Làm mới">
+          <button className="btn btn--ghost btn--sm" onClick={() => loadData(page)} title="Làm mới">
             <IconRefresh /> Làm mới
           </button>
         </div>
@@ -223,10 +313,66 @@ export default function AdminDevicesPage() {
           <input
             type="text"
             className="search-input"
-            placeholder="Tìm theo tên thiết bị, IP, người dùng..."
+            placeholder="Tìm theo tên, SĐT, IP, trình duyệt..."
             value={search}
             onChange={handleSearchChange}
           />
+        </div>
+
+        <div className="filter-row">
+          <div className="filter-group">
+            <IconFilter />
+            <SelectFilter
+              value={statusFilter}
+              options={STATUS_OPTIONS}
+              onChange={(e) => { setStatusFilter(e.target.value); }}
+              onBlur={handleFilterChange}
+            />
+          </div>
+
+          <div className="filter-group">
+            <SelectFilter
+              value={browserFilter}
+              options={BROWSER_OPTIONS}
+              onChange={(e) => { setBrowserFilter(e.target.value); }}
+              onBlur={handleFilterChange}
+            />
+          </div>
+
+          <div className="filter-group">
+            <SelectFilter
+              value={osFilter}
+              options={OS_OPTIONS}
+              onChange={(e) => { setOsFilter(e.target.value); }}
+              onBlur={handleFilterChange}
+            />
+          </div>
+
+          <div className="filter-group filter-group--date">
+            <input
+              type="date"
+              className="date-input"
+              value={dateFrom}
+              onChange={(e) => { setDateFrom(e.target.value); }}
+              onBlur={handleFilterChange}
+              title="Từ ngày"
+            />
+            <span className="date-separator">—</span>
+            <input
+              type="date"
+              className="date-input"
+              value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); }}
+              onBlur={handleFilterChange}
+              title="Đến ngày"
+            />
+          </div>
+
+          {hasActiveFilters && (
+            <button className="btn btn--ghost btn--sm btn--clear-filters" onClick={handleClearFilters}>
+              ✕ Xóa lọc
+            </button>
+          )}
         </div>
       </div>
 
@@ -244,14 +390,14 @@ export default function AdminDevicesPage() {
         <div className="admin-devices__error">
           <IconAlert />
           <span>{error}</span>
-          <button className="btn btn--secondary btn--sm" onClick={() => loadData(page, search)}>Thử lại</button>
+          <button className="btn btn--secondary btn--sm" onClick={() => loadData(page)}>Thử lại</button>
         </div>
       )}
 
       {!loading && !error && devices.length === 0 && (
         <div className="admin-devices__empty">
           <IconDevice />
-          <p>{search ? 'Không tìm thấy thiết bị nào' : 'Chưa có thiết bị nào được ghi nhận'}</p>
+          <p>{search || hasActiveFilters ? 'Không tìm thấy thiết bị nào' : 'Chưa có thiết bị nào được ghi nhận'}</p>
         </div>
       )}
 

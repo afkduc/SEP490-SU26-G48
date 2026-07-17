@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
-import { adminApi } from '../../services';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
+import { useSharedBranches } from '../../contexts/SharedDataContext';
+import { useToast } from '../../components/common/ToastContext';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import AuditLogDetailDrawer from './AuditLogDetailDrawer';
 import AdminPagination from './components/AdminPagination';
+import TableSkeleton from './components/TableSkeleton';
 import './AuditLogsPage.css';
 
 const ACTION_OPTIONS = [
@@ -52,9 +54,9 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
 }
 
 export default function AuditLogsPage() {
+  const toast = useToast();
   const audit = useAuditLogs();
-  const [branches, setBranches] = useState([]);
-  const [branchesError, setBranchesError] = useState(null);
+  const { branches, branchesError } = useSharedBranches();
   // userId dang xem chi tiet (mo drawer user)
   const [detailUserId, setDetailUserId] = useState(null);
   // log dang xem chi tiet (mo drawer log)
@@ -74,19 +76,6 @@ export default function AuditLogsPage() {
       setExporting(false);
     }
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await adminApi.adminBranchesApi.list();
-        if (!cancelled) setBranches(res?.items || []);
-      } catch (err) {
-        if (!cancelled) setBranchesError(err.message || 'Không tải được chi nhánh');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   function resetFilters() {
     audit.setParams(() => ({
@@ -218,8 +207,26 @@ export default function AuditLogsPage() {
       {/* Table */}
       <div className="table-card">
         {audit.loading ? (
-          <div className="admin-logs__loading">Đang tải danh sách...</div>
-        ) : audit.error ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Người dùng</th>
+                <th>Hành động</th>
+                <th>Bảng</th>
+                <th>Mã / ID</th>
+                <th>IP</th>
+                <th>Phương thức</th>
+                <th>Thời gian xử lý</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <TableSkeleton rows={6} />
+          </table>
+        </div>
+      ) : audit.error ? (
           <div className="admin-logs__error">
             <strong>Lỗi:</strong> {audit.error.message || 'Không thể tải danh sách'}
           </div>

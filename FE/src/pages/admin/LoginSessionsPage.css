@@ -1,187 +1,14 @@
-/* LoginSessionsPage – styles */
+/* LoginSessionsPage — extends AdminShared.css */
+@import './AdminShared.css';
 
-.admin-logs {
-  padding: 28px 32px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #1e293b;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  min-height: calc(100vh - 64px);
-}
-
-/* ── Header ── */
-.admin-logs__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.admin-logs__title-block {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
+/* ── Page header icon color ── */
 .admin-logs__title-icon {
-  width: 44px;
-  height: 44px;
   background: #ecfeff;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   color: #0891b2;
-  flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(8, 145, 178, 0.2);
 }
 
-.admin-logs__title-group h1 {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 2px;
-  letter-spacing: -0.2px;
-}
-
-.admin-logs__subtitle {
-  font-size: 0.82rem;
-  color: #64748b;
-  margin: 0;
-}
-
-/* ── Filter Card ── */
-.filter-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 18px 20px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.filter-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  align-items: end;
-}
-
-.input {
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  color: #0f172a;
-  background: #fff;
-  transition: all 0.15s ease;
-  font-family: inherit;
-}
-
-.input:focus {
-  outline: none;
-  border-color: #0891b2;
-  box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12);
-}
-
-.input--search::placeholder {
-  color: #94a3b8;
-}
-
-.filter-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.btn {
-  padding: 9px 16px;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.15s ease;
-  font-family: inherit;
-  white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--ghost {
-  background: #f1f5f9;
-  color: #475569;
-  border-color: #e2e8f0;
-}
-
-.btn--ghost:hover:not(:disabled) {
-  background: #e2e8f0;
-}
-
-/* ── Table ── */
-.table-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  -webkit-overflow-scrolling: touch;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-  min-width: 1100px;
-}
-
-.table thead {
-  background: #f8fafc;
-}
-
-.table th {
-  text-align: left;
-  padding: 12px 14px;
-  font-weight: 600;
-  font-size: 0.75rem;
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid #e2e8f0;
-  white-space: nowrap;
-}
-
-.table td {
-  padding: 12px 14px;
-  border-bottom: 1px solid #f1f5f9;
-  color: #334155;
-  vertical-align: middle;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.table tbody tr:hover {
-  background: #f8fafc;
-}
-
-.table__empty {
-  text-align: center;
-  padding: 32px 14px !important;
-  color: #94a3b8;
-  font-style: italic;
-}
-
+/* ── Table cells ── */
 .admin-logs__date {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -220,63 +47,7 @@
   color: #475569;
 }
 
-/* ── Badges ── */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.badge--success {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.badge--danger {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.badge--secondary {
-  background: #f1f5f9;
-  color: #475569;
-}
-/* ── States ── */
-.admin-logs__loading,
-.admin-logs__error {
-  padding: 32px 16px;
-  text-align: center;
-  color: #64748b;
-  font-size: 0.9rem;
-}
-
-.admin-logs__error {
-  color: #b91c1c;
-}
-
-/* ── Pagination moved to components/AdminPagination.css ── */
-
-/* ── Responsive: ẩn cột phụ khi màn hẹp ── */
-@media (max-width: 1280px) {
-  .table .col-hide-md {
-    display: none;
-  }
-}
-
-@media (max-width: 900px) {
-  .table .col-hide-sm {
-    display: none;
-  }
-}
-
-/* ── Action buttons trong table row ── */
+/* ── Action buttons ── */
 .admin-logs__row-actions {
   display: inline-flex;
   align-items: center;
@@ -323,9 +94,153 @@
   border-color: #cbd5e1;
 }
 
-/* ── Drawer/UserInfoCard/DetailList moved to components/AdminDrawer.css ── */
+/* ── States ── */
+.admin-page__loading,
+.admin-page__error {
+  padding: 32px 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.9rem;
+}
 
-.font-mono {
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 0.82rem;
+.admin-page__error {
+  color: #b91c1c;
+}
+
+/* ── Filter row override for sessions (uses grid in shared, but sessions page uses flex) ── */
+.admin-logs .filter-card {
+  padding: 20px 24px;
+}
+
+.admin-logs .filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-logs .input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: #fff;
+  color: #1e293b;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  box-sizing: border-box;
+  width: auto;
+  flex: 1;
+  min-width: 160px;
+}
+
+.admin-logs .input:focus {
+  border-color: #0891b2;
+  box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.1);
+}
+
+.admin-logs .input--search {
+  padding-left: 36px;
+  background: #f8fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") 10px center no-repeat;
+}
+
+.admin-logs .input--select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+  min-width: 140px;
+  cursor: pointer;
+}
+
+.admin-logs .input--date {
+  padding: 8px 12px;
+  height: 40px;
+}
+
+.admin-logs .btn {
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: #fff;
+  color: #475569;
+}
+
+.admin-logs .btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+/* ── Table overrides ── */
+.table-card {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  min-width: 1100px;
+}
+
+.table thead {
+  background: #f8fafc;
+}
+
+.table th {
+  text-align: left;
+  padding: 12px 14px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.table__empty {
+  text-align: center;
+  padding: 32px 14px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* ── Badge overrides ── */
+.badge--success { background: #dcfce7; color: #166534; }
+.badge--danger { background: #fee2e2; color: #991b1b; }
+.badge--secondary { background: #f1f5f9; color: #475569; }
+
+/* ── Responsive: hide secondary columns on narrow screens ── */
+@media (max-width: 1280px) {
+  .table .col-hide-md {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .table .col-hide-sm {
+    display: none;
+  }
 }
