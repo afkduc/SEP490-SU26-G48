@@ -5,17 +5,15 @@ const DEFAULT_DEBOUNCE_MS = 400;
 
 /**
  * Hook generic cho các trang admin có danh sách phân trang + filter.
- * Hook này KHÔNG tự fetch — caller chịu trách nhiệm gọi `refetch` từ useEffect
- * theo dõi `params` và `debouncedValues`. Điều này tránh auto-fetch logic mơ hồ.
  *
  * @param {Object}   options
  * @param {Function} options.apiFn          Hàm gọi API, nhận (params) → Promise<{items,total,page,pageSize}>
  * @param {Object}   options.defaultParams  Params khởi tạo
- * @param {string[]} [options.debounceKeys] Tên field cần debounce
- * @param {number}   [options.debounceMs]   Thời gian debounce (ms)
+ * @param {string[]} [options.debounceKeys] Tên field cần debounce (text search)
+ * @param {number}   [options.debounceMs]  Thời gian debounce (ms)
  *
  * Trả về:
- *   { data, loading, error, refetch, refresh, params, setParams, updateParam, effectiveParams }
+ *   { data, loading, error, refetch, refresh, params, setParams, updateParam }
  */
 export function usePaginatedList({
   apiFn,
@@ -29,43 +27,30 @@ export function usePaginatedList({
     ...defaultParams,
   };
 
-  const [params, setParams] = useState(initialParams);
-  const [data, setData] = useState({ items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE });
+  const [params, setParamsState] = useState(initialParams);
+  const [data, setData] = useState({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Debounce cache
+  // Dùng ref để lưu trữ params hiện tại (không gây re-render)
+  const paramsRef = useRef(params);
+
+  // Debounce cache - ref lưu trữ debounced values
   const debouncedRef = useRef({});
   debounceKeys.forEach((k) => {
     if (!(k in debouncedRef.current)) debouncedRef.current[k] = params[k] ?? '';
   });
-  const [, forceTick] = useState(0);
 
-  // Setup debounce: mỗi lần params[key] đổi, schedule flush sau debounceMs
-  useEffect(() => {
-    if (debounceKeys.length === 0) return undefined;
-    const timeouts = debounceKeys.map((key) => {
-      const id = setTimeout(() => {
-        debouncedRef.current[key] = params[key] ?? '';
-        forceTick((n) => n + 1);
-      }, debounceMs);
-      return id;
-    });
-    return () => {
-      timeouts.forEach((id) => clearTimeout(id));
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...debounceKeys.map((k) => params[k]), debounceMs]);
+  // Trigger để useEffect re-run khi debounce flush
+  const [debouncedVersion, setDebouncedVersion] = useState(0);
 
-  // Build params để gọi API
-  const effectiveParams = useCallback(() => {
-    const out = { ...params };
-    debounceKeys.forEach((key) => {
-      out[key] = debouncedRef.current[key] ?? '';
-    });
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params, debounceKeys.join('|')]);
+  // Timer refs cho từng key
+  const timerRefs = useRef({});
 
   // Clean params (bỏ empty)
   function cleanParams(p) {
@@ -76,6 +61,7 @@ export function usePaginatedList({
     return out;
   }
 
+  // API call function
   const callApi = useCallback(async (p) => {
     setLoading(true);
     setError(null);
@@ -96,38 +82,90 @@ export function usePaginatedList({
     }
   }, [apiFn]);
 
-  // Auto fetch khi params đổi (bao gồm cả debounced keys)
-  const debouncedSnapshot = JSON.stringify(debouncedRef.current);
+  // Cleanup timers on unmount
   useEffect(() => {
-    callApi(effectiveParams());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.page, params.pageSize, debouncedSnapshot, ...Object.keys(params).filter((k) => !debounceKeys.includes(k)).flatMap((k) => [params[k]])]);
+    return () => {
+      Object.values(timerRefs.current).forEach(clearTimeout);
+    };
+  }, []);
+
+  // Setup debounce cho debounceKeys
+  useEffect(() => {
+    debounceKeys.forEach((key) => {
+      if (timerRefs.current[key]) {
+        clearTimeout(timerRefs.current[key]);
+      }
+      timerRefs.current[key] = setTimeout(() => {
+        debouncedRef.current[key] = paramsRef.current[key] ?? '';
+        setDebouncedVersion((v) => v + 1);
+      }, debounceMs);
+    });
+
+    return () => {
+      debounceKeys.forEach((key) => {
+        if (timerRefs.current[key]) {
+          clearTimeout(timerRefs.current[key]);
+        }
+      });
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debounceKeys.join(','), debounceMs]);
+
+  // Auto fetch khi: page/pageSize thay đổi HOẶC debounce flush
+  useEffect(() => {
+    const effectiveParams = { ...paramsRef.current };
+    debounceKeys.forEach((key) => {
+      effectiveParams[key] = debouncedRef.current[key] ?? '';
+    });
+    callApi(effectiveParams);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.page, params.pageSize, debouncedVersion]);
+
+  const setParams = useCallback((updater) => {
+    setParamsState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      paramsRef.current = next;
+      return next;
+    });
+  }, []);
 
   const updateParam = useCallback((key, value) => {
-    setParams((prev) => ({
-      ...prev,
-      [key]: value,
-      page: key === 'page' ? value : 1,
-    }));
+    // Immediate update debouncedRef (không chờ debounce)
     if (debounceKeys.includes(key)) {
-      debouncedRef.current[key] = ''; // Reset cache → effect sẽ đợi debounce flush
+      debouncedRef.current[key] = value ?? '';
     }
+    setParamsState((prev) => {
+      const next = {
+        ...prev,
+        [key]: value,
+        page: key === 'page' ? value : 1,
+      };
+      paramsRef.current = next;
+      return next;
+    });
   }, [debounceKeys]);
 
   const refresh = useCallback(async () => {
-    // Force-flush debounce
     debounceKeys.forEach((key) => {
-      debouncedRef.current[key] = params[key] ?? '';
+      debouncedRef.current[key] = paramsRef.current[key] ?? '';
     });
-    forceTick((n) => n + 1);
-    await callApi(effectiveParams());
-  }, [callApi, effectiveParams, params, debounceKeys]);
+    setDebouncedVersion((v) => v + 1);
+    await callApi({ ...paramsRef.current });
+  }, [callApi, debounceKeys]);
+
+  const refetch = useCallback(() => {
+    const effectiveParams = { ...paramsRef.current };
+    debounceKeys.forEach((key) => {
+      effectiveParams[key] = debouncedRef.current[key] ?? '';
+    });
+    callApi(effectiveParams);
+  }, [callApi, debounceKeys]);
 
   return {
     data,
     loading,
     error,
-    refetch: () => callApi(effectiveParams()),
+    refetch,
     refresh,
     params,
     setParams,
