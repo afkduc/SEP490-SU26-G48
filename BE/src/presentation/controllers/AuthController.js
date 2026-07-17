@@ -17,6 +17,8 @@ class AuthController {
       );
       return success(res, result, 'Đăng nhập thành công');
     } catch (err) {
+      // Doc email tu body de tracking failed login (co the undefined neu body rong)
+      const email = req.body?.email;
       trackLoginFailed(req, email).catch((e) =>
         console.error('[AuthController] trackLoginFailed error:', e.message)
       );
