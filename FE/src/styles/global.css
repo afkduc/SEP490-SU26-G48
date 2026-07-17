@@ -574,4 +574,11 @@ body {
 
 @media (max-width: 900px) {
   .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
+
+  /* Man hinh nho: bang thuong phai cuon ngang - lam mo 2 canh trai/phai de
+     goi y con noi dung o ngoai vung nhin, khong can JS theo doi vi tri cuon. */
+  .table-wrapper, .filter-bar {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%);
+  }
 }

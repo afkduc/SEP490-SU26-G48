@@ -333,6 +333,8 @@ function RepairOrderList() {
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const loadAll = () => {
     setLoading(true);
@@ -429,6 +431,12 @@ function RepairOrderList() {
 
     return result;
   }, [rows, filterStatus, filterTeamLeader, filterFromDate, filterToDate, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paginatedRows = filteredRows.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [filterStatus, filterTeamLeader, filterFromDate, filterToDate, sortOrder]);
 
   const handleAssign = (settlementId) => {
     navigate('/repair-orders/create', { state: { settlementId } });
@@ -549,7 +557,7 @@ function RepairOrderList() {
                 </div>
               </td></tr>
             )}
-            {filteredRows.map((r) => {
+            {paginatedRows.map((r) => {
               const st = STATUS_LABELS[r.status] || { label: r.status, badge: 'badge-inactive' };
               const isBusy = busyId === r.id;
               return (
@@ -595,6 +603,17 @@ function RepairOrderList() {
           </tbody>
         </table>
       </div>
+
+      {filteredRows.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 12, color: 'var(--gray-500)' }}>
+          <div>Tổng {filteredRows.length} lệnh</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-secondary btn-sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => p - 1)}>Trước</button>
+            <span>Trang {pageSafe}/{totalPages}</span>
+            <button className="btn btn-secondary btn-sm" disabled={pageSafe >= totalPages} onClick={() => setPage((p) => p + 1)}>Sau</button>
+          </div>
+        </div>
+      )}
 
       {viewOrderId && (
         <RepairOrderDetailModal orderId={viewOrderId} onClose={() => setViewOrderId(null)} />
