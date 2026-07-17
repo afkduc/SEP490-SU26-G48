@@ -25,16 +25,16 @@ function buildExportRequestRouter() {
     controller.getNextCode,
   );
 
-  // Service Order helpers - phai dat TRUOC /:id de khong bi nuot.
+  // Repair Order helpers - phai dat TRUOC /:id de khong bi nuot.
   router.get(
-    '/service-orders/exportable',
+    '/repair-orders/exportable',
     requirePerm('export_requests:create'),
-    controller.listExportableServiceOrders,
+    controller.listExportableRepairOrders,
   );
   router.get(
-    '/service-orders/:id/for-export',
+    '/repair-orders/:id/for-export',
     requirePerm('export_requests:create'),
-    controller.getServiceOrderForExport,
+    controller.getRepairOrderForExport,
   );
 
   // List + detail phieu xuat.

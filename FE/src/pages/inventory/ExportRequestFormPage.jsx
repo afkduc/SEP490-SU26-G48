@@ -2,22 +2,23 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useExportRequestForm } from '../../hooks/inventory/useExportRequestForm';
+import { productApi } from '../../services';
 import './ExportRequestFormPage.css';
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function buildItemFromSo(soItem) {
+function buildItemFromRo(roTask) {
   return {
-    rowKey: `r_${soItem.serviceOrderItemId}_${Math.random().toString(36).slice(2, 6)}`,
-    productId: soItem.productId,
-    productCode: soItem.productCode,
-    productName: soItem.productName,
-    unit: soItem.unit,
-    quantity: soItem.requestedQuantity,
-    requestedQuantity: soItem.requestedQuantity,
-    currentStock: soItem.currentStock,
+    rowKey: `r_${roTask.repairTaskId}_${Math.random().toString(36).slice(2, 6)}`,
+    productId: roTask.productId,
+    productCode: roTask.productCode,
+    productName: roTask.productName,
+    unit: roTask.unit,
+    quantity: roTask.requestedQuantity,
+    requestedQuantity: roTask.requestedQuantity,
+    currentStock: roTask.currentStock,
   };
 }
 
@@ -29,61 +30,118 @@ export default function ExportRequestFormPage() {
   const {
     nextCode, codeDate, loadingCode, codeError, refetchCode,
     submitting, submitError, submit,
-    serviceOrders, loadingServiceOrders, fetchServiceOrders,
-    loadServiceOrder, loadingSoDetail,
+    repairOrders, loadingRepairOrders, fetchRepairOrders,
+    loadRepairOrder, loadingRoDetail,
   } = useExportRequestForm(branchId);
 
   const [exportDate, setExportDate] = useState(todayIso());
   const [notes, setNotes] = useState('');
-  const [selectedSo, setSelectedSo] = useState(null);
+  const [selectedRo, setSelectedRo] = useState(null);
   const [items, setItems] = useState([]);
   const [formError, setFormError] = useState('');
-  const [soSearchTerm, setSoSearchTerm] = useState('');
-  const [showSoPicker, setShowSoPicker] = useState(true);
+  const [roSearchTerm, setRoSearchTerm] = useState('');
+  const [showRoPicker, setShowRoPicker] = useState(true);
 
-  // Load danh sach SO khi mo form
+  // Them phu tung thu cong (khi LSC khong co san task PART)
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [productSearchResults, setProductSearchResults] = useState([]);
+  const [searchingProducts, setSearchingProducts] = useState(false);
+
+  // Load danh sach RO khi mo form
   useEffect(() => {
-    if (showSoPicker) {
-      fetchServiceOrders(soSearchTerm);
+    if (showRoPicker) {
+      fetchRepairOrders(roSearchTerm);
     }
-  }, [showSoPicker, soSearchTerm, fetchServiceOrders]);
+  }, [showRoPicker, roSearchTerm, fetchRepairOrders]);
 
-  async function handlePickSo(so) {
+  // Tim phu tung khi nhap tu khoa (debounce 300ms)
+  useEffect(() => {
+    const term = productSearchTerm.trim();
+    if (term.length < 2) {
+      setProductSearchResults([]);
+      return;
+    }
+    const handle = setTimeout(async () => {
+      setSearchingProducts(true);
+      try {
+        const res = await productApi.searchProductsApi(term);
+        const list = Array.isArray(res) ? res : (res?.items || []);
+        setProductSearchResults(list.slice(0, 20));
+      } catch (_) {
+        setProductSearchResults([]);
+      } finally {
+        setSearchingProducts(false);
+      }
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [productSearchTerm]);
+
+  async function handlePickRo(ro) {
     setFormError('');
-    if (so.alreadyExported) {
-      setFormError(`Phieu sua chua ${so.orderCode} da duoc xuat kho truoc do.`);
+    if (ro.alreadyExported) {
+      setFormError(`Lenh sua chua ${ro.repairOrderCode} da duoc xuat kho truoc do.`);
       return;
     }
     try {
-      const detail = await loadServiceOrder(so.id);
-      const builtItems = (detail.items || []).map(buildItemFromSo);
-      setSelectedSo({
+      const detail = await loadRepairOrder(ro.id);
+      const builtItems = (detail.items || []).map(buildItemFromRo);
+      setSelectedRo({
         id: detail.id,
-        orderCode: detail.orderCode,
+        repairOrderCode: detail.repairOrderCode,
+        serviceOrderCode: detail.serviceOrderCode,
         status: detail.status,
         customerName: detail.customerName,
         vehiclePlate: detail.vehiclePlate,
-        advisorName: detail.advisorName,
+        teamLeaderName: detail.teamLeaderName,
       });
       setItems(builtItems);
-      setShowSoPicker(false);
+      setShowRoPicker(false);
     } catch (err) {
-      setFormError(err.message || 'Khong the tai phieu sua chua');
+      setFormError(err.message || 'Khong the tai lenh sua chua');
     }
   }
 
-  function handleChangeSo() {
-    setSelectedSo(null);
+  function handleChangeRo() {
+    setSelectedRo(null);
     setItems([]);
-    setShowSoPicker(true);
+    setShowRoPicker(true);
   }
 
   function updateItem(rowKey, patch) {
     setItems((prev) => prev.map((it) => (it.rowKey === rowKey ? { ...it, ...patch } : it)));
   }
 
+  function addManualProduct(p) {
+    setItems((prev) => {
+      // Neu SP da co thi cong don so luong
+      const exist = prev.find((it) => it.productId === p.id);
+      if (exist) {
+        return prev.map((it) => (it.productId === p.id ? { ...it, quantity: Number(exist.quantity || 0) + 1 } : it));
+      }
+      return [
+        ...prev,
+        {
+          rowKey: `m_${p.id}_${Math.random().toString(36).slice(2, 6)}`,
+          productId: p.id,
+          productCode: p.code || p.productCode,
+          productName: p.name || p.productName,
+          unit: p.unit,
+          quantity: 1,
+          requestedQuantity: 0,
+          currentStock: p.stockQuantity ?? p.stock_quantity ?? null,
+        },
+      ];
+    });
+    setProductSearchTerm('');
+    setProductSearchResults([]);
+  }
+
+  function removeItem(rowKey) {
+    setItems((prev) => prev.filter((it) => it.rowKey !== rowKey));
+  }
+
   function validate() {
-    if (!selectedSo) return 'Vui long chon phieu sua chua';
+    if (!selectedRo) return 'Vui long chon lenh sua chua';
     if (!exportDate) return 'Vui long chon ngay xuat';
     if (items.length === 0) return 'Phieu xuat phai co it nhat 1 dong phu tung';
     for (let i = 0; i < items.length; i += 1) {
@@ -109,7 +167,7 @@ export default function ExportRequestFormPage() {
     }
     try {
       const created = await submit({
-        serviceOrderId: selectedSo.id,
+        repairOrderId: selectedRo.id,
         exportDate,
         notes: notes || undefined,
         items: items.map((it) => ({
@@ -147,28 +205,29 @@ export default function ExportRequestFormPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="er-form__body">
-        {/* Chon phieu sua chua */}
+        {/* Chon lenh sua chua */}
         <div className="er-form__section">
-          <h2 className="er-form__section-title">Phieu sua chua (Service Order)</h2>
-          {!selectedSo ? (
+          <h2 className="er-form__section-title">Lenh sua chua (Repair Order)</h2>
+          {!selectedRo ? (
             <div className="er-form__so-picker">
               <input
                 className="input"
                 type="text"
-                placeholder="Tim theo ma SO, ten khach, bien so xe..."
-                value={soSearchTerm}
-                onChange={(e) => setSoSearchTerm(e.target.value)}
+                placeholder="Tim theo ma LSC, ma RO, ten khach, bien so xe..."
+                value={roSearchTerm}
+                onChange={(e) => setRoSearchTerm(e.target.value)}
               />
-              {loadingServiceOrders ? (
-                <div className="er-form__hint">Dang tai danh sach SO...</div>
-              ) : serviceOrders.length === 0 ? (
-                <div className="er-form__hint">Khong co phieu sua chua nao can xuat kho.</div>
+              {loadingRepairOrders ? (
+                <div className="er-form__hint">Dang tai danh sach LSC...</div>
+              ) : repairOrders.length === 0 ? (
+                <div className="er-form__hint">Khong co lenh sua chua nao can xuat kho.</div>
               ) : (
                 <div className="table-responsive">
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Ma SO</th>
+                        <th>Ma LSC</th>
+                        <th>Ma RO</th>
                         <th>Khach hang</th>
                         <th>Xe</th>
                         <th>Trang thai</th>
@@ -177,25 +236,26 @@ export default function ExportRequestFormPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {serviceOrders.map((so) => (
-                        <tr key={so.id}>
-                          <td><span className="font-mono">{so.orderCode}</span></td>
-                          <td>{so.customerName || '—'}</td>
-                          <td>{so.vehiclePlate || '—'}</td>
+                      {repairOrders.map((ro) => (
+                        <tr key={ro.id}>
+                          <td><span className="font-mono">{ro.repairOrderCode}</span></td>
+                          <td><span className="font-mono">{ro.serviceOrderCode || '—'}</span></td>
+                          <td>{ro.customerName || '—'}</td>
+                          <td>{ro.vehiclePlate || '—'}</td>
                           <td>
-                            {so.alreadyExported ? (
+                            {ro.alreadyExported ? (
                               <span className="badge badge--danger">Da xuat</span>
                             ) : (
                               <span className="badge badge--success">Chua xuat</span>
                             )}
                           </td>
-                          <td className="text-right">{so.partItemCount ?? 0}</td>
+                          <td className="text-right">{ro.partTaskCount ?? 0}</td>
                           <td>
                             <button
                               type="button"
                               className="btn btn--primary btn--sm"
-                              disabled={so.alreadyExported}
-                              onClick={() => handlePickSo(so)}
+                              disabled={ro.alreadyExported}
+                              onClick={() => handlePickRo(ro)}
                             >
                               Chon
                             </button>
@@ -210,12 +270,13 @@ export default function ExportRequestFormPage() {
           ) : (
             <div className="er-form__so-summary">
               <div className="er-form__info-grid">
-                <div><strong>Ma SO:</strong> <span className="font-mono">{selectedSo.orderCode}</span></div>
-                <div><strong>Khach hang:</strong> {selectedSo.customerName || '—'}</div>
-                <div><strong>Xe:</strong> {selectedSo.vehiclePlate || '—'}</div>
-                <div><strong>Tu van:</strong> {selectedSo.advisorName || '—'}</div>
+                <div><strong>Ma LSC:</strong> <span className="font-mono">{selectedRo.repairOrderCode}</span></div>
+                <div><strong>Ma RO:</strong> <span className="font-mono">{selectedRo.serviceOrderCode || '—'}</span></div>
+                <div><strong>Khach hang:</strong> {selectedRo.customerName || '—'}</div>
+                <div><strong>Xe:</strong> {selectedRo.vehiclePlate || '—'}</div>
+                <div><strong>To truong:</strong> {selectedRo.teamLeaderName || '—'}</div>
               </div>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={handleChangeSo}>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={handleChangeRo}>
                 Doi phieu khac
               </button>
             </div>
@@ -223,7 +284,7 @@ export default function ExportRequestFormPage() {
         </div>
 
         {/* Thong tin phieu xuat */}
-        {selectedSo && (
+        {selectedRo && (
           <>
             <div className="er-form__info">
               <div className="er-form__info-row">
@@ -277,13 +338,15 @@ export default function ExportRequestFormPage() {
               <div className="er-form__items-header">
                 <h2 className="er-form__items-title">Danh sach phu tung xuat</h2>
                 <span className="er-form__hint">
-                  Co the dieu chinh so luong (vi du xuat khong het hoac them phu tung phat sinh).
-                  {loadingSoDetail && ' Dang tai...'}
+                  Co the dieu chinh so luong, them phu tung phat sinh hoac xoa dong khong can xuat.
+                  {loadingRoDetail && ' Dang tai...'}
                 </span>
               </div>
 
               {items.length === 0 ? (
-                <p className="er-form__empty">Phieu sua chua khong co phu tung (PART) nao.</p>
+                <p className="er-form__empty">
+                  Phieu sua chua khong co phu tung (PART) nao. Ban co the them thu cong ben duoi.
+                </p>
               ) : (
                 <div className="table-responsive">
                   <table className="table">
@@ -296,6 +359,7 @@ export default function ExportRequestFormPage() {
                         <th className="text-right" style={{ width: 100 }}>Yeu cau</th>
                         <th className="text-right" style={{ width: 100 }}>Ton kho</th>
                         <th style={{ width: 130 }}>Xuat *</th>
+                        <th style={{ width: 70 }}></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -324,6 +388,16 @@ export default function ExportRequestFormPage() {
                                 placeholder="0"
                               />
                             </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn btn--ghost btn--sm"
+                                onClick={() => removeItem(it.rowKey)}
+                                title="Xoa dong nay"
+                              >
+                                Xoa
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
@@ -332,11 +406,43 @@ export default function ExportRequestFormPage() {
                       <tr>
                         <td colSpan={6} className="text-right"><strong>Tong so luong:</strong></td>
                         <td className="text-right"><strong>{totalQuantity}</strong></td>
+                        <td></td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
               )}
+
+              {/* Them phu tung thu cong (cho phep tu LSC khong co PART task) */}
+              <div className="er-form__add-product">
+                <h3 className="er-form__add-title">+ Them phu tung</h3>
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="Nhap ma hoac ten phu tung (it nhat 2 ky tu)..."
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                />
+                {searchingProducts && (
+                  <div className="er-form__hint">Dang tim...</div>
+                )}
+                {!searchingProducts && productSearchResults.length > 0 && (
+                  <ul className="er-form__product-results">
+                    {productSearchResults.map((p) => (
+                      <li key={p.id}>
+                        <button type="button" className="er-form__product-hit" onClick={() => addManualProduct(p)}>
+                          <span className="font-mono">{p.code || p.productCode}</span>
+                          <span className="er-form__product-name">{p.name || p.productName}</span>
+                          <span className="er-form__product-stock">Ton: {p.stockQuantity ?? p.stock_quantity ?? '—'}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!searchingProducts && productSearchTerm.trim().length >= 2 && productSearchResults.length === 0 && (
+                  <div className="er-form__hint">Khong tim thay phu tung phu hop.</div>
+                )}
+              </div>
             </div>
           </>
         )}
@@ -344,7 +450,7 @@ export default function ExportRequestFormPage() {
         {formError && <div className="er-form__error">{formError}</div>}
         {submitError && <div className="er-form__error">{submitError}</div>}
 
-        {selectedSo && (
+        {selectedRo && (
           <div className="er-form__actions">
             <Link to="/inventory/export-requests" className="btn btn--ghost">
               Huy
