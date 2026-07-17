@@ -160,11 +160,11 @@ export default function AdminUsersPage() {
   const currentPage = data.page || 1;
 
   return (
-    <div className="admin-users">
+    <div className="admin-page">
       {/* Header */}
-      <div className="admin-users__header">
-        <div className="admin-users__title-block">
-          <div className="admin-users__title-icon">
+      <div className="admin-page__header">
+        <div className="admin-page__title-block">
+          <div className="admin-page__title-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
               <circle cx="9" cy="7" r="4"/>
@@ -172,16 +172,16 @@ export default function AdminUsersPage() {
               <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           </div>
-          <div className="admin-users__title-group">
+          <div className="admin-page__title-group">
             <h1>Quản lý người dùng</h1>
-            <p className="admin-users__subtitle">
+            <p className="admin-page__subtitle">
               Danh sách tài khoản hệ thống
             </p>
           </div>
         </div>
-        <div className="admin-users__actions">
+        <div className="admin-page__actions">
           {data.total > 0 && (
-            <span className="admin-users__total-badge">{data.total} tài khoản</span>
+            <span className="admin-page__total-badge">{data.total} tài khoản</span>
           )}
           <button
             className="btn btn--secondary"

@@ -7,7 +7,7 @@ import './AdminRolesPage.css';
 
 const IconShield = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
   </svg>
 );
 
@@ -40,10 +40,10 @@ const IconMatrix = () => (
 
 const IconUsers = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-    <circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
   </svg>
 );
 
@@ -143,8 +143,8 @@ function RoleFormModal({ role, onClose, onSuccess }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+              </div>
+              </div>
   );
 }
 
@@ -157,7 +157,7 @@ function RoleUsersModal({ role, users, onClose }) {
         <div className="role-modal__header">
           <h2 className="role-modal__title">Người dùng có vai trò "{role?.roleLabel}"</h2>
           <button className="role-modal__close" onClick={onClose} type="button"><IconX /></button>
-        </div>
+              </div>
         <div className="role-modal__body">
           {users.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0' }}>Không có người dùng nào</p>
@@ -169,7 +169,7 @@ function RoleUsersModal({ role, users, onClose }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="role-user-name">{u.displayName}</div>
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{u.email}</div>
-                  </div>
+              </div>
                   {u.branchName && <span className="role-user-branch">{u.branchName}</span>}
                   <span style={{
                     fontSize: '0.72rem', fontWeight: 600,
@@ -178,8 +178,8 @@ function RoleUsersModal({ role, users, onClose }) {
                     padding: '2px 8px', borderRadius: '4px',
                   }}>
                     {u.status === 'active' ? 'Hoạt động' : 'Khóa'}
-                  </span>
-                </div>
+                </span>
+              </div>
               ))}
             </div>
           )}
@@ -475,18 +475,18 @@ export default function AdminRolesPage() {
             <div className="admin-roles__loading">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-              </svg>
+          </svg>
               <span>Đang tải...</span>
-            </div>
-          )}
+        </div>
+      )}
 
           {error && !loading && (
             <div className="admin-roles__error">
               <IconAlert />
               <span>{error}</span>
               <button className="btn btn--secondary btn--sm" onClick={loadRoles}>Thử lại</button>
-            </div>
-          )}
+        </div>
+      )}
 
           {!loading && !error && roles.length === 0 && (
             <div className="admin-roles__empty">
