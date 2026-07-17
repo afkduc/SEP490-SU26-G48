@@ -3,6 +3,7 @@ const ApiError = require('../../utils/ApiError');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^(0[0-9]{9,10})$/;
+const PASSWORD_MIN_LENGTH = 6;
 
 class AdminUserService {
   constructor({ adminUserRepository }) {
@@ -32,6 +33,26 @@ class AdminUserService {
       status,
       page: parsedPage,
       pageSize: parsedPageSize,
+    });
+
+    return result;
+  }
+
+  /**
+   * Lay full users theo filter (khong phan trang) de xuat Excel.
+   * Tuong thich bo loc voi listUsers, chi khac la tra ve tat ca rows.
+   */
+  async exportUsers({ search, branchId, roleId, status } = {}) {
+    const VALID_STATUSES = ['active', 'inactive', 'locked'];
+    if (status && !VALID_STATUSES.includes(status)) {
+      throw new ApiError(400, 'status khong hop le: active, inactive, locked');
+    }
+
+    const result = await this.adminUserRepository.findAllForExport({
+      search: search?.trim(),
+      branchId: branchId ? Number(branchId) : undefined,
+      roleId: roleId?.trim(),
+      status,
     });
 
     return result;
@@ -143,6 +164,117 @@ class AdminUserService {
     } catch (err) {
       throw new ApiError(400, err.message || 'Cap nhat nguoi dung that bai');
     }
+  }
+
+  /**
+   * Generate mat khau ngau nhien (12 ky tu: hoa + thuong + so + dac biet)
+   * Dam bao moi nhom ky tu deu co it nhat 1 ky tu
+   */
+  generateRandomPassword() {
+    const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const LOWER = 'abcdefghijklmnopqrstuvwxyz';
+    const DIGITS = '0123456789';
+    const SPECIAL = '!@#$%^&*';
+    const ALL = UPPER + LOWER + DIGITS + SPECIAL;
+
+    // 4 ky tu bat buoc (moi nhom 1) + 8 ky tu random tu ALL
+    const required = [
+      UPPER[Math.floor(Math.random() * UPPER.length)],
+      LOWER[Math.floor(Math.random() * LOWER.length)],
+      DIGITS[Math.floor(Math.random() * DIGITS.length)],
+      SPECIAL[Math.floor(Math.random() * SPECIAL.length)],
+    ];
+
+    const remaining = [];
+    for (let i = 0; i < 8; i++) {
+      remaining.push(ALL[Math.floor(Math.random() * ALL.length)]);
+    }
+
+    // Tron mang va ghep thanh chuoi (tranh cac ky tu required luon o dau)
+    const combined = [...required, ...remaining];
+    for (let i = combined.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [combined[i], combined[j]] = [combined[j], combined[i]];
+    }
+    return combined.join('');
+  }
+
+  /**
+   * Validate mat khau nhap tay. Reuse rule tu createUser:
+   *   - khong rong
+   *   - do dai toi thieu PASSWORD_MIN_LENGTH
+   *   - chi trim khoang trang 2 dau, khong trim ben trong
+   */
+  validateManualPassword(rawPassword) {
+    if (rawPassword === undefined || rawPassword === null || rawPassword === '') {
+      throw new ApiError(400, 'Mat khau moi la bat buoc khi chon che do nhap tay');
+    }
+    const password = String(rawPassword).trim();
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      throw new ApiError(400, `Mat khau phai co it nhat ${PASSWORD_MIN_LENGTH} ky tu`);
+    }
+    return password;
+  }
+
+  /**
+   * Admin reset mat khau cho user
+   * - Co 2 che do:
+   *   + newPassword duoc cung cap: dung MK do (admin nhap tay)
+   *   + newPassword khong cung cap: generate MK ngau nhien 12 ky tu (hoa+thuong+so+dac biet)
+   * - Hash bcrypt, luu DB, dat must_change_password theo flag
+   * - Tra ve MK plain text 1 lan duy nhat (controller se gui cho FE)
+   */
+  async resetPassword({ userId, mustChangePassword = true, newPassword } = {}) {
+    if (!userId) {
+      throw new ApiError(400, 'userId la bat buoc');
+    }
+
+    // Kiem tra user ton tai
+    const existing = await this.adminUserRepository.findById(Number(userId));
+    if (!existing) {
+      throw new ApiError(404, 'Nguoi dung khong ton tai');
+    }
+
+    // Khong reset MK cho chinh admin dang thuc hien (tranh tu khoa tai khoan)
+    // (Controller se xu ly truong hop nay neu can, o service chi check don gian)
+
+    // Quyet dinh MK plain text:
+    //   - newPassword undefined/empty -> random
+    //   - newPassword co gia tri -> validate + dung MK do
+    let plainPassword;
+    let isManual = false;
+    if (newPassword !== undefined && newPassword !== null && newPassword !== '') {
+      plainPassword = this.validateManualPassword(newPassword);
+      isManual = true;
+    } else {
+      plainPassword = this.generateRandomPassword();
+    }
+
+    // Hash MK
+    const passwordHash = bcrypt.hashSync(plainPassword, 10);
+
+    // Update DB
+    const ok = await this.adminUserRepository.updatePassword(
+      Number(userId),
+      passwordHash,
+      mustChangePassword
+    );
+
+    if (!ok) {
+      throw new ApiError(500, 'Reset mat khau that bai');
+    }
+
+    return {
+      userId: Number(userId),
+      newPassword: plainPassword, // plain text - chi tra 1 lan
+      isManual,
+      mustChangePassword: Boolean(mustChangePassword),
+      message: isManual
+        ? 'Mat khau moi da duoc dat theo gia tri admin nhap.'
+        : mustChangePassword
+        ? 'Mat khau da duoc dat lai. User phai doi mat khau khi dang nhap lan sau.'
+        : 'Mat khau da duoc dat lai thanh cong.',
+    };
   }
 }
 

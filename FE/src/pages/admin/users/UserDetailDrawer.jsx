@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { adminUsersApi } from '../../../services/adminApi';
 import AssignRoleModal from './AssignRoleModal';
-import './UserDetailDrawer.css';
+import ResetPasswordModal from './ResetPasswordModal';
+import '../components/AdminDrawer.css';
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
@@ -75,6 +76,7 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAssign, setShowAssign] = useState(false);
+  const [showReset, setShowReset] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -218,6 +220,19 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
         </div>
 
         <div className="drawer__footer">
+          <button
+            className="drawer__btn-secondary"
+            onClick={() => setShowReset(true)}
+            type="button"
+            disabled={!user?.id}
+            title="Tạo mật khẩu mới ngẫu nhiên cho người dùng này"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Đặt lại mật khẩu
+          </button>
           <button className="drawer__btn-assign" onClick={() => setShowAssign(true)} type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -237,6 +252,13 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
             onRolesChanged?.();
             onClose?.();
           }}
+        />
+      )}
+
+      {showReset && user && (
+        <ResetPasswordModal
+          user={{ id: user.id, name: fullName, email: user.email }}
+          onClose={() => setShowReset(false)}
         />
       )}
     </div>

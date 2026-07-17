@@ -1,5 +1,6 @@
 import UserDetailDrawer from './users/UserDetailDrawer';
 import { useState } from 'react';
+import './components/AdminDrawer.css';
 import './AdminLogDrawers.css';
 
 const ACTION_LABELS = {
@@ -97,7 +98,7 @@ export default function AuditLogDetailDrawer({ log, onClose, onViewUser }) {
 
   return (
     <div className="drawer-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className="drawer">
+      <div className="drawer drawer--audit-log">
         <div className="drawer__header">
           <div className="drawer__title-block">
             <div className="drawer__title-icon">
