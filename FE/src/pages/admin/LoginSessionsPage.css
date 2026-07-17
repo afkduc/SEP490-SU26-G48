@@ -245,7 +245,6 @@
   background: #f1f5f9;
   color: #475569;
 }
-
 /* ── States ── */
 .admin-logs__loading,
 .admin-logs__error {
@@ -278,7 +277,7 @@
 .admin-logs__row-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: nowrap;
 }
 
@@ -286,31 +285,20 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 9px;
-  font-size: 0.76rem;
-  font-weight: 500;
-  color: #475569;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #0891b2;
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
+  min-width: unset;
 }
 
 .admin-logs__action-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #1e293b;
-}
-
-.admin-logs__action-btn--primary {
-  color: #0891b2;
-  background: #ecfeff;
-  border-color: #a5f3fc;
-}
-
-.admin-logs__action-btn--primary:hover {
   background: #0891b2;
   color: #fff;
   border-color: #0891b2;
@@ -318,6 +306,18 @@
 
 .admin-logs__action-btn svg {
   flex-shrink: 0;
+}
+
+.admin-logs__action-btn--outline {
+  color: #475569;
+  background: #fff;
+  border-color: #e2e8f0;
+}
+
+.admin-logs__action-btn--outline:hover {
+  background: #f8fafc;
+  color: #1e293b;
+  border-color: #cbd5e1;
 }
 
 /* ── Drawer/UserInfoCard/DetailList moved to components/AdminDrawer.css ── */
