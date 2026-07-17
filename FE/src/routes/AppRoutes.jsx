@@ -6,6 +6,8 @@ import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
+import { ToastProvider } from '../components/common/ToastContext';
+import { SharedDataProvider } from '../contexts/SharedDataContext';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
@@ -47,11 +49,13 @@ function Loading() {
 
 function AppRoutes() {
   return (
-    <Suspense fallback={<Loading />}>
-      <Routes>
-        {/* Public */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/unauthorized" element={<UnauthorizedPage />} />
+    <ToastProvider>
+      <SharedDataProvider>
+        <Suspense fallback={<Loading />}>
+          <Routes>
+          {/* Public */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         {/* Protected – wrapped in AppLayout (Navbar) */}
         <Route
@@ -269,7 +273,9 @@ function AppRoutes() {
         <Route path="/" element={<RoleAwareRedirect />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </Suspense>
+      </Suspense>
+    </SharedDataProvider>
+  </ToastProvider>
   );
 }
 

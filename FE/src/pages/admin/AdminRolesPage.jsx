@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminRolesApi } from '../../services/adminApi';
+import { useToast } from '../../components/common/ToastContext';
 import './AdminRolesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -320,6 +321,7 @@ function PermissionMatrix({ roles, permissions, rolePermissions, onChange, onSav
 // ─── Main ────────────────────────────────────────────────────────
 
 export default function AdminRolesPage() {
+  const toast = useToast();
   const [tab, setTab] = useState('list'); // 'list' | 'matrix'
 
   const [roles, setRoles] = useState([]);
@@ -401,7 +403,7 @@ export default function AdminRolesPage() {
       );
       setMatrixDirty(false);
     } catch (err) {
-      alert('Lỗi khi lưu: ' + (err.message || 'Không rõ'));
+      toast.error('Lỗi khi lưu: ' + (err.message || 'Không rõ'));
     } finally {
       setMatrixSaving(false);
     }
@@ -410,9 +412,10 @@ export default function AdminRolesPage() {
   async function handleToggleStatus(role) {
     try {
       await adminRolesApi.toggleStatus(role.id);
+      toast.success('Cập nhật trạng thái thành công');
       loadRoles();
     } catch (err) {
-      alert(err.message || 'Lỗi khi cập nhật trạng thái');
+      toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
     }
   }
 
@@ -540,7 +543,12 @@ export default function AdminRolesPage() {
         <RoleFormModal
           role={editRole}
           onClose={() => { setShowForm(false); setEditRole(null); }}
-          onSuccess={() => { setShowForm(false); setEditRole(null); loadRoles(); }}
+          onSuccess={() => {
+            toast.success(editRole ? 'Cập nhật vai trò thành công' : 'Tạo vai trò mới thành công');
+            setShowForm(false);
+            setEditRole(null);
+            loadRoles();
+          }}
         />
       )}
 

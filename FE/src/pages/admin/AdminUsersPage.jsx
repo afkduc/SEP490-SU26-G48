@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
+import { useSharedBranches } from '../../contexts/SharedDataContext';
 import {
   adminUsersApi,
-  adminBranchesApi,
-  adminRolesApi,
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
+import { useToast } from '../../components/common/ToastContext';
 import UserFormModal from './users/UserFormModal';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import AssignRoleModal from './users/AssignRoleModal';
 import AdminPagination from './components/AdminPagination';
+import TableSkeleton from './components/TableSkeleton';
 import './AdminUsersPage.css';
 
 const STATUS_OPTIONS = [
@@ -53,6 +54,11 @@ function getInitials(firstName, lastName) {
 }
 
 export default function AdminUsersPage() {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isInitialMount = useRef(true);
+
   const {
     data,
     loading,
@@ -63,12 +69,8 @@ export default function AdminUsersPage() {
     refresh,
   } = useAdminUsers();
 
+  const { branches, roles, branchesLoading, rolesLoading, branchesError, rolesError } = useSharedBranches();
   const [searchParams] = useSearchParams();
-  const [branches, setBranches] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [branchesError, setBranchesError] = useState(null);
-  const [rolesError, setRolesError] = useState(null);
-
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [detailUserId, setDetailUserId] = useState(null);
@@ -77,37 +79,42 @@ export default function AdminUsersPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
 
+  // ── Sync filters → URL (không trigger re-render nhiều lần) ──
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      // Init from URL on first mount
+      const sp = new URLSearchParams(window.location.search);
+      const urlParams = {};
+      if (sp.get('search')) urlParams.search = sp.get('search');
+      if (sp.get('branchId')) urlParams.branchId = Number(sp.get('branchId'));
+      if (sp.get('roleId')) urlParams.roleId = Number(sp.get('roleId'));
+      if (sp.get('status')) urlParams.status = sp.get('status');
+      if (sp.get('page')) urlParams.page = Number(sp.get('page'));
+      if (Object.keys(urlParams).length > 0) {
+        setParams((p) => ({ ...p, ...urlParams }));
+      }
+      return;
+    }
+
+    // Sync state → URL
+    const sp = new URLSearchParams();
+    if (params.search) sp.set('search', params.search);
+    if (params.branchId) sp.set('branchId', params.branchId);
+    if (params.roleId) sp.set('roleId', params.roleId);
+    if (params.status) sp.set('status', params.status);
+    if (params.page > 1) sp.set('page', params.page);
+    const qs = sp.toString();
+    const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
+    window.history.replaceState(null, '', newUrl);
+  }, [params.search, params.branchId, params.roleId, params.status, params.page]);
+
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
       setShowModal(true);
       setEditUser(null);
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const bRes = await adminBranchesApi.list();
-        if (!cancelled) {
-          setBranches(bRes?.items || []);
-          setBranchesError(null);
-        }
-      } catch (err) {
-        if (!cancelled) setBranchesError(err.message || 'Không tải được danh sách chi nhánh');
-      }
-      try {
-        const rRes = await adminRolesApi.list();
-        if (!cancelled) {
-          setRoles(rRes?.items || []);
-          setRolesError(null);
-        }
-      } catch (err) {
-        if (!cancelled) setRolesError(err.message || 'Không tải được danh sách vai trò');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   function resetFilters() {
     setParams(() => ({
@@ -127,8 +134,10 @@ export default function AdminUsersPage() {
     setTogglingId(userId);
     try {
       await adminUsersApi.update({ userId, status: newStatus });
+      toast.success(newStatus === 'inactive' ? 'Tài khoản đã bị khóa' : 'Tài khoản đã được kích hoạt');
       refresh();
-    } catch (_) {
+    } catch (err) {
+      toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
     } finally {
       setTogglingId(null);
     }
@@ -271,7 +280,22 @@ export default function AdminUsersPage() {
         </div>
 
         {loading ? (
-          <div className="admin-users__loading">Đang tải danh sách...</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Người dùng</th>
+                  <th>Email</th>
+                  <th>Chi nhánh</th>
+                  <th>Vai trò</th>
+                  <th>Trạng thái</th>
+                  <th>Ngày tạo</th>
+                  <th style={{ textAlign: 'right' }}>Hành động</th>
+                </tr>
+              </thead>
+              <TableSkeleton />
+            </table>
+          </div>
         ) : error ? (
           <div className="admin-users__error">
             <strong>Lỗi:</strong> {error.message || 'Không thể tải danh sách'}
