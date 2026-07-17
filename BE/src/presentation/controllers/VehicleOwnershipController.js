@@ -16,9 +16,10 @@ class VehicleOwnershipController {
 
   transfer = async (req, res, next) => {
     try {
-      const { newCustomerId, transferDate, notes } = req.body;
+      const { newCustomerId, newCustomer, transferDate, notes } = req.body;
       const items = await this.vehicleOwnershipService.transfer(req.params.id, {
         newCustomerId,
+        newCustomer,
         transferDate,
         notes,
       });
