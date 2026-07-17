@@ -118,10 +118,13 @@ class ProfileRepositoryImpl {
     return this.findById(userId);
   }
 
-  async updatePassword(userId, passwordHash) {
+  async updatePassword(userId, passwordHash, mustChangePassword = false) {
     await query(
-      'UPDATE users SET user_password = @p1 WHERE id = @p2',
-      { p1: passwordHash, p2: userId }
+      `UPDATE users
+       SET    user_password         = @p1,
+              must_change_password  = @p2
+       WHERE  id = @p3`,
+      { p1: passwordHash, p2: mustChangePassword ? 1 : 0, p3: userId }
     );
   }
 }

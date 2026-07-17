@@ -1,4 +1,6 @@
 import httpClient from './httpClient';
+import { API_BASE_URL } from '../config';
+import { fetchBlob } from '../utils/downloadBlob';
 
 /**
  * Build query string tu object, bo qua gia tri null/undefined/empty
@@ -47,6 +49,16 @@ class AuditApi {
 
   getEntityDefinitions() {
     return httpClient.get('/audit/entity-definitions');
+  }
+
+  /**
+   * Xuat audit logs ra file Excel (.xlsx) theo filter hien tai.
+   * Tra ve Blob (tuong thich voi downloadBlob utility).
+   * BE se set Content-Disposition de lay ten file audit_logs_YYYYMMDD.xlsx.
+   */
+  exportAuditLogs(params = {}) {
+    const path = `${API_BASE_URL}/audit/export${buildQuery(params)}`;
+    return fetchBlob(path);
   }
 }
 
