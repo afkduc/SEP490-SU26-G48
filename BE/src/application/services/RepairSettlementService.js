@@ -6,6 +6,11 @@ const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
 const LHSC_VALUES = ['DV', 'PT'];
 const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB'];
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
+const ACTIVE_STATUS_LABELS = {
+  waiting_repair: 'chờ sửa chữa',
+  inprogress: 'đang sửa chữa',
+  waiting_payment: 'chờ thanh toán',
+};
 
 // FE gui "Ngay ke tiep" dang dd/mm/yyyy (o nhap tu do, khong phai <input type="date">).
 function parseDDMMYYYY(value) {
@@ -21,10 +26,10 @@ class RepairSettlementService {
     this.repairSettlementRepository = repairSettlementRepository;
   }
 
-  async getAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, page, limit } = {}) {
+  async getAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page, limit } = {}) {
     const [items, total] = await Promise.all([
-      this.repairSettlementRepository.findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, page, limit }),
-      this.repairSettlementRepository.count({ branchId, status, search, customerId, vehicleId, fromDate, toDate }),
+      this.repairSettlementRepository.findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page, limit }),
+      this.repairSettlementRepository.count({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId }),
     ]);
     return {
       items: RepairSettlementResponseDto.fromEntityList(items),
@@ -34,6 +39,10 @@ class RepairSettlementService {
     };
   }
 
+  // Khong gioi han theo advisorId o day: getById con duoc dung de xem chi tiet
+  // 1 phieu tu man "Lich su dich vu" cua khach hang/xe (co the do co van KHAC
+  // phu trach) - man do co tinh chat tra cuu dung chung, phai xem duoc het.
+  // Rieng danh sach chinh (getAll) moi gioi han "chi xem cua ban than".
   async getById(id) {
     const entity = await this.repairSettlementRepository.findById(id);
     if (!entity) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
@@ -42,6 +51,7 @@ class RepairSettlementService {
 
   async create(payload, { branchId, advisorId }) {
     const data = this._validateAndNormalize(payload);
+    await this._assertNoActiveDuplicate(data.customerId, data.vehicleId);
     const entity = await this.repairSettlementRepository.create(data, { branchId, advisorId });
     return RepairSettlementResponseDto.fromEntity(entity);
   }
@@ -54,8 +64,22 @@ class RepairSettlementService {
     }
 
     const data = this._validateAndNormalize(payload);
+    await this._assertNoActiveDuplicate(data.customerId, data.vehicleId, id);
     const entity = await this.repairSettlementRepository.update(id, data);
     return RepairSettlementResponseDto.fromEntity(entity);
+  }
+
+  // 1 khach hang + 1 xe chi duoc co toi da 1 phieu quyet toan dang xu ly
+  // (chua huy, chua xuat hoa don) tai 1 thoi diem.
+  async _assertNoActiveDuplicate(customerId, vehicleId, excludeId) {
+    const conflict = await this.repairSettlementRepository.findActiveByCustomerVehicle(customerId, vehicleId, excludeId);
+    if (conflict) {
+      const label = ACTIVE_STATUS_LABELS[conflict.status] || conflict.status;
+      throw new ApiError(
+        409,
+        `Khách hàng và xe này đang có phiếu quyết toán ${conflict.code} (${label}) chưa xử lý xong. Vui lòng hủy hoặc hoàn tất phiếu đó trước khi tạo phiếu mới.`
+      );
+    }
   }
 
   async updateStatus(id, status, { issuedBy, cancelReason } = {}) {

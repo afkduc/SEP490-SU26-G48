@@ -2,6 +2,7 @@ const RepairSettlementRepository = require('../../domain/repositories/RepairSett
 const RepairSettlement = require('../../domain/entities/RepairSettlement');
 const { query, sql } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const { nowVN } = require('../../utils/dateVN');
 
 // Cot join dung chung cho findAll/findById - lay du thong tin khach hang,
 // xe (kem ngay mua tu warranty_records), co van dich vu va to truong.
@@ -59,8 +60,11 @@ function itemTypeFor(lhsc) {
 // customerId va vehicleId co the ket hop CUNG LUC (vd: man "Lich su dich vu"
 // cua 1 khach hang loc theo 1 xe cu the cua ho) - khac voi truoc day chi cho
 // dung 1 trong 2. Neu khong truyen ca 2 (man danh sach cua co van dich vu) thi
-// bat buoc loc theo branchId nhu cu.
-function buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate }) {
+// bat buoc loc theo branchId nhu cu, kem advisorId neu nguoi goi la
+// service_advisor (chi xem phieu cua chinh minh) - KHONG ap dung cho man lich
+// su khach hang/xe (customerId/vehicleId) vi do la du lieu dung chung, 1 xe co
+// the da qua tay nhieu co van khac nhau.
+function buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId }) {
   const params = {};
   const conditions = [];
 
@@ -75,6 +79,10 @@ function buildConditions({ branchId, status, search, customerId, vehicleId, from
   if (!customerId && !vehicleId) {
     params.branchId = branchId;
     conditions.push('so.branch_id = @branchId');
+    if (advisorId) {
+      params.advisorId = advisorId;
+      conditions.push('so.advisor_id = @advisorId');
+    }
   }
 
   if (status) {
@@ -98,9 +106,9 @@ function buildConditions({ branchId, status, search, customerId, vehicleId, from
 }
 
 class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
-  async findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 20 } = {}) {
+  async findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
-    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate });
+    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId });
 
     const sqlText = `${HEADER_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY so.id DESC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
     params.offset = offset;
@@ -110,8 +118,8 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.recordset.map((row) => RepairSettlement.fromPersistence(row, []));
   }
 
-  async count({ branchId, status, search, customerId, vehicleId, fromDate, toDate } = {}) {
-    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate });
+  async count({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId } = {}) {
+    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId });
 
     const sqlText = `
       SELECT COUNT(*) AS total
@@ -137,9 +145,27 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return RepairSettlement.fromPersistence(header, itemsResult.recordset);
   }
 
+  // 1 khach hang + 1 xe chi duoc co TOI DA 1 phieu quyet toan dang xu ly
+  // (waiting_repair/inprogress/waiting_payment) tai 1 thoi diem - phai huy
+  // hoac xuat hoa don (invoiced) xong moi duoc tao phieu moi cho cap nay.
+  async findActiveByCustomerVehicle(customerId, vehicleId, excludeId) {
+    const result = await query(
+      `SELECT TOP 1 id, order_code, status
+       FROM   service_orders
+       WHERE  customer_id = @customerId
+         AND  vehicle_id = @vehicleId
+         AND  status IN ('waiting_repair', 'inprogress', 'waiting_payment')
+         AND  (@excludeId IS NULL OR id <> @excludeId)
+       ORDER  BY id DESC`,
+      { customerId, vehicleId, excludeId: excludeId || null }
+    );
+    const row = result.recordset[0];
+    return row ? { id: row.id, code: row.order_code, status: row.status } : null;
+  }
+
   async create(data, { branchId, advisorId }) {
     const newId = await runInTransaction(async (tx) => {
-      const isWarranty = await this._checkWarranty(data.vehicleId);
+      const isWarranty = await this._checkWarranty(data.vehicleId, data.currentKm);
 
       const headerResult = await tx
         .request()
@@ -159,6 +185,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('nextMaintenanceKm', sql.Int, data.nextMaintenanceKm || null)
         .input('nextMaintenanceDate', sql.Date, data.nextMaintenanceDate || null)
         .input('isWarranty', sql.Bit, isWarranty)
+        .input('intakeDate', sql.DateTime, nowVN())
         .query(`
           INSERT INTO service_orders (
             order_code, branch_id, vehicle_id, customer_id, advisor_id,
@@ -170,7 +197,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             '', @branchId, @vehicleId, @customerId, @advisorId,
             @customerRequest, @currentKm, @status,
             @subtotal, @discountAmount, @afterDiscount, @vat, @freeAmount, @total,
-            @nextMaintenanceKm, @nextMaintenanceDate, @isWarranty, GETDATE()
+            @nextMaintenanceKm, @nextMaintenanceDate, @isWarranty, @intakeDate
           );
           SELECT SCOPE_IDENTITY() AS id;
         `);
@@ -190,6 +217,8 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
 
   async update(id, data) {
     await runInTransaction(async (tx) => {
+      const isWarranty = await this._checkWarranty(data.vehicleId, data.currentKm);
+
       await tx
         .request()
         .input('id', sql.BigInt, id)
@@ -203,6 +232,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('total', sql.Decimal(18, 2), data.total || 0)
         .input('nextMaintenanceKm', sql.Int, data.nextMaintenanceKm || null)
         .input('nextMaintenanceDate', sql.Date, data.nextMaintenanceDate || null)
+        .input('isWarranty', sql.Bit, isWarranty)
         .query(`
           UPDATE service_orders SET
             customer_request = @customerRequest,
@@ -214,7 +244,8 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             free_amount = @freeAmount,
             total = @total,
             next_maintenance_km = @nextMaintenanceKm,
-            next_maintenance_date = @nextMaintenanceDate
+            next_maintenance_date = @nextMaintenanceDate,
+            is_warranty = @isWarranty
           WHERE id = @id
         `);
 
@@ -317,12 +348,24 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
       .query(`UPDATE vehicles SET current_km = @currentKm WHERE id = @vehicleId AND current_km < @currentKm`);
   }
 
-  async _checkWarranty(vehicleId) {
+  // Con bao hanh khi CA HAI dieu kien thoa: con trong thoi han (warranty_end_date)
+  // VA con trong han km (warranty_km) - dung km cua CHINH lan vao xuong nay
+  // (data.currentKm), khong dung vehicles.current_km (co the la so km cua lan
+  // truoc, chua duoc cap nhat luc check).
+  async _checkWarranty(vehicleId, currentKm) {
     const result = await query(
-      `SELECT is_under_warranty FROM v_warranty_status WHERE vehicle_id = @vehicleId`,
+      `SELECT TOP 1 warranty_end_date, warranty_km
+       FROM   warranty_records
+       WHERE  vehicle_id = @vehicleId
+       ORDER  BY purchase_date DESC`,
       { vehicleId }
     );
-    return Boolean(result.recordset[0]?.is_under_warranty);
+    const wr = result.recordset[0];
+    if (!wr) return false;
+
+    const withinPeriod = new Date() <= new Date(wr.warranty_end_date);
+    const withinKm = currentKm == null ? true : Number(currentKm) <= wr.warranty_km;
+    return withinPeriod && withinKm;
   }
 }
 
