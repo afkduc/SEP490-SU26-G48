@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
+import { useSharedBranches } from '../../contexts/SharedDataContext';
 import {
   adminUsersApi,
-  adminBranchesApi,
-  adminRolesApi,
 } from '../../services/adminApi';
+import { downloadBlob } from '../../utils/downloadBlob';
+import { useToast } from '../../components/common/ToastContext';
 import UserFormModal from './users/UserFormModal';
 import UserDetailDrawer from './users/UserDetailDrawer';
+import AssignRoleModal from './users/AssignRoleModal';
+import AdminPagination from './components/AdminPagination';
+import TableSkeleton from './components/TableSkeleton';
 import './AdminUsersPage.css';
 
 const STATUS_OPTIONS = [
@@ -50,6 +54,11 @@ function getInitials(firstName, lastName) {
 }
 
 export default function AdminUsersPage() {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isInitialMount = useRef(true);
+
   const {
     data,
     loading,
@@ -60,16 +69,45 @@ export default function AdminUsersPage() {
     refresh,
   } = useAdminUsers();
 
+  const { branches, roles, branchesLoading, rolesLoading, branchesError, rolesError } = useSharedBranches();
   const [searchParams] = useSearchParams();
-  const [branches, setBranches] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [branchesError, setBranchesError] = useState(null);
-  const [rolesError, setRolesError] = useState(null);
-
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [detailUserId, setDetailUserId] = useState(null);
+  const [assignUserId, setAssignUserId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+
+  // ── Sync filters → URL (không trigger re-render nhiều lần) ──
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      // Init from URL on first mount
+      const sp = new URLSearchParams(window.location.search);
+      const urlParams = {};
+      if (sp.get('search')) urlParams.search = sp.get('search');
+      if (sp.get('branchId')) urlParams.branchId = Number(sp.get('branchId'));
+      if (sp.get('roleId')) urlParams.roleId = Number(sp.get('roleId'));
+      if (sp.get('status')) urlParams.status = sp.get('status');
+      if (sp.get('page')) urlParams.page = Number(sp.get('page'));
+      if (Object.keys(urlParams).length > 0) {
+        setParams((p) => ({ ...p, ...urlParams }));
+      }
+      return;
+    }
+
+    // Sync state → URL
+    const sp = new URLSearchParams();
+    if (params.search) sp.set('search', params.search);
+    if (params.branchId) sp.set('branchId', params.branchId);
+    if (params.roleId) sp.set('roleId', params.roleId);
+    if (params.status) sp.set('status', params.status);
+    if (params.page > 1) sp.set('page', params.page);
+    const qs = sp.toString();
+    const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
+    window.history.replaceState(null, '', newUrl);
+  }, [params.search, params.branchId, params.roleId, params.status, params.page]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -77,31 +115,6 @@ export default function AdminUsersPage() {
       setEditUser(null);
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const bRes = await adminBranchesApi.list();
-        if (!cancelled) {
-          setBranches(bRes?.items || []);
-          setBranchesError(null);
-        }
-      } catch (err) {
-        if (!cancelled) setBranchesError(err.message || 'Không tải được danh sách chi nhánh');
-      }
-      try {
-        const rRes = await adminRolesApi.list();
-        if (!cancelled) {
-          setRoles(rRes?.items || []);
-          setRolesError(null);
-        }
-      } catch (err) {
-        if (!cancelled) setRolesError(err.message || 'Không tải được danh sách vai trò');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   function resetFilters() {
     setParams(() => ({
@@ -121,10 +134,25 @@ export default function AdminUsersPage() {
     setTogglingId(userId);
     try {
       await adminUsersApi.update({ userId, status: newStatus });
+      toast.success(newStatus === 'inactive' ? 'Tài khoản đã bị khóa' : 'Tài khoản đã được kích hoạt');
       refresh();
-    } catch (_) {
+    } catch (err) {
+      toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleExportExcel() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const blob = await adminUsersApi.exportUsers(params);
+      downloadBlob(blob, 'users.xlsx');
+    } catch (err) {
+      setExportError(err.message || 'Xuất Excel thất bại');
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -132,11 +160,11 @@ export default function AdminUsersPage() {
   const currentPage = data.page || 1;
 
   return (
-    <div className="admin-users">
+    <div className="admin-page">
       {/* Header */}
-      <div className="admin-users__header">
-        <div className="admin-users__title-block">
-          <div className="admin-users__title-icon">
+      <div className="admin-page__header">
+        <div className="admin-page__title-block">
+          <div className="admin-page__title-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
               <circle cx="9" cy="7" r="4"/>
@@ -144,17 +172,30 @@ export default function AdminUsersPage() {
               <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           </div>
-          <div className="admin-users__title-group">
+          <div className="admin-page__title-group">
             <h1>Quản lý người dùng</h1>
-            <p className="admin-users__subtitle">
+            <p className="admin-page__subtitle">
               Danh sách tài khoản hệ thống
             </p>
           </div>
         </div>
-        <div className="admin-users__actions">
+        <div className="admin-page__actions">
           {data.total > 0 && (
-            <span className="admin-users__total-badge">{data.total} tài khoản</span>
+            <span className="admin-page__total-badge">{data.total} tài khoản</span>
           )}
+          <button
+            className="btn btn--secondary"
+            onClick={handleExportExcel}
+            disabled={exporting || loading}
+            title="Xuất danh sách người dùng (theo bộ lọc hiện tại) ra file Excel"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+          </button>
           <button
             className="btn btn--primary"
             onClick={() => { setEditUser(null); setShowModal(true); }}
@@ -165,6 +206,11 @@ export default function AdminUsersPage() {
             Tạo người dùng mới
           </button>
         </div>
+        {exportError && (
+          <div className="admin-users__error" style={{ marginTop: 12 }}>
+            <strong>Xuất Excel thất bại:</strong> {exportError}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -234,7 +280,22 @@ export default function AdminUsersPage() {
         </div>
 
         {loading ? (
-          <div className="admin-users__loading">Đang tải danh sách...</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Người dùng</th>
+                  <th>Email</th>
+                  <th>Chi nhánh</th>
+                  <th>Vai trò</th>
+                  <th>Trạng thái</th>
+                  <th>Ngày tạo</th>
+                  <th style={{ textAlign: 'right' }}>Hành động</th>
+                </tr>
+              </thead>
+              <TableSkeleton />
+            </table>
+          </div>
         ) : error ? (
           <div className="admin-users__error">
             <strong>Lỗi:</strong> {error.message || 'Không thể tải danh sách'}
@@ -358,57 +419,14 @@ export default function AdminUsersPage() {
 
             {/* Pagination */}
             {data.total > 0 && (
-              <div className="pagination">
-                <span className="pagination__info">
-                  Tổng <strong>{data.total}</strong> tài khoản
-                  &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
-                </span>
-                <div className="pagination__controls">
-                  <button
-                    className="pagination__nav-btn"
-                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                    disabled={currentPage <= 1}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="15 18 9 12 15 6"/>
-                    </svg>
-                    Trước
-                  </button>
-
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 7) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 4) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 3) {
-                      pageNum = totalPages - 6 + i;
-                    } else {
-                      pageNum = currentPage - 3 + i;
-                    }
-                    return (
-                      <button
-                        key={pageNum}
-                        className={`pagination__page-btn ${currentPage === pageNum ? 'active' : ''}`}
-                        onClick={() => handlePageChange(pageNum)}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    className="pagination__nav-btn"
-                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage >= totalPages}
-                  >
-                    Sau
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="9 18 15 12 9 6"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <AdminPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                total={data.total}
+                onChange={handlePageChange}
+                loading={loading}
+                accent="indigo"
+              />
             )}
           </>
         )}
@@ -427,6 +445,14 @@ export default function AdminUsersPage() {
           userId={detailUserId}
           onClose={() => setDetailUserId(null)}
           onRolesChanged={() => refresh()}
+        />
+      )}
+
+      {assignUserId && (
+        <AssignRoleModal
+          userId={assignUserId}
+          onClose={() => setAssignUserId(null)}
+          onSuccess={() => refresh()}
         />
       )}
     </div>

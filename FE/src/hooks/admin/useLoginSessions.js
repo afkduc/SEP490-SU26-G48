@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { adminLoginSessionsApi, adminBranchesApi } from '../../services/adminApi';
+import { usePaginatedList } from './usePaginatedList';
+import { adminLoginSessionsApi } from '../../services/adminApi';
 
 const DEFAULT_PARAMS = {
   userName: '',
@@ -10,52 +10,26 @@ const DEFAULT_PARAMS = {
   endDate: '',
   branchId: undefined,
   page: 1,
-  pageSize: 20,
+  pageSize: 10,
 };
 
+/**
+ * Hook lấy danh sách phiên đăng nhập (login sessions) cho admin.
+ */
 export function useLoginSessions() {
-  const [data, setData] = useState({ items: [], total: 0, page: 1, pageSize: 20 });
-  const [params, setParamsState] = useState(DEFAULT_PARAMS);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const list = usePaginatedList({
+    apiFn: adminLoginSessionsApi.list,
+    defaultParams: DEFAULT_PARAMS,
+  });
 
-  const setParams = useCallback((updater) => {
-    setParamsState((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      return { ...prev, ...next, page: next.page ?? 1 };
-    });
-  }, []);
-
-  const updateParam = useCallback((key, value) => {
-    setParamsState((prev) => ({ ...prev, [key]: value, page: 1 }));
-  }, []);
-
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = {};
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== '') qs[k] = v;
-      });
-      const res = await adminLoginSessionsApi.list(qs);
-      const items = res?.items ?? res ?? [];
-      setData({
-        items: Array.isArray(items) ? items : [],
-        total: Array.isArray(items) ? items.length : (res?.total ?? 0),
-        page: Number(res?.page || params.page || 1),
-        pageSize: Number(res?.pageSize || params.pageSize || 20),
-      });
-    } catch (err) {
-      setError(err.message || 'Không thể tải danh sách');
-    } finally {
-      setLoading(false);
-    }
-  }, [params]);
-
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
-
-  return { data, params, setParams, updateParam, loading, error, refetch: fetch };
+  return {
+    data: list.data,
+    loading: list.loading,
+    error: list.error,
+    params: list.params,
+    setParams: list.setParams,
+    updateParam: list.updateParam,
+    refetch: list.refetch,
+    refresh: list.refresh,
+  };
 }

@@ -74,7 +74,9 @@ class ProfileService {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.profileRepository.updatePassword(userId, passwordHash);
+    // Khi user tu doi MK (force change), reset flag must_change_password = 0
+    // de lan dang nhap sau binh thuong (khong bi redirect ve trang doi MK)
+    await this.profileRepository.updatePassword(userId, passwordHash, false);
 
     return true;
   }
