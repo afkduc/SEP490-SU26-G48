@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminSpecialtiesApi } from '../../services/adminApi';
+import { useToast } from '../../components/common/ToastContext';
 import './AdminSpecialtiesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -115,6 +116,7 @@ function SpecialtyFormModal({ specialty, onClose, onSuccess }) {
 // ─── Main Component ──────────────────────────────────────────────────
 
 export default function AdminSpecialtiesPage() {
+  const toast = useToast();
   const [specialties, setSpecialties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -140,9 +142,10 @@ export default function AdminSpecialtiesPage() {
   async function handleToggleStatus(specialty) {
     try {
       await adminSpecialtiesApi.toggleStatus(specialty.id);
+      toast.success(specialty.isActive ? 'Đã tắt chuyên môn' : 'Đã kích hoạt chuyên môn');
       loadData();
     } catch (err) {
-      alert(err.message || 'Lỗi khi cập nhật trạng thái');
+      toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
     }
   }
 
@@ -250,7 +253,12 @@ export default function AdminSpecialtiesPage() {
         <SpecialtyFormModal
           specialty={editSpecialty}
           onClose={() => { setShowForm(false); setEditSpecialty(null); }}
-          onSuccess={() => { setShowForm(false); setEditSpecialty(null); loadData(); }}
+          onSuccess={() => {
+            toast.success(editSpecialty ? 'Cập nhật chuyên môn thành công' : 'Tạo chuyên môn mới thành công');
+            setShowForm(false);
+            setEditSpecialty(null);
+            loadData();
+          }}
         />
       )}
     </div>

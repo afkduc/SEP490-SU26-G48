@@ -74,7 +74,7 @@ class DeviceRepository {
   /**
    * Lay tat ca devices cua tat ca user (admin overview)
    */
-  async findAll({ userId, search, page = 1, pageSize = 20 }) {
+  async findAll({ userId, search, browser, os, isCurrent, dateFrom, dateTo, page = 1, pageSize = 20 }) {
     const conditions = ['1=1'];
     const params = {};
     let idx = 1;
@@ -88,10 +88,45 @@ class DeviceRepository {
     if (search) {
       conditions.push(`(
         u.user_name LIKE @p${idx}
+        OR u.first_name LIKE @p${idx}
+        OR u.last_name LIKE @p${idx}
         OR d.device_name LIKE @p${idx}
         OR d.ip_address LIKE @p${idx}
+        OR d.browser LIKE @p${idx}
+        OR d.os LIKE @p${idx}
       )`);
       params[`p${idx}`] = `%${search}%`;
+      idx++;
+    }
+
+    if (browser) {
+      conditions.push(`d.browser LIKE @p${idx}`);
+      params[`p${idx}`] = `%${browser}%`;
+      idx++;
+    }
+
+    if (os) {
+      conditions.push(`d.os LIKE @p${idx}`);
+      params[`p${idx}`] = `%${os}%`;
+      idx++;
+    }
+
+    if (isCurrent !== undefined && isCurrent !== null && isCurrent !== '') {
+      const val = isCurrent === true || isCurrent === 'true' || isCurrent === '1' ? 1 : 0;
+      conditions.push(`d.is_current = @p${idx}`);
+      params[`p${idx}`] = val;
+      idx++;
+    }
+
+    if (dateFrom) {
+      conditions.push(`d.last_login_at >= @p${idx}`);
+      params[`p${idx}`] = dateFrom;
+      idx++;
+    }
+
+    if (dateTo) {
+      conditions.push(`d.last_login_at <= @p${idx}`);
+      params[`p${idx}`] = dateTo;
       idx++;
     }
 

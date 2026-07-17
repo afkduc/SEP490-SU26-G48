@@ -317,10 +317,15 @@ class AdminController {
   // Devices
   listDevices = async (req, res, next) => {
     try {
-      const { userId, search, page, pageSize } = req.query;
+      const { userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize } = req.query;
       const result = await this.deviceService.listAll({
         userId,
         search,
+        browser,
+        os,
+        isCurrent,
+        dateFrom,
+        dateTo,
         page: page ? Number(page) : 1,
         pageSize: pageSize ? Number(pageSize) : 20,
       });
