@@ -15,13 +15,14 @@ class ExportRequestService {
     this.exportRequestRepository = exportRequestRepository;
   }
 
-  async list({ branchId, status, serviceOrderId, fromDate, toDate, search, page, limit } = {}) {
+  async list({ branchId, status, repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit } = {}) {
     if (!branchId) throw new ApiError(400, 'branchId is required');
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const filters = {
       branchId: Number(branchId),
       status: status || undefined,
+      repairOrderId: repairOrderId ? Number(repairOrderId) : undefined,
       serviceOrderId: serviceOrderId ? Number(serviceOrderId) : undefined,
       fromDate: fromDate ? new Date(fromDate) : undefined,
       toDate: toDate ? new Date(toDate) : undefined,
@@ -58,35 +59,42 @@ class ExportRequestService {
   }
 
   /**
-   * Lay danh sach Service Order co the xuat kho (chua xuat hoac xuat mot phan).
+   * Lay danh sach Repair Order co the xuat kho (chua xuat hoac xuat mot phan).
    */
-  async listExportableServiceOrders({ branchId, search, page, limit } = {}) {
+  async listExportableRepairOrders({ branchId, search, page, limit } = {}) {
     if (!branchId) throw new ApiError(400, 'branchId is required');
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
-    const items = await this.exportRequestRepository.findExportableServiceOrders({
-      branchId: Number(branchId),
-      search: search || undefined,
-      page: safePage,
-      limit: safeLimit,
-    });
+    const [items, total] = await Promise.all([
+      this.exportRequestRepository.findExportableRepairOrders({
+        branchId: Number(branchId),
+        search: search || undefined,
+        page: safePage,
+        limit: safeLimit,
+      }),
+      this.exportRequestRepository.countExportableRepairOrders({
+        branchId: Number(branchId),
+        search: search || undefined,
+      }),
+    ]);
     return {
       items,
+      total,
       page: safePage,
       limit: safeLimit,
     };
   }
 
   /**
-   * Lay chi tiet 1 Service Order + phu tung (PART) de hien thi trong form xuat.
+   * Lay chi tiet 1 Repair Order + phu tung (PART) de hien thi trong form xuat.
    */
-  async getServiceOrderForExport(serviceOrderId) {
-    const numId = Number(serviceOrderId);
+  async getRepairOrderForExport(repairOrderId) {
+    const numId = Number(repairOrderId);
     if (!Number.isFinite(numId) || numId <= 0) {
-      throw new ApiError(400, 'serviceOrderId khong hop le');
+      throw new ApiError(400, 'repairOrderId khong hop le');
     }
-    const data = await this.exportRequestRepository.findServiceOrderForExport(numId);
-    if (!data) throw new ApiError(404, 'Khong tim thay phieu sua chua');
+    const data = await this.exportRequestRepository.findRepairOrderForExport(numId);
+    if (!data) throw new ApiError(404, 'Khong tim thay lenh sua chua');
     return data;
   }
 
