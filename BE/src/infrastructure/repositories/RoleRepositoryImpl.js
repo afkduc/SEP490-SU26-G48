@@ -11,16 +11,18 @@ class RoleRepositoryImpl {
         r.id,
         r.role_name,
         r.role_label,
+        ISNULL(r.is_active, 1) AS is_active,
         COUNT(ur.id) AS user_count
       FROM roles r
       LEFT JOIN user_role ur ON ur.role_id = r.id
-      GROUP BY r.id, r.role_name, r.role_label
+      GROUP BY r.id, r.role_name, r.role_label, r.is_active
       ORDER BY r.id ASC
     `);
     return result.recordset.map((row) => ({
       id: row.id,
       roleName: row.role_name,
       roleLabel: row.role_label,
+      isActive: Boolean(row.is_active),
       userCount: Number(row.user_count),
     }));
   }
@@ -35,7 +37,8 @@ class RoleRepositoryImpl {
       `SELECT
         r.id,
         r.role_name,
-        r.role_label
+        r.role_label,
+        ISNULL(r.is_active, 1) AS is_active
        FROM roles r
        WHERE r.id = @p1`,
       { p1: roleId }
@@ -46,6 +49,7 @@ class RoleRepositoryImpl {
       id: row.id,
       roleName: row.role_name,
       roleLabel: row.role_label,
+      isActive: Boolean(row.is_active),
     };
   }
 
@@ -61,13 +65,13 @@ class RoleRepositoryImpl {
   }
 
   /**
-   * Tao role moi
+   * Tao role moi (mac dinh active)
    */
   async create({ roleName, roleLabel }) {
     const result = await query(
-      `INSERT INTO roles (role_name, role_label)
+      `INSERT INTO roles (role_name, role_label, is_active)
        OUTPUT INSERTED.id
-       VALUES (@p1, @p2)`,
+       VALUES (@p1, @p2, 1)`,
       { p1: roleName, p2: roleLabel }
     );
     return result.recordset[0].id;
@@ -99,6 +103,17 @@ class RoleRepositoryImpl {
     await query('DELETE FROM role_permissions WHERE role_id = @p1', { p1: id });
     await query('DELETE FROM roles WHERE id = @p1', { p1: id });
     return { success: true };
+  }
+
+  /**
+   * Toggle trang thai active/inactive
+   */
+  async toggleStatus(id) {
+    await query(
+      'UPDATE roles SET is_active = CASE WHEN ISNULL(is_active, 1) = 1 THEN 0 ELSE 1 END WHERE id = @p1',
+      { p1: id }
+    );
+    return this.findById(id);
   }
 
   /**

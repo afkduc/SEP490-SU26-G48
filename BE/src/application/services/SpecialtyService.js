@@ -62,6 +62,12 @@ class SpecialtyService {
     return { deleted: true, id: Number(id) };
   }
 
+  async toggleStatus(id) {
+    const existing = await this.specialtyRepository.findById(Number(id));
+    if (!existing) throw new ApiError(404, 'Chuyen mon khong ton tai');
+    return this.specialtyRepository.toggleStatus(id);
+  }
+
   async getUserSpecialties(userId) {
     return this.specialtyRepository.findByUserId(Number(userId));
   }

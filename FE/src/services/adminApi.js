@@ -178,6 +178,10 @@ class AdminRolesApi {
     return httpClient.delete(`/admin/roles/${id}`);
   }
 
+  toggleStatus(id) {
+    return httpClient.patch(`/admin/roles/${id}/toggle-status`);
+  }
+
   listPermissions() {
     return httpClient.get('/admin/permissions');
   }
@@ -318,6 +322,10 @@ class AdminSpecialtiesApi {
 
   delete(id) {
     return httpClient.delete(`/admin/specialties/${id}`);
+  }
+
+  toggleStatus(id) {
+    return httpClient.patch(`/admin/specialties/${id}/toggle-status`);
   }
 
   getUserSpecialties(userId) {

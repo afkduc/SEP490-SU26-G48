@@ -57,6 +57,7 @@ function buildAdminRouter() {
   router.post('/roles', controller.createRole);
   router.put('/roles/:id', controller.updateRole);
   router.delete('/roles/:id', controller.deleteRole);
+  router.patch('/roles/:id/toggle-status', controller.toggleRoleStatus);
   router.get('/permissions', controller.listPermissions);
   router.get('/roles/:id/permissions', controller.getRolePermissions);
   router.put('/roles/:id/permissions', controller.setRolePermissions);
@@ -78,6 +79,7 @@ function buildAdminRouter() {
   router.post('/specialties', controller.createSpecialty);
   router.put('/specialties/:id', controller.updateSpecialty);
   router.delete('/specialties/:id', controller.deleteSpecialty);
+  router.patch('/specialties/:id/toggle-status', controller.toggleSpecialtyStatus);
   router.get('/users/:userId/specialties', controller.getUserSpecialties);
   router.put('/users/:userId/specialties', controller.setUserSpecialties);
 
