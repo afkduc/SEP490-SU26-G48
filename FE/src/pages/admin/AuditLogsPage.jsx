@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { adminApi } from '../../services';
+import { auditApi } from '../../services/auditApi';
+import { downloadBlob } from '../../utils/downloadBlob';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import AuditLogDetailDrawer from './AuditLogDetailDrawer';
 import AdminPagination from './components/AdminPagination';
@@ -57,6 +59,21 @@ export default function AuditLogsPage() {
   const [detailUserId, setDetailUserId] = useState(null);
   // log dang xem chi tiet (mo drawer log)
   const [detailLog, setDetailLog] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+
+  async function handleExportExcel() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const blob = await auditApi.exportAuditLogs(audit.params);
+      downloadBlob(blob, 'audit_logs.xlsx');
+    } catch (err) {
+      setExportError(err.message || 'Xuất Excel thất bại');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +123,27 @@ export default function AuditLogsPage() {
             <p className="admin-logs__subtitle">Theo dõi tất cả thao tác của người dùng trên hệ thống</p>
           </div>
         </div>
+        <div className="admin-logs__actions">
+          <button
+            className="btn btn--secondary"
+            onClick={handleExportExcel}
+            disabled={exporting || audit.loading}
+            title="Xuất nhật ký (theo bộ lọc hiện tại) ra file Excel"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+          </button>
+        </div>
       </div>
+      {exportError && (
+        <div className="admin-logs__error" style={{ marginTop: 12 }}>
+          <strong>Xuất Excel thất bại:</strong> {exportError}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="filter-card">

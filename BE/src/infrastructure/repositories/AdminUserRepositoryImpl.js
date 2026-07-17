@@ -114,6 +114,85 @@ class AdminUserRepositoryImpl {
     return { items: users, total, page, pageSize };
   }
 
+  /**
+   * Lay full users (khong phan trang) de export Excel.
+   * Cap toi da 10000 rows de bao ve DB.
+   */
+  async findAllForExport({ search, branchId, roleId, status, limit = 10000 } = {}) {
+    const conditions = ['1=1'];
+    const params = {};
+    let paramIndex = 1;
+
+    if (search) {
+      conditions.push(`(
+        u.user_name LIKE @p${paramIndex}
+        OR u.email LIKE @p${paramIndex}
+        OR u.first_name LIKE @p${paramIndex}
+        OR u.last_name LIKE @p${paramIndex}
+      )`);
+      params[`p${paramIndex}`] = `%${search}%`;
+      paramIndex++;
+    }
+
+    if (branchId) {
+      conditions.push(`u.branch_id = @p${paramIndex}`);
+      params[`p${paramIndex}`] = branchId;
+      paramIndex++;
+    }
+
+    if (roleId) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM user_role ur
+        WHERE ur.user_id = u.id AND ur.role_id = @p${paramIndex}
+      )`);
+      params[`p${paramIndex}`] = Number(roleId);
+      paramIndex++;
+    }
+
+    if (status) {
+      conditions.push(`u.status = @p${paramIndex}`);
+      params[`p${paramIndex}`] = status;
+      paramIndex++;
+    }
+
+    const whereClause = conditions.join(' AND ');
+    const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 10000, 10000));
+
+    const dataResult = await query(
+      `SELECT ${ADMIN_USER_COLUMNS}
+       FROM   users u
+       LEFT   JOIN branches b ON b.id = u.branch_id
+       WHERE  ${whereClause}
+       ORDER  BY u.id ASC
+       OFFSET 0 ROWS FETCH NEXT @p_limit ROWS ONLY`,
+      { ...params, p_limit: safeLimit }
+    );
+
+    const users = dataResult.recordset.map(toAdminUserRow);
+
+    // Lay roles cho cac user
+    if (users.length > 0) {
+      const userIds = users.map((u) => u.id);
+      const rolesResult = await query(
+        `SELECT ur.user_id, r.id AS role_id, r.role_name
+         FROM   user_role ur
+         JOIN   roles r ON r.id = ur.role_id
+         WHERE  ur.user_id IN (${userIds.map((_, i) => `@p${paramIndex + i}`).join(',')})`,
+        Object.fromEntries(userIds.map((id, i) => [`p${paramIndex + i}`, id]))
+      );
+      const rolesByUser = {};
+      for (const row of rolesResult.recordset) {
+        if (!rolesByUser[row.user_id]) rolesByUser[row.user_id] = [];
+        rolesByUser[row.user_id].push({ roleId: row.role_id, roleName: row.role_name });
+      }
+      for (const user of users) {
+        user.roles = rolesByUser[user.id] || [];
+      }
+    }
+
+    return { items: users, total: users.length, truncated: users.length >= safeLimit };
+  }
+
   async countAllUsers() {
     const result = await query('SELECT COUNT(*) AS total FROM users');
     return result.recordset[0].total;
