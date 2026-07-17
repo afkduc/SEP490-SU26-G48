@@ -5,7 +5,7 @@ const ApiError = require('../../utils/ApiError');
  * Tra ve object da duoc chuan hoa hoac nem ApiError(400).
  *
  * @param {Object} payload - req.body
- * @returns {Object} { branch_id, service_order_id, performed_by,
+ * @returns {Object} { branch_id, repair_order_id, performed_by,
  *                     export_date, notes?, items: [{ product_id, product_code,
  *                     product_name, unit?, quantity }] }
  */
@@ -19,9 +19,9 @@ function validateCreateExportRequest(payload) {
     throw new ApiError(400, 'branchId khong hop le');
   }
 
-  const serviceOrderId = Number(payload.serviceOrderId ?? payload.service_order_id);
-  if (!Number.isFinite(serviceOrderId) || serviceOrderId <= 0) {
-    throw new ApiError(400, 'serviceOrderId khong hop le');
+  const repairOrderId = Number(payload.repairOrderId ?? payload.repair_order_id);
+  if (!Number.isFinite(repairOrderId) || repairOrderId <= 0) {
+    throw new ApiError(400, 'repairOrderId khong hop le');
   }
 
   const performedBy = Number(payload.performedBy ?? payload.performed_by);
@@ -86,7 +86,7 @@ function validateCreateExportRequest(payload) {
 
   return {
     branch_id: branchId,
-    service_order_id: serviceOrderId,
+    repair_order_id: repairOrderId,
     performed_by: performedBy,
     export_date: exportDate,
     notes,
