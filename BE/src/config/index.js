@@ -10,7 +10,8 @@ module.exports = {
     user: process.env.DB_USER || 'sa',
     password: process.env.DB_PASSWORD || '',
     options: {
-      encrypt: false,
+      // SQL Server cloud (Azure) bat buoc encrypt=true. Local co the giu false.
+      encrypt: process.env.DB_ENCRYPT !== 'false',
       trustServerCertificate: process.env.DB_TRUST_CERT === 'true',
     },
     pool: {

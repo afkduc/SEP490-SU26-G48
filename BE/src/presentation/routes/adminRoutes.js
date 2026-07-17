@@ -88,6 +88,9 @@ function buildAdminRouter() {
   router.get('/security-alerts/counts', controller.acknowledgeAlertCounts);
   router.patch('/security-alerts/:id/ack', controller.acknowledgeAlert);
 
+  // Login sessions - realtime polling
+  router.get('/login-sessions/recent', controller.getRecentLoginSessions);
+
   return router;
 }
 

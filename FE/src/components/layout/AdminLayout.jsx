@@ -160,8 +160,11 @@ export default function AdminLayout({ children }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    setUserMenuOpen(false);
+    // await de dam bao BE nhan duoc yeu cau logout (trackLogout)
+    // truoc khi navigate ve trang login.
+    await logout();
     navigate('/login', { replace: true });
   };
 

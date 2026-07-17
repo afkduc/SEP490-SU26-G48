@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
-import UserDetailDrawer from './users/UserDetailDrawer';
 import AuditLogDetailDrawer from './AuditLogDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import './AuditLogsPage.css';
@@ -19,16 +18,81 @@ const ACTION_OPTIONS = [
 const ACTION_LABELS = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa' };
 const ACTION_CLASS = { CREATE: 'badge--success', UPDATE: 'badge--info', DELETE: 'badge--danger' };
 
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleString('vi-VN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  } catch {
-    return value;
+/**
+ * Map tên bảng (table_name) sang tên tiếng Việt cho dễ hiểu.
+ * BE vẫn giữ table_name là key chuẩn (customers, users, ...).
+ * Đây chỉ là lớp ánh xạ hiển thị ở frontend.
+ */
+const TABLE_NAME_VI = {
+  customers:           'Khách hàng',
+  users:               'Người dùng',
+  user_roles:          'Vai trò người dùng',
+  roles:               'Vai trò',
+  permissions:         'Phân quyền',
+  branches:            'Chi nhánh',
+  appointments:        'Lịch hẹn',
+  vehicles:            'Phương tiện',
+  service_catalog:     'Danh mục dịch vụ',
+  products:            'Phụ tùng / Sản phẩm',
+  work_orders:         'Phiếu sửa chữa',
+  work_order_items:    'Hạng mục phiếu sửa',
+  invoices:            'Hóa đơn',
+  payments:            'Thanh toán',
+  inventory:           'Tồn kho',
+  inventory_transactions: 'Giao dịch kho',
+  login_sessions:      'Phiên đăng nhập',
+  login_session_events:'Sự kiện phiên',
+  audit_logs:          'Nhật ký hệ thống',
+  notifications:       'Thông báo',
+};
+
+function viTableName(name) {
+  if (!name) return '—';
+  return TABLE_NAME_VI[name] || name;
+}
+
+/**
+ * formatDate: trả về thời gian local (vi-VN) hiển thị ở cột "Thời gian".
+ * - Ưu tiên dùng ISO với 'Z' để hiểu là UTC (fix vấn đề lệch giờ).
+ * - Nếu BE trả về string không có timezone, coi như UTC vì DB đang lưu UTC.
+ */
+function formatLocal(value) {
+  if (!value) return { main: '—', sub: '', ago: '' };
+  let d;
+  if (value instanceof Date) {
+    d = value;
+  } else {
+    const s = typeof value === 'string' ? value : String(value);
+    const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(s);
+    d = new Date(hasTz ? s : `${s}Z`);
   }
+  if (Number.isNaN(d.getTime())) return { main: String(value), sub: '', ago: '' };
+
+  const main = d.toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+  const sub = d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  const diffMs = Date.now() - d.getTime();
+  const ago = humanizeAgo(diffMs);
+  return { main, sub, ago };
+}
+
+function humanizeAgo(diffMs) {
+  if (diffMs < 0) return 'vừa xong';
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 5) return 'vừa xong';
+  if (sec < 60) return `${sec} giây trước`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} phút trước`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} giờ trước`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} ngày trước`;
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `${mo} tháng trước`;
+  return `${Math.floor(mo / 12)} năm trước`;
 }
 
 function getMethodClass(method) {
@@ -42,11 +106,19 @@ function getMethodClass(method) {
 }
 
 function getResponseBadge(status) {
-  if (!status) return null;
-  if (status >= 200 && status < 300) return { cls: 'badge--success', label: status };
-  if (status >= 400 && status < 500) return { cls: 'badge--warning', label: status };
-  if (status >= 500) return { cls: 'badge--danger', label: status };
-  return { cls: 'badge--secondary', label: status };
+  if (status == null) return null;
+  if (status >= 200 && status < 300) return { cls: 'badge--success', label: `${status} Thành công` };
+  if (status >= 400 && status < 500) return { cls: 'badge--warning', label: `${status} Lỗi client` };
+  if (status >= 500) return { cls: 'badge--danger', label: `${status} Lỗi server` };
+  return { cls: 'badge--secondary', label: String(status) };
+}
+
+function formatDuration(ms) {
+  if (ms == null || Number.isNaN(Number(ms))) return '—';
+  const n = Number(ms);
+  if (n < 1000) return `${n} ms`;
+  if (n < 60_000) return `${(n / 1000).toFixed(2)} s`;
+  return `${Math.floor(n / 60_000)}m ${Math.floor((n % 60_000) / 1000)}s`;
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -65,7 +137,7 @@ const IconDownload = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
     <polyline points="7 10 12 15 17 10"/>
-    <line x1="12" y1="15" x2="12" y2="3"/>
+    <line x1="12" y1="15" x2="12" y1="3"/>
   </svg>
 );
 
@@ -79,13 +151,6 @@ const IconRefresh = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="1 4 1 10 7 10"/>
     <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
-  </svg>
-);
-
-const IconUser = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
   </svg>
 );
 
@@ -200,10 +265,16 @@ export default function AuditLogsPage() {
   const toast = useToast();
   const audit = useAuditLogs();
   const { branches, branchesError } = useSharedBranches();
-  const [detailUserId, setDetailUserId] = useState(null);
   const [detailLog, setDetailLog] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Tick mỗi 30s để cột "x phút trước" tự cập nhật realtime (re-render nhẹ)
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   async function handleExportExcel() {
     setExporting(true);
@@ -237,6 +308,9 @@ export default function AuditLogsPage() {
   const hasFilters = audit.params.userName || audit.params.phone || audit.params.action ||
     audit.params.entityCode || audit.params.startDate || audit.params.endDate ||
     (audit.params.branchId != null);
+
+  // Chỉ render lại cột thời gian khi tick (không re-render toàn trang)
+  const timeTick = useMemo(() => now, [now]);
 
   return (
     <div className="admin-logs">
@@ -324,7 +398,7 @@ export default function AuditLogsPage() {
             <input
               className="filter-field__input"
               type="text"
-              placeholder="VD: ND-001, USR-005..."
+              placeholder="VD: KH-001, ND-005..."
               value={audit.params.entityCode || ''}
               onChange={(e) => audit.updateParam('entityCode', e.target.value)}
             />
@@ -408,8 +482,8 @@ export default function AuditLogsPage() {
             <div className="admin-logs__table-wrapper">
               <AuditTable
                 items={audit.data.items}
-                onViewUser={setDetailUserId}
                 onViewLog={setDetailLog}
+                timeTick={timeTick}
               />
             </div>
             <Pagination
@@ -422,14 +496,6 @@ export default function AuditLogsPage() {
           </>
         )}
       </div>
-
-      {/* User detail drawer */}
-      {detailUserId && (
-        <UserDetailDrawer
-          userId={detailUserId}
-          onClose={() => setDetailUserId(null)}
-        />
-      )}
 
       {/* Log detail drawer */}
       {detailLog && (
@@ -450,11 +516,11 @@ function TableSkeleton({ rows }) {
       <thead>
         <tr>
           <th>Thời gian</th>
-          <th>Người dùng</th>
+          <th>Thực hiện bởi</th>
           <th>Hành động</th>
-          <th>Bảng</th>
-          <th>Mã / ID</th>
-          <th>IP</th>
+          <th>Bảng dữ liệu</th>
+          <th>Mã bản ghi</th>
+          <th>Địa chỉ IP</th>
           <th>Phương thức</th>
           <th>Thời gian xử lý</th>
           <th>Trạng thái</th>
@@ -476,18 +542,21 @@ function TableSkeleton({ rows }) {
   );
 }
 
-function AuditTable({ items, onViewUser, onViewLog }) {
+function AuditTable({ items, onViewLog, timeTick }) {
+  // timeTick chỉ để phụ thuộc re-render; formatLocal dùng Date.now() thực tế
+  void timeTick;
+
   if (!items || items.length === 0) {
     return (
       <table className="table">
         <thead>
           <tr>
             <th>Thời gian</th>
-            <th>Người dùng</th>
+            <th>Thực hiện bởi</th>
             <th>Hành động</th>
-            <th>Bảng</th>
-            <th>Mã / ID</th>
-            <th>IP</th>
+            <th>Bảng dữ liệu</th>
+            <th>Mã bản ghi</th>
+            <th>Địa chỉ IP</th>
             <th>Phương thức</th>
             <th>Thời gian xử lý</th>
             <th>Trạng thái</th>
@@ -510,11 +579,18 @@ function AuditTable({ items, onViewUser, onViewLog }) {
       <thead>
         <tr>
           <th>Thời gian</th>
-          <th>Người dùng</th>
+          <th>Thực hiện bởi</th>
           <th>Hành động</th>
-          <th>Bảng</th>
-          <th>Mã / ID</th>
-          <th>IP</th>
+          <th>Bảng dữ liệu</th>
+          <th>
+            Mã bản ghi
+            <span
+              className="th-info"
+              title="Mã hiển thị (entity_code) hoặc ID nội bộ (record_id) của bản ghi bị tác động. Ví dụ KH-001 = mã khách hàng #1, USR-005 = mã người dùng #5."
+              aria-label="Giải thích"
+            >i</span>
+          </th>
+          <th>Địa chỉ IP</th>
           <th>Phương thức</th>
           <th>Thời gian xử lý</th>
           <th>Trạng thái</th>
@@ -525,12 +601,21 @@ function AuditTable({ items, onViewUser, onViewLog }) {
         {items.map((item) => {
           const resp = getResponseBadge(item.response_status);
           const methodCls = getMethodClass(item.request_method);
+          const t = formatLocal(item.logged_at);
+          const tableVi = viTableName(item.table_name || item.entity_name);
+          const codeText = item.entity_code || (item.record_id != null ? `#${item.record_id}` : null);
           return (
             <tr key={item.id}>
-              <td className="audit-logs__date">{formatDate(item.logged_at)}</td>
+              <td>
+                <div className="audit-logs__time-cell">
+                  <span className="audit-logs__time-main">{t.main}</span>
+                  <span className="audit-logs__time-ago">{t.ago}</span>
+                  <span className="audit-logs__time-utc" title="Thời điểm UTC gốc từ server">{t.sub}</span>
+                </div>
+              </td>
               <td>
                 <div className="audit-logs__user-cell">
-                  <span className="audit-logs__user-name">{item.user_name || '—'}</span>
+                  <span className="audit-logs__user-name">{item.user_name || 'Hệ thống'}</span>
                   {item.phone_number && (
                     <span className="audit-logs__user-phone">{item.phone_number}</span>
                   )}
@@ -544,21 +629,45 @@ function AuditTable({ items, onViewUser, onViewLog }) {
                 ) : '—'}
               </td>
               <td>
-                <span className="audit-logs__entity">
-                  {item.table_name || item.entity_name || '—'}
+                <span
+                  className="audit-logs__entity"
+                  title={item.table_name ? `Tên bảng trong DB: ${item.table_name}` : undefined}
+                >
+                  {tableVi}
                 </span>
               </td>
-              <td className="audit-logs__code">
-                {item.entity_code || (item.record_id ? `#${item.record_id}` : '—')}
+              <td>
+                {codeText ? (
+                  <span
+                    className="audit-logs__code"
+                    title={item.entity_code
+                      ? `Mã hiển thị: ${item.entity_code}${item.record_id != null ? ` • ID nội bộ: #${item.record_id}` : ''}`
+                      : `ID nội bộ: #${item.record_id}`}
+                  >
+                    {codeText}
+                  </span>
+                ) : '—'}
               </td>
-              <td className="audit-logs__ip">{item.ip_address || '—'}</td>
+              <td>
+                <span
+                  className="audit-logs__ip"
+                  title={item.ip_address || 'Không ghi nhận IP'}
+                >
+                  {item.ip_address || '—'}
+                </span>
+              </td>
               <td>
                 <span className={`audit-logs__method ${methodCls}`}>
                   {item.request_method || '—'}
                 </span>
               </td>
-              <td className="audit-logs__duration">
-                {item.duration_ms != null ? `${item.duration_ms}ms` : '—'}
+              <td>
+                <span
+                  className="audit-logs__duration"
+                  title={item.duration_ms != null ? `${item.duration_ms} ms` : 'Không ghi nhận'}
+                >
+                  {formatDuration(item.duration_ms)}
+                </span>
               </td>
               <td>
                 {resp ? (
@@ -576,17 +685,6 @@ function AuditTable({ items, onViewUser, onViewLog }) {
                     <IconDoc />
                     Chi tiết
                   </button>
-                  {item.user_id && (
-                    <button
-                      type="button"
-                      className="admin-logs__action-btn"
-                      onClick={() => onViewUser?.(item.user_id)}
-                      title="Xem chi tiết người dùng"
-                    >
-                      <IconUser />
-                      Người dùng
-                    </button>
-                  )}
                 </div>
               </td>
             </tr>
