@@ -21,6 +21,15 @@ app.use(errorHandler);
 async function start() {
   try {
     await getPool();
+
+    // Start background jobs
+    try {
+      require('./jobs/securityAlertJob').start();
+      require('./jobs/auditRetentionJob').start();
+    } catch (jobErr) {
+      console.warn('[BE] Failed to start background jobs:', jobErr.message);
+    }
+
     app.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);
     });

@@ -433,37 +433,38 @@ class AdminUserRepositoryImpl {
       recentLogins = [];
     }
 
-    // System alerts (based on data anomalies)
-    const alerts = [];
-    if (users.lockedCount > 0) {
-      alerts.push({
-        id: 'locked-users',
-        type: 'warning',
-        title: 'Tai khoan bi khoa',
-        message: `${users.lockedCount} tai khoan bi khoa can xu ly`,
-        icon: 'lock',
-        time: new Date().toISOString(),
-      });
-    }
-    if (failedLogins > 10) {
-      alerts.push({
-        id: 'failed-logins',
-        type: 'danger',
-        title: 'Nhieu lan dang nhap that bai',
-        message: `${failedLogins} lan dang nhap that bai - kiem tra an ninh`,
-        icon: 'alert',
-        time: new Date().toISOString(),
-      });
-    }
-    if (users.inactiveCount > users.activeCount * 0.3) {
-      alerts.push({
-        id: 'inactive-users',
-        type: 'info',
-        title: 'Nhieu tai khoan khong hoat dong',
-        message: `${users.inactiveCount} tai khoan khong hoat dong`,
-        icon: 'user',
-        time: new Date().toISOString(),
-      });
+    // System alerts — REAL data from security_alerts table (max 5 recent unacknowledged)
+    let alerts = [];
+    try {
+      const alertsResult = await query(`
+        SELECT TOP 5
+          id, severity, title, message, user_id, created_at, rule_key
+        FROM security_alerts
+        WHERE is_acknowledged = 0
+        ORDER BY
+          CASE severity
+            WHEN 'critical' THEN 1
+            WHEN 'high'     THEN 2
+            WHEN 'medium'   THEN 3
+            WHEN 'info'     THEN 4
+          END ASC,
+          created_at DESC
+      `);
+      alerts = alertsResult.recordset.map((row) => ({
+        id: String(row.id),
+        type: row.severity === 'critical' ? 'danger' : row.severity === 'high' ? 'danger' : row.severity === 'medium' ? 'warning' : 'info',
+        title: row.title,
+        message: row.message,
+        severity: row.severity,
+        icon: row.rule_key === 'failed_login_burst' ? 'alert'
+            : row.rule_key === 'new_admin_role' ? 'shield'
+            : row.rule_key === 'inactive_admin' ? 'user'
+            : 'info',
+        time: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
+        alertId: row.id,
+      }));
+    } catch (_) {
+      alerts = [];
     }
 
     return {
