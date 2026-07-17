@@ -310,7 +310,7 @@ function AuditTable({ items, onViewUser, onViewLog }) {
           const resp = getResponseBadge(item.response_status);
           return (
             <tr key={item.id}>
-              <td className="admin-logs__date">{formatDate(item.logged_at)}</td>
+              <td className="audit-logs__date">{formatDate(item.logged_at)}</td>
               <td>
                 <div className="admin-logs__user-cell">
                   <span className="admin-logs__user-name">{item.user_name || '—'}</span>
