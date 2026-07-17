@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import './AdminLayout.css';
 
@@ -140,16 +140,34 @@ function getInitials(name = '') {
 export default function AdminLayout({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
 
   const currentPage = ADMIN_SIDEBAR.flatMap((g) => g.items).find((item) =>
     location.pathname === item.path || location.pathname.startsWith(item.path + '/')
   );
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleLogout = () => {
     logout();
-    window.location.href = '/login';
+    navigate('/login', { replace: true });
+  };
+
+  const handleProfileClick = () => {
+    setUserMenuOpen(false);
+    navigate('/admin/profile');
   };
 
   return (
@@ -238,7 +256,7 @@ export default function AdminLayout({ children }) {
           </div>
 
           <div className="admin-topbar__right">
-            <div className="admin-topbar__user" onClick={() => setUserMenuOpen((v) => !v)}>
+            <div className="admin-topbar__user" onClick={() => setUserMenuOpen((v) => !v)} ref={userMenuRef}>
               <div className="admin-topbar__avatar">{getInitials(user?.name || '')}</div>
               <div className="admin-topbar__user-info">
                 <span className="admin-topbar__user-name">{user?.name}</span>
@@ -260,7 +278,7 @@ export default function AdminLayout({ children }) {
                   <div className="admin-topbar__dropdown-divider"/>
                   <button
                     className="admin-topbar__dropdown-item"
-                    onClick={() => { window.location.href = '/admin/profile'; }}
+                    onClick={handleProfileClick}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>

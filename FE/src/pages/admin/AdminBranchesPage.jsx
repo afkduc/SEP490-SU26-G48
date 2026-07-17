@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminBranchesApi } from '../../services/adminApi';
+import { useToast } from '../../components/common/ToastContext';
 import './AdminBranchesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -415,6 +416,7 @@ function StatsModal({ branch, stats, onClose }) {
 // ─── Main Component ──────────────────────────────────────────────────
 
 export default function AdminBranchesPage() {
+  const toast = useToast();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -474,16 +476,18 @@ export default function AdminBranchesPage() {
     setDeactivateLoading(true);
     try {
       await adminBranchesApi.deactivate(deactivateTarget.id);
+      toast.success(`Chi nhánh "${deactivateTarget.branchName}" đã được ngưng hoạt động`);
       setDeactivateTarget(null);
       loadData();
     } catch (err) {
-      alert(err.message || 'Lỗi khi ngưng hoạt động chi nhánh');
+      toast.error(err.message || 'Lỗi khi ngưng hoạt động chi nhánh');
     } finally {
       setDeactivateLoading(false);
     }
   }
 
   function handleFormSuccess() {
+    toast.success(editBranch ? 'Cập nhật chi nhánh thành công' : 'Tạo chi nhánh mới thành công');
     setShowForm(false);
     setEditBranch(null);
     loadData();
