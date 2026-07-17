@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
 import AppLayout from '../components/layout/AppLayout';
@@ -71,105 +71,27 @@ function AppRoutes() {
 
         {/* Admin */}
         <Route
-          path="/admin/dashboard"
+          path="/admin"
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
               <AdminLayout>
-                <AdminDashboardPage />
+                <Outlet />
               </AdminLayout>
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminUsersPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/branches"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminBranchesPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/roles"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminRolesPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/devices"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminDevicesPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/specialties"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminSpecialtiesPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/logs"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AuditLogsPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/login-sessions"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <LoginSessionsPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/profile"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminProfilePage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/profile/notifications"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminProfileNotificationsPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="branches" element={<AdminBranchesPage />} />
+          <Route path="roles" element={<AdminRolesPage />} />
+          <Route path="devices" element={<AdminDevicesPage />} />
+          <Route path="specialties" element={<AdminSpecialtiesPage />} />
+          <Route path="logs" element={<AuditLogsPage />} />
+          <Route path="login-sessions" element={<LoginSessionsPage />} />
+          <Route path="profile" element={<AdminProfilePage />} />
+          <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
+        </Route>
         {/* General Director settlement reports */}
                 <Route
                   path="/general-director/*"

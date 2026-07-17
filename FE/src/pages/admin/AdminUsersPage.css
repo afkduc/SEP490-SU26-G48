@@ -1,63 +1,4 @@
-/* AdminUsersPage — extends AdminShared.css */
-@import './AdminShared.css';
-
-/* ── Page-specific overrides ── */
-.admin-users__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 28px;
-  gap: 20px;
-}
-
-.admin-users__title-icon {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
-}
-
-.admin-users__title-group h1 {
-  font-size: 1.5rem;
-  letter-spacing: -0.3px;
-}
-
-.admin-users__total-badge {
-  font-size: 0.8rem;
-  color: #64748b;
-  background: #f1f5f9;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: 500;
-}
-
-.filter-card {
-  margin-bottom: 20px;
-}
-
-.table-card__header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.table-card__title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #0f172a;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.table-card__title::before {
-  content: '';
-  display: inline-block;
-  width: 3px;
-  height: 14px;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  border-radius: 2px;
-}
+/* AdminUsersPage — extends AdminShared.css (already imported globally) */
 
 /* ── Name column ── */
 .user-name-cell {
@@ -165,10 +106,4 @@
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.8rem;
   color: #64748b;
-}
-
-@media (max-width: 768px) {
-  .filter-row .input--search {
-    min-width: 100%;
-  }
 }

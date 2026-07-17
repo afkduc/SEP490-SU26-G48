@@ -379,16 +379,16 @@ export default function AdminLoginSessionsPage() {
   }
 
   return (
-    <div className="admin-sessions">
+    <div className="admin-page">
       {/* Header */}
-      <div className="admin-sessions__header">
-        <div className="admin-sessions__title-block">
-          <div className="admin-sessions__title-icon">
+      <div className="admin-page__header">
+        <div className="admin-page__title-block">
+          <div className="admin-page__title-icon" style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)', boxShadow: '0 6px 20px rgba(8, 145, 178, 0.35)' }}>
             <IconSession />
           </div>
-          <div className="admin-sessions__title-group">
+          <div className="admin-page__title-group">
             <h1>Lịch sử đăng nhập</h1>
-            <p className="admin-sessions__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
+            <p className="admin-page__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
           </div>
         </div>
       </div>
