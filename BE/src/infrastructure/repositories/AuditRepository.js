@@ -29,11 +29,16 @@ const LOGIN_SESSION_COLUMNS = `
   ls.action_type,
   ls.ip_address,
   ls.user_agent,
+  ls.browser,
+  ls.os,
   ls.login_time,
   ls.logout_time,
   ls.session_duration_seconds,
+  ls.logout_reason,
+  ls.failure_reason,
   ls.branch_id,
-  ls.status
+  ls.status,
+  b.branch_name
 `;
 
 function toAuditLogRow(row) {
@@ -69,10 +74,15 @@ function toLoginSessionRow(row) {
     action_type: row.action_type,
     ip_address: row.ip_address,
     user_agent: row.user_agent,
+    browser: row.browser,
+    os: row.os,
     login_time: row.login_time,
     logout_time: row.logout_time,
     session_duration_seconds: row.session_duration_seconds,
+    logout_reason: row.logout_reason,
+    failure_reason: row.failure_reason,
     branch_id: row.branch_id,
+    branch_name: row.branch_name,
     status: row.status,
   };
 }
@@ -409,6 +419,7 @@ async function getLoginSessions(filters = {}) {
   const dataResult = await query(
     `SELECT ${LOGIN_SESSION_COLUMNS}
      FROM   login_sessions ls
+     LEFT   JOIN branches b ON b.id = ls.branch_id
      WHERE  ${whereClause}
      ORDER  BY ls.login_time DESC, ls.id DESC
      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY`,
@@ -418,6 +429,21 @@ async function getLoginSessions(filters = {}) {
   const items = dataResult.recordset.map(toLoginSessionRow);
 
   return { total, page: safePage, pageSize: safePageSize, items };
+}
+
+async function getLoginSessionsSince(sinceDate, limit = 50) {
+  const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 50, 200));
+  const result = await query(
+    `SELECT ${LOGIN_SESSION_COLUMNS}
+     FROM   login_sessions ls
+     LEFT   JOIN branches b ON b.id = ls.branch_id
+     WHERE  ls.login_time  > @p1
+        OR  ls.logout_time > @p1
+     ORDER  BY COALESCE(ls.logout_time, ls.login_time) DESC, ls.id DESC
+     OFFSET 0 ROWS FETCH NEXT @p2 ROWS ONLY`,
+    { p1: sinceDate, p2: safeLimit }
+  );
+  return result.recordset.map(toLoginSessionRow);
 }
 
 async function getEntityDefinitions() {
@@ -452,6 +478,7 @@ module.exports = {
   getAuditLogs,
   getAuditLogsForExport,
   getLoginSessions,
+  getLoginSessionsSince,
   getEntityDefinitions,
   getAuditLogsByUser,
 };
