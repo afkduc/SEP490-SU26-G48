@@ -10,6 +10,10 @@ const UserRoleRepositoryImpl = require('../../infrastructure/repositories/UserRo
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
 const { exportUsersToExcel } = require('../../utils/excelExporter');
+const BranchService = require('../../application/services/BranchService');
+const DeviceService = require('../../application/services/DeviceService');
+const SpecialtyService = require('../../application/services/SpecialtyService');
+const SecurityAlertService = require('../../application/services/SecurityAlertService');
 
 class AdminController {
   constructor() {
@@ -24,13 +28,48 @@ class AdminController {
     this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo });
 
     this.auditService = new AuditService(AuditRepository);
+    this.branchService = new BranchService();
+    this.deviceService = new DeviceService();
+    this.specialtyService = new SpecialtyService();
+    this.securityAlertService = new SecurityAlertService();
 
     this.getDashboardStats = this.getDashboardStats.bind(this);
     this.listUsers = this.listUsers.bind(this);
     this.exportUsers = this.exportUsers.bind(this);
     this.listBranches = this.listBranches.bind(this);
+    this.listBranchesFull = this.listBranchesFull.bind(this);
+    this.getBranchDetail = this.getBranchDetail.bind(this);
+    this.getBranchStats = this.getBranchStats.bind(this);
+    this.getManagerCandidates = this.getManagerCandidates.bind(this);
+    this.createBranch = this.createBranch.bind(this);
+    this.updateBranch = this.updateBranch.bind(this);
+    this.deactivateBranch = this.deactivateBranch.bind(this);
+    this.reactivateBranch = this.reactivateBranch.bind(this);
     this.listRoles = this.listRoles.bind(this);
     this.getRoleDetail = this.getRoleDetail.bind(this);
+    this.listPermissions = this.listPermissions.bind(this);
+    this.getRolePermissions = this.getRolePermissions.bind(this);
+    this.setRolePermissions = this.setRolePermissions.bind(this);
+    this.getRoleUsers = this.getRoleUsers.bind(this);
+    this.createRole = this.createRole.bind(this);
+    this.updateRole = this.updateRole.bind(this);
+    this.deleteRole = this.deleteRole.bind(this);
+    this.listDevices = this.listDevices.bind(this);
+    this.listUserDevices = this.listUserDevices.bind(this);
+    this.forceLogoutDevice = this.forceLogoutDevice.bind(this);
+    this.forceLogoutAllOtherDevices = this.forceLogoutAllOtherDevices.bind(this);
+    this.listSpecialties = this.listSpecialties.bind(this);
+    this.createSpecialty = this.createSpecialty.bind(this);
+    this.updateSpecialty = this.updateSpecialty.bind(this);
+    this.deleteSpecialty = this.deleteSpecialty.bind(this);
+    this.getUserSpecialties = this.getUserSpecialties.bind(this);
+    this.setUserSpecialties = this.setUserSpecialties.bind(this);
+    this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
+    this.acknowledgeAlert = this.acknowledgeAlert.bind(this);
+    this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
+    this.acknowledgeAlert = this.acknowledgeAlert.bind(this);
+    this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
+    this.acknowledgeAlertCounts = this.acknowledgeAlertCounts.bind(this);
     this.getUserRoles = this.getUserRoles.bind(this);
     this.assignRoles = this.assignRoles.bind(this);
     this.revokeRole = this.revokeRole.bind(this);
@@ -86,6 +125,7 @@ class AdminController {
     }
   };
 
+  // Branches
   listBranches = async (req, res, next) => {
     try {
       const result = await this.adminUserService.listBranches();
@@ -95,7 +135,79 @@ class AdminController {
     }
   };
 
-  // UC-11: list all roles with user count
+  listBranchesFull = async (req, res, next) => {
+    try {
+      const branches = await this.branchService.list();
+      return success(res, { items: branches, total: branches.length }, 'Danh sach chi nhanh (admin)');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getBranchDetail = async (req, res, next) => {
+    try {
+      const branch = await this.branchService.getById(req.params.id);
+      return success(res, branch, 'Chi tiet chi nhanh');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getBranchStats = async (req, res, next) => {
+    try {
+      const stats = await this.branchService.getStats(req.params.id);
+      return success(res, stats, 'Thong ke chi nhanh');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getManagerCandidates = async (req, res, next) => {
+    try {
+      const result = await this.branchService.getManagerCandidates();
+      return success(res, result, 'Danh sach ung vien lam quan ly');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createBranch = async (req, res, next) => {
+    try {
+      const branch = await this.branchService.create(req.body);
+      return success(res, branch, 'Tao chi nhanh thanh cong', 201);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateBranch = async (req, res, next) => {
+    try {
+      const branch = await this.branchService.update(req.params.id, req.body);
+      return success(res, branch, 'Cap nhat chi nhanh thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  deactivateBranch = async (req, res, next) => {
+    try {
+      const branch = await this.branchService.deactivate(req.params.id);
+      return success(res, branch, 'Ngung hoat dong chi nhanh');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  reactivateBranch = async (req, res, next) => {
+    try {
+      const branch = await this.branchService.reactivate(req.params.id);
+      return success(res, branch, 'Kich hoat lai chi nhanh');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Roles (UC-11)
   listRoles = async (req, res, next) => {
     try {
       const result = await this.roleService.listRoles();
@@ -110,6 +222,219 @@ class AdminController {
     try {
       const role = await this.roleService.getRoleDetail(req.params.id);
       return success(res, role, 'Chi tiet role');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // UC-11: list all permissions
+  listPermissions = async (req, res, next) => {
+    try {
+      const permissions = await this.roleService.listPermissions();
+      return success(res, { items: permissions, total: permissions.length }, 'Danh sach quyen');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // UC-11: get permissions of a role
+  getRolePermissions = async (req, res, next) => {
+    try {
+      const permissions = await this.roleService.getRolePermissions(req.params.id);
+      return success(res, { items: permissions, total: permissions.length }, 'Quyen cua vai tro');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // UC-11: set permissions for a role
+  setRolePermissions = async (req, res, next) => {
+    try {
+      const { permissionIds } = req.body;
+      const permissions = await this.roleService.setRolePermissions(
+        req.params.id,
+        Array.isArray(permissionIds) ? permissionIds.map(Number) : []
+      );
+      return success(res, { items: permissions, total: permissions.length }, 'Cap nhat quyen vai tro thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // UC-11: get users having a role
+  getRoleUsers = async (req, res, next) => {
+    try {
+      const users = await this.roleService.getRoleUsers(req.params.id);
+      return success(res, { items: users, total: users.length }, 'Nguoi dung co vai tro nay');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // UC-11: create role
+  createRole = async (req, res, next) => {
+    try {
+      const { roleName, roleLabel } = req.body;
+      const role = await this.roleService.createRole({ roleName, roleLabel });
+      return success(res, role, 'Tao vai tro thanh cong', 201);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // UC-11: update role
+  updateRole = async (req, res, next) => {
+    try {
+      const { roleLabel } = req.body;
+      const role = await this.roleService.updateRole(req.params.id, { roleLabel });
+      return success(res, role, 'Cap nhat vai tro thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // UC-11: delete role
+  deleteRole = async (req, res, next) => {
+    try {
+      const result = await this.roleService.deleteRole(req.params.id);
+      return success(res, result, 'Xoa vai tro thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Devices
+  listDevices = async (req, res, next) => {
+    try {
+      const { userId, search, page, pageSize } = req.query;
+      const result = await this.deviceService.listAll({
+        userId,
+        search,
+        page: page ? Number(page) : 1,
+        pageSize: pageSize ? Number(pageSize) : 20,
+      });
+      return success(res, result, 'Danh sach thiet bi');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listUserDevices = async (req, res, next) => {
+    try {
+      const devices = await this.deviceService.listByUser(req.params.userId);
+      return success(res, { items: devices, total: devices.length }, 'Thiet bi cua nguoi dung');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  forceLogoutDevice = async (req, res, next) => {
+    try {
+      const result = await this.deviceService.forceLogoutDevice(req.params.deviceId);
+      return success(res, result, 'Da dang xuat khoi thiet bi');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  forceLogoutAllOtherDevices = async (req, res, next) => {
+    try {
+      const { userId, currentDeviceId } = req.params;
+      const result = await this.deviceService.forceLogoutAllOtherDevices(userId, currentDeviceId);
+      return success(res, result, 'Da dang xuat tat ca thiet bi khac');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Specialties
+  listSpecialties = async (req, res, next) => {
+    try {
+      const specialties = await this.specialtyService.list();
+      return success(res, { items: specialties, total: specialties.length }, 'Danh sach chuyen mon');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createSpecialty = async (req, res, next) => {
+    try {
+      const specialty = await this.specialtyService.create(req.body);
+      return success(res, specialty, 'Tao chuyen mon thanh cong', 201);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateSpecialty = async (req, res, next) => {
+    try {
+      const specialty = await this.specialtyService.update(req.params.id, req.body);
+      return success(res, specialty, 'Cap nhat chuyen mon thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  deleteSpecialty = async (req, res, next) => {
+    try {
+      const result = await this.specialtyService.delete(req.params.id);
+      return success(res, result, 'Xoa chuyen mon thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getUserSpecialties = async (req, res, next) => {
+    try {
+      const specialties = await this.specialtyService.getUserSpecialties(req.params.userId);
+      return success(res, { items: specialties, total: specialties.length }, 'Chuyen mon cua nguoi dung');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setUserSpecialties = async (req, res, next) => {
+    try {
+      const { specialtyIds } = req.body;
+      const specialties = await this.specialtyService.setUserSpecialties(
+        req.params.userId,
+        Array.isArray(specialtyIds) ? specialtyIds.map(Number) : []
+      );
+      return success(res, { items: specialties, total: specialties.length }, 'Cap nhat chuyen mon nguoi dung thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Security Alerts
+  listSecurityAlerts = async (req, res, next) => {
+    try {
+      const { severity, isAcknowledged, page, pageSize } = req.query;
+      const result = await this.securityAlertService.list({
+        severity,
+        isAcknowledged: isAcknowledged !== undefined ? isAcknowledged === 'true' : undefined,
+        page: page ? Number(page) : 1,
+        pageSize: pageSize ? Number(pageSize) : 20,
+      });
+      return success(res, result, 'Danh sach canh bao bao mat');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  acknowledgeAlert = async (req, res, next) => {
+    try {
+      const alert = await this.securityAlertService.acknowledge(req.params.id, req.user?.id);
+      return success(res, alert, 'Da xu ly canh bao');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  acknowledgeAlertCounts = async (req, res, next) => {
+    try {
+      const counts = await this.securityAlertService.getCounts();
+      return success(res, counts, 'So luong canh bao');
     } catch (err) {
       next(err);
     }

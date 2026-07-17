@@ -94,24 +94,68 @@ class AdminUsersApi {
 const adminUsersApi = new AdminUsersApi();
 
 /**
- * Admin Branches API (dropdown filter)
- *   - list(): GET /api/admin/branches
- *     tra ve: { items: [{id, branchName}], total }
+ * Admin Branches API
+ *   - list():           GET /api/admin/branches (dropdown - chi tra ve id + branchName)
+ *   - listFull():      GET /api/admin/branches/full (admin page - tra ve thong tin day du)
+ *   - getDetail(id):   GET /api/admin/branches/:id
+ *   - getStats(id):    GET /api/admin/branches/:id/stats
+ *   - getManagerCandidates(): GET /api/admin/branches/manager-candidates
+ *   - create(payload):  POST /api/admin/branches
+ *   - update(id, payload): PUT /api/admin/branches/:id
+ *   - deactivate(id):  PATCH /api/admin/branches/:id/deactivate
+ *   - reactivate(id): PATCH /api/admin/branches/:id/reactivate
  */
 class AdminBranchesApi {
   list() {
     return httpClient.get('/admin/branches');
+  }
+
+  listFull() {
+    return httpClient.get('/admin/branches/full');
+  }
+
+  getDetail(id) {
+    return httpClient.get(`/admin/branches/${id}`);
+  }
+
+  getStats(id) {
+    return httpClient.get(`/admin/branches/${id}/stats`);
+  }
+
+  getManagerCandidates() {
+    return httpClient.get('/admin/branches/manager-candidates');
+  }
+
+  create(payload) {
+    return httpClient.post('/admin/branches', payload);
+  }
+
+  update(id, payload) {
+    return httpClient.put(`/admin/branches/${id}`, payload);
+  }
+
+  deactivate(id) {
+    return httpClient.patch(`/admin/branches/${id}/deactivate`);
+  }
+
+  reactivate(id) {
+    return httpClient.patch(`/admin/branches/${id}/reactivate`);
   }
 }
 
 const adminBranchesApi = new AdminBranchesApi();
 
 /**
- * Admin Roles API (UC-11 + UC-12)
- *   - list():         GET /api/admin/roles
- *     tra ve: { items: [{id, roleName, roleLabel, description, isActive, userCount}], total }
- *   - getDetail(id):  GET /api/admin/roles/:id
- *     tra ve: { id, roleName, roleLabel, description, isActive, userCount }
+ * Admin Roles API (UC-11)
+ *   - list():                    GET /api/admin/roles
+ *   - getDetail(id):            GET /api/admin/roles/:id
+ *   - create(payload):          POST /api/admin/roles
+ *   - update(id, payload):      PUT /api/admin/roles/:id
+ *   - delete(id):               DELETE /api/admin/roles/:id
+ *   - listPermissions():         GET /api/admin/permissions
+ *   - getRolePermissions(id):    GET /api/admin/roles/:id/permissions
+ *   - setRolePermissions(id, permIds[]): PUT /api/admin/roles/:id/permissions
+ *   - getRoleUsers(id):         GET /api/admin/roles/:id/users
  */
 class AdminRolesApi {
   list() {
@@ -120,6 +164,34 @@ class AdminRolesApi {
 
   getDetail(id) {
     return httpClient.get(`/admin/roles/${id}`);
+  }
+
+  create(payload) {
+    return httpClient.post('/admin/roles', payload);
+  }
+
+  update(id, payload) {
+    return httpClient.put(`/admin/roles/${id}`, payload);
+  }
+
+  delete(id) {
+    return httpClient.delete(`/admin/roles/${id}`);
+  }
+
+  listPermissions() {
+    return httpClient.get('/admin/permissions');
+  }
+
+  getRolePermissions(id) {
+    return httpClient.get(`/admin/roles/${id}/permissions`);
+  }
+
+  setRolePermissions(id, permissionIds) {
+    return httpClient.put(`/admin/roles/${id}/permissions`, { permissionIds });
+  }
+
+  getRoleUsers(id) {
+    return httpClient.get(`/admin/roles/${id}/users`);
   }
 }
 
@@ -192,3 +264,95 @@ export {
   adminUserRolesApi,
   adminLoginSessionsApi,
 };
+
+/**
+ * Admin Devices API
+ *   - list(params):     GET /api/admin/devices
+ *   - listByUser(id): GET /api/admin/devices/user/:id
+ *   - forceLogout(deviceId): DELETE /api/admin/devices/:deviceId
+ *   - forceLogoutOthers(userId, currentDeviceId): DELETE /api/admin/devices/user/:userId/others
+ */
+class AdminDevicesApi {
+  list(params = {}) {
+    return httpClient.get(`/admin/devices${buildQuery(params)}`);
+  }
+
+  listByUser(userId) {
+    return httpClient.get(`/admin/devices/user/${userId}`);
+  }
+
+  forceLogout(deviceId) {
+    return httpClient.delete(`/admin/devices/${deviceId}`);
+  }
+
+  forceLogoutOthers(userId, currentDeviceId) {
+    return httpClient.delete(`/admin/devices/user/${userId}/others?currentDeviceId=${currentDeviceId || ''}`);
+  }
+}
+
+const adminDevicesApi = new AdminDevicesApi();
+
+export { AdminDevicesApi, adminDevicesApi };
+
+/**
+ * Admin Specialties API
+ *   - list():              GET /api/admin/specialties
+ *   - create(payload):    POST /api/admin/specialties
+ *   - update(id, payload): PUT /api/admin/specialties/:id
+ *   - delete(id):         DELETE /api/admin/specialties/:id
+ *   - getUserSpecialties(userId): GET /api/admin/users/:userId/specialties
+ *   - setUserSpecialties(userId, ids[]): PUT /api/admin/users/:userId/specialties
+ */
+class AdminSpecialtiesApi {
+  list() {
+    return httpClient.get('/admin/specialties');
+  }
+
+  create(payload) {
+    return httpClient.post('/admin/specialties', payload);
+  }
+
+  update(id, payload) {
+    return httpClient.put(`/admin/specialties/${id}`, payload);
+  }
+
+  delete(id) {
+    return httpClient.delete(`/admin/specialties/${id}`);
+  }
+
+  getUserSpecialties(userId) {
+    return httpClient.get(`/admin/users/${userId}/specialties`);
+  }
+
+  setUserSpecialties(userId, specialtyIds) {
+    return httpClient.put(`/admin/users/${userId}/specialties`, { specialtyIds });
+  }
+}
+
+const adminSpecialtiesApi = new AdminSpecialtiesApi();
+
+export { AdminSpecialtiesApi, adminSpecialtiesApi };
+
+/**
+ * Admin Security Alerts API
+ *   - list(params):   GET /api/admin/security-alerts
+ *   - getCounts():    GET /api/admin/security-alerts/counts
+ *   - ack(id):        PATCH /api/admin/security-alerts/:id/ack
+ */
+class AdminSecurityAlertsApi {
+  list(params = {}) {
+    return httpClient.get(`/admin/security-alerts${buildQuery(params)}`);
+  }
+
+  getCounts() {
+    return httpClient.get('/admin/security-alerts/counts');
+  }
+
+  ack(alertId) {
+    return httpClient.patch(`/admin/security-alerts/${alertId}/ack`);
+  }
+}
+
+const adminSecurityAlertsApi = new AdminSecurityAlertsApi();
+
+export { AdminSecurityAlertsApi, adminSecurityAlertsApi };

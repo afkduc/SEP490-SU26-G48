@@ -17,7 +17,11 @@ const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralD
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
+const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
+const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
+const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
+const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -78,6 +82,46 @@ function AppRoutes() {
             <ProtectedRoute roles={[ROLES.ADMIN]}>
               <AdminLayout>
                 <AdminUsersPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/branches"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AdminBranchesPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/roles"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AdminRolesPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/devices"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AdminDevicesPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/specialties"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <AdminLayout>
+                <AdminSpecialtiesPage />
               </AdminLayout>
             </ProtectedRoute>
           }
