@@ -77,6 +77,19 @@ class AuditService {
     });
   }
 
+  async getLoginSessionsSince(since, limit = 50) {
+    const sinceDate = since ? new Date(since) : new Date(Date.now() - 60 * 1000);
+    if (Number.isNaN(sinceDate.getTime())) {
+      throw new ApiError(400, 'since phai la ISO date hoac unix ms');
+    }
+    const parsedLimit = parseInt(limit, 10) || 50;
+    if (parsedLimit < 1 || parsedLimit > 200) {
+      throw new ApiError(400, 'limit phai tu 1 den 200');
+    }
+    const items = await this.auditRepository.getLoginSessionsSince(sinceDate, parsedLimit);
+    return { items, since: sinceDate.toISOString(), serverTime: new Date().toISOString() };
+  }
+
   async getEntityDefinitions() {
     return this.auditRepository.getEntityDefinitions();
   }

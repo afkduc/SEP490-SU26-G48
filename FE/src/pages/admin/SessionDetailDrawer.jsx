@@ -16,14 +16,12 @@ const STATUS_LABELS = {
 
 function formatDateTime(value) {
   if (!value) return '—';
-  try {
-    return new Date(value).toLocaleString('vi-VN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    });
-  } catch {
-    return value;
-  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
 }
 
 function formatDuration(seconds) {
@@ -43,10 +41,10 @@ function formatDuration(seconds) {
 function parseBrowser(ua) {
   if (!ua) return { name: '—', version: '', full: '' };
   const regexes = [
+    { name: 'Edge', re: /Edg\/([\d.]+)/ },
     { name: 'Chrome', re: /Chrome\/([\d.]+)/ },
     { name: 'Firefox', re: /Firefox\/([\d.]+)/ },
     { name: 'Safari', re: /Safari\/([\d.]+)/ },
-    { name: 'Edge', re: /Edg\/([\d.]+)/ },
     { name: 'Opera', re: /OPR\/([\d.]+)/ },
   ];
   for (const { name, re } of regexes) {
@@ -132,8 +130,11 @@ export default function SessionDetailDrawer({ session, onClose }) {
 
   const fullName = session.user_name || 'Người dùng';
   const phone = session.phone_number || '';
-  const browser = parseBrowser(session.user_agent);
-  const os = parseOs(session.user_agent);
+  // Uu tien browser/os da duoc BE parse san. Chi fallback parse UA neu BE chua co.
+  const browser = session.browser
+    ? { name: session.browser, version: '', full: session.user_agent || '' }
+    : parseBrowser(session.user_agent);
+  const os = session.os || parseOs(session.user_agent);
   const device = parseDevice(session.user_agent);
   // tick được dùng để ép re-render mỗi giây cho phiên active
   void tick;

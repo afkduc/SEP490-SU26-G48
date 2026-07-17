@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { loginApi } from '../services/authApi';
+import { loginApi, logoutApi } from '../services/authApi';
 import { ROLES } from '../constants/roles';
 
 const AppContext = createContext(null);
@@ -67,7 +67,15 @@ export function AppProvider({ children }) {
     return result;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Goi API logout truoc (fire-and-forget) de BE trackLogout cap nhat
+    // status = 'ended' + logout_time + session_duration_seconds cho phien dang nhap.
+    // Loi API (vd het token) van cho logout local de user khong bi ket.
+    try {
+      await logoutApi();
+    } catch (e) {
+      console.warn('[AppContext] logout API failed (tiep tuc logout local):', e?.message);
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     sessionStorage.removeItem('token');

@@ -238,6 +238,11 @@ class AdminLoginSessionsApi {
   list(params = {}) {
     return httpClient.get(`/audit/login-sessions${buildQuery(params)}`);
   }
+  // Realtime polling - lay cac session moi tu moc since (ISO date hoac unix ms)
+  recent(since) {
+    const sinceMs = typeof since === 'number' ? new Date(since).toISOString() : since;
+    return httpClient.get(`/admin/login-sessions/recent?since=${encodeURIComponent(sinceMs || '')}&limit=50`);
+  }
 }
 
 const adminLoginSessionsApi = new AdminLoginSessionsApi();
