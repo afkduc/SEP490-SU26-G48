@@ -345,21 +345,6 @@ function BranchCard({ branch, onEdit, onDeactivate, onStats }) {
         </div>
       </div>
 
-      <div className="branch-card__stats">
-        <div className="branch-card__stat">
-          <span className="branch-card__stat-value">{stats?.userCount ?? '—'}</span>
-          <span className="branch-card__stat-label">Nhân viên</span>
-        </div>
-        <div className="branch-card__stat">
-          <span className="branch-card__stat-value">{stats?.orderCount ?? '—'}</span>
-          <span className="branch-card__stat-label">Đơn hàng</span>
-        </div>
-        <div className="branch-card__stat">
-          <span className="branch-card__stat-value">{stats?.revenue30Days != null ? formatCurrency(stats.revenue30Days) : '—'}</span>
-          <span className="branch-card__stat-label">Doanh thu 30d</span>
-        </div>
-      </div>
-
       <div className="branch-card__actions">
         <button className="btn btn--sm btn--secondary" onClick={() => onStats(branch)} title="Xem thống kê">
           <IconRefresh />
