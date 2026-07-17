@@ -3,6 +3,7 @@ const ApiError = require('../../utils/ApiError');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^(0[0-9]{9,10})$/;
+const PASSWORD_MIN_LENGTH = 6;
 
 class AdminUserService {
   constructor({ adminUserRepository }) {
@@ -179,12 +180,31 @@ class AdminUserService {
   }
 
   /**
+   * Validate mat khau nhap tay. Reuse rule tu createUser:
+   *   - khong rong
+   *   - do dai toi thieu PASSWORD_MIN_LENGTH
+   *   - chi trim khoang trang 2 dau, khong trim ben trong
+   */
+  validateManualPassword(rawPassword) {
+    if (rawPassword === undefined || rawPassword === null || rawPassword === '') {
+      throw new ApiError(400, 'Mat khau moi la bat buoc khi chon che do nhap tay');
+    }
+    const password = String(rawPassword).trim();
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      throw new ApiError(400, `Mat khau phai co it nhat ${PASSWORD_MIN_LENGTH} ky tu`);
+    }
+    return password;
+  }
+
+  /**
    * Admin reset mat khau cho user
-   * - Generate MK ngau nhien, hash bcrypt, luu DB
-   * - Dat must_change_password = true de user phai doi MK lan dang nhap sau
+   * - Co 2 che do:
+   *   + newPassword duoc cung cap: dung MK do (admin nhap tay)
+   *   + newPassword khong cung cap: generate MK ngau nhien 12 ky tu (hoa+thuong+so+dac biet)
+   * - Hash bcrypt, luu DB, dat must_change_password theo flag
    * - Tra ve MK plain text 1 lan duy nhat (controller se gui cho FE)
    */
-  async resetPassword({ userId, mustChangePassword = true }) {
+  async resetPassword({ userId, mustChangePassword = true, newPassword } = {}) {
     if (!userId) {
       throw new ApiError(400, 'userId la bat buoc');
     }
@@ -198,8 +218,17 @@ class AdminUserService {
     // Khong reset MK cho chinh admin dang thuc hien (tranh tu khoa tai khoan)
     // (Controller se xu ly truong hop nay neu can, o service chi check don gian)
 
-    // Generate MK plain text
-    const plainPassword = this.generateRandomPassword();
+    // Quyet dinh MK plain text:
+    //   - newPassword undefined/empty -> random
+    //   - newPassword co gia tri -> validate + dung MK do
+    let plainPassword;
+    let isManual = false;
+    if (newPassword !== undefined && newPassword !== null && newPassword !== '') {
+      plainPassword = this.validateManualPassword(newPassword);
+      isManual = true;
+    } else {
+      plainPassword = this.generateRandomPassword();
+    }
 
     // Hash MK
     const passwordHash = bcrypt.hashSync(plainPassword, 10);
@@ -218,8 +247,11 @@ class AdminUserService {
     return {
       userId: Number(userId),
       newPassword: plainPassword, // plain text - chi tra 1 lan
+      isManual,
       mustChangePassword: Boolean(mustChangePassword),
-      message: mustChangePassword
+      message: isManual
+        ? 'Mat khau moi da duoc dat theo gia tri admin nhap.'
+        : mustChangePassword
         ? 'Mat khau da duoc dat lai. User phai doi mat khau khi dang nhap lan sau.'
         : 'Mat khau da duoc dat lai thanh cong.',
     };

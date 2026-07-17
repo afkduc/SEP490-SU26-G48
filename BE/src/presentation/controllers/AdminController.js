@@ -176,10 +176,12 @@ class AdminController {
 
       // `mustChangePassword` mac dinh true (co the client override qua body)
       const mustChangePassword = req.body?.mustChangePassword !== false;
+      const newPassword = req.body?.newPassword;
 
       const result = await this.adminUserService.resetPassword({
         userId: targetUserId,
         mustChangePassword,
+        newPassword,
       });
       return success(res, result, result.message);
     } catch (err) {
