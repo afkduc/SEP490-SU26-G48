@@ -16,6 +16,7 @@ class RepairOrder {
     this.vehicleId = data.vehicleId ?? null;
     this.createdBy = data.createdBy ?? null;
     this.createdByName = data.createdByName ?? null;
+    this.advisorId = data.advisorId ?? null; // co van dich vu cua phieu quyet toan goc (service_orders.advisor_id)
     this.status = data.status ?? 'inprogress';
     this.notes = data.notes ?? null;
     this.createdAt = data.createdAt ?? null;
@@ -41,6 +42,7 @@ class RepairOrder {
       vehicleId: headerRow.vehicle_id,
       createdBy: headerRow.created_by,
       createdByName: headerRow.created_by_name,
+      advisorId: headerRow.advisor_id,
       status: headerRow.status,
       notes: headerRow.notes,
       createdAt: headerRow.created_at,

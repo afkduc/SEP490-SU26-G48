@@ -8,14 +8,17 @@ class RepairOrderService {
     this.repairOrderRepository = repairOrderRepository;
   }
 
-  async getAll({ branchId } = {}) {
-    const items = await this.repairOrderRepository.findAll({ branchId });
+  async getAll({ branchId, advisorId } = {}) {
+    const items = await this.repairOrderRepository.findAll({ branchId, advisorId });
     return RepairOrderResponseDto.fromEntityList(items);
   }
 
-  async getById(id) {
+  async getById(id, { requesterId, isServiceAdvisor } = {}) {
     const entity = await this.repairOrderRepository.findById(id);
     if (!entity) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
+    if (isServiceAdvisor && String(entity.advisorId) !== String(requesterId)) {
+      throw new ApiError(403, 'Bạn không có quyền xem lệnh sửa chữa của cố vấn dịch vụ khác');
+    }
     return RepairOrderResponseDto.fromEntity(entity);
   }
 
