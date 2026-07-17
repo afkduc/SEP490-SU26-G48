@@ -38,6 +38,26 @@ class AdminUserService {
     return result;
   }
 
+  /**
+   * Lay full users theo filter (khong phan trang) de xuat Excel.
+   * Tuong thich bo loc voi listUsers, chi khac la tra ve tat ca rows.
+   */
+  async exportUsers({ search, branchId, roleId, status } = {}) {
+    const VALID_STATUSES = ['active', 'inactive', 'locked'];
+    if (status && !VALID_STATUSES.includes(status)) {
+      throw new ApiError(400, 'status khong hop le: active, inactive, locked');
+    }
+
+    const result = await this.adminUserRepository.findAllForExport({
+      search: search?.trim(),
+      branchId: branchId ? Number(branchId) : undefined,
+      roleId: roleId?.trim(),
+      status,
+    });
+
+    return result;
+  }
+
   async listBranches() {
     const branches = await this.adminUserRepository.findAllBranches();
     return { items: branches, total: branches.length };

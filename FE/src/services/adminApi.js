@@ -1,4 +1,6 @@
 ﻿import httpClient from './httpClient';
+import { API_BASE_URL } from '../config';
+import { fetchBlob } from '../utils/downloadBlob';
 
 /**
  * Legacy named exports (giu de backward compat voi code cu)
@@ -76,6 +78,16 @@ class AdminUsersApi {
       body.newPassword = newPassword;
     }
     return httpClient.post(`/admin/users/${userId}/reset-password`, body);
+  }
+
+  /**
+   * Xuat danh sach nguoi dung ra file Excel (.xlsx) theo filter hien tai.
+   * Tra ve Blob (tuong thich voi downloadBlob utility).
+   * BE se set Content-Disposition de lay ten file users_YYYYMMDD.xlsx.
+   */
+  exportUsers(params = {}) {
+    const path = `${API_BASE_URL}/admin/users/export${buildQuery(params)}`;
+    return fetchBlob(path);
   }
 }
 

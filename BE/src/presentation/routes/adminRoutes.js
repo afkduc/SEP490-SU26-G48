@@ -34,6 +34,7 @@ function buildAdminRouter() {
 
   // Users
   router.get('/users', validateListUsersQuery, controller.listUsers);
+  router.get('/users/export', controller.exportUsers);
   router.get('/users/:id', controller.getUserDetail);
   router.post('/users', controller.createUser);
   router.put('/users/:id', controller.updateUser);

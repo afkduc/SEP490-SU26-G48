@@ -7,6 +7,9 @@ const RoleService = require('../../application/services/RoleService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const UserRoleService = require('../../application/services/UserRoleService');
 const UserRoleRepositoryImpl = require('../../infrastructure/repositories/UserRoleRepositoryImpl');
+const AuditService = require('../../application/services/AuditService');
+const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
+const { exportUsersToExcel } = require('../../utils/excelExporter');
 
 class AdminController {
   constructor() {
@@ -20,8 +23,11 @@ class AdminController {
     const roleRepo = new RoleRepositoryImpl();
     this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo });
 
+    this.auditService = new AuditService(AuditRepository);
+
     this.getDashboardStats = this.getDashboardStats.bind(this);
     this.listUsers = this.listUsers.bind(this);
+    this.exportUsers = this.exportUsers.bind(this);
     this.listBranches = this.listBranches.bind(this);
     this.listRoles = this.listRoles.bind(this);
     this.getRoleDetail = this.getRoleDetail.bind(this);
@@ -55,6 +61,26 @@ class AdminController {
     try {
       const result = await this.adminUserService.listUsers(req.query);
       return success(res, result, 'Danh sach nguoi dung (chi admin)');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  exportUsers = async (req, res, next) => {
+    try {
+      const { items } = await this.adminUserService.exportUsers(req.query);
+      const buffer = await exportUsersToExcel(items, req.query);
+
+      const date = new Date();
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const filename = `users_${yyyy}${mm}${dd}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', buffer.length);
+      return res.send(Buffer.from(buffer));
     } catch (err) {
       next(err);
     }

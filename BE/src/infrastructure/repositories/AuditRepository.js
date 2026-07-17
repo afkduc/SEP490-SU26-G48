@@ -260,6 +260,80 @@ async function getAuditLogs(filters = {}) {
   return { total, page: safePage, pageSize: safePageSize, items };
 }
 
+async function getAuditLogsForExport(filters = {}) {
+  const {
+    userName,
+    phone,
+    action,
+    entityName,
+    entityCode,
+    startDate,
+    endDate,
+    branchId,
+    limit = 10000,
+  } = filters;
+
+  const conditions = ['1=1'];
+  const params = {};
+  let paramIndex = 1;
+
+  if (userName) {
+    conditions.push(`al.user_name LIKE @p${paramIndex}`);
+    params[`p${paramIndex}`] = `%${userName}%`;
+    paramIndex++;
+  }
+  if (phone) {
+    conditions.push(`al.phone_number LIKE @p${paramIndex}`);
+    params[`p${paramIndex}`] = `%${phone}%`;
+    paramIndex++;
+  }
+  if (action) {
+    conditions.push(`al.action = @p${paramIndex}`);
+    params[`p${paramIndex}`] = action;
+    paramIndex++;
+  }
+  if (entityName) {
+    conditions.push(`al.entity_name LIKE @p${paramIndex}`);
+    params[`p${paramIndex}`] = `%${entityName}%`;
+    paramIndex++;
+  }
+  if (entityCode) {
+    conditions.push(`al.entity_code = @p${paramIndex}`);
+    params[`p${paramIndex}`] = entityCode;
+    paramIndex++;
+  }
+  if (branchId) {
+    conditions.push(`al.branch_id = @p${paramIndex}`);
+    params[`p${paramIndex}`] = branchId;
+    paramIndex++;
+  }
+  if (startDate) {
+    conditions.push(`al.logged_at >= @p${paramIndex}`);
+    params[`p${paramIndex}`] = startDate;
+    paramIndex++;
+  }
+  if (endDate) {
+    conditions.push(`al.logged_at <= @p${paramIndex}`);
+    params[`p${paramIndex}`] = endDate;
+    paramIndex++;
+  }
+
+  const whereClause = conditions.join(' AND ');
+  const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 10000, 10000));
+
+  const dataResult = await query(
+    `SELECT ${AUDIT_LOG_COLUMNS}
+     FROM   audit_logs al
+     WHERE  ${whereClause}
+     ORDER  BY al.logged_at DESC, al.id DESC
+     OFFSET 0 ROWS FETCH NEXT @p_limit ROWS ONLY`,
+    { ...params, p_limit: safeLimit }
+  );
+
+  const items = dataResult.recordset.map(toAuditLogRow);
+  return { items, total: items.length, truncated: items.length >= safeLimit };
+}
+
 async function getLoginSessions(filters = {}) {
   const {
     userName,
@@ -376,6 +450,7 @@ async function getAuditLogsByUser(userId, limit = 10) {
 module.exports = {
   insertAuditLog,
   getAuditLogs,
+  getAuditLogsForExport,
   getLoginSessions,
   getEntityDefinitions,
   getAuditLogsByUser,

@@ -6,6 +6,7 @@ import {
   adminBranchesApi,
   adminRolesApi,
 } from '../../services/adminApi';
+import { downloadBlob } from '../../utils/downloadBlob';
 import UserFormModal from './users/UserFormModal';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import AssignRoleModal from './users/AssignRoleModal';
@@ -73,6 +74,8 @@ export default function AdminUsersPage() {
   const [detailUserId, setDetailUserId] = useState(null);
   const [assignUserId, setAssignUserId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -131,6 +134,19 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function handleExportExcel() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const blob = await adminUsersApi.exportUsers(params);
+      downloadBlob(blob, 'users.xlsx');
+    } catch (err) {
+      setExportError(err.message || 'Xuất Excel thất bại');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const totalPages = data.total > 0 ? Math.ceil(data.total / (data.pageSize || 10)) : 1;
   const currentPage = data.page || 1;
 
@@ -159,6 +175,19 @@ export default function AdminUsersPage() {
             <span className="admin-users__total-badge">{data.total} tài khoản</span>
           )}
           <button
+            className="btn btn--secondary"
+            onClick={handleExportExcel}
+            disabled={exporting || loading}
+            title="Xuất danh sách người dùng (theo bộ lọc hiện tại) ra file Excel"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+          </button>
+          <button
             className="btn btn--primary"
             onClick={() => { setEditUser(null); setShowModal(true); }}
           >
@@ -168,6 +197,11 @@ export default function AdminUsersPage() {
             Tạo người dùng mới
           </button>
         </div>
+        {exportError && (
+          <div className="admin-users__error" style={{ marginTop: 12 }}>
+            <strong>Xuất Excel thất bại:</strong> {exportError}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
