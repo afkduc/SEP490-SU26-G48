@@ -5,6 +5,7 @@ import './AdminPagination.css';
  * Props:
  *  - currentPage, totalPages, total, onChange, loading
  *  - accent: 'cyan' | 'indigo' (màu nút active)
+ *  - siblingCount: số trang hiển thị 2 bên trang hiện tại (mặc định 1)
  */
 export default function AdminPagination({
   currentPage,
@@ -13,6 +14,7 @@ export default function AdminPagination({
   onChange,
   loading,
   accent = 'cyan',
+  siblingCount = 1,
 }) {
   if (!total || total === 0) return null;
 
@@ -21,17 +23,37 @@ export default function AdminPagination({
     onChange(page);
   }
 
-  const pages = (() => {
-    const out = [];
-    const len = Math.min(totalPages, 7);
-    for (let i = 0; i < len; i += 1) {
-      if (totalPages <= 7) out.push(i + 1);
-      else if (currentPage <= 4) out.push(i + 1);
-      else if (currentPage >= totalPages - 3) out.push(totalPages - 6 + i);
-      else out.push(currentPage - 3 + i);
+  // Build pagination range với first / ... / left-siblings / current / right-siblings / ... / last
+  const paginationRange = (() => {
+    const totalNumbers = siblingCount * 2 + 5; // first + last + current + 2*siblings + 2 dots
+    if (totalPages <= totalNumbers) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
-    return out;
+
+    const leftSibling = Math.max(currentPage - siblingCount, 1);
+    const rightSibling = Math.min(currentPage + siblingCount, totalPages);
+    const showLeftDots = leftSibling > 2;
+    const showRightDots = rightSibling < totalPages - 1;
+
+    if (!showLeftDots && showRightDots) {
+      const leftCount = 3 + 2 * siblingCount;
+      return [...Array.from({ length: leftCount }, (_, i) => i + 1), 'dots-right', totalPages];
+    }
+    if (showLeftDots && !showRightDots) {
+      const rightCount = 3 + 2 * siblingCount;
+      return [1, 'dots-left', ...Array.from({ length: rightCount }, (_, i) => totalPages - rightCount + 1 + i)];
+    }
+    return [
+      1,
+      'dots-left',
+      ...Array.from({ length: 2 * siblingCount + 1 }, (_, i) => leftSibling + i),
+      'dots-right',
+      totalPages,
+    ];
   })();
+
+  const isFirst = currentPage <= 1;
+  const isLast = currentPage >= totalPages;
 
   return (
     <div className="admin-pagination">
@@ -40,37 +62,85 @@ export default function AdminPagination({
         &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
       </span>
       <div className="admin-pagination__controls">
+        {/* « First */}
+        <button
+          type="button"
+          className="admin-pagination__nav-btn admin-pagination__edge-btn"
+          onClick={() => handlePageChange(1)}
+          disabled={isFirst || loading}
+          title="Trang đầu"
+          aria-label="Trang đầu"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="11 17 6 12 11 7" />
+            <polyline points="18 17 13 12 18 7" />
+          </svg>
+        </button>
+
+        {/* ‹ Prev */}
         <button
           type="button"
           className="admin-pagination__nav-btn"
           onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage <= 1 || loading}
+          disabled={isFirst || loading}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="15 18 9 12 15 6" />
           </svg>
           Trước
         </button>
-        {pages.map((p) => (
-          <button
-            key={p}
-            type="button"
-            className={`admin-pagination__page-btn admin-pagination--${accent} ${p === currentPage ? 'active' : ''}`}
-            onClick={() => handlePageChange(p)}
-            disabled={loading}
-          >
-            {p}
-          </button>
-        ))}
+
+        {/* Pages + dots */}
+        {paginationRange.map((p, idx) => {
+          if (p === 'dots-left' || p === 'dots-right') {
+            return (
+              <span
+                key={`${p}-${idx}`}
+                className="admin-pagination__dots"
+                aria-hidden="true"
+              >
+                …
+              </span>
+            );
+          }
+          return (
+            <button
+              key={p}
+              type="button"
+              className={`admin-pagination__page-btn admin-pagination--${accent} ${p === currentPage ? 'active' : ''}`}
+              onClick={() => handlePageChange(p)}
+              disabled={loading}
+            >
+              {p}
+            </button>
+          );
+        })}
+
+        {/* Next › */}
         <button
           type="button"
           className="admin-pagination__nav-btn"
           onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage >= totalPages || loading}
+          disabled={isLast || loading}
         >
           Sau
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+
+        {/* Last » */}
+        <button
+          type="button"
+          className="admin-pagination__nav-btn admin-pagination__edge-btn"
+          onClick={() => handlePageChange(totalPages)}
+          disabled={isLast || loading}
+          title="Trang cuối"
+          aria-label="Trang cuối"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="13 17 18 12 13 7" />
+            <polyline points="6 17 11 12 6 7" />
           </svg>
         </button>
       </div>

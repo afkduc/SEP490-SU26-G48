@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
+import { adminLoginSessionsApi } from '../../services/adminApi';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import './LoginSessionsPage.css';
+
+const POLL_INTERVAL_MS = 10_000;
 
 const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
@@ -27,14 +30,33 @@ const STATUS_LABEL = { active: 'Đang hoạt động', ended: 'Đã đăng xuấ
 
 function formatDate(value) {
   if (!value) return '—';
-  try {
-    return new Date(value).toLocaleString('vi-VN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  } catch {
-    return value;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+}
+
+function renderBrowser(item) {
+  if (item.browser && item.os) {
+    return (
+      <span>
+        <strong>{item.browser}</strong>
+        <span style={{ color: '#64748b' }}> · {item.os}</span>
+      </span>
+    );
   }
+  if (item.browser) {
+    return <strong>{item.browser}</strong>;
+  }
+  if (!item.user_agent) return '—';
+  const match = item.user_agent.match(/(Edge|Edg|Chrome|Firefox|Safari|OPR|Opera)[\/ ]?([\d.]+)/i);
+  if (match) {
+    const name = match[1] === 'Edg' ? 'Edge' : match[1];
+    return <span><strong>{name}</strong> {match[2]}</span>;
+  }
+  return item.user_agent.slice(0, 30);
 }
 
 function formatDuration(seconds) {
@@ -301,11 +323,8 @@ function SessionTable({ items, onViewUser, onViewSession }) {
               ) : '—'}
             </td>
             <td className="admin-sessions__ip">{item.ip_address || '—'}</td>
-            <td className="admin-sessions__user-agent" title={item.user_agent}>
-              {item.user_agent ? (() => {
-                const match = item.user_agent.match(/Chrome\/[\d.]+|Firefox\/[\d.]+|Safari\/[\d.]+/);
-                return match ? match[0] : `${item.user_agent.slice(0, 30)}...`;
-              })() : '—'}
+            <td className="admin-sessions__user-agent" title={item.user_agent || ''}>
+              {renderBrowser(item)}
             </td>
             <td className="admin-sessions__duration">
               {item.status === 'active' ? (
@@ -330,17 +349,6 @@ function SessionTable({ items, onViewUser, onViewSession }) {
                   </svg>
                   Chi tiết
                 </button>
-                {item.user_id && (
-                  <button
-                    type="button"
-                    className="admin-sessions__action-btn"
-                    onClick={() => onViewUser?.(item.user_id)}
-                    title="Xem chi tiết người dùng"
-                  >
-                    <IconUser />
-                    Người dùng
-                  </button>
-                )}
               </div>
             </td>
           </tr>
@@ -357,6 +365,52 @@ export default function AdminLoginSessionsPage() {
   const { branches, branchesError } = useSharedBranches();
   const [detailUserId, setDetailUserId] = useState(null);
   const [detailSession, setDetailSession] = useState(null);
+  const [realtimeEnabled, setRealtimeEnabled] = useState(true);
+
+// Realtime polling: moi POLL_INTERVAL_MS goi /login-sessions/recent?since=...
+// de kiem tra co session moi (login hoac logout) khong. Neu co -> refetch
+// toan trang. Tam dung khi tab an (visibilitychange).
+useEffect(() => {
+    if (!realtimeEnabled) return undefined;
+    let cancelled = false;
+    let timerId = null;
+    let lastSinceIso = new Date(Date.now() - 60_000).toISOString();
+
+    async function poll() {
+      try {
+        const res = await adminLoginSessionsApi.recent(lastSinceIso);
+        if (cancelled) return;
+        const items = res?.items || [];
+        if (items.length > 0) {
+          // Co phien moi -> refetch full list de dam bao du lieu dong bo
+          sessions.refetch();
+        }
+        lastSinceIso = new Date().toISOString();
+      } catch (e) {
+        console.warn('[AdminLoginSessionsPage] realtime poll failed:', e?.message);
+      } finally {
+        if (!cancelled) timerId = setTimeout(poll, POLL_INTERVAL_MS);
+      }
+    }
+
+    timerId = setTimeout(poll, POLL_INTERVAL_MS);
+
+    function onVisibility() {
+      if (document.hidden) {
+        if (timerId) clearTimeout(timerId);
+      } else if (!cancelled) {
+        timerId = setTimeout(poll, 500);
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelled = true;
+      if (timerId) clearTimeout(timerId);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtimeEnabled, sessions.refetch]);
 
   const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
   const hasFilters = sessions.params.userName || sessions.params.phone ||
@@ -390,6 +444,16 @@ export default function AdminLoginSessionsPage() {
             <h1>Lịch sử đăng nhập</h1>
             <p className="admin-page__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
           </div>
+        </div>
+        <div className="admin-page__header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={realtimeEnabled}
+              onChange={(e) => setRealtimeEnabled(e.target.checked)}
+            />
+            Cập nhật realtime
+          </label>
         </div>
       </div>
 

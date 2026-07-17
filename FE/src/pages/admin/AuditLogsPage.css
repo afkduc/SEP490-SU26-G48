@@ -410,12 +410,51 @@
 }
 
 /* ── Table cells ─────────────────────────────────────────── */
-.audit-logs__date {
+.audit-logs__time-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   white-space: nowrap;
-  font-size: 0.8rem;
-  color: #64748b;
+}
+
+.audit-logs__time-main {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1e293b;
   font-family: 'JetBrains Mono', monospace;
 }
+
+.audit-logs__time-ago {
+  font-size: 0.7rem;
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+.audit-logs__time-utc {
+  font-size: 0.66rem;
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.th-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4f46e5;
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-style: italic;
+  cursor: help;
+  user-select: none;
+  vertical-align: middle;
+}
+
+.th-info:hover { background: #c7d2fe; }
 
 .audit-logs__user-cell {
   display: flex;
@@ -442,6 +481,7 @@
   background: #f1f5f9;
   padding: 2px 6px;
   border-radius: 4px;
+  cursor: help;
 }
 
 .audit-logs__code {
@@ -449,12 +489,15 @@
   font-family: 'JetBrains Mono', monospace;
   color: #4f46e5;
   font-weight: 500;
+  cursor: help;
+  border-bottom: 1px dotted #c7d2fe;
 }
 
 .audit-logs__ip {
   font-size: 0.78rem;
   font-family: 'JetBrains Mono', monospace;
   color: #64748b;
+  cursor: help;
 }
 
 .audit-logs__method {

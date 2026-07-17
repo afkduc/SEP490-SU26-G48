@@ -72,6 +72,7 @@ class AdminController {
     this.acknowledgeAlert = this.acknowledgeAlert.bind(this);
     this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
     this.acknowledgeAlertCounts = this.acknowledgeAlertCounts.bind(this);
+    this.getRecentLoginSessions = this.getRecentLoginSessions.bind(this);
     this.getUserRoles = this.getUserRoles.bind(this);
     this.assignRoles = this.assignRoles.bind(this);
     this.revokeRole = this.revokeRole.bind(this);
@@ -460,6 +461,18 @@ class AdminController {
     try {
       const counts = await this.securityAlertService.getCounts();
       return success(res, counts, 'So luong canh bao');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Realtime polling cho AdminLoginSessionsPage. FE goi moi 10s voi `since`
+  // de lay cac session moi (login hoac logout) tu moc thoi gian cu.
+  getRecentLoginSessions = async (req, res, next) => {
+    try {
+      const { since, limit } = req.query;
+      const result = await this.auditService.getLoginSessionsSince(since, limit);
+      return success(res, result, 'Cac phien dang nhap moi');
     } catch (err) {
       next(err);
     }

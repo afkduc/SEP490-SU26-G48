@@ -10,29 +10,46 @@ function parseUserAgent(userAgent) {
   if (!userAgent) return { deviceName: 'Unknown', browser: 'Unknown', os: 'Unknown' };
   const ua = userAgent.toLowerCase();
 
+  // OS phai check TRUOC khi browser, vi UA Edge/Chrome trên Windows
+  // van co chu "Mac OS X" trong mot so truong hop dac biet.
+  // Uu tien theo thu tu cu the nhat:
   let os = 'Unknown';
-  if (ua.includes('windows')) os = 'Windows';
-  else if (ua.includes('mac os') || ua.includes('macos')) os = 'macOS';
-  else if (ua.includes('linux')) os = 'Linux';
+  if (ua.includes('windows nt 10.0') || ua.includes('windows nt 11')) os = 'Windows 10/11';
+  else if (ua.includes('windows nt 6.3')) os = 'Windows 8.1';
+  else if (ua.includes('windows nt 6.2')) os = 'Windows 8';
+  else if (ua.includes('windows nt 6.1')) os = 'Windows 7';
+  else if (ua.includes('windows')) os = 'Windows';
   else if (ua.includes('android')) os = 'Android';
-  else if (ua.includes('iphone') || ua.includes('ipad')) os = 'iOS';
+  else if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) os = 'iOS';
+  else if (ua.includes('mac os x') || ua.includes('macos')) os = 'macOS';
+  else if (ua.includes('cros')) os = 'Chrome OS';
+  else if (ua.includes('linux')) os = 'Linux';
 
+  // Browser: Edge truoc (UA Edge co "Chrome" nhung phai nhan dien truoc)
   let browser = 'Unknown';
-  if (ua.includes('edg/')) browser = 'Edge';
-  else if (ua.includes('chrome/') && !ua.includes('chromium')) browser = 'Chrome';
+  if (ua.includes('edg/') || ua.includes('edge/')) browser = 'Edge';
+  else if (ua.includes('opr/') || ua.includes('opera/')) browser = 'Opera';
   else if (ua.includes('firefox/')) browser = 'Firefox';
+  else if (ua.includes('chrome/') && !ua.includes('chromium')) browser = 'Chrome';
   else if (ua.includes('safari/') && !ua.includes('chrome')) browser = 'Safari';
-  else if (ua.includes('opr/')) browser = 'Opera';
+  else if (ua.includes('msie') || ua.includes('trident/')) browser = 'Internet Explorer';
 
   const deviceName = `${browser} on ${os}`;
   return { deviceName: safeString(deviceName, 255), browser: safeString(browser, 100), os: safeString(os, 100) };
 }
 
 function getRequestMeta(req) {
-  const ipAddress = req.ip || (req.connection && req.connection.remoteAddress) || null;
+  const xff = req.headers ? req.headers['x-forwarded-for'] : null;
+  let ipAddress = null;
+  if (xff) {
+    ipAddress = xff.split(',')[0].trim() || null;
+  }
+  if (!ipAddress) {
+    ipAddress = req.ip || (req.connection && req.connection.remoteAddress) || null;
+  }
   const userAgent = req.headers ? req.headers['user-agent'] : null;
   return {
-    ipAddress: safeString(ipAddress, 64),
+    ipAddress: safeString(ipAddress, 45),
     userAgent: safeString(userAgent, 512),
   };
 }
@@ -73,9 +90,29 @@ async function upsertDevice(userId, userAgent, ipAddress) {
   }
 }
 
+async function logSessionEvent({ sessionId, eventType, userId, userName, ipAddress, userAgent }) {
+  try {
+    await query(
+      `INSERT INTO login_session_events (session_id, event_type, user_id, user_name, ip_address, user_agent)
+       VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`,
+      {
+        p1: sessionId,
+        p2: eventType,
+        p3: userId || null,
+        p4: userName || null,
+        p5: ipAddress || null,
+        p6: userAgent || null,
+      }
+    );
+  } catch (err) {
+    console.error('[loginSessionMiddleware] logSessionEvent failed:', err && err.message ? err.message : err);
+  }
+}
+
 async function trackLogin(req, user) {
   try {
     const { ipAddress, userAgent } = getRequestMeta(req);
+    const { browser, os } = parseUserAgent(userAgent);
 
     const userId = user && (user.id !== undefined ? user.id : user.user_id) ? user.id : null;
     const userName = safeString(user && (user.user_name || user.name || user.email));
@@ -84,20 +121,61 @@ async function trackLogin(req, user) {
       ? user.branch_id
       : null;
 
-    await query(
+    // Dong cac phien active cu cua CUNG user truoc khi tao phien moi.
+    // Tranh tinh trang user spam login -> 149 row active (hinh anh ban gui).
+    // Ly do: neu user login tai 2 noi (web + mobile), session cu van 'active'
+    // nhung thuc te user da chuyen sang thiet bi moi -> phien cu se bi treo mai.
+    // Dat logout_reason = 'NEW_LOGIN_OVERRIDE' de audit biet session cu bi
+    // thay the boi session moi.
+    if (userId) {
+      try {
+        await query(
+          `UPDATE login_sessions
+           SET    logout_time              = SYSUTCDATETIME(),
+                  logout_reason            = 'NEW_LOGIN_OVERRIDE',
+                  session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+                  status                   = 'ended'
+           WHERE  user_id    = @p1
+             AND  status     = 'active'
+             AND  action_type = 'LOGIN'`,
+          { p1: userId }
+        );
+      } catch (err) {
+        console.error('[loginSessionMiddleware] failed to close stale sessions:', err && err.message);
+      }
+    }
+
+    const insertResult = await query(
       `INSERT INTO login_sessions
-         (action_type, user_id, user_name, phone, ip_address, user_agent, branch_id, status)
+         (action_type, user_id, user_name, phone, ip_address, user_agent,
+          browser, os, branch_id, status, login_time)
+       OUTPUT INSERTED.id
        VALUES
-         ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, 'active')`,
+         ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'active', SYSUTCDATETIME())`,
       {
         p1: userId,
         p2: userName,
         p3: phone,
         p4: ipAddress,
         p5: userAgent,
-        p6: branchId,
+        p6: browser,
+        p7: os,
+        p8: branchId,
       }
     );
+
+    const sessionId = insertResult.recordset && insertResult.recordset[0] ? insertResult.recordset[0].id : null;
+
+    if (sessionId) {
+      await logSessionEvent({
+        sessionId,
+        eventType: 'LOGIN',
+        userId,
+        userName,
+        ipAddress,
+        userAgent,
+      });
+    }
 
     if (userId && ipAddress) {
       await upsertDevice(userId, userAgent, ipAddress);
@@ -109,36 +187,65 @@ async function trackLogin(req, user) {
 
 async function trackLogout(req) {
   try {
-    if (!req || !req.user || !req.user.user_name) {
-      console.error('[loginSessionMiddleware] trackLogout skipped: req.user.user_name missing');
+    if (!req || !req.user) {
+      console.error('[loginSessionMiddleware] trackLogout skipped: req.user missing');
       return;
     }
 
-    const userName = safeString(req.user.user_name);
+    // JWT payload co cac field: userId, email, name (la user_name), roles, branchId
+    // Token cu co the chi co userName thay vi name -> chap nhan ca hai.
+    const userName = safeString(req.user.name || req.user.user_name);
+    const userId = req.user.userId || req.user.id || null;
+
+    if (!userName && !userId) {
+      console.error('[loginSessionMiddleware] trackLogout skipped: missing user identifier');
+      return;
+    }
+
+    const { ipAddress, userAgent } = getRequestMeta(req);
+
+    // Dong session active gan nhat cua user. Uu tien user_id de tranh nham khi
+    // user doi ten hien thi (user_name).
+    const active = await query(
+      `SELECT TOP 1 id, user_id
+       FROM   login_sessions
+       WHERE  status = 'active' AND action_type = 'LOGIN'
+         ${userId ? 'AND user_id = @p2' : 'AND user_name = @p1'}
+       ORDER  BY login_time DESC`,
+      userId ? { p2: userId } : { p1: userName }
+    );
+
+    if (!active.recordset.length) {
+      console.warn(`[loginSessionMiddleware] trackLogout: no active session for ${userName || userId}`);
+      return;
+    }
+
+    const sessionId = active.recordset[0].id;
+    const sessionUserId = active.recordset[0].user_id;
 
     await query(
       `UPDATE login_sessions
-       SET    logout_time                = GETDATE(),
-              session_duration_seconds   = DATEDIFF(SECOND, login_time, GETDATE()),
+       SET    logout_time                = SYSUTCDATETIME(),
+              logout_reason              = 'USER_INITIATED',
+              session_duration_seconds   = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
               status                     = 'ended'
-       WHERE  user_name = @p1
-         AND  status    = 'active'
-         AND  action_type = 'LOGIN'
-         AND  login_time  = (
-               SELECT TOP 1 login_time
-               FROM   login_sessions
-               WHERE  user_name   = @p1
-                 AND  status      = 'active'
-                 AND  action_type = 'LOGIN'
-               ORDER BY login_time DESC
-             )`,
-      { p1: userName }
+       WHERE  id = @p1`,
+      { p1: sessionId }
     );
 
-    if (req.user && req.user.id) {
+    await logSessionEvent({
+      sessionId,
+      eventType: 'LOGOUT',
+      userId: sessionUserId,
+      userName,
+      ipAddress,
+      userAgent,
+    });
+
+    if (sessionUserId) {
       await query(
         'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1 AND is_current = 1',
-        { p1: req.user.id }
+        { p1: sessionUserId }
       );
     }
   } catch (err) {
@@ -146,22 +253,62 @@ async function trackLogout(req) {
   }
 }
 
-async function trackLoginFailed(req, identifier) {
+async function trackLoginFailed(req, payload) {
   try {
     const { ipAddress, userAgent } = getRequestMeta(req);
-    const userName = safeString(identifier);
+    const { browser, os } = parseUserAgent(userAgent);
 
-    await query(
+    // payload co the la:
+    //  - string: chi co email (backward compat)
+    //  - object { user, reason }: tu AuthController, co day du thong tin user
+    let userId = null;
+    let userName = null;
+    let phone = null;
+    let branchId = null;
+    let failureReason = 'WRONG_PASSWORD';
+
+    if (payload && typeof payload === 'object' && payload.user) {
+      const u = payload.user;
+      userId = u.id ?? u.user_id ?? null;
+      userName = safeString(u.user_name || u.name || u.email);
+      phone = safeString(u.phone, 32);
+      branchId = u.branch_id != null ? u.branch_id : null;
+      failureReason = payload.reason || 'WRONG_PASSWORD';
+    } else if (typeof payload === 'string') {
+      userName = safeString(payload);
+    }
+
+    const insertResult = await query(
       `INSERT INTO login_sessions
-         (action_type, user_id, user_name, phone, ip_address, user_agent, branch_id, status)
+         (action_type, user_id, user_name, phone, ip_address, user_agent,
+          browser, os, branch_id, status, login_time, failure_reason)
+       OUTPUT INSERTED.id
        VALUES
-         ('LOGIN_FAILED', NULL, @p1, NULL, @p2, @p3, NULL, 'failed')`,
+         ('LOGIN_FAILED', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'failed', SYSUTCDATETIME(), @p9)`,
       {
-        p1: userName,
-        p2: ipAddress,
-        p3: userAgent,
+        p1: userId,
+        p2: userName,
+        p3: phone,
+        p4: ipAddress,
+        p5: userAgent,
+        p6: browser,
+        p7: os,
+        p8: branchId,
+        p9: failureReason,
       }
     );
+
+    const sessionId = insertResult.recordset && insertResult.recordset[0] ? insertResult.recordset[0].id : null;
+    if (sessionId) {
+      await logSessionEvent({
+        sessionId,
+        eventType: 'LOGIN_FAILED',
+        userId,
+        userName,
+        ipAddress,
+        userAgent,
+      });
+    }
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLoginFailed failed:', err && err.message ? err.message : err);
   }
@@ -172,4 +319,7 @@ module.exports = {
   trackLogout,
   trackLoginFailed,
   upsertDevice,
+  parseUserAgent,
+  getRequestMeta,
+  logSessionEvent,
 };
