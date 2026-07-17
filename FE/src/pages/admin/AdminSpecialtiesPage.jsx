@@ -245,7 +245,6 @@ export default function AdminSpecialtiesPage() {
                   <tr>
                     <th style={{ width: '140px' }}>Mã</th>
                     <th>Tên chuyên môn</th>
-                    <th style={{ width: '160px' }}>Ngày tạo</th>
                     <th style={{ width: '120px' }}>Thao tác</th>
                   </tr>
                 </thead>
@@ -254,7 +253,6 @@ export default function AdminSpecialtiesPage() {
                     <tr key={s.id}>
                       <td><span className="specialty-code">{s.specialtyCode}</span></td>
                       <td><span className="specialty-name">{s.specialtyName}</span></td>
-                      <td style={{ whiteSpace: 'nowrap', color: '#94a3b8', fontSize: '0.82rem' }}>{formatDate(s.createdAt)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button

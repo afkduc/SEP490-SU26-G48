@@ -20,8 +20,7 @@ class BranchRepositoryImpl {
         m.first_name AS manager_first_name,
         m.last_name  AS manager_last_name,
         m.email      AS manager_email,
-        m.status     AS manager_status,
-        b.created_at
+        m.status     AS manager_status
       FROM branches b
       LEFT JOIN users m ON m.id = b.manager_id
       ORDER BY b.branch_code ASC
@@ -40,7 +39,6 @@ class BranchRepositoryImpl {
       managerEmail: row.manager_email,
       managerStatus: row.manager_status,
       isActive: row.is_active === 1 || row.is_active === true,
-      createdAt: row.created_at,
     }));
   }
 
@@ -61,8 +59,7 @@ class BranchRepositoryImpl {
         m.user_name  AS manager_user_name,
         m.first_name AS manager_first_name,
         m.last_name  AS manager_last_name,
-        m.email      AS manager_email,
-        b.created_at
+        m.email      AS manager_email
       FROM branches b
       LEFT JOIN users m ON m.id = b.manager_id
       WHERE b.id = @p1
@@ -84,7 +81,6 @@ class BranchRepositoryImpl {
         : row.manager_user_name || null,
       managerEmail: row.manager_email,
       isActive: row.is_active === 1 || row.is_active === true,
-      createdAt: row.created_at,
     };
   }
 
@@ -155,9 +151,9 @@ class BranchRepositoryImpl {
    */
   async create({ branchCode, branchName, address, phone, email, managerId }) {
     const result = await query(`
-      INSERT INTO branches (branch_code, branch_name, address, phone, email, manager_id, is_active, created_at)
+      INSERT INTO branches (branch_code, branch_name, address, phone, email, manager_id, is_active)
       OUTPUT INSERTED.id
-      VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, GETDATE())
+      VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1)
     `, {
       p1: branchCode,
       p2: branchName,

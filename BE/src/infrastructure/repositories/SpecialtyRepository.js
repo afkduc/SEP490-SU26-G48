@@ -6,7 +6,7 @@ class SpecialtyRepository {
    */
   async findAll() {
     const result = await query(`
-      SELECT id, specialty_code, specialty_name, created_at
+      SELECT id, specialty_code, specialty_name
       FROM specialties
       ORDER BY specialty_code ASC
     `);
@@ -14,7 +14,6 @@ class SpecialtyRepository {
       id: row.id,
       specialtyCode: row.specialty_code,
       specialtyName: row.specialty_name,
-      createdAt: row.created_at,
     }));
   }
 
