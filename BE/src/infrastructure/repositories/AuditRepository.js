@@ -198,13 +198,13 @@ async function getAuditLogs(filters = {}) {
   let paramIndex = 1;
 
   if (userName) {
-    conditions.push(`al.user_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.user_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${userName}%`;
     paramIndex++;
   }
 
   if (phone) {
-    conditions.push(`al.phone_number LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${phone}%`;
     paramIndex++;
   }
@@ -216,7 +216,7 @@ async function getAuditLogs(filters = {}) {
   }
 
   if (entityName) {
-    conditions.push(`al.entity_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.entity_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${entityName}%`;
     paramIndex++;
   }
@@ -288,12 +288,12 @@ async function getAuditLogsForExport(filters = {}) {
   let paramIndex = 1;
 
   if (userName) {
-    conditions.push(`al.user_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.user_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${userName}%`;
     paramIndex++;
   }
   if (phone) {
-    conditions.push(`al.phone_number LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${phone}%`;
     paramIndex++;
   }
@@ -303,7 +303,7 @@ async function getAuditLogsForExport(filters = {}) {
     paramIndex++;
   }
   if (entityName) {
-    conditions.push(`al.entity_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.entity_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${entityName}%`;
     paramIndex++;
   }
@@ -362,13 +362,13 @@ async function getLoginSessions(filters = {}) {
   let paramIndex = 1;
 
   if (userName) {
-    conditions.push(`ls.user_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(ls.user_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${userName}%`;
     paramIndex++;
   }
 
   if (phone) {
-    conditions.push(`ls.phone LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(ls.phone) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${phone}%`;
     paramIndex++;
   }

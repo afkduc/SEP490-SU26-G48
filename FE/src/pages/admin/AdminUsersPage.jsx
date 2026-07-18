@@ -130,6 +130,17 @@ export default function AdminUsersPage() {
     }
   }, [searchParams]);
 
+  // Reset page ve 1 khi route /admin/users duoc click tu sidebar
+  // Dung window.location de so sanh vi no thay doi khi URL thay doi (query string cung thay doi)
+  useEffect(() => {
+    const currentUrl = window.location.href;
+    // Chi reset khi pathname la /admin/users VA khong co query string (tu sidebar click)
+    if (location.pathname === '/admin/users' && !window.location.search) {
+      setParams((p) => ({ ...p, page: 1 }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, window.location.search]);
+
   function resetFilters() {
     setParams(() => ({
       search: '',
@@ -144,11 +155,11 @@ export default function AdminUsersPage() {
     updateParam('page', page);
   }
 
-  async function handleToggleStatus(userId, newStatus) {
+    async function handleToggleStatus(userId, newStatus) {
     setTogglingId(userId);
     try {
       await adminUsersApi.update({ userId, status: newStatus });
-      toast.success(newStatus === 'inactive' ? 'Tài khoản đã bị khóa' : 'Tài khoản đã được kích hoạt');
+      toast.success(newStatus === 'locked' ? 'Tài khoản đã bị khóa' : 'Tài khoản đã được kích hoạt');
       refresh();
     } catch (err) {
       toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
@@ -233,7 +244,7 @@ export default function AdminUsersPage() {
           <input
             className="input input--search"
             type="text"
-            placeholder="Tìm theo tên, email, họ, tên..."
+            placeholder="Tìm theo tên, email, số điện thoại..."
             value={params.search || ''}
             onChange={(e) => updateParam('search', e.target.value)}
           />
@@ -307,7 +318,19 @@ export default function AdminUsersPage() {
                   <th style={{ textAlign: 'right' }}>Hành động</th>
                 </tr>
               </thead>
-              <TableSkeleton />
+              <tbody>
+                {[...Array(5)].map((_, i) => (
+                  <tr key={i}>
+                    <td data-label="Người dùng"><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div className="skeleton skeleton--circle" style={{ width: 34, height: 34 }} /><div><div className="skeleton" style={{ width: 100, height: 12 }} /><div className="skeleton" style={{ width: 70, height: 10, marginTop: 4 }} /></div></div></td>
+                    <td data-label="Email"><div className="skeleton" style={{ width: 140, height: 12 }} /></td>
+                    <td data-label="Chi nhánh"><div className="skeleton" style={{ width: 90, height: 12 }} /></td>
+                    <td data-label="Vai trò"><div className="skeleton" style={{ width: 60, height: 20, borderRadius: 20 }} /></td>
+                    <td data-label="Trạng thái"><div className="skeleton" style={{ width: 70, height: 20, borderRadius: 20 }} /></td>
+                    <td data-label="Ngày tạo"><div className="skeleton" style={{ width: 70, height: 12 }} /></td>
+                    <td data-label="Hành động"><div className="skeleton" style={{ width: 180, height: 28, borderRadius: 6 }} /></td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         ) : error ? (
@@ -339,7 +362,7 @@ export default function AdminUsersPage() {
                   ) : (
                     data.items.map((u) => (
                       <tr key={u.id}>
-                        <td>
+                        <td data-label="Người dùng">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                             <div className="user-avatar">
                               {getInitials(u.firstName, u.lastName)}
@@ -357,9 +380,9 @@ export default function AdminUsersPage() {
                             </div>
                           </div>
                         </td>
-                        <td style={{ color: '#64748b', fontSize: '0.85rem' }}>{u.email || '—'}</td>
-                        <td style={{ color: '#64748b', fontSize: '0.85rem' }}>{u.branchName || '—'}</td>
-                        <td>
+                        <td data-label="Email" style={{ color: '#64748b', fontSize: '0.85rem' }}>{u.email || '—'}</td>
+                        <td data-label="Chi nhánh" style={{ color: '#64748b', fontSize: '0.85rem' }}>{u.branchName || '—'}</td>
+                        <td data-label="Vai trò">
                           {u.roles?.length > 0 ? (
                             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                               {u.roles.map((r) => {
@@ -373,7 +396,7 @@ export default function AdminUsersPage() {
                             <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>—</span>
                           )}
                         </td>
-                        <td>
+                        <td data-label="Trạng thái">
                           <div className="user-status-cell">
                             <span className={`badge ${STATUS_CLASS[u.status] || ''}`}>
                               {STATUS_LABELS[u.status] || u.status}
@@ -381,14 +404,14 @@ export default function AdminUsersPage() {
                             <button
                               className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
                               title={u.status === 'active' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
-                              onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
+                              onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'locked' : 'active')}
                               disabled={togglingId === u.id}
                             >
                               {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khóa' : 'Mở')}
                             </button>
                           </div>
                         </td>
-                        <td className="admin-users__date">{formatDate(u.createdAt)}</td>
+                        <td data-label="Ngày tạo" className="admin-users__date">{formatDate(u.createdAt)}</td>
                         <td>
                           <div className="action-btns" style={{ justifyContent: 'flex-end' }}>
                             <button
