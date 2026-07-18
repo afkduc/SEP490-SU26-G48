@@ -1,4 +1,4 @@
-﻿import httpClient from './httpClient';
+import httpClient from './httpClient';
 import { API_BASE_URL } from '../config';
 import { fetchBlob } from '../utils/downloadBlob';
 
@@ -260,6 +260,15 @@ export async function getRecentLoginSessions() {
  */
 export async function reissueAdminToken() {
   return httpClient.post('/admin/reissue-token', {});
+}
+
+/**
+ * POST /api/admin/refresh-permissions
+ * Lay permissions moi nhat tu DB sau khi admin sua ma tran quyen.
+ * Tra ve: { token, permissions }
+ */
+export async function refreshPermissionsApi() {
+  return httpClient.post('/admin/refresh-permissions', {});
 }
 
 export {

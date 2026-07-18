@@ -1,4 +1,4 @@
-function toUserDto(user, roles) {
+function toUserDto(user, roles, permissionKeys = []) {
   return {
     id: user.id,
     pseudoId: user.pseudo_id,
@@ -13,6 +13,7 @@ function toUserDto(user, roles) {
     roleLabels: roles.map((r) => r.role_label),
     primaryRole: roles[0]?.role_name || null,
     primaryRoleLabel: roles[0]?.role_label || null,
+    permissions: permissionKeys,
     mustChangePassword: Boolean(user.must_change_password),
     tokenVersion: user.token_version || 1,
   };
