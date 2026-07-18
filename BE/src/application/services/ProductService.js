@@ -21,10 +21,10 @@ class ProductService {
     this.productRepository = productRepository;
   }
 
-  async getAllProducts({ branchId, status, search, category, page, limit } = {}) {
+  async getAllProducts({ branchId, status, search, category, lowStockOnly, page, limit } = {}) {
     const [items, total] = await Promise.all([
-      this.productRepository.findAll({ branchId, status, search, category, page, limit }),
-      this.productRepository.count({ branchId, status, search, category }),
+      this.productRepository.findAll({ branchId, status, search, category, lowStockOnly, page, limit }),
+      this.productRepository.count({ branchId, status, search, category, lowStockOnly }),
     ]);
     return {
       items: ProductResponseDto.fromEntityList(items),
@@ -88,6 +88,10 @@ class ProductService {
     const deleted = await this.productRepository.delete(id);
     if (!deleted) throw new ApiError(404, 'Product not found');
     return ProductResponseDto.fromEntity(deleted);
+  }
+
+  async getCategories() {
+    return this.productRepository.getDistinctCategories();
   }
 }
 
