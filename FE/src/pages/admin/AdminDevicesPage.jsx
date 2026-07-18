@@ -439,13 +439,19 @@ export default function AdminDevicesPage() {
                     </span>
                   </td>
                   <td>
-                    <button
-                      className="btn btn--danger btn--sm"
-                      onClick={() => setLogoutTarget(device)}
-                      title="Đăng xuất khỏi thiết bị này"
-                    >
-                      <IconLogout /> Đăng xuất
-                    </button>
+                    {!device.isCurrent ? (
+                      <span className="btn btn--secondary btn--sm btn--disabled">
+                        Đã đăng xuất
+                      </span>
+                    ) : (
+                      <button
+                        className="btn btn--danger btn--sm"
+                        onClick={() => setLogoutTarget(device)}
+                        title="Đăng xuất khỏi thiết bị này"
+                      >
+                        <IconLogout /> Đăng xuất
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
