@@ -58,27 +58,39 @@ async function upsertDevice(userId, userAgent, ipAddress) {
   try {
     const { deviceName, browser, os } = parseUserAgent(userAgent);
 
-    await query(
-      'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
-      { p1: userId }
-    );
-
+    // Check if device already exists for this user with same IP+browser+os
     const existing = await query(
-      `SELECT TOP 1 id FROM user_devices
+      `SELECT TOP 1 id, is_current FROM user_devices
        WHERE user_id = @p1 AND ip_address = @p2 AND browser = @p3 AND os = @p4`,
       { p1: userId, p2: ipAddress, p3: browser, p4: os }
     );
 
     if (existing.recordset.length > 0) {
+      const existingDevice = existing.recordset[0];
+      // Update existing device to current
       await query(
         `UPDATE user_devices
          SET    is_current = 1,
                 last_login_at = SYSUTCDATETIME(),
                 user_agent = @p5
          WHERE  id = @p1`,
-        { p1: existing.recordset[0].id, p5: userAgent }
+        { p1: existingDevice.id, p5: userAgent }
       );
+      // Only mark OTHER devices of this USER as non-current (not all devices!)
+      // Skip if existing device is already current (avoid unnecessary query)
+      if (!existingDevice.is_current) {
+        await query(
+          'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1 AND id != @p2',
+          { p1: userId, p2: existingDevice.id }
+        );
+      }
     } else {
+      // First time login on this device/IP/browser/os combination
+      // Mark all OLD devices of THIS user as non-current, then insert new device
+      await query(
+        'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
+        { p1: userId }
+      );
       await query(
         `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, last_login_at)
          VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, SYSUTCDATETIME())`,
@@ -86,7 +98,7 @@ async function upsertDevice(userId, userAgent, ipAddress) {
       );
     }
   } catch (err) {
-    console.error('[loginSessionMiddleware] upsertDevice ERROR:', err && err.message ? err.message : err);
+    console.error('[loginSessionMiddleware] upsertDevice ERROR:', err.message ? err.message : err);
   }
 }
 
@@ -121,12 +133,9 @@ async function trackLogin(req, user) {
       ? user.branch_id
       : null;
 
-    // Dong cac phien active cu cua CUNG user truoc khi tao phien moi.
-    // Tranh tinh trang user spam login -> 149 row active (hinh anh ban gui).
-    // Ly do: neu user login tai 2 noi (web + mobile), session cu van 'active'
-    // nhung thuc te user da chuyen sang thiet bi moi -> phien cu se bi treo mai.
-    // Dat logout_reason = 'NEW_LOGIN_OVERRIDE' de audit biet session cu bi
-    // thay the boi session moi.
+    // Chi dong session cua CHINH USER nay (cung user_id)
+    // Neu user A login 2 lan -> lan 1 bi kick (logout_reason = 'NEW_LOGIN_OVERRIDE')
+    // Neu user A va user B login -> khong anh huong nhau
     if (userId) {
       try {
         await query(
@@ -135,16 +144,24 @@ async function trackLogin(req, user) {
                   logout_reason            = 'NEW_LOGIN_OVERRIDE',
                   session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
                   status                   = 'ended'
-           WHERE  user_id    = @p1
-             AND  status     = 'active'
+           WHERE  user_id   = @p1
+             AND  status   = 'active'
              AND  action_type = 'LOGIN'`,
           { p1: userId }
         );
+        console.log(`[trackLogin] Closed previous sessions for userId=${userId}`);
+
+        // Dong device cua user bi kick (chi user hien tai)
+        await query(
+          'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
+          { p1: userId }
+        );
       } catch (err) {
-        console.error('[loginSessionMiddleware] failed to close stale sessions:', err && err.message);
+        console.error('[loginSessionMiddleware] failed to close stale sessions:', err.message);
       }
     }
 
+    // Buoc 4: Insert session moi
     const insertResult = await query(
       `INSERT INTO login_sessions
          (action_type, user_id, user_name, phone, ip_address, user_agent,
@@ -177,11 +194,13 @@ async function trackLogin(req, user) {
       });
     }
 
+    // Buoc 5: Update device CHO USER HIEN TAI (chi anh huong device cua user nay)
+    // Khong anh huong device cua user khac
     if (userId && ipAddress) {
       await upsertDevice(userId, userAgent, ipAddress);
     }
   } catch (err) {
-    console.error('[loginSessionMiddleware] trackLogin failed:', err && err.message ? err.message : err);
+    console.error('[loginSessionMiddleware] trackLogin failed:', err.message ? err.message : err);
   }
 }
 

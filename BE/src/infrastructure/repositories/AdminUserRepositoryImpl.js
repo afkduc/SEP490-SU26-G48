@@ -264,12 +264,24 @@ class AdminUserRepositoryImpl {
     return result.recordset[0] || null;
   }
 
-  async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId }) {
+  async nextPseudoId() {
     const result = await query(
-      `INSERT INTO users (user_name, email, user_password, first_name, last_name, phone, branch_id, team_size, status, created_at)
+      `SELECT ISNULL(MAX(TRY_CAST(SUBSTRING(pseudo_id, 3, LEN(pseudo_id) - 2) AS INT)), 0) + 1 AS next_num
+       FROM users
+       WHERE pseudo_id LIKE 'NV%'`
+    );
+    const nextNum = result.recordset[0].next_num;
+    return `NV${String(nextNum).padStart(3, '0')}`;
+  }
+
+  async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId }) {
+    // Generate pseudo_id automatically (e.g., NV001, NV002, ...)
+    const pseudoId = await this.nextPseudoId();
+    const result = await query(
+      `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, team_size, status, created_at)
        OUTPUT INSERTED.id
-       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0, 'active', GETDATE())`,
-      { p1: name, p2: email, p3: passwordHash, p4: firstName || name, p5: lastName || '', p6: phone, p7: branchId }
+       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 0, 'active', GETDATE())`,
+      { p1: pseudoId, p2: name, p3: email, p4: passwordHash, p5: firstName || name, p6: lastName || '', p7: phone, p8: branchId }
     );
     const userId = result.recordset[0].id;
     if (roleId) {
