@@ -324,10 +324,11 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          rot.unit_price,
          p.product_code AS current_product_code,
          p.product_name AS current_product_name,
-         p.unit AS current_unit,
+         u.unit_name AS current_unit,
          p.stock_quantity AS current_stock
        FROM repair_order_tasks rot
        LEFT JOIN products p ON p.id = rot.product_id
+       LEFT JOIN units u ON u.id = p.unit_id
        WHERE rot.repair_order_id = @id
          AND rot.task_type = 'PART'
          AND rot.product_id IS NOT NULL
@@ -373,18 +374,19 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       .input('request_code', sql.VarChar(30), requestData.request_code)
       .input('branch_id', sql.BigInt, requestData.branch_id)
       .input('repair_order_id', sql.BigInt, requestData.repair_order_id)
+      .input('service_order_id', sql.BigInt, requestData.service_order_id ?? null)
       .input('performed_by', sql.BigInt, requestData.performed_by)
       .input('export_date', sql.Date, requestData.export_date ?? new Date())
       .input('notes', sql.NVarChar(500), requestData.notes ?? null)
       .query(`
         INSERT INTO export_requests (
-          request_code, branch_id, repair_order_id, performed_by,
-          export_date, status, notes, created_at
+          request_code, branch_id, repair_order_id, service_order_id,
+          performed_by, export_date, status, notes, created_at
         )
         OUTPUT INSERTED.id
         VALUES (
-          @request_code, @branch_id, @repair_order_id, @performed_by,
-          @export_date, 'completed', @notes, GETDATE()
+          @request_code, @branch_id, @repair_order_id, @service_order_id,
+          @performed_by, @export_date, 'completed', @notes, GETDATE()
         )
       `);
     const newId = insertReq.recordset[0].id;
