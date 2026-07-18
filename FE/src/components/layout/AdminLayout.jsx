@@ -185,6 +185,7 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className={`admin-shell ${collapsed ? 'admin-shell--collapsed' : ''}`}>
+
       {/* ── Sidebar ── */}
       <aside className="admin-sidebar">
         {/* Brand */}
