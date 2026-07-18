@@ -406,7 +406,6 @@ export default function ExportRequestFormPage() {
                       <tr>
                         <td colSpan={6} className="text-right"><strong>Tong so luong:</strong></td>
                         <td className="text-right"><strong>{totalQuantity}</strong></td>
-                        <td></td>
                       </tr>
                     </tfoot>
                   </table>

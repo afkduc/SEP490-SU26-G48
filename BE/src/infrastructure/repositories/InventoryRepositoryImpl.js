@@ -43,9 +43,10 @@ class InventoryRepositoryImpl extends InventoryRepository {
       { includeJoin: true },
     );
     const sql = `
-      SELECT p.*, s.supplier_name
+      SELECT p.*, s.supplier_name, u.unit_name
       FROM products p
       ${join}
+      LEFT JOIN units u ON p.unit_id = u.id
       WHERE ${where}
       ORDER BY p.product_name ASC
       OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
@@ -54,6 +55,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
     return result.recordset.map((r) => {
       const product = Product.fromPersistence(r);
       product.supplierName = r.supplier_name;
+      product.unit = r.unit_name || 'Cai';
       return product;
     });
   }
@@ -72,9 +74,10 @@ class InventoryRepositoryImpl extends InventoryRepository {
       { includeJoin: true },
     );
     const sql = `
-      SELECT p.*, s.supplier_name
+      SELECT p.*, s.supplier_name, u.unit_name
       FROM products p
       ${join}
+      LEFT JOIN units u ON p.unit_id = u.id
       WHERE ${where} AND p.status = 'active'
       ORDER BY p.stock_quantity ASC
     `;
@@ -82,21 +85,24 @@ class InventoryRepositoryImpl extends InventoryRepository {
     return result.recordset.map((r) => {
       const product = Product.fromPersistence(r);
       product.supplierName = r.supplier_name;
+      product.unit = r.unit_name || 'Cai';
       return product;
     });
   }
 
   async getStockByProduct(productId, branchId) {
     const sql = `
-      SELECT p.*, s.supplier_name
+      SELECT p.*, s.supplier_name, u.unit_name
       FROM products p
       LEFT JOIN suppliers s ON p.supplier_id = s.id
+      LEFT JOIN units u ON p.unit_id = u.id
       WHERE p.id = @productId AND p.branch_id = @branchId
     `;
     const result = await query(sql, { productId, branchId });
     if (!result.recordset[0]) return null;
     const product = Product.fromPersistence(result.recordset[0]);
     product.supplierName = result.recordset[0].supplier_name;
+    product.unit = result.recordset[0].unit_name || 'Cai';
     return product;
   }
 
@@ -129,9 +135,10 @@ class InventoryRepositoryImpl extends InventoryRepository {
         .input('productId', sql.BigInt, productId)
         .input('branchId', sql.BigInt, branchId)
         .query(`
-          SELECT p.*, s.supplier_name
+          SELECT p.*, s.supplier_name, u.unit_name
           FROM products p
           LEFT JOIN suppliers s ON p.supplier_id = s.id
+          LEFT JOIN units u ON p.unit_id = u.id
           WHERE p.id = @productId AND p.branch_id = @branchId
         `);
 
@@ -139,6 +146,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
       if (!row) return null;
       const product = Product.fromPersistence(row);
       product.supplierName = row.supplier_name;
+      product.unit = row.unit_name || 'Cai';
       return product;
     });
   }
@@ -170,9 +178,10 @@ class InventoryRepositoryImpl extends InventoryRepository {
 
   async findAllActiveProducts(branchId) {
     const result = await query(
-      `SELECT p.*, s.supplier_name
+      `SELECT p.*, s.supplier_name, u.unit_name
        FROM   products p
        LEFT JOIN suppliers s ON s.id = p.supplier_id
+       LEFT JOIN units u ON p.unit_id = u.id
        WHERE  p.branch_id = @branchId AND p.status = 'active'
        ORDER  BY p.product_name`,
       { branchId }
@@ -180,6 +189,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
     return result.recordset.map((r) => {
       const product = Product.fromPersistence(r);
       product.supplierName = r.supplier_name;
+      product.unit = r.unit_name || 'Cai';
       return product;
     });
   }
