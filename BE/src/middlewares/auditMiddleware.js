@@ -125,7 +125,27 @@ function auditLogger(req, res, next) {
 
   res.on('finish', () => {
     try {
-      const { method, originalUrl, ip, body, user } = req;
+      // Resolve IP cùng logic với loginSessionMiddleware (getRequestMeta).
+      // Đảm bảo cả login_sessions và audit_logs ghi IP theo cùng 1 quy tắc
+      // nên không có trường hợp 1 bảng có IP, bảng kia lại null.
+      //   1) x-forwarded-for (proxy/CDN) — tách phần tử đầu tiên
+      //   2) req.ip (Express + trust proxy)
+      //   3) req.connection / req.socket .remoteAddress (IPv4/IPv6)
+      //   4) x-real-ip (một số reverse-proxy dùng thay XFF)
+      const xff = req.headers ? req.headers['x-forwarded-for'] : null;
+      let ip = null;
+      if (xff) ip = xff.split(',')[0].trim() || null;
+      if (!ip) ip = req.ip || null;
+      if (!ip && req.connection) ip = req.connection.remoteAddress || null;
+      if (!ip && req.socket) ip = req.socket.remoteAddress || null;
+      if (!ip) {
+        const h = req.headers || {};
+        ip = h['x-real-ip'] || null;
+      }
+      // Ip varchar(45) trong DB — truncate để chắc chắn không tràn.
+      const ipFinal = ip ? String(ip).slice(0, 45) : null;
+
+      const { method, originalUrl, body, user } = req;
 
       // 1. Skip read-only requests — only audit write operations.
       if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return;
@@ -192,7 +212,7 @@ function auditLogger(req, res, next) {
           p6: entityName,
           p7: entityCode,
           p8: recordId,
-          p9: ip,
+          p9: ipFinal,
           p10: method,
           p11: String(originalUrl).slice(0, 500),
           p12: sanitizedBody ? JSON.stringify(sanitizedBody) : null,

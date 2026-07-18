@@ -40,7 +40,11 @@ class AuthService {
     }
 
     const roles = await this.authRepository.findUserRoles(user.id);
-    const userDto = toUserDto(user, roles);
+
+    // Tang token_version de void tat ca token cu khi user login o noi khac.
+    const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
+
+    const userDto = toUserDto({ ...user, token_version: newTokenVersion }, roles);
 
     const token = jwt.sign(
       {
@@ -49,6 +53,7 @@ class AuthService {
         name: userDto.name,
         roles: userDto.roles,
         branchId: userDto.branchId,
+        tokenVersion: userDto.tokenVersion,
       },
       config.jwtSecret,
       { expiresIn: config.jwtExpiresIn }
