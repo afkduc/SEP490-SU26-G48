@@ -1,20 +1,41 @@
 const jwt = require('jsonwebtoken');
 const ApiError = require('../utils/ApiError');
 const config = require('../config');
+const { query } = require('../infrastructure/database/sqlServer');
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return next(new ApiError(401, 'Chưa đăng nhập'));
   }
 
   const token = authHeader.split(' ')[1];
+  let decoded;
   try {
-    const decoded = jwt.verify(token, config.jwtSecret);
+    decoded = jwt.verify(token, config.jwtSecret);
+  } catch {
+    return next(new ApiError(401, 'Token không hợp lệ hoặc đã hết hạn'));
+  }
+
+  if (!decoded.userId) {
+    req.user = decoded;
+    return next();
+  }
+
+  try {
+    const result = await query(
+      `SELECT token_version FROM users WHERE id = @userId`,
+      { userId: decoded.userId }
+    );
+    const dbVersion = result.recordset[0]?.token_version;
+    if (dbVersion !== undefined && decoded.tokenVersion !== dbVersion) {
+      return next(new ApiError(401, 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.'));
+    }
     req.user = decoded;
     next();
   } catch {
-    next(new ApiError(401, 'Token không hợp lệ hoặc đã hết hạn'));
+    req.user = decoded;
+    next();
   }
 }
 

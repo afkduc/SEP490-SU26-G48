@@ -408,27 +408,54 @@ async function getLoginSessions(filters = {}) {
   const safePageSize = Math.max(1, parseInt(pageSize, 10) || 20);
   const offset = (safePage - 1) * safePageSize;
 
-  const countResult = await query(
-    `SELECT COUNT(*) AS total
-     FROM   login_sessions ls
-     WHERE  ${whereClause}`,
-    params
-  );
+  const [countResult, statsResult] = await Promise.all([
+    query(
+      `SELECT COUNT(*) AS total
+       FROM   login_sessions ls
+       WHERE  ${whereClause}`,
+      params
+    ),
+    query(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(CASE WHEN ls.action_type = 'LOGIN' THEN 1 ELSE 0 END) AS login_count,
+         SUM(CASE WHEN ls.action_type = 'LOGIN_FAILED' THEN 1 ELSE 0 END) AS failed_count,
+         SUM(CASE WHEN ls.status = 'active' THEN 1 ELSE 0 END) AS active_count
+       FROM   login_sessions ls
+       WHERE  ${whereClause}`,
+      params
+    ),
+  ]);
   const total = countResult.recordset[0].total;
+  const stats = statsResult.recordset[0];
 
   const dataResult = await query(
     `SELECT ${LOGIN_SESSION_COLUMNS}
      FROM   login_sessions ls
      LEFT   JOIN branches b ON b.id = ls.branch_id
      WHERE  ${whereClause}
-     ORDER  BY ls.login_time DESC, ls.id DESC
+     ORDER  BY
+       CASE WHEN ls.status = 'active' THEN 0 ELSE 1 END,
+       CASE WHEN ls.status = 'active' THEN ls.login_time ELSE COALESCE(ls.logout_time, ls.login_time) END DESC,
+       ls.id DESC
      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY`,
     { ...params, offset, pageSize: safePageSize }
   );
 
   const items = dataResult.recordset.map(toLoginSessionRow);
 
-  return { total, page: safePage, pageSize: safePageSize, items };
+  return {
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    items,
+    stats: {
+      total: stats.total || 0,
+      loginCount: stats.login_count || 0,
+      failedCount: stats.failed_count || 0,
+      activeCount: stats.active_count || 0,
+    },
+  };
 }
 
 async function getLoginSessionsSince(sinceDate, limit = 50) {

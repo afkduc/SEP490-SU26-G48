@@ -4,15 +4,19 @@
 
 /* ── Page wrapper ─────────────────────────────────────────── */
 .admin-logs {
-  padding: 28px 32px;
+  padding: 24px 24px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #1e293b;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   min-height: calc(100vh - 64px);
   background: #f8fafc;
   box-sizing: border-box;
+  /* Full màn — kéo giãn theo viewport, không bao giờ xuất hiện scrollbar ngang */
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* ── Header ───────────────────────────────────────────────── */
@@ -354,13 +358,31 @@
 
 .admin-logs__table-title svg { color: #94a3b8; }
 
-.admin-logs__table-wrapper { overflow-x: auto; }
+.admin-logs__table-wrapper {
+  /* Wrapper KHÔNG cho scroll ngang — table tự co giãn + truncate để luôn vừa viewport */
+  overflow-x: visible;
+  width: 100%;
+}
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
+  /* Fixed layout để phân bổ cột theo tỉ lệ %, không phụ thuộc nội dung */
+  table-layout: fixed;
 }
+
+/* Phân bổ độ rộng cột (tổng = 100%) ở mặc định ≥1100px */
+.table colgroup col:nth-child(1)  { width: 16%; }  /* Thời gian — cần đủ cho 3 dòng */
+.table colgroup col:nth-child(2)  { width: 12%; }  /* Người dùng */
+.table colgroup col:nth-child(3)  { width: 7%;  }  /* Hành động */
+.table colgroup col:nth-child(4)  { width: 11%; }  /* Bảng dữ liệu */
+.table colgroup col:nth-child(5)  { width: 9%;  }  /* Mã bản ghi */
+.table colgroup col:nth-child(6)  { width: 10%; }  /* Địa chỉ IP */
+.table colgroup col:nth-child(7)  { width: 6%;  }  /* Phương thức */
+.table colgroup col:nth-child(8)  { width: 8%;  }  /* Thời gian xử lý */
+.table colgroup col:nth-child(9)  { width: 10%; }  /* Trạng thái */
+.table colgroup col:nth-child(10) { width: 8%;  }  /* Thao tác - nút Chi tiết */
 
 .table thead tr {
   background: #f8fafc;
@@ -368,15 +390,17 @@
 }
 
 .table thead th {
-  padding: 11px 16px;
+  padding: 10px 12px;
   text-align: left;
   font-size: 0.72rem;
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
   border-bottom: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .table tbody tr {
@@ -397,9 +421,49 @@
 }
 
 .table tbody td {
-  padding: 12px 16px;
+  padding: 10px 12px;
   color: #334155;
   vertical-align: middle;
+  /* Truncate dài: 1 dòng + ellipsis, hover cell sẽ thấy title (set ở từng span) */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Các span nội dung trong cell cũng phải truncate theo */
+.table tbody td > * {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Time-cell là container flex-column chứa 3 dòng (main / ago / utc).
+   Phải loại trừ khỏi override display:block ở trên, nếu không các span sẽ
+   chảy ngang thành 1 dòng. */
+.table tbody td.audit-logs__cell--time > .audit-logs__time-cell {
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.table tbody td.audit-logs__cell--time > .audit-logs__time-cell > span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Action cell (nút Chi tiết): không truncate */
+.table tbody td.audit-logs__cell--actions,
+.table tbody td.audit-logs__cell--actions > * {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .table__empty {
@@ -498,6 +562,20 @@
   font-family: 'JetBrains Mono', monospace;
   color: #64748b;
   cursor: help;
+}
+
+.audit-logs__ip--missing {
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.audit-logs__code--empty {
+  color: #94a3b8;
+  border-bottom: none;
+  font-style: italic;
 }
 
 .audit-logs__method {
@@ -631,9 +709,46 @@
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
+/* Màn ≤ 1100px: ẩn cột "Bảng dữ liệu" + "Thời gian xử lý" — hiển thị trong drawer chi tiết */
+@media (max-width: 1100px) {
+  .admin-logs__table-wrapper { overflow-x: visible; }
+  .table colgroup col:nth-child(4)  { display: none; }  /* Bảng dữ liệu */
+  .table colgroup col:nth-child(8)  { display: none; }  /* Thời gian xử lý */
+  /* Phân bổ lại tỉ lệ cho 8 cột còn lại */
+  .table colgroup col:nth-child(1)  { width: 16%; }
+  .table colgroup col:nth-child(2)  { width: 14%; }
+  .table colgroup col:nth-child(3)  { width: 9%;  }
+  .table colgroup col:nth-child(5)  { width: 11%; }
+  .table colgroup col:nth-child(6)  { width: 13%; }
+  .table colgroup col:nth-child(7)  { width: 8%;  }
+  .table colgroup col:nth-child(9)  { width: 13%; }
+  .table colgroup col:nth-child(10) { width: 10%; }
+}
+
+/* Màn ≤ 820px: ẩn thêm cột "Mã bản ghi" + "Phương thức" */
+@media (max-width: 820px) {
+  .table colgroup col:nth-child(5)  { display: none; }
+  .table colgroup col:nth-child(7)  { display: none; }
+  .table colgroup col:nth-child(1)  { width: 19%; }
+  .table colgroup col:nth-child(2)  { width: 17%; }
+  .table colgroup col:nth-child(3)  { width: 11%; }
+  .table colgroup col:nth-child(6)  { width: 16%; }
+  .table colgroup col:nth-child(9)  { width: 17%; }
+  .table colgroup col:nth-child(10) { width: 13%; }
+  /* Ẩn cả dòng header tương ứng */
+  .table thead th:nth-child(4),
+  .table thead th:nth-child(5),
+  .table thead th:nth-child(7),
+  .table thead th:nth-child(8),
+  .table tbody td:nth-child(4),
+  .table tbody td:nth-child(5),
+  .table tbody td:nth-child(7),
+  .table tbody td:nth-child(8) { display: none; }
+}
+
 @media (max-width: 900px) {
   .admin-logs {
-    padding: 20px 16px;
+    padding: 18px 14px;
   }
 
   .admin-logs__filter-body {
