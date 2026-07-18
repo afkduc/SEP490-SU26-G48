@@ -31,6 +31,19 @@ async function authenticate(req, res, next) {
     if (dbVersion !== undefined && decoded.tokenVersion !== dbVersion) {
       return next(new ApiError(401, 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.'));
     }
+
+    // Kiem tra device con active khong (per-device logout)
+    // Neu co deviceId trong JWT, kiem tra is_current trong user_devices
+    if (decoded.deviceId) {
+      const deviceResult = await query(
+        `SELECT is_current FROM user_devices WHERE id = @deviceId AND user_id = @userId`,
+        { deviceId: decoded.deviceId, userId: decoded.userId }
+      );
+      if (deviceResult.recordset.length > 0 && deviceResult.recordset[0].is_current === 0) {
+        return next(new ApiError(401, 'Thiết bị đã bị đăng xuất từ quản trị. Vui lòng đăng nhập lại.'));
+      }
+    }
+
     // Merge permissions from JWT (set at login time) into req.user
     req.user = {
       userId: decoded.userId,
@@ -40,6 +53,7 @@ async function authenticate(req, res, next) {
       permissions: decoded.permissions || [],
       branchId: decoded.branchId,
       tokenVersion: decoded.tokenVersion,
+      deviceId: decoded.deviceId || null,
     };
     next();
   } catch {

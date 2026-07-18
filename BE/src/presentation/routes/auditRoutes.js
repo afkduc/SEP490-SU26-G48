@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate, requireAdmin } = require('../../middlewares/auth');
+const { trackActivity } = require('../../middlewares');
 const { success } = require('../../utils/response');
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
@@ -19,7 +20,7 @@ function buildAuditRouter() {
   const repository = AuditRepository;
   const auditService = new AuditService(repository);
 
-  router.use(authenticate, requireAdmin);
+  router.use(authenticate, requireAdmin, trackActivity);
 
   router.get('/', async (req, res, next) => {
     try {

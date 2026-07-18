@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
-import { adminLoginSessionsApi } from '../../services/adminApi';
+import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import './LoginSessionsPage.css';
-
-const POLL_INTERVAL_MS = 10_000;
 
 const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
@@ -359,56 +357,14 @@ export default function AdminLoginSessionsPage() {
   const [detailSession, setDetailSession] = useState(null);
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
 
-// Realtime polling: moi POLL_INTERVAL_MS goi /login-sessions/recent?since=...
-// de kiem tra co session moi (login hoac logout) khong. Neu co -> refetch
-// toan trang. Tam dung khi tab an (visibilitychange).
-useEffect(() => {
-    if (!realtimeEnabled) return undefined;
-    let cancelled = false;
-    let timerId = null;
-    let lastSinceIso = new Date(Date.now() - 60_000).toISOString();
+  // SSE: nhan su kien realtime tu server, chi refetch khi co su kien moi
+  const handleSessionEvent = (eventData) => {
+    console.log('[AdminLoginSessionsPage] SSE event:', eventData);
+    // Co su kien -> refetch full list de dam bao du lieu dong bo
+    sessions.refetch();
+  };
 
-    async function poll() {
-      try {
-        const res = await adminLoginSessionsApi.recent(lastSinceIso);
-        if (cancelled) return;
-        const items = res?.items || [];
-        if (items.length > 0) {
-          // Co phien moi -> refetch full list de dam bao du lieu dong bo
-          sessions.refetch();
-        }
-        lastSinceIso = new Date().toISOString();
-      } catch (e) {
-        // Neu 401 (hết phiên), dung polling
-        if (e?.status === 401 || e?.message?.includes('hết hiệu lực') || e?.message?.includes('hết hạn')) {
-          console.warn('[AdminLoginSessionsPage] Session expired, stopping poll');
-          setRealtimeEnabled(false);
-          return;
-        }
-        console.warn('[AdminLoginSessionsPage] realtime poll failed:', e?.message);
-      } finally {
-        if (!cancelled) timerId = setTimeout(poll, POLL_INTERVAL_MS);
-      }
-    }
-
-    timerId = setTimeout(poll, POLL_INTERVAL_MS);
-
-    function onVisibility() {
-      if (document.hidden) {
-        if (timerId) clearTimeout(timerId);
-      } else if (!cancelled) {
-        timerId = setTimeout(poll, 500);
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibility);
-
-    return () => {
-      cancelled = true;
-      if (timerId) clearTimeout(timerId);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realtimeEnabled, sessions.refetch]);
+  const { connected } = useLoginSessionsSSE(handleSessionEvent, realtimeEnabled);
 
   const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
   const hasFilters = sessions.params.userName || sessions.params.phone ||
