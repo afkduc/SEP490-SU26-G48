@@ -28,6 +28,9 @@ function buildAdminRouter() {
   // van co the goi va lay token moi co day du roles tu DB.
   router.post('/reissue-token', authenticate, controller.reissueToken);
 
+  // Refresh permissions sau khi admin sua ma tran quyen
+  router.post('/refresh-permissions', authenticate, controller.refreshPermissions);
+
   router.use(authenticate, requireAdmin);
 
   router.get('/dashboard', controller.getDashboardStats);

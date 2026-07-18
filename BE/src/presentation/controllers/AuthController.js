@@ -35,6 +35,7 @@ class AuthController {
 
   async getMe(req, res, next) {
     try {
+      // req.user da co permissions tu auth middleware
       return success(res, req.user, 'Lấy thông tin thành công');
     } catch (err) {
       next(err);

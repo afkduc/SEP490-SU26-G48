@@ -31,7 +31,16 @@ async function authenticate(req, res, next) {
     if (dbVersion !== undefined && decoded.tokenVersion !== dbVersion) {
       return next(new ApiError(401, 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.'));
     }
-    req.user = decoded;
+    // Merge permissions from JWT (set at login time) into req.user
+    req.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      name: decoded.name,
+      roles: decoded.roles || [],
+      permissions: decoded.permissions || [],
+      branchId: decoded.branchId,
+      tokenVersion: decoded.tokenVersion,
+    };
     next();
   } catch {
     req.user = decoded;

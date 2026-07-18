@@ -8,11 +8,36 @@ function loadSession() {
   try {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
-    if (token && raw) return { token, user: JSON.parse(raw) };
+    if (token && raw) {
+      const user = JSON.parse(raw);
+      // Load permissions từ localStorage (được set khi login)
+      const permissions = localStorage.getItem('permissions') || sessionStorage.getItem('permissions');
+      return {
+        token,
+        user,
+        permissions: permissions ? JSON.parse(permissions) : (user.permissions || []),
+      };
+    }
   } catch {
     /* ignore */
   }
-  return { token: null, user: null };
+  return { token: null, user: null, permissions: [] };
+}
+
+function saveSession(token, user, permissions) {
+  const storage = token === localStorage.getItem('token') ? localStorage : sessionStorage;
+  storage.setItem('token', token);
+  storage.setItem('user', JSON.stringify(user));
+  storage.setItem('permissions', JSON.stringify(permissions || []));
+}
+
+function clearSession() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('permissions');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('user');
+  sessionStorage.removeItem('permissions');
 }
 
 /**
@@ -44,49 +69,68 @@ export function AppProvider({ children }) {
   const initial = loadSession();
   const [token, setToken] = useState(initial.token);
   const [user, setUser] = useState(initial.user);
+  const [permissions, setPermissions] = useState(initial.permissions);
 
   useEffect(() => {
-    if (token) {
-      localStorage.setItem('token', token);
-    } else {
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
+    if (token && user) {
+      saveSession(token, user, permissions);
     }
-  }, [token]);
+  }, [token, user, permissions]);
 
   const login = async (email, password, remember = false) => {
     const result = await loginApi(email, password);
+    const newPermissions = result.user?.permissions || [];
     const storage = remember ? localStorage : sessionStorage;
     storage.setItem('token', result.token);
-    // Luu them flag mustChangePassword (trong user object) de trang khac co the check
     storage.setItem('user', JSON.stringify(result.user));
+    storage.setItem('permissions', JSON.stringify(newPermissions));
     setToken(result.token);
     setUser(result.user);
+    setPermissions(newPermissions);
 
     // Tra luon ket qua cho caller (LoginPage) de xu ly redirect neu can
     return result;
   };
 
   const logout = async () => {
-    // Goi API logout truoc (fire-and-forget) de BE trackLogout cap nhat
-    // status = 'ended' + logout_time + session_duration_seconds cho phien dang nhap.
-    // Loi API (vd het token) van cho logout local de user khong bi ket.
     try {
       await logoutApi();
     } catch (e) {
       console.warn('[AppContext] logout API failed (tiep tuc logout local):', e?.message);
     }
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
+    clearSession();
     setToken(null);
     setUser(null);
+    setPermissions([]);
+  };
+
+  /**
+   * Reload permissions from localStorage.
+   * Dùng sau khi admin thay đổi ma trận quyền trên chính máy của họ.
+   */
+  const reloadPermissions = () => {
+    try {
+      const stored = localStorage.getItem('permissions') || sessionStorage.getItem('permissions');
+      if (stored) {
+        setPermissions(JSON.parse(stored));
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
   const value = useMemo(
-    () => ({ token, user, isAuthenticated: Boolean(token && user), login, logout }),
-    [token, user]
+    () => ({
+      token,
+      user,
+      permissions,
+      isAuthenticated: Boolean(token && user),
+      login,
+      logout,
+      reloadPermissions,
+      setUser,
+    }),
+    [token, user, permissions]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

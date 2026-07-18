@@ -188,6 +188,26 @@ class RoleRepositoryImpl {
   }
 
   /**
+   * Lay tat ca permission_key strings cua 1 user (dùng cho RBAC enforcement).
+   * Chỉ lấy roles đang active (is_active = 1) và permissions của các role đó.
+   * @param {number} userId
+   * @returns {Promise<string[]>}
+   */
+  async getUserPermissionKeys(userId) {
+    const result = await query(`
+      SELECT DISTINCT p.permission_key
+      FROM user_role ur
+      JOIN roles r ON r.id = ur.role_id
+      JOIN role_permissions rp ON rp.role_id = r.id
+      JOIN permissions p ON p.id = rp.permission_id
+      WHERE ur.user_id = @p1
+        AND ISNULL(ur.is_active, 1) = 1
+        AND ISNULL(r.is_active, 1) = 1
+    `, { p1: userId });
+    return result.recordset.map((row) => row.permission_key);
+  }
+
+  /**
    * Lay danh sach user (id, name, email, status) dang co role nay
    */
   async getRoleUsers(roleId) {
