@@ -8,7 +8,7 @@ const ADMIN_SIDEBAR = [
     group: null,
     items: [
       {
-        label: 'Tong quan',
+        label: 'Tổng quan',
         path: '/admin/dashboard',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -20,10 +20,10 @@ const ADMIN_SIDEBAR = [
     ],
   },
   {
-    group: 'He thong',
+    group: 'Hệ thống',
     items: [
       {
-        label: 'Nguoi dung',
+        label: 'Người dùng',
         path: '/admin/users',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -33,10 +33,10 @@ const ADMIN_SIDEBAR = [
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
         ),
-        badge: 'He thong',
+        badge: 'Hệ thống',
       },
       {
-        label: 'Chi nhanh',
+        label: 'Chi nhánh',
         path: '/admin/branches',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -46,7 +46,7 @@ const ADMIN_SIDEBAR = [
         ),
       },
       {
-        label: 'Vai tro',
+        label: 'Vai trò',
         path: '/admin/roles',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -57,10 +57,10 @@ const ADMIN_SIDEBAR = [
     ],
   },
   {
-    group: 'Giam sat',
+    group: 'Giám sát',
     items: [
       {
-        label: 'Nhat ky hoat dong',
+        label: 'Nhật ký hoạt động',
         path: '/admin/logs',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -73,7 +73,7 @@ const ADMIN_SIDEBAR = [
         ),
       },
       {
-        label: 'Lich su dang nhap',
+        label: 'Lịch sử đăng nhập',
         path: '/admin/login-sessions',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -83,7 +83,7 @@ const ADMIN_SIDEBAR = [
         ),
       },
       {
-        label: 'Thiet bi',
+        label: 'Thiết bị',
         path: '/admin/devices',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -94,7 +94,7 @@ const ADMIN_SIDEBAR = [
         ),
       },
       {
-        label: 'Chuyen mon',
+        label: 'Chuyên môn',
         path: '/admin/specialties',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -105,10 +105,10 @@ const ADMIN_SIDEBAR = [
     ],
   },
   {
-    group: 'Tai khoan',
+    group: 'Tài khoản',
     items: [
       {
-        label: 'Ho so ca nhan',
+        label: 'Hồ sơ cá nhân',
         path: '/admin/profile',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -118,7 +118,7 @@ const ADMIN_SIDEBAR = [
         ),
       },
       {
-        label: 'Cai dat thong bao',
+        label: 'Cài đặt thông báo',
         path: '/admin/profile/notifications',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -198,7 +198,7 @@ export default function AdminLayout({ children }) {
           {!collapsed && (
             <div className="admin-sidebar__brand-text">
               <span className="admin-sidebar__brand-name">AutoGara</span>
-              <span className="admin-sidebar__brand-role">Quan tri he thong</span>
+              <span className="admin-sidebar__brand-role">Quản trị hệ thống</span>
             </div>
           )}
         </div>
@@ -244,7 +244,7 @@ export default function AdminLayout({ children }) {
           <button
             className="admin-sidebar__collapse-btn"
             onClick={() => setCollapsed((v) => !v)}
-            title={collapsed ? 'Mo rong sidebar' : 'Thu gon sidebar'}
+            title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               {collapsed ? (
@@ -253,7 +253,7 @@ export default function AdminLayout({ children }) {
                 <polyline points="15 18 9 12 15 6"/>
               )}
             </svg>
-            {!collapsed && <span>Thu gon</span>}
+            {!collapsed && <span>Thu gọn</span>}
           </button>
         </div>
       </aside>
@@ -263,7 +263,7 @@ export default function AdminLayout({ children }) {
         {/* Top bar */}
         <header className="admin-topbar">
           <div className="admin-topbar__breadcrumb">
-            <span className="admin-topbar__section">Quan tri</span>
+            <span className="admin-topbar__section">Quản trị</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 18 15 12 9 6"/>
             </svg>
@@ -275,14 +275,14 @@ export default function AdminLayout({ children }) {
             {user && (
               <div className="admin-topbar__online-indicator" title="Tài khoản đang hoạt động">
                 <span className="online-dot" />
-                <span className="online-label">Online</span>
+                <span className="online-label">Trực tuyến</span>
               </div>
             )}
             <div className="admin-topbar__user" onClick={() => setUserMenuOpen((v) => !v)} ref={userMenuRef}>
               <div className="admin-topbar__avatar">{getInitials(user?.name || '')}</div>
               <div className="admin-topbar__user-info">
                 <span className="admin-topbar__user-name">{user?.name}</span>
-                <span className="admin-topbar__user-role">Quan tri vien</span>
+                <span className="admin-topbar__user-role">Quản trị viên</span>
               </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="6 9 12 15 18 9"/>
@@ -306,7 +306,7 @@ export default function AdminLayout({ children }) {
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                       <circle cx="12" cy="7" r="4"/>
                     </svg>
-                    Ho so ca nhan
+                    Ho sơ cá nhân
                   </button>
                   <button className="admin-topbar__dropdown-item admin-topbar__dropdown-item--danger" onClick={handleLogout}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -314,7 +314,7 @@ export default function AdminLayout({ children }) {
                       <polyline points="16 17 21 12 16 7"/>
                       <line x1="21" y1="12" x2="9" y2="12"/>
                     </svg>
-                    Dang xuat
+                    Đăng xuất
                   </button>
                 </div>
               )}
