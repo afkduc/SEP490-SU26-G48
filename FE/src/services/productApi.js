@@ -53,6 +53,10 @@ export async function deleteProductApi(id) {
   return httpClient.delete(`/products/${id}`);
 }
 
+export async function getCategoriesApi() {
+  return httpClient.get('/products/categories');
+}
+
 /**
  * Tra cuu phu tung theo tu khoa (dung o trang quyet toan sua chua).
  * BE: GET /api/inventory/products/search?q=...
