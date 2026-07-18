@@ -6,9 +6,10 @@ class ProductRepositoryImpl extends ProductRepository {
   async findAll({ branchId, status, search, category, page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
     let sql = `
-      SELECT p.*, s.supplier_name
+      SELECT p.*, s.supplier_name, u.unit_name
       FROM products p
       LEFT JOIN suppliers s ON p.supplier_id = s.id
+      LEFT JOIN units u ON p.unit_id = u.id
       WHERE 1=1
     `;
     const params = {};
@@ -42,9 +43,10 @@ class ProductRepositoryImpl extends ProductRepository {
 
   async findById(id) {
     const sql = `
-      SELECT p.*, s.supplier_name
+      SELECT p.*, s.supplier_name, u.unit_name
       FROM products p
       LEFT JOIN suppliers s ON p.supplier_id = s.id
+      LEFT JOIN units u ON p.unit_id = u.id
       WHERE p.id = @id
     `;
     const result = await query(sql, { id });
@@ -57,9 +59,10 @@ class ProductRepositoryImpl extends ProductRepository {
     const where = branchId ? 'product_code = @code AND branch_id = @branchId' : 'product_code = @code';
     const params = branchId ? { code, branchId } : { code };
     const result = await query(
-      `SELECT p.*, s.supplier_name
+      `SELECT p.*, s.supplier_name, u.unit_name
        FROM   products p
        LEFT   JOIN suppliers s ON p.supplier_id = s.id
+       LEFT   JOIN units u ON p.unit_id = u.id
        WHERE  ${where}`,
       params
     );
@@ -73,12 +76,12 @@ class ProductRepositoryImpl extends ProductRepository {
   async create(data) {
     const sql = `
       INSERT INTO products (
-        product_code, product_name, category, brand_name, unit,
+        product_code, product_name, category, brand_name, unit_id,
         unit_price, stock_quantity, min_stock, supplier_id,
         location, branch_id, status
       )
       VALUES (
-        @productCode, @productName, @category, @brandName, @unit,
+        @productCode, @productName, @category, @brandName, @unitId,
         @unitPrice, @stockQuantity, @minStock, @supplierId,
         @location, @branchId, @status
       );
@@ -89,7 +92,7 @@ class ProductRepositoryImpl extends ProductRepository {
       productName: data.productName,
       category: data.category || null,
       brandName: data.brandName || null,
-      unit: data.unit || 'Cai',
+      unitId: data.unitId,
       unitPrice: data.unitPrice || null,
       stockQuantity: data.stockQuantity || 0,
       minStock: data.minStock || 0,
@@ -119,9 +122,9 @@ class ProductRepositoryImpl extends ProductRepository {
       params.brandName = data.brandName;
       fields.push('brand_name = @brandName');
     }
-    if (data.unit !== undefined) {
-      params.unit = data.unit;
-      fields.push('unit = @unit');
+    if (data.unitId !== undefined) {
+      params.unitId = data.unitId;
+      fields.push('unit_id = @unitId');
     }
     if (data.unitPrice !== undefined) {
       params.unitPrice = data.unitPrice;
@@ -181,6 +184,11 @@ class ProductRepositoryImpl extends ProductRepository {
 
     const result = await query(sql, params);
     return result.recordset[0].total;
+  }
+
+  async listUnits() {
+    const result = await query(`SELECT id, unit_name FROM units ORDER BY unit_name`);
+    return result.recordset.map((r) => ({ id: r.id, name: r.unit_name }));
   }
 }
 

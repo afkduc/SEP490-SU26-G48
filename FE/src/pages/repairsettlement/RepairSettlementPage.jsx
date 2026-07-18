@@ -33,9 +33,10 @@ const HTTT_OPTIONS = [
   { value: 'BH', label: 'Bảo hiểm chi trả' },
   { value: 'NB', label: 'Nội bộ chịu phí' },
 ];
-// ĐVT thường gặp cho gara ô tô; tự chọn mặc định theo LHSC nhưng vẫn cho sửa tay.
-const UNIT_OPTIONS = ['Lần', 'Cái', 'Bộ', 'Lít', 'Chai', 'Bình'];
-const DEFAULT_UNIT_BY_LHSC = { DV: 'Lần', PT: 'Cái' };
+// ĐVT thường gặp cho gara ô tô (chỉ áp dụng cho dòng phụ tùng - dòng dịch vụ
+// luôn cố định đơn vị "Công", không cho sửa).
+const UNIT_OPTIONS = ['Cái', 'Bộ', 'Lít', 'Chai', 'Bình'];
+const DEFAULT_UNIT_BY_LHSC = { DV: 'Công', PT: 'Cái' };
 
 // Còn bảo hành khi CẢ HAI điều kiện thỏa: còn trong thời hạn (warrantyEndDate)
 // VÀ còn trong hạn km (warrantyKmLimit so với km hiện tại đang nhập cho lần vào
@@ -82,7 +83,7 @@ function numberToVietnamese(num) {
 }
 
 function emptyItem() {
-  return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: 'KHT', unit: 'Lần', qty: 1, unitPrice: 0, discount: 0, total: 0 };
+  return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: 'KHT', unit: 'Công', qty: 1, unitPrice: 0, discount: 0, total: 0 };
 }
 
 // Che dữ liệu nhạy cảm (điện thoại, email, CCCD) khi hiển thị dữ liệu đã tra cứu
@@ -975,7 +976,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const selectCatalogService = (idx, svc) => {
     setItems((prev) => {
       const next = [...prev];
-      next[idx] = recalcItem({ ...next[idx], code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Lần', lhsc: 'DV', discount: 0 });
+      next[idx] = recalcItem({ ...next[idx], code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', discount: 0 });
       return next;
     });
     closeCatalogSuggestions(idx);
@@ -995,7 +996,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         productId: null,
         description,
         unitPrice: pkg.totalPrice,
-        unit: 'Lần',
+        unit: 'Công',
         qty: 1,
         lhsc: 'DV',
         discount: 0,
@@ -1017,7 +1018,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         productId: product.id,
         description: product.productName,
         unitPrice: product.unitPrice || 0,
-        unit: product.unit || next[idx].unit,
+        unit: product.unitName || next[idx].unit,
         lhsc: 'PT',
         discount: 0,
       });
@@ -1356,7 +1357,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                                   style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
                                   <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
                                   <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>
-                                    {formatCurrency(p.unitPrice)} / {p.unit} · Tồn: {p.stockQuantity}
+                                    {formatCurrency(p.unitPrice)} / {p.unitName} · Tồn: {p.stockQuantity}
                                     {p.isLowStock && <span style={{ color: '#C62828', fontWeight: 600 }}> (sắp hết)</span>}
                                   </div>
                                 </div>
@@ -1396,9 +1397,13 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       </select>
                     </td>
                     <td>
-                      <select className="form-select" style={{ fontSize: 12 }} value={item.unit} onChange={(e) => setItem(idx, 'unit', e.target.value)}>
-                        {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
-                      </select>
+                      {item.lhsc === 'DV' ? (
+                        <span style={{ fontSize: 12 }}>Công</span>
+                      ) : (
+                        <select className="form-select" style={{ fontSize: 12 }} value={item.unit} onChange={(e) => setItem(idx, 'unit', e.target.value)}>
+                          {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                      )}
                     </td>
                     <td>
                       <input className="form-input" style={{ fontSize: 12 }} type="number" min={1} value={item.qty} onChange={(e) => setItem(idx, 'qty', Number(e.target.value))} />

@@ -429,10 +429,60 @@ class ManagerRepositoryImpl {
       { id: Number(id), branchId: Number(branchId) }
     );
     const row = result.recordset[0];
-    return row ? mapServiceRow(row) : null;
+    if (!row) return null;
+
+    const parts = await this._listServiceParts(id);
+    return { ...mapServiceRow(row), parts };
   }
 
-  async createService({ branchId, serviceCode, serviceName, categoryId, unitPrice, durationMin, description }) {
+  async _listServiceParts(serviceId) {
+    const result = await query(
+      `SELECT sp.product_id, p.product_code, p.product_name, u.unit_name, sp.quantity
+       FROM service_parts sp
+       JOIN products p ON p.id = sp.product_id
+       LEFT JOIN units u ON u.id = p.unit_id
+       WHERE sp.service_id = @serviceId
+       ORDER BY p.product_name ASC`,
+      { serviceId: Number(serviceId) }
+    );
+    return result.recordset.map((r) => ({
+      productId: r.product_id,
+      productCode: r.product_code,
+      productName: r.product_name,
+      unitName: r.unit_name,
+      quantity: r.quantity,
+    }));
+  }
+
+  async _syncServiceParts(serviceId, parts = []) {
+    await query('DELETE FROM service_parts WHERE service_id = @serviceId', { serviceId: Number(serviceId) });
+    for (const part of parts) {
+      await query('INSERT INTO service_parts (service_id, product_id, quantity) VALUES (@serviceId, @productId, @quantity)', {
+        serviceId: Number(serviceId),
+        productId: Number(part.productId),
+        quantity: Number(part.quantity),
+      });
+    }
+  }
+
+  async listProducts(branchId) {
+    const result = await query(
+      `SELECT p.id, p.product_code, p.product_name, u.unit_name
+       FROM products p
+       LEFT JOIN units u ON u.id = p.unit_id
+       WHERE p.branch_id = @branchId AND p.status = 'active'
+       ORDER BY p.product_name ASC`,
+      { branchId: Number(branchId) }
+    );
+    return result.recordset.map((r) => ({
+      id: r.id,
+      code: r.product_code,
+      name: r.product_name,
+      unitName: r.unit_name,
+    }));
+  }
+
+  async createService({ branchId, serviceCode, serviceName, categoryId, unitPrice, durationMin, description, parts }) {
     const result = await query(
       `INSERT INTO services (service_code, service_name, category_id, unit_price, duration_min, description, is_active, branch_id)
        OUTPUT INSERTED.id
@@ -447,10 +497,12 @@ class ManagerRepositoryImpl {
         branchId: Number(branchId),
       }
     );
-    return this.getServiceById(branchId, result.recordset[0].id);
+    const newId = result.recordset[0].id;
+    await this._syncServiceParts(newId, parts);
+    return this.getServiceById(branchId, newId);
   }
 
-  async updateService(branchId, id, { serviceName, categoryId, unitPrice, durationMin, description, isActive }) {
+  async updateService(branchId, id, { serviceName, categoryId, unitPrice, durationMin, description, isActive, parts }) {
     await query(
       `UPDATE services
        SET service_name = @serviceName,
@@ -471,6 +523,9 @@ class ManagerRepositoryImpl {
         branchId: Number(branchId),
       }
     );
+    if (parts !== undefined) {
+      await this._syncServiceParts(id, parts);
+    }
     return this.getServiceById(branchId, id);
   }
 
