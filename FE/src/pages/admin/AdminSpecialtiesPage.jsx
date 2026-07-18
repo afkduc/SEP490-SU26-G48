@@ -218,7 +218,7 @@ export default function AdminSpecialtiesPage() {
                       <td><span className="specialty-name">{s.specialtyName}</span></td>
                       <td>
                         <span className={`specialty-status-badge ${s.isActive ? 'specialty-status-badge--active' : 'specialty-status-badge--inactive'}`}>
-                          {s.isActive ? 'Active' : 'Disabled'}
+                          {s.isActive ? 'Hoạt động' : 'Tắt'}
                         </span>
                       </td>
                       <td>
