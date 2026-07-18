@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { usePartDetail } from '../../hooks/inventory/usePartDetail';
 import { useParts } from '../../hooks/inventory/useParts';
 import { useAuth } from '../../contexts/AppContext';
+import { listUnitsApi } from '../../services/productApi';
 import './PartDetailPage.css';
 
 const STATUS_LABELS = {
@@ -24,12 +25,17 @@ export default function PartDetailPage() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [units, setUnits] = useState([]);
+
+  useEffect(() => {
+    listUnitsApi().then(setUnits).catch(() => setUnits([]));
+  }, []);
 
   function startEdit() {
     setForm({
       productName: part.productName,
       category: part.category || '',
-      unit: part.unit || 'Cai',
+      unitId: part.unitId ?? '',
       unitPrice: part.unitPrice ?? '',
       minStock: part.minStock ?? 5,
       supplierId: part.supplierId ?? '',
@@ -54,6 +60,7 @@ export default function PartDetailPage() {
     try {
       const payload = {
         ...form,
+        unitId: form.unitId === '' ? null : Number(form.unitId),
         unitPrice: form.unitPrice === '' ? null : Number(form.unitPrice),
         minStock: Number(form.minStock),
         supplierId: form.supplierId === '' || form.supplierId == null ? null : Number(form.supplierId),
@@ -148,9 +155,14 @@ export default function PartDetailPage() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Don vi</label>
-                  <input className="input" value={form.unit}
-                    onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+                  <label className="form-label">Don vi <span className="required">*</span></label>
+                  <select className="input input--select" value={form.unitId} required
+                    onChange={(e) => setForm({ ...form, unitId: e.target.value })}>
+                    <option value="">Chon don vi</option>
+                    {units.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -211,7 +223,7 @@ export default function PartDetailPage() {
               <DetailRow label="Ten phu tung" value={part.productName} />
               <DetailRow label="Loai" value={part.category || '—'} />
               <DetailRow label="Thuong hieu" value={part.brandName || '—'} />
-              <DetailRow label="Don vi" value={part.unit || '—'} />
+              <DetailRow label="Don vi" value={part.unitName || '—'} />
               <DetailRow label="Nha cung cap" value={part.supplierName || part.supplierId || '—'} />
             </div>
           )}
@@ -221,7 +233,7 @@ export default function PartDetailPage() {
           <h3 className="detail-card__title">Ton kho (chi doc)</h3>
           <div className={`stock-highlight ${isLow ? 'stock-highlight--warn' : 'stock-highlight--ok'}`}>
             <span className="stock-highlight__number">{stock}</span>
-            <span className="stock-highlight__unit">{part.unit || 'Cai'}</span>
+            <span className="stock-highlight__unit">{part.unitName || ''}</span>
           </div>
           <div className="detail-info-list">
             <DetailRow label="Ton toi thieu" value={min} />
