@@ -28,6 +28,10 @@ class ProductRepository {
   async count({ branchId, status, search, category } = {}) {
     throw new Error('Method count() must be implemented');
   }
+
+  async getDistinctCategories() {
+    throw new Error('Method getDistinctCategories() must be implemented');
+  }
 }
 
 module.exports = ProductRepository;

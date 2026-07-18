@@ -6,13 +6,11 @@ import './PartListPage.css';
 
 const STATUS_LABELS = {
   active: 'Hoat dong',
-  low_stock: 'Sap het',
   inactive: 'Tam ngung',
 };
 
 const STATUS_CLASS = {
   active: 'badge--success',
-  low_stock: 'badge--warning',
   inactive: 'badge--danger',
 };
 
@@ -21,7 +19,8 @@ function emptyForm() {
     partCode: '',
     partName: '',
     category: '',
-    unit: 'Cai',
+    unit: '',
+    unitId: '',
     unitPrice: '',
     minStock: 5,
     supplierId: '',
@@ -35,8 +34,9 @@ export default function PartListPage() {
   const { user } = useAuth();
   const branchId = user?.branchId;
   const {
-    parts, loading, error,
-    params, setParams,
+    parts, total, loading, error, categories,
+    params,
+    setSearch, setStatus, setCategory, setLowStockOnly, setPage,
     create, update, remove,
   } = useParts({ branchId });
 
@@ -45,12 +45,6 @@ export default function PartListPage() {
   const [form, setForm] = useState(emptyForm());
   const [formError, setFormError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
-
-  function setSearch(v) { setParams((p) => ({ ...p, search: v })); }
-  function setStatus(v) { setParams((p) => ({ ...p, status: v })); }
-  function setCategory(v) { setParams((p) => ({ ...p, category: v })); }
-  function setLowStockOnly(v) { setParams((p) => ({ ...p, lowStockOnly: v })); }
-  function applyFilters() {}
 
   function openCreate() {
     setEditing(null);
@@ -62,10 +56,11 @@ export default function PartListPage() {
   function openEdit(p) {
     setEditing(p);
     setForm({
-      partCode: p.productCode ?? p.partCode ?? '',
-      partName: p.productName ?? p.partName ?? '',
+      partCode: p.productCode ?? '',
+      partName: p.productName ?? '',
       category: p.category || '',
-      unit: p.unit || 'Cai',
+      unit: p.unit || '',
+      unitId: p.unitId ?? '',
       unitPrice: p.unitPrice ?? '',
       minStock: p.minStock ?? 5,
       supplierId: p.supplierId ?? '',
@@ -89,8 +84,8 @@ export default function PartListPage() {
       const payload = {
         productCode: form.partCode,
         productName: form.partName,
-        category: form.category,
-        unit: form.unit,
+        category: form.category || null,
+        unitId: form.unitId ? Number(form.unitId) : 1,
         unitPrice: form.unitPrice === '' ? null : Number(form.unitPrice),
         minStock: Number(form.minStock),
         supplierId: form.supplierId === '' ? null : Number(form.supplierId),
@@ -98,7 +93,6 @@ export default function PartListPage() {
         status: form.status,
         note: form.note,
       };
-      // Luu y: KHONG gui stockQuantity len BE - stock chi duoc thay doi qua phieu nhap/xuat.
       if (editing) {
         await update(editing.id, payload);
       } else {
@@ -120,9 +114,7 @@ export default function PartListPage() {
     }
   }
 
-  function handleKeyDown(e) {
-    if (e.key === 'Enter') applyFilters();
-  }
+  const totalPages = Math.max(1, Math.ceil(total / (params.limit || 20)));
 
   if (!branchId) {
     return (
@@ -152,7 +144,6 @@ export default function PartListPage() {
           placeholder="Tim theo ma, ten phu tung..."
           value={params.search}
           onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={handleKeyDown}
         />
         <select
           className="input input--select"
@@ -161,7 +152,6 @@ export default function PartListPage() {
         >
           <option value="">Tat ca trang thai</option>
           <option value="active">Hoat dong</option>
-          <option value="low_stock">Sap het</option>
           <option value="inactive">Tam ngung</option>
         </select>
         <select
@@ -170,11 +160,9 @@ export default function PartListPage() {
           onChange={(e) => setCategory(e.target.value)}
         >
           <option value="">Tat ca loai</option>
-          <option value="Phu tung dong co">Phu tung dong co</option>
-          <option value="Phu tung gam">Phu tung gam</option>
-          <option value="Phu tung dien">Phu tung dien</option>
-          <option value="Dau nhot & hoa chat">Dau nhot & hoa chat</option>
-          <option value="Phu kien">Phu kien</option>
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
         </select>
         <label className="filter-low-stock">
           <input
@@ -184,7 +172,6 @@ export default function PartListPage() {
           />
           Sap het
         </label>
-        <button className="btn btn--secondary" onClick={applyFilters}>Loc</button>
       </div>
 
       {/* Table */}
@@ -193,76 +180,103 @@ export default function PartListPage() {
       ) : error ? (
         <div className="part-list__error">Loi: {error}</div>
       ) : (
-        <div className="table-responsive">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Ma PT</th>
-                <th>Ten phu tung</th>
-                <th>Loai</th>
-                <th>Don vi</th>
-                <th>Don gia</th>
-                <th>SL ton</th>
-                <th>Min</th>
-                <th>Trang thai</th>
-                <th style={{ width: 160 }}>Hanh dong</th>
-              </tr>
-            </thead>
-            <tbody>
-              {parts.length === 0 ? (
+        <>
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
                 <tr>
-                  <td colSpan={9} className="table__empty">
-                    Khong co phu tung nao
-                  </td>
+                  <th>Ma PT</th>
+                  <th>Ten phu tung</th>
+                  <th>Loai</th>
+                  <th>Don vi</th>
+                  <th className="text-right">Don gia</th>
+                  <th className="text-right">SL ton</th>
+                  <th className="text-right">Min</th>
+                  <th>Trang thai</th>
+                  <th style={{ width: 160 }}>Hanh dong</th>
                 </tr>
-              ) : (
-                parts.map((p) => {
-                  const stock = Number(p.stockQuantity ?? 0);
-                  const min = Number(p.minStock ?? 0);
-                  const isLow = stock <= min;
-                  return (
-                    <tr key={p.id} className={isLow ? 'row--low-stock' : ''}>
-                      <td><span className="font-mono">{p.productCode ?? p.partCode}</span></td>
-                      <td>{p.productName ?? p.partName}</td>
-                      <td>{p.category || '—'}</td>
-                      <td>{p.unit}</td>
-                      <td className="text-right">
-                        {p.unitPrice != null ? Number(p.unitPrice).toLocaleString('vi-VN') + ' đ' : '—'}
-                      </td>
-                      <td className={`text-right ${isLow ? 'text-danger' : 'text-success'}`}>
-                        {stock}
-                      </td>
-                      <td className="text-right">{min}</td>
-                      <td>
-                        <span className={`badge ${STATUS_CLASS[p.status] || ''}`}>
-                          {STATUS_LABELS[p.status] || p.status}
-                        </span>
-                      </td>
-                      <td className="table__actions">
-                        <Link
-                          to={`/inventory/parts/${p.id}`}
-                          className="btn btn--ghost btn--sm"
-                        >
-                          Chi tiet
-                        </Link>
-                        <button className="btn btn--ghost btn--sm" onClick={() => openEdit(p)}>
-                          Sua
-                        </button>
-                        <button
-                          className="btn btn--ghost btn--sm btn--danger"
-                          onClick={() => handleDelete(p.id)}
-                          disabled={deletingId === p.id}
-                        >
-                          Xoa
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {parts.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="table__empty">
+                      Khong co phu tung nao
+                    </td>
+                  </tr>
+                ) : (
+                  parts.map((p) => {
+                    const stock = Number(p.stockQuantity ?? 0);
+                    const min = Number(p.minStock ?? 0);
+                    const isLow = stock <= min && min > 0;
+                    return (
+                      <tr key={p.id} className={isLow ? 'row--low-stock' : ''}>
+                        <td><span className="font-mono">{p.productCode ?? '—'}</span></td>
+                        <td>
+                          <Link to={`/inventory/parts/${p.id}`}>{p.productName ?? '—'}</Link>
+                        </td>
+                        <td>{p.category || '—'}</td>
+                        <td>{p.unit || '—'}</td>
+                        <td className="text-right">
+                          {p.unitPrice != null ? `${Number(p.unitPrice).toLocaleString('vi-VN')} đ` : '—'}
+                        </td>
+                        <td className={`text-right ${isLow ? 'text-danger' : 'text-success'}`}>
+                          {stock}
+                        </td>
+                        <td className="text-right">{min}</td>
+                        <td>
+                          <span className={`badge ${STATUS_CLASS[p.status] || ''}`}>
+                            {STATUS_LABELS[p.status] || p.status}
+                          </span>
+                        </td>
+                        <td className="table__actions">
+                          <Link
+                            to={`/inventory/parts/${p.id}`}
+                            className="btn btn--ghost btn--sm"
+                          >
+                            Chi tiet
+                          </Link>
+                          <button className="btn btn--ghost btn--sm" onClick={() => openEdit(p)}>
+                            Sua
+                          </button>
+                          <button
+                            className="btn btn--ghost btn--sm btn--danger"
+                            onClick={() => handleDelete(p.id)}
+                            disabled={deletingId === p.id}
+                          >
+                            Xoa
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="part-list__pagination">
+              <button
+                className="btn btn--ghost btn--sm"
+                disabled={params.page <= 1}
+                onClick={() => setPage(params.page - 1)}
+              >
+                ← Truoc
+              </button>
+              <span className="part-list__page-info">
+                Trang {params.page} / {totalPages} (tong {total})
+              </span>
+              <button
+                className="btn btn--ghost btn--sm"
+                disabled={params.page >= totalPages}
+                onClick={() => setPage(params.page + 1)}
+              >
+                Sau →
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Modal Create / Edit */}
@@ -301,7 +315,7 @@ export default function PartListPage() {
                     <option value="Phu tung dong co">Phu tung dong co</option>
                     <option value="Phu tung gam">Phu tung gam</option>
                     <option value="Phu tung dien">Phu tung dien</option>
-                    <option value="Dau nhot & hoa chat">Dau nhot & hoa chat</option>
+                    <option value="Dau nhot &amp; hoa chat">Dau nhot &amp; hoa chat</option>
                     <option value="Phu kien">Phu kien</option>
                   </select>
                 </div>

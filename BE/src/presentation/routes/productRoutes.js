@@ -10,6 +10,7 @@ function buildProductRouter() {
   const router = express.Router();
   const controller = makeProductController();
 
+  router.get('/categories', controller.getCategories);
   router.get('/', controller.getAll);
   router.get('/:id', controller.getById);
   router.post('/', controller.create);
