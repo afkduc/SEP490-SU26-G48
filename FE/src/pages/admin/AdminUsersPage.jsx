@@ -70,6 +70,20 @@ export default function AdminUsersPage() {
   } = useAdminUsers();
 
   const { branches, roles, branchesLoading, rolesLoading, branchesError, rolesError } = useSharedBranches();
+
+  // Local state for filters (ensure always available even if SharedDataContext is slow)
+  const [localBranches, setLocalBranches] = useState([]);
+  const [localRoles, setLocalRoles] = useState([]);
+
+  // Sync from SharedDataContext to local state
+  useEffect(() => {
+    if (branches && branches.length > 0) setLocalBranches(branches);
+  }, [branches]);
+
+  useEffect(() => {
+    if (roles && roles.length > 0) setLocalRoles(roles);
+  }, [roles]);
+
   const [searchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
@@ -233,9 +247,9 @@ export default function AdminUsersPage() {
             disabled={!!branchesError}
           >
             <option value="">
-              {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
+              {(branchesError || branchesLoading) ? `Đang tải...` : 'Tất cả chi nhánh'}
             </option>
-            {branches.map((b) => (
+            {localBranches.map((b) => (
               <option key={b.id} value={b.id}>{b.branchName}</option>
             ))}
           </select>
@@ -247,9 +261,9 @@ export default function AdminUsersPage() {
             disabled={!!rolesError}
           >
             <option value="">
-              {rolesError ? `Lỗi: ${rolesError}` : 'Tất cả vai trò'}
+              {(rolesError || rolesLoading) ? `Đang tải...` : 'Tất cả vai trò'}
             </option>
-            {roles.map((r) => (
+            {localRoles.map((r) => (
               <option key={r.id} value={r.id}>{r.roleName}</option>
             ))}
           </select>
