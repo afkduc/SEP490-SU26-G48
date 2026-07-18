@@ -111,8 +111,8 @@ class DeviceRepository {
       idx++;
     }
 
-    if (isCurrent !== undefined && isCurrent !== null && isCurrent !== '') {
-      const val = isCurrent === true || isCurrent === 'true' || isCurrent === '1' ? 1 : 0;
+    if (isCurrent !== undefined && isCurrent !== null && String(isCurrent).trim() !== '') {
+      const val = String(isCurrent).toLowerCase() === 'true' || isCurrent === true || isCurrent === '1' ? 1 : 0;
       conditions.push(`d.is_current = @p${idx}`);
       params[`p${idx}`] = val;
       idx++;
@@ -164,7 +164,7 @@ class DeviceRepository {
     `, { ...params, offset, pageSize });
 
     const items = dataResult.recordset.map((row) => ({
-      id: row.id,
+      id: Number(row.id),
       userId: row.user_id,
       userName: row.user_name,
       displayName: row.first_name && row.last_name

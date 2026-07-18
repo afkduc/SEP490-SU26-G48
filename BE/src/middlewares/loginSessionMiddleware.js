@@ -73,7 +73,7 @@ async function upsertDevice(userId, userAgent, ipAddress) {
       await query(
         `UPDATE user_devices
          SET    is_current = 1,
-                last_login_at = GETDATE(),
+                last_login_at = SYSUTCDATETIME(),
                 user_agent = @p5
          WHERE  id = @p1`,
         { p1: existing.recordset[0].id, p5: userAgent }
@@ -81,12 +81,12 @@ async function upsertDevice(userId, userAgent, ipAddress) {
     } else {
       await query(
         `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, last_login_at)
-         VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, GETDATE())`,
+         VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, SYSUTCDATETIME())`,
         { p1: userId, p2: deviceName, p3: browser, p4: os, p5: ipAddress, p6: userAgent }
       );
     }
   } catch (err) {
-    console.error('[loginSessionMiddleware] upsertDevice failed:', err && err.message ? err.message : err);
+    console.error('[loginSessionMiddleware] upsertDevice ERROR:', err && err.message ? err.message : err);
   }
 }
 
@@ -242,14 +242,18 @@ async function trackLogout(req) {
       userAgent,
     });
 
+    // Cap nhat is_current = 0 cho TAT CA device cua user (khong chi device hien tai)
     if (sessionUserId) {
-      await query(
+      const devResult = await query(
         'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1 AND is_current = 1',
         { p1: sessionUserId }
       );
+      if (devResult.rowsAffected && devResult.rowsAffected[0] > 0) {
+        console.log(`[loginSessionMiddleware] Marked ${devResult.rowsAffected[0]} device(s) as inactive for userId=${sessionUserId}`);
+      }
     }
   } catch (err) {
-    console.error('[loginSessionMiddleware] trackLogout failed:', err && err.message ? err.message : err);
+    console.error('[loginSessionMiddleware] trackLogout ERROR:', err && err.message ? err.message : err);
   }
 }
 

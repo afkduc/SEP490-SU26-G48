@@ -19,11 +19,43 @@ class DeviceService {
     const device = devices.items.find((d) => d.id === Number(deviceId));
     if (!device) throw new ApiError(404, 'Thiet bi khong ton tai');
 
-    // Mark device as not current
+    // 1. Revoke all tokens for this user
+    await this._revokeUserTokens(device.userId);
+
+    // 2. Dong tat ca session active cua user
+    await this._closeUserSessions(device.userId);
+
+    // 3. Delete device record
     await this.deviceRepository.delete(deviceId);
 
-    // End the active login session for this user+IP if exists
-    return { deleted: true, deviceId: Number(deviceId) };
+    return { deleted: true, deviceId: Number(deviceId), userId: device.userId };
+  }
+
+  async _revokeUserTokens(userId) {
+    const { query } = require('../../infrastructure/database/sqlServer');
+    await query(
+      `UPDATE users SET token_version = ISNULL(token_version, 0) + 1 WHERE id = @p1`,
+      { p1: Number(userId) }
+    );
+  }
+
+  async _closeUserSessions(userId) {
+    const { query } = require('../../infrastructure/database/sqlServer');
+    const result = await query(
+      `UPDATE login_sessions
+       SET    logout_time              = SYSUTCDATETIME(),
+              logout_reason            = 'ADMIN_FORCE_LOGOUT',
+              session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+              status                  = 'ended'
+       WHERE  user_id    = @p1
+         AND  status    = 'active'
+         AND  action_type = 'LOGIN'`,
+      { p1: Number(userId) }
+    );
+    if (result.rowsAffected && result.rowsAffected[0] > 0) {
+      console.log(`[DeviceService] Closed ${result.rowsAffected[0]} active session(s) for userId=${userId}`);
+    }
+    return result.rowsAffected ? result.rowsAffected[0] : 0;
   }
 
   async forceLogoutAllOtherDevices(userId, currentDeviceId) {
