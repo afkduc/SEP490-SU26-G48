@@ -271,6 +271,13 @@ export default function AdminLayout({ children }) {
           </div>
 
           <div className="admin-topbar__right">
+            {/* Online indicator - chi hien thi khi co user session */}
+            {user && (
+              <div className="admin-topbar__online-indicator" title="Tài khoản đang hoạt động">
+                <span className="online-dot" />
+                <span className="online-label">Online</span>
+              </div>
+            )}
             <div className="admin-topbar__user" onClick={() => setUserMenuOpen((v) => !v)} ref={userMenuRef}>
               <div className="admin-topbar__avatar">{getInitials(user?.name || '')}</div>
               <div className="admin-topbar__user-info">

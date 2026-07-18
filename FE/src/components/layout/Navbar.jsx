@@ -254,6 +254,11 @@ export default function Navbar() {
       </nav>
 
       <div className="navbar__right">
+        {/* Online indicator */}
+        <div className="navbar__online-indicator" title="Tai khoan dang hoat dong">
+          <span className="online-dot" />
+          <span className="online-label">Online</span>
+        </div>
         {roleLabel && <span className="navbar__role-badge">{roleLabel}</span>}
 
         <div className="navbar__user" onClick={() => setDropdownOpen((v) => !v)}>
