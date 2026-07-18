@@ -25,30 +25,58 @@ const ACTION_CLASS = { CREATE: 'badge--success', UPDATE: 'badge--info', DELETE: 
  */
 const TABLE_NAME_VI = {
   customers:           'Khách hàng',
-  users:               'Người dùng',
-  user_roles:          'Vai trò người dùng',
-  roles:               'Vai trò',
-  permissions:         'Phân quyền',
-  branches:            'Chi nhánh',
-  appointments:        'Lịch hẹn',
   vehicles:            'Phương tiện',
-  service_catalog:     'Danh mục dịch vụ',
+  brands:              'Hãng xe',
+  branches:            'Chi nhánh',
+  users:               'Người dùng',
+  user_role:           'Phân quyền người dùng',
+  user_specialty:      'Chuyên môn nhân viên',
+  user_devices:        'Thiết bị đăng nhập',
+  user_notification_settings: 'Cài đặt thông báo',
+  roles:               'Vai trò',
+  role_permissions:    'Phân quyền theo vai trò',
+  role_security_mapping: 'Ánh xạ vai trò - bảo mật',
+  permissions:         'Phân quyền chi tiết',
+  service_categories:  'Danh mục dịch vụ',
+  services:            'Dịch vụ',
+  service_packages:    'Gói dịch vụ',
+  service_package_items: 'Hạng mục gói dịch vụ',
+  suppliers:           'Nhà cung cấp',
   products:            'Phụ tùng / Sản phẩm',
+  inventory_transactions: 'Giao dịch kho',
+  contracts:           'Hợp đồng',
+  appointments:        'Lịch hẹn',
   work_orders:         'Phiếu sửa chữa',
   work_order_items:    'Hạng mục phiếu sửa',
+  repair_orders:       'Phiếu sửa chữa (Repair Order)',
+  repair_order_tasks:  'Công việc sửa chữa',
+  service_orders:      'Đơn dịch vụ',
+  service_order_items: 'Hạng mục đơn dịch vụ',
   invoices:            'Hóa đơn',
   payments:            'Thanh toán',
-  inventory:           'Tồn kho',
-  inventory_transactions: 'Giao dịch kho',
+  specialties:         'Chuyên môn',
+  warranty_records:    'Lịch sử bảo hành',
+  after_service_care:  'Chăm sóc sau dịch vụ',
+  customer_feedback:   'Phản hồi khách hàng',
+  maintenance_reminders: 'Lịch nhắc bảo dưỡng',
+  vehicle_owners:      'Chủ phương tiện',
+  import_requests:     'Yêu cầu nhập kho',
+  import_request_items:'Chi tiết nhập kho',
+  export_requests:     'Yêu cầu xuất kho',
+  export_request_items:'Chi tiết xuất kho',
+  entity_definitions:  'Định nghĩa đối tượng',
   login_sessions:      'Phiên đăng nhập',
-  login_session_events:'Sự kiện phiên',
+  login_session_events:'Sự kiện phiên đăng nhập',
   audit_logs:          'Nhật ký hệ thống',
   notifications:       'Thông báo',
 };
 
 function viTableName(name) {
   if (!name) return '—';
-  return TABLE_NAME_VI[name] || name;
+  // Có trong bảng ánh xạ → dịch; ngược lại hiển thị raw key kèm cờ cảnh báo
+  // để lộ bug dữ liệu (table không tồn tại trong DB hoặc chưa được ánh xạ).
+  if (TABLE_NAME_VI[name]) return TABLE_NAME_VI[name];
+  return `⚠ ${name} (chưa ánh xạ)`;
 }
 
 /**
@@ -137,7 +165,7 @@ const IconDownload = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
     <polyline points="7 10 12 15 17 10"/>
-    <line x1="12" y1="15" x2="12" y1="3"/>
+    <line x1="12" y1="15" x2="12" y2="3"/>
   </svg>
 );
 
@@ -513,10 +541,14 @@ export default function AuditLogsPage() {
 function TableSkeleton({ rows }) {
   return (
     <table className="table">
+      <colgroup>
+        <col /><col /><col /><col /><col />
+        <col /><col /><col /><col /><col />
+      </colgroup>
       <thead>
         <tr>
           <th>Thời gian</th>
-          <th>Thực hiện bởi</th>
+          <th>Người dùng</th>
           <th>Hành động</th>
           <th>Bảng dữ liệu</th>
           <th>Mã bản ghi</th>
@@ -549,10 +581,14 @@ function AuditTable({ items, onViewLog, timeTick }) {
   if (!items || items.length === 0) {
     return (
       <table className="table">
+        <colgroup>
+          <col /><col /><col /><col /><col />
+          <col /><col /><col /><col /><col />
+        </colgroup>
         <thead>
           <tr>
             <th>Thời gian</th>
-            <th>Thực hiện bởi</th>
+            <th>Người dùng</th>
             <th>Hành động</th>
             <th>Bảng dữ liệu</th>
             <th>Mã bản ghi</th>
@@ -576,17 +612,26 @@ function AuditTable({ items, onViewLog, timeTick }) {
 
   return (
     <table className="table">
+      <colgroup>
+        <col /><col /><col /><col /><col />
+        <col /><col /><col /><col /><col />
+      </colgroup>
       <thead>
         <tr>
           <th>Thời gian</th>
-          <th>Thực hiện bởi</th>
+          <th>Người dùng</th>
           <th>Hành động</th>
           <th>Bảng dữ liệu</th>
           <th>
             Mã bản ghi
             <span
               className="th-info"
-              title="Mã hiển thị (entity_code) hoặc ID nội bộ (record_id) của bản ghi bị tác động. Ví dụ KH-001 = mã khách hàng #1, USR-005 = mã người dùng #5."
+              title={
+                'Cột này hiển thị 2 loại mã:\n' +
+                '• entity_code — mã do con người đặt, dễ đọc (VD: KH-001 = khách hàng số 1, ND-005 = người dùng số 5, INV-023 = hóa đơn số 23). Ưu tiên hiển thị.\n' +
+                '• record_id — ID nội bộ trong database (PK tự tăng). Chỉ hiển thị khi không có entity_code, thêm dấu # phía trước (VD: #12 = dòng id=12 trong bảng).\n' +
+                'Nếu cả hai đều trống → bản ghi đó chưa xác định được đối tượng bị tác động.'
+              }
               aria-label="Giải thích"
             >i</span>
           </th>
@@ -606,24 +651,24 @@ function AuditTable({ items, onViewLog, timeTick }) {
           const codeText = item.entity_code || (item.record_id != null ? `#${item.record_id}` : null);
           return (
             <tr key={item.id}>
-              <td>
+              <td className="audit-logs__cell--time">
                 <div className="audit-logs__time-cell">
-                  <span className="audit-logs__time-main">{t.main}</span>
+                  <span className="audit-logs__time-main" title={t.main}>{t.main}</span>
                   <span className="audit-logs__time-ago">{t.ago}</span>
                   <span className="audit-logs__time-utc" title="Thời điểm UTC gốc từ server">{t.sub}</span>
                 </div>
               </td>
               <td>
-                <div className="audit-logs__user-cell">
+                <div className="audit-logs__user-cell" title={item.user_name || 'Hệ thống'}>
                   <span className="audit-logs__user-name">{item.user_name || 'Hệ thống'}</span>
                   {item.phone_number && (
-                    <span className="audit-logs__user-phone">{item.phone_number}</span>
+                    <span className="audit-logs__user-phone" title={item.phone_number}>{item.phone_number}</span>
                   )}
                 </div>
               </td>
               <td>
                 {item.action ? (
-                  <span className={`badge ${ACTION_CLASS[item.action] || 'badge--secondary'}`}>
+                  <span className={`badge ${ACTION_CLASS[item.action] || 'badge--secondary'}`} title={item.action}>
                     {ACTION_LABELS[item.action] || item.action}
                   </span>
                 ) : '—'}
@@ -641,23 +686,45 @@ function AuditTable({ items, onViewLog, timeTick }) {
                   <span
                     className="audit-logs__code"
                     title={item.entity_code
-                      ? `Mã hiển thị: ${item.entity_code}${item.record_id != null ? ` • ID nội bộ: #${item.record_id}` : ''}`
-                      : `ID nội bộ: #${item.record_id}`}
+                      ? `Mã hiển thị (entity_code): ${item.entity_code}\nID nội bộ trong DB (record_id): ${item.record_id != null ? '#' + item.record_id : '—'}`
+                      : `ID nội bộ trong DB (record_id): #${item.record_id}\nBản ghi này chưa có entity_code.`}
                   >
                     {codeText}
                   </span>
-                ) : '—'}
+                ) : (
+                  <span className="audit-logs__code audit-logs__code--empty" title="Không xác định được bản ghi bị tác động">
+                    —
+                  </span>
+                )}
               </td>
               <td>
-                <span
-                  className="audit-logs__ip"
-                  title={item.ip_address || 'Không ghi nhận IP'}
-                >
-                  {item.ip_address || '—'}
-                </span>
+                {item.ip_address ? (
+                  <span
+                    className="audit-logs__ip"
+                    title={
+                      `IP: ${item.ip_address}\n` +
+                      `Lấy từ: req.ip / X-Forwarded-For / socket remoteAddress (BE src/middlewares/auditMiddleware.js).`
+                    }
+                  >
+                    {item.ip_address}
+                  </span>
+                ) : (
+                  <span
+                    className="audit-logs__ip audit-logs__ip--missing"
+                    title={
+                      'Không có IP cho nhật ký này.\n' +
+                      'Nguyên nhân thường gặp:\n' +
+                      '• Bản ghi được tạo trước khi middleware ghi IP (record cũ).\n' +
+                      '• Middleware chưa bắt được route này (route đi tắt, không qua auditMiddleware).\n' +
+                      '• Lỗi ghi DB — xem log server: "[auditLogger] failed to write audit log".'
+                    }
+                  >
+                    —
+                  </span>
+                )}
               </td>
               <td>
-                <span className={`audit-logs__method ${methodCls}`}>
+                <span className={`audit-logs__method ${methodCls}`} title={item.request_method || ''}>
                   {item.request_method || '—'}
                 </span>
               </td>
@@ -671,10 +738,12 @@ function AuditTable({ items, onViewLog, timeTick }) {
               </td>
               <td>
                 {resp ? (
-                  <span className={`badge ${resp.cls}`}>{resp.label}</span>
+                  <span className={`badge ${resp.cls}`} title={String(item.response_status)}>
+                    {resp.label}
+                  </span>
                 ) : '—'}
               </td>
-              <td>
+              <td className="audit-logs__cell--actions">
                 <div className="admin-logs__row-actions">
                   <button
                     type="button"

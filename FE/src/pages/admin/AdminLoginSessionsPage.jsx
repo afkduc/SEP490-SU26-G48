@@ -172,22 +172,14 @@ const IconFailed = () => (
 
 // ─── Stats Cards ────────────────────────────────────────────────────
 
-function StatsCards({ items, loading }) {
-  const counts = { total: 0, login: 0, failed: 0, active: 0 };
-  if (items && items.length > 0) {
-    counts.total = items.length;
-    items.forEach((item) => {
-      if (item.action_type === 'LOGIN_FAILED') counts.failed++;
-      else if (item.action_type === 'LOGIN') counts.login++;
-      if (item.status === 'active') counts.active++;
-    });
-  }
+function StatsCards({ stats, loading }) {
+  const counts = stats || { total: 0, loginCount: 0, failedCount: 0, activeCount: 0 };
 
   const cards = [
     { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: counts.total, label: 'Tổng phiên' },
-    { icon: <IconLogin />, iconCls: 'stat-card__icon--green', value: counts.login, label: 'Đăng nhập thành công' },
-    { icon: <IconActive />, iconCls: 'stat-card__icon--cyan', value: counts.active, label: 'Đang hoạt động' },
-    { icon: <IconFailed />, iconCls: 'stat-card__icon--red', value: counts.failed, label: 'Thất bại' },
+    { icon: <IconLogin />, iconCls: 'stat-card__icon--green', value: counts.loginCount, label: 'Đăng nhập thành công' },
+    { icon: <IconActive />, iconCls: 'stat-card__icon--cyan', value: counts.activeCount, label: 'Đang hoạt động' },
+    { icon: <IconFailed />, iconCls: 'stat-card__icon--red', value: counts.failedCount, label: 'Thất bại' },
   ];
 
   return (
@@ -387,6 +379,12 @@ useEffect(() => {
         }
         lastSinceIso = new Date().toISOString();
       } catch (e) {
+        // Neu 401 (hết phiên), dung polling
+        if (e?.status === 401 || e?.message?.includes('hết hiệu lực') || e?.message?.includes('hết hạn')) {
+          console.warn('[AdminLoginSessionsPage] Session expired, stopping poll');
+          setRealtimeEnabled(false);
+          return;
+        }
         console.warn('[AdminLoginSessionsPage] realtime poll failed:', e?.message);
       } finally {
         if (!cancelled) timerId = setTimeout(poll, POLL_INTERVAL_MS);
@@ -458,7 +456,7 @@ useEffect(() => {
       </div>
 
       {/* Stats Cards */}
-      <StatsCards items={sessions.data.items} loading={sessions.loading} />
+      <StatsCards stats={sessions.data.stats} loading={sessions.loading} />
 
       {/* Filter Card */}
       <div className="admin-sessions__filters">

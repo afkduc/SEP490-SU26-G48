@@ -344,7 +344,7 @@ class AdminUserRepositoryImpl {
       query('SELECT COUNT(*) AS total FROM branches WHERE is_active = 1'),
       query('SELECT COUNT(*) AS total FROM roles'),
     ]);
-
+    
     const users = userStats.recordset[0];
 
     // Recent audit logs (general activity)

@@ -602,6 +602,7 @@ class AdminController {
           name: req.user.name,
           roles: roleNames,
           branchId: req.user.branchId,
+          tokenVersion: req.user.tokenVersion,
         },
         config.jwtSecret,
         { expiresIn: config.jwtExpiresIn }
