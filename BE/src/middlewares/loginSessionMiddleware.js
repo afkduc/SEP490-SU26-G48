@@ -1,4 +1,5 @@
 const { query } = require('../infrastructure/database/sqlServer');
+const { emitLoginSessionEvent } = require('../application/events/LoginSessionEvents');
 
 function safeString(value, max = 255) {
   if (value === undefined || value === null) return null;
@@ -39,18 +40,38 @@ function parseUserAgent(userAgent) {
 }
 
 function getRequestMeta(req) {
+  // 1. Cloudflare - CF-Connecting-IP header (độ ưu tiên cao nhất)
+  const cfIp = req.headers ? req.headers['cf-connecting-ip'] : null;
+  if (cfIp) {
+    return {
+      ipAddress: safeString(cfIp.split(',')[0].trim(), 45),
+      userAgent: safeString(req.headers ? req.headers['user-agent'] : null, 512),
+    };
+  }
+
+  // 2. X-Real-IP (nginx, traefik)
+  const realIp = req.headers ? req.headers['x-real-ip'] : null;
+  if (realIp) {
+    return {
+      ipAddress: safeString(realIp.split(',')[0].trim(), 45),
+      userAgent: safeString(req.headers ? req.headers['user-agent'] : null, 512),
+    };
+  }
+
+  // 3. X-Forwarded-For (proxy chain - apache, load balancer)
   const xff = req.headers ? req.headers['x-forwarded-for'] : null;
-  let ipAddress = null;
   if (xff) {
-    ipAddress = xff.split(',')[0].trim() || null;
+    return {
+      ipAddress: safeString(xff.split(',')[0].trim(), 45),
+      userAgent: safeString(req.headers ? req.headers['user-agent'] : null, 512),
+    };
   }
-  if (!ipAddress) {
-    ipAddress = req.ip || (req.connection && req.connection.remoteAddress) || null;
-  }
-  const userAgent = req.headers ? req.headers['user-agent'] : null;
+
+  // 4. req.ip (Express, cần trust proxy đúng ở app.js)
+  // Khi trust proxy = true, req.ip sẽ là IP của client thật
   return {
-    ipAddress: safeString(ipAddress, 45),
-    userAgent: safeString(userAgent, 512),
+    ipAddress: safeString(req.ip || (req.connection && req.connection.remoteAddress) || null, 45),
+    userAgent: safeString(req.headers ? req.headers['user-agent'] : null, 512),
   };
 }
 
@@ -65,13 +86,18 @@ async function upsertDevice(userId, userAgent, ipAddress) {
       { p1: userId, p2: ipAddress, p3: browser, p4: os }
     );
 
+    let deviceId;
+
     if (existing.recordset.length > 0) {
       const existingDevice = existing.recordset[0];
+      deviceId = existingDevice.id;
       // Update existing device to current
+      // last_activity_at = last_login_at = now when user logs in
       await query(
         `UPDATE user_devices
          SET    is_current = 1,
                 last_login_at = SYSUTCDATETIME(),
+                last_activity_at = SYSUTCDATETIME(),
                 user_agent = @p5
          WHERE  id = @p1`,
         { p1: existingDevice.id, p5: userAgent }
@@ -91,14 +117,19 @@ async function upsertDevice(userId, userAgent, ipAddress) {
         'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
         { p1: userId }
       );
-      await query(
-        `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, last_login_at)
-         VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, SYSUTCDATETIME())`,
+      const insertResult = await query(
+        `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, last_login_at, last_activity_at)
+         OUTPUT INSERTED.id
+         VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, SYSUTCDATETIME(), SYSUTCDATETIME())`,
         { p1: userId, p2: deviceName, p3: browser, p4: os, p5: ipAddress, p6: userAgent }
       );
+      deviceId = insertResult.recordset?.[0]?.id;
     }
+
+    return deviceId;
   } catch (err) {
     console.error('[loginSessionMiddleware] upsertDevice ERROR:', err.message ? err.message : err);
+    return null;
   }
 }
 
@@ -136,9 +167,11 @@ async function trackLogin(req, user) {
     // Chi dong session cua CHINH USER nay (cung user_id)
     // Neu user A login 2 lan -> lan 1 bi kick (logout_reason = 'NEW_LOGIN_OVERRIDE')
     // Neu user A va user B login -> khong anh huong nhau
+    // CHI DOI VOI SESSION CÓ action_type = 'LOGIN' (khong doi LOGIN_FAILED)
     if (userId) {
       try {
-        await query(
+        // Đóng TẤT CẢ session active của user (để đảm bảo không có race condition)
+        const result = await query(
           `UPDATE login_sessions
            SET    logout_time              = SYSUTCDATETIME(),
                   logout_reason            = 'NEW_LOGIN_OVERRIDE',
@@ -149,7 +182,9 @@ async function trackLogin(req, user) {
              AND  action_type = 'LOGIN'`,
           { p1: userId }
         );
-        console.log(`[trackLogin] Closed previous sessions for userId=${userId}`);
+        if (result.rowsAffected && result.rowsAffected[0] > 0) {
+          console.log(`[trackLogin] Closed ${result.rowsAffected[0]} previous session(s) for userId=${userId}`);
+        }
 
         // Dong device cua user bi kick (chi user hien tai)
         await query(
@@ -196,11 +231,32 @@ async function trackLogin(req, user) {
 
     // Buoc 5: Update device CHO USER HIEN TAI (chi anh huong device cua user nay)
     // Khong anh huong device cua user khac
+    // Tra ve deviceId de AuthService co the them vao JWT
+    let deviceId = null;
     if (userId && ipAddress) {
-      await upsertDevice(userId, userAgent, ipAddress);
+      deviceId = await upsertDevice(userId, userAgent, ipAddress);
     }
+
+    // Emit SSE event (sau khi co deviceId)
+    if (sessionId) {
+      emitLoginSessionEvent('login', {
+        sessionId,
+        userId,
+        userName,
+        phone,
+        ipAddress,
+        browser,
+        os,
+        branchId,
+        deviceId,  // Them deviceId vao event
+      });
+    }
+
+    // Tra ve deviceId de AuthService co the them vao JWT
+    return { deviceId };
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLogin failed:', err.message ? err.message : err);
+    return { deviceId: null };
   }
 }
 
@@ -261,16 +317,28 @@ async function trackLogout(req) {
       userAgent,
     });
 
-    // Cap nhat is_current = 0 cho TAT CA device cua user (khong chi device hien tai)
+    // Cap nhat last_activity_at = now truoc khi logout
+    // Sau do set is_current = 0
+    // Device chi active khi user dang su dung, logout se tat
     if (sessionUserId) {
       const devResult = await query(
-        'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1 AND is_current = 1',
+        `UPDATE user_devices 
+         SET last_activity_at = SYSUTCDATETIME(), is_current = 0 
+         WHERE user_id = @p1 AND is_current = 1`,
         { p1: sessionUserId }
       );
       if (devResult.rowsAffected && devResult.rowsAffected[0] > 0) {
         console.log(`[loginSessionMiddleware] Marked ${devResult.rowsAffected[0]} device(s) as inactive for userId=${sessionUserId}`);
       }
     }
+
+    // Emit SSE event
+    emitLoginSessionEvent('logout', {
+      sessionId,
+      userId: sessionUserId,
+      userName,
+      ipAddress,
+    });
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLogout ERROR:', err && err.message ? err.message : err);
   }
@@ -331,6 +399,20 @@ async function trackLoginFailed(req, payload) {
         ipAddress,
         userAgent,
       });
+
+      // Emit SSE event (chi emi khi co userName vi loi thuong do nhap sai)
+      if (userName) {
+        emitLoginSessionEvent('login_failed', {
+          sessionId,
+          userId,
+          userName,
+          phone,
+          ipAddress,
+          browser,
+          os,
+          failureReason,
+        });
+      }
     }
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLoginFailed failed:', err && err.message ? err.message : err);
