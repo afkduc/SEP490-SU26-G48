@@ -5,7 +5,7 @@ import httpClient from './httpClient';
  * Luu y: KHONG truyen stockQuantity len BE (BE se tu dong bo qua).
  *
  *   - list(params): GET /api/products voi filter { branchId, status, search, category, page, limit }.
- *     tra ve: { items: [{ id, productCode, productName, category, brandName, unit, unitPrice,
+ *     tra ve: { items: [{ id, productCode, productName, category, brandName, unitId, unitName, unitPrice,
  *                         stockQuantity, minStock, supplierId, supplierName, location, branchId, status, isLowStock }],
  *               total, page, limit }
  *
@@ -51,6 +51,14 @@ export async function updateProductApi(id, payload) {
 
 export async function deleteProductApi(id) {
   return httpClient.delete(`/products/${id}`);
+}
+
+/**
+ * Danh sách đơn vị tính (dùng cho dropdown chọn đơn vị của phụ tùng).
+ * BE: GET /api/products/units -> [{ id, name }]
+ */
+export async function listUnitsApi() {
+  return httpClient.get('/products/units');
 }
 
 /**
