@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
-import { adminRolesApi } from '../../services/adminApi';
+import { useEffect, useState, Fragment } from 'react';
+import { adminRolesApi, refreshPermissionsApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
+import { useAuth } from '../../contexts/AppContext';
+import { ROLE_VALUES } from '../../constants/roles';
 import './AdminRolesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -237,7 +239,7 @@ function RoleCard({ role, onEdit, onToggleStatus, onUsers }) {
 
 // ─── Permission Matrix ───────────────────────────────────────────
 
-function PermissionMatrix({ roles, permissions, rolePermissions, onChange, onSave, saving, dirty }) {
+function PermissionMatrix({ roles, visibleRoles, permissions, rolePermissions, onChange, onSave, saving, dirty }) {
   const grouped = groupPermissionsByModule(permissions);
 
   function isChecked(roleId, permId) {
@@ -258,7 +260,7 @@ function PermissionMatrix({ roles, permissions, rolePermissions, onChange, onSav
       <div className="matrix-header">
         <h2>Ma trận quyền — Vai trò &amp; Quyền</h2>
         <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-          {permissions.length} quyền · {roles.length} vai trò
+          {permissions.length} quyền · {visibleRoles.length} vai trò
         </span>
       </div>
 
@@ -266,37 +268,43 @@ function PermissionMatrix({ roles, permissions, rolePermissions, onChange, onSav
         <table className="matrix-table">
           <thead>
             <tr>
-              <th>Vai trò</th>
-              {Object.entries(grouped).map(([module, perms]) =>
-                perms.map((p) => (
-                  <th key={p.id} title={`${p.resource}:${p.action}`}>
-                    {p.action}
-                  </th>
-                ))
-              )}
+              <th className="matrix-th--module">Quyền / Vai trò</th>
+              {visibleRoles.map((role) => (
+                <th key={role.id} title={role.roleName} className="matrix-th--role">
+                  <div className="matrix-role-label">{role.roleLabel}</div>
+                  <div className="matrix-role-code">{role.roleName}</div>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {roles.map((role) => (
-              <tr key={role.id}>
-                <td>
-                  <div>{role.roleLabel}</div>
-                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 400 }}>{role.roleName}</div>
-                </td>
-                {Object.entries(grouped).map(([module, perms]) =>
-                  perms.map((p) => (
-                    <td key={p.id}>
-                      <input
-                        type="checkbox"
-                        className="matrix-checkbox"
-                        checked={isChecked(role.id, p.id)}
-                        onChange={() => toggle(role.id, p.id)}
-                        title={`${role.roleLabel} — ${p.permissionKey}`}
-                      />
+              {Object.entries(grouped).map(([module, modulePerms]) => (
+                <Fragment key={`mod-${module}`}>
+                  <tr className="matrix-module-row">
+                    <td colSpan={visibleRoles.length + 1} className="matrix-module-cell">
+                      {module}
                     </td>
-                  ))
-                )}
-              </tr>
+                  </tr>
+                  {modulePerms.map((p) => (
+                    <tr key={p.id} className="matrix-perm-row">
+                      <td className="matrix-perm-label" title={`${p.resource}:${p.action}`}>
+                        <span className="matrix-perm-action">{p.action}</span>
+                        <span className="matrix-perm-key">{p.permissionKey}</span>
+                      </td>
+                      {visibleRoles.map((role) => (
+                        <td key={role.id} className="matrix-check-cell">
+                          <input
+                            type="checkbox"
+                            className="matrix-checkbox"
+                            checked={isChecked(role.id, p.id)}
+                            onChange={() => toggle(role.id, p.id)}
+                            title={`${role.roleLabel} — ${p.permissionKey}`}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </Fragment>
             ))}
           </tbody>
         </table>
@@ -322,6 +330,7 @@ function PermissionMatrix({ roles, permissions, rolePermissions, onChange, onSav
 
 export default function AdminRolesPage() {
   const toast = useToast();
+  const { reloadPermissions } = useAuth();
   const [tab, setTab] = useState('list'); // 'list' | 'matrix'
 
   const [roles, setRoles] = useState([]);
@@ -386,6 +395,8 @@ export default function AdminRolesPage() {
   useEffect(() => { loadRoles(); }, []);
   useEffect(() => { if (tab === 'matrix' && permissions.length === 0) loadMatrix(); }, [tab]);
 
+  const visibleRoles = roles.filter((r) => ROLE_VALUES.includes(r.roleName));
+
   function handleMatrixChange(roleId, permIds) {
     setRolePermissions((prev) => ({ ...prev, [roleId]: permIds }));
     setMatrixDirty(true);
@@ -394,14 +405,30 @@ export default function AdminRolesPage() {
   async function handleMatrixSave() {
     setMatrixSaving(true);
     try {
-      const roleList = roles;
       await Promise.all(
-        roleList.map(async (role) => {
+        visibleRoles.map(async (role) => {
           const permIds = rolePermissions[role.id] || [];
           await adminRolesApi.setRolePermissions(role.id, permIds);
         })
       );
       setMatrixDirty(false);
+
+      // Refresh token với permissions mới từ DB
+      try {
+        const result = await refreshPermissionsApi();
+        if (result?.token) {
+          localStorage.setItem('token', result.token);
+          sessionStorage.setItem('token', result.token);
+        }
+        if (result?.permissions) {
+          localStorage.setItem('permissions', JSON.stringify(result.permissions));
+          sessionStorage.setItem('permissions', JSON.stringify(result.permissions));
+        }
+      } catch {
+        // Neu refresh that bai, van thong bao thanh cong (BE da luu DB)
+      }
+
+      toast.success('Đã lưu ma trận quyền. Thay đổi sẽ có hiệu lực ngay.');
     } catch (err) {
       toast.error('Lỗi khi lưu: ' + (err.message || 'Không rõ'));
     } finally {
@@ -526,6 +553,7 @@ export default function AdminRolesPage() {
             permissions.length > 0 && (
               <PermissionMatrix
                 roles={roles}
+                visibleRoles={visibleRoles}
                 permissions={permissions}
                 rolePermissions={rolePermissions}
                 onChange={handleMatrixChange}

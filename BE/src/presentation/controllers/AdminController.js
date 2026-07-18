@@ -7,6 +7,7 @@ const RoleService = require('../../application/services/RoleService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const UserRoleService = require('../../application/services/UserRoleService');
 const UserRoleRepositoryImpl = require('../../infrastructure/repositories/UserRoleRepositoryImpl');
+const PermissionService = require('../../application/services/PermissionService');
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
 const { exportUsersToExcel } = require('../../utils/excelExporter');
@@ -21,7 +22,8 @@ class AdminController {
     this.adminUserService = new AdminUserService({ adminUserRepository });
 
     const roleRepository = new RoleRepositoryImpl();
-    this.roleService = new RoleService({ roleRepository });
+    const permissionService = new PermissionService({ roleRepository });
+    this.roleService = new RoleService({ roleRepository, permissionService });
 
     const userRoleRepository = new UserRoleRepositoryImpl();
     const roleRepo = new RoleRepositoryImpl();
@@ -80,6 +82,8 @@ class AdminController {
     this.updateUser = this.updateUser.bind(this);
     this.getUserDetail = this.getUserDetail.bind(this);
     this.resetPassword = this.resetPassword.bind(this);
+    this.reissueToken = this.reissueToken.bind(this);
+    this.refreshPermissions = this.refreshPermissions.bind(this);
   }
 
   getDashboardStats = async (req, res, next) => {
@@ -595,12 +599,20 @@ class AdminController {
       const roles = await this.userRoleService.getUserRoles(userId);
       const roleNames = roles.map((r) => r.roleName).filter(Boolean);
 
+      // Lay permissions tu DB
+      const PermissionService = require('../../application/services/PermissionService');
+      const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+      const ps = new PermissionService({ roleRepository: new RoleRepositoryImpl() });
+      const permissions = await ps.getUserPermissions(userId);
+      const permissionKeys = Array.from(permissions);
+
       const newToken = jwt.sign(
         {
           userId,
           email: req.user.email,
           name: req.user.name,
           roles: roleNames,
+          permissions: permissionKeys,
           branchId: req.user.branchId,
           tokenVersion: req.user.tokenVersion,
         },
@@ -608,7 +620,50 @@ class AdminController {
         { expiresIn: config.jwtExpiresIn }
       );
 
-      return success(res, { token: newToken, roles: roleNames }, 'Cap lai token thanh cong');
+      return success(res, { token: newToken, roles: roleNames, permissions: permissionKeys }, 'Cap lai token thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /api/admin/refresh-permissions
+   * Lay permissions moi nhat tu DB va tra ve token moi.
+   * Dung khi admin vua sua ma tran quyen — can cap nhat token de
+   * permission thay doi co hieu luc ngay lap tuc.
+   */
+  refreshPermissions = async (req, res, next) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return next(new (require('../../utils/ApiError'))(401, 'Token khong hop le'));
+      }
+
+      const roles = await this.userRoleService.getUserRoles(userId);
+      const roleNames = roles.map((r) => r.roleName).filter(Boolean);
+
+      // Lay permissions tu DB (bypass cache de lay gia tri moi nhat)
+      const PermissionService = require('../../application/services/PermissionService');
+      const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+      const ps = new PermissionService({ roleRepository: new RoleRepositoryImpl() });
+      const permissions = await ps.getUserPermissions(userId);
+      const permissionKeys = Array.from(permissions);
+
+      const newToken = jwt.sign(
+        {
+          userId,
+          email: req.user.email,
+          name: req.user.name,
+          roles: roleNames,
+          permissions: permissionKeys,
+          branchId: req.user.branchId,
+          tokenVersion: req.user.tokenVersion,
+        },
+        config.jwtSecret,
+        { expiresIn: config.jwtExpiresIn }
+      );
+
+      return success(res, { token: newToken, permissions: permissionKeys }, 'Cap nhat quyen thanh cong');
     } catch (err) {
       next(err);
     }

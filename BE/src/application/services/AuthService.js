@@ -3,10 +3,22 @@ const jwt = require('jsonwebtoken');
 const ApiError = require('../../utils/ApiError');
 const { toUserDto } = require('../dto/AuthDto');
 const config = require('../../config');
+const PermissionService = require('./PermissionService');
+const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 
 class AuthService {
   constructor(authRepository) {
     this.authRepository = authRepository;
+  }
+
+  /** Lazy-init PermissionService (avoid circular dependency at module load) */
+  _getPermissionService() {
+    if (!this._permissionService) {
+      this._permissionService = new PermissionService({
+        roleRepository: new RoleRepositoryImpl(),
+      });
+    }
+    return this._permissionService;
   }
 
   async login(email, password) {
@@ -18,8 +30,6 @@ class AuthService {
 
     const user = await this.authRepository.findUserByEmail(email);
     if (!user) {
-      // User KHONG ton tai: giu secret (tranh email enumeration), KHONG ghi log
-      // vao login_sessions vi se gay rac DB khi spam tu email ao.
       const e = new ApiError(401, 'Email hoặc mật khẩu không đúng');
       e.audit = { userExists: false };
       throw e;
@@ -27,7 +37,6 @@ class AuthService {
 
     const isMatch = await this._verifyPassword(password, user.user_password);
     if (!isMatch) {
-      // User CO ton tai nhung sai pass: ghi LOGIN_FAILED de audit brute-force.
       const e = new ApiError(401, 'Email hoặc mật khẩu không đúng');
       e.audit = { userExists: true, user, reason: 'WRONG_PASSWORD' };
       throw e;
@@ -41,10 +50,14 @@ class AuthService {
 
     const roles = await this.authRepository.findUserRoles(user.id);
 
-    // Tang token_version de void tat ca token cu khi user login o noi khac.
+    // Lay permissions tu DB
+    const permissionService = this._getPermissionService();
+    const permissions = await permissionService.getUserPermissions(user.id);
+    const permissionKeys = Array.from(permissions);
+
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
 
-    const userDto = toUserDto({ ...user, token_version: newTokenVersion }, roles);
+    const userDto = toUserDto({ ...user, token_version: newTokenVersion }, roles, permissionKeys);
 
     const token = jwt.sign(
       {
@@ -52,6 +65,7 @@ class AuthService {
         email: userDto.email,
         name: userDto.name,
         roles: userDto.roles,
+        permissions: userDto.permissions,
         branchId: userDto.branchId,
         tokenVersion: userDto.tokenVersion,
       },
