@@ -171,7 +171,7 @@ export default function ImportRequestDetailPage() {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={4} className="text-right"><strong>Tong cong</strong></td>
+                    <td colSpan={5} className="text-right"><strong>Tong cong</strong></td>
                     <td className="text-right"><strong>{totalQty}</strong></td>
                   </tr>
                 </tfoot>
