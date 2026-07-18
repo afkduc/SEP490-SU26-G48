@@ -436,7 +436,9 @@
 }
 
 /* ── Responsive ─────────────────────────────────────────── */
-@media (max-width: 900px) {
+
+/* Tablet */
+@media (max-width: 1024px) {
   .admin-sidebar {
     width: 68px;
   }
@@ -465,3 +467,4 @@
     padding: 0 16px;
   }
 }
+

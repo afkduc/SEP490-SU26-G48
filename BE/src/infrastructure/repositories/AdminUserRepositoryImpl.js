@@ -38,10 +38,11 @@ class AdminUserRepositoryImpl {
 
     if (search) {
       conditions.push(`(
-        u.user_name LIKE @p${paramIndex}
-        OR u.email LIKE @p${paramIndex}
-        OR u.first_name LIKE @p${paramIndex}
-        OR u.last_name LIKE @p${paramIndex}
+        LOWER(u.user_name) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.email) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.first_name) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.last_name) LIKE LOWER(@p${paramIndex})
+        OR u.phone LIKE @p${paramIndex}
       )`);
       params[`p${paramIndex}`] = `%${search}%`;
       paramIndex++;
@@ -125,10 +126,11 @@ class AdminUserRepositoryImpl {
 
     if (search) {
       conditions.push(`(
-        u.user_name LIKE @p${paramIndex}
-        OR u.email LIKE @p${paramIndex}
-        OR u.first_name LIKE @p${paramIndex}
-        OR u.last_name LIKE @p${paramIndex}
+        LOWER(u.user_name) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.email) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.first_name) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.last_name) LIKE LOWER(@p${paramIndex})
+        OR u.phone LIKE @p${paramIndex}
       )`);
       params[`p${paramIndex}`] = `%${search}%`;
       paramIndex++;

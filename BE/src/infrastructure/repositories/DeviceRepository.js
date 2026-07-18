@@ -87,26 +87,26 @@ class DeviceRepository {
 
     if (search) {
       conditions.push(`(
-        u.user_name LIKE @p${idx}
-        OR u.first_name LIKE @p${idx}
-        OR u.last_name LIKE @p${idx}
-        OR d.device_name LIKE @p${idx}
+        LOWER(u.user_name) LIKE LOWER(@p${idx})
+        OR LOWER(u.first_name) LIKE LOWER(@p${idx})
+        OR LOWER(u.last_name) LIKE LOWER(@p${idx})
+        OR LOWER(d.device_name) LIKE LOWER(@p${idx})
         OR d.ip_address LIKE @p${idx}
-        OR d.browser LIKE @p${idx}
-        OR d.os LIKE @p${idx}
+        OR LOWER(d.browser) LIKE LOWER(@p${idx})
+        OR LOWER(d.os) LIKE LOWER(@p${idx})
       )`);
       params[`p${idx}`] = `%${search}%`;
       idx++;
     }
 
     if (browser) {
-      conditions.push(`d.browser LIKE @p${idx}`);
+      conditions.push(`LOWER(d.browser) LIKE LOWER(@p${idx})`);
       params[`p${idx}`] = `%${browser}%`;
       idx++;
     }
 
     if (os) {
-      conditions.push(`d.os LIKE @p${idx}`);
+      conditions.push(`LOWER(d.os) LIKE LOWER(@p${idx})`);
       params[`p${idx}`] = `%${os}%`;
       idx++;
     }
