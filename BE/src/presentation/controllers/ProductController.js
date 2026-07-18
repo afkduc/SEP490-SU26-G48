@@ -7,12 +7,13 @@ class ProductController {
 
   getAll = async (req, res, next) => {
     try {
-      const { branchId, status, search, category, page = 1, limit = 20 } = req.query;
+      const { branchId, status, search, category, lowStockOnly, page = 1, limit = 20 } = req.query;
       const result = await this.productService.getAllProducts({
         branchId: branchId ? Number(branchId) : undefined,
         status,
         search,
         category,
+        lowStockOnly: lowStockOnly === 'true' || lowStockOnly === true,
         page: Number(page),
         limit: Number(limit),
       });
@@ -58,6 +59,15 @@ class ProductController {
     try {
       const product = await this.productService.deleteProduct(req.params.id);
       return success(res, product, 'Product deleted');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getCategories = async (req, res, next) => {
+    try {
+      const categories = await this.productService.getCategories();
+      return success(res, categories, 'Categories retrieved');
     } catch (err) {
       next(err);
     }
