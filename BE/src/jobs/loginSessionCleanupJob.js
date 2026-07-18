@@ -38,6 +38,34 @@ async function cleanupStaleSessions() {
   }
 }
 
+/**
+ * Dong tat ca device co is_current=1 nhung user khong co session active nao.
+ * Vi du: user bi dong tab, device van la is_current=1 nhung session da
+ * bi cleanup job dong roi.
+ */
+async function cleanupOrphanedDevices() {
+  try {
+    const result = await query(
+      `UPDATE ud
+       SET    ud.is_current = 0
+       FROM   user_devices ud
+       WHERE  ud.is_current = 1
+         AND  NOT EXISTS (
+           SELECT 1 FROM login_sessions ls
+           WHERE  ls.user_id = ud.user_id
+             AND  ls.status = 'active'
+             AND  ls.action_type = 'LOGIN'
+         )`
+    );
+    const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
+    if (affected > 0) {
+      console.log(`[loginSessionJob] Marked ${affected} orphaned device(s) as inactive`);
+    }
+  } catch (err) {
+    console.error('[loginSessionJob] cleanupOrphanedDevices failed:', err && err.message ? err.message : err);
+  }
+}
+
 async function backfillBrowserOs(limit = BACKFILL_BATCH) {
   try {
     const result = await query(
@@ -90,6 +118,7 @@ async function backfillLogoutReason() {
 
 async function runAll() {
   await cleanupStaleSessions();
+  await cleanupOrphanedDevices();
   await backfillLogoutReason();
   await backfillBrowserOs();
 }
@@ -111,4 +140,4 @@ function stop() {
   }
 }
 
-module.exports = { start, stop, runAll, cleanupStaleSessions, backfillBrowserOs, backfillLogoutReason };
+module.exports = { start, stop, runAll, cleanupStaleSessions, cleanupOrphanedDevices, backfillBrowserOs, backfillLogoutReason };
