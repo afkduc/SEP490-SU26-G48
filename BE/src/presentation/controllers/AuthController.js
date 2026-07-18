@@ -11,10 +11,16 @@ class AuthController {
   async login(req, res, next) {
     try {
       const { email, password } = req.body;
-      const result = await this.authService.login(email, password);
-      trackLogin(req, result.user || result).catch((e) =>
-        console.error('[AuthController] trackLogin error:', e.message)
-      );
+
+      // 1. Authenticate user first (tra ve { user } - chua co token)
+      const { user } = await this.authService.login(email, password);
+      
+      // 2. Track login with full user info to get deviceId
+      const trackResult = await trackLogin(req, user);
+      const deviceId = trackResult?.deviceId || null;
+      
+      // 3. Tao token voi deviceId (chi tao 1 lan)
+      const result = await this.authService.issueTokenWithDevice(user, deviceId);
       return success(res, result, 'Đăng nhập thành công');
     } catch (err) {
       // Chi ghi LOGIN_FAILED khi user ton tai (sai pass / tai khoan bi khoa).

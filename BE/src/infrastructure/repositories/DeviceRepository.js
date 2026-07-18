@@ -16,12 +16,16 @@ class DeviceRepository {
         d.user_agent,
         d.is_current,
         d.last_login_at,
+        d.last_activity_at,
         d.created_at,
         u.user_name
       FROM user_devices d
       LEFT JOIN users u ON u.id = d.user_id
       WHERE d.user_id = @p1
-      ORDER BY d.is_current DESC, d.last_login_at DESC
+      ORDER BY 
+        CASE WHEN d.is_current = 1 THEN 0 ELSE 1 END,
+        ISNULL(d.last_activity_at, d.last_login_at) DESC,
+        d.last_login_at DESC
     `, { p1: userId });
     return result.recordset.map((row) => ({
       id: row.id,
@@ -34,6 +38,7 @@ class DeviceRepository {
       userAgent: row.user_agent,
       isCurrent: row.is_current === 1 || row.is_current === true,
       lastLoginAt: row.last_login_at,
+      lastActivityAt: row.last_activity_at,
       createdAt: row.created_at,
     }));
   }
@@ -52,11 +57,14 @@ class DeviceRepository {
         d.ip_address,
         d.is_current,
         d.last_login_at,
+        d.last_activity_at,
         u.user_name
       FROM user_devices d
       LEFT JOIN users u ON u.id = d.user_id
       WHERE d.user_id = @p1 AND d.is_current = 1
-      ORDER BY d.last_login_at DESC
+      ORDER BY 
+        ISNULL(d.last_activity_at, d.last_login_at) DESC,
+        d.last_login_at DESC
     `, { p1: userId });
     return result.recordset.map((row) => ({
       id: row.id,
@@ -68,6 +76,7 @@ class DeviceRepository {
       ipAddress: row.ip_address,
       isCurrent: true,
       lastLoginAt: row.last_login_at,
+      lastActivityAt: row.last_activity_at,
     }));
   }
 
@@ -151,6 +160,7 @@ class DeviceRepository {
         d.ip_address,
         d.is_current,
         d.last_login_at,
+        d.last_activity_at,
         u.user_name,
         u.first_name,
         u.last_name,
@@ -159,7 +169,10 @@ class DeviceRepository {
       LEFT JOIN users u ON u.id = d.user_id
       LEFT JOIN branches b ON b.id = u.branch_id
       WHERE ${where}
-      ORDER BY d.is_current DESC, d.last_login_at DESC
+      ORDER BY 
+        CASE WHEN d.is_current = 1 THEN 0 ELSE 1 END,
+        ISNULL(d.last_activity_at, d.last_login_at) DESC,
+        d.last_login_at DESC
       OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
     `, { ...params, offset, pageSize });
 
@@ -177,6 +190,7 @@ class DeviceRepository {
       ipAddress: row.ip_address,
       isCurrent: row.is_current === 1 || row.is_current === true,
       lastLoginAt: row.last_login_at,
+      lastActivityAt: row.last_activity_at,
     }));
 
     return {
@@ -226,6 +240,26 @@ class DeviceRepository {
       { p1: userId }
     );
     return Number(result.recordset[0].total);
+  }
+
+  /**
+   * Update last_activity_at with 60s throttle.
+   * Only updates if last_activity_at is NULL or >= 60 seconds ago.
+   * Returns true if updated, false if skipped.
+   */
+  async updateLastActivityIfNeeded(deviceId) {
+    const result = await query(
+      `UPDATE user_devices
+       SET last_activity_at = SYSUTCDATETIME()
+       WHERE id = @p1
+         AND is_current = 1
+         AND (
+           last_activity_at IS NULL
+           OR DATEDIFF_BIG(SECOND, last_activity_at, SYSUTCDATETIME()) >= 60
+         )`,
+      { p1: deviceId }
+    );
+    return result.rowsAffected[0] > 0;
   }
 }
 

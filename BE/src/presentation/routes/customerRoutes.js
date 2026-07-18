@@ -3,6 +3,7 @@ const multer = require('multer');
 const { makeCustomerService } = require('../../application/services');
 const CustomerController = require('../controllers/CustomerController');
 const { authenticate, authorize } = require('../../middlewares/auth');
+const { trackActivity } = require('../../middlewares');
 const ApiError = require('../../utils/ApiError');
 
 const EXCEL_MIMETYPES = [
@@ -29,7 +30,7 @@ function buildCustomerRouter() {
   const router = express.Router();
   const controller = makeCustomerController();
 
-  router.use(authenticate);
+  router.use(authenticate, trackActivity);
   router.get('/', controller.getAll);
   router.get('/:id', controller.getById);
   router.put('/:id', controller.update);

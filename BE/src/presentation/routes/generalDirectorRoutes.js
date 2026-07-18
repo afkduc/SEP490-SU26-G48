@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate, authorize } = require('../../middlewares/auth');
+const { trackActivity } = require('../../middlewares');
 const GeneralDirectorController = require('../controllers/GeneralDirectorController');
 const GeneralDirectorService = require('../../application/services/GeneralDirectorService');
 const GeneralDirectorRepositoryImpl = require('../../infrastructure/repositories/GeneralDirectorRepositoryImpl');
@@ -10,7 +11,7 @@ function buildGeneralDirectorRouter() {
   const service = new GeneralDirectorService(repository);
   const controller = new GeneralDirectorController(service);
 
-  router.use(authenticate, authorize('general_director', 'admin'));
+  router.use(authenticate, authorize('general_director', 'admin'), trackActivity);
 
   router.get('/reports/revenue', controller.getRevenueReports);
   router.get('/reports/settlements', controller.getSettlementReports);
