@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { adminDevicesApi } from '../../services/adminApi';
+import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useToast } from '../../components/common/ToastContext';
 import './AdminDevicesPage.css';
 
@@ -69,6 +70,7 @@ function formatDate(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
   return d.toLocaleString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
@@ -241,6 +243,17 @@ export default function AdminDevicesPage() {
 
   useEffect(() => { loadData(1); }, []);
 
+  // SSE listener - chi refresh khi co su kien thuc su
+  const handleSSEEvent = useCallback((eventData) => {
+    // Chi refresh khi co event lien quan
+    // login, logout, force - tat ca deu anh huong danh sach device
+    if (['login', 'logout', 'force'].includes(eventData.type)) {
+      loadData(page);
+    }
+  }, [loadData, page]);
+
+  useLoginSessionsSSE(handleSSEEvent);
+
   function handleSearchChange(e) {
     const val = e.target.value;
     setSearch(val);
@@ -271,12 +284,21 @@ export default function AdminDevicesPage() {
 
   async function handleForceLogout() {
     if (!logoutTarget) return;
+    const targetId = logoutTarget.id;
+    const targetName = logoutTarget.deviceName;
     setLogoutLoading(true);
     try {
-      await adminDevicesApi.forceLogout(logoutTarget.id);
-      toast.success(`Đã đăng xuất thiết bị "${logoutTarget.deviceName}"`);
+      await adminDevicesApi.forceLogout(targetId);
+      toast.success(`Đã đăng xuất thiết bị "${targetName}"`);
       setLogoutTarget(null);
-      loadData(page);
+      
+      // Smooth update - chi cap nhat device bi revoke, khong load lai toan bo trang
+      // Đanh dau device thanh inactive (isCurrent = false)
+      setDevices(prev => prev.map(d => 
+        d.id === targetId 
+          ? { ...d, isCurrent: false } 
+          : d
+      ));
     } catch (err) {
       toast.error(err.message || 'Lỗi khi đăng xuất thiết bị');
     } finally {

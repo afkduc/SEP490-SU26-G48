@@ -48,32 +48,12 @@ class AuthService {
       throw e;
     }
 
-    const roles = await this.authRepository.findUserRoles(user.id);
-
-    // Lay permissions tu DB
-    const permissionService = this._getPermissionService();
-    const permissions = await permissionService.getUserPermissions(user.id);
-    const permissionKeys = Array.from(permissions);
-
+    // Increment token version de revoke token cu
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
+    user.token_version = newTokenVersion;
 
-    const userDto = toUserDto({ ...user, token_version: newTokenVersion }, roles, permissionKeys);
-
-    const token = jwt.sign(
-      {
-        userId: userDto.id,
-        email: userDto.email,
-        name: userDto.name,
-        roles: userDto.roles,
-        permissions: userDto.permissions,
-        branchId: userDto.branchId,
-        tokenVersion: userDto.tokenVersion,
-      },
-      config.jwtSecret,
-      { expiresIn: config.jwtExpiresIn }
-    );
-
-    return { token, user: userDto };
+    // Tra ve user object (CHUA CO TOKEN) - controller se tao token sau khi co deviceId
+    return { user };
   }
 
   async _verifyPassword(input, stored) {
@@ -82,6 +62,48 @@ class AuthService {
     }
     // Fallback: plain text (chỉ dùng khi dev, chưa hash password trong DB)
     return input === stored;
+  }
+
+  /**
+   * Tao JWT moi co deviceId (dung khi login thanh cong)
+   */
+  async issueTokenWithDevice(user, deviceId) {
+    return this._signToken(user, deviceId);
+  }
+
+  /**
+   * Tao token nhung chua co deviceId - du lieu user phai co token_version
+   */
+  async issueTokenWithoutDevice(user) {
+    return this._signToken(user, null);
+  }
+
+  async _signToken(user, deviceId) {
+    const roles = await this.authRepository.findUserRoles(user.id);
+    const permissionService = this._getPermissionService();
+    const permissions = await permissionService.getUserPermissions(user.id);
+    const permissionKeys = Array.from(permissions);
+
+    const userDto = toUserDto({ ...user, token_version: user.token_version }, roles, permissionKeys);
+
+    const tokenPayload = {
+      userId: userDto.id,
+      email: userDto.email,
+      name: userDto.name,
+      roles: userDto.roles,
+      permissions: userDto.permissions,
+      branchId: userDto.branchId,
+      tokenVersion: userDto.tokenVersion,
+    };
+
+    // Chi them deviceId neu co (backward compat voi token cu)
+    if (deviceId) {
+      tokenPayload.deviceId = deviceId;
+    }
+
+    const token = jwt.sign(tokenPayload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+
+    return { token, user: userDto };
   }
 }
 

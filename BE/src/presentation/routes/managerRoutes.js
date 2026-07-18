@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate, authorize } = require('../../middlewares/auth');
+const { trackActivity } = require('../../middlewares');
 const ManagerController = require('../controllers/ManagerController');
 const ManagerService = require('../../application/services/ManagerService');
 const ManagerRepositoryImpl = require('../../infrastructure/repositories/ManagerRepositoryImpl');
@@ -10,7 +11,7 @@ function buildManagerRouter() {
   const service = new ManagerService(repository);
   const controller = new ManagerController(service);
 
-  router.use(authenticate, authorize('manager', 'admin'));
+  router.use(authenticate, authorize('manager', 'admin'), trackActivity);
 
   router.get('/branch', controller.getBranch);
   router.get('/roles', controller.getRoles);

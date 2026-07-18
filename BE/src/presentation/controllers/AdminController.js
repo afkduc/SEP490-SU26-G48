@@ -84,6 +84,7 @@ class AdminController {
     this.resetPassword = this.resetPassword.bind(this);
     this.reissueToken = this.reissueToken.bind(this);
     this.refreshPermissions = this.refreshPermissions.bind(this);
+    this.cleanupDuplicateSessions = this.cleanupDuplicateSessions.bind(this);
   }
 
   getDashboardStats = async (req, res, next) => {
@@ -664,6 +665,66 @@ class AdminController {
       );
 
       return success(res, { token: newToken, permissions: permissionKeys }, 'Cap nhat quyen thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /api/admin/sessions/cleanup
+   * Don dep cac session trung lap: chi giu lai session moi nhat cho moi user.
+   * Dung de xu ly cac session active trung lap trong database.
+   */
+  cleanupDuplicateSessions = async (req, res, next) => {
+    try {
+      const { query } = require('../../infrastructure/database/sqlServer');
+
+      // Tim va dong cac session trung lap, chi giu lai session moi nhat
+      const result = await query(`
+        WITH RankedSessions AS (
+          SELECT 
+            id,
+            user_id,
+            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_time DESC) as rn
+          FROM login_sessions
+          WHERE status = 'active' AND action_type = 'LOGIN'
+        )
+        UPDATE login_sessions
+        SET status = 'ended', 
+            logout_reason = 'SESSION_CLEANUP',
+            logout_time = SYSUTCDATETIME(),
+            session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME())
+        WHERE id IN (
+          SELECT id FROM RankedSessions WHERE rn > 1
+        );
+        SELECT @@ROWCOUNT as closedSessions;
+      `);
+
+      const closedSessions = result.recordset?.[0]?.closedSessions || 0;
+
+      // Xoa device cu trung lap (chi giu device moi nhat)
+      await query(`
+        WITH RankedDevices AS (
+          SELECT 
+            id,
+            user_id,
+            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY last_login_at DESC) as rn
+          FROM user_devices
+          WHERE is_current = 1
+        )
+        UPDATE user_devices
+        SET is_current = 0
+        WHERE id IN (
+          SELECT id FROM RankedDevices WHERE rn > 1
+        );
+      `);
+
+      return success(res, {
+        closedSessions,
+        message: closedSessions > 0
+          ? `Da dong ${closedSessions} session trung lap`
+          : 'Khong co session trung lap',
+      }, 'Don dep session thanh cong');
     } catch (err) {
       next(err);
     }

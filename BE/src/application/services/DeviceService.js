@@ -1,5 +1,6 @@
 const DeviceRepository = require('../../infrastructure/repositories/DeviceRepository');
 const ApiError = require('../../utils/ApiError');
+const { emitLoginSessionEvent } = require('../events/LoginSessionEvents');
 
 class DeviceService {
   constructor() {
@@ -19,49 +20,49 @@ class DeviceService {
     const device = devices.items.find((d) => d.id === Number(deviceId));
     if (!device) throw new ApiError(404, 'Thiet bi khong ton tai');
 
-    // 1. Revoke all tokens for this user
-    await this._revokeUserTokens(device.userId);
+    const userId = device.userId;
+    const userName = device.userName;
 
-    // 2. Dong tat ca session active cua user
-    await this._closeUserSessions(device.userId);
+    // 1. Chi revoke DEVICE NAY - set is_current = 0
+    // KHONG revoke token_version cua user (vi lam vay se logout TAT CA thiet bi)
+    await this._revokeDevice(deviceId);
 
-    // 3. Delete device record
-    await this.deviceRepository.delete(deviceId);
+    // 2. Emit SSE event de thong bao cho admin
+    emitLoginSessionEvent('force', {
+      userId,
+      userName,
+      deviceId: Number(deviceId),
+    });
 
-    return { deleted: true, deviceId: Number(deviceId), userId: device.userId };
+    return { revoked: true, deviceId: Number(deviceId), userId };
   }
 
-  async _revokeUserTokens(userId) {
+  async _revokeDevice(deviceId) {
     const { query } = require('../../infrastructure/database/sqlServer');
+    // Update last_activity_at = now before setting is_current = 0
+    // This records the last time device was active (when force logout happened)
     await query(
-      `UPDATE users SET token_version = ISNULL(token_version, 0) + 1 WHERE id = @p1`,
-      { p1: Number(userId) }
+      `UPDATE user_devices 
+       SET last_activity_at = SYSUTCDATETIME(), is_current = 0 
+       WHERE id = @p1`,
+      { p1: Number(deviceId) }
     );
-  }
-
-  async _closeUserSessions(userId) {
-    const { query } = require('../../infrastructure/database/sqlServer');
-    const result = await query(
-      `UPDATE login_sessions
-       SET    logout_time              = SYSUTCDATETIME(),
-              logout_reason            = 'ADMIN_FORCE_LOGOUT',
-              session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
-              status                  = 'ended'
-       WHERE  user_id    = @p1
-         AND  status    = 'active'
-         AND  action_type = 'LOGIN'`,
-      { p1: Number(userId) }
-    );
-    if (result.rowsAffected && result.rowsAffected[0] > 0) {
-      console.log(`[DeviceService] Closed ${result.rowsAffected[0]} active session(s) for userId=${userId}`);
-    }
-    return result.rowsAffected ? result.rowsAffected[0] : 0;
+    console.log(`[DeviceService] Revoked deviceId=${deviceId}`);
   }
 
   async forceLogoutAllOtherDevices(userId, currentDeviceId) {
     const count = await this.deviceRepository.countActiveByUserId(Number(userId));
     const deleted = await this.deviceRepository.deleteOtherDevices(Number(userId), currentDeviceId);
     return { deleted, remainingCount: count - deleted };
+  }
+
+  /**
+   * Update last_activity_at with 60s throttle.
+   * Only updates if last_activity_at is NULL or >= 60 seconds ago.
+   * Returns true if updated, false if skipped.
+   */
+  async updateLastActivity(deviceId) {
+    return this.deviceRepository.updateLastActivityIfNeeded(Number(deviceId));
   }
 }
 
