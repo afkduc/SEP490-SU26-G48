@@ -1,5 +1,11 @@
 import { API_BASE_URL } from '../config';
 
+export const SESSION_EXPIRED_KEY = 'SESSION_EXPIRED';
+
+export function showSessionExpired() {
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_KEY));
+}
+
 class HttpClient {
   constructor(baseURL = API_BASE_URL) {
     this.baseURL = baseURL;
@@ -23,6 +29,9 @@ class HttpClient {
       : await response.text();
 
     if (!response.ok) {
+      if (response.status === 401) {
+        showSessionExpired();
+      }
       const message = (payload && payload.message) || response.statusText;
       const error = new Error(message);
       error.status = response.status;

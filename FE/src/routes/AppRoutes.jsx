@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
+import SessionExpiredModal from '../components/SessionExpiredModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
@@ -52,6 +53,7 @@ function AppRoutes() {
   return (
     <ToastProvider>
       <SharedDataProvider>
+        <SessionExpiredModal />
         <Suspense fallback={<Loading />}>
           <Routes>
           {/* Public */}

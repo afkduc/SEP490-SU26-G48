@@ -145,9 +145,19 @@ export default function AdminLayout({ children }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
-  const currentPage = ADMIN_SIDEBAR.flatMap((g) => g.items).find((item) =>
-    location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-  );
+  const allItems = ADMIN_SIDEBAR.flatMap((g) => g.items);
+  // Uu tien match path dai nhat: trang con khong bi "nhot" thanh item cha.
+  // /admin/profile/notifications -> chi match "Cai dat thong bao",
+  // KHONG match "Ho so ca nhan".
+  const matchedPaths = allItems
+    .filter((i) =>
+      location.pathname === i.path
+      || (i.path !== '/admin/dashboard' && location.pathname.startsWith(i.path + '/'))
+    )
+    .map((i) => i.path)
+    .sort((a, b) => b.length - a.length);
+  const longestMatch = matchedPaths[0];
+  const currentPage = allItems.find((i) => i.path === longestMatch);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -201,13 +211,15 @@ export default function AdminLayout({ children }) {
                 <div className="admin-sidebar__group-label">{group.group}</div>
               )}
               {group.items.map((item) => {
-                const isActive = location.pathname === item.path ||
-                  (item.path !== '/admin/dashboard' && location.pathname.startsWith(item.path));
+                // Chi highlight item co path khop DAI NHAT voi URL.
+                // /admin/profile/notifications -> chi sang "Cai dat thong bao",
+                // KHONG sang "Ho so ca nhan".
+                const isActive = item.path === longestMatch;
                 return (
                   <NavLink
                     key={item.path}
                     to={item.path}
-                    className={`admin-sidebar__item ${isActive ? 'admin-sidebar__item--active' : ''}`}
+                    className={() => `admin-sidebar__item ${isActive ? 'admin-sidebar__item--active' : ''}`}
                     title={collapsed ? item.label : undefined}
                   >
                     <span className="admin-sidebar__item-icon">{item.icon}</span>

@@ -73,6 +73,7 @@ export function usePaginatedList({
         total: res?.total ?? (Array.isArray(items) ? items.length : 0),
         page: Number(res?.page || p.page || 1),
         pageSize: Number(res?.pageSize || p.pageSize || DEFAULT_PAGE_SIZE),
+        stats: res?.stats ?? null,
       });
     } catch (err) {
       setError(err);

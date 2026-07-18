@@ -25,6 +25,20 @@ router.get('/', (req, res) => {
   return success(res, null, 'Welcome to AutoGara API');
 });
 
+// Route debug (chỉ trả IP của request hiện tại) — dùng để kiểm tra
+// Express đang lấy IP đúng chưa sau khi deploy qua reverse proxy / CDN.
+// Mở browser/postman: GET /api/_debug/whoami → trả IP Express thấy được.
+router.get('/_debug/whoami', (req, res) => {
+  return success(res, {
+    ip: req.ip,
+    ips: req.ips,
+    socketRemote: req.socket ? req.socket.remoteAddress : null,
+    xForwardedFor: req.headers['x-forwarded-for'] || null,
+    xRealIp: req.headers['x-real-ip'] || null,
+    trustProxySetting: req.app.get('trust proxy'),
+  }, 'IP mà Express đang nhìn thấy từ request này');
+});
+
 router.use('/auth', buildAuthRouter());
 router.use('/users', buildUserRouter());
 router.use('/vehicles', buildVehicleRouter());
