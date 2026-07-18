@@ -77,7 +77,7 @@ export default function AdminPagination({
           </svg>
         </button>
 
-        {/* ‹ Prev */}
+        {/* ‹ Trước */}
         <button
           type="button"
           className="admin-pagination__nav-btn"
@@ -116,7 +116,7 @@ export default function AdminPagination({
           );
         })}
 
-        {/* Next › */}
+        {/* Tiếp › */}
         <button
           type="button"
           className="admin-pagination__nav-btn"

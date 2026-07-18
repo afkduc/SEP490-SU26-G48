@@ -194,7 +194,7 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
 
           <div className="reset-pw-footer">
             <div className="reset-pw-footer__actions">
-              <button className="btn-cancel" onClick={handleClose}>Dong</button>
+              <button className="btn-cancel" onClick={handleClose}>Đóng</button>
             </div>
           </div>
         </div>

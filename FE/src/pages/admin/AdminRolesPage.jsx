@@ -204,7 +204,7 @@ function RoleCard({ role, onEdit, onToggleStatus, onUsers }) {
               {role.roleName}
             </span>
             <span className={`role-card__status-chip ${role.isActive ? 'role-card__status-chip--active' : 'role-card__status-chip--inactive'}`}>
-              {role.isActive ? 'Active' : 'Disabled'}
+              {role.isActive ? 'Hoạt động' : 'Tắt'}
             </span>
           </div>
           <div className="role-card__name">{role.roleLabel}</div>
