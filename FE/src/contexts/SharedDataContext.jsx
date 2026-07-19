@@ -1,13 +1,18 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { adminBranchesApi, adminRolesApi } from '../services/adminApi';
+import { useAuth } from './AppContext';
 
 const SharedDataContext = createContext(null);
 
 export function SharedDataProvider({ children }) {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+  const shouldLoadAdminData = isAuthenticated && location.pathname.startsWith('/admin');
   const [branches, setBranches] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [branchesLoading, setBranchesLoading] = useState(true);
-  const [rolesLoading, setRolesLoading] = useState(true);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+  const [rolesLoading, setRolesLoading] = useState(false);
   const [branchesError, setBranchesError] = useState(null);
   const [rolesError, setRolesError] = useState(null);
 
@@ -38,9 +43,14 @@ export function SharedDataProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (!shouldLoadAdminData) {
+      setBranchesLoading(false);
+      setRolesLoading(false);
+      return;
+    }
     fetchBranches();
     fetchRoles();
-  }, [fetchBranches, fetchRoles]);
+  }, [shouldLoadAdminData, fetchBranches, fetchRoles]);
 
   const refreshBranches = useCallback(() => fetchBranches(), [fetchBranches]);
   const refreshRoles = useCallback(() => fetchRoles(), [fetchRoles]);

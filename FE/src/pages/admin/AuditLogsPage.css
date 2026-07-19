@@ -4,15 +4,19 @@
 
 /* ── Page wrapper ─────────────────────────────────────────── */
 .admin-logs {
-  padding: 28px 32px;
+  padding: 24px 24px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #1e293b;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   min-height: calc(100vh - 64px);
   background: #f8fafc;
   box-sizing: border-box;
+  /* Full màn — kéo giãn theo viewport, không bao giờ xuất hiện scrollbar ngang */
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* ── Header ───────────────────────────────────────────────── */
@@ -139,6 +143,27 @@
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid #f1f5f9;
+}
+
+.admin-logs__quick-search {
+  margin-bottom: 12px;
+}
+
+.admin-logs__quick-search .filter-field {
+  position: relative;
+}
+
+.admin-logs__quick-search .filter-field > svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.admin-logs__quick-search .filter-field__input {
+  padding-left: 36px;
 }
 
 .admin-logs__filter-title {
@@ -354,13 +379,25 @@
 
 .admin-logs__table-title svg { color: #94a3b8; }
 
-.admin-logs__table-wrapper { overflow-x: auto; }
+.admin-logs__table-wrapper {
+  /* Wrapper KHÔNG cho scroll ngang — table tự co giãn + truncate để luôn vừa viewport */
+  overflow-x: visible;
+  width: 100%;
+}
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
+  /* Fixed layout để phân bổ cột theo tỉ lệ %, không phụ thuộc nội dung */
+  table-layout: fixed;
 }
+
+/* Phân bổ độ rộng cột (tổng = 100%) ở mặc định ≥1100px */
+.table colgroup col:nth-child(1)  { width: 160px; }  /* Người dùng */
+.table colgroup col:nth-child(2)  { width: 100px; }  /* Hành động */
+.table colgroup col:nth-child(3)  { width: auto;  }  /* Mô tả — chiếm phần còn lại */
+.table colgroup col:nth-child(4)  { width: 170px; }  /* Thời gian — sát phải */
 
 .table thead tr {
   background: #f8fafc;
@@ -368,15 +405,17 @@
 }
 
 .table thead th {
-  padding: 11px 16px;
+  padding: 10px 12px;
   text-align: left;
   font-size: 0.72rem;
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
   border-bottom: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .table tbody tr {
@@ -397,9 +436,75 @@
 }
 
 .table tbody td {
-  padding: 12px 16px;
+  padding: 10px 12px;
   color: #334155;
   vertical-align: middle;
+  /* Truncate dài: 1 dòng + ellipsis, hover cell sẽ thấy title (set ở từng span) */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Các span nội dung trong cell cũng phải truncate theo */
+.table tbody td > * {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Time-cell là container flex-column chứa 3 dòng (main / ago / utc).
+   Phải loại trừ khỏi override display:block ở trên, nếu không các span sẽ
+   chảy ngang thành 1 dòng. */
+.table tbody td.audit-logs__cell--time > .audit-logs__time-cell {
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* User-cell (avatar + tên) cũng phải flex để avatar + tên nằm cùng 1 dòng.
+   Tương tự time-cell, phải loại trừ khỏi override display:block ở trên. */
+.table tbody td > .audit-logs__user-cell {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.table tbody td > .audit-logs__user-cell > .audit-logs__user-avatar {
+  display: inline-flex !important;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+}
+
+.table tbody td > .audit-logs__user-cell > .audit-logs__user-text {
+  display: block !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.table tbody td.audit-logs__cell--time > .audit-logs__time-cell > span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Action cell (nút Chi tiết): không truncate */
+.table tbody td.audit-logs__cell--actions,
+.table tbody td.audit-logs__cell--actions > * {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .table__empty {
@@ -410,29 +515,109 @@
 }
 
 /* ── Table cells ─────────────────────────────────────────── */
-.audit-logs__date {
-  white-space: nowrap;
-  font-size: 0.8rem;
-  color: #64748b;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.audit-logs__user-cell {
+.audit-logs__time-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  white-space: nowrap;
+}
+
+.audit-logs__time-main {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1e293b;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.audit-logs__time-ago {
+  font-size: 0.7rem;
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+.audit-logs__time-utc {
+  font-size: 0.66rem;
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.th-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4f46e5;
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-style: italic;
+  cursor: help;
+  user-select: none;
+  vertical-align: middle;
+}
+
+.th-info:hover { background: #c7d2fe; }
+
+.audit-logs__user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: nowrap;
+}
+
+.audit-logs__user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  letter-spacing: 0.02em;
+}
+
+.audit-logs__user-text {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .audit-logs__user-name {
   font-weight: 600;
   font-size: 0.85rem;
   color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  line-height: 1.3;
 }
 
 .audit-logs__user-phone {
   font-size: 0.72rem;
   color: #94a3b8;
   font-family: 'JetBrains Mono', monospace;
+}
+
+.audit-logs__description {
+  font-size: 0.83rem;
+  color: #334155;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  display: block;
 }
 
 .audit-logs__entity {
@@ -442,6 +627,7 @@
   background: #f1f5f9;
   padding: 2px 6px;
   border-radius: 4px;
+  cursor: help;
 }
 
 .audit-logs__code {
@@ -449,12 +635,29 @@
   font-family: 'JetBrains Mono', monospace;
   color: #4f46e5;
   font-weight: 500;
+  cursor: help;
+  border-bottom: 1px dotted #c7d2fe;
 }
 
 .audit-logs__ip {
   font-size: 0.78rem;
   font-family: 'JetBrains Mono', monospace;
   color: #64748b;
+  cursor: help;
+}
+
+.audit-logs__ip--missing {
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.audit-logs__code--empty {
+  color: #94a3b8;
+  border-bottom: none;
+  font-style: italic;
 }
 
 .audit-logs__method {
@@ -497,6 +700,15 @@
 .badge--danger { background: #fee2e2; color: #dc2626; }
 .badge--info { background: #dbeafe; color: #1d4ed8; }
 .badge--warning { background: #fef9c3; color: #a16207; }
+.badge--purple { background: #ede9fe; color: #7c3aed; }
+.badge--orange { background: #fff7ed; color: #ea580c; }
+.badge--teal { background: #f0fdfa; color: #0d9488; }
+.badge--cyan { background: #ecfeff; color: #0891b2; }
+.badge--indigo { background: #eef2ff; color: #4f46e5; }
+.badge--rose { background: #fff1f2; color: #e11d48; }
+.badge--green { background: #dcfce7; color: #16a34a; }
+.badge--amber { background: #fef3c7; color: #d97706; }
+.badge--slate { background: #e2e8f0; color: #334155; }
 
 /* ── Row actions ─────────────────────────────────────────── */
 .admin-logs__row-actions {
@@ -588,9 +800,15 @@
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .table colgroup col:nth-child(1) { width: 140px; }  /* Người dùng */
+  .table colgroup col:nth-child(2) { width: 90px;  }  /* Hành động */
+  .table colgroup col:nth-child(4) { width: 150px; }  /* Thời gian */
+}
+
 @media (max-width: 900px) {
   .admin-logs {
-    padding: 20px 16px;
+    padding: 18px 14px;
   }
 
   .admin-logs__filter-body {

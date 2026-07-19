@@ -10,9 +10,9 @@ class SupplierRepositoryImpl extends SupplierRepository {
 
     if (search) {
       conditions.push(`(
-        supplier_code LIKE @p${p}
-        OR supplier_name LIKE @p${p}
-        OR contact_name LIKE @p${p}
+        LOWER(supplier_code) LIKE LOWER(@p${p})
+        OR LOWER(supplier_name) LIKE LOWER(@p${p})
+        OR LOWER(contact_name) LIKE LOWER(@p${p})
         OR phone LIKE @p${p}
       )`);
       params[`p${p}`] = `%${search}%`;

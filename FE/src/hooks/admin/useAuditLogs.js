@@ -4,11 +4,16 @@ import { auditApi } from '../../services/auditApi';
 const DEFAULT_PAGE_SIZE = 10;
 
 const DEFAULT_PARAMS = {
+  keyword: '',
   userName: '',
   phone: '',
   action: '',
+  tableName: '',
   entityName: '',
   entityCode: '',
+  ipAddress: '',
+  requestMethod: '',
+  responseStatus: '',
   startDate: '',
   endDate: '',
   branchId: undefined,
@@ -18,13 +23,14 @@ const DEFAULT_PARAMS = {
 
 /**
  * Hook lấy danh sách audit logs (UC-00 System Log).
- * `userName` và `phone` được debounce 400ms thông qua usePaginatedList.
+ * `userName`, `phone`, `keyword`, `entityCode` được debounce 200ms thông qua usePaginatedList.
  */
 export function useAuditLogs(initialParams = {}) {
   const list = usePaginatedList({
     apiFn: auditApi.getAuditLogs,
     defaultParams: { ...DEFAULT_PARAMS, ...initialParams },
-    debounceKeys: ['userName', 'phone'],
+    debounceKeys: ['keyword', 'userName', 'phone', 'entityCode'],
+    debounceMs: 200,
   });
 
   return {

@@ -37,22 +37,19 @@ export function usePaginatedList({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Dùng ref để lưu trữ params hiện tại (không gây re-render)
+  // Ref lưu params hiện tại (không gây re-render)
   const paramsRef = useRef(params);
 
-  // Debounce cache - ref lưu trữ debounced values
+  // Ref lưu debounced values (dùng để merge vào params khi gọi API)
   const debouncedRef = useRef({});
   debounceKeys.forEach((k) => {
     if (!(k in debouncedRef.current)) debouncedRef.current[k] = params[k] ?? '';
   });
 
-  // Trigger để useEffect re-run khi debounce flush
-  const [debouncedVersion, setDebouncedVersion] = useState(0);
-
   // Timer refs cho từng key
   const timerRefs = useRef({});
 
-  // Clean params (bỏ empty)
+  // Clean params (bỏ empty/undefined)
   function cleanParams(p) {
     const out = {};
     Object.entries(p).forEach(([k, v]) => {
@@ -61,7 +58,7 @@ export function usePaginatedList({
     return out;
   }
 
-  // API call function
+  // API call function - stable reference
   const callApi = useCallback(async (p) => {
     setLoading(true);
     setError(null);
@@ -73,6 +70,7 @@ export function usePaginatedList({
         total: res?.total ?? (Array.isArray(items) ? items.length : 0),
         page: Number(res?.page || p.page || 1),
         pageSize: Number(res?.pageSize || p.pageSize || DEFAULT_PAGE_SIZE),
+        stats: res?.stats ?? null,
       });
     } catch (err) {
       setError(err);
@@ -89,37 +87,64 @@ export function usePaginatedList({
     };
   }, []);
 
-  // Setup debounce cho debounceKeys
+  // Merge debounced values vào params hiện tại để tạo effective params
+  function getEffectiveParams(currentParams) {
+    const effective = { ...currentParams };
+    debounceKeys.forEach((k) => {
+      effective[k] = debouncedRef.current[k] ?? '';
+    });
+    return effective;
+  }
+
+  // Trigger gọi API với params hiện tại (đã merge debounced values)
+  const triggerFetch = useCallback(() => {
+    callApi(getEffectiveParams(paramsRef.current));
+  }, [callApi]);
+
+  // Effect gọi API khi page/pageSize thay đổi
   useEffect(() => {
-    debounceKeys.forEach((key) => {
+    triggerFetch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.page, params.pageSize]);
+
+  /**
+   * Cập nhật 1 param:
+   * - Luôn cập nhật state để UI phản hồi ngay
+   * - Luôn reset page về 1 (trừ khi key là 'page')
+   * - Gọi API sau khi state đã update (dùng setTimeout 0)
+   */
+  const updateParam = useCallback((key, value) => {
+    const isDebounceKey = debounceKeys.includes(key);
+
+    if (isDebounceKey) {
+      // Cancel timer cũ (tránh race condition khi gõ nhanh)
       if (timerRefs.current[key]) {
         clearTimeout(timerRefs.current[key]);
       }
-      timerRefs.current[key] = setTimeout(() => {
-        debouncedRef.current[key] = paramsRef.current[key] ?? '';
-        setDebouncedVersion((v) => v + 1);
-      }, debounceMs);
-    });
 
-    return () => {
-      debounceKeys.forEach((key) => {
-        if (timerRefs.current[key]) {
-          clearTimeout(timerRefs.current[key]);
-        }
+      // Cập nhật debouncedRef ngay để có giá trị mới nhất
+      debouncedRef.current[key] = value ?? '';
+
+      // Cập nhật state để UI phản hồi ngay (input hiển thị giá trị)
+      setParamsState((prev) => {
+        const next = { ...prev, [key]: value, page: 1 };
+        paramsRef.current = next;
+        return next;
       });
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debounceKeys.join(','), debounceMs]);
 
-  // Auto fetch khi: page/pageSize thay đổi HOẶC debounce flush
-  useEffect(() => {
-    const effectiveParams = { ...paramsRef.current };
-    debounceKeys.forEach((key) => {
-      effectiveParams[key] = debouncedRef.current[key] ?? '';
-    });
-    callApi(effectiveParams);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.page, params.pageSize, debouncedVersion]);
+      // Gọi API SAU khi state update (dùng setTimeout 0)
+      setTimeout(() => callApi(getEffectiveParams(paramsRef.current)), 0);
+    } else {
+      // Không phải debounce key: cập nhật state, sau đó gọi API với giá trị mới
+      setParamsState((prev) => {
+        const next = { ...prev, [key]: value, page: key === 'page' ? value : 1 };
+        paramsRef.current = next;
+        return next;
+      });
+      // Gọi API sau state update với params mới
+      setTimeout(() => callApi(getEffectiveParams(paramsRef.current)), 0);
+    }
+  }, [debounceKeys, callApi]);
 
   const setParams = useCallback((updater) => {
     setParamsState((prev) => {
@@ -129,37 +154,16 @@ export function usePaginatedList({
     });
   }, []);
 
-  const updateParam = useCallback((key, value) => {
-    // Immediate update debouncedRef (không chờ debounce)
-    if (debounceKeys.includes(key)) {
-      debouncedRef.current[key] = value ?? '';
-    }
-    setParamsState((prev) => {
-      const next = {
-        ...prev,
-        [key]: value,
-        page: key === 'page' ? value : 1,
-      };
-      paramsRef.current = next;
-      return next;
-    });
-  }, [debounceKeys]);
-
   const refresh = useCallback(async () => {
     debounceKeys.forEach((key) => {
       debouncedRef.current[key] = paramsRef.current[key] ?? '';
     });
-    setDebouncedVersion((v) => v + 1);
-    await callApi({ ...paramsRef.current });
+    await callApi(getEffectiveParams(paramsRef.current));
   }, [callApi, debounceKeys]);
 
   const refetch = useCallback(() => {
-    const effectiveParams = { ...paramsRef.current };
-    debounceKeys.forEach((key) => {
-      effectiveParams[key] = debouncedRef.current[key] ?? '';
-    });
-    callApi(effectiveParams);
-  }, [callApi, debounceKeys]);
+    callApi(getEffectiveParams(paramsRef.current));
+  }, [callApi]);
 
   return {
     data,

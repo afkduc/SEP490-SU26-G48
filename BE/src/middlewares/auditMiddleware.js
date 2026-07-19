@@ -7,7 +7,15 @@ const METHOD_TO_ACTION = {
   DELETE: 'DELETE',
 };
 
-const SKIP_PATHS = new Set(['/api/auth/login', '/api/auth/logout']);
+// Paths that should NOT be audited at all.
+// Auth flow is recorded by loginSessionMiddleware; audit endpoint
+// itself shouldn't log its own reads or it would self-amplify.
+const SKIP_PATHS = new Set([
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/audit',
+  '/api/audit/',
+]);
 
 const SENSITIVE_FIELDS = [
   'password',
@@ -104,13 +112,123 @@ function pickResponseRecordId(responseBody) {
   return null;
 }
 
-function buildDescription(action, entityName, entityCode, userName) {
-  const parts = [action];
-  if (entityName) parts.push(entityName);
-  if (entityCode) parts.push(entityCode);
-  parts.push('by');
-  parts.push(userName || 'unknown');
-  return parts.join(' ');
+function buildDescription(action, entityName, entityCode, userName, when, userRoles) {
+  // Sinh mô tả thân thiện với admin, ví dụ:
+  //   "Lễ tân A tạo hợp đồng CT-001 lúc 14:35 19/07/2026"
+  //   "Admin B cập nhật tài khoản USR-005 lúc 09:12 19/07/2026"
+  //   "Anh C xóa khách hàng KH-009 lúc 16:02 19/07/2026"
+  // Nguyên tắc: không log URL/endpoint, không log method, chỉ log:
+  //   <tên gọi thân thiện của người dùng> <hành vi tiếng Việt>
+  //   <tên đối tượng tiếng Việt> [mã] lúc <giờ phút> <ngày/tháng/năm>
+
+  // Chọn nhãn vai trò theo thứ tự ưu tiên:
+  //   1) nhãn tiếng Việt cho role đầu tiên trong mảng roles
+  //   2) không có role → suy từ user_name
+  //   3) fallback "Hệ thống" nếu thiếu hết
+  const actor = pickActorLabel(userRoles, userName);
+
+  const verb = ACTION_VERB[action] || 'tác động';
+  const object = TABLE_LABEL[entityName] || entityName || 'dữ liệu';
+  const code = entityCode ? ` ${entityCode}` : '';
+
+  return `${actor} ${verb} ${object}${code} lúc ${formatVnDateTime(when || new Date())}`;
+}
+
+function pickActorLabel(roles, userName) {
+  if (Array.isArray(roles)) {
+    for (const r of roles) {
+      const key = normalizeRole(r);
+      if (ROLE_LABEL[key]) return ROLE_LABEL[key];
+    }
+  }
+  return defaultActorLabel(userName);
+}
+
+// Map user_role → lời xưng thân thiện tiếng Việt.
+// role được so khớp theo chuỗi con (case-insensitive).
+const ROLE_LABEL = {
+  admin: 'Admin',
+  manager: 'Quản lý',
+  receptionist: 'Lễ tân',
+  sales: 'Nhân viên bán hàng',
+  sale: 'Nhân viên bán hàng',
+  technician: 'Kỹ thuật viên',
+  warehouse_staff: 'Thủ kho',
+  accountant: 'Kế toán',
+  customer_care: 'Chăm sóc khách hàng',
+  general_director: 'Giám đốc',
+  director: 'Giám đốc',
+  user: 'Người dùng',
+};
+
+function normalizeRole(s) {
+  if (!s) return '';
+  return String(s).toLowerCase().replace(/[^a-z_]/g, '');
+}
+
+// Khi không khớp vai trò, sinh nhãn mặc định dựa trên tên đăng nhập.
+// Ví dụ: "nguyen.sale" → "Người dùng nguyen.sale".
+function defaultActorLabel(userName) {
+  if (!userName) return 'Hệ thống';
+  // Nếu userName trông giống tên người (chứa dấu cách / viết hoa), dùng nguyên.
+  if (/[A-Z][a-z]/.test(userName) || /\s/.test(userName)) return userName;
+  return `Người dùng ${userName}`;
+}
+
+const ACTION_VERB = {
+  CREATE: 'tạo',
+  UPDATE: 'cập nhật',
+  DELETE: 'xóa',
+  LOGIN: 'đăng nhập',
+  LOGOUT: 'đăng xuất',
+  READ: 'xem',
+};
+
+// Map table_name → tên tiếng Việt dễ hiểu.
+// Khớp theo key (lower-case, bỏ dấu gạch ngang) — thêm key mới khi có bảng mới.
+const TABLE_LABEL = {
+  users: 'tài khoản',
+  user: 'tài khoản',
+  contracts: 'hợp đồng',
+  contract: 'hợp đồng',
+  customers: 'khách hàng',
+  customer: 'khách hàng',
+  vehicles: 'xe',
+  vehicle: 'xe',
+  orders: 'đơn hàng',
+  order: 'đơn hàng',
+  invoices: 'hóa đơn',
+  invoice: 'hóa đơn',
+  work_orders: 'phiếu sửa chữa',
+  work_order: 'phiếu sửa chữa',
+  repair_orders: 'phiếu sửa chữa',
+  parts: 'phụ tùng',
+  part: 'phụ tùng',
+  suppliers: 'nhà cung cấp',
+  supplier: 'nhà cung cấp',
+  branches: 'chi nhánh',
+  branch: 'chi nhánh',
+  roles: 'vai trò',
+  role: 'vai trò',
+  specialties: 'chuyên môn',
+  specialty: 'chuyên môn',
+  services: 'dịch vụ',
+  service: 'dịch vụ',
+  import_requests: 'phiếu nhập kho',
+  import_request: 'phiếu nhập kho',
+  login_sessions: 'phiên đăng nhập',
+  login_session: 'phiên đăng nhập',
+  devices: 'thiết bị',
+  device: 'thiết bị',
+  notifications: 'thông báo',
+  notification: 'thông báo',
+  admin: 'tài khoản', // route /api/admin/... dùng 'admin' vì inferTableName lấy segment [1]
+};
+
+function formatVnDateTime(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} ` +
+    `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
 }
 
 function auditLogger(req, res, next) {
@@ -125,14 +243,38 @@ function auditLogger(req, res, next) {
 
   res.on('finish', () => {
     try {
-      const { method, originalUrl, ip, body, user } = req;
+      // Resolve IP cùng logic với loginSessionMiddleware (getRequestMeta).
+      // Đảm bảo cả login_sessions và audit_logs ghi IP theo cùng 1 quy tắc
+      // nên không có trường hợp 1 bảng có IP, bảng kia lại null.
+      //   1) x-forwarded-for (proxy/CDN) — tách phần tử đầu tiên
+      //   2) req.ip (Express + trust proxy)
+      //   3) req.connection / req.socket .remoteAddress (IPv4/IPv6)
+      //   4) x-real-ip (một số reverse-proxy dùng thay XFF)
+      const xff = req.headers ? req.headers['x-forwarded-for'] : null;
+      let ip = null;
+      if (xff) ip = xff.split(',')[0].trim() || null;
+      if (!ip) ip = req.ip || null;
+      if (!ip && req.connection) ip = req.connection.remoteAddress || null;
+      if (!ip && req.socket) ip = req.socket.remoteAddress || null;
+      if (!ip) {
+        const h = req.headers || {};
+        ip = h['x-real-ip'] || null;
+      }
+      // Ip varchar(45) trong DB — truncate để chắc chắn không tràn.
+      const ipFinal = ip ? String(ip).slice(0, 45) : null;
 
-      // 1. Skip read-only requests — only audit write operations.
-      if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return;
+      const { method, originalUrl, body, user } = req;
+
+      // 1. Only audit write operations. Read traffic is intentionally
+      //    NOT logged — admins want to know what users *changed* (admin
+      //    locked an account, receptionist created a contract, ...),
+      //    not what they viewed. Reads would also explode the table
+      //    given how chatty admin pages are.
+      if (method !== 'POST' && method !== 'PUT' && method !== 'PATCH' && method !== 'DELETE') return;
 
       // 2. Skip auth endpoints — those are recorded by loginSession middleware.
       const pathOnly = originalUrl.split('?')[0];
-      if (SKIP_PATHS.has(pathOnly)) return;
+      if (SKIP_PATHS.has(pathOnly) || (pathOnly.startsWith('/api/audit'))) return;
 
       // 3. Map HTTP method → audit action.
       const action = METHOD_TO_ACTION[method];
@@ -164,10 +306,14 @@ function auditLogger(req, res, next) {
       const responseStatus = res.statusCode;
       const durationMs = Date.now() - start;
 
-      // 10. Build a human-readable description.
-      const description = buildDescription(action, tableName, entityCode, userName);
+      // 10. Build a human-friendly description, e.g.
+      //     "Lễ tân A tạo hợp đồng CT-001 lúc 14:35 19/07/2026".
+      //     Designed so admins can read the timeline without seeing
+      //     raw URLs, method names, or debug tokens.
+      const userRoles = user && Array.isArray(user.roles) ? user.roles : [];
+      const description = buildDescription(action, tableName, entityCode, userName, new Date(), userRoles);
 
-      // 12. Fire-and-forget insert — never block the response cycle.
+      // 11. Fire-and-forget insert — never block the response cycle.
       const entityName = tableName; // use tableName as fallback entity name
       query(
         `INSERT INTO audit_logs (
@@ -192,7 +338,7 @@ function auditLogger(req, res, next) {
           p6: entityName,
           p7: entityCode,
           p8: recordId,
-          p9: ip,
+          p9: ipFinal,
           p10: method,
           p11: String(originalUrl).slice(0, 500),
           p12: sanitizedBody ? JSON.stringify(sanitizedBody) : null,

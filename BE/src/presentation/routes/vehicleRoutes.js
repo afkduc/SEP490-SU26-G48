@@ -6,6 +6,7 @@ const VehicleOwnershipController = require('../controllers/VehicleOwnershipContr
 const VehicleOwnershipService = require('../../application/services/VehicleOwnershipService');
 const VehicleOwnershipRepositoryImpl = require('../../infrastructure/repositories/VehicleOwnershipRepositoryImpl');
 const { authenticate } = require('../../middlewares/auth');
+const { trackActivity } = require('../../middlewares');
 
 function buildVehicleRouter() {
   const router = express.Router();
@@ -18,9 +19,10 @@ function buildVehicleRouter() {
   const ownershipService = new VehicleOwnershipService({ vehicleOwnershipRepository: ownershipRepo });
   const ownershipController = new VehicleOwnershipController({ vehicleOwnershipService: ownershipService });
 
-  router.get('/search', authenticate, searchController.search);
-  router.get('/:id/owners', authenticate, ownershipController.getHistory);
-  router.post('/:id/transfer', authenticate, ownershipController.transfer);
+  router.use(authenticate, trackActivity);
+  router.get('/search', searchController.search);
+  router.get('/:id/owners', ownershipController.getHistory);
+  router.post('/:id/transfer', ownershipController.transfer);
 
   return router;
 }

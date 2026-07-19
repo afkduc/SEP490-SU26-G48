@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
+import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
+import { formatDateSafe } from '../../utils/dateUtils';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -26,15 +28,34 @@ const STATUS_CLASS = { active: 'badge--success', ended: 'badge--secondary', fail
 const STATUS_LABEL = { active: 'Đang hoạt động', ended: 'Đã đăng xuất', failed: 'Thất bại' };
 
 function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleString('vi-VN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  } catch {
-    return value;
+  // Su dung formatDateSafe de parse an toan va hien thi VN timezone
+  // (khop voi server tra ve UTC). Cu: khong co timeZone nen dung browser local.
+  return formatDateSafe(value, {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    locale: 'vi-VN',
+    withSeconds: true,
+  });
+}
+
+function renderBrowser(item) {
+  if (item.browser && item.os) {
+    return (
+      <span>
+        <strong>{item.browser}</strong>
+        <span style={{ color: '#64748b' }}> · {item.os}</span>
+      </span>
+    );
   }
+  if (item.browser) {
+    return <strong>{item.browser}</strong>;
+  }
+  if (!item.user_agent) return '—';
+  const match = item.user_agent.match(/(Edge|Edg|Chrome|Firefox|Safari|OPR|Opera)[\/ ]?([\d.]+)/i);
+  if (match) {
+    const name = match[1] === 'Edg' ? 'Edge' : match[1];
+    return <span><strong>{name}</strong> {match[2]}</span>;
+  }
+  return item.user_agent.slice(0, 30);
 }
 
 function formatDuration(seconds) {
@@ -150,22 +171,14 @@ const IconFailed = () => (
 
 // ─── Stats Cards ────────────────────────────────────────────────────
 
-function StatsCards({ items, loading }) {
-  const counts = { total: 0, login: 0, failed: 0, active: 0 };
-  if (items && items.length > 0) {
-    counts.total = items.length;
-    items.forEach((item) => {
-      if (item.action_type === 'LOGIN_FAILED') counts.failed++;
-      else if (item.action_type === 'LOGIN') counts.login++;
-      if (item.status === 'active') counts.active++;
-    });
-  }
+function StatsCards({ stats, loading }) {
+  const counts = stats || { total: 0, loginCount: 0, failedCount: 0, activeCount: 0 };
 
   const cards = [
     { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: counts.total, label: 'Tổng phiên' },
-    { icon: <IconLogin />, iconCls: 'stat-card__icon--green', value: counts.login, label: 'Đăng nhập thành công' },
-    { icon: <IconActive />, iconCls: 'stat-card__icon--cyan', value: counts.active, label: 'Đang hoạt động' },
-    { icon: <IconFailed />, iconCls: 'stat-card__icon--red', value: counts.failed, label: 'Thất bại' },
+    { icon: <IconLogin />, iconCls: 'stat-card__icon--green', value: counts.loginCount, label: 'Đăng nhập thành công' },
+    { icon: <IconActive />, iconCls: 'stat-card__icon--cyan', value: counts.activeCount, label: 'Đang hoạt động' },
+    { icon: <IconFailed />, iconCls: 'stat-card__icon--red', value: counts.failedCount, label: 'Thất bại' },
   ];
 
   return (
@@ -301,11 +314,8 @@ function SessionTable({ items, onViewUser, onViewSession }) {
               ) : '—'}
             </td>
             <td className="admin-sessions__ip">{item.ip_address || '—'}</td>
-            <td className="admin-sessions__user-agent" title={item.user_agent}>
-              {item.user_agent ? (() => {
-                const match = item.user_agent.match(/Chrome\/[\d.]+|Firefox\/[\d.]+|Safari\/[\d.]+/);
-                return match ? match[0] : `${item.user_agent.slice(0, 30)}...`;
-              })() : '—'}
+            <td className="admin-sessions__user-agent" title={item.user_agent || ''}>
+              {renderBrowser(item)}
             </td>
             <td className="admin-sessions__duration">
               {item.status === 'active' ? (
@@ -330,17 +340,6 @@ function SessionTable({ items, onViewUser, onViewSession }) {
                   </svg>
                   Chi tiết
                 </button>
-                {item.user_id && (
-                  <button
-                    type="button"
-                    className="admin-sessions__action-btn"
-                    onClick={() => onViewUser?.(item.user_id)}
-                    title="Xem chi tiết người dùng"
-                  >
-                    <IconUser />
-                    Người dùng
-                  </button>
-                )}
               </div>
             </td>
           </tr>
@@ -357,6 +356,16 @@ export default function AdminLoginSessionsPage() {
   const { branches, branchesError } = useSharedBranches();
   const [detailUserId, setDetailUserId] = useState(null);
   const [detailSession, setDetailSession] = useState(null);
+  const [realtimeEnabled, setRealtimeEnabled] = useState(true);
+
+  // SSE: nhan su kien realtime tu server, chi refetch khi co su kien moi
+  const handleSessionEvent = (eventData) => {
+    console.log('[AdminLoginSessionsPage] SSE event:', eventData);
+    // Co su kien -> refetch full list de dam bao du lieu dong bo
+    sessions.refetch();
+  };
+
+  const { connected } = useLoginSessionsSSE(handleSessionEvent, realtimeEnabled);
 
   const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
   const hasFilters = sessions.params.userName || sessions.params.phone ||
@@ -391,10 +400,20 @@ export default function AdminLoginSessionsPage() {
             <p className="admin-page__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
           </div>
         </div>
+        <div className="admin-page__header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={realtimeEnabled}
+              onChange={(e) => setRealtimeEnabled(e.target.checked)}
+            />
+            Cập nhật realtime
+          </label>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <StatsCards items={sessions.data.items} loading={sessions.loading} />
+      <StatsCards stats={sessions.data.stats} loading={sessions.loading} />
 
       {/* Filter Card */}
       <div className="admin-sessions__filters">

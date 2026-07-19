@@ -1,12 +1,27 @@
 import { API_BASE_URL } from '../config';
 
+export const SESSION_EXPIRED_KEY = 'SESSION_EXPIRED';
+
+export function showSessionExpired() {
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_KEY));
+}
+
 class HttpClient {
   constructor(baseURL = API_BASE_URL) {
     this.baseURL = baseURL;
   }
 
-  async request(path, { method = 'GET', body, headers = {}, isForm = false } = {}) {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  async request(path, {
+    method = 'GET',
+    body,
+    headers = {},
+    isForm = false,
+    omitAuth = false,
+    skipSessionExpired = false,
+  } = {}) {
+    const token = omitAuth
+      ? null
+      : localStorage.getItem('token') || sessionStorage.getItem('token');
     const response = await fetch(`${this.baseURL}${path}`, {
       method,
       headers: {
@@ -23,6 +38,11 @@ class HttpClient {
       : await response.text();
 
     if (!response.ok) {
+      const currentToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const belongsToCurrentSession = Boolean(token && token === currentToken);
+      if (response.status === 401 && belongsToCurrentSession && !skipSessionExpired) {
+        showSessionExpired();
+      }
       const message = (payload && payload.message) || response.statusText;
       const error = new Error(message);
       error.status = response.status;
@@ -38,28 +58,28 @@ class HttpClient {
     return payload;
   }
 
-  get(path) {
-    return this.request(path, { method: 'GET' });
+  get(path, options = {}) {
+    return this.request(path, { method: 'GET', ...options });
   }
 
-  post(path, body) {
-    return this.request(path, { method: 'POST', body });
+  post(path, body, options = {}) {
+    return this.request(path, { method: 'POST', body, ...options });
   }
 
-  postForm(path, formData) {
-    return this.request(path, { method: 'POST', body: formData, isForm: true });
+  postForm(path, formData, options = {}) {
+    return this.request(path, { method: 'POST', body: formData, isForm: true, ...options });
   }
 
-  put(path, body) {
-    return this.request(path, { method: 'PUT', body });
+  put(path, body, options = {}) {
+    return this.request(path, { method: 'PUT', body, ...options });
   }
 
-  patch(path, body) {
-    return this.request(path, { method: 'PATCH', body });
+  patch(path, body, options = {}) {
+    return this.request(path, { method: 'PATCH', body, ...options });
   }
 
-  delete(path) {
-    return this.request(path, { method: 'DELETE' });
+  delete(path, options = {}) {
+    return this.request(path, { method: 'DELETE', ...options });
   }
 }
 
