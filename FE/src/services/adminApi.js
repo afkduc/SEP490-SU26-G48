@@ -306,6 +306,14 @@ class AdminDevicesApi {
   forceLogoutOthers(userId, currentDeviceId) {
     return httpClient.delete(`/admin/devices/user/${userId}/others?currentDeviceId=${currentDeviceId || ''}`);
   }
+
+  /**
+   * Admin force logout ALL devices of a user (including current).
+   * DELETE /api/admin/devices/user/:userId/all
+   */
+  forceLogoutAllDevices(userId) {
+    return httpClient.delete(`/admin/devices/user/${userId}/all`);
+  }
 }
 
 const adminDevicesApi = new AdminDevicesApi();

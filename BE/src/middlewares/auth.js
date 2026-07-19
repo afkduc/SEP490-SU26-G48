@@ -4,6 +4,11 @@ const config = require('../config');
 const { query } = require('../infrastructure/database/sqlServer');
 
 async function authenticate(req, res, next) {
+  // Allow preflight CORS requests to pass through
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return next(new ApiError(401, 'Chưa đăng nhập'));

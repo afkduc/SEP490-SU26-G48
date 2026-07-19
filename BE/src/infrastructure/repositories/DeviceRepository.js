@@ -232,6 +232,17 @@ class DeviceRepository {
   }
 
   /**
+   * Revoke all devices of a user (set is_current = 0 for all).
+   */
+  async revokeAllDevices(userId) {
+    await query(`
+      UPDATE user_devices
+      SET last_activity_at = SYSUTCDATETIME(), is_current = 0
+      WHERE user_id = @p1 AND is_current = 1
+    `, { p1: userId });
+  }
+
+  /**
    * Dem so device active cua user
    */
   async countActiveByUserId(userId) {
