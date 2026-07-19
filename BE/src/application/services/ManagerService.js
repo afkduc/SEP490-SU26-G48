@@ -4,6 +4,10 @@ const ApiError = require('../../utils/ApiError');
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^(0[0-9]{9,10})$/;
 const VALID_STATUSES = ['active', 'inactive'];
+// Phai giu dong bo voi REPAIR_CATEGORY_VALUES trong RepairSettlementService.js -
+// khai bao san Loai hinh sua chua cho dich vu/goi tai day de man tao phieu
+// quyet toan tu dong dien theo, khong phai chon tay tung lan.
+const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
 
 class ManagerService {
   constructor(managerRepository) {
@@ -225,6 +229,10 @@ class ManagerService {
       }
     }
 
+    if (payload.repairCategory && !REPAIR_CATEGORY_VALUES.includes(payload.repairCategory)) {
+      throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
+    }
+
     const categories = await this.managerRepository.listServiceCategories();
     if (!categories.some((c) => Number(c.id) === Number(categoryId))) {
       throw new ApiError(400, 'Danh mục không hợp lệ');
@@ -248,6 +256,7 @@ class ManagerService {
       unitPrice: price,
       durationMin: duration,
       description: (payload.description || '').trim() || null,
+      repairCategory: payload.repairCategory || null,
       parts: parts || [],
     });
   }
@@ -270,6 +279,7 @@ class ManagerService {
       durationMin: duration,
       description: (payload.description || '').trim() || null,
       isActive: newIsActive,
+      repairCategory: payload.repairCategory || null,
       parts,
     });
 
@@ -325,6 +335,10 @@ class ManagerService {
       }
     }
 
+    if (payload.repairCategory && !REPAIR_CATEGORY_VALUES.includes(payload.repairCategory)) {
+      throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
+    }
+
     const categories = await this.managerRepository.listServiceCategories();
     if (!categories.some((c) => Number(c.id) === Number(categoryId))) {
       throw new ApiError(400, 'Danh mục không hợp lệ');
@@ -362,6 +376,7 @@ class ManagerService {
       applicableKm: km,
       totalPrice: price,
       description: (payload.description || '').trim() || null,
+      repairCategory: payload.repairCategory || null,
       serviceIds,
     });
   }
@@ -384,6 +399,7 @@ class ManagerService {
       totalPrice: price,
       description: (payload.description || '').trim() || null,
       isActive: payload.isActive !== undefined ? !!payload.isActive : existing.isActive,
+      repairCategory: payload.repairCategory || null,
       serviceIds,
     });
   }

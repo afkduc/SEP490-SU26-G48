@@ -38,12 +38,12 @@ function genCode(prefix, id) {
 }
 
 class RepairOrderRepositoryImpl extends RepairOrderRepository {
-  // advisorId: chi loc khi nguoi goi la service_advisor - moi advisor chi thay
-  // lenh sua chua bat nguon tu phieu quyet toan CUA CHINH MINH (so.advisor_id).
-  async findAll({ branchId, advisorId } = {}) {
+  // Man "Lenh sua chua" la bang dieu phoi chung ca chi nhanh - khong loc theo
+  // advisorId, de bat ky co van dich vu nao cung thay het de gan to truong.
+  async findAll({ branchId } = {}) {
     const result = await query(
-      `${HEADER_SELECT} WHERE ro.branch_id = @branchId AND (@advisorId IS NULL OR so.advisor_id = @advisorId) ORDER BY ro.id DESC`,
-      { branchId, advisorId: advisorId || null }
+      `${HEADER_SELECT} WHERE ro.branch_id = @branchId ORDER BY ro.id DESC`,
+      { branchId }
     );
     return result.recordset.map((row) => RepairOrder.fromPersistence(row, []));
   }
