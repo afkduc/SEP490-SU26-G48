@@ -166,6 +166,7 @@ function mapServiceRow(row) {
     durationMin: row.duration_min,
     description: row.description,
     isActive: !!row.is_active,
+    repairCategory: row.repair_category,
   };
 }
 
@@ -180,6 +181,7 @@ function mapPackageRow(row) {
     totalPrice: Number(row.total_price || 0),
     description: row.description,
     isActive: !!row.is_active,
+    repairCategory: row.repair_category,
   };
 }
 
@@ -401,7 +403,7 @@ class ManagerRepositoryImpl {
 
     const result = await query(
       `SELECT s.id, s.service_code, s.service_name, s.category_id, c.category_name,
-              s.unit_price, s.duration_min, s.description, s.is_active
+              s.unit_price, s.duration_min, s.description, s.is_active, s.repair_category
        FROM services s
        LEFT JOIN service_categories c ON c.id = s.category_id
        WHERE s.branch_id = @branchId
@@ -422,7 +424,7 @@ class ManagerRepositoryImpl {
   async getServiceById(branchId, id) {
     const result = await query(
       `SELECT s.id, s.service_code, s.service_name, s.category_id, c.category_name,
-              s.unit_price, s.duration_min, s.description, s.is_active
+              s.unit_price, s.duration_min, s.description, s.is_active, s.repair_category
        FROM services s
        LEFT JOIN service_categories c ON c.id = s.category_id
        WHERE s.id = @id AND s.branch_id = @branchId`,
@@ -482,11 +484,11 @@ class ManagerRepositoryImpl {
     }));
   }
 
-  async createService({ branchId, serviceCode, serviceName, categoryId, unitPrice, durationMin, description, parts }) {
+  async createService({ branchId, serviceCode, serviceName, categoryId, unitPrice, durationMin, description, repairCategory, parts }) {
     const result = await query(
-      `INSERT INTO services (service_code, service_name, category_id, unit_price, duration_min, description, is_active, branch_id)
+      `INSERT INTO services (service_code, service_name, category_id, unit_price, duration_min, description, is_active, branch_id, repair_category)
        OUTPUT INSERTED.id
-       VALUES (@serviceCode, @serviceName, @categoryId, @unitPrice, @durationMin, @description, 1, @branchId)`,
+       VALUES (@serviceCode, @serviceName, @categoryId, @unitPrice, @durationMin, @description, 1, @branchId, @repairCategory)`,
       {
         serviceCode,
         serviceName,
@@ -495,6 +497,7 @@ class ManagerRepositoryImpl {
         durationMin,
         description,
         branchId: Number(branchId),
+        repairCategory: repairCategory || null,
       }
     );
     const newId = result.recordset[0].id;
@@ -502,7 +505,7 @@ class ManagerRepositoryImpl {
     return this.getServiceById(branchId, newId);
   }
 
-  async updateService(branchId, id, { serviceName, categoryId, unitPrice, durationMin, description, isActive, parts }) {
+  async updateService(branchId, id, { serviceName, categoryId, unitPrice, durationMin, description, isActive, repairCategory, parts }) {
     await query(
       `UPDATE services
        SET service_name = @serviceName,
@@ -510,7 +513,8 @@ class ManagerRepositoryImpl {
            unit_price = @unitPrice,
            duration_min = @durationMin,
            description = @description,
-           is_active = @isActive
+           is_active = @isActive,
+           repair_category = @repairCategory
        WHERE id = @id AND branch_id = @branchId`,
       {
         serviceName,
@@ -519,6 +523,7 @@ class ManagerRepositoryImpl {
         durationMin,
         description,
         isActive: isActive ? 1 : 0,
+        repairCategory: repairCategory || null,
         id: Number(id),
         branchId: Number(branchId),
       }
@@ -538,7 +543,7 @@ class ManagerRepositoryImpl {
 
     const result = await query(
       `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
-              sp.applicable_km, sp.total_price, sp.description, sp.is_active,
+              sp.applicable_km, sp.total_price, sp.description, sp.is_active, sp.repair_category,
               (SELECT COUNT(*) FROM service_package_items spi WHERE spi.package_id = sp.id) AS item_count
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
@@ -559,7 +564,7 @@ class ManagerRepositoryImpl {
   async getServicePackageById(branchId, id) {
     const result = await query(
       `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
-              sp.applicable_km, sp.total_price, sp.description, sp.is_active
+              sp.applicable_km, sp.total_price, sp.description, sp.is_active, sp.repair_category
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
        WHERE sp.id = @id AND sp.branch_id = @branchId`,
@@ -610,11 +615,11 @@ class ManagerRepositoryImpl {
     }
   }
 
-  async createServicePackage({ branchId, packageCode, packageName, categoryId, applicableKm, totalPrice, description, serviceIds }) {
+  async createServicePackage({ branchId, packageCode, packageName, categoryId, applicableKm, totalPrice, description, repairCategory, serviceIds }) {
     const result = await query(
-      `INSERT INTO service_packages (package_code, package_name, category_id, applicable_km, total_price, description, is_active, branch_id)
+      `INSERT INTO service_packages (package_code, package_name, category_id, applicable_km, total_price, description, is_active, branch_id, repair_category)
        OUTPUT INSERTED.id
-       VALUES (@packageCode, @packageName, @categoryId, @applicableKm, @totalPrice, @description, 1, @branchId)`,
+       VALUES (@packageCode, @packageName, @categoryId, @applicableKm, @totalPrice, @description, 1, @branchId, @repairCategory)`,
       {
         packageCode,
         packageName,
@@ -623,6 +628,7 @@ class ManagerRepositoryImpl {
         totalPrice,
         description,
         branchId: Number(branchId),
+        repairCategory: repairCategory || null,
       }
     );
     const packageId = result.recordset[0].id;
@@ -630,7 +636,7 @@ class ManagerRepositoryImpl {
     return this.getServicePackageById(branchId, packageId);
   }
 
-  async updateServicePackage(branchId, id, { packageName, categoryId, applicableKm, totalPrice, description, isActive, serviceIds }) {
+  async updateServicePackage(branchId, id, { packageName, categoryId, applicableKm, totalPrice, description, isActive, repairCategory, serviceIds }) {
     await query(
       `UPDATE service_packages
        SET package_name = @packageName,
@@ -638,7 +644,8 @@ class ManagerRepositoryImpl {
            applicable_km = @applicableKm,
            total_price = @totalPrice,
            description = @description,
-           is_active = @isActive
+           is_active = @isActive,
+           repair_category = @repairCategory
        WHERE id = @id AND branch_id = @branchId`,
       {
         packageName,
@@ -647,6 +654,7 @@ class ManagerRepositoryImpl {
         totalPrice,
         description,
         isActive: isActive ? 1 : 0,
+        repairCategory: repairCategory || null,
         id: Number(id),
         branchId: Number(branchId),
       }
