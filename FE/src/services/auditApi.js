@@ -18,25 +18,39 @@ function buildQuery(params = {}) {
 /**
  * Audit Logs API
  *   - getAuditLogs(params): GET /api/audit
- *     params: { userName, phone, action, entityName, entityCode, startDate, endDate, branchId, page, pageSize }
- *     tra ve: { items: [{id, user_id, user_name, phone_number, action, table_name, entity_name, entity_code,
- *                        record_id, ip_address, request_method, request_url, request_body, response_status,
- *                        duration_ms, branch_id, description, logged_at}], total, page, pageSize }
+ *     params: {
+ *       keyword, userName, phone, action, tableName, entityName,
+ *       entityCode, ipAddress, requestMethod, responseStatus,
+ *       startDate, endDate, branchId, page, pageSize
+ *     }
+ *     tra ve: {
+ *       items: [...], total, page, pageSize,
+ *       stats: { total, create, update, delete }
+ *     }
+ *
+ *   - getAuditLogById(id): GET /api/audit/:id
+ *     tra ve: { chi tiet mot audit log }
  *
  *   - getAuditLogsByUser(userId, limit): GET /api/audit/users/:userId/logs
  *     tra ve: [{...audit_log}]
  *
  *   - getLoginSessions(params): GET /api/audit/login-sessions
  *     params: { userName, phone, actionType, startDate, endDate, status, branchId, page, pageSize }
- *     tra ve: { items: [{id, user_id, user_name, phone_number, action_type, ip_address, user_agent,
- *                        login_time, logout_time, session_duration_seconds, branch_id, status}], total, page, pageSize }
+ *     tra ve: { items: [...], total, page, pageSize, stats: {...} }
  *
  *   - getEntityDefinitions(): GET /api/audit/entity-definitions
  *     tra ve: [{id, tableName, entityName, prefixCode, icon}]
+ *
+ *   - exportAuditLogs(params): GET /api/audit/export (Blob)
+ *     tra ve: Blob (Excel file)
  */
 class AuditApi {
   getAuditLogs(params = {}) {
     return httpClient.get(`/audit${buildQuery(params)}`);
+  }
+
+  getAuditLogById(id) {
+    return httpClient.get(`/audit/${id}`);
   }
 
   getAuditLogsByUser(userId, limit) {
@@ -54,7 +68,6 @@ class AuditApi {
   /**
    * Xuat audit logs ra file Excel (.xlsx) theo filter hien tai.
    * Tra ve Blob (tuong thich voi downloadBlob utility).
-   * BE se set Content-Disposition de lay ten file audit_logs_YYYYMMDD.xlsx.
    */
   exportAuditLogs(params = {}) {
     const path = `${API_BASE_URL}/audit/export${buildQuery(params)}`;

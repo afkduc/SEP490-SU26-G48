@@ -22,14 +22,36 @@ function buildAuditRouter() {
 
   router.use(authenticate, requireAdmin, trackActivity);
 
+  /**
+   * GET /api/audit
+   * Filter params:
+   * - keyword: tim kiem tren user_name, description, entity_name, entity_code, table_name, request_url
+   * - userName: ten nguoi dung
+   * - phone: so dien thoai
+   * - action: CREATE, UPDATE, DELETE, LOGIN, LOGOUT, etc.
+   * - tableName: ten bang du lieu
+   * - entityName: ten doi tuong
+   * - entityCode: ma doi tuong
+   * - ipAddress: dia chi IP
+   * - requestMethod: GET, POST, PUT, DELETE
+   * - responseStatus: 2xx, 4xx, 5xx, hoac ma cu the
+   * - branchId: chi nhanh
+   * - startDate, endDate: khoang ngay
+   * - page, pageSize: phan trang
+   */
   router.get('/', async (req, res, next) => {
     try {
       const data = await auditService.getAuditLogs({
+        keyword: req.query.keyword,
         userName: req.query.userName,
         phone: req.query.phone,
         action: req.query.action,
+        tableName: req.query.tableName,
         entityName: req.query.entityName,
         entityCode: req.query.entityCode,
+        ipAddress: req.query.ipAddress,
+        requestMethod: req.query.requestMethod,
+        responseStatus: req.query.responseStatus,
         startDate: req.query.startDate,
         endDate: req.query.endDate,
         branchId: req.query.branchId,
@@ -42,24 +64,38 @@ function buildAuditRouter() {
     }
   });
 
+  /**
+   * GET /api/audit/export
+   * Xuat audit logs ra Excel theo filter hien tai
+   */
   router.get('/export', async (req, res, next) => {
     try {
       const { items } = await auditService.exportAuditLogs({
+        keyword: req.query.keyword,
         userName: req.query.userName,
         phone: req.query.phone,
         action: req.query.action,
+        tableName: req.query.tableName,
         entityName: req.query.entityName,
         entityCode: req.query.entityCode,
+        ipAddress: req.query.ipAddress,
+        requestMethod: req.query.requestMethod,
+        responseStatus: req.query.responseStatus,
         startDate: req.query.startDate,
         endDate: req.query.endDate,
         branchId: req.query.branchId,
       });
       const buffer = await exportAuditLogsToExcel(items, {
+        keyword: req.query.keyword,
         userName: req.query.userName,
         phone: req.query.phone,
         action: req.query.action,
+        tableName: req.query.tableName,
         entityName: req.query.entityName,
         entityCode: req.query.entityCode,
+        ipAddress: req.query.ipAddress,
+        requestMethod: req.query.requestMethod,
+        responseStatus: req.query.responseStatus,
         startDate: req.query.startDate,
         endDate: req.query.endDate,
         branchId: req.query.branchId,
@@ -75,6 +111,19 @@ function buildAuditRouter() {
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', buffer.length);
       return res.send(Buffer.from(buffer));
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  /**
+   * GET /api/audit/:id
+   * Lay chi tiet mot audit log
+   */
+  router.get('/:id', async (req, res, next) => {
+    try {
+      const log = await auditService.getAuditLogById(req.params.id);
+      return success(res, log, 'Lay chi tiet audit log thanh cong');
     } catch (err) {
       return next(err);
     }
