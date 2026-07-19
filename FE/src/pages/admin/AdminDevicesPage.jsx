@@ -1,6 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { adminDevicesApi } from '../../services/adminApi';
+import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useToast } from '../../components/common/ToastContext';
+import { formatDateSafe } from '../../utils/dateUtils';
 import './AdminDevicesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -66,11 +68,11 @@ function getBrowserIcon(browser) {
 }
 
 function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleString('vi-VN', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+  // Su dung formatDateSafe de dam bao parse duoc moi dinh dang
+  // (ISO UTC, Date object) va hien thi VN timezone nhat quan.
+  return formatDateSafe(dateStr, {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    locale: 'vi-VN',
   });
 }
 
@@ -241,6 +243,79 @@ export default function AdminDevicesPage() {
 
   useEffect(() => { loadData(1); }, []);
 
+  // SSE listener - chi cap nhat row bi anh huong (login/logout/force),
+  // tranh loadData() gay giat man hinh khi user dang cuon/xem.
+  const handleSSEEvent = useCallback((eventData) => {
+    if (!eventData || !['login', 'logout', 'force'].includes(eventData.type)) return;
+
+    // Truong hop co deviceId va ta biet id do, patch ngay row tuong ung
+    const changedDeviceId = Number(
+      eventData.deviceId ?? eventData.payload?.deviceId ?? eventData.device?.id
+    );
+    const userIdChanged = Number(
+      eventData.userId ?? eventData.payload?.userId ?? eventData.user?.id
+    );
+
+    if (eventData.type === 'force' && changedDeviceId) {
+      setDevices((prev) =>
+        prev.map((d) => (d.id === changedDeviceId ? { ...d, isCurrent: false } : d))
+      );
+      return;
+    }
+
+    // Truong hop login: neu co deviceId, patch row do thanh current; neu khong,
+    // fallback refetch (khi do co the co row moi hoac row cu bi set isCurrent=0)
+    if (eventData.type === 'login' && (changedDeviceId || userIdChanged)) {
+      setDevices((prev) => {
+        let next = prev;
+        // Set isCurrent=false cho moi row cua user (tru row moi)
+        if (userIdChanged) {
+          next = next.map((d) =>
+            d.userId === userIdChanged && d.id !== changedDeviceId
+              ? { ...d, isCurrent: false }
+              : d
+          );
+        }
+        // Set isCurrent=true cho row moi neu co deviceId
+        if (changedDeviceId) {
+          next = next.map((d) => (d.id === changedDeviceId ? { ...d, isCurrent: true } : d));
+        }
+        return next;
+      });
+      // Neu khong co deviceId, can refetch de lay row moi insert
+      if (!changedDeviceId) {
+        loadData(page);
+      }
+      return;
+    }
+
+    // Truong hop logout hoac khong ro deviceId -> refetch
+    loadData(page);
+  }, [loadData, page]);
+
+  useLoginSessionsSSE(handleSSEEvent);
+
+  // Sort client-side de dam bao is_current len tren, moi nhat truoc.
+  // BE da sort (trong DeviceRepository), nhung useMemo nay giup FE on dinh
+  // ngay ca khi SSE patch row don le.
+  const sortedDevices = useMemo(() => {
+    return [...devices].sort((a, b) => {
+      // is_current=true len tren
+      const ca = a.isCurrent ? 0 : 1;
+      const cb = b.isCurrent ? 0 : 1;
+      if (ca !== cb) return ca - cb;
+
+      // Moi nhat truoc: uu tien lastActivityAt, fallback lastLoginAt
+      const ta = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+      const tb = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
+      if (ta !== tb) return tb - ta;
+
+      const la = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
+      const lb = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+      return lb - la;
+    });
+  }, [devices]);
+
   function handleSearchChange(e) {
     const val = e.target.value;
     setSearch(val);
@@ -271,12 +346,21 @@ export default function AdminDevicesPage() {
 
   async function handleForceLogout() {
     if (!logoutTarget) return;
+    const targetId = logoutTarget.id;
+    const targetName = logoutTarget.deviceName;
     setLogoutLoading(true);
     try {
-      await adminDevicesApi.forceLogout(logoutTarget.id);
-      toast.success(`Đã đăng xuất thiết bị "${logoutTarget.deviceName}"`);
+      await adminDevicesApi.forceLogout(targetId);
+      toast.success(`Đã đăng xuất thiết bị "${targetName}"`);
       setLogoutTarget(null);
-      loadData(page);
+      
+      // Smooth update - chi cap nhat device bi revoke, khong load lai toan bo trang
+      // Đanh dau device thanh inactive (isCurrent = false)
+      setDevices(prev => prev.map(d => 
+        d.id === targetId 
+          ? { ...d, isCurrent: false } 
+          : d
+      ));
     } catch (err) {
       toast.error(err.message || 'Lỗi khi đăng xuất thiết bị');
     } finally {
@@ -415,7 +499,7 @@ export default function AdminDevicesPage() {
               </tr>
             </thead>
             <tbody>
-              {devices.map((device) => (
+              {sortedDevices.map((device) => (
                 <tr key={device.id}>
                   <td>
                     <div className="device-info">
@@ -439,13 +523,22 @@ export default function AdminDevicesPage() {
                     </span>
                   </td>
                   <td>
-                    <button
-                      className="btn btn--danger btn--sm"
-                      onClick={() => setLogoutTarget(device)}
-                      title="Đăng xuất khỏi thiết bị này"
-                    >
-                      <IconLogout /> Đăng xuất
-                    </button>
+                    {/* Button Force Logout CHI enable khi isCurrent=true.
+                        Khi isCurrent=false: hien thi text "Da dang xuat" (readonly).
+                        Day la logic da dung tu truoc - giu nguyen. */}
+                    {!device.isCurrent ? (
+                      <span className="btn btn--secondary btn--sm btn--disabled">
+                        Đã đăng xuất
+                      </span>
+                    ) : (
+                      <button
+                        className="btn btn--danger btn--sm"
+                        onClick={() => setLogoutTarget(device)}
+                        title="Đăng xuất khỏi thiết bị này"
+                      >
+                        <IconLogout /> Đăng xuất
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

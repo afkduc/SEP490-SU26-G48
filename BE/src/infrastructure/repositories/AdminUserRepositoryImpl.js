@@ -38,10 +38,11 @@ class AdminUserRepositoryImpl {
 
     if (search) {
       conditions.push(`(
-        u.user_name LIKE @p${paramIndex}
-        OR u.email LIKE @p${paramIndex}
-        OR u.first_name LIKE @p${paramIndex}
-        OR u.last_name LIKE @p${paramIndex}
+        LOWER(u.user_name) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.email) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.first_name) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.last_name) LIKE LOWER(@p${paramIndex})
+        OR u.phone LIKE @p${paramIndex}
       )`);
       params[`p${paramIndex}`] = `%${search}%`;
       paramIndex++;
@@ -125,10 +126,11 @@ class AdminUserRepositoryImpl {
 
     if (search) {
       conditions.push(`(
-        u.user_name LIKE @p${paramIndex}
-        OR u.email LIKE @p${paramIndex}
-        OR u.first_name LIKE @p${paramIndex}
-        OR u.last_name LIKE @p${paramIndex}
+        LOWER(u.user_name) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.email) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.first_name) LIKE LOWER(@p${paramIndex})
+        OR LOWER(u.last_name) LIKE LOWER(@p${paramIndex})
+        OR u.phone LIKE @p${paramIndex}
       )`);
       params[`p${paramIndex}`] = `%${search}%`;
       paramIndex++;
@@ -264,12 +266,24 @@ class AdminUserRepositoryImpl {
     return result.recordset[0] || null;
   }
 
-  async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId }) {
+  async nextPseudoId() {
     const result = await query(
-      `INSERT INTO users (user_name, email, user_password, first_name, last_name, phone, branch_id, team_size, status, created_at)
+      `SELECT ISNULL(MAX(TRY_CAST(SUBSTRING(pseudo_id, 3, LEN(pseudo_id) - 2) AS INT)), 0) + 1 AS next_num
+       FROM users
+       WHERE pseudo_id LIKE 'NV%'`
+    );
+    const nextNum = result.recordset[0].next_num;
+    return `NV${String(nextNum).padStart(3, '0')}`;
+  }
+
+  async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId }) {
+    // Generate pseudo_id automatically (e.g., NV001, NV002, ...)
+    const pseudoId = await this.nextPseudoId();
+    const result = await query(
+      `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, team_size, status, created_at)
        OUTPUT INSERTED.id
-       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0, 'active', GETDATE())`,
-      { p1: name, p2: email, p3: passwordHash, p4: firstName || name, p5: lastName || '', p6: phone, p7: branchId }
+       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 0, 'active', GETDATE())`,
+      { p1: pseudoId, p2: name, p3: email, p4: passwordHash, p5: firstName || name, p6: lastName || '', p7: phone, p8: branchId }
     );
     const userId = result.recordset[0].id;
     if (roleId) {
@@ -344,7 +358,7 @@ class AdminUserRepositoryImpl {
       query('SELECT COUNT(*) AS total FROM branches WHERE is_active = 1'),
       query('SELECT COUNT(*) AS total FROM roles'),
     ]);
-
+    
     const users = userStats.recordset[0];
 
     // Recent audit logs (general activity)
@@ -385,6 +399,7 @@ class AdminUserRepositoryImpl {
     let recentLogins = [];
     let todayLogins = 0;
     let failedLogins = 0;
+    let recentFailedLogins = 0;
     try {
       const loginResult = await query(`
         SELECT TOP 8
@@ -412,23 +427,35 @@ class AdminUserRepositoryImpl {
         status: row.status,
       }));
 
-      // Today's login count
+      // Today's successful login count
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const todayResult = await query(`
         SELECT COUNT(*) AS total
         FROM login_sessions
-        WHERE login_time >= @p1
+        WHERE action_type = 'LOGIN'
+          AND login_time >= @p1
       `, { p1: todayStart });
       todayLogins = Number(todayResult.recordset[0].total);
 
-      // Failed logins count
+      // Failed logins count — today only (same time boundary as todayLogins)
       const failedResult = await query(`
         SELECT COUNT(*) AS total
         FROM login_sessions
         WHERE action_type = 'LOGIN_FAILED'
-      `);
+          AND login_time >= @p1
+      `, { p1: todayStart });
       failedLogins = Number(failedResult.recordset[0].total);
+
+      // Chi dung cua so 15 phut cho canh bao bao mat. failedLogins o tren
+      // van la thong ke lich su trong ngay de hien thi tai card dashboard.
+      const recentFailedResult = await query(`
+        SELECT COUNT(*) AS total
+        FROM login_sessions
+        WHERE action_type = 'LOGIN_FAILED'
+          AND login_time >= DATEADD(MINUTE, -15, SYSUTCDATETIME())
+      `);
+      recentFailedLogins = Number(recentFailedResult.recordset[0].total);
     } catch (_) {
       recentLogins = [];
     }
@@ -478,6 +505,7 @@ class AdminUserRepositoryImpl {
       recentLogins,
       todayLogins,
       failedLogins,
+      recentFailedLogins,
       alerts,
     };
   }

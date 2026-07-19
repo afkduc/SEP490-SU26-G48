@@ -264,6 +264,9 @@ class AdminUserService {
       throw new ApiError(500, 'Reset mat khau that bai');
     }
 
+    // Notify user about password reset by admin
+    this._sendPasswordResetNotification(Number(userId));
+
     return {
       userId: Number(userId),
       newPassword: plainPassword, // plain text - chi tra 1 lan
@@ -275,6 +278,16 @@ class AdminUserService {
         ? 'Mat khau da duoc dat lai. User phai doi mat khau khi dang nhap lan sau.'
         : 'Mat khau da duoc dat lai thanh cong.',
     };
+  }
+
+  _sendPasswordResetNotification(userId) {
+    try {
+      const NotificationService = require('./NotificationService');
+      const ns = new NotificationService();
+      ns.notify('PASSWORD_CHANGED', { userId, resetByAdmin: true });
+    } catch (err) {
+      console.error('[AdminUserService] Failed to send password reset notification:', err.message);
+    }
   }
 }
 

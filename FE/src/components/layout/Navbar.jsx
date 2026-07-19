@@ -6,22 +6,22 @@ import './Navbar.css';
 
 // ===== Admin =====
 const ADMIN_NAV = [
-  { label: 'Dashboard', path: '/admin/dashboard' },
+  { label: 'Bảng điều khiển', path: '/admin/dashboard' },
   {
-    label: 'User',
+    label: 'Người dùng',
     children: [
-      { label: 'Danh sách User', path: '/admin/users' },
-      { label: 'Thêm User', path: '/admin/users?create=true' },
+      { label: 'Danh sách người dùng', path: '/admin/users' },
+      { label: 'Thêm người dùng', path: '/admin/users?create=true' },
     ],
   },
   {
-    label: 'Role',
+    label: 'Vai trò',
     children: [
       { label: 'Phân quyền người dùng', path: '/admin/users' },
     ],
   },
   {
-    label: 'Log',
+    label: 'Nhật ký',
     children: [
       { label: 'Nhật ký hoạt động', path: '/admin/logs' },
     ],
@@ -30,7 +30,7 @@ const ADMIN_NAV = [
 
 // ===== Service Advisor =====
 const SERVICE_ADVISOR_NAV = [
-  { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Bảng điều khiển', path: '/dashboard' },
   {
     label: 'Quyết toán sửa chữa',
     children: [
@@ -57,7 +57,7 @@ const SERVICE_ADVISOR_NAV = [
 
 // ===== Manager =====
 const MANAGER_NAV = [
-  { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Bảng điều khiển', path: '/dashboard' },
   { label: 'Kho', path: '/inventory' },
   {
     label: 'Phieu nhap',
@@ -94,34 +94,34 @@ const MANAGER_NAV = [
   },
 ];
 
-// ===== Warehouse Staff (Nhan vien kho) - menu phang, khong dropdown =====
+// ===== Warehouse Staff (Nhân viên kho) - menu phẳng, không dropdown =====
 const WAREHOUSE_STAFF_NAV = [
-  { label: 'Tong quan kho', path: '/inventory', end: true },
-  { label: 'Phu tung', path: '/inventory/parts' },
-  { label: 'Ton kho', path: '/inventory/stock' },
-  { label: 'Phieu nhap', path: '/inventory/import-requests' },
-  { label: 'Phieu xuat', path: '/inventory/export-requests' },
-  { label: 'Nha cung cap', path: '/inventory/suppliers' },
+  { label: 'Tổng quan kho', path: '/inventory', end: true },
+  { label: 'Phụ tùng', path: '/inventory/parts' },
+  { label: 'Tồn kho', path: '/inventory/stock' },
+  { label: 'Phiếu nhập', path: '/inventory/import-requests' },
+  { label: 'Phiếu xuất', path: '/inventory/export-requests' },
+  { label: 'Nhà cung cấp', path: '/inventory/suppliers' },
 ];
 
-// ===== Accountant (Ke toan) - chi xem kho, khong dropdown =====
+// ===== Accountant (Kế toán) - chỉ xem kho, không dropdown =====
 const ACCOUNTANT_NAV = [
-  { label: 'Tong quan kho', path: '/inventory' },
-  { label: 'Phu tung', path: '/inventory/parts' },
-  { label: 'Ton kho', path: '/inventory/stock' },
-  { label: 'Phieu nhap', path: '/inventory/import-requests' },
-  { label: 'Phieu xuat', path: '/inventory/export-requests' },
-  { label: 'Nha cung cap', path: '/inventory/suppliers' },
+  { label: 'Tổng quan kho', path: '/inventory' },
+  { label: 'Phụ tùng', path: '/inventory/parts' },
+  { label: 'Tồn kho', path: '/inventory/stock' },
+  { label: 'Phiếu nhập', path: '/inventory/import-requests' },
+  { label: 'Phiếu xuất', path: '/inventory/export-requests' },
+  { label: 'Nhà cung cấp', path: '/inventory/suppliers' },
 ];
 
-// ===== General Director (Giam doc) - xem bao cao tong quan, co dropdown =====
+// ===== General Director (Giám đốc) - xem báo cáo tổng quan, có dropdown =====
 const GENERAL_DIRECTOR_NAV = [
-  { label: 'Tong quan kho', path: '/inventory', end: true },
-  { label: 'Phu tung', path: '/inventory/parts' },
-  { label: 'Ton kho', path: '/inventory/stock' },
-  { label: 'Phieu nhap', path: '/inventory/import-requests' },
-  { label: 'Phieu xuat', path: '/inventory/export-requests' },
-  { label: 'Nha cung cap', path: '/inventory/suppliers' },
+  { label: 'Tổng quan kho', path: '/inventory', end: true },
+  { label: 'Phụ tùng', path: '/inventory/parts' },
+  { label: 'Tồn kho', path: '/inventory/stock' },
+  { label: 'Phiếu nhập', path: '/inventory/import-requests' },
+  { label: 'Phiếu xuất', path: '/inventory/export-requests' },
+  { label: 'Nhà cung cấp', path: '/inventory/suppliers' },
 ];
 
 const NAV_ITEMS_BY_ROLE = {
@@ -272,6 +272,11 @@ export default function Navbar() {
       </nav>
 
       <div className="navbar__right">
+        {/* Online indicator */}
+        <div className="navbar__online-indicator" title="Tai khoan dang hoat dong">
+          <span className="online-dot" />
+          <span className="online-label">Trực tuyến</span>
+        </div>
         {roleLabel && <span className="navbar__role-badge">{roleLabel}</span>}
 
         <div className="navbar__user" onClick={() => setDropdownOpen((v) => !v)}>

@@ -1,8 +1,9 @@
 const ApiError = require('../../utils/ApiError');
 
 class RoleService {
-  constructor({ roleRepository }) {
+  constructor({ roleRepository, permissionService }) {
     this.roleRepository = roleRepository;
+    this.permissionService = permissionService;
   }
 
   async listRoles() {
@@ -40,6 +41,15 @@ class RoleService {
     const role = await this.roleRepository.findById(Number(roleId));
     if (!role) throw new ApiError(404, 'Role khong ton tai');
     await this.roleRepository.setRolePermissions(roleId, permissionIds);
+
+    // Invalidate cache cho tat ca users có role này
+    if (this.permissionService) {
+      const users = await this.roleRepository.getRoleUsers(roleId);
+      for (const user of users) {
+        this.permissionService.invalidateCache(user.id);
+      }
+    }
+
     return this.roleRepository.getRolePermissions(roleId);
   }
 
