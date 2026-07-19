@@ -8,17 +8,14 @@ class RepairOrderService {
     this.repairOrderRepository = repairOrderRepository;
   }
 
-  async getAll({ branchId, advisorId } = {}) {
-    const items = await this.repairOrderRepository.findAll({ branchId, advisorId });
+  async getAll({ branchId } = {}) {
+    const items = await this.repairOrderRepository.findAll({ branchId });
     return RepairOrderResponseDto.fromEntityList(items);
   }
 
-  async getById(id, { requesterId, isServiceAdvisor } = {}) {
+  async getById(id) {
     const entity = await this.repairOrderRepository.findById(id);
     if (!entity) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
-    if (isServiceAdvisor && String(entity.advisorId) !== String(requesterId)) {
-      throw new ApiError(403, 'Bạn không có quyền xem lệnh sửa chữa của cố vấn dịch vụ khác');
-    }
     return RepairOrderResponseDto.fromEntity(entity);
   }
 
@@ -72,7 +69,7 @@ class RepairOrderService {
     if (String(existing.branchId) !== String(branchId)) {
       throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
     }
-    if (existing.status !== 'in_progress') {
+    if (existing.status !== 'inprogress') {
       throw new ApiError(409, 'Lệnh đã kết thúc (hoàn thành/hủy), không thể đổi trạng thái nữa');
     }
 
