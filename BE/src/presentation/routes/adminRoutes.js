@@ -77,6 +77,7 @@ function buildAdminRouter() {
   router.get('/devices/user/:userId', controller.listUserDevices);
   router.delete('/devices/:deviceId', controller.forceLogoutDevice);
   router.delete('/devices/user/:userId/others', controller.forceLogoutAllOtherDevices);
+  router.delete('/devices/user/:userId/all', controller.forceLogoutAllDevices);
 
   // Specialties
   router.get('/specialties', controller.listSpecialties);

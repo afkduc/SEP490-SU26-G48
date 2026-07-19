@@ -61,6 +61,7 @@ class AdminController {
     this.listUserDevices = this.listUserDevices.bind(this);
     this.forceLogoutDevice = this.forceLogoutDevice.bind(this);
     this.forceLogoutAllOtherDevices = this.forceLogoutAllOtherDevices.bind(this);
+    this.forceLogoutAllDevices = this.forceLogoutAllDevices.bind(this);
     this.listSpecialties = this.listSpecialties.bind(this);
     this.createSpecialty = this.createSpecialty.bind(this);
     this.updateSpecialty = this.updateSpecialty.bind(this);
@@ -364,6 +365,23 @@ class AdminController {
       const { userId, currentDeviceId } = req.params;
       const result = await this.deviceService.forceLogoutAllOtherDevices(userId, currentDeviceId);
       return success(res, result, 'Da dang xuat tat ca thiet bi khac');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * Admin force logout ALL devices of a user (including current).
+   * DELETE /api/admin/devices/user/:userId/all
+   */
+  forceLogoutAllDevices = async (req, res, next) => {
+    try {
+      const { userId } = req.params;
+      if (!userId) {
+        return res.status(400).json({ message: 'userId la bat buoc' });
+      }
+      const result = await this.deviceService.forceLogoutAllDevices(userId);
+      return success(res, result, `Da dang xuat ${result.revoked} thiet bi`);
     } catch (err) {
       next(err);
     }
