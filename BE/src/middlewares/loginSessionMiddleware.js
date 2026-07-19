@@ -250,10 +250,29 @@ async function trackLogin(req, user) {
         branchId,
         deviceId,  // Them deviceId vao event
       });
+
+      // Send notification for successful login
+      this._sendLoginNotification(userId, browser, os, ipAddress, deviceId);
     }
 
     // Tra ve deviceId de AuthService co the them vao JWT
     return { deviceId };
+  }
+
+  _sendLoginNotification(userId, browser, os, ipAddress, deviceId) {
+    try {
+      const NotificationService = require('../application/services/NotificationService');
+      const ns = new NotificationService();
+      ns.notify('LOGIN_SUCCESS', {
+        userId,
+        browser,
+        os,
+        ip: ipAddress,
+        deviceId,
+      });
+    } catch (err) {
+      console.error('[loginSessionMiddleware] Failed to send login notification:', err.message);
+    }
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLogin failed:', err.message ? err.message : err);
     return { deviceId: null };

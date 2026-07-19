@@ -78,7 +78,20 @@ class ProfileService {
     // de lan dang nhap sau binh thuong (khong bi redirect ve trang doi MK)
     await this.profileRepository.updatePassword(userId, passwordHash, false);
 
+    // Notify user about password change
+    this._sendPasswordChangedNotification(userId);
+
     return true;
+  }
+
+  async _sendPasswordChangedNotification(userId) {
+    try {
+      const NotificationService = require('./NotificationService');
+      const ns = new NotificationService();
+      await ns.notify('PASSWORD_CHANGED', { userId });
+    } catch (err) {
+      console.error('[ProfileService] Failed to send password changed notification:', err.message);
+    }
   }
 
   async _verifyPassword(input, stored) {
