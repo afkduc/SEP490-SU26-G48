@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
-import { adminLoginSessionsApi, adminBranchesApi } from '../../services/adminApi';
+import { useSharedBranches } from '../../contexts/SharedDataContext';
+import UserDetailDrawer from './users/UserDetailDrawer';
+import SessionDetailDrawer from './SessionDetailDrawer';
+import AdminPagination from './components/AdminPagination';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -35,58 +38,206 @@ function formatDate(value) {
 }
 
 function formatDuration(seconds) {
-  if (seconds === undefined || seconds === null) return '—';
-  if (seconds < 0) return '—';
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds === undefined || seconds === null) return null;
+  if (seconds < 0) return null;
+  if (seconds < 60) return `${seconds} giây`;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  const parts = [];
+  if (h > 0) parts.push(`${h} giờ`);
+  if (remM > 0) parts.push(`${remM} phút`);
+  if (s > 0 && h === 0) parts.push(`${s} giây`);
+  return parts.join(' ') || '0 phút';
 }
 
-function Pagination({ currentPage, totalPages, total, onChange, loading }) {
-  if (total === 0) return null;
+function liveDurationSeconds(loginTime) {
+  if (!loginTime) return null;
+  const t = new Date(loginTime).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 1000));
+}
+
+function useDurationTicker(intervalMs = 30000) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────
+
+const IconSession = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+);
+
+const IconFilter = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+  </svg>
+);
+
+const IconRefresh = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1 4 1 10 7 10"/>
+    <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+  </svg>
+);
+
+const IconUser = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+
+const IconTable = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+    <line x1="3" y1="9" x2="21" y2="9"/>
+    <line x1="3" y1="15" x2="21" y2="15"/>
+    <line x1="9" y1="3" x2="9" y2="21"/>
+    <line x1="15" y1="3" x2="15" y2="21"/>
+  </svg>
+);
+
+const IconTotal = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6"/>
+    <line x1="8" y1="12" x2="21" y2="12"/>
+    <line x1="8" y1="18" x2="21" y2="18"/>
+    <line x1="3" y1="6" x2="3.01" y2="6"/>
+    <line x1="3" y1="12" x2="3.01" y2="12"/>
+    <line x1="3" y1="18" x2="3.01" y2="18"/>
+  </svg>
+);
+
+const IconLogin = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+    <polyline points="10 17 15 12 10 7"/>
+    <line x1="15" y1="12" x2="3" y2="12"/>
+  </svg>
+);
+
+const IconLogout = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+    <polyline points="16 17 21 12 16 7"/>
+    <line x1="21" y1="12" x2="9" y2="12"/>
+  </svg>
+);
+
+const IconActive = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+    <polyline points="22 4 12 14.01 9 11.01"/>
+  </svg>
+);
+
+const IconFailed = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="15" y1="9" x2="9" y2="15"/>
+    <line x1="9" y1="9" x2="15" y2="15"/>
+  </svg>
+);
+
+// ─── Stats Cards ────────────────────────────────────────────────────
+
+function StatsCards({ items, loading }) {
+  const counts = { total: 0, login: 0, failed: 0, active: 0 };
+  if (items && items.length > 0) {
+    counts.total = items.length;
+    items.forEach((item) => {
+      if (item.action_type === 'LOGIN_FAILED') counts.failed++;
+      else if (item.action_type === 'LOGIN') counts.login++;
+      if (item.status === 'active') counts.active++;
+    });
+  }
+
+  const cards = [
+    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: counts.total, label: 'Tổng phiên' },
+    { icon: <IconLogin />, iconCls: 'stat-card__icon--green', value: counts.login, label: 'Đăng nhập thành công' },
+    { icon: <IconActive />, iconCls: 'stat-card__icon--cyan', value: counts.active, label: 'Đang hoạt động' },
+    { icon: <IconFailed />, iconCls: 'stat-card__icon--red', value: counts.failed, label: 'Thất bại' },
+  ];
+
   return (
-    <div className="pagination">
-      <span className="pagination__info">
-        Tổng <strong>{total}</strong> bản ghi
-        &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
-      </span>
-      <div className="pagination__controls">
-        <button className="pagination__nav-btn" onClick={() => onChange(currentPage - 1)} disabled={currentPage <= 1 || loading}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Trước
-        </button>
-        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-          let pageNum;
-          if (totalPages <= 7) pageNum = i + 1;
-          else if (currentPage <= 4) pageNum = i + 1;
-          else if (currentPage >= totalPages - 3) pageNum = totalPages - 6 + i;
-          else pageNum = currentPage - 3 + i;
-          return (
-            <button
-              key={pageNum}
-              className={`pagination__page-btn ${currentPage === pageNum ? 'active' : ''}`}
-              onClick={() => onChange(pageNum)}
-              disabled={loading}
-            >
-              {pageNum}
-            </button>
-          );
-        })}
-        <button className="pagination__nav-btn" onClick={() => onChange(currentPage + 1)} disabled={currentPage >= totalPages || loading}>
-          Sau
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-      </div>
+    <div className="admin-sessions__stats">
+      {cards.map((c, i) => (
+        <div key={i} className="stat-card">
+          <div className={`stat-card__icon ${c.iconCls}`}>{c.icon}</div>
+          <div className="stat-card__content">
+            <span className="stat-card__value">
+              {loading ? '—' : c.value}
+            </span>
+            <span className="stat-card__label">{c.label}</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function SessionTable({ items }) {
+// ─── Pagination ────────────────────────────────────────────────────
+
+function Pagination({ currentPage, totalPages, total, onChange, loading }) {
+  return (
+    <AdminPagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      total={total}
+      onChange={onChange}
+      loading={loading}
+      accent="cyan"
+    />
+  );
+}
+
+// ─── Table Skeleton ────────────────────────────────────────────────
+
+function TableSkeleton({ rows }) {
+  return (
+    <table className="table">
+      <thead>
+        <tr>
+          <th>Thời gian đăng nhập</th>
+          <th>Người dùng</th>
+          <th>Số điện thoại</th>
+          <th>Hành động</th>
+          <th>Trạng thái</th>
+          <th>IP</th>
+          <th>Trình duyệt</th>
+          <th>Thời lượng</th>
+          <th>Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Array.from({ length: rows }).map((_, i) => (
+          <tr key={i}>
+            {[...Array(9)].map((_, j) => (
+              <td key={j}>
+                <div className="skeleton-line" style={{ width: `${50 + Math.random() * 40}%` }} />
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// ─── Session Table ─────────────────────────────────────────────────
+
+function SessionTable({ items, onViewUser, onViewSession }) {
+  useDurationTicker(30000);
+
   if (!items || items.length === 0) {
     return (
       <table className="table">
@@ -99,8 +250,8 @@ function SessionTable({ items }) {
             <th>Trạng thái</th>
             <th>IP</th>
             <th>Trình duyệt</th>
-            <th>Thời gian đăng xuất</th>
             <th>Thời lượng</th>
+            <th>Thao tác</th>
           </tr>
         </thead>
         <tbody>
@@ -113,6 +264,7 @@ function SessionTable({ items }) {
       </table>
     );
   }
+
   return (
     <table className="table">
       <thead>
@@ -124,16 +276,16 @@ function SessionTable({ items }) {
           <th>Trạng thái</th>
           <th>IP</th>
           <th>Trình duyệt</th>
-          <th>Thời gian đăng xuất</th>
           <th>Thời lượng</th>
+          <th>Thao tác</th>
         </tr>
       </thead>
       <tbody>
         {items.map((item) => (
           <tr key={item.id}>
-            <td className="admin-logs__date">{formatDate(item.login_time)}</td>
-            <td className="admin-logs__user-name">{item.user_name || '—'}</td>
-            <td className="admin-logs__phone">{item.phone_number || '—'}</td>
+            <td className="admin-sessions__date">{formatDate(item.login_time)}</td>
+            <td className="admin-sessions__user-name">{item.user_name || '—'}</td>
+            <td className="admin-sessions__phone">{item.phone_number || '—'}</td>
             <td>
               {item.action_type ? (
                 <span className={`badge ${ACTION_CLASS[item.action_type] || 'badge--secondary'}`}>
@@ -148,15 +300,49 @@ function SessionTable({ items }) {
                 </span>
               ) : '—'}
             </td>
-            <td className="admin-logs__ip">{item.ip_address || '—'}</td>
-            <td className="admin-logs__user-agent" title={item.user_agent}>
+            <td className="admin-sessions__ip">{item.ip_address || '—'}</td>
+            <td className="admin-sessions__user-agent" title={item.user_agent}>
               {item.user_agent ? (() => {
                 const match = item.user_agent.match(/Chrome\/[\d.]+|Firefox\/[\d.]+|Safari\/[\d.]+/);
                 return match ? match[0] : `${item.user_agent.slice(0, 30)}...`;
               })() : '—'}
             </td>
-            <td className="admin-logs__date">{formatDate(item.logout_time)}</td>
-            <td className="admin-logs__duration">{formatDuration(item.session_duration_seconds)}</td>
+            <td className="admin-sessions__duration">
+              {item.status === 'active' ? (
+                <span style={{ color: '#0891b2', fontWeight: 600 }}>
+                  {formatDuration(liveDurationSeconds(item.login_time)) || '—'}
+                </span>
+              ) : (
+                formatDuration(item.session_duration_seconds) || '—'
+              )}
+            </td>
+            <td>
+              <div className="admin-sessions__row-actions">
+                <button
+                  type="button"
+                  className="admin-sessions__action-btn admin-sessions__action-btn--primary"
+                  onClick={() => onViewSession?.(item)}
+                  title="Xem chi tiết phiên"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  Chi tiết
+                </button>
+                {item.user_id && (
+                  <button
+                    type="button"
+                    className="admin-sessions__action-btn"
+                    onClick={() => onViewUser?.(item.user_id)}
+                    title="Xem chi tiết người dùng"
+                  >
+                    <IconUser />
+                    Người dùng
+                  </button>
+                )}
+              </div>
+            </td>
           </tr>
         ))}
       </tbody>
@@ -164,135 +350,191 @@ function SessionTable({ items }) {
   );
 }
 
+// ─── Main Component ──────────────────────────────────────────────────
+
 export default function AdminLoginSessionsPage() {
   const sessions = useLoginSessions();
-  const [branches, setBranches] = useState([]);
-  const [branchesError, setBranchesError] = useState(null);
+  const { branches, branchesError } = useSharedBranches();
+  const [detailUserId, setDetailUserId] = useState(null);
+  const [detailSession, setDetailSession] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await adminBranchesApi.list();
-        if (!cancelled) setBranches(res?.items || []);
-      } catch (err) {
-        if (!cancelled) setBranchesError(err.message || 'Không tải được chi nhánh');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
+  const hasFilters = sessions.params.userName || sessions.params.phone ||
+    sessions.params.actionType || sessions.params.status ||
+    sessions.params.startDate || sessions.params.endDate ||
+    (sessions.params.branchId != null);
 
-  const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 20)) : 1;
+  function resetFilters() {
+    sessions.setParams(() => ({
+      userName: '',
+      phone: '',
+      actionType: '',
+      status: '',
+      startDate: '',
+      endDate: '',
+      branchId: undefined,
+      page: 1,
+      pageSize: 10,
+    }));
+  }
 
   return (
-    <div className="admin-logs">
-      <div className="admin-logs__header">
-        <div className="admin-logs__title-block">
-          <div className="admin-logs__title-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
+    <div className="admin-page">
+      {/* Header */}
+      <div className="admin-page__header">
+        <div className="admin-page__title-block">
+          <div className="admin-page__title-icon" style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)', boxShadow: '0 6px 20px rgba(8, 145, 178, 0.35)' }}>
+            <IconSession />
           </div>
-          <div className="admin-logs__title-group">
-            <h1>Thiết bị đăng nhập</h1>
-            <p className="admin-logs__subtitle">Theo dõi các thiết bị đã đăng nhập vào hệ thống</p>
+          <div className="admin-page__title-group">
+            <h1>Lịch sử đăng nhập</h1>
+            <p className="admin-page__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
           </div>
         </div>
       </div>
 
-      <div className="filter-card">
-        <div className="filter-row">
-          <input
-            className="input input--search"
-            type="text"
-            placeholder="Tìm theo tên người dùng..."
-            value={sessions.params.userName || ''}
-            onChange={(e) => sessions.updateParam('userName', e.target.value)}
-          />
-          <input
-            className="input input--search"
-            type="text"
-            placeholder="Tìm theo số điện thoại..."
-            value={sessions.params.phone || ''}
-            onChange={(e) => sessions.updateParam('phone', e.target.value)}
-          />
-          <select
-            className="input input--select"
-            value={sessions.params.actionType || ''}
-            onChange={(e) => sessions.updateParam('actionType', e.target.value)}
-          >
-            {ACTION_OPTIONS.map((o) => (
-              <option key={o.value || 'all'} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <select
-            className="input input--select"
-            value={sessions.params.status || ''}
-            onChange={(e) => sessions.updateParam('status', e.target.value)}
-          >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value || 'all'} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <input
-            className="input input--date"
-            type="date"
-            value={sessions.params.startDate || ''}
-            onChange={(e) => sessions.updateParam('startDate', e.target.value)}
-            title="Từ ngày"
-          />
-          <input
-            className="input input--date"
-            type="date"
-            value={sessions.params.endDate || ''}
-            onChange={(e) => sessions.updateParam('endDate', e.target.value)}
-            title="Đến ngày"
-          />
-          <select
-            className="input input--select"
-            value={sessions.params.branchId ?? ''}
-            onChange={(e) => sessions.updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)}
-            disabled={!!branchesError}
-          >
-            <option value="">
-              {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
-            </option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.branchName}</option>
-            ))}
-          </select>
-          <button className="btn btn--ghost" onClick={() => sessions.setParams(() => ({
-            userName: '',
-            phone: '',
-            actionType: '',
-            status: '',
-            startDate: '',
-            endDate: '',
-            branchId: undefined,
-            page: 1,
-            pageSize: 20,
-          }))}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-            </svg>
-            Đặt lại
-          </button>
+      {/* Stats Cards */}
+      <StatsCards items={sessions.data.items} loading={sessions.loading} />
+
+      {/* Filter Card */}
+      <div className="admin-sessions__filters">
+        <div className="admin-sessions__filter-header">
+          <div className="admin-sessions__filter-title">
+            <IconFilter />
+            Bộ lọc &amp; Tìm kiếm
+          </div>
+        </div>
+
+        <div className="admin-sessions__filter-body">
+          <div className="filter-field">
+            <label className="filter-field__label">Tên người dùng</label>
+            <input
+              className="filter-field__input"
+              type="text"
+              placeholder="Nhập tên người dùng..."
+              value={sessions.params.userName || ''}
+              onChange={(e) => sessions.updateParam('userName', e.target.value)}
+            />
+          </div>
+
+          <div className="filter-field">
+            <label className="filter-field__label">Số điện thoại</label>
+            <input
+              className="filter-field__input"
+              type="text"
+              placeholder="Nhập SĐT..."
+              value={sessions.params.phone || ''}
+              onChange={(e) => sessions.updateParam('phone', e.target.value)}
+            />
+          </div>
+
+          <div className="filter-field">
+            <label className="filter-field__label">Hành động</label>
+            <select
+              className="filter-field__select"
+              value={sessions.params.actionType || ''}
+              onChange={(e) => sessions.updateParam('actionType', e.target.value)}
+            >
+              {ACTION_OPTIONS.map((o) => (
+                <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-field">
+            <label className="filter-field__label">Trạng thái</label>
+            <select
+              className="filter-field__select"
+              value={sessions.params.status || ''}
+              onChange={(e) => sessions.updateParam('status', e.target.value)}
+            >
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-field">
+            <label className="filter-field__label">Chi nhánh</label>
+            <select
+              className="filter-field__select"
+              value={sessions.params.branchId ?? ''}
+              onChange={(e) => sessions.updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)}
+              disabled={!!branchesError}
+            >
+              <option value="">
+                {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
+              </option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.branchName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-field">
+            <label className="filter-field__label">Khoảng ngày</label>
+            <div className="filter-field__date-group">
+              <input
+                className="filter-field__input filter-field__input--date"
+                type="date"
+                value={sessions.params.startDate || ''}
+                onChange={(e) => sessions.updateParam('startDate', e.target.value)}
+                title="Từ ngày"
+              />
+              <span className="filter-field__date-sep">—</span>
+              <input
+                className="filter-field__input filter-field__input--date"
+                type="date"
+                value={sessions.params.endDate || ''}
+                onChange={(e) => sessions.updateParam('endDate', e.target.value)}
+                title="Đến ngày"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="admin-sessions__filter-actions">
+          <div className="admin-sessions__filter-results">
+            {sessions.data.total > 0 && (
+              <>Tìm thấy <strong>{sessions.data.total}</strong> phiên đăng nhập</>
+            )}
+          </div>
+          <div className="admin-sessions__filter-btns">
+            {hasFilters && (
+              <button className="btn btn--ghost btn--sm" onClick={resetFilters}>
+                <IconRefresh />
+                Đặt lại
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="table-card">
+      {/* Table */}
+      <div className="admin-sessions__table-card">
+        <div className="admin-sessions__table-header">
+          <div className="admin-sessions__table-title">
+            <IconTable />
+            Danh sách phiên đăng nhập
+          </div>
+        </div>
+
         {sessions.loading ? (
-          <div className="admin-logs__loading">Đang tải danh sách...</div>
+          <div className="admin-sessions__table-wrapper">
+            <TableSkeleton rows={6} />
+          </div>
         ) : sessions.error ? (
-          <div className="admin-logs__error">
+          <div className="admin-sessions__error">
             <strong>Lỗi:</strong> {sessions.error.message || 'Không thể tải danh sách'}
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <SessionTable items={sessions.data.items} />
+            <div className="admin-sessions__table-wrapper">
+              <SessionTable
+                items={sessions.data.items}
+                onViewUser={setDetailUserId}
+                onViewSession={setDetailSession}
+              />
             </div>
             <Pagination
               currentPage={sessions.data.page || 1}
@@ -304,6 +546,22 @@ export default function AdminLoginSessionsPage() {
           </>
         )}
       </div>
+
+      {/* User detail drawer */}
+      {detailUserId && (
+        <UserDetailDrawer
+          userId={detailUserId}
+          onClose={() => setDetailUserId(null)}
+        />
+      )}
+
+      {/* Session detail drawer */}
+      {detailSession && (
+        <SessionDetailDrawer
+          session={detailSession}
+          onClose={() => setDetailSession(null)}
+        />
+      )}
     </div>
   );
 }
