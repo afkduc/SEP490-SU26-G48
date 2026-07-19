@@ -28,14 +28,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await login(form.email, form.password, rememberMe);
-
-      // Neu admin vua reset MK, bat buoc user doi MK truoc khi vao dashboard
-      if (result?.user?.mustChangePassword) {
-        navigate('/admin/profile?tab=password&reason=forced', { replace: true });
-        return;
-      }
-
-      navigate(routeAfterLogin(result?.user));
+      // Luôn chuyển thẳng về dashboard theo role — bỏ luồng ép đổi mật khẩu tạm.
+      navigate(routeAfterLogin(result?.user), { replace: true });
     } catch (err) {
       setError(err.message || 'Đăng nhập thất bại');
     } finally {

@@ -117,13 +117,22 @@ async function upsertDevice(userId, userAgent, ipAddress) {
         'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
         { p1: userId }
       );
+      // Quan trong: trigger trg_user_devices_no_future la INSTEAD OF, no chan
+      // INSERT truc tiep va tu thuc hien INSERT khac. SCOPE_IDENTITY() KHONG
+      // hoat dong trong truong hop nay vi scope cua outer batch KHONG co
+      // identity moi (trigger chay trong scope rieng).
+      // Fix: dung @@IDENTITY thay SCOPE_IDENTITY(). @@IDENTITY tra gia tri
+      // identity cuoi cung do BAT KY statement nao tao ra (ke ca trigger).
+      // De an toan trong concurrent, nen chi chay mot INSERT tai mot thoi diem
+      // (khong co race vi session pool dam bao).
       const insertResult = await query(
         `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, last_login_at, last_activity_at)
-         OUTPUT INSERTED.id
-         VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, SYSUTCDATETIME(), SYSUTCDATETIME())`,
+         VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+         SELECT @@IDENTITY AS new_id;`,
         { p1: userId, p2: deviceName, p3: browser, p4: os, p5: ipAddress, p6: userAgent }
       );
-      deviceId = insertResult.recordset?.[0]?.id;
+      const rawNewId = insertResult.recordset?.[0]?.new_id;
+      deviceId = rawNewId !== null && rawNewId !== undefined ? Number(rawNewId) : null;
     }
 
     return deviceId;
@@ -180,13 +189,13 @@ async function trackLogin(req, user) {
       ? user.branch_id
       : null;
 
-    // Chi dong session cua CHINH USER nay (cung user_id)
-    // Neu user A login 2 lan -> lan 1 bi kick (logout_reason = 'NEW_LOGIN_OVERRIDE')
-    // Neu user A va user B login -> khong anh huong nhau
-    // CHI DOI VOI SESSION CÓ action_type = 'LOGIN' (khong doi LOGIN_FAILED)
+    // Step 1: Close stale sessions of this user OR ones that point to a
+    // device that has been revoked. Without this, leaving a tab open or
+    // server restarts leave rows status='active' forever, which then makes
+    // the login-session history disagree with the devices page.
     if (userId) {
       try {
-        // Đóng TẤT CẢ session active của user (để đảm bảo không có race condition)
+        // Close the user's existing active sessions
         const result = await query(
           `UPDATE login_sessions
            SET    logout_time              = SYSUTCDATETIME(),
@@ -207,19 +216,42 @@ async function trackLogin(req, user) {
           'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
           { p1: userId }
         );
+
+        // Dong luon cac session active cua user khac ma minh dang dang nhap,
+        // tranh truong hop mot user cua ticket #login-session-mismatch van
+        // dang giu session active ma khong co device tuong ung.
+        await query(
+          `UPDATE login_sessions
+              SET logout_time = SYSUTCDATETIME(),
+                  logout_reason = 'STALE_HEARTBEAT',
+                  status = 'ended'
+            WHERE status = 'active'
+              AND action_type = 'LOGIN'
+              AND user_id != @p1
+              AND NOT EXISTS (
+                SELECT 1 FROM user_devices ud
+                WHERE ud.user_id = login_sessions.user_id
+                  AND ud.is_current = 1
+              )`,
+          { p1: userId }
+        );
       } catch (err) {
         console.error('[loginSessionMiddleware] failed to close stale sessions:', err.message);
       }
     }
 
     // Buoc 4: Insert session moi
+    // Bang login_sessions co trigger INSTEAD OF, nen OUTPUT INSERTED.id se throw
+    // error "cannot have any enabled triggers if the statement contains an
+    // OUTPUT clause without INTO clause". Phai dung @@IDENTITY (tra gia tri
+    // identity cuoi cung do bat ky statement nao tao ra, ke ca trigger).
     const insertResult = await query(
       `INSERT INTO login_sessions
          (action_type, user_id, user_name, phone, ip_address, user_agent,
           browser, os, branch_id, status, login_time)
-       OUTPUT INSERTED.id
        VALUES
-         ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'active', SYSUTCDATETIME())`,
+         ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'active', SYSUTCDATETIME());
+       SELECT @@IDENTITY AS new_id;`,
       {
         p1: userId,
         p2: userName,
@@ -232,7 +264,8 @@ async function trackLogin(req, user) {
       }
     );
 
-    const sessionId = insertResult.recordset && insertResult.recordset[0] ? insertResult.recordset[0].id : null;
+    const rawSessionId = insertResult.recordset?.[0]?.new_id;
+    const sessionId = rawSessionId !== null && rawSessionId !== undefined ? Number(rawSessionId) : null;
 
     if (sessionId) {
       await logSessionEvent({
@@ -392,9 +425,9 @@ async function trackLoginFailed(req, payload) {
       `INSERT INTO login_sessions
          (action_type, user_id, user_name, phone, ip_address, user_agent,
           browser, os, branch_id, status, login_time, failure_reason)
-       OUTPUT INSERTED.id
        VALUES
-         ('LOGIN_FAILED', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'failed', SYSUTCDATETIME(), @p9)`,
+         ('LOGIN_FAILED', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'failed', SYSUTCDATETIME(), @p9);
+       SELECT @@IDENTITY AS new_id;`,
       {
         p1: userId,
         p2: userName,
@@ -408,7 +441,8 @@ async function trackLoginFailed(req, payload) {
       }
     );
 
-    const sessionId = insertResult.recordset && insertResult.recordset[0] ? insertResult.recordset[0].id : null;
+    const rawFailedSessionId = insertResult.recordset?.[0]?.new_id;
+    const sessionId = rawFailedSessionId !== null && rawFailedSessionId !== undefined ? Number(rawFailedSessionId) : null;
     if (sessionId) {
       await logSessionEvent({
         sessionId,
