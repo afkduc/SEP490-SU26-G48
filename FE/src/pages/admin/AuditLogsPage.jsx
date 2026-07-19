@@ -1,52 +1,158 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
-import UserDetailDrawer from './users/UserDetailDrawer';
-import AuditLogDetailDrawer from './AuditLogDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import './AuditLogsPage.css';
 
 const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
-  { value: 'CREATE', label: 'Tạo mới (CREATE)' },
-  { value: 'UPDATE', label: 'Cập nhật (UPDATE)' },
-  { value: 'DELETE', label: 'Xóa (DELETE)' },
+  { value: 'CREATE', label: 'Tạo mới (CREATE)', color: 'success' },
+  { value: 'UPDATE', label: 'Cập nhật (UPDATE)', color: 'info' },
+  { value: 'DELETE', label: 'Xóa (DELETE)', color: 'danger' },
+  { value: 'READ', label: 'Xem dữ liệu (READ)', color: 'slate' },
+  { value: 'LOGIN', label: 'Đăng nhập (LOGIN)', color: 'purple' },
+  { value: 'LOGOUT', label: 'Đăng xuất (LOGOUT)', color: 'gray' },
+  { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất (FORCE_LOGOUT)', color: 'orange' },
+  { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu (CHANGE_PASSWORD)', color: 'teal' },
+  { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu (RESET_PASSWORD)', color: 'cyan' },
+  { value: 'ASSIGN_ROLE', label: 'Gán vai trò (ASSIGN_ROLE)', color: 'indigo' },
+  { value: 'REMOVE_ROLE', label: 'Xóa vai trò (REMOVE_ROLE)', color: 'rose' },
+  { value: 'EXPORT', label: 'Xuất dữ liệu (EXPORT)', color: 'green' },
+  { value: 'IMPORT', label: 'Nhập dữ liệu (IMPORT)', color: 'amber' },
 ];
 
-const ACTION_LABELS = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa' };
-const ACTION_CLASS = { CREATE: 'badge--success', UPDATE: 'badge--info', DELETE: 'badge--danger' };
+const ACTION_LABELS = {
+  CREATE: 'Tạo mới',
+  UPDATE: 'Cập nhật',
+  DELETE: 'Xóa',
+  READ: 'Xem dữ liệu',
+  LOGIN: 'Đăng nhập',
+  LOGOUT: 'Đăng xuất',
+  FORCE_LOGOUT: 'Buộc đăng xuất',
+  CHANGE_PASSWORD: 'Đổi mật khẩu',
+  RESET_PASSWORD: 'Đặt lại mật khẩu',
+  ASSIGN_ROLE: 'Gán vai trò',
+  REMOVE_ROLE: 'Xóa vai trò',
+  EXPORT: 'Xuất dữ liệu',
+  IMPORT: 'Nhập dữ liệu',
+};
 
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleString('vi-VN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  } catch {
-    return value;
+const ACTION_CLASS = {
+  CREATE: 'badge--success',
+  UPDATE: 'badge--info',
+  DELETE: 'badge--danger',
+  READ: 'badge--slate',
+  LOGIN: 'badge--purple',
+  LOGOUT: 'badge--secondary',
+  FORCE_LOGOUT: 'badge--orange',
+  CHANGE_PASSWORD: 'badge--teal',
+  RESET_PASSWORD: 'badge--cyan',
+  ASSIGN_ROLE: 'badge--indigo',
+  REMOVE_ROLE: 'badge--rose',
+  EXPORT: 'badge--green',
+  IMPORT: 'badge--amber',
+};
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: '2xx', label: '2xx - Thành công' },
+  { value: '4xx', label: '4xx - Lỗi client' },
+  { value: '5xx', label: '5xx - Lỗi server' },
+];
+
+/**
+ * Map tên bảng (table_name) sang tên tiếng Việt cho dễ hiểu.
+ * BE vẫn giữ table_name là key chuẩn (customers, users, ...).
+ * Đây chỉ là lớp ánh xạ hiển thị ở frontend.
+ */
+const TABLE_NAME_VI = {
+  customers: 'Khách hàng',
+  vehicles: 'Phương tiện',
+  brands: 'Hãng xe',
+  branches: 'Chi nhánh',
+  users: 'Người dùng',
+  user_role: 'Phân quyền người dùng',
+  user_specialty: 'Chuyên môn nhân viên',
+  user_devices: 'Thiết bị đăng nhập',
+  user_notification_settings: 'Cài đặt thông báo',
+  roles: 'Vai trò',
+  role_permissions: 'Phân quyền theo vai trò',
+  role_security_mapping: 'Ánh xạ vai trò - bảo mật',
+  permissions: 'Phân quyền chi tiết',
+  service_categories: 'Danh mục dịch vụ',
+  services: 'Dịch vụ',
+  service_packages: 'Gói dịch vụ',
+  service_package_items: 'Hạng mục gói dịch vụ',
+  suppliers: 'Nhà cung cấp',
+  products: 'Phụ tùng / Sản phẩm',
+  inventory_transactions: 'Giao dịch kho',
+  contracts: 'Hợp đồng',
+  appointments: 'Lịch hẹn',
+  work_orders: 'Phiếu sửa chữa',
+  work_order_items: 'Hạng mục phiếu sửa',
+  repair_orders: 'Phiếu sửa chữa (Repair Order)',
+  repair_order_tasks: 'Công việc sửa chữa',
+  service_orders: 'Đơn dịch vụ',
+  service_order_items: 'Hạng mục đơn dịch vụ',
+  invoices: 'Hóa đơn',
+  payments: 'Thanh toán',
+  specialties: 'Chuyên môn',
+  warranty_records: 'Lịch sử bảo hành',
+  after_service_care: 'Chăm sóc sau dịch vụ',
+  customer_feedback: 'Phản hồi khách hàng',
+  maintenance_reminders: 'Lịch nhắc bảo dưỡng',
+  vehicle_owners: 'Chủ phương tiện',
+  import_requests: 'Yêu cầu nhập kho',
+  import_request_items: 'Chi tiết nhập kho',
+  export_requests: 'Yêu cầu xuất kho',
+  export_request_items: 'Chi tiết xuất kho',
+  entity_definitions: 'Định nghĩa đối tượng',
+  login_sessions: 'Phiên đăng nhập',
+  login_session_events: 'Sự kiện phiên đăng nhập',
+  audit_logs: 'Nhật ký hệ thống',
+  notifications: 'Thông báo',
+};
+
+function formatLocal(value) {
+  if (!value) return { main: '—', sub: '', ago: '' };
+  let d;
+  if (value instanceof Date) {
+    d = value;
+  } else {
+    const s = typeof value === 'string' ? value : String(value);
+    const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(s);
+    d = new Date(hasTz ? s : `${s}Z`);
   }
+  if (Number.isNaN(d.getTime())) return { main: String(value), sub: '', ago: '' };
+
+  const main = d.toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+  const sub = d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  const diffMs = Date.now() - d.getTime();
+  const ago = humanizeAgo(diffMs);
+  return { main, sub, ago };
 }
 
-function getMethodClass(method) {
-  if (!method) return 'method--default';
-  const m = method.toUpperCase();
-  if (m === 'GET') return 'method--GET';
-  if (m === 'POST') return 'method--POST';
-  if (m === 'PUT' || m === 'PATCH') return 'method--PUT';
-  if (m === 'DELETE') return 'method--DELETE';
-  return 'method--default';
-}
-
-function getResponseBadge(status) {
-  if (!status) return null;
-  if (status >= 200 && status < 300) return { cls: 'badge--success', label: status };
-  if (status >= 400 && status < 500) return { cls: 'badge--warning', label: status };
-  if (status >= 500) return { cls: 'badge--danger', label: status };
-  return { cls: 'badge--secondary', label: status };
+function humanizeAgo(diffMs) {
+  if (diffMs < 0) return 'vừa xong';
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 5) return 'vừa xong';
+  if (sec < 60) return `${sec} giây trước`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} phút trước`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} giờ trước`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} ngày trước`;
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `${mo} tháng trước`;
+  return `${Math.floor(mo / 12)} năm trước`;
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -79,22 +185,6 @@ const IconRefresh = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="1 4 1 10 7 10"/>
     <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
-  </svg>
-);
-
-const IconUser = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
-  </svg>
-);
-
-const IconDoc = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-    <polyline points="14 2 14 8 20 8"/>
-    <line x1="16" y1="13" x2="8" y2="13"/>
-    <line x1="16" y1="17" x2="8" y2="17"/>
   </svg>
 );
 
@@ -141,25 +231,21 @@ const IconTotal = () => (
   </svg>
 );
 
+const IconSearch = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+
 // ─── Stats Cards ────────────────────────────────────────────────────
 
-function StatsCards({ items, loading }) {
-  const counts = { total: 0, create: 0, update: 0, delete: 0 };
-  if (items && items.length > 0) {
-    counts.total = items.length;
-    items.forEach((item) => {
-      const a = (item.action || '').toUpperCase();
-      if (a.includes('CREATE') || a.includes('INSERT')) counts.create++;
-      else if (a.includes('UPDATE') || a.includes('EDIT')) counts.update++;
-      else if (a.includes('DELETE') || a.includes('REMOVE')) counts.delete++;
-    });
-  }
-
+function StatsCards({ stats, loading }) {
   const cards = [
-    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: counts.total, label: 'Tổng bản ghi' },
-    { icon: <IconCreate />, iconCls: 'stat-card__icon--green', value: counts.create, label: 'Tạo mới' },
-    { icon: <IconUpdate />, iconCls: 'stat-card__icon--blue', value: counts.update, label: 'Cập nhật' },
-    { icon: <IconDelete />, iconCls: 'stat-card__icon--red', value: counts.delete, label: 'Xóa' },
+    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: stats?.total || 0, label: 'Tổng bản ghi' },
+    { icon: <IconCreate />, iconCls: 'stat-card__icon--green', value: stats?.create || 0, label: 'Tạo mới' },
+    { icon: <IconUpdate />, iconCls: 'stat-card__icon--blue', value: stats?.update || 0, label: 'Cập nhật' },
+    { icon: <IconDelete />, iconCls: 'stat-card__icon--red', value: stats?.delete || 0, label: 'Xóa' },
   ];
 
   return (
@@ -169,7 +255,7 @@ function StatsCards({ items, loading }) {
           <div className={`stat-card__icon ${c.iconCls}`}>{c.icon}</div>
           <div className="stat-card__content">
             <span className="stat-card__value">
-              {loading ? '—' : c.value}
+              {loading ? '—' : c.value.toLocaleString('vi-VN')}
             </span>
             <span className="stat-card__label">{c.label}</span>
           </div>
@@ -200,10 +286,15 @@ export default function AuditLogsPage() {
   const toast = useToast();
   const audit = useAuditLogs();
   const { branches, branchesError } = useSharedBranches();
-  const [detailUserId, setDetailUserId] = useState(null);
-  const [detailLog, setDetailLog] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   async function handleExportExcel() {
     setExporting(true);
@@ -220,11 +311,16 @@ export default function AuditLogsPage() {
 
   function resetFilters() {
     audit.setParams(() => ({
+      keyword: '',
       userName: '',
       phone: '',
       action: '',
+      tableName: '',
       entityName: '',
       entityCode: '',
+      ipAddress: '',
+      requestMethod: '',
+      responseStatus: '',
       startDate: '',
       endDate: '',
       branchId: undefined,
@@ -234,8 +330,10 @@ export default function AuditLogsPage() {
   }
 
   const totalPages = audit.data.total > 0 ? Math.ceil(audit.data.total / (audit.data.pageSize || 10)) : 1;
-  const hasFilters = audit.params.userName || audit.params.phone || audit.params.action ||
-    audit.params.entityCode || audit.params.startDate || audit.params.endDate ||
+  const hasFilters = audit.params.keyword || audit.params.userName || audit.params.phone ||
+    audit.params.action || audit.params.entityName || audit.params.entityCode ||
+    audit.params.ipAddress ||
+    audit.params.startDate || audit.params.endDate ||
     (audit.params.branchId != null);
 
   return (
@@ -272,7 +370,7 @@ export default function AuditLogsPage() {
       )}
 
       {/* Stats Cards */}
-      <StatsCards items={audit.data.items} loading={audit.loading} />
+      <StatsCards stats={audit.data.stats} loading={audit.loading} />
 
       {/* Filter Card */}
       <div className="admin-logs__filters">
@@ -281,98 +379,120 @@ export default function AuditLogsPage() {
             <IconFilter />
             Bộ lọc &amp; Tìm kiếm
           </div>
+          <button
+            className="btn btn--ghost btn--sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            {showFilters ? 'Ẩn bộ lọc' : 'Mở rộng'}
+          </button>
         </div>
 
-        <div className="admin-logs__filter-body">
-          <div className="filter-field">
-            <label className="filter-field__label">Tên người dùng</label>
+        {/* Quick search - always visible */}
+        <div className="admin-logs__quick-search">
+          <div className="filter-field filter-field--search">
+            <IconSearch />
             <input
               className="filter-field__input"
               type="text"
-              placeholder="Nhập tên người dùng..."
-              value={audit.params.userName || ''}
-              onChange={(e) => audit.updateParam('userName', e.target.value)}
+              placeholder="Tìm kiếm nhanh (tên, mã, mô tả, URL...)"
+              value={audit.params.keyword || ''}
+              onChange={(e) => audit.updateParam('keyword', e.target.value)}
             />
           </div>
+        </div>
 
-          <div className="filter-field">
-            <label className="filter-field__label">Số điện thoại</label>
-            <input
-              className="filter-field__input"
-              type="text"
-              placeholder="Nhập SĐT..."
-              value={audit.params.phone || ''}
-              onChange={(e) => audit.updateParam('phone', e.target.value)}
-            />
-          </div>
-
-          <div className="filter-field">
-            <label className="filter-field__label">Hành động</label>
-            <select
-              className="filter-field__select"
-              value={audit.params.action || ''}
-              onChange={(e) => audit.updateParam('action', e.target.value)}
-            >
-              {ACTION_OPTIONS.map((o) => (
-                <option key={o.value || 'all'} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-field">
-            <label className="filter-field__label">Mã bản ghi</label>
-            <input
-              className="filter-field__input"
-              type="text"
-              placeholder="VD: ND-001, USR-005..."
-              value={audit.params.entityCode || ''}
-              onChange={(e) => audit.updateParam('entityCode', e.target.value)}
-            />
-          </div>
-
-          <div className="filter-field">
-            <label className="filter-field__label">Chi nhánh</label>
-            <select
-              className="filter-field__select"
-              value={audit.params.branchId ?? ''}
-              onChange={(e) => audit.updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)}
-              disabled={!!branchesError}
-            >
-              <option value="">
-                {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
-              </option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>{b.branchName}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-field">
-            <label className="filter-field__label">Khoảng ngày</label>
-            <div className="filter-field__date-group">
+        {showFilters && (
+          <div className="admin-logs__filter-body">
+            <div className="filter-field">
+              <label className="filter-field__label">Tên người dùng</label>
               <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={audit.params.startDate || ''}
-                onChange={(e) => audit.updateParam('startDate', e.target.value)}
-                title="Từ ngày"
-              />
-              <span className="filter-field__date-sep">—</span>
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={audit.params.endDate || ''}
-                onChange={(e) => audit.updateParam('endDate', e.target.value)}
-                title="Đến ngày"
+                className="filter-field__input"
+                type="text"
+                placeholder="Nhập tên người dùng..."
+                value={audit.params.userName || ''}
+                onChange={(e) => audit.updateParam('userName', e.target.value)}
               />
             </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Số điện thoại</label>
+              <input
+                className="filter-field__input"
+                type="text"
+                placeholder="Nhập SĐT..."
+                value={audit.params.phone || ''}
+                onChange={(e) => audit.updateParam('phone', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Hành động</label>
+              <select
+                className="filter-field__select"
+                value={audit.params.action || ''}
+                onChange={(e) => audit.updateParam('action', e.target.value)}
+              >
+                {ACTION_OPTIONS.map((o) => (
+                  <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Địa chỉ IP</label>
+              <input
+                className="filter-field__input"
+                type="text"
+                placeholder="VD: 192.168.1.1"
+                value={audit.params.ipAddress || ''}
+                onChange={(e) => audit.updateParam('ipAddress', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Chi nhánh</label>
+              <select
+                className="filter-field__select"
+                value={audit.params.branchId ?? ''}
+                onChange={(e) => audit.updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)}
+                disabled={!!branchesError}
+              >
+                <option value="">
+                  {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
+                </option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.branchName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Khoảng ngày</label>
+              <div className="filter-field__date-group">
+                <input
+                  className="filter-field__input filter-field__input--date"
+                  type="date"
+                  value={audit.params.startDate || ''}
+                  onChange={(e) => audit.updateParam('startDate', e.target.value)}
+                  title="Từ ngày"
+                />
+                <span className="filter-field__date-sep">—</span>
+                <input
+                  className="filter-field__input filter-field__input--date"
+                  type="date"
+                  value={audit.params.endDate || ''}
+                  onChange={(e) => audit.updateParam('endDate', e.target.value)}
+                  title="Đến ngày"
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="admin-logs__filter-actions">
           <div className="admin-logs__filter-results">
             {audit.data.total > 0 && (
-              <>Tìm thấy <strong>{audit.data.total}</strong> nhật ký</>
+              <>Tìm thấy <strong>{audit.data.total.toLocaleString('vi-VN')}</strong> nhật ký</>
             )}
           </div>
           <div className="admin-logs__filter-btns">
@@ -406,11 +526,7 @@ export default function AuditLogsPage() {
         ) : (
           <>
             <div className="admin-logs__table-wrapper">
-              <AuditTable
-                items={audit.data.items}
-                onViewUser={setDetailUserId}
-                onViewLog={setDetailLog}
-              />
+              <AuditTable items={audit.data.items} />
             </div>
             <Pagination
               currentPage={audit.data.page || 1}
@@ -423,21 +539,6 @@ export default function AuditLogsPage() {
         )}
       </div>
 
-      {/* User detail drawer */}
-      {detailUserId && (
-        <UserDetailDrawer
-          userId={detailUserId}
-          onClose={() => setDetailUserId(null)}
-        />
-      )}
-
-      {/* Log detail drawer */}
-      {detailLog && (
-        <AuditLogDetailDrawer
-          log={detailLog}
-          onClose={() => setDetailLog(null)}
-        />
-      )}
     </div>
   );
 }
@@ -447,24 +548,21 @@ export default function AuditLogsPage() {
 function TableSkeleton({ rows }) {
   return (
     <table className="table">
+        <colgroup>
+          <col /><col /><col /><col />
+        </colgroup>
       <thead>
         <tr>
-          <th>Thời gian</th>
           <th>Người dùng</th>
           <th>Hành động</th>
-          <th>Bảng</th>
-          <th>Mã / ID</th>
-          <th>IP</th>
-          <th>Phương thức</th>
-          <th>Thời gian xử lý</th>
-          <th>Trạng thái</th>
-          <th>Thao tác</th>
+          <th>Mô tả</th>
+          <th>Thời gian</th>
         </tr>
       </thead>
       <tbody>
         {Array.from({ length: rows }).map((_, i) => (
           <tr key={i}>
-            {[...Array(10)].map((_, j) => (
+            {[...Array(4)].map((_, j) => (
               <td key={j}>
                 <div className="skeleton-line" style={{ width: `${50 + Math.random() * 40}%` }} />
               </td>
@@ -476,27 +574,24 @@ function TableSkeleton({ rows }) {
   );
 }
 
-function AuditTable({ items, onViewUser, onViewLog }) {
+function AuditTable({ items }) {
   if (!items || items.length === 0) {
     return (
       <table className="table">
+        <colgroup>
+          <col /><col /><col /><col />
+        </colgroup>
         <thead>
           <tr>
-            <th>Thời gian</th>
             <th>Người dùng</th>
             <th>Hành động</th>
-            <th>Bảng</th>
-            <th>Mã / ID</th>
-            <th>IP</th>
-            <th>Phương thức</th>
-            <th>Thời gian xử lý</th>
-            <th>Trạng thái</th>
-            <th>Thao tác</th>
+            <th>Mô tả</th>
+            <th>Thời gian</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td colSpan={10} className="table__empty">
+            <td colSpan={4} className="table__empty">
               Không có nhật ký nào phù hợp với bộ lọc
             </td>
           </tr>
@@ -507,86 +602,49 @@ function AuditTable({ items, onViewUser, onViewLog }) {
 
   return (
     <table className="table">
+        <colgroup>
+          <col /><col /><col /><col />
+        </colgroup>
       <thead>
         <tr>
-          <th>Thời gian</th>
           <th>Người dùng</th>
           <th>Hành động</th>
-          <th>Bảng</th>
-          <th>Mã / ID</th>
-          <th>IP</th>
-          <th>Phương thức</th>
-          <th>Thời gian xử lý</th>
-          <th>Trạng thái</th>
-          <th>Thao tác</th>
+          <th>Mô tả</th>
+          <th>Thời gian</th>
         </tr>
       </thead>
       <tbody>
         {items.map((item) => {
-          const resp = getResponseBadge(item.response_status);
-          const methodCls = getMethodClass(item.request_method);
+          const t = formatLocal(item.logged_at);
+          const userName = item.user_name || 'Hệ thống';
+          const initials = userName.split(' ').filter(Boolean).slice(-2)
+            .map((p) => p[0]).join('').toUpperCase() || '?';
           return (
             <tr key={item.id}>
-              <td className="audit-logs__date">{formatDate(item.logged_at)}</td>
               <td>
-                <div className="audit-logs__user-cell">
-                  <span className="audit-logs__user-name">{item.user_name || '—'}</span>
-                  {item.phone_number && (
-                    <span className="audit-logs__user-phone">{item.phone_number}</span>
-                  )}
+                <div className="audit-logs__user-cell" title={userName}>
+                  <span className="audit-logs__user-avatar" aria-hidden="true">{initials}</span>
+                  <div className="audit-logs__user-text">
+                    <span className="audit-logs__user-name">{userName}</span>
+                  </div>
                 </div>
               </td>
               <td>
                 {item.action ? (
-                  <span className={`badge ${ACTION_CLASS[item.action] || 'badge--secondary'}`}>
+                  <span className={`badge ${ACTION_CLASS[item.action] || 'badge--secondary'}`} title={item.action}>
                     {ACTION_LABELS[item.action] || item.action}
                   </span>
                 ) : '—'}
               </td>
               <td>
-                <span className="audit-logs__entity">
-                  {item.table_name || item.entity_name || '—'}
+                <span className="audit-logs__description" title={item.description || ''}>
+                  {item.description || '—'}
                 </span>
               </td>
-              <td className="audit-logs__code">
-                {item.entity_code || (item.record_id ? `#${item.record_id}` : '—')}
-              </td>
-              <td className="audit-logs__ip">{item.ip_address || '—'}</td>
-              <td>
-                <span className={`audit-logs__method ${methodCls}`}>
-                  {item.request_method || '—'}
-                </span>
-              </td>
-              <td className="audit-logs__duration">
-                {item.duration_ms != null ? `${item.duration_ms}ms` : '—'}
-              </td>
-              <td>
-                {resp ? (
-                  <span className={`badge ${resp.cls}`}>{resp.label}</span>
-                ) : '—'}
-              </td>
-              <td>
-                <div className="admin-logs__row-actions">
-                  <button
-                    type="button"
-                    className="admin-logs__action-btn admin-logs__action-btn--primary"
-                    onClick={() => onViewLog?.(item)}
-                    title="Xem chi tiết nhật ký"
-                  >
-                    <IconDoc />
-                    Chi tiết
-                  </button>
-                  {item.user_id && (
-                    <button
-                      type="button"
-                      className="admin-logs__action-btn"
-                      onClick={() => onViewUser?.(item.user_id)}
-                      title="Xem chi tiết người dùng"
-                    >
-                      <IconUser />
-                      Người dùng
-                    </button>
-                  )}
+              <td className="audit-logs__cell--time">
+                <div className="audit-logs__time-cell">
+                  <span className="audit-logs__time-main" title={t.main}>{t.main}</span>
+                  <span className="audit-logs__time-ago">{t.ago}</span>
                 </div>
               </td>
             </tr>

@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate, authorize } = require('../../middlewares/auth');
+const { trackActivity } = require('../../middlewares');
 const ManagerController = require('../controllers/ManagerController');
 const ManagerService = require('../../application/services/ManagerService');
 const ManagerRepositoryImpl = require('../../infrastructure/repositories/ManagerRepositoryImpl');
@@ -14,17 +15,7 @@ function buildManagerRouter() {
   const service = new ManagerService(repository);
   const controller = new ManagerController(service);
 
-  // Controller rieng cho phieu nhap (manager vao day de duyet/tu choi).
-  const importRequestController = new ManagerImportRequestController({
-    importRequestService: makeImportRequestService(),
-  });
-
-  // Controller rieng cho phieu xuat (manager vao day de xem/audit - NVKho tu xuat).
-  const exportRequestController = new ManagerExportRequestController({
-    exportRequestService: makeExportRequestService(),
-  });
-
-  router.use(authenticate, authorize('manager', 'admin'));
+  router.use(authenticate, authorize('manager', 'admin'), trackActivity);
 
   router.get('/branch', controller.getBranch);
   router.get('/roles', controller.getRoles);

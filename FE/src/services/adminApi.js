@@ -1,4 +1,4 @@
-﻿import httpClient from './httpClient';
+import httpClient from './httpClient';
 import { API_BASE_URL } from '../config';
 import { fetchBlob } from '../utils/downloadBlob';
 
@@ -238,6 +238,11 @@ class AdminLoginSessionsApi {
   list(params = {}) {
     return httpClient.get(`/audit/login-sessions${buildQuery(params)}`);
   }
+  // Realtime polling - lay cac session moi tu moc since (ISO date hoac unix ms)
+  recent(since) {
+    const sinceMs = typeof since === 'number' ? new Date(since).toISOString() : since;
+    return httpClient.get(`/admin/login-sessions/recent?since=${encodeURIComponent(sinceMs || '')}&limit=50`);
+  }
 }
 
 const adminLoginSessionsApi = new AdminLoginSessionsApi();
@@ -255,6 +260,15 @@ export async function getRecentLoginSessions() {
  */
 export async function reissueAdminToken() {
   return httpClient.post('/admin/reissue-token', {});
+}
+
+/**
+ * POST /api/admin/refresh-permissions
+ * Lay permissions moi nhat tu DB sau khi admin sua ma tran quyen.
+ * Tra ve: { token, permissions }
+ */
+export async function refreshPermissionsApi() {
+  return httpClient.post('/admin/refresh-permissions', {});
 }
 
 export {
@@ -291,6 +305,14 @@ class AdminDevicesApi {
 
   forceLogoutOthers(userId, currentDeviceId) {
     return httpClient.delete(`/admin/devices/user/${userId}/others?currentDeviceId=${currentDeviceId || ''}`);
+  }
+
+  /**
+   * Admin force logout ALL devices of a user (including current).
+   * DELETE /api/admin/devices/user/:userId/all
+   */
+  forceLogoutAllDevices(userId) {
+    return httpClient.delete(`/admin/devices/user/${userId}/all`);
   }
 }
 

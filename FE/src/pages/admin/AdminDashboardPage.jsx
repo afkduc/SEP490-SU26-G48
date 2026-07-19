@@ -1,10 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
-import {
-  getAdminDashboardStats,
-  reissueAdminToken,
-} from '../../services/adminApi';
+import { getAdminDashboardStats } from '../../services/adminApi';
 import './AdminDashboardPage.css';
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
@@ -538,18 +535,20 @@ function generateAlertsFromStats(stats) {
     });
   }
 
-  // 2. Nhieu lan dang nhap that bai
-  if (stats.failedLogins > 0) {
-    const severity = stats.failedLogins > 10 ? 'critical' : 'medium';
-    const type = stats.failedLogins > 10 ? 'danger' : 'warning';
+  // 2. Canh bao khi co cum dang nhap that bai bat thuong trong 15 phut.
+  // failedLogins la thong ke ca ngay; no khong dai dien cho phien hien tai.
+  const failedBurstCount = stats.recentFailedLogins || 0;
+  if (failedBurstCount >= 5) {
+    const severity = failedBurstCount > 10 ? 'critical' : 'medium';
+    const type = failedBurstCount > 10 ? 'danger' : 'warning';
     out.push({
       id: 'auto-failed-logins',
       type,
       severity,
       category: 'security',
       icon: 'alert',
-      title: 'Đăng nhập thất bại',
-      message: `${stats.failedLogins} lần đăng nhập thất bại${stats.failedLogins > 10 ? ' - kiểm tra an ninh ngay' : ''}`,
+      title: 'Nhiều lần đăng nhập thất bại',
+      message: `${failedBurstCount} lần đăng nhập thất bại trong 15 phút qua${failedBurstCount > 10 ? ' - kiểm tra an ninh ngay' : ''}`,
       affectedEntity: 'auth',
       time: nowIso,
     });
@@ -803,30 +802,6 @@ export default function AdminDashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        // Reissue token truoc de dam bao JWT co day du roles tu DB (phong TH
-        // token cu bi cache va thieu role admin sau khi admin moi duoc them role).
-        try {
-          const reissued = await reissueAdminToken();
-          if (reissued?.token) {
-            localStorage.setItem('token', reissued.token);
-            if (Array.isArray(reissued.roles)) {
-              try {
-                const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
-                if (raw) {
-                  const cached = JSON.parse(raw);
-                  const updated = { ...cached, roles: reissued.roles };
-                  localStorage.setItem('user', JSON.stringify(updated));
-                  sessionStorage.setItem('user', JSON.stringify(updated));
-                }
-              } catch {
-                /* ignore parse error */
-              }
-            }
-          }
-        } catch {
-          // Bo qua loi reissue (co the do token het han) -> trang se redirect login
-        }
-
         const statsData = await getAdminDashboardStats();
         if (!cancelled) {
           setStats(statsData);

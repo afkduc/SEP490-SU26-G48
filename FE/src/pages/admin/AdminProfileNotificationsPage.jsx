@@ -1,36 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { notificationApi } from '../../services';
 import './AdminProfileNotificationsPage.css';
 
-const DEFAULT_SETTINGS = {
-  emailOnLogin: true,
-  emailOnFailedLogin: true,
-  emailOnRoleChange: true,
-  browserOnLogin: true,
-  inAppOnSystemAlert: true,
-};
-
 export default function AdminProfileNotificationsPage() {
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await notificationApi.getNotificationSettings();
+      setSettings(data);
+    } catch (err) {
+      setError('Không thể tải cài đặt thông báo');
+      console.error('[AdminProfileNotificationsPage] loadSettings error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const handleChange = (key, value) => {
+    if (!settings) return;
     setSettings((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
   };
 
   const handleSave = async () => {
+    if (!settings) return;
     setSaving(true);
     setSaved(false);
+    setError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await notificationApi.updateNotificationSettings(settings);
       setSaved(true);
+      await loadSettings();
     } catch (err) {
-      throw err;
+      setError('Lưu cài đặt thất bại');
+      console.error('[AdminProfileNotificationsPage] saveSettings error:', err);
     } finally {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="admin-notifications">
+        <div className="admin-notifications__header">
+          <div>
+            <h1>Cài đặt thông báo</h1>
+            <p className="admin-notifications__subtitle">Quản lý các kênh thông báo của tài khoản</p>
+          </div>
+        </div>
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <p>Đang tải cài đặt...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !settings) {
+    return (
+      <div className="admin-notifications">
+        <div className="admin-notifications__header">
+          <div>
+            <h1>Cài đặt thông báo</h1>
+            <p className="admin-notifications__subtitle">Quản lý các kênh thông báo của tài khoản</p>
+          </div>
+        </div>
+        <div className="error-state">
+          <p>{error}</p>
+          <button className="btn btn--secondary" onClick={loadSettings}>
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-notifications">
@@ -42,11 +96,18 @@ export default function AdminProfileNotificationsPage() {
         <button
           className="btn btn--primary"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !settings}
         >
           {saving ? 'Đang lưu...' : 'Lưu cài đặt'}
         </button>
       </div>
+
+      {error && (
+        <div className="alert-banner alert-banner--error">
+          <span className="alert-banner__icon">!</span>
+          <span className="alert-banner__message">{error}</span>
+        </div>
+      )}
 
       {saved && (
         <div className="alert-banner alert-banner--success">
@@ -65,7 +126,7 @@ export default function AdminProfileNotificationsPage() {
             </span>
             <input
               type="checkbox"
-              checked={settings.emailOnLogin}
+              checked={settings?.emailOnLogin ?? true}
               onChange={(e) => handleChange('emailOnLogin', e.target.checked)}
             />
           </label>
@@ -76,7 +137,7 @@ export default function AdminProfileNotificationsPage() {
             </span>
             <input
               type="checkbox"
-              checked={settings.emailOnFailedLogin}
+              checked={settings?.emailOnFailedLogin ?? true}
               onChange={(e) => handleChange('emailOnFailedLogin', e.target.checked)}
             />
           </label>
@@ -87,8 +148,19 @@ export default function AdminProfileNotificationsPage() {
             </span>
             <input
               type="checkbox"
-              checked={settings.emailOnRoleChange}
+              checked={settings?.emailOnRoleChange ?? true}
               onChange={(e) => handleChange('emailOnRoleChange', e.target.checked)}
+            />
+          </label>
+          <label className="notification-row">
+            <span className="notification-row__label">
+              <span className="notification-row__title">Thông báo thay đổi mật khẩu</span>
+              <span className="notification-row__description">Gửi email khi mật khẩu được thay đổi</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={settings?.emailOnPasswordChange ?? true}
+              onChange={(e) => handleChange('emailOnPasswordChange', e.target.checked)}
             />
           </label>
         </div>
@@ -102,19 +174,41 @@ export default function AdminProfileNotificationsPage() {
             </span>
             <input
               type="checkbox"
-              checked={settings.browserOnLogin}
-              onChange={(e) => handleChange('browserOnLogin', e.target.checked)}
+              checked={settings?.inAppLogin ?? true}
+              onChange={(e) => handleChange('inAppLogin', e.target.checked)}
             />
           </label>
           <label className="notification-row">
             <span className="notification-row__label">
-              <span className="notification-row__title">Thông báo cảnh báo hệ thống</span>
-              <span className="notification-row__description">Hiển thị cảnh báo trong hệ thống khi có sự cố</span>
+              <span className="notification-row__title">Thông báo cảnh báo bảo mật</span>
+              <span className="notification-row__description">Hiển thị cảnh báo bảo mật (thiết bị lạ, đăng nhập bất thường)</span>
             </span>
             <input
               type="checkbox"
-              checked={settings.inAppOnSystemAlert}
-              onChange={(e) => handleChange('inAppOnSystemAlert', e.target.checked)}
+              checked={settings?.inAppSecurityAlert ?? true}
+              onChange={(e) => handleChange('inAppSecurityAlert', e.target.checked)}
+            />
+          </label>
+          <label className="notification-row">
+            <span className="notification-row__label">
+              <span className="notification-row__title">Thông báo thay đổi phân quyền</span>
+              <span className="notification-row__description">Hiển thị thông báo khi vai trò thay đổi</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={settings?.inAppRoleChange ?? true}
+              onChange={(e) => handleChange('inAppRoleChange', e.target.checked)}
+            />
+          </label>
+          <label className="notification-row">
+            <span className="notification-row__label">
+              <span className="notification-row__title">Thông báo thay đổi mật khẩu</span>
+              <span className="notification-row__description">Hiển thị thông báo khi mật khẩu được thay đổi</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={settings?.inAppPasswordChange ?? true}
+              onChange={(e) => handleChange('inAppPasswordChange', e.target.checked)}
             />
           </label>
         </div>
