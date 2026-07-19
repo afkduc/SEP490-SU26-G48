@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
@@ -10,13 +10,65 @@ import './AuditLogsPage.css';
 
 const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
-  { value: 'CREATE', label: 'Tạo mới (CREATE)' },
-  { value: 'UPDATE', label: 'Cập nhật (UPDATE)' },
-  { value: 'DELETE', label: 'Xóa (DELETE)' },
+  { value: 'CREATE', label: 'Tạo mới (CREATE)', color: 'success' },
+  { value: 'UPDATE', label: 'Cập nhật (UPDATE)', color: 'info' },
+  { value: 'DELETE', label: 'Xóa (DELETE)', color: 'danger' },
+  { value: 'LOGIN', label: 'Đăng nhập (LOGIN)', color: 'purple' },
+  { value: 'LOGOUT', label: 'Đăng xuất (LOGOUT)', color: 'gray' },
+  { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất (FORCE_LOGOUT)', color: 'orange' },
+  { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu (CHANGE_PASSWORD)', color: 'teal' },
+  { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu (RESET_PASSWORD)', color: 'cyan' },
+  { value: 'ASSIGN_ROLE', label: 'Gán vai trò (ASSIGN_ROLE)', color: 'indigo' },
+  { value: 'REMOVE_ROLE', label: 'Xóa vai trò (REMOVE_ROLE)', color: 'rose' },
+  { value: 'EXPORT', label: 'Xuất dữ liệu (EXPORT)', color: 'green' },
+  { value: 'IMPORT', label: 'Nhập dữ liệu (IMPORT)', color: 'amber' },
 ];
 
-const ACTION_LABELS = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa' };
-const ACTION_CLASS = { CREATE: 'badge--success', UPDATE: 'badge--info', DELETE: 'badge--danger' };
+const ACTION_LABELS = {
+  CREATE: 'Tạo mới',
+  UPDATE: 'Cập nhật',
+  DELETE: 'Xóa',
+  LOGIN: 'Đăng nhập',
+  LOGOUT: 'Đăng xuất',
+  FORCE_LOGOUT: 'Buộc đăng xuất',
+  CHANGE_PASSWORD: 'Đổi mật khẩu',
+  RESET_PASSWORD: 'Đặt lại mật khẩu',
+  ASSIGN_ROLE: 'Gán vai trò',
+  REMOVE_ROLE: 'Xóa vai trò',
+  EXPORT: 'Xuất dữ liệu',
+  IMPORT: 'Nhập dữ liệu',
+};
+
+const ACTION_CLASS = {
+  CREATE: 'badge--success',
+  UPDATE: 'badge--info',
+  DELETE: 'badge--danger',
+  LOGIN: 'badge--purple',
+  LOGOUT: 'badge--secondary',
+  FORCE_LOGOUT: 'badge--orange',
+  CHANGE_PASSWORD: 'badge--teal',
+  RESET_PASSWORD: 'badge--cyan',
+  ASSIGN_ROLE: 'badge--indigo',
+  REMOVE_ROLE: 'badge--rose',
+  EXPORT: 'badge--green',
+  IMPORT: 'badge--amber',
+};
+
+const METHOD_OPTIONS = [
+  { value: '', label: 'Tất cả phương thức' },
+  { value: 'GET', label: 'GET' },
+  { value: 'POST', label: 'POST' },
+  { value: 'PUT', label: 'PUT' },
+  { value: 'PATCH', label: 'PATCH' },
+  { value: 'DELETE', label: 'DELETE' },
+];
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: '2xx', label: '2xx - Thành công' },
+  { value: '4xx', label: '4xx - Lỗi client' },
+  { value: '5xx', label: '5xx - Lỗi server' },
+];
 
 /**
  * Map tên bảng (table_name) sang tên tiếng Việt cho dễ hiểu.
@@ -24,66 +76,59 @@ const ACTION_CLASS = { CREATE: 'badge--success', UPDATE: 'badge--info', DELETE: 
  * Đây chỉ là lớp ánh xạ hiển thị ở frontend.
  */
 const TABLE_NAME_VI = {
-  customers:           'Khách hàng',
-  vehicles:            'Phương tiện',
-  brands:              'Hãng xe',
-  branches:            'Chi nhánh',
-  users:               'Người dùng',
-  user_role:           'Phân quyền người dùng',
-  user_specialty:      'Chuyên môn nhân viên',
-  user_devices:        'Thiết bị đăng nhập',
+  customers: 'Khách hàng',
+  vehicles: 'Phương tiện',
+  brands: 'Hãng xe',
+  branches: 'Chi nhánh',
+  users: 'Người dùng',
+  user_role: 'Phân quyền người dùng',
+  user_specialty: 'Chuyên môn nhân viên',
+  user_devices: 'Thiết bị đăng nhập',
   user_notification_settings: 'Cài đặt thông báo',
-  roles:               'Vai trò',
-  role_permissions:    'Phân quyền theo vai trò',
+  roles: 'Vai trò',
+  role_permissions: 'Phân quyền theo vai trò',
   role_security_mapping: 'Ánh xạ vai trò - bảo mật',
-  permissions:         'Phân quyền chi tiết',
-  service_categories:  'Danh mục dịch vụ',
-  services:            'Dịch vụ',
-  service_packages:    'Gói dịch vụ',
+  permissions: 'Phân quyền chi tiết',
+  service_categories: 'Danh mục dịch vụ',
+  services: 'Dịch vụ',
+  service_packages: 'Gói dịch vụ',
   service_package_items: 'Hạng mục gói dịch vụ',
-  suppliers:           'Nhà cung cấp',
-  products:            'Phụ tùng / Sản phẩm',
+  suppliers: 'Nhà cung cấp',
+  products: 'Phụ tùng / Sản phẩm',
   inventory_transactions: 'Giao dịch kho',
-  contracts:           'Hợp đồng',
-  appointments:        'Lịch hẹn',
-  work_orders:         'Phiếu sửa chữa',
-  work_order_items:    'Hạng mục phiếu sửa',
-  repair_orders:       'Phiếu sửa chữa (Repair Order)',
-  repair_order_tasks:  'Công việc sửa chữa',
-  service_orders:      'Đơn dịch vụ',
+  contracts: 'Hợp đồng',
+  appointments: 'Lịch hẹn',
+  work_orders: 'Phiếu sửa chữa',
+  work_order_items: 'Hạng mục phiếu sửa',
+  repair_orders: 'Phiếu sửa chữa (Repair Order)',
+  repair_order_tasks: 'Công việc sửa chữa',
+  service_orders: 'Đơn dịch vụ',
   service_order_items: 'Hạng mục đơn dịch vụ',
-  invoices:            'Hóa đơn',
-  payments:            'Thanh toán',
-  specialties:         'Chuyên môn',
-  warranty_records:    'Lịch sử bảo hành',
-  after_service_care:  'Chăm sóc sau dịch vụ',
-  customer_feedback:   'Phản hồi khách hàng',
+  invoices: 'Hóa đơn',
+  payments: 'Thanh toán',
+  specialties: 'Chuyên môn',
+  warranty_records: 'Lịch sử bảo hành',
+  after_service_care: 'Chăm sóc sau dịch vụ',
+  customer_feedback: 'Phản hồi khách hàng',
   maintenance_reminders: 'Lịch nhắc bảo dưỡng',
-  vehicle_owners:      'Chủ phương tiện',
-  import_requests:     'Yêu cầu nhập kho',
-  import_request_items:'Chi tiết nhập kho',
-  export_requests:     'Yêu cầu xuất kho',
-  export_request_items:'Chi tiết xuất kho',
-  entity_definitions:  'Định nghĩa đối tượng',
-  login_sessions:      'Phiên đăng nhập',
-  login_session_events:'Sự kiện phiên đăng nhập',
-  audit_logs:          'Nhật ký hệ thống',
-  notifications:       'Thông báo',
+  vehicle_owners: 'Chủ phương tiện',
+  import_requests: 'Yêu cầu nhập kho',
+  import_request_items: 'Chi tiết nhập kho',
+  export_requests: 'Yêu cầu xuất kho',
+  export_request_items: 'Chi tiết xuất kho',
+  entity_definitions: 'Định nghĩa đối tượng',
+  login_sessions: 'Phiên đăng nhập',
+  login_session_events: 'Sự kiện phiên đăng nhập',
+  audit_logs: 'Nhật ký hệ thống',
+  notifications: 'Thông báo',
 };
 
 function viTableName(name) {
   if (!name) return '—';
-  // Có trong bảng ánh xạ → dịch; ngược lại hiển thị raw key kèm cờ cảnh báo
-  // để lộ bug dữ liệu (table không tồn tại trong DB hoặc chưa được ánh xạ).
   if (TABLE_NAME_VI[name]) return TABLE_NAME_VI[name];
   return `⚠ ${name} (chưa ánh xạ)`;
 }
 
-/**
- * formatDate: trả về thời gian local (vi-VN) hiển thị ở cột "Thời gian".
- * - Ưu tiên dùng ISO với 'Z' để hiểu là UTC (fix vấn đề lệch giờ).
- * - Nếu BE trả về string không có timezone, coi như UTC vì DB đang lưu UTC.
- */
 function formatLocal(value) {
   if (!value) return { main: '—', sub: '', ago: '' };
   let d;
@@ -135,9 +180,10 @@ function getMethodClass(method) {
 
 function getResponseBadge(status) {
   if (status == null) return null;
-  if (status >= 200 && status < 300) return { cls: 'badge--success', label: `${status} Thành công` };
-  if (status >= 400 && status < 500) return { cls: 'badge--warning', label: `${status} Lỗi client` };
-  if (status >= 500) return { cls: 'badge--danger', label: `${status} Lỗi server` };
+  if (status >= 200 && status < 300) return { cls: 'badge--success', label: `${status}` };
+  if (status >= 300 && status < 400) return { cls: 'badge--info', label: `${status}` };
+  if (status >= 400 && status < 500) return { cls: 'badge--warning', label: `${status}` };
+  if (status >= 500) return { cls: 'badge--danger', label: `${status}` };
   return { cls: 'badge--secondary', label: String(status) };
 }
 
@@ -234,25 +280,21 @@ const IconTotal = () => (
   </svg>
 );
 
+const IconSearch = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+
 // ─── Stats Cards ────────────────────────────────────────────────────
 
-function StatsCards({ items, loading }) {
-  const counts = { total: 0, create: 0, update: 0, delete: 0 };
-  if (items && items.length > 0) {
-    counts.total = items.length;
-    items.forEach((item) => {
-      const a = (item.action || '').toUpperCase();
-      if (a.includes('CREATE') || a.includes('INSERT')) counts.create++;
-      else if (a.includes('UPDATE') || a.includes('EDIT')) counts.update++;
-      else if (a.includes('DELETE') || a.includes('REMOVE')) counts.delete++;
-    });
-  }
-
+function StatsCards({ stats, loading }) {
   const cards = [
-    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: counts.total, label: 'Tổng bản ghi' },
-    { icon: <IconCreate />, iconCls: 'stat-card__icon--green', value: counts.create, label: 'Tạo mới' },
-    { icon: <IconUpdate />, iconCls: 'stat-card__icon--blue', value: counts.update, label: 'Cập nhật' },
-    { icon: <IconDelete />, iconCls: 'stat-card__icon--red', value: counts.delete, label: 'Xóa' },
+    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: stats?.total || 0, label: 'Tổng bản ghi' },
+    { icon: <IconCreate />, iconCls: 'stat-card__icon--green', value: stats?.create || 0, label: 'Tạo mới' },
+    { icon: <IconUpdate />, iconCls: 'stat-card__icon--blue', value: stats?.update || 0, label: 'Cập nhật' },
+    { icon: <IconDelete />, iconCls: 'stat-card__icon--red', value: stats?.delete || 0, label: 'Xóa' },
   ];
 
   return (
@@ -262,7 +304,7 @@ function StatsCards({ items, loading }) {
           <div className={`stat-card__icon ${c.iconCls}`}>{c.icon}</div>
           <div className="stat-card__content">
             <span className="stat-card__value">
-              {loading ? '—' : c.value}
+              {loading ? '—' : c.value.toLocaleString('vi-VN')}
             </span>
             <span className="stat-card__label">{c.label}</span>
           </div>
@@ -297,8 +339,8 @@ export default function AuditLogsPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [now, setNow] = useState(() => Date.now());
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Tick mỗi 30s để cột "x phút trước" tự cập nhật realtime (re-render nhẹ)
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
@@ -319,11 +361,16 @@ export default function AuditLogsPage() {
 
   function resetFilters() {
     audit.setParams(() => ({
+      keyword: '',
       userName: '',
       phone: '',
       action: '',
+      tableName: '',
       entityName: '',
       entityCode: '',
+      ipAddress: '',
+      requestMethod: '',
+      responseStatus: '',
       startDate: '',
       endDate: '',
       branchId: undefined,
@@ -333,11 +380,12 @@ export default function AuditLogsPage() {
   }
 
   const totalPages = audit.data.total > 0 ? Math.ceil(audit.data.total / (audit.data.pageSize || 10)) : 1;
-  const hasFilters = audit.params.userName || audit.params.phone || audit.params.action ||
-    audit.params.entityCode || audit.params.startDate || audit.params.endDate ||
+  const hasFilters = audit.params.keyword || audit.params.userName || audit.params.phone ||
+    audit.params.action || audit.params.tableName || audit.params.entityName ||
+    audit.params.entityCode || audit.params.ipAddress || audit.params.requestMethod ||
+    audit.params.responseStatus || audit.params.startDate || audit.params.endDate ||
     (audit.params.branchId != null);
 
-  // Chỉ render lại cột thời gian khi tick (không re-render toàn trang)
   const timeTick = useMemo(() => now, [now]);
 
   return (
@@ -374,7 +422,7 @@ export default function AuditLogsPage() {
       )}
 
       {/* Stats Cards */}
-      <StatsCards items={audit.data.items} loading={audit.loading} />
+      <StatsCards stats={audit.data.stats} loading={audit.loading} />
 
       {/* Filter Card */}
       <div className="admin-logs__filters">
@@ -383,98 +431,168 @@ export default function AuditLogsPage() {
             <IconFilter />
             Bộ lọc &amp; Tìm kiếm
           </div>
+          <button
+            className="btn btn--ghost btn--sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            {showFilters ? 'Ẩn bộ lọc' : 'Mở rộng'}
+          </button>
         </div>
 
-        <div className="admin-logs__filter-body">
-          <div className="filter-field">
-            <label className="filter-field__label">Tên người dùng</label>
+        {/* Quick search - always visible */}
+        <div className="admin-logs__quick-search">
+          <div className="filter-field filter-field--search">
+            <IconSearch />
             <input
               className="filter-field__input"
               type="text"
-              placeholder="Nhập tên người dùng..."
-              value={audit.params.userName || ''}
-              onChange={(e) => audit.updateParam('userName', e.target.value)}
+              placeholder="Tìm kiếm nhanh (tên, mã, mô tả, URL...)"
+              value={audit.params.keyword || ''}
+              onChange={(e) => audit.updateParam('keyword', e.target.value)}
             />
           </div>
+        </div>
 
-          <div className="filter-field">
-            <label className="filter-field__label">Số điện thoại</label>
-            <input
-              className="filter-field__input"
-              type="text"
-              placeholder="Nhập SĐT..."
-              value={audit.params.phone || ''}
-              onChange={(e) => audit.updateParam('phone', e.target.value)}
-            />
-          </div>
-
-          <div className="filter-field">
-            <label className="filter-field__label">Hành động</label>
-            <select
-              className="filter-field__select"
-              value={audit.params.action || ''}
-              onChange={(e) => audit.updateParam('action', e.target.value)}
-            >
-              {ACTION_OPTIONS.map((o) => (
-                <option key={o.value || 'all'} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-field">
-            <label className="filter-field__label">Mã bản ghi</label>
-            <input
-              className="filter-field__input"
-              type="text"
-              placeholder="VD: KH-001, ND-005..."
-              value={audit.params.entityCode || ''}
-              onChange={(e) => audit.updateParam('entityCode', e.target.value)}
-            />
-          </div>
-
-          <div className="filter-field">
-            <label className="filter-field__label">Chi nhánh</label>
-            <select
-              className="filter-field__select"
-              value={audit.params.branchId ?? ''}
-              onChange={(e) => audit.updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)}
-              disabled={!!branchesError}
-            >
-              <option value="">
-                {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
-              </option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>{b.branchName}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-field">
-            <label className="filter-field__label">Khoảng ngày</label>
-            <div className="filter-field__date-group">
+        {showFilters && (
+          <div className="admin-logs__filter-body">
+            <div className="filter-field">
+              <label className="filter-field__label">Tên người dùng</label>
               <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={audit.params.startDate || ''}
-                onChange={(e) => audit.updateParam('startDate', e.target.value)}
-                title="Từ ngày"
-              />
-              <span className="filter-field__date-sep">—</span>
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={audit.params.endDate || ''}
-                onChange={(e) => audit.updateParam('endDate', e.target.value)}
-                title="Đến ngày"
+                className="filter-field__input"
+                type="text"
+                placeholder="Nhập tên người dùng..."
+                value={audit.params.userName || ''}
+                onChange={(e) => audit.updateParam('userName', e.target.value)}
               />
             </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Số điện thoại</label>
+              <input
+                className="filter-field__input"
+                type="text"
+                placeholder="Nhập SĐT..."
+                value={audit.params.phone || ''}
+                onChange={(e) => audit.updateParam('phone', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Hành động</label>
+              <select
+                className="filter-field__select"
+                value={audit.params.action || ''}
+                onChange={(e) => audit.updateParam('action', e.target.value)}
+              >
+                {ACTION_OPTIONS.map((o) => (
+                  <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Bảng dữ liệu</label>
+              <input
+                className="filter-field__input"
+                type="text"
+                placeholder="VD: users, customers..."
+                value={audit.params.tableName || ''}
+                onChange={(e) => audit.updateParam('tableName', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Mã bản ghi</label>
+              <input
+                className="filter-field__input"
+                type="text"
+                placeholder="VD: KH-001, ND-005..."
+                value={audit.params.entityCode || ''}
+                onChange={(e) => audit.updateParam('entityCode', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Địa chỉ IP</label>
+              <input
+                className="filter-field__input"
+                type="text"
+                placeholder="VD: 192.168.1.1"
+                value={audit.params.ipAddress || ''}
+                onChange={(e) => audit.updateParam('ipAddress', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Phương thức HTTP</label>
+              <select
+                className="filter-field__select"
+                value={audit.params.requestMethod || ''}
+                onChange={(e) => audit.updateParam('requestMethod', e.target.value)}
+              >
+                {METHOD_OPTIONS.map((o) => (
+                  <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Trạng thái HTTP</label>
+              <select
+                className="filter-field__select"
+                value={audit.params.responseStatus || ''}
+                onChange={(e) => audit.updateParam('responseStatus', e.target.value)}
+              >
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Chi nhánh</label>
+              <select
+                className="filter-field__select"
+                value={audit.params.branchId ?? ''}
+                onChange={(e) => audit.updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)}
+                disabled={!!branchesError}
+              >
+                <option value="">
+                  {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
+                </option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.branchName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Khoảng ngày</label>
+              <div className="filter-field__date-group">
+                <input
+                  className="filter-field__input filter-field__input--date"
+                  type="date"
+                  value={audit.params.startDate || ''}
+                  onChange={(e) => audit.updateParam('startDate', e.target.value)}
+                  title="Từ ngày"
+                />
+                <span className="filter-field__date-sep">—</span>
+                <input
+                  className="filter-field__input filter-field__input--date"
+                  type="date"
+                  value={audit.params.endDate || ''}
+                  onChange={(e) => audit.updateParam('endDate', e.target.value)}
+                  title="Đến ngày"
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="admin-logs__filter-actions">
           <div className="admin-logs__filter-results">
             {audit.data.total > 0 && (
-              <>Tìm thấy <strong>{audit.data.total}</strong> nhật ký</>
+              <>Tìm thấy <strong>{audit.data.total.toLocaleString('vi-VN')}</strong> nhật ký</>
             )}
           </div>
           <div className="admin-logs__filter-btns">
@@ -575,7 +693,6 @@ function TableSkeleton({ rows }) {
 }
 
 function AuditTable({ items, onViewLog, timeTick }) {
-  // timeTick chỉ để phụ thuộc re-render; formatLocal dùng Date.now() thực tế
   void timeTick;
 
   if (!items || items.length === 0) {
@@ -655,7 +772,6 @@ function AuditTable({ items, onViewLog, timeTick }) {
                 <div className="audit-logs__time-cell">
                   <span className="audit-logs__time-main" title={t.main}>{t.main}</span>
                   <span className="audit-logs__time-ago">{t.ago}</span>
-                  <span className="audit-logs__time-utc" title="Thời điểm UTC gốc từ server">{t.sub}</span>
                 </div>
               </td>
               <td>
@@ -701,26 +817,12 @@ function AuditTable({ items, onViewLog, timeTick }) {
                 {item.ip_address ? (
                   <span
                     className="audit-logs__ip"
-                    title={
-                      `IP: ${item.ip_address}\n` +
-                      `Lấy từ: req.ip / X-Forwarded-For / socket remoteAddress (BE src/middlewares/auditMiddleware.js).`
-                    }
+                    title={`IP: ${item.ip_address}`}
                   >
                     {item.ip_address}
                   </span>
                 ) : (
-                  <span
-                    className="audit-logs__ip audit-logs__ip--missing"
-                    title={
-                      'Không có IP cho nhật ký này.\n' +
-                      'Nguyên nhân thường gặp:\n' +
-                      '• Bản ghi được tạo trước khi middleware ghi IP (record cũ).\n' +
-                      '• Middleware chưa bắt được route này (route đi tắt, không qua auditMiddleware).\n' +
-                      '• Lỗi ghi DB — xem log server: "[auditLogger] failed to write audit log".'
-                    }
-                  >
-                    —
-                  </span>
+                  <span className="audit-logs__ip audit-logs__ip--missing">—</span>
                 )}
               </td>
               <td>

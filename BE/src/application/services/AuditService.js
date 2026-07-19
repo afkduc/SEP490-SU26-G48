@@ -44,13 +44,32 @@ class AuditService {
     });
   }
 
+  async getAuditLogById(id) {
+    const parsedId = parseInt(id, 10);
+    if (Number.isNaN(parsedId) || parsedId < 1) {
+      throw new ApiError(400, 'id khong hop le');
+    }
+
+    const log = await this.auditRepository.getAuditLogById(parsedId);
+    if (!log) {
+      throw new ApiError(404, 'Khong tim thay audit log');
+    }
+
+    return log;
+  }
+
   async exportAuditLogs(filters = {}) {
     return this.auditRepository.getAuditLogsForExport({
+      keyword: filters.keyword,
       userName: filters.userName,
       phone: filters.phone,
       action: filters.action,
+      tableName: filters.tableName,
       entityName: filters.entityName,
       entityCode: filters.entityCode,
+      ipAddress: filters.ipAddress,
+      requestMethod: filters.requestMethod,
+      responseStatus: filters.responseStatus,
       startDate: filters.startDate,
       endDate: filters.endDate,
       branchId: filters.branchId,
