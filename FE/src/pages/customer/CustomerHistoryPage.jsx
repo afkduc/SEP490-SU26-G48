@@ -32,7 +32,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">📋 Phiếu quyết toán {detail?.code || ''}</h3>
+          <h3 className="modal-title">Phiếu quyết toán {detail?.code || ''}</h3>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {st && <span className={`badge ${st.badge}`}>{st.label}</span>}
             <button className="modal-close" onClick={onClose}>✕</button>
@@ -40,12 +40,13 @@ function SettlementDetailModal({ settlementId, onClose }) {
         </div>
         <div className="modal-body">
           {loading && <p>Đang tải…</p>}
-          {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
+          {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
           {detail && (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
                 {[
                   ['Chi nhánh', detail.branch || '—'],
+                  ['Cố vấn dịch vụ', detail.advisor || '—'],
                   ['Ngày vào', detail.date || '—'],
                   ['Ngày ra', detail.paidDate || 'Chờ khách thanh toán'],
                 ].map(([l, v]) => (
@@ -72,13 +73,14 @@ function SettlementDetailModal({ settlementId, onClose }) {
                 <div>
                   <div className="form-section-title">Xe</div>
                   {[
-                    ['Biển số', detail.vehicle?.licensePlate],
-                    ['Loại xe', detail.vehicle?.vehicleModel],
-                    ['Số Km', `${(detail.vehicle?.currentKm || 0).toLocaleString()} km`],
-                  ].map(([l, v]) => (
+                    ['Biển số', detail.vehicle?.licensePlate, '—'],
+                    ['Loại xe', detail.vehicle?.vehicleModel, '—'],
+                    ['Số Km', `${(detail.vehicle?.currentKm || 0).toLocaleString()} km`, '—'],
+                    ['Tổ trưởng phụ trách', detail.teamLeader, 'Chưa phân công'],
+                  ].map(([l, v, empty]) => (
                     <div key={l} className="detail-row">
                       <div className="detail-label" style={{ width: 120, fontSize: 11 }}>{l}</div>
-                      <div className="detail-value" style={{ fontSize: 12 }}>{v || '—'}</div>
+                      <div className="detail-value" style={{ fontSize: 12 }}>{v || empty}</div>
                     </div>
                   ))}
                 </div>
@@ -134,11 +136,16 @@ function SettlementDetailModal({ settlementId, onClose }) {
   );
 }
 
-// ─── Form chuyển nhượng xe cho khách hàng khác (tìm khách theo tên/SĐT) ──
+// ─── Form chuyển nhượng xe cho khách hàng khác (tìm khách theo tên/SĐT, hoặc
+// nhập thông tin 1 khách hàng hoàn toàn mới - chưa từng có trong hệ thống) ──
 function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
+  const [mode, setMode] = useState('existing'); // 'existing' | 'new'
   const [search, setSearch] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [newFullName, setNewFullName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newAddress, setNewAddress] = useState('');
   const [transferDate, setTransferDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -155,12 +162,31 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
     return () => clearTimeout(timer);
   }, [search, currentOwnerId]);
 
+  const switchMode = (m) => {
+    setMode(m);
+    setSelected(null);
+    setSearch('');
+    setError('');
+  };
+
   const submit = async () => {
-    if (!selected) { setError('Vui lòng chọn khách hàng nhận chuyển nhượng'); return; }
+    if (mode === 'existing' && !selected) {
+      setError('Vui lòng chọn khách hàng nhận chuyển nhượng');
+      return;
+    }
+    if (mode === 'new' && (!newFullName.trim() || !newPhone.trim())) {
+      setError('Vui lòng nhập họ tên và số điện thoại khách hàng mới');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
-      await transferVehicleOwnerApi(vehicleId, { newCustomerId: selected.id, transferDate, notes });
+      await transferVehicleOwnerApi(vehicleId, {
+        newCustomerId: mode === 'existing' ? selected.id : undefined,
+        newCustomer: mode === 'new' ? { fullName: newFullName.trim(), phone: newPhone.trim(), address: newAddress.trim() || undefined } : undefined,
+        transferDate,
+        notes,
+      });
       onDone();
     } catch (err) {
       setError(err.message || 'Chuyển nhượng thất bại');
@@ -171,38 +197,62 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
 
   return (
     <div style={{ border: '1px solid var(--primary-light)', background: 'var(--primary-very-light)', borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>
-      <div style={{ fontWeight: 700, marginBottom: 10, color: 'var(--primary-dark)' }}>🔄 Chuyển nhượng xe cho khách hàng khác</div>
+      <div style={{ fontWeight: 700, marginBottom: 10, color: 'var(--primary-dark)' }}>Chuyển nhượng xe cho khách hàng khác</div>
       {error && (
-        <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#C62828' }}>⚠️ {error}</div>
+        <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#C62828' }}>{error}</div>
       )}
 
-      {!selected ? (
-        <div style={{ position: 'relative', marginBottom: 10 }}>
-          <input
-            className="form-input"
-            placeholder="Tìm khách hàng theo tên hoặc số điện thoại…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {suggestions.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 6, boxShadow: 'var(--shadow-lg)', maxHeight: 220, overflowY: 'auto' }}>
-              {suggestions.map((c) => (
-                <div
-                  key={c.id}
-                  onMouseDown={() => { setSelected(c); setSuggestions([]); setSearch(''); }}
-                  style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--gray-100)' }}
-                >
-                  <div style={{ fontWeight: 600 }}>{c.fullName}</div>
-                  <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{c.phone}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ marginBottom: 10, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <b>Khách hàng mới:</b> {selected.fullName} ({selected.phone})
-          <button className="btn btn-secondary btn-sm" onClick={() => setSelected(null)}>Đổi</button>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <button className={`btn btn-sm ${mode === 'existing' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => switchMode('existing')}>Khách hàng đã có</button>
+        <button className={`btn btn-sm ${mode === 'new' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => switchMode('new')}>Khách hàng mới</button>
+      </div>
+
+      {mode === 'existing' && (
+        !selected ? (
+          <div style={{ position: 'relative', marginBottom: 10 }}>
+            <input
+              className="form-input"
+              placeholder="Tìm khách hàng theo tên hoặc số điện thoại…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {suggestions.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 6, boxShadow: 'var(--shadow-lg)', maxHeight: 220, overflowY: 'auto' }}>
+                {suggestions.map((c) => (
+                  <div
+                    key={c.id}
+                    onMouseDown={() => { setSelected(c); setSuggestions([]); setSearch(''); }}
+                    style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--gray-100)' }}
+                  >
+                    <div style={{ fontWeight: 600 }}>{c.fullName}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{c.phone}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ marginBottom: 10, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <b>Khách hàng nhận chuyển nhượng:</b> {selected.fullName} ({selected.phone})
+            <button className="btn btn-secondary btn-sm" onClick={() => setSelected(null)}>Đổi</button>
+          </div>
+        )
+      )}
+
+      {mode === 'new' && (
+        <div className="form-grid form-grid-2" style={{ marginBottom: 10 }}>
+          <div className="form-group">
+            <label className="form-label required">Họ và tên</label>
+            <input className="form-input" value={newFullName} onChange={(e) => setNewFullName(e.target.value)} placeholder="Tên khách hàng mới" />
+          </div>
+          <div className="form-group">
+            <label className="form-label required">Số điện thoại</label>
+            <input className="form-input" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="0912345678" />
+          </div>
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label">Địa chỉ</label>
+            <input className="form-input" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Địa chỉ (tuỳ chọn)" />
+          </div>
         </div>
       )}
 
@@ -219,7 +269,7 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button className="btn btn-secondary" onClick={onCancel} disabled={saving}>Hủy</button>
-        <button className="btn btn-primary" onClick={submit} disabled={saving || !selected}>
+        <button className="btn btn-primary" onClick={submit} disabled={saving || (mode === 'existing' ? !selected : !newFullName.trim() || !newPhone.trim())}>
           {saving ? 'Đang lưu…' : 'Xác nhận chuyển nhượng'}
         </button>
       </div>
@@ -234,6 +284,9 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
 // lay tu bang vehicle_owners de biet chinh xac giai doan ai so huu.
 function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
   const [history, setHistory] = useState([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
+  const HISTORY_PAGE_SIZE = 10;
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [viewId, setViewId] = useState(null);
@@ -253,14 +306,24 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    listRepairSettlementsApi({ vehicleId: vehicle.id, limit: 100 })
-      .then((result) => { if (alive) setHistory(result.items || []); })
+    listRepairSettlementsApi({ vehicleId: vehicle.id, page: historyPage, limit: HISTORY_PAGE_SIZE })
+      .then((result) => {
+        if (!alive) return;
+        setHistory(result.items || []);
+        setHistoryTotal(result.total || 0);
+      })
       .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được lịch sử xe'); })
       .finally(() => { if (alive) setLoading(false); });
-    loadOwners();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle.id, historyPage]);
+
+  useEffect(() => {
+    loadOwners();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle.id]);
+
+  const historyTotalPages = Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 
   const currentOwner = owners.find((o) => !o.endDate);
 
@@ -275,7 +338,7 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal modal-xl" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1200 }}>
           <div className="modal-header">
-            <h3 className="modal-title">🚗 Lịch sử xe – {vehicle.licensePlate}</h3>
+            <h3 className="modal-title">Lịch sử xe – {vehicle.licensePlate}</h3>
             <button className="modal-close" onClick={onClose}>✕</button>
           </div>
           <div className="modal-body">
@@ -297,7 +360,7 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
                 Lịch sử chủ xe <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--gray-500)' }}>({owners.length} chủ)</span>
               </div>
               {!showTransferForm && (
-                <button className="btn btn-secondary btn-sm" onClick={() => setShowTransferForm(true)}>🔄 Đổi chủ xe</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowTransferForm(true)}>Đổi chủ xe</button>
               )}
             </div>
 
@@ -327,7 +390,7 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
                     {o.notes && <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{o.notes}</div>}
                   </div>
                   <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--gray-500)' }}>
-                    <div>{formatDate(o.startDate) || 'Không rõ ngày'} → {o.endDate ? formatDate(o.endDate) : 'hiện tại'}</div>
+                    <div>{formatDate(o.startDate) || 'Không rõ ngày'} đến {o.endDate ? formatDate(o.endDate) : 'hiện tại'}</div>
                     {!o.endDate && (
                       <span className="badge badge-active" style={{ marginTop: 4, display: 'inline-block' }}>Chủ hiện tại</span>
                     )}
@@ -337,7 +400,7 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
             </div>
 
             <div className="form-section-title">Lịch sử bảo dưỡng &amp; sửa chữa</div>
-            {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
+            {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
             <div className="table-wrapper">
               <table className="data-table">
                 <thead><tr><th>Số phiếu</th><th>Chi nhánh</th><th>Ngày</th><th>Khách hàng</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
@@ -348,7 +411,6 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
                   {!loading && history.length === 0 && (
                     <tr><td colSpan={7}>
                       <div className="empty-state">
-                        <div className="empty-state-icon">📭</div>
                         <h3>Chưa có lịch sử</h3>
                       </div>
                     </td></tr>
@@ -363,13 +425,23 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
                         <td style={{ fontSize: 12 }}>{h.customer?.fullName || '—'}</td>
                         <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(h.total)}</td>
                         <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
-                        <td><button className="btn btn-secondary btn-sm btn-icon" title="Xem chi tiết" onClick={() => setViewId(h.id)}>👁️</button></td>
+                        <td><button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setViewId(h.id)}>Xem chi tiết</button></td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
+            {historyTotal > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 12, color: 'var(--gray-500)' }}>
+                <div>Tổng {historyTotal} phiếu</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button className="btn btn-secondary btn-sm" disabled={historyPage <= 1} onClick={() => setHistoryPage((p) => p - 1)}>Trước</button>
+                  <span>Trang {historyPage}/{historyTotalPages}</span>
+                  <button className="btn btn-secondary btn-sm" disabled={historyPage >= historyTotalPages} onClick={() => setHistoryPage((p) => p + 1)}>Sau</button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
@@ -402,7 +474,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
   const [historyStatus, setHistoryStatus] = useState('');
   const [historyFromDate, setHistoryFromDate] = useState('');
   const [historyToDate, setHistoryToDate] = useState('');
-  const HISTORY_PAGE_SIZE = 5;
+  const HISTORY_PAGE_SIZE = 10;
 
   useEffect(() => {
     let alive = true;
@@ -493,14 +565,14 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal modal-xl" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1200 }}>
           <div className="modal-header">
-            <h3 className="modal-title">👤 {customer?.fullName || 'Khách hàng'}</h3>
+            <h3 className="modal-title">{customer?.fullName || 'Khách hàng'}</h3>
             <button className="modal-close" onClick={onClose}>✕</button>
           </div>
 
           <div style={{ display: 'flex', gap: 2, padding: '0 20px', borderBottom: '1px solid var(--gray-200)' }}>
             {[
-              { key: 'info', label: '📋 Thông tin', count: null },
-              { key: 'history', label: '🛠️ Lịch sử dịch vụ', count: customer?.historyCount ?? null },
+              { key: 'info', label: 'Thông tin', count: null },
+              { key: 'history', label: 'Lịch sử dịch vụ', count: customer?.historyCount ?? null },
             ].map((t) => (
               <button
                 key={t.key}
@@ -518,7 +590,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
 
           <div className="modal-body">
             {loading && <p>Đang tải…</p>}
-            {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
+            {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
 
             {customer && tab === 'info' && !editing && (
               <div>
@@ -538,7 +610,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                   ))}
                 </div>
 
-                <div className="form-section-title">🚗 Xe của khách hàng ({customer.vehicles.length})</div>
+                <div className="form-section-title">Xe của khách hàng ({customer.vehicles.length})</div>
                 {customer.vehicles.length === 0 && (
                   <p style={{ color: 'var(--gray-500)', fontSize: 13 }}>Khách hàng chưa có xe nào.</p>
                 )}
@@ -546,7 +618,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                   <div key={v.id} style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: '12px 16px', marginBottom: 8 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--primary-dark)' }}>{v.licensePlate}</span>
-                      <button className="btn btn-info btn-sm" onClick={() => setVehicleView(v)}>🔍 Lịch sử xe</button>
+                      <button className="btn btn-info btn-sm" onClick={() => setVehicleView(v)}>Lịch sử xe</button>
                     </div>
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>{v.vehicleModel || '—'}</div>
                     <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 6 }}>
@@ -565,7 +637,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
               <div>
                 {saveError && (
                   <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
-                    ⚠️ {saveError}
+                    {saveError}
                   </div>
                 )}
                 <div className="form-grid form-grid-2">
@@ -659,7 +731,6 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                       {!loadingHistory && history.length === 0 && (
                         <tr><td colSpan={7}>
                           <div className="empty-state">
-                            <div className="empty-state-icon">📭</div>
                             <h3>Chưa có lịch sử dịch vụ</h3>
                             {hasHistoryFilters && <p>Không có phiếu nào khớp bộ lọc đang chọn.</p>}
                           </div>
@@ -678,7 +749,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                             </td>
                             <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(h.total)}</td>
                             <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
-                            <td><button className="btn btn-secondary btn-sm btn-icon" title="Xem chi tiết" onClick={() => setViewSettlementId(h.id)}>👁️</button></td>
+                            <td><button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setViewSettlementId(h.id)}>Xem chi tiết</button></td>
                           </tr>
                         );
                       })}
@@ -695,7 +766,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                         disabled={historyPage <= 1}
                         onClick={() => setHistoryPage((p) => p - 1)}
                       >
-                        ‹ Trước
+                        Trước
                       </button>
                       <span>Trang {historyPage}/{historyTotalPages}</span>
                       <button
@@ -703,7 +774,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                         disabled={historyPage >= historyTotalPages}
                         onClick={() => setHistoryPage((p) => p + 1)}
                       >
-                        Sau ›
+                        Sau
                       </button>
                     </div>
                   </div>
@@ -714,12 +785,12 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
 
           <div className="modal-footer">
             {tab === 'info' && !editing && (
-              <button className="btn btn-warning" onClick={startEdit}>✏️ Chỉnh sửa thông tin</button>
+              <button className="btn btn-warning" onClick={startEdit}>Chỉnh sửa thông tin</button>
             )}
             {tab === 'info' && editing && (
               <>
                 <button className="btn btn-secondary" onClick={cancelEdit} disabled={saving}>Hủy</button>
-                <button className="btn btn-primary" onClick={saveEdit} disabled={saving}>{saving ? 'Đang lưu…' : '💾 Lưu thay đổi'}</button>
+                <button className="btn btn-primary" onClick={saveEdit} disabled={saving}>{saving ? 'Đang lưu…' : 'Lưu thay đổi'}</button>
               </>
             )}
             {!editing && <button className="btn btn-secondary" onClick={onClose}>Đóng</button>}
@@ -774,7 +845,7 @@ function ImportCustomersModal({ onClose, onImported }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">📥 Nhập khách hàng từ Excel</h3>
+          <h3 className="modal-title">Nhập khách hàng từ Excel</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -798,7 +869,7 @@ function ImportCustomersModal({ onClose, onImported }) {
 
           {error && (
             <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#C62828' }}>
-              ⚠️ {error}
+              {error}
             </div>
           )}
 
@@ -846,7 +917,7 @@ function ImportCustomersModal({ onClose, onImported }) {
           <button className="btn btn-secondary" onClick={onClose}>{result ? 'Đóng' : 'Hủy'}</button>
           {!result && (
             <button className="btn btn-primary" onClick={handleSubmit} disabled={!file || importing}>
-              {importing ? 'Đang nhập…' : '📥 Nhập dữ liệu'}
+              {importing ? 'Đang nhập…' : 'Nhập dữ liệu'}
             </button>
           )}
         </div>
@@ -860,6 +931,9 @@ function CustomerList() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
   const [summary, setSummary] = useState({ totalCustomers: 0, totalServiceHistory: 0 });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -874,19 +948,23 @@ function CustomerList() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => { setPage(1); }, [debouncedSearch]);
+
   const load = () => {
     setLoading(true);
     setLoadError('');
-    listCustomersApi({ search: debouncedSearch, limit: 100 })
+    listCustomersApi({ search: debouncedSearch, page, limit: PAGE_SIZE })
       .then((result) => {
         setItems(result.items || []);
+        setTotal(result.total || 0);
         setSummary(result.summary || { totalCustomers: 0, totalServiceHistory: 0 });
       })
       .catch((err) => setLoadError(err.message || 'Không tải được danh sách khách hàng'))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [debouncedSearch]);
+  useEffect(() => { load(); }, [debouncedSearch, page]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
@@ -907,14 +985,12 @@ function CustomerList() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20, maxWidth: 560 }}>
         <div className="card">
           <div className="card-body">
-            <div style={{ fontSize: 24 }}>👤</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--primary-dark)', margin: '4px 0 2px' }}>{summary.totalCustomers}</div>
             <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>Tổng khách hàng</div>
           </div>
         </div>
         <div className="card">
           <div className="card-body">
-            <div style={{ fontSize: 24 }}>🛠️</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--primary-dark)', margin: '4px 0 2px' }}>{summary.totalServiceHistory}</div>
             <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>Tổng lượt dịch vụ</div>
           </div>
@@ -923,15 +999,14 @@ function CustomerList() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon">🔍</span>
-          <input placeholder="Tên, số điện thoại, biển số xe…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input style={{ paddingLeft: 12 }} placeholder="Tên, số điện thoại, biển số xe…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)' }}>{items.length} khách hàng</div>
+        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)' }}>{total} khách hàng</div>
       </div>
 
       {loadError && (
         <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
-          ⚠️ {loadError}
+          {loadError}
         </div>
       )}
 
@@ -947,7 +1022,6 @@ function CustomerList() {
             {!loading && items.length === 0 && (
               <tr><td colSpan={6}>
                 <div className="empty-state">
-                  <div className="empty-state-icon">📭</div>
                   <h3>Không tìm thấy khách hàng</h3>
                 </div>
               </td></tr>
@@ -973,7 +1047,7 @@ function CustomerList() {
                 </td>
                 <td>
                   <div className="table-actions">
-                    <button className="btn btn-info btn-sm" onClick={() => setSelectedId(c.id)}>📋 Xem chi tiết</button>
+                    <button className="btn btn-info btn-sm" onClick={() => setSelectedId(c.id)}>Xem chi tiết</button>
                   </div>
                 </td>
               </tr>
@@ -981,6 +1055,17 @@ function CustomerList() {
           </tbody>
         </table>
       </div>
+
+      {total > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 12, color: 'var(--gray-500)' }}>
+          <div>Tổng {total} khách hàng</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Trước</button>
+            <span>Trang {page}/{totalPages}</span>
+            <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Sau</button>
+          </div>
+        </div>
+      )}
 
       {selectedId && (
         <CustomerDetailModal customerId={selectedId} onClose={() => setSelectedId(null)} onUpdated={load} />
