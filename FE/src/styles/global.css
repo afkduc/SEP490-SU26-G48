@@ -572,6 +572,14 @@ body {
 .th-cell { border: 1px solid var(--gray-300); padding: 4px 5px; background: var(--gray-100); font-weight: 700; text-align: center; font-size: 11px; }
 .td-cell { border: 1px solid var(--gray-300); padding: 4px 5px; font-size: 11px; }
 
+/* ── Utility ── */
+.text-right { text-align: right; }
+.text-success { color: #065f46; font-weight: 600; }
+.text-danger { color: #991b1b; font-weight: 600; }
+.font-mono { font-family: 'Courier New', monospace; font-size: 13px; color: #4338ca; }
+.table__actions { display: flex; gap: 4px; align-items: center; }
+.table__empty { text-align: center; color: #9ca3af; padding: 40px 12px !important; }
+
 @media (max-width: 900px) {
   .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
 
