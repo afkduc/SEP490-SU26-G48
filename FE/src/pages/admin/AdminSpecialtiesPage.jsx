@@ -203,12 +203,6 @@ export default function AdminSpecialtiesPage() {
           ) : (
             <div className="specialties-table-wrapper">
               <table className="specialties-table">
-                <colgroup>
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '50%' }} />
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '20%' }} />
-                </colgroup>
                 <thead>
                   <tr>
                     <th className="col--code">Mã</th>
