@@ -17,8 +17,7 @@ const ADMIN_NAV = [
   {
     label: 'Role',
     children: [
-      { label: 'Danh sách Role', path: '/admin/roles' },
-      { label: 'Phân quyền', path: '/admin/users' },
+      { label: 'Phân quyền người dùng', path: '/admin/users' },
     ],
   },
   {
@@ -48,10 +47,7 @@ const SERVICE_ADVISOR_NAV = [
   },
   {
     label: 'Chăm sóc khách hàng',
-    children: [
-      { label: 'Lịch hẹn', path: '/customer-care/appointments' },
-      { label: 'Nhắc nhở', path: '/customer-care/reminders' },
-    ],
+    path: '/customer-care',
   },
   {
     label: 'Khách hàng',
