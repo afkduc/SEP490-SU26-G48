@@ -10,6 +10,7 @@ class ManagerController {
     this.createEmployee = this.createEmployee.bind(this);
     this.updateEmployee = this.updateEmployee.bind(this);
     this.getServiceCategories = this.getServiceCategories.bind(this);
+    this.getProducts = this.getProducts.bind(this);
     this.getServices = this.getServices.bind(this);
     this.getServiceById = this.getServiceById.bind(this);
     this.createService = this.createService.bind(this);
@@ -94,6 +95,15 @@ class ManagerController {
     try {
       const data = await this.managerService.listServiceCategories();
       return success(res, data, 'Lấy danh sách danh mục dịch vụ thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getProducts(req, res, next) {
+    try {
+      const data = await this.managerService.listProducts(req.user.branchId);
+      return success(res, data, 'Lấy danh sách phụ tùng thành công');
     } catch (err) {
       next(err);
     }
