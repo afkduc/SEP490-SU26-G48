@@ -14,11 +14,11 @@ class AuthController {
 
       // 1. Authenticate user first (tra ve { user } - chua co token)
       const { user } = await this.authService.login(email, password);
-      
+
       // 2. Track login with full user info to get deviceId
       const trackResult = await trackLogin(req, user);
       const deviceId = trackResult?.deviceId || null;
-      
+
       // 3. Tao token voi deviceId (chi tao 1 lan)
       const result = await this.authService.issueTokenWithDevice(user, deviceId);
       return success(res, result, 'Đăng nhập thành công');

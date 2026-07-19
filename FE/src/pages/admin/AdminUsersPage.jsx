@@ -412,8 +412,8 @@ export default function AdminUsersPage() {
                           </div>
                         </td>
                         <td data-label="Ngày tạo" className="admin-users__date">{formatDate(u.createdAt)}</td>
-                        <td>
-                          <div className="action-btns" style={{ justifyContent: 'flex-end' }}>
+                        <td className="admin-users__actions-cell">
+                          <div className="action-btns">
                             <button
                               className="btn btn--sm btn--view"
                               onClick={() => setDetailUserId(u.id)}
