@@ -92,12 +92,12 @@ class ProductRepositoryImpl extends ProductRepository {
   async create(data) {
     const sql = `
       INSERT INTO products (
-        product_code, product_name, category, brand_name,
+        product_code, product_name, category, brand_name, unit_id,
         unit_price, stock_quantity, min_stock, supplier_id,
         location, branch_id, status, unit_id
       )
       VALUES (
-        @productCode, @productName, @category, @brandName,
+        @productCode, @productName, @category, @brandName, @unitId,
         @unitPrice, @stockQuantity, @minStock, @supplierId,
         @location, @branchId, @status, @unitId
       );
@@ -108,6 +108,7 @@ class ProductRepositoryImpl extends ProductRepository {
       productName: data.productName,
       category: data.category || null,
       brandName: data.brandName || null,
+      unitId: data.unitId || 1,
       unitPrice: data.unitPrice || null,
       stockQuantity: data.stockQuantity || 0,
       minStock: data.minStock || 0,
@@ -209,7 +210,7 @@ class ProductRepositoryImpl extends ProductRepository {
     return result.recordset[0].total;
   }
 
-  async getDistinctCategories() {
+async getDistinctCategories() {
     const sql = `
       SELECT DISTINCT category
       FROM products
@@ -218,6 +219,11 @@ class ProductRepositoryImpl extends ProductRepository {
     `;
     const result = await query(sql, []);
     return result.recordset.map((r) => r.category);
+  }
+
+  async listUnits() {
+    const result = await query(`SELECT id, unit_name FROM units ORDER BY unit_name`);
+    return result.recordset.map((r) => ({ id: r.id, name: r.unit_name }));
   }
 }
 

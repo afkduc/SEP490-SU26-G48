@@ -1,11 +1,26 @@
 // Format 1 Date/string ve dd/mm/yyyy (khop voi o "Ngay ke tiep" cua FE, dang la input text tu do).
+// Dung cac getter UTC (khong dung .getDate()/.getHours() local) vi mssql
+// (tedious, useUTC mac dinh true) doc/ghi cot date/datetime cua SQL Server
+// theo truc UTC cua JS Date - dung getter local se bi lech theo mui gio he
+// dieu hanh cua may chu Node, khong lien quan gi den mui gio Viet Nam.
 function toDDMMYYYY(value) {
   if (!value) return '';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}/${d.getFullYear()}`;
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getUTCFullYear()}`;
+}
+
+// Nhu toDDMMYYYY nhung kem gio:phut - dung cho ngay tiep nhan (intake_date la
+// datetime, co gio thuc te xe vao xuong, khong chi rieng ngay).
+function toDDMMYYYYHHmm(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const min = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${toDDMMYYYY(value)} ${hh}:${min}`;
 }
 
 // Format ve yyyy-mm-dd (khop voi vehicleInfo.purchaseDate FE dang dung).
@@ -20,7 +35,7 @@ class RepairSettlementResponseDto {
     return {
       id: entity.id,
       code: entity.code,
-      date: toDDMMYYYY(entity.intakeDate),
+      date: toDDMMYYYYHHmm(entity.intakeDate),
       paidDate: entity.paidAt ? toDDMMYYYY(entity.paidAt) : null,
       advisor: entity.advisor?.name || null,
       advisorPhone: entity.advisor?.phone || null,
@@ -37,6 +52,7 @@ class RepairSettlementResponseDto {
       total: entity.total,
       nextMaintenanceKm: entity.nextMaintenanceKm,
       nextMaintenanceDate: toDDMMYYYY(entity.nextMaintenanceDate),
+      isWarranty: entity.isWarranty,
       teamLeader: entity.teamLeaderName,
       status: entity.status,
       cancelReason: entity.cancelReason,

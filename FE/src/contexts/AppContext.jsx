@@ -58,9 +58,12 @@ export function AppProvider({ children }) {
     const result = await loginApi(email, password);
     const storage = remember ? localStorage : sessionStorage;
     storage.setItem('token', result.token);
+    // Luu them flag mustChangePassword (trong user object) de trang khac co the check
     storage.setItem('user', JSON.stringify(result.user));
     setToken(result.token);
     setUser(result.user);
+
+    // Tra luon ket qua cho caller (LoginPage) de xu ly redirect neu can
     return result;
   };
 

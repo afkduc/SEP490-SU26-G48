@@ -1,24 +1,30 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
+import { ToastProvider } from '../components/common/ToastContext';
+import { SharedDataProvider } from '../contexts/SharedDataContext';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
 const CustomerHistoryPage = lazy(() => import('../pages/customer/CustomerHistoryPage'));
+const CustomerCarePage = lazy(() => import('../pages/customercare/CustomerCarePage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
-const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
+const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
+const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
+const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
+const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -47,11 +53,13 @@ function Loading() {
 
 function AppRoutes() {
   return (
-    <Suspense fallback={<Loading />}>
-      <Routes>
-        {/* Public */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/unauthorized" element={<UnauthorizedPage />} />
+    <ToastProvider>
+      <SharedDataProvider>
+        <Suspense fallback={<Loading />}>
+          <Routes>
+          {/* Public */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         {/* Protected – wrapped in AppLayout (Navbar) */}
         <Route
@@ -67,79 +75,27 @@ function AppRoutes() {
 
         {/* Admin */}
         <Route
-          path="/admin/dashboard"
+          path="/admin"
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
               <AdminLayout>
-                <AdminDashboardPage />
+                <Outlet />
               </AdminLayout>
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminUsersPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/roles"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminRolesPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/logs"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AuditLogsPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/logs/login"
-          element={<Navigate to="/admin/logs?tab=login" replace />}
-        />
-        <Route
-          path="/admin/profile"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminProfilePage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/profile/devices"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <LoginSessionsPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/profile/notifications"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <AdminProfileNotificationsPage />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="branches" element={<AdminBranchesPage />} />
+          <Route path="roles" element={<AdminRolesPage />} />
+          <Route path="devices" element={<AdminDevicesPage />} />
+          <Route path="specialties" element={<AdminSpecialtiesPage />} />
+          <Route path="logs" element={<AuditLogsPage />} />
+          <Route path="login-sessions" element={<LoginSessionsPage />} />
+          <Route path="profile" element={<AdminProfilePage />} />
+          <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
+        </Route>
         {/* General Director settlement reports */}
                 <Route
                   path="/general-director/*"
@@ -200,6 +156,18 @@ function AppRoutes() {
           }
         />
 
+        {/* Chăm sóc khách hàng - nhắc nhở bảo dưỡng */}
+        <Route
+          path="/customer-care"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <CustomerCarePage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Inventory module */}
         <Route
           path={ROUTES.INVENTORY}
@@ -226,7 +194,7 @@ function AppRoutes() {
         </Route>
 
         {/* Placeholder routes */}
-        {['/maintenance', '/customer-care', '/services'].map((path) => (
+        {['/maintenance', '/services'].map((path) => (
           <Route
             key={path}
             path={path}
@@ -246,7 +214,9 @@ function AppRoutes() {
         <Route path="/" element={<RoleAwareRedirect />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </Suspense>
+      </Suspense>
+    </SharedDataProvider>
+  </ToastProvider>
   );
 }
 

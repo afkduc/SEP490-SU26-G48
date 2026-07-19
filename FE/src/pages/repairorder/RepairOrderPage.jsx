@@ -10,6 +10,7 @@ import {
   getRepairOrderApi,
   updateRepairOrderStatusApi,
 } from '../../services/repairOrderApi';
+import { printWorkList } from '../repairsettlement/RepairSettlementPage';
 
 const LHSC_LABELS = { DV: 'Dịch vụ', PT: 'Phụ tùng', BH: 'Bảo hành', HD: 'Hợp đồng' };
 // "pending_assignment" là trạng thái ảo (không lưu ở BE) cho các phiếu quyết
@@ -20,10 +21,19 @@ const STATUS_LABELS = {
   completed: { label: 'Hoàn thành', badge: 'badge-completed' },
   cancelled: { label: 'Hủy', badge: 'badge-cancelled' },
 };
-// Cùng 1 chiều cao/kiểu cho mọi nút trong cột Thao tác (dù nút có icon+chữ
-// hay chỉ icon) để hàng lối thẳng hàng, không bị lệch cao thấp giữa các nút.
+
+// Ngay o day luon o dang chuoi dd/mm/yyyy (BE format san qua toDDMMYYYY, ca
+// cho phieu quyet toan lan lenh sua chua) - parse ve Date de loc/sap xep.
+function parseDDMMYYYY(value) {
+  if (!value) return null;
+  const m = String(value).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  return new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+}
+// Cùng 1 chiều cao/kiểu cho mọi nút trong cột Thao tác để hàng lối thẳng
+// hàng, không bị lệch cao thấp giữa các nút.
 const ACTION_BTN_STYLE = { height: 28, padding: '0 10px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' };
-const ACTION_ICON_BTN_STYLE = { ...ACTION_BTN_STYLE, width: 28, padding: 0, justifyContent: 'center' };
 
 // ─── Modal xem chi tiết phiếu quyết toán (dòng đang chờ phân công) ───
 function PendingSettlementDetailModal({ settlementId, onClose }) {
@@ -45,7 +55,7 @@ function PendingSettlementDetailModal({ settlementId, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">📋 Phiếu quyết toán {detail?.code || ''}</h3>
+          <h3 className="modal-title">Phiếu quyết toán {detail?.code || ''}</h3>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span className="badge badge-pending">Đang chờ phân công</span>
             <button className="modal-close" onClick={onClose}>✕</button>
@@ -53,7 +63,7 @@ function PendingSettlementDetailModal({ settlementId, onClose }) {
         </div>
         <div className="modal-body">
           {loading && <p>Đang tải…</p>}
-          {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
+          {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
           {detail && (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -153,7 +163,7 @@ function RepairOrderDetailModal({ orderId, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">🔧 Lệnh sửa chữa {detail?.code || ''}</h3>
+          <h3 className="modal-title">Lệnh sửa chữa {detail?.code || ''}</h3>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {st && <span className={`badge ${st.badge}`}>{st.label}</span>}
             <button className="modal-close" onClick={onClose}>✕</button>
@@ -161,7 +171,7 @@ function RepairOrderDetailModal({ orderId, onClose }) {
         </div>
         <div className="modal-body">
           {loading && <p>Đang tải…</p>}
-          {loadError && <p style={{ color: '#C62828' }}>⚠️ {loadError}</p>}
+          {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
           {detail && (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -227,7 +237,7 @@ function RepairOrderDetailModal({ orderId, onClose }) {
                         <td><span className="tag">{t.taskTypeLabel}</span></td>
                         <td style={{ textAlign: 'center' }}>{t.quantity}</td>
                         <td style={{ textAlign: 'right' }}>{formatCurrency(t.unitPrice)}</td>
-                        <td style={{ textAlign: 'center' }}>{t.isDone ? '✅' : '—'}</td>
+                        <td style={{ textAlign: 'center' }}>{t.isDone ? 'Đã xong' : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -269,7 +279,7 @@ function CancelReasonModal({ title, onConfirm, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">🚫 {title}</h3>
+          <h3 className="modal-title">{title}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -286,9 +296,9 @@ function CancelReasonModal({ title, onConfirm, onClose }) {
           {error && <div className="form-error" style={{ marginTop: 6 }}>{error}</div>}
         </div>
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>← Trở lại</button>
+          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Trở lại</button>
           <button className="btn btn-danger" onClick={handleConfirm} disabled={submitting}>
-            {submitting ? 'Đang xử lý…' : '✔ Xác nhận hủy'}
+            {submitting ? 'Đang xử lý…' : 'Xác nhận hủy'}
           </button>
         </div>
       </div>
@@ -315,11 +325,22 @@ function RepairOrderList() {
   const [viewSettlementId, setViewSettlementId] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null); // { kind: 'order' | 'pending', id }
 
+  // Bo loc: mac dinh sap xep ngay som nhat truoc (asc) khi vua mo man hinh,
+  // cho phep loc them theo trang thai / to truong / khoang ngay, ket hop
+  // duoc nhieu dieu kien cung luc, ap dung ngay khi chon (khong can nut loc).
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterTeamLeader, setFilterTeamLeader] = useState('');
+  const [filterFromDate, setFilterFromDate] = useState('');
+  const [filterToDate, setFilterToDate] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
+
   const loadAll = () => {
     setLoading(true);
     return Promise.all([
-      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100 }),
-      listRepairSettlementsApi({ status: 'cancelled', limit: 100 }),
+      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100, scope: 'branch' }),
+      listRepairSettlementsApi({ status: 'cancelled', limit: 100, scope: 'branch' }),
       listRepairOrdersApi(),
     ])
       .then(([waitingResult, cancelledResult, orderResult]) => {
@@ -360,6 +381,68 @@ function RepairOrderList() {
     }));
     return [...pendingRows, ...orderRows];
   }, [pendingSettlements, orders]);
+
+  // Danh sach to truong de hien trong dropdown loc - lay tu chinh du lieu dang
+  // co (khong goi API rieng), vi chi can loc trong pham vi to truong da tung
+  // duoc phan cong o day.
+  const teamLeaderOptions = useMemo(() => {
+    const map = new Map();
+    rows.forEach((r) => {
+      if (r.teamLeader) map.set(String(r.teamLeader.id), r.teamLeader.fullName);
+    });
+    return Array.from(map.entries()).map(([id, fullName]) => ({ id, fullName }));
+  }, [rows]);
+
+  const hasFilters = Boolean(filterStatus || filterTeamLeader || filterFromDate || filterToDate);
+  const clearFilters = () => {
+    setFilterStatus('');
+    setFilterTeamLeader('');
+    setFilterFromDate('');
+    setFilterToDate('');
+  };
+
+  const filteredRows = useMemo(() => {
+    const fromDate = filterFromDate ? parseDDMMYYYY(filterFromDate.split('-').reverse().join('/')) : null;
+    const toDate = filterToDate ? parseDDMMYYYY(filterToDate.split('-').reverse().join('/')) : null;
+
+    let result = rows.filter((r) => {
+      if (filterStatus && r.status !== filterStatus) return false;
+      if (filterTeamLeader) {
+        if (filterTeamLeader === 'unassigned') {
+          if (r.teamLeader) return false;
+        } else if (String(r.teamLeader?.id) !== filterTeamLeader) {
+          return false;
+        }
+      }
+      const rowDate = parseDDMMYYYY(r.date);
+      if (fromDate && (!rowDate || rowDate < fromDate)) return false;
+      if (toDate && (!rowDate || rowDate > toDate)) return false;
+      return true;
+    });
+
+    // Phieu "Dang cho phan cong" luon noi len dau, khong phu thuoc ngay tao cu/moi -
+    // day la viec can xu ly gap nhat, khong the de bi chon vui xuong trang sau chi
+    // vi tao tu lau (sap xep theo ngay chi ap dung TRONG TUNG nhom, khong gop chung).
+    result = [...result].sort((a, b) => {
+      const pendingA = a.status === 'pending_assignment' ? 0 : 1;
+      const pendingB = b.status === 'pending_assignment' ? 0 : 1;
+      if (pendingA !== pendingB) return pendingA - pendingB;
+      const da = parseDDMMYYYY(a.date);
+      const db = parseDDMMYYYY(b.date);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return sortOrder === 'asc' ? da - db : db - da;
+    });
+
+    return result;
+  }, [rows, filterStatus, filterTeamLeader, filterFromDate, filterToDate, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paginatedRows = filteredRows.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [filterStatus, filterTeamLeader, filterFromDate, filterToDate, sortOrder]);
 
   const handleAssign = (settlementId) => {
     navigate('/repair-orders/create', { state: { settlementId } });
@@ -404,16 +487,59 @@ function RepairOrderList() {
         </div>
         <div className="page-header-right">
           <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
-            🏢 {user?.branchName || user?.branch}
+            {user?.branchName || user?.branch}
           </span>
         </div>
       </div>
 
       {(loadError || actionError) && (
         <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
-          ⚠️ {loadError || actionError}
+          {loadError || actionError}
         </div>
       )}
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
+          <label className="form-label">Trạng thái</label>
+          <select className="form-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="">Tất cả trạng thái</option>
+            {Object.entries(STATUS_LABELS).map(([key, v]) => (
+              <option key={key} value={key}>{v.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: 190 }}>
+          <label className="form-label">Tổ trưởng phụ trách</label>
+          <select className="form-select" value={filterTeamLeader} onChange={(e) => setFilterTeamLeader(e.target.value)}>
+            <option value="">Tất cả tổ trưởng</option>
+            <option value="unassigned">Chưa phân công</option>
+            {teamLeaderOptions.map((t) => (
+              <option key={t.id} value={t.id}>{t.fullName}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label">Từ ngày</label>
+          <input className="form-input" type="date" value={filterFromDate} onChange={(e) => setFilterFromDate(e.target.value)} />
+        </div>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label">Đến ngày</label>
+          <input className="form-input" type="date" value={filterToDate} onChange={(e) => setFilterToDate(e.target.value)} />
+        </div>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
+          <label className="form-label">Sắp xếp theo ngày</label>
+          <select className="form-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+            <option value="asc">Cũ nhất</option>
+            <option value="desc">Mới nhất</option>
+          </select>
+        </div>
+        {hasFilters && (
+          <button className="btn btn-secondary btn-sm" onClick={clearFilters}>Xóa lọc</button>
+        )}
+        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)', alignSelf: 'center' }}>
+          {filteredRows.length} / {rows.length} lệnh
+        </div>
+      </div>
 
       <div className="table-wrapper">
         <table className="data-table">
@@ -429,16 +555,15 @@ function RepairOrderList() {
                 <div className="empty-state"><p>Đang tải danh sách lệnh sửa chữa…</p></div>
               </td></tr>
             )}
-            {!loading && rows.length === 0 && (
+            {!loading && filteredRows.length === 0 && (
               <tr><td colSpan={7}>
                 <div className="empty-state">
-                  <div className="empty-state-icon">📭</div>
                   <h3>Chưa có lệnh sửa chữa nào</h3>
-                  <p>Chưa có phiếu quyết toán nào đang chờ sửa chữa, và chưa có lệnh sửa chữa nào được tạo.</p>
+                  <p>{hasFilters ? 'Không có lệnh nào khớp bộ lọc đang chọn.' : 'Chưa có phiếu quyết toán nào đang chờ sửa chữa, và chưa có lệnh sửa chữa nào được tạo.'}</p>
                 </div>
               </td></tr>
             )}
-            {rows.map((r) => {
+            {paginatedRows.map((r) => {
               const st = STATUS_LABELS[r.status] || { label: r.status, badge: 'badge-inactive' };
               const isBusy = busyId === r.id;
               return (
@@ -450,7 +575,7 @@ function RepairOrderList() {
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{r.vehicle?.vehicleModel}</div>
                   </td>
                   <td style={{ fontSize: 12 }}>
-                    {r.teamLeader ? <span>👨‍🔧 {r.teamLeader.fullName}</span> : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa phân công</span>}
+                    {r.teamLeader ? <span>{r.teamLeader.fullName}</span> : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa phân công</span>}
                   </td>
                   <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
                   <td style={{ fontSize: 12 }}>{r.date}</td>
@@ -458,23 +583,23 @@ function RepairOrderList() {
                     <div className="table-actions" style={{ flexWrap: 'nowrap' }}>
                       {r.kind === 'pending' && r.status === 'pending_assignment' && (
                         <>
-                          <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} onClick={() => handleAssign(r.id)}>📋 Phân công</button>
-                          <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'pending', id: r.id })}>🚫 Hủy</button>
-                          <button className="btn btn-secondary btn-sm" style={ACTION_ICON_BTN_STYLE} title="Xem chi tiết phiếu" onClick={() => setViewSettlementId(r.id)}>👁️</button>
+                          <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} onClick={() => handleAssign(r.id)}>Phân công</button>
+                          <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'pending', id: r.id })}>Hủy</button>
+                          <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewSettlementId(r.id)}>Xem chi tiết</button>
                         </>
                       )}
                       {r.kind === 'pending' && r.status === 'cancelled' && (
-                        <button className="btn btn-secondary btn-sm" style={ACTION_ICON_BTN_STYLE} title="Xem chi tiết phiếu" onClick={() => setViewSettlementId(r.id)}>👁️</button>
+                        <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewSettlementId(r.id)}>Xem chi tiết</button>
                       )}
                       {r.kind === 'order' && r.status === 'in_progress' && (
                         <>
-                          <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => handleMarkComplete(r.id)}>✅ Hoàn thành</button>
-                          <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'order', id: r.id })}>🚫 Hủy</button>
-                          <button className="btn btn-secondary btn-sm" style={ACTION_ICON_BTN_STYLE} title="Xem chi tiết lệnh" onClick={() => setViewOrderId(r.id)}>👁️</button>
+                          <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => handleMarkComplete(r.id)}>Hoàn thành</button>
+                          <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'order', id: r.id })}>Hủy</button>
+                          <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewOrderId(r.id)}>Xem chi tiết</button>
                         </>
                       )}
                       {r.kind === 'order' && r.status !== 'in_progress' && (
-                        <button className="btn btn-secondary btn-sm" style={ACTION_ICON_BTN_STYLE} title="Xem chi tiết lệnh" onClick={() => setViewOrderId(r.id)}>👁️</button>
+                        <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewOrderId(r.id)}>Xem chi tiết</button>
                       )}
                     </div>
                   </td>
@@ -484,6 +609,17 @@ function RepairOrderList() {
           </tbody>
         </table>
       </div>
+
+      {filteredRows.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 12, color: 'var(--gray-500)' }}>
+          <div>Tổng {filteredRows.length} lệnh</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-secondary btn-sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => p - 1)}>Trước</button>
+            <span>Trang {pageSafe}/{totalPages}</span>
+            <button className="btn btn-secondary btn-sm" disabled={pageSafe >= totalPages} onClick={() => setPage((p) => p + 1)}>Sau</button>
+          </div>
+        </div>
+      )}
 
       {viewOrderId && (
         <RepairOrderDetailModal orderId={viewOrderId} onClose={() => setViewOrderId(null)} />
@@ -520,11 +656,12 @@ function RepairOrderCreate() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [confirmedOrder, setConfirmedOrder] = useState(null);
 
   useEffect(() => {
     let alive = true;
     Promise.all([
-      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100 }),
+      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100, scope: 'branch' }),
       listTeamLeadersApi(),
     ])
       .then(([settlementResult, teamLeaderResult]) => {
@@ -568,15 +705,16 @@ function RepairOrderCreate() {
         teamLeaderId: selectedTeamLeaderId,
         notes,
       });
-      navigate('/repair-orders');
+      setConfirmedOrder({ ...selectedSettlementDetail, teamLeader: selectedTeamLeader.fullName });
     } catch (err) {
       setSaveError(err.message || 'Tạo lệnh sửa chữa thất bại');
+    } finally {
       setSaving(false);
     }
   };
 
   if (loading) return <div className="page-loading">Đang tải dữ liệu…</div>;
-  if (loadError) return <div className="page-loading">⚠️ {loadError}</div>;
+  if (loadError) return <div className="page-loading">{loadError}</div>;
 
   return (
     <div>
@@ -600,13 +738,13 @@ function RepairOrderCreate() {
           justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10,
         }}>
           <div style={{ fontSize: 13, color: '#2E7D32' }}>
-            ✅ <b>Phiếu quyết toán đã được chọn</b>
+            <b>Phiếu quyết toán đã được chọn</b>
             <div style={{ fontSize: 12, color: 'var(--gray-700)', marginTop: 2 }}>
               {selectedSettlementDetail.customer?.fullName} — {selectedSettlementDetail.vehicle?.licensePlate} &nbsp;|&nbsp;
               Mã phiếu: <b>{selectedSettlementDetail.code}</b> &nbsp;|&nbsp; Tổng cộng: <b>{formatCurrency(selectedSettlementDetail.total)}</b>
             </div>
           </div>
-          <button className="btn btn-secondary" onClick={() => setShowSettlementPicker(true)}>Đổi phiếu quyết toán</button>
+          <button className="btn btn-secondary" disabled={Boolean(confirmedOrder)} onClick={() => setShowSettlementPicker(true)}>Đổi phiếu quyết toán</button>
         </div>
       )}
 
@@ -644,7 +782,7 @@ function RepairOrderCreate() {
             {teamLeaders.length === 0 && (
               <div style={{ fontSize: 13, color: 'var(--gray-500)', fontStyle: 'italic' }}>Chi nhánh chưa có tổ trưởng nào đang hoạt động.</div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: confirmedOrder ? 0.6 : 1, pointerEvents: confirmedOrder ? 'none' : 'auto' }}>
               {teamLeaders.map((t) => {
                 const isSelected = selectedTeamLeaderId === t.id;
                 return (
@@ -667,7 +805,7 @@ function RepairOrderCreate() {
                       background: isSelected ? 'var(--primary)' : 'var(--gray-200)',
                       color: isSelected ? 'white' : 'var(--gray-500)', fontWeight: 700, fontSize: 13,
                     }}>
-                      {isSelected ? '✓' : t.fullName.charAt(0)}
+                      {t.fullName.charAt(0)}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 13 }}>{t.fullName}</div>
@@ -696,6 +834,7 @@ function RepairOrderCreate() {
                 placeholder="Chú ý kỹ thuật, lưu ý đặc biệt…"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                disabled={Boolean(confirmedOrder)}
               />
             </div>
 
@@ -705,28 +844,47 @@ function RepairOrderCreate() {
               borderRadius: 8, padding: '10px 12px', marginBottom: 14, fontSize: 12,
             }}>
               <div style={{ fontWeight: 700, marginBottom: 4, color: selectedTeamLeader ? '#2E7D32' : 'var(--gray-600)' }}>
-                {selectedTeamLeader ? '✅ Đã phân công' : 'Chưa chọn tổ trưởng'}
+                {selectedTeamLeader ? 'Đã phân công' : 'Chưa chọn tổ trưởng'}
               </div>
               {selectedTeamLeader && (
-                <div style={{ color: 'var(--gray-700)' }}>👤 {selectedTeamLeader.fullName} — {selectedTeamLeader.specialty}</div>
+                <div style={{ color: 'var(--gray-700)' }}>{selectedTeamLeader.fullName} — {selectedTeamLeader.specialty}</div>
               )}
             </div>
 
-            {saveError && (
-              <div style={{ fontSize: 12, color: '#C62828', marginBottom: 10 }}>⚠️ {saveError}</div>
+            {confirmedOrder ? (
+              <>
+                <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 13, color: '#2E7D32', fontWeight: 700, textAlign: 'center' }}>
+                  Xác nhận thành công
+                </div>
+                <button
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
+                  onClick={() => printWorkList(confirmedOrder)}
+                >
+                  Xuất file công việc
+                </button>
+                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate('/repair-orders')}>
+                  Quay lại
+                </button>
+              </>
+            ) : (
+              <>
+                {saveError && (
+                  <div style={{ fontSize: 12, color: '#C62828', marginBottom: 10 }}>{saveError}</div>
+                )}
+                <button
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
+                  disabled={!canConfirm || saving}
+                  onClick={handleConfirm}
+                >
+                  {saving ? 'Đang xác nhận…' : 'Xác nhận lệnh sửa chữa'}
+                </button>
+                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate('/repair-orders')}>
+                  Quay lại
+                </button>
+              </>
             )}
-
-            <button
-              className="btn btn-primary"
-              style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
-              disabled={!canConfirm || saving}
-              onClick={handleConfirm}
-            >
-              🔧 {saving ? 'Đang xác nhận…' : 'Xác nhận lệnh sửa chữa'}
-            </button>
-            <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate('/repair-orders')}>
-              ← Quay lại
-            </button>
           </div>
         </div>
       )}

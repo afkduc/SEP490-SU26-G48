@@ -9,9 +9,8 @@ export const ROUTES = Object.freeze({
 
 
   ADMIN_USERS: '/admin/users',
-  ADMIN_ROLES: '/admin/roles',
   ADMIN_LOGS: '/admin/logs',
-  ADMIN_LOGIN_SESSIONS: '/admin/logs/login',
+  ADMIN_LOGIN_SESSIONS: '/admin/login-sessions',
 
   INVENTORY: '/inventory',
 

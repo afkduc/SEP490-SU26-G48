@@ -11,6 +11,7 @@ class Product {
     this.brandName = data.brand_name ?? data.brandName ?? null;
     this.unitId = data.unit_id ?? data.unitId ?? null;
     this.unit = data.unit_name ?? data.unit ?? null;
+    this.unitName = data.unit_name ?? data.unitName ?? null;
     this.unitPrice = data.unit_price ?? data.unitPrice ?? null;
     this.stockQuantity = data.stock_quantity ?? data.stockQuantity ?? 0;
     this.minStock = data.min_stock ?? data.minStock ?? 0;

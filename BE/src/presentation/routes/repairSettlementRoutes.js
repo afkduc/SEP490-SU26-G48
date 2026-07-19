@@ -13,6 +13,7 @@ function buildRepairSettlementRouter() {
 
   router.use(authenticate);
   router.get('/', controller.getAll);
+  router.get('/check-duplicate', controller.checkDuplicate);
   router.get('/:id', controller.getById);
   router.post('/', controller.create);
   router.put('/:id', controller.update);

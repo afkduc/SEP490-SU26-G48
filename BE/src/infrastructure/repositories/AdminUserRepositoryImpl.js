@@ -56,10 +56,9 @@ class AdminUserRepositoryImpl {
     if (roleId) {
       conditions.push(`EXISTS (
         SELECT 1 FROM user_role ur
-        JOIN roles r ON r.id = ur.role_id
-        WHERE ur.user_id = u.id AND r.role_name = @p${paramIndex}
+        WHERE ur.user_id = u.id AND ur.role_id = @p${paramIndex}
       )`);
-      params[`p${paramIndex}`] = roleId;
+      params[`p${paramIndex}`] = Number(roleId);
       paramIndex++;
     }
 
@@ -113,6 +112,85 @@ class AdminUserRepositoryImpl {
     }
 
     return { items: users, total, page, pageSize };
+  }
+
+  /**
+   * Lay full users (khong phan trang) de export Excel.
+   * Cap toi da 10000 rows de bao ve DB.
+   */
+  async findAllForExport({ search, branchId, roleId, status, limit = 10000 } = {}) {
+    const conditions = ['1=1'];
+    const params = {};
+    let paramIndex = 1;
+
+    if (search) {
+      conditions.push(`(
+        u.user_name LIKE @p${paramIndex}
+        OR u.email LIKE @p${paramIndex}
+        OR u.first_name LIKE @p${paramIndex}
+        OR u.last_name LIKE @p${paramIndex}
+      )`);
+      params[`p${paramIndex}`] = `%${search}%`;
+      paramIndex++;
+    }
+
+    if (branchId) {
+      conditions.push(`u.branch_id = @p${paramIndex}`);
+      params[`p${paramIndex}`] = branchId;
+      paramIndex++;
+    }
+
+    if (roleId) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM user_role ur
+        WHERE ur.user_id = u.id AND ur.role_id = @p${paramIndex}
+      )`);
+      params[`p${paramIndex}`] = Number(roleId);
+      paramIndex++;
+    }
+
+    if (status) {
+      conditions.push(`u.status = @p${paramIndex}`);
+      params[`p${paramIndex}`] = status;
+      paramIndex++;
+    }
+
+    const whereClause = conditions.join(' AND ');
+    const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 10000, 10000));
+
+    const dataResult = await query(
+      `SELECT ${ADMIN_USER_COLUMNS}
+       FROM   users u
+       LEFT   JOIN branches b ON b.id = u.branch_id
+       WHERE  ${whereClause}
+       ORDER  BY u.id ASC
+       OFFSET 0 ROWS FETCH NEXT @p_limit ROWS ONLY`,
+      { ...params, p_limit: safeLimit }
+    );
+
+    const users = dataResult.recordset.map(toAdminUserRow);
+
+    // Lay roles cho cac user
+    if (users.length > 0) {
+      const userIds = users.map((u) => u.id);
+      const rolesResult = await query(
+        `SELECT ur.user_id, r.id AS role_id, r.role_name
+         FROM   user_role ur
+         JOIN   roles r ON r.id = ur.role_id
+         WHERE  ur.user_id IN (${userIds.map((_, i) => `@p${paramIndex + i}`).join(',')})`,
+        Object.fromEntries(userIds.map((id, i) => [`p${paramIndex + i}`, id]))
+      );
+      const rolesByUser = {};
+      for (const row of rolesResult.recordset) {
+        if (!rolesByUser[row.user_id]) rolesByUser[row.user_id] = [];
+        rolesByUser[row.user_id].push({ roleId: row.role_id, roleName: row.role_name });
+      }
+      for (const user of users) {
+        user.roles = rolesByUser[user.id] || [];
+      }
+    }
+
+    return { items: users, total: users.length, truncated: users.length >= safeLimit };
   }
 
   async countAllUsers() {
@@ -188,9 +266,9 @@ class AdminUserRepositoryImpl {
 
   async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId }) {
     const result = await query(
-      `INSERT INTO users (user_name, email, user_password, first_name, last_name, phone, branch_id, status)
+      `INSERT INTO users (user_name, email, user_password, first_name, last_name, phone, branch_id, team_size, status, created_at)
        OUTPUT INSERTED.id
-       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 'active')`,
+       VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0, 'active', GETDATE())`,
       { p1: name, p2: email, p3: passwordHash, p4: firstName || name, p5: lastName || '', p6: phone, p7: branchId }
     );
     const userId = result.recordset[0].id;
@@ -204,27 +282,17 @@ class AdminUserRepositoryImpl {
   }
 
   async updateUser({ userId, status, roleId, branchId }) {
-    const updates = [];
-    const params = {};
-    let p = 1;
-
     if (status !== undefined) {
-      updates.push(`status = @p${p}`);
-      params[`p${p}`] = status;
-      p++;
+      await query(
+        `UPDATE users SET status = @p1 WHERE id = @p2`,
+        { p1: status, p2: userId }
+      );
     }
 
     if (branchId !== undefined) {
-      updates.push(`branch_id = @p${p}`);
-      params[`p${p}`] = branchId;
-      p++;
-    }
-
-    if (updates.length > 0) {
-      params[`p${p}`] = userId;
       await query(
-        `UPDATE users SET ${updates.join(', ')} WHERE id = @p${p}`,
-        params
+        `UPDATE users SET branch_id = @p1 WHERE id = @p2`,
+        { p1: branchId, p2: userId }
       );
     }
 
@@ -239,6 +307,24 @@ class AdminUserRepositoryImpl {
     }
 
     return this.findById(userId);
+  }
+
+  /**
+   * Update mat khau user (admin reset password)
+   * @param {number} userId - ID user can reset
+   * @param {string} passwordHash - mat khau da hash (bcrypt)
+   * @param {boolean} mustChangePassword - co bat buoc doi lan dang nhap sau khong
+   * @returns {Promise<boolean>} true neu update thanh cong
+   */
+  async updatePassword(userId, passwordHash, mustChangePassword) {
+    const result = await query(
+      `UPDATE users
+       SET    user_password       = @p1,
+              must_change_password = @p2
+       WHERE  id = @p3`,
+      { p1: passwordHash, p2: mustChangePassword ? 1 : 0, p3: userId }
+    );
+    return result.rowsAffected[0] > 0;
   }
 
   /**
@@ -347,37 +433,38 @@ class AdminUserRepositoryImpl {
       recentLogins = [];
     }
 
-    // System alerts (based on data anomalies)
-    const alerts = [];
-    if (users.lockedCount > 0) {
-      alerts.push({
-        id: 'locked-users',
-        type: 'warning',
-        title: 'Tai khoan bi khoa',
-        message: `${users.lockedCount} tai khoan bi khoa can xu ly`,
-        icon: 'lock',
-        time: new Date().toISOString(),
-      });
-    }
-    if (failedLogins > 10) {
-      alerts.push({
-        id: 'failed-logins',
-        type: 'danger',
-        title: 'Nhieu lan dang nhap that bai',
-        message: `${failedLogins} lan dang nhap that bai - kiem tra an ninh`,
-        icon: 'alert',
-        time: new Date().toISOString(),
-      });
-    }
-    if (users.inactiveCount > users.activeCount * 0.3) {
-      alerts.push({
-        id: 'inactive-users',
-        type: 'info',
-        title: 'Nhieu tai khoan khong hoat dong',
-        message: `${users.inactiveCount} tai khoan khong hoat dong`,
-        icon: 'user',
-        time: new Date().toISOString(),
-      });
+    // System alerts — REAL data from security_alerts table (max 5 recent unacknowledged)
+    let alerts = [];
+    try {
+      const alertsResult = await query(`
+        SELECT TOP 5
+          id, severity, title, message, user_id, created_at, rule_key
+        FROM security_alerts
+        WHERE is_acknowledged = 0
+        ORDER BY
+          CASE severity
+            WHEN 'critical' THEN 1
+            WHEN 'high'     THEN 2
+            WHEN 'medium'   THEN 3
+            WHEN 'info'     THEN 4
+          END ASC,
+          created_at DESC
+      `);
+      alerts = alertsResult.recordset.map((row) => ({
+        id: String(row.id),
+        type: row.severity === 'critical' ? 'danger' : row.severity === 'high' ? 'danger' : row.severity === 'medium' ? 'warning' : 'info',
+        title: row.title,
+        message: row.message,
+        severity: row.severity,
+        icon: row.rule_key === 'failed_login_burst' ? 'alert'
+            : row.rule_key === 'new_admin_role' ? 'shield'
+            : row.rule_key === 'inactive_admin' ? 'user'
+            : 'info',
+        time: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
+        alertId: row.id,
+      }));
+    } catch (_) {
+      alerts = [];
     }
 
     return {
