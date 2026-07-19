@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import ScrollToggleButton from '../common/ScrollToggleButton';
 import './AdminLayout.css';
 
 const ADMIN_SIDEBAR = [
@@ -327,6 +328,9 @@ export default function AdminLayout({ children }) {
         <main className="admin-content">
           {children}
         </main>
+
+        {/* Floating scroll navigation button */}
+        <ScrollToggleButton />
       </div>
     </div>
   );

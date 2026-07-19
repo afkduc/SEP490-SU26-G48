@@ -1,0 +1,74 @@
+/* ─────────────────────────────────────────────────────────
+   ScrollToggleButton – Floating navigation button
+   Position: fixed bottom-right, responsive
+───────────────────────────────────────────────────────── */
+
+.scroll-toggle-btn {
+  position: fixed;
+  z-index: 9999;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.04);
+  transition:
+    opacity 0.25s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scroll-toggle-btn--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.scroll-toggle-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.12),
+    0 4px 8px rgba(0, 0, 0, 0.06);
+}
+
+.scroll-toggle-btn:active {
+  transform: translateY(0);
+}
+
+.scroll-toggle-btn svg {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #4f46e5;
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .scroll-toggle-btn {
+    bottom: 24px;
+    right: 24px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .scroll-toggle-btn {
+    bottom: 20px;
+    right: 20px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 639px) {
+  .scroll-toggle-btn {
+    bottom: 16px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+  }
+}
