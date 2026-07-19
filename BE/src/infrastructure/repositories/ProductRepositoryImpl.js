@@ -1,9 +1,10 @@
 const ProductRepository = require('../../domain/repositories/ProductRepository');
 const Product = require('../../domain/entities/Product');
 const { query } = require('../database/sqlServer');
+const { normalizeVietnamese } = require('../../utils/vietnamese');
 
 class ProductRepositoryImpl extends ProductRepository {
-  async findAll({ branchId, status, search, category, page = 1, limit = 20 } = {}) {
+  async findAll({ branchId, status, search, category, lowStockOnly, page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
     let sql = `
       SELECT p.*, s.supplier_name, u.unit_name
@@ -23,12 +24,19 @@ class ProductRepositoryImpl extends ProductRepository {
       sql += ` AND p.status = @status`;
     }
     if (search) {
-      params.search = `%${search}%`;
-      sql += ` AND (p.product_code LIKE @search OR p.product_name LIKE @search)`;
+      const normalizedSearch = normalizeVietnamese(search);
+      params.search = normalizedSearch;
+      sql += ` AND (
+        dbo.RemoveVietnameseAccents(p.product_code) LIKE '%' + @search + '%'
+        OR dbo.RemoveVietnameseAccents(p.product_name) LIKE '%' + @search + '%'
+      )`;
     }
     if (category) {
       params.category = category;
-      sql += ` AND p.category = @category`;
+      sql += ` AND p.category COLLATE Vietnamese_CI_AI = @category`;
+    }
+    if (lowStockOnly) {
+      sql += ` AND p.stock_quantity <= p.min_stock AND p.min_stock > 0`;
     }
 
     sql += ` ORDER BY p.id DESC`;
@@ -38,7 +46,12 @@ class ProductRepositoryImpl extends ProductRepository {
     params.limit = limit;
 
     const result = await query(sql, params);
-    return result.recordset.map((r) => Product.fromPersistence(r));
+    return result.recordset.map((r) => {
+      const product = Product.fromPersistence(r);
+      product.supplierName = r.supplier_name;
+      product.unit = r.unit_name || 'Cai';
+      return product;
+    });
   }
 
   async findById(id) {
@@ -50,12 +63,14 @@ class ProductRepositoryImpl extends ProductRepository {
       WHERE p.id = @id
     `;
     const result = await query(sql, { id });
-    return Product.fromPersistence(result.recordset[0]);
+    if (!result.recordset[0]) return null;
+    const product = Product.fromPersistence(result.recordset[0]);
+    product.supplierName = result.recordset[0].supplier_name;
+    product.unit = result.recordset[0].unit_name || 'Cai';
+    return product;
   }
 
   async findByCode(code, branchId) {
-    // Ma phu tung la UNIQUE theo (product_code, branch_id) trong DB.
-    // Neu truyen branchId thi check trong dung chi nhanh do.
     const where = branchId ? 'product_code = @code AND branch_id = @branchId' : 'product_code = @code';
     const params = branchId ? { code, branchId } : { code };
     const result = await query(
@@ -70,6 +85,7 @@ class ProductRepositoryImpl extends ProductRepository {
     if (!row) return null;
     const product = Product.fromPersistence(row);
     product.supplierName = row.supplier_name;
+    product.unit = row.unit_name || 'Cai';
     return product;
   }
 
@@ -78,12 +94,12 @@ class ProductRepositoryImpl extends ProductRepository {
       INSERT INTO products (
         product_code, product_name, category, brand_name, unit_id,
         unit_price, stock_quantity, min_stock, supplier_id,
-        location, branch_id, status
+        location, branch_id, status, unit_id
       )
       VALUES (
         @productCode, @productName, @category, @brandName, @unitId,
         @unitPrice, @stockQuantity, @minStock, @supplierId,
-        @location, @branchId, @status
+        @location, @branchId, @status, @unitId
       );
       SELECT SCOPE_IDENTITY() AS id;
     `;
@@ -92,7 +108,7 @@ class ProductRepositoryImpl extends ProductRepository {
       productName: data.productName,
       category: data.category || null,
       brandName: data.brandName || null,
-      unitId: data.unitId,
+      unitId: data.unitId || 1,
       unitPrice: data.unitPrice || null,
       stockQuantity: data.stockQuantity || 0,
       minStock: data.minStock || 0,
@@ -100,6 +116,7 @@ class ProductRepositoryImpl extends ProductRepository {
       location: data.location || null,
       branchId: data.branchId || null,
       status: data.status || 'active',
+      unitId: data.unitId || 1,
     };
     const result = await query(sql, params);
     const newId = result.recordset[0].id;
@@ -161,7 +178,7 @@ class ProductRepositoryImpl extends ProductRepository {
     return before;
   }
 
-  async count({ branchId, status, search, category } = {}) {
+  async count({ branchId, status, search, category, lowStockOnly } = {}) {
     let sql = `SELECT COUNT(*) AS total FROM products WHERE 1=1`;
     const params = {};
 
@@ -174,16 +191,34 @@ class ProductRepositoryImpl extends ProductRepository {
       sql += ` AND status = @status`;
     }
     if (search) {
-      params.search = `%${search}%`;
-      sql += ` AND (product_code LIKE @search OR product_name LIKE @search)`;
+      const normalizedSearch = normalizeVietnamese(search);
+      params.search = normalizedSearch;
+      sql += ` AND (
+        dbo.RemoveVietnameseAccents(product_code) LIKE '%' + @search + '%'
+        OR dbo.RemoveVietnameseAccents(product_name) LIKE '%' + @search + '%'
+      )`;
     }
     if (category) {
       params.category = category;
-      sql += ` AND category = @category`;
+      sql += ` AND category COLLATE Vietnamese_CI_AI = @category`;
+    }
+    if (lowStockOnly) {
+      sql += ` AND stock_quantity <= min_stock AND min_stock > 0`;
     }
 
     const result = await query(sql, params);
     return result.recordset[0].total;
+  }
+
+async getDistinctCategories() {
+    const sql = `
+      SELECT DISTINCT category
+      FROM products
+      WHERE category IS NOT NULL AND category != ''
+      ORDER BY category ASC
+    `;
+    const result = await query(sql, []);
+    return result.recordset.map((r) => r.category);
   }
 
   async listUnits() {

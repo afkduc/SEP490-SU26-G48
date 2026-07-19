@@ -53,6 +53,10 @@ export async function deleteProductApi(id) {
   return httpClient.delete(`/products/${id}`);
 }
 
+export async function getCategoriesApi() {
+  return httpClient.get('/products/categories');
+}
+
 /**
  * Danh sách đơn vị tính (dùng cho dropdown chọn đơn vị của phụ tùng).
  * BE: GET /api/products/units -> [{ id, name }]
