@@ -23,11 +23,13 @@ class VehicleSearchRepositoryImpl extends VehicleSearchRepository {
               v.frame_number,
               v.engine_number,
               v.current_km,
-              wr.purchase_date
+              wr.purchase_date,
+              wr.warranty_end_date,
+              wr.warranty_km AS warranty_km_limit
        FROM   vehicles v
        JOIN   customers c ON c.id = v.customer_id
        OUTER APPLY (
-           SELECT TOP 1 w.purchase_date
+           SELECT TOP 1 w.purchase_date, w.warranty_end_date, w.warranty_km
            FROM   warranty_records w
            WHERE  w.vehicle_id = v.id
            ORDER  BY w.purchase_date DESC

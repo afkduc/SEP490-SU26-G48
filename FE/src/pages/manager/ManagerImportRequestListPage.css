@@ -1,0 +1,111 @@
+/* Reuse BEM-style cua Inventory page, doi prefix sang 'mir-'. */
+.mir-list {
+  padding: 24px 32px;
+}
+
+.mir-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.mir-list__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: #1f2937;
+}
+
+.mir-list__subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+  max-width: 720px;
+}
+
+.mir-list__tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+.mir-list__tab {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #4b5563;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mir-list__tab:hover {
+  background: #f3f4f6;
+}
+
+.mir-list__tab--active {
+  background: #1f6feb;
+  color: #fff;
+  border-color: #1f6feb;
+}
+
+.mir-list__filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.mir-list__filters .input {
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.mir-list__filters .input--search {
+  min-width: 260px;
+  flex: 1;
+}
+
+.mir-list__loading,
+.mir-list__error {
+  padding: 32px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.mir-list__error {
+  color: #dc2626;
+}
+
+.mir-list__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.mir-list__pagination-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.mir-list__pagination-current {
+  min-width: 100px;
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
