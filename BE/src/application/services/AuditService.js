@@ -44,6 +44,19 @@ class AuditService {
     });
   }
 
+  async exportAuditLogs(filters = {}) {
+    return this.auditRepository.getAuditLogsForExport({
+      userName: filters.userName,
+      phone: filters.phone,
+      action: filters.action,
+      entityName: filters.entityName,
+      entityCode: filters.entityCode,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      branchId: filters.branchId,
+    });
+  }
+
   async getLoginSessions(filters = {}) {
     const { page, pageSize } = filters;
 

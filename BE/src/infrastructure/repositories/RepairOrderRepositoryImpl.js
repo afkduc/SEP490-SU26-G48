@@ -15,7 +15,8 @@ const HEADER_SELECT = `
          v.license_plate    AS vehicle_license_plate,
          v.vehicle_model_text,
          c.id           AS customer_id,
-         c.full_name    AS customer_full_name
+         c.full_name    AS customer_full_name,
+         so.advisor_id  AS advisor_id
   FROM   repair_orders ro
   JOIN   branches b      ON b.id = ro.branch_id
   JOIN   users    tl     ON tl.id = ro.team_leader_id
@@ -37,10 +38,12 @@ function genCode(prefix, id) {
 }
 
 class RepairOrderRepositoryImpl extends RepairOrderRepository {
-  async findAll({ branchId } = {}) {
+  // advisorId: chi loc khi nguoi goi la service_advisor - moi advisor chi thay
+  // lenh sua chua bat nguon tu phieu quyet toan CUA CHINH MINH (so.advisor_id).
+  async findAll({ branchId, advisorId } = {}) {
     const result = await query(
-      `${HEADER_SELECT} WHERE ro.branch_id = @branchId ORDER BY ro.id DESC`,
-      { branchId }
+      `${HEADER_SELECT} WHERE ro.branch_id = @branchId AND (@advisorId IS NULL OR so.advisor_id = @advisorId) ORDER BY ro.id DESC`,
+      { branchId, advisorId: advisorId || null }
     );
     return result.recordset.map((row) => RepairOrder.fromPersistence(row, []));
   }
