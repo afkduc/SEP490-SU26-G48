@@ -5,6 +5,15 @@ class ProductController {
     this.productService = productService;
   }
 
+  listUnits = async (req, res, next) => {
+    try {
+      const units = await this.productService.listUnits();
+      return success(res, units, 'Units retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getAll = async (req, res, next) => {
     try {
       const { branchId, status, search, category, page = 1, limit = 20 } = req.query;

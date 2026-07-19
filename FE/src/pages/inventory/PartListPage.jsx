@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useParts } from '../../hooks/inventory/useParts';
+import { listUnitsApi } from '../../services/productApi';
 import './PartListPage.css';
 
 const STATUS_LABELS = {
@@ -21,7 +22,7 @@ function emptyForm() {
     partCode: '',
     partName: '',
     category: '',
-    unit: 'Cai',
+    unitId: '',
     unitPrice: '',
     minStock: 5,
     supplierId: '',
@@ -45,6 +46,11 @@ export default function PartListPage() {
   const [form, setForm] = useState(emptyForm());
   const [formError, setFormError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [units, setUnits] = useState([]);
+
+  useEffect(() => {
+    listUnitsApi().then(setUnits).catch(() => setUnits([]));
+  }, []);
 
   function setSearch(v) { setParams((p) => ({ ...p, search: v })); }
   function setStatus(v) { setParams((p) => ({ ...p, status: v })); }
@@ -65,7 +71,7 @@ export default function PartListPage() {
       partCode: p.productCode ?? p.partCode ?? '',
       partName: p.productName ?? p.partName ?? '',
       category: p.category || '',
-      unit: p.unit || 'Cai',
+      unitId: p.unitId ?? '',
       unitPrice: p.unitPrice ?? '',
       minStock: p.minStock ?? 5,
       supplierId: p.supplierId ?? '',
@@ -90,7 +96,7 @@ export default function PartListPage() {
         productCode: form.partCode,
         productName: form.partName,
         category: form.category,
-        unit: form.unit,
+        unitId: form.unitId === '' ? null : Number(form.unitId),
         unitPrice: form.unitPrice === '' ? null : Number(form.unitPrice),
         minStock: Number(form.minStock),
         supplierId: form.supplierId === '' ? null : Number(form.supplierId),
@@ -225,7 +231,7 @@ export default function PartListPage() {
                       <td><span className="font-mono">{p.productCode ?? p.partCode}</span></td>
                       <td>{p.productName ?? p.partName}</td>
                       <td>{p.category || '—'}</td>
-                      <td>{p.unit}</td>
+                      <td>{p.unitName || '—'}</td>
                       <td className="text-right">
                         {p.unitPrice != null ? Number(p.unitPrice).toLocaleString('vi-VN') + ' đ' : '—'}
                       </td>
@@ -306,10 +312,14 @@ export default function PartListPage() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Don vi</label>
-                  <input className="input" value={form.unit}
-                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                    placeholder="VD: Cai, Bo, Chai" />
+                  <label className="form-label">Don vi <span className="required">*</span></label>
+                  <select className="input input--select" value={form.unitId} required
+                    onChange={(e) => setForm({ ...form, unitId: e.target.value })}>
+                    <option value="">Chon don vi</option>
+                    {units.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
