@@ -8,6 +8,8 @@ const ExportRequestService = require('./ExportRequestService');
 const CustomerService = require('./CustomerService');
 const DashboardService = require('./DashboardService');
 const MaintenanceReminderService = require('./MaintenanceReminderService');
+const PermissionService = require('./PermissionService');
+const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const {
   makeUserRepository,
   makeProductRepository,
@@ -63,6 +65,10 @@ function makeMaintenanceReminderService() {
   return new MaintenanceReminderService({ maintenanceReminderRepository: makeMaintenanceReminderRepository() });
 }
 
+function makePermissionService() {
+  return new PermissionService({ roleRepository: new RoleRepositoryImpl() });
+}
+
 module.exports = {
   UserService,
   ProductService,
@@ -74,6 +80,7 @@ module.exports = {
   CustomerService,
   DashboardService,
   MaintenanceReminderService,
+  PermissionService,
   makeUserService,
   makeProductService,
   makeRepairSettlementService,
@@ -84,4 +91,5 @@ module.exports = {
   makeCustomerService,
   makeDashboardService,
   makeMaintenanceReminderService,
+  makePermissionService,
 };

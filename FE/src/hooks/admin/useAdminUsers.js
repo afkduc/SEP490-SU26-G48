@@ -15,13 +15,14 @@ const DEFAULT_PARAMS = {
 
 /**
  * Hook lấy danh sách users cho admin page (UC-07).
- * `search` được debounce 400ms thông qua usePaginatedList.
+ * `search` được debounce 200ms thông qua usePaginatedList.
  */
 export function useAdminUsers(initialParams = {}) {
   const list = usePaginatedList({
     apiFn: adminUsersApi.list,
     defaultParams: { ...DEFAULT_PARAMS, ...initialParams },
     debounceKeys: ['search'],
+    debounceMs: 200,
   });
 
   // Wrapper để tương thích với code cũ (initialParams)

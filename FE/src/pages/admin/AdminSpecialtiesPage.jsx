@@ -205,24 +205,24 @@ export default function AdminSpecialtiesPage() {
               <table className="specialties-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '140px' }}>Mã</th>
-                    <th>Tên chuyên môn</th>
-                    <th style={{ width: '120px' }}>Trạng thái</th>
-                    <th style={{ width: '160px' }}>Thao tác</th>
+                    <th className="col--code">Mã</th>
+                    <th className="col--name">Tên chuyên môn</th>
+                    <th className="col--status">Trạng thái</th>
+                    <th className="col--actions">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {specialties.map((s) => (
                     <tr key={s.id} className={s.isActive ? '' : 'row--inactive'}>
-                      <td><span className="specialty-code">{s.specialtyCode}</span></td>
-                      <td><span className="specialty-name">{s.specialtyName}</span></td>
-                      <td>
+                      <td className="specialty-code-cell"><span className="specialty-code">{s.specialtyCode}</span></td>
+                      <td className="specialty-name-cell"><span className="specialty-name">{s.specialtyName}</span></td>
+                      <td className="specialty-status-cell">
                         <span className={`specialty-status-badge ${s.isActive ? 'specialty-status-badge--active' : 'specialty-status-badge--inactive'}`}>
-                          {s.isActive ? 'Active' : 'Disabled'}
+                          {s.isActive ? 'Hoạt động' : 'Tắt'}
                         </span>
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                      <td className="specialty-actions-cell">
+                        <div className="specialty-actions">
                           <button
                             className="btn btn--secondary btn--sm"
                             onClick={() => { setEditSpecialty(s); setShowForm(true); }}

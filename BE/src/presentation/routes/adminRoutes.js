@@ -1,6 +1,7 @@
 const express = require('express');
 const AdminController = require('../controllers/AdminController');
 const { authenticate, requireAdmin } = require('../../middlewares/auth');
+const { trackActivity } = require('../../middlewares');
 const { validateListUsersQuery } = require('../validators/adminUserValidator');
 
 /**
@@ -26,9 +27,12 @@ function buildAdminRouter() {
 
   // Endpoint reissue-token dat TRUOC requireAdmin de user co token cu (thieu role admin)
   // van co the goi va lay token moi co day du roles tu DB.
-  router.post('/reissue-token', authenticate, controller.reissueToken);
+  router.post('/reissue-token', authenticate, trackActivity, controller.reissueToken);
 
-  router.use(authenticate, requireAdmin);
+  // Refresh permissions sau khi admin sua ma tran quyen
+  router.post('/refresh-permissions', authenticate, trackActivity, controller.refreshPermissions);
+
+  router.use(authenticate, requireAdmin, trackActivity);
 
   router.get('/dashboard', controller.getDashboardStats);
 
@@ -73,6 +77,7 @@ function buildAdminRouter() {
   router.get('/devices/user/:userId', controller.listUserDevices);
   router.delete('/devices/:deviceId', controller.forceLogoutDevice);
   router.delete('/devices/user/:userId/others', controller.forceLogoutAllOtherDevices);
+  router.delete('/devices/user/:userId/all', controller.forceLogoutAllDevices);
 
   // Specialties
   router.get('/specialties', controller.listSpecialties);
@@ -87,6 +92,10 @@ function buildAdminRouter() {
   router.get('/security-alerts', controller.listSecurityAlerts);
   router.get('/security-alerts/counts', controller.acknowledgeAlertCounts);
   router.patch('/security-alerts/:id/ack', controller.acknowledgeAlert);
+
+  // Login sessions - realtime
+  router.post('/sessions/cleanup', controller.cleanupDuplicateSessions);
+  router.get('/login-sessions/recent', controller.getRecentLoginSessions);
 
   return router;
 }

@@ -246,6 +246,10 @@
   font-size: 0.78rem;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
 }
 
 .admin-sessions__user-agent {

@@ -7,6 +7,7 @@ const RoleService = require('../../application/services/RoleService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const UserRoleService = require('../../application/services/UserRoleService');
 const UserRoleRepositoryImpl = require('../../infrastructure/repositories/UserRoleRepositoryImpl');
+const PermissionService = require('../../application/services/PermissionService');
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
 const { exportUsersToExcel } = require('../../utils/excelExporter');
@@ -21,7 +22,8 @@ class AdminController {
     this.adminUserService = new AdminUserService({ adminUserRepository });
 
     const roleRepository = new RoleRepositoryImpl();
-    this.roleService = new RoleService({ roleRepository });
+    const permissionService = new PermissionService({ roleRepository });
+    this.roleService = new RoleService({ roleRepository, permissionService });
 
     const userRoleRepository = new UserRoleRepositoryImpl();
     const roleRepo = new RoleRepositoryImpl();
@@ -59,6 +61,7 @@ class AdminController {
     this.listUserDevices = this.listUserDevices.bind(this);
     this.forceLogoutDevice = this.forceLogoutDevice.bind(this);
     this.forceLogoutAllOtherDevices = this.forceLogoutAllOtherDevices.bind(this);
+    this.forceLogoutAllDevices = this.forceLogoutAllDevices.bind(this);
     this.listSpecialties = this.listSpecialties.bind(this);
     this.createSpecialty = this.createSpecialty.bind(this);
     this.updateSpecialty = this.updateSpecialty.bind(this);
@@ -72,6 +75,7 @@ class AdminController {
     this.acknowledgeAlert = this.acknowledgeAlert.bind(this);
     this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
     this.acknowledgeAlertCounts = this.acknowledgeAlertCounts.bind(this);
+    this.getRecentLoginSessions = this.getRecentLoginSessions.bind(this);
     this.getUserRoles = this.getUserRoles.bind(this);
     this.assignRoles = this.assignRoles.bind(this);
     this.revokeRole = this.revokeRole.bind(this);
@@ -79,6 +83,9 @@ class AdminController {
     this.updateUser = this.updateUser.bind(this);
     this.getUserDetail = this.getUserDetail.bind(this);
     this.resetPassword = this.resetPassword.bind(this);
+    this.reissueToken = this.reissueToken.bind(this);
+    this.refreshPermissions = this.refreshPermissions.bind(this);
+    this.cleanupDuplicateSessions = this.cleanupDuplicateSessions.bind(this);
   }
 
   getDashboardStats = async (req, res, next) => {
@@ -363,6 +370,23 @@ class AdminController {
     }
   };
 
+  /**
+   * Admin force logout ALL devices of a user (including current).
+   * DELETE /api/admin/devices/user/:userId/all
+   */
+  forceLogoutAllDevices = async (req, res, next) => {
+    try {
+      const { userId } = req.params;
+      if (!userId) {
+        return res.status(400).json({ message: 'userId la bat buoc' });
+      }
+      const result = await this.deviceService.forceLogoutAllDevices(userId);
+      return success(res, result, `Da dang xuat ${result.revoked} thiet bi`);
+    } catch (err) {
+      next(err);
+    }
+  };
+
   // Specialties
   listSpecialties = async (req, res, next) => {
     try {
@@ -460,6 +484,18 @@ class AdminController {
     try {
       const counts = await this.securityAlertService.getCounts();
       return success(res, counts, 'So luong canh bao');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Realtime polling cho AdminLoginSessionsPage. FE goi moi 10s voi `since`
+  // de lay cac session moi (login hoac logout) tu moc thoi gian cu.
+  getRecentLoginSessions = async (req, res, next) => {
+    try {
+      const { since, limit } = req.query;
+      const result = await this.auditService.getLoginSessionsSince(since, limit);
+      return success(res, result, 'Cac phien dang nhap moi');
     } catch (err) {
       next(err);
     }
@@ -582,19 +618,133 @@ class AdminController {
       const roles = await this.userRoleService.getUserRoles(userId);
       const roleNames = roles.map((r) => r.roleName).filter(Boolean);
 
+      // Lay permissions tu DB
+      const PermissionService = require('../../application/services/PermissionService');
+      const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+      const ps = new PermissionService({ roleRepository: new RoleRepositoryImpl() });
+      const permissions = await ps.getUserPermissions(userId);
+      const permissionKeys = Array.from(permissions);
+
       const newToken = jwt.sign(
         {
           userId,
           email: req.user.email,
           name: req.user.name,
           roles: roleNames,
+          permissions: permissionKeys,
           branchId: req.user.branchId,
+          tokenVersion: req.user.tokenVersion,
+          ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
         },
         config.jwtSecret,
         { expiresIn: config.jwtExpiresIn }
       );
 
-      return success(res, { token: newToken, roles: roleNames }, 'Cap lai token thanh cong');
+      return success(res, { token: newToken, roles: roleNames, permissions: permissionKeys }, 'Cap lai token thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /api/admin/refresh-permissions
+   * Lay permissions moi nhat tu DB va tra ve token moi.
+   * Dung khi admin vua sua ma tran quyen — can cap nhat token de
+   * permission thay doi co hieu luc ngay lap tuc.
+   */
+  refreshPermissions = async (req, res, next) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return next(new (require('../../utils/ApiError'))(401, 'Token khong hop le'));
+      }
+
+      const roles = await this.userRoleService.getUserRoles(userId);
+      const roleNames = roles.map((r) => r.roleName).filter(Boolean);
+
+      // Lay permissions tu DB (bypass cache de lay gia tri moi nhat)
+      const PermissionService = require('../../application/services/PermissionService');
+      const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+      const ps = new PermissionService({ roleRepository: new RoleRepositoryImpl() });
+      const permissions = await ps.getUserPermissions(userId);
+      const permissionKeys = Array.from(permissions);
+
+      const newToken = jwt.sign(
+        {
+          userId,
+          email: req.user.email,
+          name: req.user.name,
+          roles: roleNames,
+          permissions: permissionKeys,
+          branchId: req.user.branchId,
+          tokenVersion: req.user.tokenVersion,
+          ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
+        },
+        config.jwtSecret,
+        { expiresIn: config.jwtExpiresIn }
+      );
+
+      return success(res, { token: newToken, permissions: permissionKeys }, 'Cap nhat quyen thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /api/admin/sessions/cleanup
+   * Don dep cac session trung lap: chi giu lai session moi nhat cho moi user.
+   * Dung de xu ly cac session active trung lap trong database.
+   */
+  cleanupDuplicateSessions = async (req, res, next) => {
+    try {
+      const { query } = require('../../infrastructure/database/sqlServer');
+
+      // Tim va dong cac session trung lap, chi giu lai session moi nhat
+      const result = await query(`
+        WITH RankedSessions AS (
+          SELECT 
+            id,
+            user_id,
+            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_time DESC) as rn
+          FROM login_sessions
+          WHERE status = 'active' AND action_type = 'LOGIN'
+        )
+        UPDATE login_sessions
+        SET status = 'ended', 
+            logout_reason = 'SESSION_CLEANUP',
+            logout_time = SYSUTCDATETIME(),
+            session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME())
+        WHERE id IN (
+          SELECT id FROM RankedSessions WHERE rn > 1
+        );
+        SELECT @@ROWCOUNT as closedSessions;
+      `);
+
+      const closedSessions = result.recordset?.[0]?.closedSessions || 0;
+
+      // Xoa device cu trung lap (chi giu device moi nhat)
+      await query(`
+        WITH RankedDevices AS (
+          SELECT 
+            id,
+            user_id,
+            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY last_login_at DESC) as rn
+          FROM user_devices
+          WHERE is_current = 1
+        )
+        UPDATE user_devices
+        SET is_current = 0
+        WHERE id IN (
+          SELECT id FROM RankedDevices WHERE rn > 1
+        );
+      `);
+
+      return success(res, {
+        closedSessions,
+        message: closedSessions > 0
+          ? `Da dong ${closedSessions} session trung lap`
+          : 'Khong co session trung lap',
+      }, 'Don dep session thanh cong');
     } catch (err) {
       next(err);
     }

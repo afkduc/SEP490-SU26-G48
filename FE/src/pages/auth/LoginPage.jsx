@@ -28,14 +28,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await login(form.email, form.password, rememberMe);
-
-      // Neu admin vua reset MK, bat buoc user doi MK truoc khi vao dashboard
-      if (result?.user?.mustChangePassword) {
-        navigate('/admin/profile?tab=password&reason=forced', { replace: true });
-        return;
-      }
-
-      navigate(routeAfterLogin(result?.user));
+      // Luôn chuyển thẳng về dashboard theo role — bỏ luồng ép đổi mật khẩu tạm.
+      navigate(routeAfterLogin(result?.user), { replace: true });
     } catch (err) {
       setError(err.message || 'Đăng nhập thất bại');
     } finally {
@@ -78,6 +72,12 @@ export default function LoginPage() {
               Mật khẩu <span className="required">*</span>
             </label>
             <div className="login-input-wrap">
+              <span className="login-lock-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </span>
               <input
                 id="password"
                 name="password"

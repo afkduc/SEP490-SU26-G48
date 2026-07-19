@@ -18,7 +18,10 @@ const AUDIT_LOG_COLUMNS = `
   al.duration_ms,
   al.branch_id,
   al.description,
-  al.logged_at
+  al.old_value,
+  al.new_value,
+  al.logged_at,
+  b.branch_name
 `;
 
 const LOGIN_SESSION_COLUMNS = `
@@ -29,11 +32,16 @@ const LOGIN_SESSION_COLUMNS = `
   ls.action_type,
   ls.ip_address,
   ls.user_agent,
+  ls.browser,
+  ls.os,
   ls.login_time,
   ls.logout_time,
   ls.session_duration_seconds,
+  ls.logout_reason,
+  ls.failure_reason,
   ls.branch_id,
-  ls.status
+  ls.status,
+  br.branch_name
 `;
 
 function toAuditLogRow(row) {
@@ -51,10 +59,14 @@ function toAuditLogRow(row) {
     ip_address: row.ip_address,
     request_method: row.request_method,
     request_url: row.request_url,
+    request_body: row.request_body,
     response_status: row.response_status,
     duration_ms: row.duration_ms,
     branch_id: row.branch_id,
+    branch_name: row.branch_name,
     description: row.description,
+    old_value: row.old_value,
+    new_value: row.new_value,
     logged_at: row.logged_at,
   };
 }
@@ -65,14 +77,19 @@ function toLoginSessionRow(row) {
     id: row.id,
     user_id: row.user_id,
     user_name: row.user_name,
-    phone_number: row.phone,   // DB column is 'phone'
+    phone_number: row.phone,
     action_type: row.action_type,
     ip_address: row.ip_address,
     user_agent: row.user_agent,
+    browser: row.browser,
+    os: row.os,
     login_time: row.login_time,
     logout_time: row.logout_time,
     session_duration_seconds: row.session_duration_seconds,
+    logout_reason: row.logout_reason,
+    failure_reason: row.failure_reason,
     branch_id: row.branch_id,
+    branch_name: row.branch_name,
     status: row.status,
   };
 }
@@ -169,13 +186,21 @@ async function insertAuditLog(logData) {
   return result.recordset[0].id;
 }
 
+/**
+ * Get audit logs with filters and stats
+ */
 async function getAuditLogs(filters = {}) {
   const {
+    keyword,
     userName,
     phone,
     action,
+    tableName,
     entityName,
     entityCode,
+    ipAddress,
+    requestMethod,
+    responseStatus,
     startDate,
     endDate,
     branchId,
@@ -187,14 +212,28 @@ async function getAuditLogs(filters = {}) {
   const params = {};
   let paramIndex = 1;
 
+  // Keyword search across multiple fields
+  if (keyword) {
+    conditions.push(`(
+      LOWER(al.user_name) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.description) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.entity_name) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.entity_code) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.table_name) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.request_url) LIKE LOWER(@p${paramIndex})
+    )`);
+    params[`p${paramIndex}`] = `%${keyword}%`;
+    paramIndex++;
+  }
+
   if (userName) {
-    conditions.push(`al.user_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.user_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${userName}%`;
     paramIndex++;
   }
 
   if (phone) {
-    conditions.push(`al.phone_number LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${phone}%`;
     paramIndex++;
   }
@@ -205,16 +244,48 @@ async function getAuditLogs(filters = {}) {
     paramIndex++;
   }
 
+  if (tableName) {
+    conditions.push(`LOWER(al.table_name) LIKE LOWER(@p${paramIndex})`);
+    params[`p${paramIndex}`] = `%${tableName}%`;
+    paramIndex++;
+  }
+
   if (entityName) {
-    conditions.push(`al.entity_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.entity_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${entityName}%`;
     paramIndex++;
   }
 
   if (entityCode) {
-    conditions.push(`al.entity_code = @p${paramIndex}`);
-    params[`p${paramIndex}`] = entityCode;
+    conditions.push(`LOWER(al.entity_code) LIKE LOWER(@p${paramIndex})`);
+    params[`p${paramIndex}`] = `%${entityCode}%`;
     paramIndex++;
+  }
+
+  if (ipAddress) {
+    conditions.push(`al.ip_address LIKE @p${paramIndex}`);
+    params[`p${paramIndex}`] = `%${ipAddress}%`;
+    paramIndex++;
+  }
+
+  if (requestMethod) {
+    conditions.push(`al.request_method = @p${paramIndex}`);
+    params[`p${paramIndex}`] = requestMethod;
+    paramIndex++;
+  }
+
+  if (responseStatus) {
+    if (responseStatus === '2xx') {
+      conditions.push(`al.response_status >= 200 AND al.response_status < 300`);
+    } else if (responseStatus === '4xx') {
+      conditions.push(`al.response_status >= 400 AND al.response_status < 500`);
+    } else if (responseStatus === '5xx') {
+      conditions.push(`al.response_status >= 500`);
+    } else {
+      conditions.push(`al.response_status = @p${paramIndex}`);
+      params[`p${paramIndex}`] = parseInt(responseStatus, 10);
+      paramIndex++;
+    }
   }
 
   if (branchId) {
@@ -237,18 +308,33 @@ async function getAuditLogs(filters = {}) {
 
   const whereClause = conditions.join(' AND ');
   const safePage = Math.max(1, parseInt(page, 10) || 1);
-  const safePageSize = Math.max(1, parseInt(pageSize, 10) || 20);
+  const safePageSize = Math.max(1, Math.min(parseInt(pageSize, 10) || 20, 100));
   const offset = (safePage - 1) * safePageSize;
 
-  const countResult = await query(
-    `SELECT COUNT(*) AS total FROM audit_logs al WHERE ${whereClause}`,
-    params
-  );
+  // Get count and stats in parallel
+  const [countResult, statsResult] = await Promise.all([
+    query(
+      `SELECT COUNT(*) AS total FROM audit_logs al WHERE ${whereClause}`,
+      params
+    ),
+    query(
+      `SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN al.action IN ('CREATE', 'INSERT') THEN 1 ELSE 0 END) AS create_count,
+        SUM(CASE WHEN al.action IN ('UPDATE', 'EDIT') THEN 1 ELSE 0 END) AS update_count,
+        SUM(CASE WHEN al.action IN ('DELETE', 'REMOVE') THEN 1 ELSE 0 END) AS delete_count
+       FROM audit_logs al WHERE ${whereClause}`,
+      params
+    ),
+  ]);
+
   const total = countResult.recordset[0].total;
+  const stats = statsResult.recordset[0];
 
   const dataResult = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
      FROM   audit_logs al
+     LEFT   JOIN branches b ON b.id = al.branch_id
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY`,
@@ -257,16 +343,51 @@ async function getAuditLogs(filters = {}) {
 
   const items = dataResult.recordset.map(toAuditLogRow);
 
-  return { total, page: safePage, pageSize: safePageSize, items };
+  return {
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    items,
+    stats: {
+      total: stats.total || 0,
+      create: stats.create_count || 0,
+      update: stats.update_count || 0,
+      delete: stats.delete_count || 0,
+    },
+  };
+}
+
+/**
+ * Get single audit log by ID
+ */
+async function getAuditLogById(id) {
+  const result = await query(
+    `SELECT ${AUDIT_LOG_COLUMNS}
+     FROM   audit_logs al
+     LEFT   JOIN branches b ON b.id = al.branch_id
+     WHERE  al.id = @p1`,
+    { p1: id }
+  );
+
+  if (result.recordset.length === 0) {
+    return null;
+  }
+
+  return toAuditLogRow(result.recordset[0]);
 }
 
 async function getAuditLogsForExport(filters = {}) {
   const {
+    keyword,
     userName,
     phone,
     action,
+    tableName,
     entityName,
     entityCode,
+    ipAddress,
+    requestMethod,
+    responseStatus,
     startDate,
     endDate,
     branchId,
@@ -277,13 +398,26 @@ async function getAuditLogsForExport(filters = {}) {
   const params = {};
   let paramIndex = 1;
 
+  if (keyword) {
+    conditions.push(`(
+      LOWER(al.user_name) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.description) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.entity_name) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.entity_code) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.table_name) LIKE LOWER(@p${paramIndex}) OR
+      LOWER(al.request_url) LIKE LOWER(@p${paramIndex})
+    )`);
+    params[`p${paramIndex}`] = `%${keyword}%`;
+    paramIndex++;
+  }
+
   if (userName) {
-    conditions.push(`al.user_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.user_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${userName}%`;
     paramIndex++;
   }
   if (phone) {
-    conditions.push(`al.phone_number LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${phone}%`;
     paramIndex++;
   }
@@ -292,15 +426,43 @@ async function getAuditLogsForExport(filters = {}) {
     params[`p${paramIndex}`] = action;
     paramIndex++;
   }
+  if (tableName) {
+    conditions.push(`LOWER(al.table_name) LIKE LOWER(@p${paramIndex})`);
+    params[`p${paramIndex}`] = `%${tableName}%`;
+    paramIndex++;
+  }
   if (entityName) {
-    conditions.push(`al.entity_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(al.entity_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${entityName}%`;
     paramIndex++;
   }
   if (entityCode) {
-    conditions.push(`al.entity_code = @p${paramIndex}`);
-    params[`p${paramIndex}`] = entityCode;
+    conditions.push(`LOWER(al.entity_code) LIKE LOWER(@p${paramIndex})`);
+    params[`p${paramIndex}`] = `%${entityCode}%`;
     paramIndex++;
+  }
+  if (ipAddress) {
+    conditions.push(`al.ip_address LIKE @p${paramIndex}`);
+    params[`p${paramIndex}`] = `%${ipAddress}%`;
+    paramIndex++;
+  }
+  if (requestMethod) {
+    conditions.push(`al.request_method = @p${paramIndex}`);
+    params[`p${paramIndex}`] = requestMethod;
+    paramIndex++;
+  }
+  if (responseStatus) {
+    if (responseStatus === '2xx') {
+      conditions.push(`al.response_status >= 200 AND al.response_status < 300`);
+    } else if (responseStatus === '4xx') {
+      conditions.push(`al.response_status >= 400 AND al.response_status < 500`);
+    } else if (responseStatus === '5xx') {
+      conditions.push(`al.response_status >= 500`);
+    } else {
+      conditions.push(`al.response_status = @p${paramIndex}`);
+      params[`p${paramIndex}`] = parseInt(responseStatus, 10);
+      paramIndex++;
+    }
   }
   if (branchId) {
     conditions.push(`al.branch_id = @p${paramIndex}`);
@@ -324,6 +486,7 @@ async function getAuditLogsForExport(filters = {}) {
   const dataResult = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
      FROM   audit_logs al
+     LEFT   JOIN branches b ON b.id = al.branch_id
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
      OFFSET 0 ROWS FETCH NEXT @p_limit ROWS ONLY`,
@@ -352,13 +515,13 @@ async function getLoginSessions(filters = {}) {
   let paramIndex = 1;
 
   if (userName) {
-    conditions.push(`ls.user_name LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(ls.user_name) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${userName}%`;
     paramIndex++;
   }
 
   if (phone) {
-    conditions.push(`ls.phone LIKE @p${paramIndex}`);
+    conditions.push(`LOWER(ls.phone) LIKE LOWER(@p${paramIndex})`);
     params[`p${paramIndex}`] = `%${phone}%`;
     paramIndex++;
   }
@@ -398,26 +561,69 @@ async function getLoginSessions(filters = {}) {
   const safePageSize = Math.max(1, parseInt(pageSize, 10) || 20);
   const offset = (safePage - 1) * safePageSize;
 
-  const countResult = await query(
-    `SELECT COUNT(*) AS total
-     FROM   login_sessions ls
-     WHERE  ${whereClause}`,
-    params
-  );
+  const [countResult, statsResult] = await Promise.all([
+    query(
+      `SELECT COUNT(*) AS total
+       FROM   login_sessions ls
+       WHERE  ${whereClause}`,
+      params
+    ),
+    query(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(CASE WHEN ls.action_type = 'LOGIN' THEN 1 ELSE 0 END) AS login_count,
+         SUM(CASE WHEN ls.action_type = 'LOGIN_FAILED' THEN 1 ELSE 0 END) AS failed_count,
+         SUM(CASE WHEN ls.status = 'active' THEN 1 ELSE 0 END) AS active_count
+       FROM   login_sessions ls
+       WHERE  ${whereClause}`,
+      params
+    ),
+  ]);
   const total = countResult.recordset[0].total;
+  const stats = statsResult.recordset[0];
 
   const dataResult = await query(
     `SELECT ${LOGIN_SESSION_COLUMNS}
      FROM   login_sessions ls
+     LEFT   JOIN branches br ON br.id = ls.branch_id
      WHERE  ${whereClause}
-     ORDER  BY ls.login_time DESC, ls.id DESC
+     ORDER  BY
+       CASE WHEN ls.status = 'active' THEN 0 ELSE 1 END,
+       CASE WHEN ls.status = 'active' THEN ls.login_time ELSE COALESCE(ls.logout_time, ls.login_time) END DESC,
+       ls.id DESC
      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY`,
     { ...params, offset, pageSize: safePageSize }
   );
 
   const items = dataResult.recordset.map(toLoginSessionRow);
 
-  return { total, page: safePage, pageSize: safePageSize, items };
+  return {
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    items,
+    stats: {
+      total: stats.total || 0,
+      loginCount: stats.login_count || 0,
+      failedCount: stats.failed_count || 0,
+      activeCount: stats.active_count || 0,
+    },
+  };
+}
+
+async function getLoginSessionsSince(sinceDate, limit = 50) {
+  const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 50, 200));
+  const result = await query(
+    `SELECT ${LOGIN_SESSION_COLUMNS}
+     FROM   login_sessions ls
+     LEFT   JOIN branches br ON br.id = ls.branch_id
+     WHERE  ls.login_time  > @p1
+        OR  ls.logout_time > @p1
+     ORDER  BY COALESCE(ls.logout_time, ls.login_time) DESC, ls.id DESC
+     OFFSET 0 ROWS FETCH NEXT @p2 ROWS ONLY`,
+    { p1: sinceDate, p2: safeLimit }
+  );
+  return result.recordset.map(toLoginSessionRow);
 }
 
 async function getEntityDefinitions() {
@@ -440,6 +646,7 @@ async function getAuditLogsByUser(userId, limit = 10) {
   const result = await query(
     `SELECT TOP (@p2) ${AUDIT_LOG_COLUMNS}
      FROM   audit_logs al
+     LEFT   JOIN branches b ON b.id = al.branch_id
      WHERE  al.user_id = @p1
      ORDER  BY al.logged_at DESC, al.id DESC`,
     { p1: userId, p2: safeLimit }
@@ -450,8 +657,10 @@ async function getAuditLogsByUser(userId, limit = 10) {
 module.exports = {
   insertAuditLog,
   getAuditLogs,
+  getAuditLogById,
   getAuditLogsForExport,
   getLoginSessions,
+  getLoginSessionsSince,
   getEntityDefinitions,
   getAuditLogsByUser,
 };
