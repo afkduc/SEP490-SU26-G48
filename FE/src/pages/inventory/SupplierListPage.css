@@ -322,7 +322,21 @@ textarea.input {
   background: #fef2f2;
 }
 
+.btn--success {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.btn--success:hover:not(:disabled) {
+  background: #15803d;
+}
+
 .btn--sm {
   padding: 4px 8px;
   font-size: 12px;
 }
+
+/* Text */
+.text-right { text-align: right; }
+.text-success { color: #065f46; font-weight: 600; }
+.text-danger { color: #991b1b; font-weight: 600; }

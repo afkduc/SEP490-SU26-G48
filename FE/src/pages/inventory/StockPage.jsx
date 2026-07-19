@@ -15,7 +15,7 @@ export default function StockPage() {
   const { user } = useAuth();
   const branchId = user?.branchId;
   const {
-    stockList, lowStock, summary, loading, error,
+    stockList, lowStock, summary, loading, error, categories,
     params, setSearch, setCategory, setLowStockOnly, setPage, refetch,
   } = useStock(branchId);
 
@@ -151,11 +151,9 @@ export default function StockPage() {
             onChange={(e) => setCategory(e.target.value)}
           >
             <option value="">Tat ca loai</option>
-            <option value="Phu tung dong co">Phu tung dong co</option>
-            <option value="Phu tung gam">Phu tung gam</option>
-            <option value="Phu tung dien">Phu tung dien</option>
-            <option value="Dau nhot & hoa chat">Dau nhot & hoa chat</option>
-            <option value="Phu kien">Phu kien</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
           </select>
           <label className="filter-low-stock">
             <input

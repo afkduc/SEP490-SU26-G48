@@ -1,0 +1,106 @@
+.mer-list {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.mer-list__header {
+  margin-bottom: 24px;
+}
+
+.mer-list__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 6px 0;
+}
+
+.mer-list__subtitle {
+  font-size: 14px;
+  color: #6B7280;
+  margin: 0;
+  max-width: 720px;
+}
+
+.mer-list__tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #E5E7EB;
+  margin-bottom: 16px;
+}
+
+.mer-list__tab {
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: #6B7280;
+  font-weight: 500;
+}
+
+.mer-list__tab:hover {
+  color: #111827;
+}
+
+.mer-list__tab--active {
+  color: #2563EB;
+  border-bottom-color: #2563EB;
+}
+
+.mer-list__filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.mer-list__filters .input {
+  padding: 8px 12px;
+  border: 1px solid #D1D5DB;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.mer-list__filters .input--search {
+  flex: 1;
+  min-width: 240px;
+}
+
+.mer-list__loading,
+.mer-list__error {
+  padding: 32px;
+  text-align: center;
+  color: #6B7280;
+}
+
+.mer-list__error {
+  color: #DC2626;
+}
+
+.mer-list__pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 12px 0;
+}
+
+.mer-list__pagination-info {
+  font-size: 14px;
+  color: #6B7280;
+}
+
+.mer-list__pagination-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.mer-list__pagination-current {
+  font-size: 14px;
+  color: #111827;
+  padding: 0 8px;
+}

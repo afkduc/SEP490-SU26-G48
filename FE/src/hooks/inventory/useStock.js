@@ -3,6 +3,7 @@ import {
   getStockListApi,
   getLowStockApi,
   getStockSummaryApi,
+  getCategoriesApi,
 } from '../../services/inventoryApi';
 
 /**
@@ -33,6 +34,7 @@ export function useStock(initialBranchId) {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [categories, setCategories] = useState([]);
 
   const { branchId, search, category, lowStockOnly, page, limit } = params;
 
@@ -65,6 +67,12 @@ export function useStock(initialBranchId) {
     fetchAll();
   }, [fetchAll]);
 
+  useEffect(() => {
+    getCategoriesApi()
+      .then((cats) => setCategories(Array.isArray(cats) ? cats : []))
+      .catch(() => setCategories([]));
+  }, []);
+
   const setSearch = useCallback((v) => {
     setParams((p) => ({ ...p, search: v, page: 1 }));
   }, []);
@@ -84,6 +92,7 @@ export function useStock(initialBranchId) {
     summary,
     loading,
     error,
+    categories,
     params,
     setSearch,
     setCategory,
