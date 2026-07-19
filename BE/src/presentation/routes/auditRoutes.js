@@ -116,31 +116,8 @@ function buildAuditRouter() {
     }
   });
 
-  /**
-   * GET /api/audit/:id
-   * Lay chi tiet mot audit log
-   */
-  router.get('/:id', async (req, res, next) => {
-    try {
-      const log = await auditService.getAuditLogById(req.params.id);
-      return success(res, log, 'Lay chi tiet audit log thanh cong');
-    } catch (err) {
-      return next(err);
-    }
-  });
-
-  router.get('/users/:userId/logs', async (req, res, next) => {
-    try {
-      const data = await auditService.getAuditLogsByUser(
-        req.params.userId,
-        req.query.limit
-      );
-      return success(res, data, 'Lay audit log theo user thanh cong');
-    } catch (err) {
-      return next(err);
-    }
-  });
-
+  // IMPORTANT: Dinh tuyen /login-sessions VA /entity-definitions TRUOC /:id
+  // vi Express match theo thu tu, neu dat /:id truoc thi login-sessions se bi bat boi /:id
   router.get('/login-sessions', async (req, res, next) => {
     try {
       const data = await auditService.getLoginSessions({
@@ -164,6 +141,32 @@ function buildAuditRouter() {
     try {
       const data = await auditService.getEntityDefinitions();
       return success(res, data, 'Lay danh sach entity definition thanh cong');
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  router.get('/users/:userId/logs', async (req, res, next) => {
+    try {
+      const data = await auditService.getAuditLogsByUser(
+        req.params.userId,
+        req.query.limit
+      );
+      return success(res, data, 'Lay audit log theo user thanh cong');
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  /**
+   * GET /api/audit/:id
+   * Lay chi tiet mot audit log
+   * PHAI DAT CUOI CUNG vi no la wildcard route
+   */
+  router.get('/:id', async (req, res, next) => {
+    try {
+      const log = await auditService.getAuditLogById(req.params.id);
+      return success(res, log, 'Lay chi tiet audit log thanh cong');
     } catch (err) {
       return next(err);
     }
