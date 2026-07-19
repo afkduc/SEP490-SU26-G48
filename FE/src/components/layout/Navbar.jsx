@@ -60,18 +60,18 @@ const MANAGER_NAV = [
   { label: 'Bảng điều khiển', path: '/dashboard' },
   { label: 'Kho', path: '/inventory' },
   {
-    label: 'Phieu nhap',
+    label: 'Phiếu nhập',
     icon: '📥',
     children: [
-      { label: 'Danh sach phieu nhap', path: '/manager/import-requests' },
-      { label: 'Phieu can duyet', path: '/manager/import-requests?status=pending' },
+      { label: 'Danh sách phiếu nhập', path: '/manager/import-requests' },
+      { label: 'Phiếu cần duyệt', path: '/manager/import-requests?status=pending' },
     ],
   },
   {
-    label: 'Phieu xuat',
+    label: 'Phiếu xuất',
     icon: '📤',
     children: [
-      { label: 'Danh sach phieu xuat', path: '/manager/export-requests' },
+      { label: 'Danh sách phiếu xuất', path: '/manager/export-requests' },
     ],
   },
   {
