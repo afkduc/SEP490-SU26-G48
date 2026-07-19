@@ -40,3 +40,7 @@ export async function getStockSummaryApi(branchId) {
   const qs = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
   return httpClient.get(`/inventory/summary${qs}`);
 }
+
+export async function getCategoriesApi() {
+  return httpClient.get('/products/categories');
+}

@@ -12,6 +12,7 @@ class ProductResponseDto {
       category: product.category,
       brandName: product.brandName,
       unitId: product.unitId,
+      unit: product.unit || 'Cai',
       unitName: product.unitName,
       unitPrice: product.unitPrice,
       stockQuantity: product.stockQuantity,

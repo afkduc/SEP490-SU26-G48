@@ -55,6 +55,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
     return result.recordset.map((r) => {
       const product = Product.fromPersistence(r);
       product.supplierName = r.supplier_name;
+      product.unit = r.unit_name || 'Cai';
       return product;
     });
   }
@@ -84,6 +85,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
     return result.recordset.map((r) => {
       const product = Product.fromPersistence(r);
       product.supplierName = r.supplier_name;
+      product.unit = r.unit_name || 'Cai';
       return product;
     });
   }
@@ -100,6 +102,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
     if (!result.recordset[0]) return null;
     const product = Product.fromPersistence(result.recordset[0]);
     product.supplierName = result.recordset[0].supplier_name;
+    product.unit = result.recordset[0].unit_name || 'Cai';
     return product;
   }
 
@@ -143,6 +146,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
       if (!row) return null;
       const product = Product.fromPersistence(row);
       product.supplierName = row.supplier_name;
+      product.unit = row.unit_name || 'Cai';
       return product;
     });
   }
@@ -177,7 +181,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
       `SELECT p.*, s.supplier_name, u.unit_name
        FROM   products p
        LEFT JOIN suppliers s ON s.id = p.supplier_id
-       LEFT JOIN units u ON u.id = p.unit_id
+LEFT JOIN units u ON u.id = p.unit_id
        WHERE  p.branch_id = @branchId AND p.status = 'active'
        ORDER  BY p.product_name`,
       { branchId }
@@ -185,6 +189,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
     return result.recordset.map((r) => {
       const product = Product.fromPersistence(r);
       product.supplierName = r.supplier_name;
+      product.unit = r.unit_name || 'Cai';
       return product;
     });
   }
