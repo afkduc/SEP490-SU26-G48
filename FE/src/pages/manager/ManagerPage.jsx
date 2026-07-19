@@ -830,6 +830,19 @@ function ServiceListPage() {
   );
 }
 
+// Phai giu dong bo voi REPAIR_CATEGORY_OPTIONS trong RepairSettlementPage.jsx
+// va REPAIR_CATEGORY_VALUES trong RepairSettlementService.js/ManagerService.js -
+// khai bao san Loai hinh sua chua o day de man tao phieu quyet toan tu dong
+// dien theo dung dich vu/goi da chon, khong phai chon tay tung lan.
+const REPAIR_CATEGORY_OPTIONS = [
+  { value: '', label: '' },
+  { value: 'ER', label: 'Sửa chữa động cơ' },
+  { value: 'CB', label: 'Sửa chữa gầm - phanh' },
+  { value: 'EE', label: 'Sửa chữa điện - điện tử' },
+  { value: 'BP', label: 'Đồng sơn' },
+  { value: 'PM', label: 'Bảo dưỡng định kỳ' },
+];
+
 function ServiceFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -839,7 +852,7 @@ function ServiceFormPage({ mode }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
-    serviceName: '', categoryId: '', unitPrice: '', durationMin: '', description: '', isActive: true,
+    serviceName: '', categoryId: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
   });
   const [parts, setParts] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -866,6 +879,7 @@ function ServiceFormPage({ mode }) {
             durationMin: data.durationMin ?? '',
             description: data.description || '',
             isActive: data.isActive,
+            repairCategory: data.repairCategory || '',
           });
           setParts((data.parts || []).map((p) => ({ productId: String(p.productId), quantity: p.quantity })));
         })
@@ -924,6 +938,7 @@ function ServiceFormPage({ mode }) {
         durationMin: form.durationMin === '' ? null : Number(form.durationMin),
         description: form.description.trim(),
         isActive: form.isActive,
+        repairCategory: form.repairCategory || null,
         parts: parts
           .filter((p) => p.productId !== '')
           .map((p) => ({ productId: Number(p.productId), quantity: Number(p.quantity) })),
@@ -1048,6 +1063,16 @@ function ServiceFormPage({ mode }) {
               <label className="form-label">Thời gian thực hiện (phút)</label>
               <input type="number" min="0" className="form-input" value={form.durationMin} onChange={(e) => setField('durationMin', e.target.value)} placeholder="Ví dụ: 30" />
               {fieldErrors.durationMin && <span className="form-error">{fieldErrors.durationMin}</span>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Loại hình sửa chữa</label>
+              <select className="form-select" value={form.repairCategory} onChange={(e) => setField('repairCategory', e.target.value)}>
+                {REPAIR_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
+                Dùng để tự điền khi cố vấn dịch vụ chọn dịch vụ này trên phiếu quyết toán.
+              </div>
             </div>
 
             {isEdit && (
@@ -1365,7 +1390,7 @@ function ServicePackageFormPage({ mode }) {
   const [availableServices, setAvailableServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [form, setForm] = useState({
-    packageName: '', categoryId: '', applicableKm: '', totalPrice: '', description: '', isActive: true, serviceIds: [],
+    packageName: '', categoryId: '', applicableKm: '', totalPrice: '', description: '', isActive: true, repairCategory: '', serviceIds: [],
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1390,6 +1415,7 @@ function ServicePackageFormPage({ mode }) {
             totalPrice: data.totalPrice ?? '',
             description: data.description || '',
             isActive: data.isActive,
+            repairCategory: data.repairCategory || '',
             serviceIds: (data.services || []).map((s) => s.id),
           });
         })
@@ -1443,6 +1469,7 @@ function ServicePackageFormPage({ mode }) {
         totalPrice: Number(form.totalPrice),
         description: form.description.trim(),
         isActive: form.isActive,
+        repairCategory: form.repairCategory || null,
         serviceIds: form.serviceIds,
       };
 
@@ -1530,6 +1557,16 @@ function ServicePackageFormPage({ mode }) {
               {form.serviceIds.length > 0 && (
                 <span className="form-hint">Tổng giá các dịch vụ đã chọn: {formatCurrency(selectedTotal)}</span>
               )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Loại hình sửa chữa</label>
+              <select className="form-select" value={form.repairCategory} onChange={(e) => setField('repairCategory', e.target.value)}>
+                {REPAIR_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
+                Dùng để tự điền khi cố vấn dịch vụ chọn gói này trên phiếu quyết toán.
+              </div>
             </div>
 
             {isEdit && (

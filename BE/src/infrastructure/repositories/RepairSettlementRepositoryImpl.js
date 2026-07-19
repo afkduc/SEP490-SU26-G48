@@ -320,6 +320,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('itemDescription', sql.NVarChar(300), item.description)
         .input('lhsc', sql.VarChar(10), item.lhsc)
         .input('httt', sql.VarChar(10), item.httt)
+        .input('repairCategory', sql.VarChar(10), item.repairCategory || null)
         .input('unit', sql.NVarChar(20), item.unit || null)
         .input('quantity', sql.Int, item.qty || 0)
         .input('unitPrice', sql.Decimal(18, 2), item.unitPrice || 0)
@@ -329,11 +330,11 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .query(`
           INSERT INTO service_order_items (
             service_order_id, item_type, product_id, service_id, item_code, item_description,
-            lhsc, httt, unit, quantity, unit_price, discount_pct, is_free, total
+            lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total
           )
           VALUES (
             @serviceOrderId, @itemType, @productId, @serviceId, @itemCode, @itemDescription,
-            @lhsc, @httt, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total
+            @lhsc, @httt, @repairCategory, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total
           )
         `);
     }

@@ -339,8 +339,8 @@ function RepairOrderList() {
   const loadAll = () => {
     setLoading(true);
     return Promise.all([
-      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100 }),
-      listRepairSettlementsApi({ status: 'cancelled', limit: 100 }),
+      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100, scope: 'branch' }),
+      listRepairSettlementsApi({ status: 'cancelled', limit: 100, scope: 'branch' }),
       listRepairOrdersApi(),
     ])
       .then(([waitingResult, cancelledResult, orderResult]) => {
@@ -420,7 +420,13 @@ function RepairOrderList() {
       return true;
     });
 
+    // Phieu "Dang cho phan cong" luon noi len dau, khong phu thuoc ngay tao cu/moi -
+    // day la viec can xu ly gap nhat, khong the de bi chon vui xuong trang sau chi
+    // vi tao tu lau (sap xep theo ngay chi ap dung TRONG TUNG nhom, khong gop chung).
     result = [...result].sort((a, b) => {
+      const pendingA = a.status === 'pending_assignment' ? 0 : 1;
+      const pendingB = b.status === 'pending_assignment' ? 0 : 1;
+      if (pendingA !== pendingB) return pendingA - pendingB;
       const da = parseDDMMYYYY(a.date);
       const db = parseDDMMYYYY(b.date);
       if (!da && !db) return 0;
@@ -655,7 +661,7 @@ function RepairOrderCreate() {
   useEffect(() => {
     let alive = true;
     Promise.all([
-      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100 }),
+      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100, scope: 'branch' }),
       listTeamLeadersApi(),
     ])
       .then(([settlementResult, teamLeaderResult]) => {

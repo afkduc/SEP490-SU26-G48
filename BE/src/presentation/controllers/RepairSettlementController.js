@@ -7,7 +7,7 @@ class RepairSettlementController {
 
   getAll = async (req, res, next) => {
     try {
-      const { status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 20 } = req.query;
+      const { status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 20, scope } = req.query;
       const isServiceAdvisor = req.user.roles?.includes('service_advisor');
       const result = await this.repairSettlementService.getAll({
         branchId: req.user.branchId,
@@ -19,12 +19,24 @@ class RepairSettlementController {
         toDate,
         // Chi loc theo advisorId khi dang xem danh sach chung cua chi nhanh
         // (khong truyen customerId/vehicleId) - man lich su khach hang/xe van
-        // phai thay du, khong bi che theo advisor dang dang nhap.
-        advisorId: isServiceAdvisor && !customerId && !vehicleId ? req.user.userId : undefined,
+        // phai thay du, khong bi che theo advisor dang dang nhap. scope=branch
+        // (man "Lenh sua chua") cung khong loc - bang dieu phoi chung ca chi
+        // nhanh, moi co van deu phai thay het de gan to truong cho nhau duoc.
+        advisorId: isServiceAdvisor && !customerId && !vehicleId && scope !== 'branch' ? req.user.userId : undefined,
         page: Number(page),
         limit: Number(limit),
       });
       return success(res, result, 'Repair settlements retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  checkDuplicate = async (req, res, next) => {
+    try {
+      const { customerId, vehicleId, excludeId } = req.query;
+      const result = await this.repairSettlementService.checkActiveDuplicate(customerId, vehicleId, excludeId);
+      return success(res, result, 'Checked active duplicate');
     } catch (err) {
       next(err);
     }
