@@ -30,7 +30,7 @@ class SecurityAlertRepository {
     );
 
     const dataResult = await query(`
-      SELECT TOP 500
+      SELECT
         sa.id,
         sa.severity,
         sa.title,

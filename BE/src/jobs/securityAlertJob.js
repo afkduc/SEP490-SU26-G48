@@ -73,14 +73,15 @@ async function checkFailedLoginBurst() {
 async function checkNewAdminRole() {
   try {
     const result = await query(`
-      SELECT TOP 10 ur.id, ur.user_id, ur.role_id, ur.created_at,
+      SELECT TOP 10 ur.id, ur.user_id, ur.role_id,
+             u.created_at AS role_assigned_at,
              u.user_name, u.email, r.role_name
       FROM user_role ur
       JOIN users u ON u.id = ur.user_id
       JOIN roles r ON r.id = ur.role_id
       WHERE r.role_name = 'admin'
-        AND ur.created_at >= DATEADD(HOUR, -24, GETDATE())
-      ORDER BY ur.created_at DESC
+        AND u.created_at >= DATEADD(HOUR, -24, GETDATE())
+      ORDER BY u.created_at DESC
     `);
 
     for (const row of result.recordset) {
@@ -91,7 +92,7 @@ async function checkNewAdminRole() {
         userId: row.user_id,
         branchId: null,
         ruleKey: RULE_KEYS.NEW_ADMIN_ROLE,
-        metadata: { userName: row.user_name, email: row.email, assignedAt: row.created_at },
+        metadata: { userName: row.user_name, email: row.email, assignedAt: row.role_assigned_at },
       });
     }
   } catch (err) {
