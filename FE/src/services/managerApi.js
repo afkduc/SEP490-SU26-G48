@@ -30,6 +30,10 @@ class ManagerApi {
     return httpClient.get('/manager/service-categories');
   }
 
+  getProducts() {
+    return httpClient.get('/manager/products');
+  }
+
   getServices(params = {}) {
     const query = new URLSearchParams(params).toString();
     return httpClient.get(`/manager/services${query ? `?${query}` : ''}`);
