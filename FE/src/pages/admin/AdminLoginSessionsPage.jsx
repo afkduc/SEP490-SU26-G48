@@ -5,6 +5,7 @@ import { useSharedBranches } from '../../contexts/SharedDataContext';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
+import { formatDateSafe } from '../../utils/dateUtils';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -27,12 +28,12 @@ const STATUS_CLASS = { active: 'badge--success', ended: 'badge--secondary', fail
 const STATUS_LABEL = { active: 'Đang hoạt động', ended: 'Đã đăng xuất', failed: 'Thất bại' };
 
 function formatDate(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('vi-VN', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  // Su dung formatDateSafe de parse an toan va hien thi VN timezone
+  // (khop voi server tra ve UTC). Cu: khong co timeZone nen dung browser local.
+  return formatDateSafe(value, {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    locale: 'vi-VN',
+    withSeconds: true,
   });
 }
 

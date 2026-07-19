@@ -399,6 +399,7 @@ class AdminUserRepositoryImpl {
     let recentLogins = [];
     let todayLogins = 0;
     let failedLogins = 0;
+    let recentFailedLogins = 0;
     try {
       const loginResult = await query(`
         SELECT TOP 8
@@ -426,23 +427,35 @@ class AdminUserRepositoryImpl {
         status: row.status,
       }));
 
-      // Today's login count
+      // Today's successful login count
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const todayResult = await query(`
         SELECT COUNT(*) AS total
         FROM login_sessions
-        WHERE login_time >= @p1
+        WHERE action_type = 'LOGIN'
+          AND login_time >= @p1
       `, { p1: todayStart });
       todayLogins = Number(todayResult.recordset[0].total);
 
-      // Failed logins count
+      // Failed logins count — today only (same time boundary as todayLogins)
       const failedResult = await query(`
         SELECT COUNT(*) AS total
         FROM login_sessions
         WHERE action_type = 'LOGIN_FAILED'
-      `);
+          AND login_time >= @p1
+      `, { p1: todayStart });
       failedLogins = Number(failedResult.recordset[0].total);
+
+      // Chi dung cua so 15 phut cho canh bao bao mat. failedLogins o tren
+      // van la thong ke lich su trong ngay de hien thi tai card dashboard.
+      const recentFailedResult = await query(`
+        SELECT COUNT(*) AS total
+        FROM login_sessions
+        WHERE action_type = 'LOGIN_FAILED'
+          AND login_time >= DATEADD(MINUTE, -15, SYSUTCDATETIME())
+      `);
+      recentFailedLogins = Number(recentFailedResult.recordset[0].total);
     } catch (_) {
       recentLogins = [];
     }
@@ -492,6 +505,7 @@ class AdminUserRepositoryImpl {
       recentLogins,
       todayLogins,
       failedLogins,
+      recentFailedLogins,
       alerts,
     };
   }

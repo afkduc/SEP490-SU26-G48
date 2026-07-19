@@ -47,9 +47,21 @@
 }
 
 /* ── Action buttons ── */
+.admin-users__actions-cell {
+  white-space: nowrap;
+}
+
 .action-btns {
   display: flex;
   gap: 6px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.action-btns .btn--sm {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .btn--view {

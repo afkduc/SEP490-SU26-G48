@@ -634,6 +634,7 @@ class AdminController {
           permissions: permissionKeys,
           branchId: req.user.branchId,
           tokenVersion: req.user.tokenVersion,
+          ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
         },
         config.jwtSecret,
         { expiresIn: config.jwtExpiresIn }
@@ -677,6 +678,7 @@ class AdminController {
           permissions: permissionKeys,
           branchId: req.user.branchId,
           tokenVersion: req.user.tokenVersion,
+          ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
         },
         config.jwtSecret,
         { expiresIn: config.jwtExpiresIn }

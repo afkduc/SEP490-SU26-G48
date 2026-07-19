@@ -55,6 +55,7 @@ async function start() {
     try {
       require('./jobs/securityAlertJob').start();
       require('./jobs/auditRetentionJob').start();
+      require('./jobs/loginSessionCleanupJob').start();
     } catch (jobErr) {
       console.warn('[BE] Failed to start background jobs:', jobErr.message);
     }

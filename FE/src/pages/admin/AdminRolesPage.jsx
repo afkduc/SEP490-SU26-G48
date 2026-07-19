@@ -416,13 +416,12 @@ export default function AdminRolesPage() {
       // Refresh token với permissions mới từ DB
       try {
         const result = await refreshPermissionsApi();
-        if (result?.token) {
-          localStorage.setItem('token', result.token);
-          sessionStorage.setItem('token', result.token);
-        }
-        if (result?.permissions) {
-          localStorage.setItem('permissions', JSON.stringify(result.permissions));
-          sessionStorage.setItem('permissions', JSON.stringify(result.permissions));
+        if (result?.token || result?.permissions) {
+          const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
+          if (result.token) storage.setItem('token', result.token);
+          if (result.permissions) {
+            storage.setItem('permissions', JSON.stringify(result.permissions));
+          }
         }
       } catch {
         // Neu refresh that bai, van thong bao thanh cong (BE da luu DB)

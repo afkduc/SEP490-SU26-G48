@@ -7,7 +7,10 @@ export default function SessionExpiredModal() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handler = () => setVisible(true);
+    const handler = () => {
+      if (window.location.pathname === '/login') return;
+      setVisible(true);
+    };
     window.addEventListener(SESSION_EXPIRED_KEY, handler);
     return () => window.removeEventListener(SESSION_EXPIRED_KEY, handler);
   }, []);
@@ -17,8 +20,10 @@ export default function SessionExpiredModal() {
     // Clear local storage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('permissions');
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
+    sessionStorage.removeItem('permissions');
     navigate('/login', { replace: true });
   }
 
