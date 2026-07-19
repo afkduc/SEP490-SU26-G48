@@ -15,7 +15,8 @@ const HEADER_SELECT = `
          v.license_plate    AS vehicle_license_plate,
          v.vehicle_model_text,
          c.id           AS customer_id,
-         c.full_name    AS customer_full_name
+         c.full_name    AS customer_full_name,
+         so.advisor_id  AS advisor_id
   FROM   repair_orders ro
   JOIN   branches b      ON b.id = ro.branch_id
   JOIN   users    tl     ON tl.id = ro.team_leader_id
@@ -37,6 +38,8 @@ function genCode(prefix, id) {
 }
 
 class RepairOrderRepositoryImpl extends RepairOrderRepository {
+  // Man "Lenh sua chua" la bang dieu phoi chung ca chi nhanh - khong loc theo
+  // advisorId, de bat ky co van dich vu nao cung thay het de gan to truong.
   async findAll({ branchId } = {}) {
     const result = await query(
       `${HEADER_SELECT} WHERE ro.branch_id = @branchId ORDER BY ro.id DESC`,

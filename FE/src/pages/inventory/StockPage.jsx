@@ -194,7 +194,7 @@ export default function StockPage() {
                         <Link to={`/inventory/parts/${p.id}`}>{p.productName ?? p.partName}</Link>
                       </td>
                       <td>{p.category || '—'}</td>
-                      <td>{p.unit || '—'}</td>
+                      <td>{p.unitName || '—'}</td>
                       <td className={`text-right ${isLow ? 'text-danger' : 'text-success'}`}>
                         {p.stockQuantity}
                       </td>

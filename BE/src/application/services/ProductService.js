@@ -56,6 +56,9 @@ class ProductService {
     if (!payload.branchId) {
       throw new ApiError(400, 'branchId is required');
     }
+    if (!payload.unitId) {
+      throw new ApiError(400, 'unitId is required');
+    }
     const existing = await this.productRepository.findByCode(payload.productCode, payload.branchId);
     if (existing) {
       throw new ApiError(409, 'Product code already exists in this branch');
@@ -90,8 +93,12 @@ class ProductService {
     return ProductResponseDto.fromEntity(deleted);
   }
 
-  async getCategories() {
+async getCategories() {
     return this.productRepository.getDistinctCategories();
+  }
+
+  async listUnits() {
+    return this.productRepository.listUnits();
   }
 }
 

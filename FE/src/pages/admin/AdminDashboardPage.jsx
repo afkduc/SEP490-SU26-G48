@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import {
@@ -783,50 +783,13 @@ function QuickAction({ to, icon, label, desc, accent }) {
   );
 }
 
-// Tab navigation noi bo: chi mot tab active tai mot thoi diem.
-// Click vao tab se smooth-scroll den section tuong ung.
-// Trang thai active cung duoc dong bo tu dong boi IntersectionObserver
-// khi nguoi dung cuon trang thu cong.
-function LogsTabSwitcher({ activeTab, onTabClick, auditCount, loginCount }) {
-  const handleClick = (tabId, sectionId) => {
-    onTabClick(tabId, sectionId);
-  };
-
-  return (
-    <div className="logs-tab-bar" role="tablist" aria-label="Loai nhat ky">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === 'activity'}
-        className={'logs-tab-btn' + (activeTab === 'activity' ? ' logs-tab-btn--active' : '')}
-        onClick={() => handleClick('activity', 'logs-activity-section')}
-      >
-        <IconLog />
-        <span>Nhật ký hoạt động</span>
-        <span className="logs-tab-btn__badge">{auditCount}</span>
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={activeTab === 'login'}
-        className={'logs-tab-btn' + (activeTab === 'login' ? ' logs-tab-btn--active' : '')}
-        onClick={() => handleClick('login', 'logs-login-section')}
-      >
-        <IconLogin />
-        <span>Lịch sử đăng nhập</span>
-        <span className="logs-tab-btn__badge">{loginCount}</span>
-      </button>
-    </div>
-  );
-}
-
 // ─── Main component ─────────────────────────────────────────────────────────
 
 const QUICK_ACTIONS = [
-  { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem & chỉnh sửa tài khoản', accent: '#4f46e5' },
+  { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem, chỉnh sửa & phân quyền', accent: '#4f46e5' },
   { to: '/admin/users/create', icon: <IconUsers />, label: 'Thêm người dùng mới', desc: 'Tạo tài khoản mới', accent: '#059669' },
-  { to: '/admin/roles', icon: <IconRole />, label: 'Quản lý vai trò', desc: 'Phân quyền người dùng', accent: '#7c3aed' },
-  { to: '/admin/logs', icon: <IconLog />, label: 'Nhật ký hệ thống', desc: 'Lịch sử thao tác', accent: '#d97706' },
+  { to: '/admin/logs', icon: <IconLog />, label: 'Nhật ký hoạt động', desc: 'Lịch sử thao tác', accent: '#d97706' },
+  { to: '/admin/login-sessions', icon: <IconLogin />, label: 'Lịch sử đăng nhập', desc: 'Theo dõi thiết bị & phiên', accent: '#0891b2' },
   { to: '/admin/profile', icon: <IconTerminal />, label: 'Hồ sơ cá nhân', desc: 'Chỉnh sửa thông tin', accent: '#db2777' },
 ];
 
@@ -835,13 +798,6 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Tab hien tai cua widget "Nhat ky". Mac dinh la activity (nhat ky hoat dong).
-  const [logsTab, setLogsTab] = useState('activity');
-  // Refs toi 2 section de scroll va observe
-  const activitySectionRef = useRef(null);
-  const loginSectionRef = useRef(null);
-  // Flag de tranh observer "nhay" tab khi dang thuc hien smooth-scroll do click
-  const programmaticScrollRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -883,56 +839,6 @@ export default function AdminDashboardPage() {
     })();
     return () => { cancelled = true; };
   }, []);
-
-  // IntersectionObserver: tu dong cap nhat active tab dua tren section
-  // dang hien thi tren man hinh khi nguoi dung cuon thu cong.
-  useEffect(() => {
-    if (!activitySectionRef.current || !loginSectionRef.current) return undefined;
-
-    const visibility = new Map();
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          visibility.set(entry.target.id, entry.intersectionRatio);
-        });
-        if (programmaticScrollRef.current) return;
-
-        const activityRatio = visibility.get('logs-activity-section') || 0;
-        const loginRatio = visibility.get('logs-login-section') || 0;
-        const visibleRatio = Math.max(activityRatio, loginRatio);
-        if (visibleRatio < 0.15) return;
-
-        if (loginRatio > activityRatio) {
-          setLogsTab('login');
-        } else {
-          setLogsTab('activity');
-        }
-      },
-      {
-        threshold: [0, 0.15, 0.3, 0.5, 0.75, 1],
-        rootMargin: '-80px 0px -40% 0px',
-      }
-    );
-
-    observer.observe(activitySectionRef.current);
-    observer.observe(loginSectionRef.current);
-
-    return () => observer.disconnect();
-  }, [stats]);
-
-  // Xu ly khi click tab: smooth-scroll den section tuong ung va cap nhat state
-  const handleTabClick = (tabId, sectionId) => {
-    programmaticScrollRef.current = true;
-    setLogsTab(tabId);
-    const el = document.getElementById(sectionId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    window.setTimeout(() => {
-      programmaticScrollRef.current = false;
-    }, 800);
-  };
 
   // Gop alerts tu backend voi alerts tu sinh (auto) de widget luon co noi dung.
   // Uu tien alerts backend, sau do them alerts auto neu can.
@@ -1073,39 +979,25 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Logs widget: gom 2 section (Activity + Login) vao chung 1 widget */}
+            {/* Logs widget - chi hien thi audit logs gan day */}
             <div className="dash-widget dash-widget--logs">
               <div className="dash-widget__topbar">
-                <LogsTabSwitcher
-                  activeTab={logsTab}
-                  onTabClick={handleTabClick}
-                  auditCount={combinedActivity.length}
-                  loginCount={stats.recentLogins?.length || 0}
-                />
-                <Link
-                  to={logsTab === 'login' ? '/admin/logs?tab=login' : '/admin/logs'}
-                  className="section-header__link"
-                >
-                  Xem tất cả <IconArrowRight />
-                </Link>
+                <div className="dash-widget__title">
+                  <IconLog />
+                  <h2 className="dash-widget__heading">Nhật ký hoạt động gần đây</h2>
+                </div>
+                <div className="dash-widget__topbar-links">
+                  <Link to="/admin/logs" className="section-header__link">
+                    Xem tất cả <IconArrowRight />
+                  </Link>
+                  <Link to="/admin/login-sessions" className="section-header__link section-header__link--alt">
+                    Lịch sử đăng nhập <IconArrowRight />
+                  </Link>
+                </div>
               </div>
 
               <div className="dash-widget__body dash-widget__body--logs">
-                {/* Activity section */}
-                <div
-                  id="logs-activity-section"
-                  ref={activitySectionRef}
-                  className="dash-logs-section dash-logs-section--scroll-target"
-                >
-                  <div className="dash-logs-section__header">
-                    <IconLog />
-                    <h3>Nhật ký hoạt động gần đây</h3>
-                    {combinedActivity.length > 0 && (
-                      <span className="dash-logs-section__count">
-                        {combinedActivity.length}
-                      </span>
-                    )}
-                  </div>
+                <div className="dash-logs-section dash-logs-section--scroll-target">
                   <div className="dash-logs-section__body">
                     {combinedActivity.length > 0 ? (
                       combinedActivity.map((entry, idx) => (
@@ -1129,40 +1021,6 @@ export default function AdminDashboardPage() {
                         <p>Chưa có hoạt động nào được ghi nhận</p>
                         <span className="empty-state__hint">
                           Hãy thao tác trên hệ thống để tạo nhật ký đầu tiên
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Login section */}
-                <div
-                  id="logs-login-section"
-                  ref={loginSectionRef}
-                  className="dash-logs-section dash-logs-section--scroll-target"
-                >
-                  <div className="dash-logs-section__header">
-                    <IconLogin />
-                    <h3>Lịch sử đăng nhập gần đây</h3>
-                    {(stats.recentLogins?.length || 0) > 0 && (
-                      <span className="dash-logs-section__count">
-                        {stats.recentLogins.length}
-                      </span>
-                    )}
-                  </div>
-                  <div className="dash-logs-section__body">
-                    {(stats.recentLogins || []).length > 0 ? (
-                      stats.recentLogins.map((item) => (
-                        <LoginItem key={item.id} item={item} />
-                      ))
-                    ) : (
-                      <div className="empty-state">
-                        <div className="empty-state__icon" style={{ color: '#94a3b8' }}>
-                          <IconLogin />
-                        </div>
-                        <p>Chưa có lịch sử đăng nhập</p>
-                        <span className="empty-state__hint">
-                          Login session sẽ được ghi lại khi người dùng đăng nhập
                         </span>
                       </div>
                     )}

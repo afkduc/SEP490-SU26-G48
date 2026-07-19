@@ -5,6 +5,10 @@ dist/
 *.log
 .claude/settings.local.json
 
-# Database
+# Database files - tự sinh, không đẩy lên git
 *.sql
-!db.sql
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.bak

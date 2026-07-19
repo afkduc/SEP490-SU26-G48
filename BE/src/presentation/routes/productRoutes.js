@@ -12,6 +12,7 @@ function buildProductRouter() {
 
   router.get('/categories', controller.getCategories);
   router.get('/', controller.getAll);
+  router.get('/units', controller.listUnits);
   router.get('/:id', controller.getById);
   router.post('/', controller.create);
   router.put('/:id', controller.update);

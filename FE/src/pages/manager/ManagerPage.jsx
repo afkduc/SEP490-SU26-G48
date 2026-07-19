@@ -580,6 +580,18 @@ function EmployeeFormPage({ mode }) {
 }
 
 function ServiceDetailModal({ service, onClose }) {
+  const [parts, setParts] = useState(null);
+
+  useEffect(() => {
+    if (!service?.id) return undefined;
+    let mounted = true;
+    setParts(null);
+    managerApi.getServiceById(service.id)
+      .then((data) => { if (mounted) setParts(data?.parts || []); })
+      .catch(() => { if (mounted) setParts([]); });
+    return () => { mounted = false; };
+  }, [service?.id]);
+
   if (!service) return null;
   const badge = activeBadge(service.isActive);
   return (
@@ -601,6 +613,29 @@ function ServiceDetailModal({ service, onClose }) {
             <div className="detail-row"><div className="detail-label">Thời gian thực hiện</div><div className="detail-value">{service.durationMin ? `${service.durationMin} phút` : '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{service.description || '—'}</div></div>
           </div>
+
+          <div className="form-section-title" style={{ marginTop: 16 }}>🔩 Phụ tùng cần thiết</div>
+          {parts === null && <div style={{ fontSize: 13, color: 'var(--gray-500)' }}>Đang tải…</div>}
+          {parts && parts.length === 0 && <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Chưa khai báo phụ tùng nào</div>}
+          {parts && parts.length > 0 && (
+            <div className="table-wrapper" style={{ boxShadow: 'none', marginTop: 8 }}>
+              <table className="data-table">
+                <thead>
+                  <tr><th>Mã</th><th>Tên phụ tùng</th><th>Đơn vị</th><th>Số lượng</th></tr>
+                </thead>
+                <tbody>
+                  {parts.map((p) => (
+                    <tr key={p.productId}>
+                      <td style={{ fontFamily: 'monospace' }}>{p.productCode}</td>
+                      <td>{p.productName}</td>
+                      <td>{p.unitName || '—'}</td>
+                      <td>{p.quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
@@ -799,6 +834,19 @@ function ServiceListPage() {
   );
 }
 
+// Phai giu dong bo voi REPAIR_CATEGORY_OPTIONS trong RepairSettlementPage.jsx
+// va REPAIR_CATEGORY_VALUES trong RepairSettlementService.js/ManagerService.js -
+// khai bao san Loai hinh sua chua o day de man tao phieu quyet toan tu dong
+// dien theo dung dich vu/goi da chon, khong phai chon tay tung lan.
+const REPAIR_CATEGORY_OPTIONS = [
+  { value: '', label: '' },
+  { value: 'ER', label: 'Sửa chữa động cơ' },
+  { value: 'CB', label: 'Sửa chữa gầm - phanh' },
+  { value: 'EE', label: 'Sửa chữa điện - điện tử' },
+  { value: 'BP', label: 'Đồng sơn' },
+  { value: 'PM', label: 'Bảo dưỡng định kỳ' },
+];
+
 function ServiceFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -806,9 +854,11 @@ function ServiceFormPage({ mode }) {
 
   const [branch, setBranch] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
-    serviceName: '', categoryId: '', unitPrice: '', durationMin: '', description: '', isActive: true,
+    serviceName: '', categoryId: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
   });
+  const [parts, setParts] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
@@ -819,6 +869,7 @@ function ServiceFormPage({ mode }) {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
     managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
+    managerApi.getProducts().then((data) => { if (mounted) setProducts(data || []); }).catch(() => {});
 
     if (isEdit && id) {
       managerApi
@@ -832,7 +883,9 @@ function ServiceFormPage({ mode }) {
             durationMin: data.durationMin ?? '',
             description: data.description || '',
             isActive: data.isActive,
+            repairCategory: data.repairCategory || '',
           });
+          setParts((data.parts || []).map((p) => ({ productId: String(p.productId), quantity: p.quantity })));
         })
         .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin dịch vụ'); })
         .finally(() => { if (mounted) setLoading(false); });
@@ -841,6 +894,12 @@ function ServiceFormPage({ mode }) {
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit]);
+
+  const addPartRow = () => setParts((prev) => [...prev, { productId: '', quantity: 1 }]);
+  const removePartRow = (idx) => setParts((prev) => prev.filter((_, i) => i !== idx));
+  const setPartField = (idx, key, value) => {
+    setParts((prev) => prev.map((p, i) => (i === idx ? { ...p, [key]: value } : p)));
+  };
 
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -856,6 +915,14 @@ function ServiceFormPage({ mode }) {
     }
     if (form.durationMin !== '' && (Number.isNaN(Number(form.durationMin)) || Number(form.durationMin) < 0)) {
       errors.durationMin = 'Thời gian không hợp lệ';
+    }
+    const filledParts = parts.filter((p) => p.productId !== '');
+    if (filledParts.some((p) => !p.quantity || Number(p.quantity) <= 0)) {
+      errors.parts = 'Số lượng phụ tùng phải lớn hơn 0';
+    }
+    const productIds = filledParts.map((p) => p.productId);
+    if (new Set(productIds).size !== productIds.length) {
+      errors.parts = 'Không được chọn trùng 1 phụ tùng nhiều lần';
     }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
@@ -875,6 +942,10 @@ function ServiceFormPage({ mode }) {
         durationMin: form.durationMin === '' ? null : Number(form.durationMin),
         description: form.description.trim(),
         isActive: form.isActive,
+        repairCategory: form.repairCategory || null,
+        parts: parts
+          .filter((p) => p.productId !== '')
+          .map((p) => ({ productId: Number(p.productId), quantity: Number(p.quantity) })),
       };
 
       let result;
@@ -998,6 +1069,16 @@ function ServiceFormPage({ mode }) {
               {fieldErrors.durationMin && <span className="form-error">{fieldErrors.durationMin}</span>}
             </div>
 
+            <div className="form-group">
+              <label className="form-label">Loại hình sửa chữa</label>
+              <select className="form-select" value={form.repairCategory} onChange={(e) => setField('repairCategory', e.target.value)}>
+                {REPAIR_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
+                Dùng để tự điền khi cố vấn dịch vụ chọn dịch vụ này trên phiếu quyết toán.
+              </div>
+            </div>
+
             {isEdit && (
               <div className="form-group">
                 <label className="form-label required">Trạng thái</label>
@@ -1013,6 +1094,48 @@ function ServiceFormPage({ mode }) {
             <label className="form-label">Mô tả</label>
             <textarea className="form-textarea" value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Mô tả ngắn về dịch vụ" />
           </div>
+        </div>
+
+        <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
+          <div className="form-section-title">🔩 Phụ tùng cần thiết</div>
+          <div style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 12 }}>
+            Khai báo phụ tùng và số lượng cần dùng để hoàn thành dịch vụ này (không bắt buộc).
+          </div>
+
+          {parts.length === 0 && (
+            <div style={{ color: 'var(--gray-400)', fontSize: 13, marginBottom: 10 }}>Chưa có phụ tùng nào</div>
+          )}
+
+          {parts.map((part, idx) => {
+            const selectedElsewhere = parts.filter((_, i) => i !== idx).map((p) => p.productId);
+            return (
+              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 40px', gap: 10, marginBottom: 8, alignItems: 'center' }}>
+                <select className="form-select" value={part.productId} onChange={(e) => setPartField(idx, 'productId', e.target.value)}>
+                  <option value="">-- Chọn phụ tùng --</option>
+                  {products
+                    .filter((p) => !selectedElsewhere.includes(String(p.id)))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>{p.code} - {p.name} ({p.unitName || '—'})</option>
+                    ))}
+                </select>
+                <input
+                  type="number"
+                  min="1"
+                  className="form-input"
+                  value={part.quantity}
+                  onChange={(e) => setPartField(idx, 'quantity', e.target.value)}
+                  placeholder="SL"
+                />
+                <button type="button" className="btn btn-secondary btn-sm btn-icon" onClick={() => removePartRow(idx)}>✕</button>
+              </div>
+            );
+          })}
+
+          {fieldErrors.parts && <span className="form-error">{fieldErrors.parts}</span>}
+
+          <button type="button" className="btn btn-secondary btn-sm" onClick={addPartRow} style={{ marginTop: 6 }}>
+            + Thêm phụ tùng
+          </button>
         </div>
 
         <div className="form-actions">
@@ -1271,7 +1394,7 @@ function ServicePackageFormPage({ mode }) {
   const [availableServices, setAvailableServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [form, setForm] = useState({
-    packageName: '', categoryId: '', applicableKm: '', totalPrice: '', description: '', isActive: true, serviceIds: [],
+    packageName: '', categoryId: '', applicableKm: '', totalPrice: '', description: '', isActive: true, repairCategory: '', serviceIds: [],
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1296,6 +1419,7 @@ function ServicePackageFormPage({ mode }) {
             totalPrice: data.totalPrice ?? '',
             description: data.description || '',
             isActive: data.isActive,
+            repairCategory: data.repairCategory || '',
             serviceIds: (data.services || []).map((s) => s.id),
           });
         })
@@ -1349,6 +1473,7 @@ function ServicePackageFormPage({ mode }) {
         totalPrice: Number(form.totalPrice),
         description: form.description.trim(),
         isActive: form.isActive,
+        repairCategory: form.repairCategory || null,
         serviceIds: form.serviceIds,
       };
 
@@ -1436,6 +1561,16 @@ function ServicePackageFormPage({ mode }) {
               {form.serviceIds.length > 0 && (
                 <span className="form-hint">Tổng giá các dịch vụ đã chọn: {formatCurrency(selectedTotal)}</span>
               )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Loại hình sửa chữa</label>
+              <select className="form-select" value={form.repairCategory} onChange={(e) => setField('repairCategory', e.target.value)}>
+                {REPAIR_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
+                Dùng để tự điền khi cố vấn dịch vụ chọn gói này trên phiếu quyết toán.
+              </div>
             </div>
 
             {isEdit && (
