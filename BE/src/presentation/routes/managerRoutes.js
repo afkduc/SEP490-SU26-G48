@@ -35,6 +35,7 @@ function buildManagerRouter() {
   router.put('/employees/:id', controller.updateEmployee);
 
   router.get('/service-categories', controller.getServiceCategories);
+  router.get('/products', controller.getProducts);
 
   router.get('/services', controller.getServices);
   router.get('/services/:id', controller.getServiceById);

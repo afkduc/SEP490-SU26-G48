@@ -181,7 +181,7 @@ class InventoryRepositoryImpl extends InventoryRepository {
       `SELECT p.*, s.supplier_name, u.unit_name
        FROM   products p
        LEFT JOIN suppliers s ON s.id = p.supplier_id
-       LEFT JOIN units u ON p.unit_id = u.id
+LEFT JOIN units u ON u.id = p.unit_id
        WHERE  p.branch_id = @branchId AND p.status = 'active'
        ORDER  BY p.product_name`,
       { branchId }

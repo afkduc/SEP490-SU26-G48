@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useParts } from '../../hooks/inventory/useParts';
+import { listUnitsApi } from '../../services/productApi';
 import './PartListPage.css';
 
 const STATUS_LABELS = {
@@ -19,7 +20,6 @@ function emptyForm() {
     partCode: '',
     partName: '',
     category: '',
-    unit: '',
     unitId: '',
     unitPrice: '',
     minStock: 5,
@@ -45,6 +45,11 @@ export default function PartListPage() {
   const [form, setForm] = useState(emptyForm());
   const [formError, setFormError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [units, setUnits] = useState([]);
+
+  useEffect(() => {
+    listUnitsApi().then(setUnits).catch(() => setUnits([]));
+  }, []);
 
   function openCreate() {
     setEditing(null);
@@ -59,7 +64,6 @@ export default function PartListPage() {
       partCode: p.productCode ?? '',
       partName: p.productName ?? '',
       category: p.category || '',
-      unit: p.unit || '',
       unitId: p.unitId ?? '',
       unitPrice: p.unitPrice ?? '',
       minStock: p.minStock ?? 5,
@@ -85,7 +89,7 @@ export default function PartListPage() {
         productCode: form.partCode,
         productName: form.partName,
         category: form.category || null,
-        unitId: form.unitId ? Number(form.unitId) : 1,
+        unitId: form.unitId === '' ? null : Number(form.unitId),
         unitPrice: form.unitPrice === '' ? null : Number(form.unitPrice),
         minStock: Number(form.minStock),
         supplierId: form.supplierId === '' ? null : Number(form.supplierId),
@@ -195,7 +199,7 @@ export default function PartListPage() {
                   <th>Trang thai</th>
                   <th style={{ width: 160 }}>Hanh dong</th>
                 </tr>
-              </thead>
+</thead>
               <tbody>
                 {parts.length === 0 ? (
                   <tr>
@@ -215,7 +219,7 @@ export default function PartListPage() {
                           <Link to={`/inventory/parts/${p.id}`}>{p.productName ?? '—'}</Link>
                         </td>
                         <td>{p.category || '—'}</td>
-                        <td>{p.unit || '—'}</td>
+                        <td>{p.unitName || p.unit || '—'}</td>
                         <td className="text-right">
                           {p.unitPrice != null ? `${Number(p.unitPrice).toLocaleString('vi-VN')} đ` : '—'}
                         </td>
@@ -320,10 +324,14 @@ export default function PartListPage() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Don vi</label>
-                  <input className="input" value={form.unit}
-                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                    placeholder="VD: Cai, Bo, Chai" />
+                  <label className="form-label">Don vi <span className="required">*</span></label>
+                  <select className="input input--select" value={form.unitId} required
+                    onChange={(e) => setForm({ ...form, unitId: e.target.value })}>
+                    <option value="">Chon don vi</option>
+                    {units.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
