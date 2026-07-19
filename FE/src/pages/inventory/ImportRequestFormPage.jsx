@@ -104,7 +104,7 @@ export default function ImportRequestFormPage() {
       productId: p.id,
       productCode: p.productCode,
       productName: p.productName,
-      unit: p.unit,
+      unit: p.unitName,
       searchTerm: `${p.productCode} - ${p.productName}`,
       searchResults: [],
       showDropdown: false,
@@ -334,7 +334,7 @@ export default function ImportRequestFormPage() {
                               <span className="font-mono">{p.productCode}</span>
                               &nbsp;-&nbsp;{p.productName}
                               <span className="ir-form__dropdown-meta">
-                                ({p.unit})
+                                ({p.unitName})
                               </span>
                             </button>
                           ))}

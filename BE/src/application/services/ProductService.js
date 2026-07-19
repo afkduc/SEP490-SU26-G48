@@ -21,10 +21,10 @@ class ProductService {
     this.productRepository = productRepository;
   }
 
-  async getAllProducts({ branchId, status, search, category, page, limit } = {}) {
+  async getAllProducts({ branchId, status, search, category, lowStockOnly, page, limit } = {}) {
     const [items, total] = await Promise.all([
-      this.productRepository.findAll({ branchId, status, search, category, page, limit }),
-      this.productRepository.count({ branchId, status, search, category }),
+      this.productRepository.findAll({ branchId, status, search, category, lowStockOnly, page, limit }),
+      this.productRepository.count({ branchId, status, search, category, lowStockOnly }),
     ]);
     return {
       items: ProductResponseDto.fromEntityList(items),
@@ -55,6 +55,9 @@ class ProductService {
     }
     if (!payload.branchId) {
       throw new ApiError(400, 'branchId is required');
+    }
+    if (!payload.unitId) {
+      throw new ApiError(400, 'unitId is required');
     }
     const existing = await this.productRepository.findByCode(payload.productCode, payload.branchId);
     if (existing) {
@@ -88,6 +91,14 @@ class ProductService {
     const deleted = await this.productRepository.delete(id);
     if (!deleted) throw new ApiError(404, 'Product not found');
     return ProductResponseDto.fromEntity(deleted);
+  }
+
+async getCategories() {
+    return this.productRepository.getDistinctCategories();
+  }
+
+  async listUnits() {
+    return this.productRepository.listUnits();
   }
 }
 
