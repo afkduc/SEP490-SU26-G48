@@ -35,7 +35,7 @@ class RepairSettlement {
     this.customer = data.customer ?? null; // { id, fullName, phone, address, taxCode, cccd, email, contactPerson, contactPhone }
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel, frameNumber, engineNumber, purchaseDate, currentKm }
     this.advisor = data.advisor ?? null; // { id, name, phone }
-    this.items = data.items ?? []; // [{ id, code, serviceId, description, lhsc, httt, unit, qty, unitPrice, discount, isFree, total }]
+    this.items = data.items ?? []; // [{ id, code, serviceId, description, lhsc, httt, repairCategory, unit, qty, unitPrice, discount, isFree, total }]
   }
 
   static fromPersistence(headerRow, itemRows = []) {
@@ -100,6 +100,7 @@ class RepairSettlement {
         description: r.item_description,
         lhsc: r.lhsc,
         httt: r.httt,
+        repairCategory: r.repair_category,
         unit: r.unit,
         qty: r.quantity,
         unitPrice: r.unit_price,

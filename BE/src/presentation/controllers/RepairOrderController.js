@@ -5,13 +5,12 @@ class RepairOrderController {
     this.repairOrderService = repairOrderService;
   }
 
+  // Man "Lenh sua chua" la bang dieu phoi chung cua ca chi nhanh (de bat ky
+  // co van dich vu nao cung gan duoc to truong cho don cua dong nghiep) -
+  // khong loc theo advisorId nhu man "Phieu quyet toan", show het theo branch.
   getAll = async (req, res, next) => {
     try {
-      const isServiceAdvisor = req.user.roles?.includes('service_advisor');
-      const result = await this.repairOrderService.getAll({
-        branchId: req.user.branchId,
-        advisorId: isServiceAdvisor ? req.user.userId : undefined,
-      });
+      const result = await this.repairOrderService.getAll({ branchId: req.user.branchId });
       return success(res, result, 'Repair orders retrieved');
     } catch (err) {
       next(err);
@@ -20,10 +19,7 @@ class RepairOrderController {
 
   getById = async (req, res, next) => {
     try {
-      const item = await this.repairOrderService.getById(req.params.id, {
-        requesterId: req.user.userId,
-        isServiceAdvisor: req.user.roles?.includes('service_advisor'),
-      });
+      const item = await this.repairOrderService.getById(req.params.id);
       return success(res, item, 'Repair order retrieved');
     } catch (err) {
       next(err);
