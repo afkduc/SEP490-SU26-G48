@@ -7,14 +7,40 @@ const ACTION_LABELS = {
   CREATE: 'Tạo mới',
   UPDATE: 'Cập nhật',
   DELETE: 'Xóa',
+  LOGIN: 'Đăng nhập',
+  LOGOUT: 'Đăng xuất',
+  FORCE_LOGOUT: 'Buộc đăng xuất',
+  CHANGE_PASSWORD: 'Đổi mật khẩu',
+  RESET_PASSWORD: 'Đặt lại mật khẩu',
+  ASSIGN_ROLE: 'Gán vai trò',
+  REMOVE_ROLE: 'Xóa vai trò',
+  EXPORT: 'Xuất dữ liệu',
+  IMPORT: 'Nhập dữ liệu',
+};
+
+const ACTION_CLASS = {
+  CREATE: 'badge--success',
+  UPDATE: 'badge--info',
+  DELETE: 'badge--danger',
+  LOGIN: 'badge--purple',
+  LOGOUT: 'badge--secondary',
+  FORCE_LOGOUT: 'badge--orange',
+  CHANGE_PASSWORD: 'badge--teal',
+  RESET_PASSWORD: 'badge--cyan',
+  ASSIGN_ROLE: 'badge--indigo',
+  REMOVE_ROLE: 'badge--rose',
+  EXPORT: 'badge--green',
+  IMPORT: 'badge--amber',
 };
 
 function formatDateTime(value) {
   if (!value) return '—';
   try {
-    return new Date(value).toLocaleString('vi-VN', {
+    const d = new Date(value);
+    return d.toLocaleString('vi-VN', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
     });
   } catch {
     return value;
@@ -28,23 +54,25 @@ function formatJson(value) {
     const parsed = JSON.parse(value);
     return parsed;
   } catch {
-    return value;
+    return null;
   }
 }
 
 function JsonBlock({ label, data }) {
   const obj = formatJson(data);
-  if (obj === null || obj === '') return null;
+  if (obj === null || data === null || data === undefined || data === '') return null;
+
   let display;
   if (typeof obj === 'object') {
     try {
       display = JSON.stringify(obj, null, 2);
     } catch {
-      display = String(obj);
+      display = String(data);
     }
   } else {
-    display = String(obj);
+    display = String(data);
   }
+
   return (
     <div className="detail-list__group">
       <div className="detail-list__group-title">{label}</div>
@@ -67,28 +95,23 @@ function DetailRow({ label, value, mono }) {
 function ResponseBadge({ status }) {
   if (status === null || status === undefined) return null;
   let cls = 'badge--secondary';
+  let text = String(status);
   if (status >= 200 && status < 300) cls = 'badge--success';
+  else if (status >= 300 && status < 400) cls = 'badge--info';
   else if (status >= 400 && status < 500) cls = 'badge--warning';
   else if (status >= 500) cls = 'badge--danger';
-  return <span className={`badge ${cls}`}>{status}</span>;
+  return <span className={`badge ${cls}`}>{text}</span>;
 }
 
 function ActionBadge({ action }) {
   if (!action) return null;
   const upper = String(action).toUpperCase();
-  let cls = 'badge--secondary';
-  let label = action;
-  if (upper.includes('CREATE') || upper.includes('INSERT')) {
-    cls = 'badge--success'; label = ACTION_LABELS.CREATE;
-  } else if (upper.includes('UPDATE') || upper.includes('EDIT') || upper.includes('MODIFY') || upper.includes('PATCH')) {
-    cls = 'badge--info'; label = ACTION_LABELS.UPDATE;
-  } else if (upper.includes('DELETE') || upper.includes('REMOVE')) {
-    cls = 'badge--danger'; label = ACTION_LABELS.DELETE;
-  }
+  let cls = ACTION_CLASS[upper] || 'badge--secondary';
+  let label = ACTION_LABELS[upper] || action;
   return <span className={`badge ${cls}`}>{label}</span>;
 }
 
-export default function AuditLogDetailDrawer({ log, onClose, onViewUser }) {
+export default function AuditLogDetailDrawer({ log, onClose }) {
   const [showUser, setShowUser] = useState(false);
 
   if (!log) return null;
@@ -140,26 +163,23 @@ export default function AuditLogDetailDrawer({ log, onClose, onViewUser }) {
             </div>
             <div className="detail-list__group">
               <DetailRow label="ID log" value={`#${log.id}`} mono />
-              <DetailRow label="Thời gian" value={formatDateTime(log.logged_at || log.created_at)} />
-              <DetailRow label="Hành động" value={
-                <ActionBadge action={log.action} />
-              } />
+              <DetailRow label="Thời gian" value={formatDateTime(log.logged_at)} />
+              <DetailRow label="Hành động" value={<ActionBadge action={log.action} />} />
               <DetailRow label="Phương thức HTTP" value={log.request_method} mono />
-              <DetailRow label="URL" value={log.request_url} mono />
-              <DetailRow label="Trạng thái" value={
-                <ResponseBadge status={log.response_status} />
-              } />
-              <DetailRow label="Thời gian xử lý" value={log.duration_ms != null ? `${log.duration_ms}ms` : null} />
+              <DetailRow label="Endpoint" value={log.request_url} mono />
+              <DetailRow label="Trạng thái" value={<ResponseBadge status={log.response_status} />} />
+              <DetailRow label="Thời gian xử lý" value={log.duration_ms != null ? `${log.duration_ms} ms` : null} />
+              <DetailRow label="Mô tả" value={log.description} />
             </div>
 
             <div className="detail-list__group">
               <div className="detail-list__group-title">Đối tượng tác động</div>
             </div>
             <div className="detail-list__group">
-              <DetailRow label="Bảng" value={log.table_name || log.entity_name} />
+              <DetailRow label="Bảng dữ liệu" value={log.table_name} mono />
+              <DetailRow label="Entity Name" value={log.entity_name} />
               <DetailRow label="Mã bản ghi" value={log.entity_code} mono />
               <DetailRow label="Record ID" value={log.record_id != null ? `#${log.record_id}` : null} mono />
-              <DetailRow label="Mô tả" value={log.description} />
             </div>
 
             <div className="detail-list__group">
@@ -167,18 +187,17 @@ export default function AuditLogDetailDrawer({ log, onClose, onViewUser }) {
             </div>
             <div className="detail-list__group">
               <DetailRow label="Họ tên" value={fullName} />
-              <DetailRow label="Số điện thoại" value={phone} />
+              <DetailRow label="Số điện thoại" value={phone} mono />
               <DetailRow label="User ID" value={log.user_id != null ? `#${log.user_id}` : null} mono />
-              <DetailRow label="IP" value={log.ip_address} mono />
+              <DetailRow label="IP Address" value={log.ip_address} mono />
               <DetailRow label="Chi nhánh" value={log.branch_name || (log.branch_id ? `Chi nhánh #${log.branch_id}` : null)} />
             </div>
           </dl>
 
-          {/* Request body */}
-          <JsonBlock label="Request body" data={log.request_body} />
-          <JsonBlock label="Response body" data={log.response_body} />
-          <JsonBlock label="Old value" data={log.old_value} />
-          <JsonBlock label="New value" data={log.new_value} />
+          {/* JSON blocks */}
+          <JsonBlock label="Request Body" data={log.request_body} />
+          <JsonBlock label="Old Value (Trước thay đổi)" data={log.old_value} />
+          <JsonBlock label="New Value (Sau thay đổi)" data={log.new_value} />
         </div>
 
         <div className="drawer__footer">
