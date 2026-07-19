@@ -16,8 +16,9 @@ class DeviceService {
   }
 
   async forceLogoutDevice(deviceId) {
-    const devices = await this.deviceRepository.findAll({ pageSize: 1000 });
-    const device = devices.items.find((d) => d.id === Number(deviceId));
+    // Toi uu: goi findById truc tiep thay vi findAll(pageSize:1000) de
+    // tranh miss khi user co nhieu device.
+    const device = await this.deviceRepository.findById(Number(deviceId));
     if (!device) throw new ApiError(404, 'Thiet bi khong ton tai');
 
     const userId = device.userId;
@@ -110,6 +111,20 @@ class DeviceService {
    */
   async updateLastActivity(deviceId) {
     return this.deviceRepository.updateLastActivityIfNeeded(Number(deviceId));
+  }
+
+  /**
+   * Heartbeat tu client (FE goi dinh ky, vi du 60s).
+   * Tra ve server time UTC de FE tinh clock offset, tranh
+   * truong hop clock client sai lam UI hien thi sai last_activity_at.
+   */
+  async heartbeat(deviceId) {
+    const updated = await this.deviceRepository.updateLastActivityIfNeeded(Number(deviceId));
+    return {
+      updated,
+      deviceId: Number(deviceId),
+      serverTime: new Date().toISOString(),
+    };
   }
 }
 

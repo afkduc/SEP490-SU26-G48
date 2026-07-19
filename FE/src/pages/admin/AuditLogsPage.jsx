@@ -4,7 +4,6 @@ import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
-import AuditLogDetailDrawer from './AuditLogDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import './AuditLogsPage.css';
 
@@ -13,6 +12,7 @@ const ACTION_OPTIONS = [
   { value: 'CREATE', label: 'Tạo mới (CREATE)', color: 'success' },
   { value: 'UPDATE', label: 'Cập nhật (UPDATE)', color: 'info' },
   { value: 'DELETE', label: 'Xóa (DELETE)', color: 'danger' },
+  { value: 'READ', label: 'Xem dữ liệu (READ)', color: 'slate' },
   { value: 'LOGIN', label: 'Đăng nhập (LOGIN)', color: 'purple' },
   { value: 'LOGOUT', label: 'Đăng xuất (LOGOUT)', color: 'gray' },
   { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất (FORCE_LOGOUT)', color: 'orange' },
@@ -28,6 +28,7 @@ const ACTION_LABELS = {
   CREATE: 'Tạo mới',
   UPDATE: 'Cập nhật',
   DELETE: 'Xóa',
+  READ: 'Xem dữ liệu',
   LOGIN: 'Đăng nhập',
   LOGOUT: 'Đăng xuất',
   FORCE_LOGOUT: 'Buộc đăng xuất',
@@ -43,6 +44,7 @@ const ACTION_CLASS = {
   CREATE: 'badge--success',
   UPDATE: 'badge--info',
   DELETE: 'badge--danger',
+  READ: 'badge--slate',
   LOGIN: 'badge--purple',
   LOGOUT: 'badge--secondary',
   FORCE_LOGOUT: 'badge--orange',
@@ -53,15 +55,6 @@ const ACTION_CLASS = {
   EXPORT: 'badge--green',
   IMPORT: 'badge--amber',
 };
-
-const METHOD_OPTIONS = [
-  { value: '', label: 'Tất cả phương thức' },
-  { value: 'GET', label: 'GET' },
-  { value: 'POST', label: 'POST' },
-  { value: 'PUT', label: 'PUT' },
-  { value: 'PATCH', label: 'PATCH' },
-  { value: 'DELETE', label: 'DELETE' },
-];
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -123,12 +116,6 @@ const TABLE_NAME_VI = {
   notifications: 'Thông báo',
 };
 
-function viTableName(name) {
-  if (!name) return '—';
-  if (TABLE_NAME_VI[name]) return TABLE_NAME_VI[name];
-  return `⚠ ${name} (chưa ánh xạ)`;
-}
-
 function formatLocal(value) {
   if (!value) return { main: '—', sub: '', ago: '' };
   let d;
@@ -168,33 +155,6 @@ function humanizeAgo(diffMs) {
   return `${Math.floor(mo / 12)} năm trước`;
 }
 
-function getMethodClass(method) {
-  if (!method) return 'method--default';
-  const m = method.toUpperCase();
-  if (m === 'GET') return 'method--GET';
-  if (m === 'POST') return 'method--POST';
-  if (m === 'PUT' || m === 'PATCH') return 'method--PUT';
-  if (m === 'DELETE') return 'method--DELETE';
-  return 'method--default';
-}
-
-function getResponseBadge(status) {
-  if (status == null) return null;
-  if (status >= 200 && status < 300) return { cls: 'badge--success', label: `${status}` };
-  if (status >= 300 && status < 400) return { cls: 'badge--info', label: `${status}` };
-  if (status >= 400 && status < 500) return { cls: 'badge--warning', label: `${status}` };
-  if (status >= 500) return { cls: 'badge--danger', label: `${status}` };
-  return { cls: 'badge--secondary', label: String(status) };
-}
-
-function formatDuration(ms) {
-  if (ms == null || Number.isNaN(Number(ms))) return '—';
-  const n = Number(ms);
-  if (n < 1000) return `${n} ms`;
-  if (n < 60_000) return `${(n / 1000).toFixed(2)} s`;
-  return `${Math.floor(n / 60_000)}m ${Math.floor((n % 60_000) / 1000)}s`;
-}
-
 // ─── Icons ────────────────────────────────────────────────────────────
 
 const IconLog = () => (
@@ -225,15 +185,6 @@ const IconRefresh = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="1 4 1 10 7 10"/>
     <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
-  </svg>
-);
-
-const IconDoc = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-    <polyline points="14 2 14 8 20 8"/>
-    <line x1="16" y1="13" x2="8" y2="13"/>
-    <line x1="16" y1="17" x2="8" y2="17"/>
   </svg>
 );
 
@@ -335,7 +286,6 @@ export default function AuditLogsPage() {
   const toast = useToast();
   const audit = useAuditLogs();
   const { branches, branchesError } = useSharedBranches();
-  const [detailLog, setDetailLog] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [now, setNow] = useState(() => Date.now());
@@ -381,12 +331,10 @@ export default function AuditLogsPage() {
 
   const totalPages = audit.data.total > 0 ? Math.ceil(audit.data.total / (audit.data.pageSize || 10)) : 1;
   const hasFilters = audit.params.keyword || audit.params.userName || audit.params.phone ||
-    audit.params.action || audit.params.tableName || audit.params.entityName ||
-    audit.params.entityCode || audit.params.ipAddress || audit.params.requestMethod ||
-    audit.params.responseStatus || audit.params.startDate || audit.params.endDate ||
+    audit.params.action || audit.params.entityName || audit.params.entityCode ||
+    audit.params.ipAddress ||
+    audit.params.startDate || audit.params.endDate ||
     (audit.params.branchId != null);
-
-  const timeTick = useMemo(() => now, [now]);
 
   return (
     <div className="admin-logs">
@@ -491,28 +439,6 @@ export default function AuditLogsPage() {
             </div>
 
             <div className="filter-field">
-              <label className="filter-field__label">Bảng dữ liệu</label>
-              <input
-                className="filter-field__input"
-                type="text"
-                placeholder="VD: users, customers..."
-                value={audit.params.tableName || ''}
-                onChange={(e) => audit.updateParam('tableName', e.target.value)}
-              />
-            </div>
-
-            <div className="filter-field">
-              <label className="filter-field__label">Mã bản ghi</label>
-              <input
-                className="filter-field__input"
-                type="text"
-                placeholder="VD: KH-001, ND-005..."
-                value={audit.params.entityCode || ''}
-                onChange={(e) => audit.updateParam('entityCode', e.target.value)}
-              />
-            </div>
-
-            <div className="filter-field">
               <label className="filter-field__label">Địa chỉ IP</label>
               <input
                 className="filter-field__input"
@@ -521,32 +447,6 @@ export default function AuditLogsPage() {
                 value={audit.params.ipAddress || ''}
                 onChange={(e) => audit.updateParam('ipAddress', e.target.value)}
               />
-            </div>
-
-            <div className="filter-field">
-              <label className="filter-field__label">Phương thức HTTP</label>
-              <select
-                className="filter-field__select"
-                value={audit.params.requestMethod || ''}
-                onChange={(e) => audit.updateParam('requestMethod', e.target.value)}
-              >
-                {METHOD_OPTIONS.map((o) => (
-                  <option key={o.value || 'all'} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="filter-field">
-              <label className="filter-field__label">Trạng thái HTTP</label>
-              <select
-                className="filter-field__select"
-                value={audit.params.responseStatus || ''}
-                onChange={(e) => audit.updateParam('responseStatus', e.target.value)}
-              >
-                {STATUS_OPTIONS.map((o) => (
-                  <option key={o.value || 'all'} value={o.value}>{o.label}</option>
-                ))}
-              </select>
             </div>
 
             <div className="filter-field">
@@ -626,11 +526,7 @@ export default function AuditLogsPage() {
         ) : (
           <>
             <div className="admin-logs__table-wrapper">
-              <AuditTable
-                items={audit.data.items}
-                onViewLog={setDetailLog}
-                timeTick={timeTick}
-              />
+              <AuditTable items={audit.data.items} />
             </div>
             <Pagination
               currentPage={audit.data.page || 1}
@@ -643,13 +539,6 @@ export default function AuditLogsPage() {
         )}
       </div>
 
-      {/* Log detail drawer */}
-      {detailLog && (
-        <AuditLogDetailDrawer
-          log={detailLog}
-          onClose={() => setDetailLog(null)}
-        />
-      )}
     </div>
   );
 }
@@ -659,28 +548,21 @@ export default function AuditLogsPage() {
 function TableSkeleton({ rows }) {
   return (
     <table className="table">
-      <colgroup>
-        <col /><col /><col /><col /><col />
-        <col /><col /><col /><col /><col />
-      </colgroup>
+        <colgroup>
+          <col /><col /><col /><col />
+        </colgroup>
       <thead>
         <tr>
-          <th>Thời gian</th>
           <th>Người dùng</th>
           <th>Hành động</th>
-          <th>Bảng dữ liệu</th>
-          <th>Mã bản ghi</th>
-          <th>Địa chỉ IP</th>
-          <th>Phương thức</th>
-          <th>Thời gian xử lý</th>
-          <th>Trạng thái</th>
-          <th>Thao tác</th>
+          <th>Mô tả</th>
+          <th>Thời gian</th>
         </tr>
       </thead>
       <tbody>
         {Array.from({ length: rows }).map((_, i) => (
           <tr key={i}>
-            {[...Array(10)].map((_, j) => (
+            {[...Array(4)].map((_, j) => (
               <td key={j}>
                 <div className="skeleton-line" style={{ width: `${50 + Math.random() * 40}%` }} />
               </td>
@@ -692,33 +574,24 @@ function TableSkeleton({ rows }) {
   );
 }
 
-function AuditTable({ items, onViewLog, timeTick }) {
-  void timeTick;
-
+function AuditTable({ items }) {
   if (!items || items.length === 0) {
     return (
       <table className="table">
         <colgroup>
-          <col /><col /><col /><col /><col />
-          <col /><col /><col /><col /><col />
+          <col /><col /><col /><col />
         </colgroup>
         <thead>
           <tr>
-            <th>Thời gian</th>
             <th>Người dùng</th>
             <th>Hành động</th>
-            <th>Bảng dữ liệu</th>
-            <th>Mã bản ghi</th>
-            <th>Địa chỉ IP</th>
-            <th>Phương thức</th>
-            <th>Thời gian xử lý</th>
-            <th>Trạng thái</th>
-            <th>Thao tác</th>
+            <th>Mô tả</th>
+            <th>Thời gian</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td colSpan={10} className="table__empty">
+            <td colSpan={4} className="table__empty">
               Không có nhật ký nào phù hợp với bộ lọc
             </td>
           </tr>
@@ -729,57 +602,31 @@ function AuditTable({ items, onViewLog, timeTick }) {
 
   return (
     <table className="table">
-      <colgroup>
-        <col /><col /><col /><col /><col />
-        <col /><col /><col /><col /><col />
-      </colgroup>
+        <colgroup>
+          <col /><col /><col /><col />
+        </colgroup>
       <thead>
         <tr>
-          <th>Thời gian</th>
           <th>Người dùng</th>
           <th>Hành động</th>
-          <th>Bảng dữ liệu</th>
-          <th>
-            Mã bản ghi
-            <span
-              className="th-info"
-              title={
-                'Cột này hiển thị 2 loại mã:\n' +
-                '• entity_code — mã do con người đặt, dễ đọc (VD: KH-001 = khách hàng số 1, ND-005 = người dùng số 5, INV-023 = hóa đơn số 23). Ưu tiên hiển thị.\n' +
-                '• record_id — ID nội bộ trong database (PK tự tăng). Chỉ hiển thị khi không có entity_code, thêm dấu # phía trước (VD: #12 = dòng id=12 trong bảng).\n' +
-                'Nếu cả hai đều trống → bản ghi đó chưa xác định được đối tượng bị tác động.'
-              }
-              aria-label="Giải thích"
-            >i</span>
-          </th>
-          <th>Địa chỉ IP</th>
-          <th>Phương thức</th>
-          <th>Thời gian xử lý</th>
-          <th>Trạng thái</th>
-          <th>Thao tác</th>
+          <th>Mô tả</th>
+          <th>Thời gian</th>
         </tr>
       </thead>
       <tbody>
         {items.map((item) => {
-          const resp = getResponseBadge(item.response_status);
-          const methodCls = getMethodClass(item.request_method);
           const t = formatLocal(item.logged_at);
-          const tableVi = viTableName(item.table_name || item.entity_name);
-          const codeText = item.entity_code || (item.record_id != null ? `#${item.record_id}` : null);
+          const userName = item.user_name || 'Hệ thống';
+          const initials = userName.split(' ').filter(Boolean).slice(-2)
+            .map((p) => p[0]).join('').toUpperCase() || '?';
           return (
             <tr key={item.id}>
-              <td className="audit-logs__cell--time">
-                <div className="audit-logs__time-cell">
-                  <span className="audit-logs__time-main" title={t.main}>{t.main}</span>
-                  <span className="audit-logs__time-ago">{t.ago}</span>
-                </div>
-              </td>
               <td>
-                <div className="audit-logs__user-cell" title={item.user_name || 'Hệ thống'}>
-                  <span className="audit-logs__user-name">{item.user_name || 'Hệ thống'}</span>
-                  {item.phone_number && (
-                    <span className="audit-logs__user-phone" title={item.phone_number}>{item.phone_number}</span>
-                  )}
+                <div className="audit-logs__user-cell" title={userName}>
+                  <span className="audit-logs__user-avatar" aria-hidden="true">{initials}</span>
+                  <div className="audit-logs__user-text">
+                    <span className="audit-logs__user-name">{userName}</span>
+                  </div>
                 </div>
               </td>
               <td>
@@ -790,72 +637,14 @@ function AuditTable({ items, onViewLog, timeTick }) {
                 ) : '—'}
               </td>
               <td>
-                <span
-                  className="audit-logs__entity"
-                  title={item.table_name ? `Tên bảng trong DB: ${item.table_name}` : undefined}
-                >
-                  {tableVi}
+                <span className="audit-logs__description" title={item.description || ''}>
+                  {item.description || '—'}
                 </span>
               </td>
-              <td>
-                {codeText ? (
-                  <span
-                    className="audit-logs__code"
-                    title={item.entity_code
-                      ? `Mã hiển thị (entity_code): ${item.entity_code}\nID nội bộ trong DB (record_id): ${item.record_id != null ? '#' + item.record_id : '—'}`
-                      : `ID nội bộ trong DB (record_id): #${item.record_id}\nBản ghi này chưa có entity_code.`}
-                  >
-                    {codeText}
-                  </span>
-                ) : (
-                  <span className="audit-logs__code audit-logs__code--empty" title="Không xác định được bản ghi bị tác động">
-                    —
-                  </span>
-                )}
-              </td>
-              <td>
-                {item.ip_address ? (
-                  <span
-                    className="audit-logs__ip"
-                    title={`IP: ${item.ip_address}`}
-                  >
-                    {item.ip_address}
-                  </span>
-                ) : (
-                  <span className="audit-logs__ip audit-logs__ip--missing">—</span>
-                )}
-              </td>
-              <td>
-                <span className={`audit-logs__method ${methodCls}`} title={item.request_method || ''}>
-                  {item.request_method || '—'}
-                </span>
-              </td>
-              <td>
-                <span
-                  className="audit-logs__duration"
-                  title={item.duration_ms != null ? `${item.duration_ms} ms` : 'Không ghi nhận'}
-                >
-                  {formatDuration(item.duration_ms)}
-                </span>
-              </td>
-              <td>
-                {resp ? (
-                  <span className={`badge ${resp.cls}`} title={String(item.response_status)}>
-                    {resp.label}
-                  </span>
-                ) : '—'}
-              </td>
-              <td className="audit-logs__cell--actions">
-                <div className="admin-logs__row-actions">
-                  <button
-                    type="button"
-                    className="admin-logs__action-btn admin-logs__action-btn--primary"
-                    onClick={() => onViewLog?.(item)}
-                    title="Xem chi tiết nhật ký"
-                  >
-                    <IconDoc />
-                    Chi tiết
-                  </button>
+              <td className="audit-logs__cell--time">
+                <div className="audit-logs__time-cell">
+                  <span className="audit-logs__time-main" title={t.main}>{t.main}</span>
+                  <span className="audit-logs__time-ago">{t.ago}</span>
                 </div>
               </td>
             </tr>

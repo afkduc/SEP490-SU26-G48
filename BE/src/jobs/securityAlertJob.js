@@ -46,7 +46,7 @@ async function checkFailedLoginBurst() {
       SELECT ip_address, COUNT(*) AS cnt
       FROM login_sessions
       WHERE action_type = 'LOGIN_FAILED'
-        AND login_time >= DATEADD(MINUTE, -15, GETDATE())
+        AND login_time >= DATEADD(MINUTE, -15, SYSUTCDATETIME())
       GROUP BY ip_address
       HAVING COUNT(*) >= 5
     `);
