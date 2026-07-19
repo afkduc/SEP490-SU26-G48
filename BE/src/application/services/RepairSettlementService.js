@@ -1,10 +1,14 @@
 const ApiError = require('../../utils/ApiError');
 const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
 
-// LHSC chi con phan anh noi dung dong (cong/vat tu); "ai tra tien" da chuyen
-// het sang HTTT (tranh 2 truong cung dung ma 'BH' nhung nghia khac nhau).
+// LHSC (ten cot lich su, thuc chat la "loai hang muc") chi con phan anh noi
+// dung dong (cong/vat tu); "ai tra tien" da chuyen het sang HTTT (tranh 2
+// truong cung dung ma 'BH' nhung nghia khac nhau).
 const LHSC_VALUES = ['DV', 'PT'];
 const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB'];
+// REPAIR_CATEGORY = "Loai hinh sua chua" THAT (dung nhu thuc te tai dai ly xe -
+// khac voi LHSC o tren, vi LHSC da bi dung nham thanh "loai hang muc").
+const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
 const ACTIVE_STATUS_LABELS = {
   waiting_repair: 'chờ sửa chữa',
@@ -74,12 +78,23 @@ class RepairSettlementService {
   async _assertNoActiveDuplicate(customerId, vehicleId, excludeId) {
     const conflict = await this.repairSettlementRepository.findActiveByCustomerVehicle(customerId, vehicleId, excludeId);
     if (conflict) {
-      const label = ACTIVE_STATUS_LABELS[conflict.status] || conflict.status;
-      throw new ApiError(
-        409,
-        `Khách hàng và xe này đang có phiếu quyết toán ${conflict.code} (${label}) chưa xử lý xong. Vui lòng hủy hoặc hoàn tất phiếu đó trước khi tạo phiếu mới.`
-      );
+      throw new ApiError(409, this._buildDuplicateMessage(conflict));
     }
+  }
+
+  _buildDuplicateMessage(conflict) {
+    const label = ACTIVE_STATUS_LABELS[conflict.status] || conflict.status;
+    return `Khách hàng và xe này đang có phiếu quyết toán ${conflict.code} (${label}) chưa xử lý xong. Vui lòng hủy hoặc hoàn tất phiếu đó trước khi tạo phiếu mới.`;
+  }
+
+  // Cho FE goi ngay sau khi chon xong khach hang + xe (truoc khi nhap hang
+  // muc, truoc khi luu) de bao trung ngay, khong phai doi den luc bam Luu
+  // moi biet - tra ve null neu khong trung, tranh phai bat loi 409.
+  async checkActiveDuplicate(customerId, vehicleId, excludeId) {
+    if (!customerId || !vehicleId) return null;
+    const conflict = await this.repairSettlementRepository.findActiveByCustomerVehicle(customerId, vehicleId, excludeId);
+    if (!conflict) return null;
+    return { code: conflict.code, status: conflict.status, message: this._buildDuplicateMessage(conflict) };
   }
 
   async updateStatus(id, status, { issuedBy, cancelReason } = {}) {
@@ -108,6 +123,12 @@ class RepairSettlementService {
     if (!payload.customerId || !payload.vehicleId) {
       throw new ApiError(400, 'Phải chọn khách hàng và xe từ gợi ý tra cứu');
     }
+    if (payload.currentKm === '' || payload.currentKm == null) {
+      throw new ApiError(400, 'Phải nhập số km hiện tại của xe');
+    }
+    if (!(payload.customerRequest || '').trim()) {
+      throw new ApiError(400, 'Phải nhập mô tả yêu cầu của khách hàng');
+    }
 
     const items = (payload.items || []).filter((i) => (i.description || '').trim().length > 0);
     if (items.length === 0) {
@@ -118,10 +139,13 @@ class RepairSettlementService {
     }
     for (const item of items) {
       if (!LHSC_VALUES.includes(item.lhsc)) {
-        throw new ApiError(400, `Loại hình sửa chữa không hợp lệ: ${item.lhsc}`);
+        throw new ApiError(400, `Loại hạng mục không hợp lệ: ${item.lhsc}`);
       }
       if (!HTTT_VALUES.includes(item.httt)) {
         throw new ApiError(400, `Hình thức thanh toán không hợp lệ: ${item.httt}`);
+      }
+      if (!REPAIR_CATEGORY_VALUES.includes(item.repairCategory)) {
+        throw new ApiError(400, `Loại hình sửa chữa không hợp lệ: ${item.repairCategory}`);
       }
     }
 
