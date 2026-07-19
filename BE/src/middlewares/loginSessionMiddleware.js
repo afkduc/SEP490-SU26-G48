@@ -6,6 +6,28 @@ function safeString(value, max = 255) {
   return str.length > max ? str.substring(0, max) : str;
 }
 
+function parseUserAgent(userAgent) {
+  if (!userAgent) return { deviceName: 'Unknown', browser: 'Unknown', os: 'Unknown' };
+  const ua = userAgent.toLowerCase();
+
+  let os = 'Unknown';
+  if (ua.includes('windows')) os = 'Windows';
+  else if (ua.includes('mac os') || ua.includes('macos')) os = 'macOS';
+  else if (ua.includes('linux')) os = 'Linux';
+  else if (ua.includes('android')) os = 'Android';
+  else if (ua.includes('iphone') || ua.includes('ipad')) os = 'iOS';
+
+  let browser = 'Unknown';
+  if (ua.includes('edg/')) browser = 'Edge';
+  else if (ua.includes('chrome/') && !ua.includes('chromium')) browser = 'Chrome';
+  else if (ua.includes('firefox/')) browser = 'Firefox';
+  else if (ua.includes('safari/') && !ua.includes('chrome')) browser = 'Safari';
+  else if (ua.includes('opr/')) browser = 'Opera';
+
+  const deviceName = `${browser} on ${os}`;
+  return { deviceName: safeString(deviceName, 255), browser: safeString(browser, 100), os: safeString(os, 100) };
+}
+
 function getRequestMeta(req) {
   const ipAddress = req.ip || (req.connection && req.connection.remoteAddress) || null;
   const userAgent = req.headers ? req.headers['user-agent'] : null;
@@ -13,6 +35,42 @@ function getRequestMeta(req) {
     ipAddress: safeString(ipAddress, 64),
     userAgent: safeString(userAgent, 512),
   };
+}
+
+async function upsertDevice(userId, userAgent, ipAddress) {
+  try {
+    const { deviceName, browser, os } = parseUserAgent(userAgent);
+
+    await query(
+      'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
+      { p1: userId }
+    );
+
+    const existing = await query(
+      `SELECT TOP 1 id FROM user_devices
+       WHERE user_id = @p1 AND ip_address = @p2 AND browser = @p3 AND os = @p4`,
+      { p1: userId, p2: ipAddress, p3: browser, p4: os }
+    );
+
+    if (existing.recordset.length > 0) {
+      await query(
+        `UPDATE user_devices
+         SET    is_current = 1,
+                last_login_at = GETDATE(),
+                user_agent = @p5
+         WHERE  id = @p1`,
+        { p1: existing.recordset[0].id, p5: userAgent }
+      );
+    } else {
+      await query(
+        `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, last_login_at)
+         VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, GETDATE())`,
+        { p1: userId, p2: deviceName, p3: browser, p4: os, p5: ipAddress, p6: userAgent }
+      );
+    }
+  } catch (err) {
+    console.error('[loginSessionMiddleware] upsertDevice failed:', err && err.message ? err.message : err);
+  }
 }
 
 async function trackLogin(req, user) {
@@ -40,6 +98,10 @@ async function trackLogin(req, user) {
         p6: branchId,
       }
     );
+
+    if (userId && ipAddress) {
+      await upsertDevice(userId, userAgent, ipAddress);
+    }
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLogin failed:', err && err.message ? err.message : err);
   }
@@ -63,15 +125,22 @@ async function trackLogout(req) {
          AND  status    = 'active'
          AND  action_type = 'LOGIN'
          AND  login_time  = (
-                SELECT TOP 1 login_time
-                FROM   login_sessions
-                WHERE  user_name   = @p1
-                  AND  status      = 'active'
-                  AND  action_type = 'LOGIN'
-                ORDER BY login_time DESC
-              )`,
+               SELECT TOP 1 login_time
+               FROM   login_sessions
+               WHERE  user_name   = @p1
+                 AND  status      = 'active'
+                 AND  action_type = 'LOGIN'
+               ORDER BY login_time DESC
+             )`,
       { p1: userName }
     );
+
+    if (req.user && req.user.id) {
+      await query(
+        'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1 AND is_current = 1',
+        { p1: req.user.id }
+      );
+    }
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLogout failed:', err && err.message ? err.message : err);
   }
@@ -102,4 +171,5 @@ module.exports = {
   trackLogin,
   trackLogout,
   trackLoginFailed,
+  upsertDevice,
 };

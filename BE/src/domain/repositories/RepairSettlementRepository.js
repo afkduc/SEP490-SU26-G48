@@ -11,6 +11,10 @@ class RepairSettlementRepository {
     throw new Error('Method findById() must be implemented');
   }
 
+  async findActiveByCustomerVehicle(customerId, vehicleId, excludeId) {
+    throw new Error('Method findActiveByCustomerVehicle() must be implemented');
+  }
+
   async create(data, { branchId, advisorId }) {
     throw new Error('Method create() must be implemented');
   }

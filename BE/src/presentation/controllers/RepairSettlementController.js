@@ -8,6 +8,7 @@ class RepairSettlementController {
   getAll = async (req, res, next) => {
     try {
       const { status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 20 } = req.query;
+      const isServiceAdvisor = req.user.roles?.includes('service_advisor');
       const result = await this.repairSettlementService.getAll({
         branchId: req.user.branchId,
         status,
@@ -16,6 +17,10 @@ class RepairSettlementController {
         vehicleId,
         fromDate,
         toDate,
+        // Chi loc theo advisorId khi dang xem danh sach chung cua chi nhanh
+        // (khong truyen customerId/vehicleId) - man lich su khach hang/xe van
+        // phai thay du, khong bi che theo advisor dang dang nhap.
+        advisorId: isServiceAdvisor && !customerId && !vehicleId ? req.user.userId : undefined,
         page: Number(page),
         limit: Number(limit),
       });
