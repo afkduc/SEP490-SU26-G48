@@ -10,6 +10,12 @@ function buildManagerRouter() {
   const repository = new ManagerRepositoryImpl();
   const service = new ManagerService(repository);
   const controller = new ManagerController(service);
+  const importRequestController = new ManagerImportRequestController({
+    importRequestService: makeImportRequestService(),
+  });
+  const exportRequestController = new ManagerExportRequestController({
+    exportRequestService: makeExportRequestService(),
+  });
 
   router.use(authenticate, authorize('manager', 'admin'), trackActivity);
 

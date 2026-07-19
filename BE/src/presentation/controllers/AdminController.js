@@ -71,9 +71,6 @@ class AdminController {
     this.setUserSpecialties = this.setUserSpecialties.bind(this);
     this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
     this.acknowledgeAlert = this.acknowledgeAlert.bind(this);
-    this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
-    this.acknowledgeAlert = this.acknowledgeAlert.bind(this);
-    this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
     this.acknowledgeAlertCounts = this.acknowledgeAlertCounts.bind(this);
     this.getRecentLoginSessions = this.getRecentLoginSessions.bind(this);
     this.getUserRoles = this.getUserRoles.bind(this);
@@ -362,7 +359,8 @@ class AdminController {
 
   forceLogoutAllOtherDevices = async (req, res, next) => {
     try {
-      const { userId, currentDeviceId } = req.params;
+      const { userId } = req.params;
+      const { currentDeviceId } = req.query;
       const result = await this.deviceService.forceLogoutAllOtherDevices(userId, currentDeviceId);
       return success(res, result, 'Da dang xuat tat ca thiet bi khac');
     } catch (err) {
@@ -473,7 +471,7 @@ class AdminController {
 
   acknowledgeAlert = async (req, res, next) => {
     try {
-      const alert = await this.securityAlertService.acknowledge(req.params.id, req.user?.id);
+      const alert = await this.securityAlertService.acknowledge(req.params.id, req.user?.userId);
       return success(res, alert, 'Da xu ly canh bao');
     } catch (err) {
       next(err);
