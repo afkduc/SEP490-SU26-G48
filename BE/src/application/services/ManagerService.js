@@ -4,6 +4,10 @@ const ApiError = require('../../utils/ApiError');
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^(0[0-9]{9,10})$/;
 const VALID_STATUSES = ['active', 'inactive'];
+// Phai giu dong bo voi REPAIR_CATEGORY_VALUES trong RepairSettlementService.js -
+// khai bao san Loai hinh sua chua cho dich vu/goi tai day de man tao phieu
+// quyet toan tu dong dien theo, khong phai chon tay tung lan.
+const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
 
 class ManagerService {
   constructor(managerRepository) {
@@ -173,6 +177,38 @@ class ManagerService {
     return service;
   }
 
+  async _validateServiceParts(branchId, parts) {
+    if (parts === undefined) return undefined;
+    if (!Array.isArray(parts)) throw new ApiError(400, 'Danh sách phụ tùng không hợp lệ');
+    if (parts.length === 0) return [];
+
+    const seen = new Set();
+    for (const part of parts) {
+      const productId = Number(part.productId);
+      const quantity = Number(part.quantity);
+      if (!productId || Number.isNaN(quantity) || quantity <= 0) {
+        throw new ApiError(400, 'Phụ tùng và số lượng không hợp lệ');
+      }
+      if (seen.has(productId)) {
+        throw new ApiError(400, 'Không được chọn trùng 1 phụ tùng nhiều lần');
+      }
+      seen.add(productId);
+    }
+
+    const branchProducts = await this.managerRepository.listProducts(branchId);
+    const validIds = new Set(branchProducts.map((p) => Number(p.id)));
+    if (!parts.every((part) => validIds.has(Number(part.productId)))) {
+      throw new ApiError(400, 'Có phụ tùng không thuộc chi nhánh này');
+    }
+
+    return parts.map((part) => ({ productId: Number(part.productId), quantity: Number(part.quantity) }));
+  }
+
+  async listProducts(branchId) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    return this.managerRepository.listProducts(branchId);
+  }
+
   async _validateServicePayload(payload) {
     const { serviceName, categoryId, unitPrice, durationMin } = payload;
 
@@ -193,6 +229,10 @@ class ManagerService {
       }
     }
 
+    if (payload.repairCategory && !REPAIR_CATEGORY_VALUES.includes(payload.repairCategory)) {
+      throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
+    }
+
     const categories = await this.managerRepository.listServiceCategories();
     if (!categories.some((c) => Number(c.id) === Number(categoryId))) {
       throw new ApiError(400, 'Danh mục không hợp lệ');
@@ -205,6 +245,7 @@ class ManagerService {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
 
     const { price, duration } = await this._validateServicePayload(payload);
+    const parts = await this._validateServiceParts(branchId, payload.parts);
     const serviceCode = await this.managerRepository.nextServiceCode(branchId);
 
     return this.managerRepository.createService({
@@ -215,6 +256,8 @@ class ManagerService {
       unitPrice: price,
       durationMin: duration,
       description: (payload.description || '').trim() || null,
+      repairCategory: payload.repairCategory || null,
+      parts: parts || [],
     });
   }
 
@@ -226,6 +269,7 @@ class ManagerService {
     if (!existing) throw new ApiError(404, 'Không tìm thấy dịch vụ');
 
     const { price, duration } = await this._validateServicePayload(payload);
+    const parts = await this._validateServiceParts(branchId, payload.parts);
     const newIsActive = payload.isActive !== undefined ? !!payload.isActive : existing.isActive;
 
     const updated = await this.managerRepository.updateService(branchId, id, {
@@ -235,6 +279,8 @@ class ManagerService {
       durationMin: duration,
       description: (payload.description || '').trim() || null,
       isActive: newIsActive,
+      repairCategory: payload.repairCategory || null,
+      parts,
     });
 
     if (existing.isActive && !newIsActive) {
@@ -289,6 +335,10 @@ class ManagerService {
       }
     }
 
+    if (payload.repairCategory && !REPAIR_CATEGORY_VALUES.includes(payload.repairCategory)) {
+      throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
+    }
+
     const categories = await this.managerRepository.listServiceCategories();
     if (!categories.some((c) => Number(c.id) === Number(categoryId))) {
       throw new ApiError(400, 'Danh mục không hợp lệ');
@@ -326,6 +376,7 @@ class ManagerService {
       applicableKm: km,
       totalPrice: price,
       description: (payload.description || '').trim() || null,
+      repairCategory: payload.repairCategory || null,
       serviceIds,
     });
   }
@@ -348,6 +399,7 @@ class ManagerService {
       totalPrice: price,
       description: (payload.description || '').trim() || null,
       isActive: payload.isActive !== undefined ? !!payload.isActive : existing.isActive,
+      repairCategory: payload.repairCategory || null,
       serviceIds,
     });
   }

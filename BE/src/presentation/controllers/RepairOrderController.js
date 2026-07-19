@@ -5,6 +5,9 @@ class RepairOrderController {
     this.repairOrderService = repairOrderService;
   }
 
+  // Man "Lenh sua chua" la bang dieu phoi chung cua ca chi nhanh (de bat ky
+  // co van dich vu nao cung gan duoc to truong cho don cua dong nghiep) -
+  // khong loc theo advisorId nhu man "Phieu quyet toan", show het theo branch.
   getAll = async (req, res, next) => {
     try {
       const result = await this.repairOrderService.getAll({ branchId: req.user.branchId });

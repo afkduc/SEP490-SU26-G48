@@ -78,7 +78,7 @@ export default function SupplierDetailPage() {
                       </td>
                       <td>{p.productName}</td>
                       <td>{p.category || '—'}</td>
-                      <td>{p.unit || '—'}</td>
+                      <td>{p.unitName || '—'}</td>
                       <td className="text-right">{p.stockQuantity ?? 0}</td>
                     </tr>
                   ))}

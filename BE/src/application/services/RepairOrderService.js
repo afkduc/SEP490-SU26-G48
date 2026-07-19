@@ -69,7 +69,7 @@ class RepairOrderService {
     if (String(existing.branchId) !== String(branchId)) {
       throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
     }
-    if (existing.status !== 'in_progress') {
+    if (existing.status !== 'inprogress') {
       throw new ApiError(409, 'Lệnh đã kết thúc (hoàn thành/hủy), không thể đổi trạng thái nữa');
     }
 
