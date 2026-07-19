@@ -34,7 +34,20 @@ class DeviceService {
       deviceId: Number(deviceId),
     });
 
+    // 3. Notify user about force logout
+    this._sendForceLogoutNotification(userId, deviceId);
+
     return { revoked: true, deviceId: Number(deviceId), userId };
+  }
+
+  _sendForceLogoutNotification(userId, deviceId) {
+    try {
+      const NotificationService = require('./NotificationService');
+      const ns = new NotificationService();
+      ns.notify('FORCE_LOGOUT', { userId, deviceId });
+    } catch (err) {
+      console.error('[DeviceService] Failed to send force logout notification:', err.message);
+    }
   }
 
   async _revokeDevice(deviceId) {
