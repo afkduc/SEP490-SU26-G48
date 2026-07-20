@@ -138,18 +138,11 @@ function getInitials(name = '') {
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export default function AdminLayout({ children }) {
-  const { user, logout } = useAuth();
+function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
+  const { user } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const userMenuRef = useRef(null);
 
   const allItems = ADMIN_SIDEBAR.flatMap((g) => g.items);
-  // Uu tien match path dai nhat: trang con khong bi "nhot" thanh item cha.
-  // /admin/profile/notifications -> chi match "Cai dat thong bao",
-  // KHONG match "Ho so ca nhan".
   const matchedPaths = allItems
     .filter((i) =>
       location.pathname === i.path
@@ -158,9 +151,95 @@ export default function AdminLayout({ children }) {
     .map((i) => i.path)
     .sort((a, b) => b.length - a.length);
   const longestMatch = matchedPaths[0];
-  const currentPage = allItems.find((i) => i.path === longestMatch);
 
-  // Close dropdown when clicking outside
+  // Click on link trong mobile -> close drawer
+  const handleItemClick = () => {
+    if (onItemClick) onItemClick();
+  };
+
+  return (
+    <aside className={`admin-sidebar${isMobileOpen ? ' admin-sidebar--mobile-open' : ''}`}>
+      {/* Brand */}
+      <div className="admin-sidebar__brand">
+        <div className="admin-sidebar__logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C1.4 11.3 1 12.1 1 13v3c0 .6.4 1 1 1h2"/>
+            <circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>
+          </svg>
+        </div>
+        <div className="admin-sidebar__brand-text">
+          <span className="admin-sidebar__brand-name">AutoGara</span>
+          <span className="admin-sidebar__brand-role">{user?.role || 'Quản trị hệ thống'}</span>
+        </div>
+        {isMobileOpen && (
+          <button
+            type="button"
+            className="admin-sidebar__close"
+            onClick={onClose}
+            aria-label="Đóng menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        )}
+      </div>
+
+      <nav className="admin-sidebar__nav">
+        {ADMIN_SIDEBAR.map((group, gi) => (
+          <div key={gi} className="admin-sidebar__group">
+            {group.group && (
+              <div className="admin-sidebar__group-label">{group.group}</div>
+            )}
+            {group.items.map((item) => {
+              const isActive = item.path === longestMatch;
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={() => `admin-sidebar__item ${isActive ? 'admin-sidebar__item--active' : ''}`}
+                  onClick={handleItemClick}
+                >
+                  <span className="admin-sidebar__item-icon">{item.icon}</span>
+                  <span className="admin-sidebar__item-label">{item.label}</span>
+                  {item.badge && <span className="admin-sidebar__item-badge">{item.badge}</span>}
+                </NavLink>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+
+export default function AdminLayout({ children }) {
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
+  // Close mobile drawer when route changes
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll khi mobile drawer mo
+  useEffect(() => {
+    if (mobileOpen) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = original;
+      };
+    }
+    return undefined;
+  }, [mobileOpen]);
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
@@ -173,8 +252,6 @@ export default function AdminLayout({ children }) {
 
   const handleLogout = async () => {
     setUserMenuOpen(false);
-    // await de dam bao BE nhan duoc yeu cau logout (trackLogout)
-    // truoc khi navigate ve trang login.
     await logout();
     navigate('/login', { replace: true });
   };
@@ -184,100 +261,86 @@ export default function AdminLayout({ children }) {
     navigate('/admin/profile');
   };
 
+  const allItems = ADMIN_SIDEBAR.flatMap((g) => g.items);
+  const matchedPaths = allItems
+    .filter((i) =>
+      location.pathname === i.path
+      || (i.path !== '/admin/dashboard' && location.pathname.startsWith(i.path + '/'))
+    )
+    .map((i) => i.path)
+    .sort((a, b) => b.length - a.length);
+  const longestMatch = matchedPaths[0];
+  const currentPage = allItems.find((i) => i.path === longestMatch);
+
   return (
     <div className={`admin-shell ${collapsed ? 'admin-shell--collapsed' : ''}`}>
 
-      {/* ── Sidebar ── */}
-      <aside className="admin-sidebar">
-        {/* Brand */}
-        <div className="admin-sidebar__brand">
-          <div className="admin-sidebar__logo">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C1.4 11.3 1 12.1 1 13v3c0 .6.4 1 1 1h2"/>
-              <circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>
-            </svg>
-          </div>
-          {!collapsed && (
-            <div className="admin-sidebar__brand-text">
-              <span className="admin-sidebar__brand-name">AutoGara</span>
-              <span className="admin-sidebar__brand-role">Quản trị hệ thống</span>
-            </div>
+      {/* Mobile drawer overlay */}
+      {mobileOpen && (
+        <div
+          className="admin-sidebar__overlay"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar (desktop + mobile drawer) */}
+      <AdminSidebar
+        isMobileOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        onItemClick={() => setMobileOpen(false)}
+      />
+
+      {/* Desktop collapse button (desktop only) */}
+      <button
+        type="button"
+        className="admin-shell__collapse-toggle"
+        onClick={() => setCollapsed((v) => !v)}
+        title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
+        aria-label={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {collapsed ? (
+            <polyline points="9 18 15 12 9 6"/>
+          ) : (
+            <polyline points="15 18 9 12 15 6"/>
           )}
-        </div>
+        </svg>
+      </button>
 
-        {/* Nav */}
-        <nav className="admin-sidebar__nav">
-          {ADMIN_SIDEBAR.map((group, gi) => (
-            <div key={gi} className="admin-sidebar__group">
-              {group.group && !collapsed && (
-                <div className="admin-sidebar__group-label">{group.group}</div>
-              )}
-              {group.items.map((item) => {
-                // Chi highlight item co path khop DAI NHAT voi URL.
-                // /admin/profile/notifications -> chi sang "Cai dat thong bao",
-                // KHONG sang "Ho so ca nhan".
-                const isActive = item.path === longestMatch;
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className={() => `admin-sidebar__item ${isActive ? 'admin-sidebar__item--active' : ''}`}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    <span className="admin-sidebar__item-icon">{item.icon}</span>
-                    {!collapsed && (
-                      <>
-                        <span className="admin-sidebar__item-label">{item.label}</span>
-                        {item.badge && <span className="admin-sidebar__item-badge">{item.badge}</span>}
-                      </>
-                    )}
-                    {collapsed && (
-                      <span className="admin-sidebar__item-tooltip">{item.label}</span>
-                    )}
-                  </NavLink>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        {/* Bottom actions */}
-        <div className="admin-sidebar__footer">
-          <button
-            className="admin-sidebar__collapse-btn"
-            onClick={() => setCollapsed((v) => !v)}
-            title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {collapsed ? (
-                <polyline points="9 18 15 12 9 6"/>
-              ) : (
-                <polyline points="15 18 9 12 15 6"/>
-              )}
-            </svg>
-            {!collapsed && <span>Thu gọn</span>}
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Main ── */}
+      {/* Main */}
       <div className="admin-main">
         {/* Top bar */}
         <header className="admin-topbar">
-          <div className="admin-topbar__breadcrumb">
-            <span className="admin-topbar__section">Quản trị</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-            <span className="admin-topbar__page">{currentPage?.label || 'Trang'}</span>
+          <div className="admin-topbar__left">
+            {/* Hamburger - chi hien tren mobile */}
+            <button
+              type="button"
+              className="admin-topbar__hamburger"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Mở menu"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+
+            <div className="admin-topbar__breadcrumb">
+              <span className="admin-topbar__section">Quản trị</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+              <span className="admin-topbar__page">{currentPage?.label || 'Trang'}</span>
+            </div>
           </div>
 
           <div className="admin-topbar__right">
-            {/* Online indicator - chi hien thi khi co user session */}
             {user && (
               <div className="admin-topbar__online-indicator" title="Tài khoản đang hoạt động">
                 <span className="online-dot" />
-                <span className="online-label">Trực tuyến</span>
+                <span className="online-label admin-topbar__online-label">Trực tuyến</span>
               </div>
             )}
             <div className="admin-topbar__user" onClick={() => setUserMenuOpen((v) => !v)} ref={userMenuRef}>
@@ -324,12 +387,10 @@ export default function AdminLayout({ children }) {
           </div>
         </header>
 
-        {/* Page content */}
         <main className="admin-content">
           {children}
         </main>
 
-        {/* Floating scroll navigation button */}
         <ScrollToggleButton />
       </div>
     </div>
