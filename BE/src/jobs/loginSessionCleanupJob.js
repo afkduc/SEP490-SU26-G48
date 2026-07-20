@@ -14,7 +14,12 @@
 const { query } = require('../infrastructure/database/sqlServer');
 
 const STALE_HOURS = parseInt(process.env.LOGIN_SESSION_STALE_HOURS || '24', 10);
+// Gioi han de tranh CPU lock neu backlog rat lon (millions rows).
+// Moi batch update TOP(@p1) rows, sau do delay 1s de DB va event loop thay.
+// MAX_ITERATIONS an toan de 1 lan job khong chay qua lau (max ~30 phut).
 const BACKFILL_BATCH = 1000;
+const BACKFILL_MAX_ITERATIONS = 100; // 100 * 1000 = 100k rows moi lan runAll
+const BACKFILL_DELAY_MS = 1000; // delay giua moi batch
 
 async function cleanupStaleSessions() {
   try {
@@ -67,37 +72,54 @@ async function cleanupOrphanedDevices() {
 }
 
 async function backfillBrowserOs(limit = BACKFILL_BATCH) {
-  try {
-    const result = await query(
-      `UPDATE TOP (@p1) login_sessions
-       SET    browser = CASE
-                       WHEN user_agent LIKE '%Edg/%'   THEN 'Edge'
-                       WHEN user_agent LIKE '%Firefox/%' THEN 'Firefox'
-                       WHEN user_agent LIKE '%OPR/%'    THEN 'Opera'
-                       WHEN user_agent LIKE '%Chrome/%' THEN 'Chrome'
-                       WHEN user_agent LIKE '%Safari/%' THEN 'Safari'
-                       ELSE 'Unknown'
-                     END,
-              os      = CASE
-                       WHEN user_agent LIKE '%Windows%'  THEN 'Windows'
-                       WHEN user_agent LIKE '%Android%'  THEN 'Android'
-                       WHEN user_agent LIKE '%iPhone%' OR user_agent LIKE '%iPad%' THEN 'iOS'
-                       WHEN user_agent LIKE '%Mac OS%' OR user_agent LIKE '%Macintosh%' THEN 'macOS'
-                       WHEN user_agent LIKE '%Linux%'    THEN 'Linux'
-                       ELSE 'Unknown'
-                     END
-       WHERE  browser IS NULL OR os IS NULL`,
-      { p1: limit }
-    );
-    const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
-    if (affected > 0) {
-      console.log(`[loginSessionJob] Backfilled ${affected} rows browser/os`);
-      // Tiep tuc cho den khi het
-      setImmediate(() => backfillBrowserOs(limit));
+  // Dung iterative loop (khong recursive setImmediate) de:
+  //  - Gioi han so iteration (MAX_ITERATIONS) tranh CPU lock khi backlog lon.
+  //  - Co the await Promise-based delay giua moi batch -> event loop tho hang.
+  //  - Co the break som khi khong con row nao can backfill (affected = 0).
+  const start = Date.now();
+  let total = 0;
+  for (let i = 0; i < BACKFILL_MAX_ITERATIONS; i++) {
+    let affected = 0;
+    try {
+      const result = await query(
+        `UPDATE TOP (@p1) login_sessions
+         SET    browser = CASE
+                         WHEN user_agent LIKE '%Edg/%'   THEN 'Edge'
+                         WHEN user_agent LIKE '%Firefox/%' THEN 'Firefox'
+                         WHEN user_agent LIKE '%OPR/%'    THEN 'Opera'
+                         WHEN user_agent LIKE '%Chrome/%' THEN 'Chrome'
+                         WHEN user_agent LIKE '%Safari/%' THEN 'Safari'
+                         ELSE 'Unknown'
+                       END,
+                os      = CASE
+                         WHEN user_agent LIKE '%Windows%'  THEN 'Windows'
+                         WHEN user_agent LIKE '%Android%'  THEN 'Android'
+                         WHEN user_agent LIKE '%iPhone%' OR user_agent LIKE '%iPad%' THEN 'iOS'
+                         WHEN user_agent LIKE '%Mac OS%' OR user_agent LIKE '%Macintosh%' THEN 'macOS'
+                         WHEN user_agent LIKE '%Linux%'    THEN 'Linux'
+                         ELSE 'Unknown'
+                       END
+         WHERE  browser IS NULL OR os IS NULL`,
+        { p1: limit }
+      );
+      affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
+    } catch (err) {
+      console.error('[loginSessionJob] backfillBrowserOs failed:', err && err.message ? err.message : err);
+      return total;
     }
-  } catch (err) {
-    console.error('[loginSessionJob] backfillBrowserOs failed:', err && err.message ? err.message : err);
+
+    total += affected;
+    if (affected === 0) break; // Het row can backfill -> dung som
+
+    // Delay giua cac batch de DB va event loop khong bi qua tai.
+    await new Promise((r) => setTimeout(r, BACKFILL_DELAY_MS));
   }
+
+  const elapsed = Date.now() - start;
+  if (total > 0) {
+    console.log(`[loginSessionJob] Backfilled ${total} rows browser/os in ${elapsed}ms`);
+  }
+  return total;
 }
 
 async function backfillLogoutReason() {
