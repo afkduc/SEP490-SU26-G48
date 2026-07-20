@@ -45,7 +45,11 @@ class DeviceService {
     try {
       const NotificationService = require('./NotificationService');
       const ns = new NotificationService();
-      ns.notify('FORCE_LOGOUT', { userId, deviceId });
+      // .catch() bat buoc - notify() la async, khong await o day (fire-and-
+      // forget) nen reject se thanh unhandled rejection lam crash ca process.
+      ns.notify('FORCE_LOGOUT', { userId, deviceId }).catch((err) => {
+        console.error('[DeviceService] Failed to send force logout notification:', err.message);
+      });
     } catch (err) {
       console.error('[DeviceService] Failed to send force logout notification:', err.message);
     }
