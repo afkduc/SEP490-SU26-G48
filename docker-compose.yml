@@ -1,0 +1,27 @@
+services:
+  be:
+    build:
+      context: ./BE
+    env_file:
+      - ./BE/.env
+    ports:
+      - "5000:5000"
+    # DB dang cai san tren chinh may Windows nay (ngoai Docker) - container
+    # can host.docker.internal (DB_SERVER trong BE/.env) de goi ra duoc.
+    # extra_hosts nay dam bao host.docker.internal luon phan giai duoc, ke
+    # ca khi chay bang Docker Engine/WSL2 thuan (khong qua Docker Desktop).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  fe:
+    build:
+      context: ./FE
+    # Khong can env_file o day: Vite da doc va "nuong" bien VITE_* tu FE/.env
+    # thang vao file JS ngay trong buoc `npm run build` (xem FE/Dockerfile) -
+    # nginx chi serve file tinh, khong doc bien moi truong luc chay nua.
+    ports:
+      - "3000:80"
+    depends_on:
+      - be
+    restart: unless-stopped
