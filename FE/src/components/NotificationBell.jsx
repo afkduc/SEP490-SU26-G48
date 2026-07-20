@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useAuth } from '../../contexts/AppContext';
-import { useNotifications } from '../../hooks/useNotifications';
-import { formatDateSafe } from '../../utils/dateUtils';
+import { useAuth } from '../contexts/AppContext';
+import { useNotifications } from '../hooks/useNotifications';
+import { formatDateSafe } from '../utils/dateUtils';
 import './NotificationBell.css';
 
 const ICON_COLORS = {

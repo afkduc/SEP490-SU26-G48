@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { API_BASE_URL } from '../../config';
-import { notificationApi } from '../../services/notificationApi';
+import { API_BASE_URL } from '../config';
+import { notificationApi } from '../services/notificationApi';
 
 const SSE_RECONNECT_DELAY_MS = 5000;
 const POLL_FALLBACK_MS = 60_000; // fallback polling 60s neu SSE fail
