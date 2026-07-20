@@ -189,21 +189,30 @@ async function trackLogin(req, user) {
       ? user.branch_id
       : null;
 
-    // Step 1: Close stale sessions of this user OR ones that point to a
-    // device that has been revoked. Without this, leaving a tab open or
-    // server restarts leave rows status='active' forever, which then makes
-    // the login-session history disagree with the devices page.
+    // Step 1: Close stale sessions CUA USER HIEN TAI (logic single-session).
+    // Without this, leaving a tab open or server restarts leave rows
+    // status='active' forever, which then makes the login-session history
+    // disagree with the devices page.
+    //
+    // BUG CU (race condition nghiem trong):
+    //   Code cu close TAT CA session active cua OTHER users
+    //   (WHERE user_id != @p1 AND NOT EXISTS is_current=1) khi user A login.
+    //   Hau qua: User B dang active nhung tam thoi khong co device moi
+    //   (vd: moi login 2 phut truoc, chua heartbeat tiep theo) → bi close nham
+    //   → bi da ra khoi he thong ma khong ro ly do.
+    //
+    // FIX: Chi close session cua chinh user dang login. Cleanup session treo
+    // cua cac user khac la viectra cua loginSessionCleanupJob (chay moi 60 phut).
     if (userId) {
       try {
-        // Close the user's existing active sessions
         const result = await query(
           `UPDATE login_sessions
            SET    logout_time              = SYSUTCDATETIME(),
                   logout_reason            = 'NEW_LOGIN_OVERRIDE',
                   session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
                   status                   = 'ended'
-           WHERE  user_id   = @p1
-             AND  status   = 'active'
+           WHERE  user_id     = @p1
+             AND  status      = 'active'
              AND  action_type = 'LOGIN'`,
           { p1: userId }
         );
@@ -211,28 +220,9 @@ async function trackLogin(req, user) {
           console.log(`[trackLogin] Closed ${result.rowsAffected[0]} previous session(s) for userId=${userId}`);
         }
 
-        // Dong device cua user bi kick (chi user hien tai)
+        // Dong device cua user hien tai (logic single-session: chi 1 device current)
         await query(
           'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
-          { p1: userId }
-        );
-
-        // Dong luon cac session active cua user khac ma minh dang dang nhap,
-        // tranh truong hop mot user cua ticket #login-session-mismatch van
-        // dang giu session active ma khong co device tuong ung.
-        await query(
-          `UPDATE login_sessions
-              SET logout_time = SYSUTCDATETIME(),
-                  logout_reason = 'STALE_HEARTBEAT',
-                  status = 'ended'
-            WHERE status = 'active'
-              AND action_type = 'LOGIN'
-              AND user_id != @p1
-              AND NOT EXISTS (
-                SELECT 1 FROM user_devices ud
-                WHERE ud.user_id = login_sessions.user_id
-                  AND ud.is_current = 1
-              )`,
           { p1: userId }
         );
       } catch (err) {
