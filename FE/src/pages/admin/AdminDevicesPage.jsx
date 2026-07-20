@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { adminDevicesApi } from '../../services/adminApi';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
+import { useAuth } from '../../contexts/AppContext';
 import { useToast } from '../../components/common/ToastContext';
 import { formatDateSafe } from '../../utils/dateUtils';
 import './AdminDevicesPage.css';
@@ -201,7 +202,10 @@ export default function AdminDevicesPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
-  const [searchTimer, setSearchTimer] = useState(null);
+  // Bug cu: searchTimer la useState -> clearTimeout(searchTimer) co the clear
+  // timeout cu (state chua update) khi user go lien tuc -> race condition.
+  // Fix: dung useRef de luu timer ID (ref dong bo, khong can render moi).
+  const searchTimerRef = useRef(null);
 
   const [statusFilter, setStatusFilter] = useState('');
   const [browserFilter, setBrowserFilter] = useState('');
@@ -293,7 +297,9 @@ export default function AdminDevicesPage() {
     loadData(page);
   }, [loadData, page]);
 
-  useLoginSessionsSSE(handleSSEEvent);
+  const { token } = useAuth();
+  // Truyen token de SSE auth (BE validate Bearer hoac ?token= query)
+  useLoginSessionsSSE(handleSSEEvent, true, token);
 
   // Sort client-side de dam bao is_current len tren, moi nhat truoc.
   // BE da sort (trong DeviceRepository), nhung useMemo nay giup FE on dinh
@@ -319,12 +325,24 @@ export default function AdminDevicesPage() {
   function handleSearchChange(e) {
     const val = e.target.value;
     setSearch(val);
-    clearTimeout(searchTimer);
-    const timer = setTimeout(() => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    searchTimerRef.current = setTimeout(() => {
+      searchTimerRef.current = null;
       loadData(1);
     }, 400);
-    setSearchTimer(timer);
   }
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+        searchTimerRef.current = null;
+      }
+    };
+  }, []);
 
   function handleFilterChange() {
     loadData(1);

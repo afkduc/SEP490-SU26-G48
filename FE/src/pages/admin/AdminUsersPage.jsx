@@ -9,7 +9,6 @@ import { downloadBlob } from '../../utils/downloadBlob';
 import { useToast } from '../../components/common/ToastContext';
 import UserFormModal from './users/UserFormModal';
 import UserDetailDrawer from './users/UserDetailDrawer';
-import AssignRoleModal from './users/AssignRoleModal';
 import AdminPagination from './components/AdminPagination';
 import TableSkeleton from './components/TableSkeleton';
 import './AdminUsersPage.css';
@@ -56,7 +55,7 @@ function getInitials(firstName, lastName) {
 /**
  * Action menu rieng cho mobile (3 cham / popup) de tranh tran bang.
  */
-function UserActionMenu({ user, onView, onAssign, onEdit }) {
+function UserActionMenu({ user, onView, onEdit }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -91,12 +90,6 @@ function UserActionMenu({ user, onView, onAssign, onEdit }) {
               <circle cx="12" cy="12" r="3" />
             </svg>
             Chi tiet
-          </button>
-          <button type="button" onClick={() => { setOpen(false); onAssign(); }} role="menuitem">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-            Phan quyen
           </button>
           <button type="button" onClick={() => { setOpen(false); onEdit(); }} role="menuitem">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -144,7 +137,6 @@ export default function AdminUsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [detailUserId, setDetailUserId] = useState(null);
-  const [assignUserId, setAssignUserId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -437,7 +429,7 @@ export default function AdminUsersPage() {
                         </td>
                         <td data-label="Ngày tạo" className="admin-users__date">{formatDate(u.createdAt)}</td>
                         <td className="admin-users__actions-cell" data-label="Hành động">
-                          {/* Desktop: 3 nut rieng */}
+                          {/* Desktop: 2 nut (Chi tiet + Sua) - Phan quyen chuyen vao Edit modal */}
                           <div className="action-btns">
                             <button
                               className="btn btn--sm btn--view"
@@ -450,17 +442,6 @@ export default function AdminUsersPage() {
                               <span>Chi tiết</span>
                             </button>
                             <button
-                              className="btn btn--sm btn--role"
-                              onClick={() => setAssignUserId(u.id)}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                                <line x1="12" y1="8" x2="12" y2="16"/>
-                                <line x1="8" y1="12" x2="16" y2="12"/>
-                              </svg>
-                              <span>Phân quyền</span>
-                            </button>
-                            <button
                               className="btn btn--sm btn--edit"
                               onClick={() => { setEditUser(u); setShowModal(true); }}
                             >
@@ -471,11 +452,10 @@ export default function AdminUsersPage() {
                               <span>Sửa</span>
                             </button>
                           </div>
-                          {/* Mobile: menu 3 cham */}
+                          {/* Mobile: menu 3 cham (Chi tiet + Sua) - Phan quyen trong modal Sua */}
                           <UserActionMenu
                             user={u}
                             onView={() => setDetailUserId(u.id)}
-                            onAssign={() => setAssignUserId(u.id)}
                             onEdit={() => { setEditUser(u); setShowModal(true); }}
                           />
                         </td>
@@ -513,14 +493,6 @@ export default function AdminUsersPage() {
           userId={detailUserId}
           onClose={() => setDetailUserId(null)}
           onRolesChanged={() => refresh()}
-        />
-      )}
-
-      {assignUserId && (
-        <AssignRoleModal
-          userId={assignUserId}
-          onClose={() => setAssignUserId(null)}
-          onSuccess={() => refresh()}
         />
       )}
     </div>
