@@ -395,7 +395,11 @@ export default function AdminRolesPage() {
   useEffect(() => { loadRoles(); }, []);
   useEffect(() => { if (tab === 'matrix' && permissions.length === 0) loadMatrix(); }, [tab]);
 
-  const visibleRoles = roles.filter((r) => ROLE_VALUES.includes(r.roleName));
+  // Matrix hien thi TAT CA roles (gồm system roles + custom roles).
+  // Truoc day chi loc theo ROLE_VALUES -> custom roles bi an va khong luu duoc.
+  // Giu lai ROLE_VALUES de highlight system roles voi style dac biet trong UI
+  // (neu can). Hien tai matrix dung `visibleRoles` thay cho filter.
+  const visibleRoles = roles;
 
   function handleMatrixChange(roleId, permIds) {
     setRolePermissions((prev) => ({ ...prev, [roleId]: permIds }));
