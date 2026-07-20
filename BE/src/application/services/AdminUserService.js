@@ -86,6 +86,10 @@ class AdminUserService {
       throw new ApiError(400, 'Email khong dung dinh dang');
     }
 
+    if (typeof password !== 'string' || password.length < PASSWORD_MIN_LENGTH) {
+      throw new ApiError(400, `Mat khau phai co it nhat ${PASSWORD_MIN_LENGTH} ky tu`);
+    }
+
     if (phone && !PHONE_REGEX.test(phone)) {
       throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
     }
