@@ -16,7 +16,14 @@ const RULE_KEYS = {
 
 /**
  * Insert 1 security alert
+ *
+ * Neu bang security_alerts chua ton tai (chua chay migration V6) hoac
+ * loi DB -> chi log 1 LAN, KHONG spam log moi 5 phut. Migration V6 se
+ * tao bang security_alerts.
  */
+const DB_MISSING_RE = /Invalid object name 'security_alerts'|'security_alerts' not found/i;
+let lastMissingLogTs = 0;
+
 async function insertAlert({ severity, title, message, userId, branchId, ruleKey, metadata }) {
   try {
     await query(
@@ -33,7 +40,18 @@ async function insertAlert({ severity, title, message, userId, branchId, ruleKey
       }
     );
   } catch (err) {
-    console.error('[securityAlertJob] insertAlert failed:', err && err.message ? err.message : err);
+    const msg = err && err.message ? err.message : String(err);
+    // Bang/thieu cot -> chi log 1 lan moi 30 phut (tranh spam console)
+    const isMissing = DB_MISSING_RE.test(msg);
+    if (isMissing) {
+      const now = Date.now();
+      if (now - lastMissingLogTs > 30 * 60_000) {
+        console.warn('[securityAlertJob] Bang security_alerts chua ton tai - hay chay Database/migrations/V6__add_security_devices_notification.sql.');
+        lastMissingLogTs = now;
+      }
+    } else {
+      console.error('[securityAlertJob] insertAlert failed:', msg);
+    }
   }
 }
 
