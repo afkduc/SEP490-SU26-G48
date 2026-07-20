@@ -184,7 +184,7 @@ function PasswordInput({ label, id, value, onChange, placeholder, error }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AdminProfilePage() {
-  const { user } = useAuth();
+  const { user, setUser, reloadPermissions } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [profile, setProfile] = useState(null);
@@ -287,18 +287,41 @@ export default function AdminProfilePage() {
       setProfile(updated);
       setEditSuccess('Cập nhật thông tin thành công!');
 
-      // Update localStorage user so Navbar/AppContext picks up the change on next reload
+      // Update localStorage user va AppContext user + permissions de Navbar,
+      // permission gate va role badge dong bo ngay (khong can F5).
+      // Bug cu: chi setProfile local + luu 1 phan vao localStorage. Neu BE
+      // tra updated.roles hoac updated.permissions (khi admin thay doi role
+      // cua chinh minh), Navbar va PermissionGate van hien thi role cu.
       try {
         const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const updatedUser = {
-            ...parsed,
-            email: updated.email,
-            name: `${updated.firstName || ''} ${updated.lastName || ''}`.trim(),
-          };
-          const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
-          storage.setItem('user', JSON.stringify(updatedUser));
+        const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
+
+        const updatedUser = {
+          ...(raw ? JSON.parse(raw) : {}),
+          ...updated,
+          // Dam bao cac field chinh xac nhat quan he giua FE va BE
+          id: updated.id ?? updated.userId,
+          email: updated.email,
+          userName: updated.userName || updated.name,
+          name:
+            `${updated.firstName || ''} ${updated.lastName || ''}`.trim() ||
+            updated.name,
+          firstName: updated.firstName,
+          lastName: updated.lastName,
+          phone: updated.phone,
+          roles: updated.roles,
+          permissions: updated.permissions,
+          branchId: updated.branchId,
+          branchName: updated.branchName,
+        };
+        storage.setItem('user', JSON.stringify(updatedUser));
+
+        // Cap nhat AppContext state de component khac (Navbar, AdminLayout)
+        // re-render voi thong tin moi ngay lap tuc.
+        setUser(updatedUser);
+        // Re-load permissions tu storage (BE co the da tra permissions moi).
+        if (typeof reloadPermissions === 'function') {
+          reloadPermissions();
         }
       } catch (_) {}
 
