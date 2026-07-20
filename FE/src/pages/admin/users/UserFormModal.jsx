@@ -9,8 +9,14 @@ const STATUS_OPTIONS = [
 ];
 
 /**
- * Lay roleId tu user.roles (da hoac chua fetch roles list)
- * @param {Array} userRoles - roles array tu user object (string[] hoac object[])
+ * Lay roleId tu user.roles (da hoac chua fetch roles list).
+ *
+ * Tra ve:
+ *   - roleId neu user chi co 1 role (normal case)
+ *   - '' neu user co nhieu role (FE phai canh bao admin -> dung modal rieng AssignRoleModal)
+ *   - '' neu user khong co role nao
+ *
+ * @param {Array} userRoles - roles array tu user object [{roleId, roleName}, ...]
  * @param {Array} allRoles  - roles tu API dropdown
  * @returns {string} roleId hoac ''
  */
@@ -19,19 +25,29 @@ function resolveRoleId(userRoles, allRoles) {
   const first = userRoles[0];
 
   // Backend moi: { roleId, roleName }
+  let resolvedId = '';
   if (typeof first === 'object' && first !== null) {
-    return first.roleId !== undefined && first.roleId !== null
+    resolvedId = first.roleId !== undefined && first.roleId !== null
       ? String(first.roleId)
       : '';
-  }
-
-  // Backend cu: ['Admin', ...] -> map ten -> id
-  if (typeof first === 'string') {
+  } else if (typeof first === 'string') {
+    // Backend cu: ['Admin', ...] -> map ten -> id
     const match = allRoles.find((r) => r.roleName === first || String(r.id) === first);
-    return match ? String(match.id) : '';
+    resolvedId = match ? String(match.id) : '';
   }
 
-  return '';
+  // Neu user co >= 2 role -> tra ve '' de form.roleId bi empty.
+  // Caller se hien thi canh bao: "User nay co N vai tro, hay dung modal Phan quyen rieng".
+  // Ly do: backend updateUser voi roleId != undefined se DELETE toan bo roles cu va
+  // INSERT 1 role moi -> MAT TOAN BO vai tro khac (data loss nghiem trong).
+  return resolvedId;
+}
+
+/**
+ * Kiem tra user co nhieu role khong (de canh bao trong UI).
+ */
+function hasMultipleRoles(userRoles) {
+  return Array.isArray(userRoles) && userRoles.length >= 2;
 }
 
 export default function UserFormModal({ user, onClose, onSuccess }) {
@@ -108,7 +124,12 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
     }
     if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc';
-    if (!form.roleId) errs.roleId = 'Vai trò là bắt buộc';
+    // Bug #10: Khi user co nhieu vai tro va admin KHONG thay doi dropdown
+    // -> form.roleId se empty (resolveRoleId returns '' for first multi-role).
+    // Tranh block submit neu admin khong thay vai tro.
+    if (!form.roleId && !(isEdit && hasMultipleRoles(user?.roles))) {
+      errs.roleId = 'Vai trò là bắt buộc';
+    }
     return errs;
   }
 
@@ -125,12 +146,20 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
 
     try {
       if (isEdit) {
+        // Bug #10 (data loss): neu user co nhieu vai tro va admin KHONG doi
+        // dropdown role -> KHONG gui roleId (undefined) de BE khong DELETE + INSERT.
+        // Neu admin doi dropdown -> gui roleId moi (BE se DELETE all + INSERT moi
+        // -> mat vai tro phu, nhan roi qua warning).
+        const shouldSendRoleId =
+          form.roleId && form.roleId !== '';
         const payload = {
           userId: user.id,
           status: form.status,
-          roleId: form.roleId ? Number(form.roleId) : null,
           branchId: form.branchId ? Number(form.branchId) : null,
         };
+        if (shouldSendRoleId) {
+          payload.roleId = Number(form.roleId);
+        }
         await adminUsersApi.update(payload);
       } else {
         const payload = {
@@ -272,6 +301,43 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
             {/* Section: Phân công */}
             <div className="form__section">
               <div className="form__section-title">Phân công & trạng thái</div>
+
+              {/* Canh bao khi user co >=2 vai tro (de tranh data loss).
+                  Bug cu: resolveRoleId chi lay role[0], FE gui 1 role duy nhat ->
+                  BE AdminUserRepositoryImpl.updateUser DELETE all + INSERT 1 ->
+                  mat toan bo vai tro khac.
+
+                  Fix hien tai:
+                  - Neu admin KHONG doi dropdown vai tro -> FE bo qua field roleId
+                    trong payload -> BE giữ nguyên toàn bộ vai tro.
+                  - Neu admin DOI dropdown -> BE sẽ DELETE các vai trò khác.
+                    Admin phải dùng modal Phân quyền riêng để quản lý nhiều vai trò. */}
+              {isEdit && hasMultipleRoles(user?.roles) && (
+                <div
+                  className="form__warning"
+                  style={{
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    color: '#92400e',
+                    padding: '10px 12px',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    marginBottom: 12,
+                    lineHeight: 1.5,
+                  }}
+                  role="alert"
+                >
+                  ⚠️ User này đang có <b>{user.roles.length} vai trò</b>:{' '}
+                  {user.roles.map((r) => r.roleName).join(', ')}.
+                  <br />
+                  Nếu bạn <b>không thay đổi</b> dropdown Vai trò bên dưới thì các
+                  vai trò hiện tại được giữ nguyên.
+                  <br />
+                  Nếu bạn <b>chọn vai trò khác</b>, các vai trò còn lại sẽ bị
+                  xóa — hãy dùng modal <b>Phân quyền</b> riêng để quản lý.
+                </div>
+              )}
+
               <div className="form__row">
                 <div className="form__field">
                   <label className="form__label">Chi nhánh <span className="required">*</span></label>
