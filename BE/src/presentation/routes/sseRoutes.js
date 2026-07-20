@@ -18,6 +18,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../../config');
 const ApiError = require('../../utils/ApiError');
 const { onLoginSession } = require('../../application/events/LoginSessionEvents');
+const NotificationEvents = require('../../application/events/NotificationEvents');
 const { query } = require('../../infrastructure/database/sqlServer');
 
 const ADMIN_ROLES = ['admin', 'manager', 'general_director'];
@@ -28,8 +29,15 @@ const ADMIN_ROLES = ['admin', 'manager', 'general_director'];
  *   - Middleware auth goi next(new ApiError(401, ...)) de Express error handler xu ly.
  *   - SSE da write headers -> khong the dung error handler nhu binh thuong.
  *   - Phai res.write 1 SSE error event roi res.end().
+ *
+ * @param {object} req - Express req
+ * @param {object} res - Express res
+ * @param {object} [options]
+ * @param {boolean} [options.requireAdmin=false] - neu true, chi cho admin/manager/general_director
+ * @returns {Promise<object|null>} decoded JWT payload hoac null (response da gui)
  */
-async function authenticateSSE(req, res) {
+async function authenticateSSE(req, res, options = {}) {
+  const { requireAdmin = false } = options;
   // Lay token tu header Authorization hoac query string (?token=)
   // (EventSource API khong gui custom header, FE can gui qua query)
   let token = null;
@@ -83,16 +91,18 @@ async function authenticateSSE(req, res) {
     }
   }
 
-  // Kiem tra role admin/manager (chi admin moi can SSE login-sessions)
-  const roles = decoded.roles || [];
-  const hasAdminRole = roles.some((r) => ADMIN_ROLES.includes(r));
-  if (!hasAdminRole) {
-    res.status(403).json({
-      success: false,
-      message: 'Không có quyền truy cập SSE',
-      code: 'FORBIDDEN',
-    });
-    return null;
+  // Kiem tra role neu can (admin-only SSE nhu login-sessions)
+  if (requireAdmin) {
+    const roles = decoded.roles || [];
+    const hasAdminRole = roles.some((r) => ADMIN_ROLES.includes(r));
+    if (!hasAdminRole) {
+      res.status(403).json({
+        success: false,
+        message: 'Không có quyền truy cập SSE',
+        code: 'FORBIDDEN',
+      });
+      return null;
+    }
   }
 
   return decoded;
@@ -119,7 +129,7 @@ function buildSSERouter() {
   router.get('/login-sessions', async (req, res) => {
     // Authenticate TRUOC khi write headers SSE.
     // Neu fail, tra JSON error (van con headers JSON mac dinh, chua flush SSE).
-    const decoded = await authenticateSSE(req, res);
+    const decoded = await authenticateSSE(req, res, { requireAdmin: true });
     if (!decoded) return; // response already sent
 
     // Set SSE headers
@@ -157,6 +167,75 @@ function buildSSERouter() {
     }, 30_000);
 
     // Cleanup on client disconnect
+    const cleanup = () => {
+      clearInterval(heartbeat);
+      try {
+        unsubscribe();
+      } catch {
+        /* ignore */
+      }
+    };
+    req.on('close', cleanup);
+    req.on('error', cleanup);
+  });
+
+  /**
+   * GET /api/sse/notifications?token=<JWT>
+   *
+   * Stream notification realtime cho user hien tai (khong can admin role).
+   * Moi notification moi tu NotificationService se duoc push ngay.
+   * Moi user chi nhan notification cua chinh minh (filter theo userId tu JWT).
+   *
+   * Event format:
+   *   event: notification
+   *   data: {"id":123,"title":"...","message":"...","type":"LOGIN_SUCCESS",...}
+   */
+  router.get('/notifications', async (req, res) => {
+    const decoded = await authenticateSSE(req, res);
+    if (!decoded) return; // response already sent
+
+    const userId = decoded.userId;
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Token khong chua userId',
+        code: 'NO_USER_ID',
+      });
+      return;
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    res.write(
+      `event: connected\ndata: ${JSON.stringify({
+        status: 'connected',
+        userId,
+      })}\n\n`
+    );
+
+    // Subscribe to notifications cho user nay
+    const unsubscribe = NotificationEvents.onNotification(userId, (notification) => {
+      try {
+        res.write(`event: notification\ndata: ${JSON.stringify(notification)}\n\n`);
+      } catch (writeErr) {
+        console.debug('[sse.notifications] write after disconnect:', writeErr && writeErr.message);
+      }
+    });
+
+    // Heartbeat keep-alive 30s
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: heartbeat\n\n`);
+      } catch {
+        clearInterval(heartbeat);
+      }
+    }, 30_000);
+
     const cleanup = () => {
       clearInterval(heartbeat);
       try {
