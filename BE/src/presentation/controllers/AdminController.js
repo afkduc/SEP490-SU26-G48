@@ -7,6 +7,7 @@ const RoleService = require('../../application/services/RoleService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const UserRoleService = require('../../application/services/UserRoleService');
 const UserRoleRepositoryImpl = require('../../infrastructure/repositories/UserRoleRepositoryImpl');
+const UserRepositoryImpl = require('../../infrastructure/repositories/UserRepositoryImpl');
 const PermissionService = require('../../application/services/PermissionService');
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
@@ -27,7 +28,8 @@ class AdminController {
 
     const userRoleRepository = new UserRoleRepositoryImpl();
     const roleRepo = new RoleRepositoryImpl();
-    this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo });
+    const userRepo = new UserRepositoryImpl();
+    this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo, userRepository: userRepo });
 
     this.auditService = new AuditService(AuditRepository);
     this.branchService = new BranchService();
