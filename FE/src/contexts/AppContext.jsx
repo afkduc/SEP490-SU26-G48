@@ -1,26 +1,31 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { loginApi, logoutApi } from '../services/authApi';
+import { loginApi, logoutApi, getMeApi } from '../services/authApi';
 import { ROLES } from '../constants/roles';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 
 const AppContext = createContext(null);
 
+/**
+ * Load session một cách đồng bộ. Hàm này được gọi TRƯỚC khi Provider
+ * mount children nên không có race condition — đảm bảo lần render đầu
+ * tiên đã có token/user/permissions (không phải đợi useEffect chạy).
+ */
 function loadSession() {
   for (const storage of [localStorage, sessionStorage]) {
     try {
       const token = storage.getItem('token');
       const rawUser = storage.getItem('user');
+      // Chi load khi CA token va user deu co (tranh re-render 2 lan)
       if (!token || !rawUser) continue;
 
       const user = JSON.parse(rawUser);
       const rawPermissions = storage.getItem('permissions');
-      return {
-        token,
-        user,
-        permissions: rawPermissions ? JSON.parse(rawPermissions) : (user.permissions || []),
-      };
+      const permissions = rawPermissions
+        ? JSON.parse(rawPermissions)
+        : (user.permissions || []);
+      return { token, user, permissions };
     } catch {
-      // Thu storage con lai neu du lieu cua storage hien tai bi hong.
+      // Bo qua storage loi, thu storage con lai.
     }
   }
   return { token: null, user: null, permissions: [] };
@@ -68,11 +73,21 @@ export function getRoleHome(user) {
 }
 
 export function AppProvider({ children }) {
+  // QUAN TRONG: load session DONG BO truoc khi tao state.
+  // Tranh duoc tinh trang "render lan dau khong co permission" ->
+  // "PermissionGate an het button" -> phai F5 moi thay.
   const initial = loadSession();
   const [token, setToken] = useState(initial.token);
   const [user, setUser] = useState(initial.user);
   const [permissions, setPermissions] = useState(initial.permissions);
 
+  // Phân biệt "session đã hydrate xong" với "không có session".
+  // Hydrated = true ngay khi component mount (initial đã load ở trên).
+  // Neu khong co session, van hydrate xong (chi la khong co gi).
+  // Muc dich: cac component con co the phan biet "dang load" vs "da load xong, khong co data".
+  const [authReady] = useState(true);
+
+  // Dong bo session vao storage khi state thay doi (sau login/logout)
   useEffect(() => {
     if (token && user) {
       saveSession(token, user, permissions);
@@ -81,21 +96,47 @@ export function AppProvider({ children }) {
 
   const login = async (email, password, remember = false) => {
     const result = await loginApi(email, password);
-    const newPermissions = result.user?.permissions || [];
 
-    // Chi giu mot phien luu tru. Neu token cu con o localStorage trong khi
-    // login moi duoc luu vao sessionStorage, httpClient se uu tien token cu
-    // va moi request sau login se bi 401 du login vua thanh cong.
+    // QUAN TRONG: Phai save token vao storage TRUOC khi goi bat ky
+    // authenticated API nao (nhu getMeApi). Vi httpClient luon doc token
+    // tu storage (khong phai tu React state), neu khong save truoc se
+    // gay 401 "Chua dang nhap" ngay sau login -> phai F5 moi het loi.
+    //
+    // Thu tu DONG BO (khong qua useEffect):
+    //   1. clearSession()      -> xoa token cu (neu co)
+    //   2. setItem('token')    -> save token moi VAO STORAGE truoc
+    //   3. getMeApi()          -> call API co Authorization header moi
+    //   4. setItem('permissions') -> save permissions sau khi co
+    //   5. setState()          -> cap nhat React state cuoi cung
     clearSession();
     const storage = remember ? localStorage : sessionStorage;
     storage.setItem('token', result.token);
     storage.setItem('user', JSON.stringify(result.user));
+
+    // Lay quyen moi nhat tu server (permissions trong JWT co the STALE neu
+    // admin vua thay doi ma tran quyen o mot tab khac). Fallback ve
+    // permissions tu JWT neu API fail (mang chap / 401).
+    let newPermissions = result.user?.permissions || [];
+    try {
+      const me = await getMeApi();
+      if (me && Array.isArray(me.permissions)) {
+        newPermissions = me.permissions;
+      }
+    } catch (e) {
+      // Nuot loi — permissions tu JWT van OK cho lan render dau tien.
+      if (typeof console !== 'undefined') {
+        console.warn('[AppContext] getMe after login failed, fallback to JWT perms:', e?.message);
+      }
+    }
+
+    // Save permissions vao storage (token + user da save o tren)
     storage.setItem('permissions', JSON.stringify(newPermissions));
+
+    // Cap nhat React state cuoi cung (re-render Provider)
     setToken(result.token);
     setUser(result.user);
     setPermissions(newPermissions);
 
-    // Tra luon ket qua cho caller (LoginPage) de xu ly redirect neu can
     return result;
   };
 
@@ -103,7 +144,10 @@ export function AppProvider({ children }) {
     try {
       await logoutApi();
     } catch (e) {
-      console.warn('[AppContext] logout API failed (tiep tuc logout local):', e?.message);
+      // Logout API fail khong quan trong — ta van don dep local.
+      if (typeof console !== 'undefined') {
+        console.warn('[AppContext] logout API failed (tiep tuc logout local):', e?.message);
+      }
     }
     clearSession();
     setToken(null);
@@ -113,20 +157,20 @@ export function AppProvider({ children }) {
 
   /**
    * Reload permissions from localStorage.
-   * Dùng sau khi admin thay đổi ma trận quyền trên chính máy của họ.
+   * Dung sau khi admin thay doi ma tran quyen tren chinh may cua ho.
    */
   const reloadPermissions = () => {
     try {
       const stored = localStorage.getItem('permissions') || sessionStorage.getItem('permissions');
       if (stored) {
-        setPermissions(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        setPermissions(parsed);
       }
     } catch {
       /* ignore */
     }
   };
 
-  // isAuthenticated tinh rieng de truyen xuong HeartbeatRunner
   const isAuthenticated = Boolean(token && user);
 
   const value = useMemo(
@@ -135,20 +179,22 @@ export function AppProvider({ children }) {
       user,
       permissions,
       isAuthenticated,
+      // Flag bao cho cac component con biet rang session da hydrate
+      // xong (khoi can loading spinner cho AuthContext).
+      authReady,
       login,
       logout,
       reloadPermissions,
       setUser,
+      setPermissions,
     }),
-    [token, user, permissions, isAuthenticated]
+    [token, user, permissions, isAuthenticated, authReady]
   );
 
   return (
     <AppContext.Provider value={value}>
-      {/* HeartbeatRunner: goi POST /api/auth/heartbeat moi 60s de cap nhat
-          last_activity_at phia BE. Tu dong tat khi user logout (enabled=false).
-          Clock offset (server - client) cung duoc refresh moi 5 phut de cac
-          trang admin hien thi thoi gian chinh xac. */}
+      {/* HeartbeatRunner: goi POST /api/auth/heartbeat moi 60s.
+          Tu tat khi user logout. Tu backoff khi nhan 401 de tranh spam. */}
       {isAuthenticated ? <HeartbeatRunner /> : null}
       {children}
     </AppContext.Provider>
