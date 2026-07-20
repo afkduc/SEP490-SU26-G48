@@ -98,7 +98,11 @@ class UserRoleService {
     try {
       const NotificationService = require('./NotificationService');
       const ns = new NotificationService();
-      ns.notify('ROLE_CHANGED', { userId, action, roles, changedBy });
+      // .catch() bat buoc - notify() la async, khong await o day (fire-and-
+      // forget) nen reject se thanh unhandled rejection lam crash ca process.
+      ns.notify('ROLE_CHANGED', { userId, action, roles, changedBy }).catch((err) => {
+        console.error('[UserRoleService] Failed to send role changed notification:', err.message);
+      });
     } catch (err) {
       console.error('[UserRoleService] Failed to send role changed notification:', err.message);
     }
