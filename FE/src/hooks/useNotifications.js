@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
-import { notificationApi } from '../services/notificationApi';
+import {
+  getNotifications,
+  getUnreadCount,
+  markAsRead,
+  markAllAsRead,
+} from '../services/notificationApi';
 
 const SSE_RECONNECT_DELAY_MS = 5000;
 const POLL_FALLBACK_MS = 60_000; // fallback polling 60s neu SSE fail
@@ -49,7 +54,7 @@ export function useNotifications(token, options = {}) {
 
   const refresh = useCallback(async () => {
     try {
-      const list = await notificationApi.getNotifications({ limit: maxItems });
+      const list = await getNotifications({ limit: maxItems });
       const items = Array.isArray(list) ? list : (list?.items || []);
       setNotifications(items);
       // Dem unread tu list (tranh 1 extra request neu list da co)
@@ -65,7 +70,7 @@ export function useNotifications(token, options = {}) {
 
   const refreshUnreadCount = useCallback(async () => {
     try {
-      const res = await notificationApi.getUnreadCount();
+      const res = await getUnreadCount();
       const count = typeof res === 'object' && res !== null
         ? Number(res.count ?? res.unreadCount ?? res)
         : Number(res);
@@ -84,7 +89,7 @@ export function useNotifications(token, options = {}) {
     );
     setUnreadCount((c) => Math.max(0, c - 1));
     try {
-      await notificationApi.markAsRead(id);
+      await markAsRead(id);
     } catch (err) {
       // Rollback neu fail
       console.warn('[useNotifications] markRead error:', err && err.message);
@@ -104,7 +109,7 @@ export function useNotifications(token, options = {}) {
     );
     setUnreadCount(0);
     try {
-      await notificationApi.markAllAsRead();
+      await markAllAsRead();
     } catch (err) {
       console.warn('[useNotifications] markAllRead error:', err && err.message);
       // Rollback
