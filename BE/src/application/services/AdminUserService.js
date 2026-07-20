@@ -284,7 +284,11 @@ class AdminUserService {
     try {
       const NotificationService = require('./NotificationService');
       const ns = new NotificationService();
-      ns.notify('PASSWORD_CHANGED', { userId, resetByAdmin: true });
+      // .catch() bat buoc - notify() la async, khong await o day (fire-and-
+      // forget) nen reject se thanh unhandled rejection lam crash ca process.
+      ns.notify('PASSWORD_CHANGED', { userId, resetByAdmin: true }).catch((err) => {
+        console.error('[AdminUserService] Failed to send password reset notification:', err.message);
+      });
     } catch (err) {
       console.error('[AdminUserService] Failed to send password reset notification:', err.message);
     }
