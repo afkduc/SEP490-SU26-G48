@@ -65,9 +65,52 @@ class DeviceService {
   }
 
   async forceLogoutAllOtherDevices(userId, currentDeviceId) {
-    const count = await this.deviceRepository.countActiveByUserId(Number(userId));
-    const deleted = await this.deviceRepository.deleteOtherDevices(Number(userId), currentDeviceId);
-    return { deleted, remainingCount: count - deleted };
+    // BUG CU (off-by-one + semantic mismatch):
+    //   - count = so device ACTIVE (is_current=1) cua user
+    //   - deleteOtherDevices xoa TAT CA device khac current (ke ca is_current=0)
+    //   -> remainingCount = count - deleted cho ket qua sai
+    //      (vi count chi dem is_current=1, nhung deleted dem tat ca)
+    //
+    // FIX: Dem dong nhat theo is_current=1 (semantic "active devices").
+    // Neu user chi co 1 device (current) va khong co currentDeviceId (admin force
+    // tu trang admin khong biet current device) -> deleted = 0 vi @p2 IS NULL
+    // trong SQL -> tat ca device (kha nang ca current) bi xoa. Sau do:
+    // remainingCount = activeCountBefore - activeDeletedAfter de chinh xac.
+    const { query } = require('../../infrastructure/database/sqlServer');
+    const userNum = Number(userId);
+    const cur = currentDeviceId == null ? null : Number(currentDeviceId);
+
+    // Dem so device active TRUOC khi xoa
+    const beforeResult = await query(
+      `SELECT COUNT(*) AS c FROM user_devices WHERE user_id = @p1 AND is_current = 1`,
+      { p1: userNum }
+    );
+    const activeBefore = Number(beforeResult.recordset[0].c);
+
+    // Dem so device se bi xoa va co is_current=1 (tru current neu co)
+    const willDeleteActiveResult = await query(
+      `SELECT COUNT(*) AS c FROM user_devices
+        WHERE user_id = @p1
+          AND is_current = 1
+          AND (@p2 IS NULL OR id != @p2)`,
+      { p1: userNum, p2: cur }
+    );
+    const activeDeleted = Number(willDeleteActiveResult.recordset[0].c);
+
+    // Thuc su xoa (logic giu nguyen repository.deleteOtherDevices)
+    const totalDeleted = await this.deviceRepository.deleteOtherDevices(userNum, cur);
+
+    // remainingCount = so device ACTIVE con lai (is_current=1)
+    // Truong hop dat biet: neu cur==null va co it nhat 1 device is_current=1
+    // -> activeDeleted co the = activeBefore (xoa het) -> remaining = 0.
+    // Neu cur!=null -> KHONG bao gio xoa current device -> remaining >= 1.
+    const remainingCount = Math.max(0, activeBefore - activeDeleted);
+
+    return {
+      deleted: totalDeleted,
+      activeDeleted,
+      remainingCount,
+    };
   }
 
   /**
