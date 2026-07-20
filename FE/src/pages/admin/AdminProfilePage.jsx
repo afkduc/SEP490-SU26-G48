@@ -195,10 +195,11 @@ export default function AdminProfilePage() {
   const forcedChange = searchParams.get('reason') === 'forced';
 
   // Tab: 'view' | 'edit' | 'password'
-  // Doc tu query param ?tab=password de auto switch khi redirect tu login
+  // Doc tu query param ?tab=edit de auto switch khi can.
+  // Tab 'password' da bi an (se lam luong rieng qua email) -> fallback 'view'.
   const initialTab = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(
-    initialTab === 'password' || initialTab === 'edit' ? initialTab : 'view'
+    initialTab === 'edit' ? 'edit' : 'view'
   );
 
   // Edit form state
@@ -249,8 +250,11 @@ export default function AdminProfilePage() {
   }, []);
 
   // Switch tab resets messages
+  // Tab 'password' bi an nen neu co ai do goi handleTabChange('password') qua
+  // query param cu, fallback ve 'view' de tranh render content bi an.
   function handleTabChange(tab) {
-    setActiveTab(tab);
+    const safeTab = tab === 'password' ? 'view' : tab;
+    setActiveTab(safeTab);
     setEditError(null);
     setEditSuccess(null);
     setPwSuccess(null);
@@ -458,13 +462,17 @@ export default function AdminProfilePage() {
                 <IconEdit size={15} />
                 Chỉnh sửa
               </button>
-              <button
-                className={`profile-tabs__btn ${activeTab === 'password' ? 'profile-tabs__btn--active' : ''}`}
-                onClick={() => handleTabChange('password')}
-              >
-                <IconLock size={15} />
-                Đổi mật khẩu
-              </button>
+              {/* Tab "Đổi mật khẩu" đã được ẩn theo yêu cầu — sẽ làm luồng */}
+              {/* riêng (qua email) sau, KHÔNG xóa component để dễ bật lại. */}
+              {false && (
+                <button
+                  className={`profile-tabs__btn ${activeTab === 'password' ? 'profile-tabs__btn--active' : ''}`}
+                  onClick={() => handleTabChange('password')}
+                >
+                  <IconLock size={15} />
+                  Đổi mật khẩu
+                </button>
+              )}
             </div>
 
             {/* ── Tab: View ───────────────────────────────── */}
@@ -509,7 +517,7 @@ export default function AdminProfilePage() {
                   </div>
                   <div className="profile-info-item">
                     <span className="profile-info-item__label">Cập nhật lần cuối</span>
-                    <span className="profile-info-item__value">{formatDateTime(profile.createdAt)}</span>
+                    <span className="profile-info-item__value">{formatDateTime(profile.updatedAt || profile.createdAt)}</span>
                   </div>
                   <div className="profile-info-item profile-info-item--full">
                     <span className="profile-info-item__label">Vai tro</span>

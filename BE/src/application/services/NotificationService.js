@@ -1,6 +1,23 @@
 const NotificationSettingsRepository = require('../../infrastructure/repositories/NotificationSettingsRepository');
 const NotificationRepository = require('../../infrastructure/repositories/NotificationRepository');
 
+// Mapping event -> DB column key thực sự tồn tại trong user_notification_settings.
+// DB chỉ có 4 cột liên quan in-app/browser:
+//   in_app_on_system_alert (security alert, login failed, new device, force logout)
+//   in_app_password_change
+//   browser_on_login
+//   email_on_role_change (role_changed)
+//   email_on_login (login_success)
+//   email_on_failed_login (login_failed)
+// Trước đây code dùng key sai (inAppLogin/inAppSecurityAlert/inAppRoleChange)
+// -> settings[key] luôn undefined -> 3/4 loại notification chết âm thầm.
+const IN_APP_SYSTEM_ALERT = 'inAppOnSystemAlert';
+const IN_APP_PASSWORD_CHANGE = 'inAppPasswordChange';
+const BROWSER_ON_LOGIN = 'browserOnLogin';
+const EMAIL_ON_LOGIN = 'emailOnLogin';
+const EMAIL_ON_FAILED_LOGIN = 'emailOnFailedLogin';
+const EMAIL_ON_ROLE_CHANGE = 'emailOnRoleChange';
+
 const NOTIFICATION_EVENTS = {
   LOGIN_SUCCESS: {
     title: 'Đăng nhập thành công',
@@ -8,21 +25,21 @@ const NOTIFICATION_EVENTS = {
       default: 'Bạn đã đăng nhập vào hệ thống.',
       withDevice: 'Bạn đã đăng nhập từ thiết bị mới: {device}.',
     },
-    affectsSettings: ['inAppLogin'],
+    affectsSettings: [EMAIL_ON_LOGIN, BROWSER_ON_LOGIN],
   },
   LOGIN_FAILED: {
     title: 'Cảnh báo đăng nhập',
     messageTemplates: {
       default: 'Có {count} lần đăng nhập thất bại cho tài khoản của bạn.',
     },
-    affectsSettings: ['inAppSecurityAlert'],
+    affectsSettings: [EMAIL_ON_FAILED_LOGIN, IN_APP_SYSTEM_ALERT],
   },
   NEW_DEVICE: {
     title: 'Đăng nhập từ thiết bị mới',
     messageTemplates: {
       default: 'Phát hiện đăng nhập từ thiết bị mới: {device} từ {location}.',
     },
-    affectsSettings: ['inAppSecurityAlert'],
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
   FORCE_LOGOUT: {
     title: 'Phiên đã bị kết thúc',
@@ -30,7 +47,7 @@ const NOTIFICATION_EVENTS = {
       default: 'Phiên đăng nhập của bạn đã bị kết thúc.',
       byAdmin: 'Tài khoản của bạn đã bị đăng xuất bởi quản trị viên.',
     },
-    affectsSettings: ['inAppSecurityAlert'],
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
   PASSWORD_CHANGED: {
     title: 'Mật khẩu đã thay đổi',
@@ -38,7 +55,7 @@ const NOTIFICATION_EVENTS = {
       default: 'Mật khẩu của bạn đã được thay đổi thành công.',
       byAdmin: 'Quản trị viên đã đặt lại mật khẩu cho tài khoản của bạn.',
     },
-    affectsSettings: ['inAppPasswordChange'],
+    affectsSettings: [IN_APP_PASSWORD_CHANGE],
   },
   ROLE_CHANGED: {
     title: 'Phân quyền đã thay đổi',
@@ -46,7 +63,7 @@ const NOTIFICATION_EVENTS = {
       assigned: 'Bạn đã được gán quyền mới: {roles}.',
       revoked: 'Quyền sau đã bị thu hồi: {roles}.',
     },
-    affectsSettings: ['inAppRoleChange'],
+    affectsSettings: [EMAIL_ON_ROLE_CHANGE, IN_APP_SYSTEM_ALERT],
   },
 };
 
@@ -91,8 +108,17 @@ class NotificationService {
     // Lấy settings để kiểm tra
     const settings = await this.settingsRepo.findByUserId(userId);
 
-    // Kiểm tra setting tương ứng
+    // Kiểm tra setting tương ứng - phải defensive vì:
+    // 1. settings có thể null nếu findByUserId fail
+    // 2. Một số affectSettings có thể là key không tồn tại (fallback default = false)
+    // Mac dinh: neu tat ca settings key deu undefined -> coi nhu khong bat, khong notify
+    // de tranh spam user voi notification khong mong muon.
     const shouldNotify = event.affectsSettings.some(setting => {
+      if (!settings || typeof settings[setting] !== 'boolean') {
+        // Key khong ton tai trong settings -> default FALSE (tat)
+        // Tru khi key nam trong whitelist default-on (khoi tao user moi).
+        return false;
+      }
       return settings[setting];
     });
 

@@ -177,16 +177,6 @@
   background: #dcfce7;
 }
 
-.btn--role {
-  background: #fef9c3;
-  color: #92400e;
-  border-color: #fde68a;
-}
-
-.btn--role:hover:not(:disabled) {
-  background: #fef3c7;
-}
-
 .btn--success-ghost {
   background: #fff;
   border-color: #22c55e;
