@@ -1,0 +1,148 @@
+# ─────────────────────────────────────────────────────────────
+# .cursorrules — Quy tắc bắt buộc cho dự án SEP490-SU26-G48
+# Mục đích: ngăn chặn các lỗi race condition, F5-required, và
+#   anti-patterns đã gặp phải trong module Auth / Heartbeat /
+#   Permission.
+# Áp dụng cho: toàn bộ file *.js / *.jsx trong dự án.
+# ─────────────────────────────────────────────────────────────
+
+# === AUTHENTICATION & SESSION ===
+
+## Auth/Session Storage Pattern (BẮT BUỘC)
+- `httpClient` đọc token từ `localStorage` / `sessionStorage` (KHÔNG từ React state).
+- Bất kỳ API call authenticated nào PHẢI đảm bảo token đã được save vào storage TRƯỚC khi gọi fetch.
+- KHÔNG BAO GIỜ dựa vào `useEffect` để save token, vì useEffect chạy SAU khi render.
+- Thứ tự bắt buộc khi login:
+  1. `clearSession()`         — xóa token cũ
+  2. `setItem('token', ...)`  — save token MỚI vào storage (đồng bộ)
+  3. `setItem('user', ...)`   — save user
+  4. `await getMeApi()`       — chỉ gọi authenticated API SAU khi token đã trong storage
+  5. `setItem('permissions')` — save permissions
+  6. `setState(token)`        — cập nhật React state CUỐI CÙNG
+- Khi F5 mới thấy đúng nhưng sau login không thấy → 99% là race condition storage vs state.
+
+## Anti-pattern: "Save in useEffect"
+```jsx
+// ❌ SAI — token chưa có trong storage khi getMeApi() chạy
+const login = async () => {
+  const r = await loginApi();
+  setToken(r.token);           // ← React state
+  const me = await getMeApi(); // ← httpClient đọc storage → null token → 401
+};
+useEffect(() => {
+  if (token) saveSession(token); // ← chạy SAU render, quá muộn
+}, [token]);
+```
+
+## Correct Pattern:
+```jsx
+// ✅ ĐÚNG — save vào storage TRƯỚC, gọi API SAU, setState CUỐI
+const login = async () => {
+  const r = await loginApi();
+  clearSession();
+  storage.setItem('token', r.token);   // ← đồng bộ, có ngay
+  storage.setItem('user', JSON.stringify(r.user));
+  const me = await getMeApi();          // ← có Authorization header hợp lệ
+  storage.setItem('permissions', JSON.stringify(me?.permissions ?? []));
+  setToken(r.token);                    // ← cuối cùng
+  setUser(r.user);
+  setPermissions(me?.permissions ?? []);
+};
+```
+
+# === HEARTBEAT ===
+
+## Heartbeat Safety (BẮT BUỘC)
+- `useHeartbeat` hook PHẢI có exponential backoff (60s → 5 phút) khi gặp lỗi.
+- Show `SessionExpiredModal` tối đa 1 LẦN — dùng ref flag `sessionExpiredFiredRef`.
+- Network/5xx → backoff nhẹ, KHÔNG show modal.
+- 401/403 → show modal 1 lần, sau đó dừng hoặc backoff.
+- KHÔNG spam request khi gặp lỗi — đây là lỗi phổ biến nhất.
+
+## SessionExpiredModal Anti-Spam (BẮT BUỘC)
+- Dùng `useRef` flag (`visibleRef`) để chống modal nhấp nháy khi nhiều event đến cùng lúc.
+- Reset flag khi user click "Đăng nhập lại".
+
+# === PERMISSION ===
+
+## Permission Loading Order (BẮT BUỘC)
+- `AppContext` PHẢI load session ĐỒNG BỘ trong `useState(loadSession())` initializer.
+- KHÔNG dùng useEffect để load session — sẽ gây "render lần đầu không có permission → PermissionGate ẩn hết button → phải F5 mới thấy".
+- `loadSession()` ưu tiên `localStorage` trước `sessionStorage`.
+- `clearSession()` PHẢI xóa CẢ 2 storage (đảm bảo chỉ 1 storage có token tại 1 thời điểm).
+
+## LoginPage Navigation (BẮT BUỘC)
+- Sau `login()` thành công, gọi `navigate(routeAfterLogin(user), { replace: true })`.
+- KHÔNG dùng `navigate(-1)` hoặc push — phải dùng replace để tránh back-button vào lại /login.
+
+# === HTTP CLIENT ===
+
+## httpClient Error Pattern (BẮT BUỘC)
+- `httpClient.request()` PHẢI check `belongsToCurrentSession` (so sánh token gửi đi với token hiện tại trong storage) trước khi show SessionExpiredModal.
+- Lý do: chống stale request (request cũ gửi với token cũ nhưng user đã login mới → modal hiện oan).
+
+## Skip SessionExpired Option
+- Một số API (như `heartbeat`) cần `skipSessionExpired: true` vì tự xử lý 401 riêng.
+
+# === BACKEND RULES ===
+
+## Error Code Convention (BẮT BUỘC)
+- Lỗi DB (thiếu bảng/cột, connection fail) → **503 Service Unavailable** (KHÔNG 500).
+- Token không hợp lệ → **401 Unauthorized**.
+- Không có quyền → **403 Forbidden**.
+- Validation fail → **400 Bad Request**.
+- Lỗi logic → **409 Conflict** hoặc **422 Unprocessable Entity**.
+- 500 chỉ dành cho lỗi thật sự không lường trước.
+
+## Try/Catch Pattern (BẮT BUỘC)
+- Mọi route handler PHẢI có try/catch 2 lớp:
+  - Lớp ngoài: bắt mọi exception, log + trả 500.
+  - Lớp trong (cho từng service call): bắt lỗi riêng, trả status code phù hợp.
+- KHÔNG BAO GIỜ để exception lan ra không kiểm soát → server crash.
+
+## Heartbeat Route Safety
+- Heartbeat PHẢI kiểm tra `deviceId` tồn tại → trả 401 (không phải 500).
+- Lỗi DB trong heartbeat → trả 503 (không phải 500) để FE phân biệt được với auth fail.
+
+# === MIGRATION & DATABASE ===
+
+## Migration Files (BẮT BUỘC)
+- File SQL migration PHẢI IDEMPOTENT: dùng `IF OBJECT_ID(...) IS NULL` và `IF COL_LENGTH(...) IS NULL`.
+- Sau khi merge migration mới, CẬP NHẬT cả `Database/db.sql` (file auto-export) để team mới chỉ cần chạy 1 file.
+- Mỗi migration PHẢI có comment ở đầu file mô tả: thay đổi gì, vì sao cần, test thế nào.
+- Migration version theo format `V{n}__short_description.sql`.
+
+# === RESPONSIVE (FE) ===
+
+## Mobile-First Rules
+- Mọi table PHẢI có wrapper `<div class="table-scroll">` để `overflow-x: auto`.
+- Table PHẢI có `min-width` để giữ layout, KHÔNG để trình duyệt tự co cột.
+- Action buttons ≥3 nút trên desktop → chuyển sang menu 3 chấm trên mobile (≤640px).
+- Pagination mobile chỉ hiện "Trước | N/M | Sau", ẩn số trang.
+- Sidebar desktop → Drawer/Hamburger trên mobile.
+- Modal trên mobile width ≤ 90vw, padding tối đa 16-24px.
+
+# === GENERAL CODE QUALITY ===
+
+## Khi sửa lỗi PHẢI trả lời:
+1. **Nguyên nhân gốc** là gì (đừng chỉ sửa hiện tượng).
+2. **File nào đã sửa**, dòng nào.
+3. **Vì sao** trước đây không hoạt động.
+4. **Cách đảm bảo** lỗi không tái diễn (test, eslint rule, doc, v.v.).
+
+## KHÔNG BAO GIỜ:
+- Để client-side state (React) là nguồn dữ liệu duy nhất cho auth — LUÔN đồng bộ với storage.
+- Gọi authenticated API ngay sau `setState` mà chưa save storage.
+- Để exception lan ra khỏi route handler.
+- Log spam lỗi lặp lại (dùng rate-limit console).
+- Bỏ qua try/catch "vì hiếm khi xảy ra".
+
+# === TESTING CHECKLIST KHI SỬA AUTH/FLOW ===
+
+Sau khi sửa bất kỳ flow nào liên quan đến login/auth/heartbeat, PHẢI test:
+- [ ] Login lần đầu → không cần F5 → Action buttons hiển thị đúng.
+- [ ] Đăng nhập 2 tài khoản liên tiếp cùng browser → không lẫn token.
+- [ ] Heartbeat 200 mỗi 60s, không spam khi gặp lỗi.
+- [ ] Token hết hạn → SessionExpiredModal hiện 1 lần, không nhấp nháy.
+- [ ] Resize browser xuống mobile → sidebar drawer, pagination gọn, action menu 3 chấm.
+- [ ] Logout → token bị xóa CẢ 2 storage, modal không hiện oan khi request cũ về.
