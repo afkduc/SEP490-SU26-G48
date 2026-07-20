@@ -19,8 +19,34 @@ function buildAuthRouter() {
   router.post('/login', controller.login);
   router.get('/me', authenticate, controller.getMe);
   router.post('/logout', authenticate, async (req, res, next) => {
-    await trackLogout(req);
-    return res.status(200).json({ message: 'Đăng xuất thành công' });
+    // QUAN TRONG (try/catch 2 lop):
+    // - trackLogout internal da co try/catch rieng (line 315-397 middleware),
+    //   nhung neu loi bat ngo (vd: req.user undefined do token decode
+    //   thanh cong nhung middleware khong gan req.user) -> throw ra ngoai ->
+    //   Express default 500.
+    // - Them try/catch ngoai de dam bao logout API luon tra 200 (FE cleanup
+    //   token local), chi log warning khi track that bai.
+    try {
+      try {
+        await trackLogout(req);
+      } catch (trackErr) {
+        // Track fail KHONG chan user logout (FE da clear token local).
+        // Log warning de debug, tra ve 200 van.
+        console.warn(
+          '[authRoutes.logout] trackLogout fail (user logout van thanh cong local):',
+          trackErr && trackErr.message ? trackErr.message : trackErr
+        );
+      }
+      return res.status(200).json({ message: 'Đăng xuất thành công' });
+    } catch (unexpectedErr) {
+      // Loi bat ngo (khong phai tu trackLogout ma tu chinh route handler).
+      // VD: req.user null, memory leak, etc.
+      console.error(
+        '[authRoutes.logout] unexpected:',
+        unexpectedErr && unexpectedErr.message ? unexpectedErr.message : unexpectedErr
+      );
+      return next(new ApiError(500, 'Lỗi máy chủ nội bộ'));
+    }
   });
 
   // Heartbeat de FE cap nhat last_activity_at theo dinh ky.
