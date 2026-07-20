@@ -6,6 +6,7 @@ const DeviceService = require('../../application/services/DeviceService');
 const { authenticate } = require('../../middlewares/auth');
 const { trackLogout } = require('../../middlewares/loginSessionMiddleware');
 const { success } = require('../../utils/response');
+const ApiError = require('../../utils/ApiError');
 
 function buildAuthRouter() {
   const router = express.Router();
@@ -24,16 +25,43 @@ function buildAuthRouter() {
 
   // Heartbeat de FE cap nhat last_activity_at theo dinh ky.
   // Tra ve serverTime de FE tinh clock offset, tranh UI hien thi sai gio.
+  // QUAN TRONG: moi loi deu duoc try/catch -> tra 401/403/500 co
+  // STATUS CODE ro rang, KHONG de exception lan ra server crash.
   router.post('/heartbeat', authenticate, async (req, res, next) => {
+    const sendError = (status, message) => {
+      // Dung success() wrapper de giong format cac response khac
+      if (status >= 500) {
+        return next(new ApiError(status, message));
+      }
+      return res.status(status).json({
+        success: false,
+        message,
+        status,
+      });
+    };
+
     try {
       const deviceId = req.user && req.user.deviceId;
       if (!deviceId) {
-        return success(res, { updated: false, serverTime: new Date().toISOString() }, 'Khong co deviceId trong token');
+        // Token khong co deviceId -> tra 401 (token cu / chua login dung flow).
+        // FE se hieu va yeu cau login lai.
+        return sendError(401, 'Thiết bị chưa đăng ký. Vui lòng đăng nhập lại.');
       }
-      const result = await deviceService.heartbeat(deviceId);
+
+      let result;
+      try {
+        result = await deviceService.heartbeat(deviceId);
+      } catch (serviceErr) {
+        // Loi DB (cot thieu / bang thieu) -> 503 Service Unavailable (dung)
+        // thay vi 500. FE khong show SessionExpiredModal cho 503.
+        console.error('[heartbeat] DeviceService error:', serviceErr?.message || serviceErr);
+        return sendError(503, 'Dịch vụ tạm thời không khả dụng. Vui lòng thử lại sau.');
+      }
+
       return success(res, result, 'Heartbeat OK');
     } catch (err) {
-      next(err);
+      console.error('[heartbeat] unexpected error:', err?.message || err);
+      return next(new ApiError(500, 'Lỗi máy chủ nội bộ'));
     }
   });
 

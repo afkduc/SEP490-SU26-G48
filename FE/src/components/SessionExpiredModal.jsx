@@ -1,23 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SESSION_EXPIRED_KEY } from '../services/httpClient';
 
 export default function SessionExpiredModal() {
   const [visible, setVisible] = useState(false);
   const navigate = useNavigate();
+  const visibleRef = useRef(false);
 
   useEffect(() => {
-    const handler = () => {
+    const handler = (event) => {
+      // Bo qua neu user dang o trang login (tranh modal nhap nhay).
       if (window.location.pathname === '/login') return;
+      // Tranh spam: neu modal dang hien thi -> khong dispatch nua.
+      if (visibleRef.current) return;
+      // Cho phep caller bo qua bang cach truyen detail.skipIfVisible
+      const detail = event?.detail || {};
+      if (detail.skipIfVisible && visibleRef.current) return;
+
+      visibleRef.current = true;
       setVisible(true);
     };
     window.addEventListener(SESSION_EXPIRED_KEY, handler);
     return () => window.removeEventListener(SESSION_EXPIRED_KEY, handler);
   }, []);
 
+  // Reset flag khi modal dong va user bam "Dang nhap lai"
   function handleLogin() {
+    visibleRef.current = false;
     setVisible(false);
-    // Clear local storage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('permissions');
