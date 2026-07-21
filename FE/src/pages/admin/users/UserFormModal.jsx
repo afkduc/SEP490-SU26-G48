@@ -9,6 +9,30 @@ const STATUS_OPTIONS = [
 ];
 
 /**
+ * Sentinel value gui tu FE -> BE de yeu cau set branch_id = NULL (quan ly tat ca chi nhanh).
+ * BE AdminUserService.updateUser se nhan gia tri nay va chuyen thanh NULL.
+ */
+const ALL_BRANCHES_SENTINEL = '__ALL__';
+
+/**
+ * Role Admin id (hardcoded theo DB seed hien tai).
+ * Chi user co role Admin moi duoc chon "Tat ca chi nhanh".
+ * TODO: thay bang role check qua permission service khi san sang.
+ */
+const ADMIN_ROLE_ID = 7;
+
+/**
+ * Kiem tra role set co chua Admin hay khong.
+ */
+function hasAdminRole(userRoles) {
+  if (!Array.isArray(userRoles)) return false;
+  return userRoles.some((r) => {
+    const id = typeof r === 'object' && r !== null ? r.roleId : r;
+    return Number(id) === ADMIN_ROLE_ID;
+  });
+}
+
+/**
  * Lay roleId tu user.roles (da hoac chua fetch roles list).
  *
  * Tra ve:
@@ -63,6 +87,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     branchId: '',
     roleId: '',
     status: 'active',
+    scopeAllBranches: false,
   });
 
   const [branches, setBranches] = useState([]);
@@ -96,6 +121,19 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     // Neu roles chua load xong, bo qua (effect tiep theo se trigger)
     const resolvedRoleId = resolveRoleId(user.roles, roles);
 
+    // Phan biet user "all branches" (co row trong user_branches) vs user 1 branch
+    // - assignedBranchIds tu BE co nhieu hon 1 row, hoac user.branchId null -> ALL
+    // - assignedBranchIds co 1 row -> set dropdown theo row do
+    const isAllBranches = Array.isArray(user.assignedBranchIds)
+      ? user.assignedBranchIds.length > 0
+      : (user.branchId === null || user.branchId === undefined);
+    let branchIdValue = '';
+    if (isAllBranches) {
+      branchIdValue = ALL_BRANCHES_SENTINEL;
+    } else if (user.branchId !== undefined && user.branchId !== null) {
+      branchIdValue = String(user.branchId);
+    }
+
     setForm({
       name: user.name || '',
       email: user.email || '',
@@ -103,12 +141,10 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       phone: user.phone || '',
-      branchId:
-        user.branchId !== undefined && user.branchId !== null
-          ? String(user.branchId)
-          : '',
+      branchId: branchIdValue,
       roleId: resolvedRoleId,
       status: user.status || 'active',
+      scopeAllBranches: isAllBranches,
     });
   }, [user, JSON.stringify(roles)]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -123,7 +159,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     if (form.phone && !/^0[0-9]{9,10}$/.test(form.phone)) {
       errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
     }
-    if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc';
+    if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc (hoặc chọn "Tất cả chi nhánh")';
     // Bug #10: Khi user co nhieu vai tro va admin KHONG thay doi dropdown
     // -> form.roleId se empty (resolveRoleId returns '' for first multi-role).
     // Tranh block submit neu admin khong thay vai tro.
@@ -159,8 +195,13 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           email: form.email?.trim() || user.email,
           phone: form.phone?.trim() || undefined,
           status: form.status,
-          branchId: form.branchId ? Number(form.branchId) : null,
         };
+        if (form.scopeAllBranches) {
+          payload.scopeAllBranches = true;
+          payload.branchId = null;
+        } else {
+          payload.branchId = form.branchId ? Number(form.branchId) : null;
+        }
         if (shouldSendRoleId) {
           payload.roleId = Number(form.roleId);
         }
@@ -173,9 +214,14 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           firstName: form.firstName.trim() || form.name.trim(),
           lastName: form.lastName.trim(),
           phone: form.phone.trim() || undefined,
-          branchId: Number(form.branchId),
           roleId: Number(form.roleId),
         };
+        if (form.scopeAllBranches) {
+          payload.scopeAllBranches = true;
+          payload.branchId = null;
+        } else {
+          payload.branchId = Number(form.branchId);
+        }
         await adminUsersApi.create(payload);
       }
       onSuccess?.();
@@ -188,7 +234,14 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
   }
 
   function handleChange(field, value) {
-    setForm((f) => ({ ...f, [field]: value }));
+    setForm((f) => {
+      const next = { ...f, [field]: value };
+      // Khi chon chi nhanh -> tu dong set scopeAllBranches
+      if (field === 'branchId') {
+        next.scopeAllBranches = value === ALL_BRANCHES_SENTINEL;
+      }
+      return next;
+    });
     setErrors((e) => ({ ...e, [field]: undefined }));
   }
 
@@ -351,10 +404,22 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                     onChange={(e) => handleChange('branchId', e.target.value)}
                   >
                     <option value="">-- Chọn chi nhánh --</option>
+                    {/* Option "Tat ca chi nhanh" chi hien thi khi user co role Admin
+                        (edit mode: user dang co role Admin) hoac role dang chon la Admin
+                        (create mode: admin form chon role Admin). */}
+                    {((isEdit && hasAdminRole(user?.roles)) ||
+                      (!isEdit && Number(form.roleId) === ADMIN_ROLE_ID)) && (
+                      <option value={ALL_BRANCHES_SENTINEL}>Tất cả chi nhánh (Admin)</option>
+                    )}
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>{b.branchName}</option>
                     ))}
                   </select>
+                  {form.branchId === ALL_BRANCHES_SENTINEL && (
+                    <span style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
+                      Backend sẽ tự động gom tất cả chi nhánh đang hoạt động cho user này
+                    </span>
+                  )}
                   {errors.branchId && <span className="form__err">{errors.branchId}</span>}
                 </div>
                 <div className="form__field">
