@@ -295,18 +295,48 @@ class AdminUserRepositoryImpl {
     return { id: userId, email };
   }
 
-  async updateUser({ userId, status, roleId, branchId }) {
+  async updateUser({ userId, firstName, lastName, email, phone, status, roleId, branchId }) {
+    // Build dynamic UPDATE query
+    const updates = [];
+    const params = {};
+    let paramIndex = 1;
+
+    if (firstName !== undefined) {
+      updates.push(`first_name = @p${paramIndex}`);
+      params[`p${paramIndex}`] = firstName;
+      paramIndex++;
+    }
+    if (lastName !== undefined) {
+      updates.push(`last_name = @p${paramIndex}`);
+      params[`p${paramIndex}`] = lastName;
+      paramIndex++;
+    }
+    if (email !== undefined) {
+      updates.push(`email = @p${paramIndex}`);
+      params[`p${paramIndex}`] = email;
+      paramIndex++;
+    }
+    if (phone !== undefined) {
+      updates.push(`phone = @p${paramIndex}`);
+      params[`p${paramIndex}`] = phone || null;
+      paramIndex++;
+    }
     if (status !== undefined) {
-      await query(
-        `UPDATE users SET status = @p1 WHERE id = @p2`,
-        { p1: status, p2: userId }
-      );
+      updates.push(`status = @p${paramIndex}`);
+      params[`p${paramIndex}`] = status;
+      paramIndex++;
+    }
+    if (branchId !== undefined) {
+      updates.push(`branch_id = @p${paramIndex}`);
+      params[`p${paramIndex}`] = branchId;
+      paramIndex++;
     }
 
-    if (branchId !== undefined) {
+    if (updates.length > 0) {
+      params[`p${paramIndex}`] = userId;
       await query(
-        `UPDATE users SET branch_id = @p1 WHERE id = @p2`,
-        { p1: branchId, p2: userId }
+        `UPDATE users SET ${updates.join(', ')} WHERE id = @p${paramIndex}`,
+        params
       );
     }
 

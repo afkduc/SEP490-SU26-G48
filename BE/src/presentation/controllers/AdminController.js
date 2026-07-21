@@ -529,7 +529,12 @@ class AdminController {
 
   createSpecialty = async (req, res, next) => {
     try {
-      const specialty = await this.specialtyService.create(req.body);
+      const actorInfo = {
+        userId: req.user?.id,
+        userName: req.user?.user_name,
+        name: req.user?.full_name || req.user?.name,
+      };
+      const specialty = await this.specialtyService.create(req.body, actorInfo);
       await auditCrud.create(req, {
         tableName: 'specialties',
         entityCode: specialty?.specialty_code || specialty?.code || null,
@@ -545,7 +550,12 @@ class AdminController {
 
   updateSpecialty = async (req, res, next) => {
     try {
-      const specialty = await this.specialtyService.update(req.params.id, req.body);
+      const actorInfo = {
+        userId: req.user?.id,
+        userName: req.user?.user_name,
+        name: req.user?.full_name || req.user?.name,
+      };
+      const specialty = await this.specialtyService.update(req.params.id, req.body, actorInfo);
       await auditCrud.update(req, {
         tableName: 'specialties',
         entityCode: specialty?.specialty_code || `ID-${req.params.id}`,
@@ -561,7 +571,12 @@ class AdminController {
 
   deleteSpecialty = async (req, res, next) => {
     try {
-      const result = await this.specialtyService.delete(req.params.id);
+      const actorInfo = {
+        userId: req.user?.id,
+        userName: req.user?.user_name,
+        name: req.user?.full_name || req.user?.name,
+      };
+      const result = await this.specialtyService.delete(req.params.id, actorInfo);
       await auditCrud.delete(req, {
         tableName: 'specialties',
         entityCode: `ID-${req.params.id}`,
@@ -734,12 +749,17 @@ class AdminController {
 
   async updateUser(req, res, next) {
     try {
-      const { userId, status, roleId, branchId } = req.body;
+      const { userId, firstName, lastName, email, phone, status, roleId, branchId } = req.body;
+      console.log('[AdminController] updateUser - req.body:', JSON.stringify(req.body));
       const oldData = {};
       if (userId) {
         try {
           const existing = await this.adminUserService.getUserDetail(userId);
           if (existing) {
+            oldData.firstName = existing.firstName;
+            oldData.lastName = existing.lastName;
+            oldData.email = existing.email;
+            oldData.phone = existing.phone;
             oldData.status = existing.status;
             oldData.roleId = existing.roleId;
             oldData.branchId = existing.branchId;
@@ -748,6 +768,10 @@ class AdminController {
       }
       const updated = await this.adminUserService.updateUser({
         userId,
+        firstName,
+        lastName,
+        email,
+        phone,
         status,
         roleId,
         branchId,
@@ -758,15 +782,26 @@ class AdminController {
         recordId: updated?.id || Number(userId) || null,
         entityName: 'Người dùng',
         oldData,
-        newData: { status, roleId, branchId },
+        newData: { firstName, lastName, email, phone, status, roleId, branchId },
       });
       const eventType = status === 'inactive' ? 'USER_DISABLED' : 'USER_UPDATED';
+
+      // Gui notification cho chinh admin thuc hien
+      await this.notificationService.notify(eventType, {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: updated?.full_name || updated?.userName || `ID-${userId}`,
+        targetCode: updated?.user_code || '',
+        userId: req.user?.userId,
+      }).catch((e) => console.warn('[AdminController] notify USER_UPDATE:', e.message));
+
+      // Gui notification cho cac admin khac (exclude chinh minh)
       await this.notificationService.notifyAdmins(eventType, {
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: updated?.full_name || updated?.userName || `ID-${userId}`,
         targetCode: updated?.user_code || '',
         userId: updated?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_UPDATE:', e.message));
+
       return success(res, updated, 'Cap nhat nguoi dung thanh cong');
     } catch (err) {
       next(err);

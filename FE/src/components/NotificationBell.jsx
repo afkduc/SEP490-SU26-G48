@@ -52,6 +52,9 @@ const ICON_LABELS = {
   PRODUCT_UPDATED: 'Cập nhật sản phẩm',
   PRODUCT_DELETED: 'Xóa sản phẩm',
   CUSTOMER_UPDATED: 'Cập nhật KH',
+  SPECIALTY_CREATED: 'Tạo chuyên môn',
+  SPECIALTY_UPDATED: 'Cập nhật chuyên môn',
+  SPECIALTY_DELETED: 'Xóa chuyên môn',
 };
 
 function getIcon(notif) {
