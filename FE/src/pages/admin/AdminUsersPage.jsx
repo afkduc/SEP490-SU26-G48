@@ -17,19 +17,16 @@ const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
   { value: 'active', label: 'Hoạt động' },
   { value: 'inactive', label: 'Ngừng hoạt động' },
-  { value: 'locked', label: 'Bị khóa' },
 ];
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
   inactive: 'Ngừng hoạt động',
-  locked: 'Bị khóa',
 };
 
 const STATUS_CLASS = {
   active: 'badge--success',
   inactive: 'badge--secondary',
-  locked: 'badge--danger',
 };
 
 function formatDate(value) {
@@ -197,10 +194,16 @@ export default function AdminUsersPage() {
   }
 
   async function handleToggleStatus(userId, newStatus) {
+    const isDeactivate = newStatus === 'inactive';
+    const confirmMsg = isDeactivate
+      ? 'Ngừng hoạt động tài khoản này? User sẽ không thể đăng nhập.'
+      : 'Kích hoạt lại tài khoản này?';
+    if (!window.confirm(confirmMsg)) return;
+
     setTogglingId(userId);
     try {
       await adminUsersApi.update({ userId, status: newStatus });
-      toast.success(newStatus === 'locked' ? 'Tài khoản đã bị khóa' : 'Tài khoản đã được kích hoạt');
+      toast.success(isDeactivate ? 'Đã ngừng hoạt động tài khoản' : 'Đã kích hoạt tài khoản');
       refresh();
     } catch (err) {
       toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
@@ -396,7 +399,26 @@ export default function AdminUsersPage() {
                           </div>
                         </td>
                         <td data-label="Email" className="user-table__email">{u.email || '—'}</td>
-                        <td data-label="Chi nhánh" className="user-table__muted">{u.branchName || '—'}</td>
+                        <td data-label="Chi nhánh" className="user-table__muted">
+                          {u.scopeAllBranches ? (
+                            <span
+                              className="badge badge--all-branches"
+                              style={{
+                                background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                                color: '#fff',
+                                fontSize: 11,
+                                fontWeight: 600,
+                                padding: '3px 10px',
+                                borderRadius: 10,
+                              }}
+                              title="Người dùng quản lý tất cả chi nhánh"
+                            >
+                              Tất cả chi nhánh
+                            </span>
+                          ) : (
+                            u.branchName || '—'
+                          )}
+                        </td>
                         <td data-label="Vai trò">
                           {u.roles?.length > 0 ? (
                             <div className="user-table__roles">
@@ -419,11 +441,11 @@ export default function AdminUsersPage() {
                             </span>
                             <button
                               className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
-                              title={u.status === 'active' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
-                              onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'locked' : 'active')}
+                              title={u.status === 'active' ? 'Ngừng hoạt động tài khoản' : 'Kích hoạt lại tài khoản'}
+                              onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
                               disabled={togglingId === u.id}
                             >
-                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khóa' : 'Mở')}
+                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Ngừng' : 'Kích hoạt')}
                             </button>
                           </div>
                         </td>
