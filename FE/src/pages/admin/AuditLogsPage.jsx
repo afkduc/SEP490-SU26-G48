@@ -290,6 +290,7 @@ export default function AuditLogsPage() {
   const [exportError, setExportError] = useState(null);
   const [now, setNow] = useState(() => Date.now());
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedLog, setSelectedLog] = useState(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -526,7 +527,7 @@ export default function AuditLogsPage() {
         ) : (
           <>
             <div className="admin-logs__table-wrapper">
-              <AuditTable items={audit.data.items} />
+              <AuditTable items={audit.data.items} onRowClick={setSelectedLog} />
             </div>
             <Pagination
               currentPage={audit.data.page || 1}
@@ -539,6 +540,11 @@ export default function AuditLogsPage() {
         )}
       </div>
 
+      {/* Detail Modal */}
+      {selectedLog && (
+        <AuditLogDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />
+      )}
+
     </div>
   );
 }
@@ -549,20 +555,21 @@ function TableSkeleton({ rows }) {
   return (
     <table className="table">
         <colgroup>
-          <col /><col /><col /><col />
+          <col /><col /><col /><col /><col />
         </colgroup>
       <thead>
         <tr>
           <th>Người dùng</th>
           <th>Hành động</th>
           <th>Mô tả</th>
+          <th>Chi nhánh</th>
           <th>Thời gian</th>
         </tr>
       </thead>
       <tbody>
         {Array.from({ length: rows }).map((_, i) => (
           <tr key={i}>
-            {[...Array(4)].map((_, j) => (
+            {[...Array(5)].map((_, j) => (
               <td key={j}>
                 <div className="skeleton-line" style={{ width: `${50 + Math.random() * 40}%` }} />
               </td>
@@ -574,24 +581,25 @@ function TableSkeleton({ rows }) {
   );
 }
 
-function AuditTable({ items }) {
+function AuditTable({ items, onRowClick }) {
   if (!items || items.length === 0) {
     return (
       <table className="table">
         <colgroup>
-          <col /><col /><col /><col />
+          <col /><col /><col /><col /><col />
         </colgroup>
         <thead>
           <tr>
             <th>Người dùng</th>
             <th>Hành động</th>
             <th>Mô tả</th>
+            <th>Chi nhánh</th>
             <th>Thời gian</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td colSpan={4} className="table__empty">
+            <td colSpan={5} className="table__empty">
               Không có nhật ký nào phù hợp với bộ lọc
             </td>
           </tr>
@@ -603,13 +611,14 @@ function AuditTable({ items }) {
   return (
     <table className="table">
         <colgroup>
-          <col /><col /><col /><col />
+          <col /><col /><col /><col /><col />
         </colgroup>
       <thead>
         <tr>
           <th>Người dùng</th>
           <th>Hành động</th>
           <th>Mô tả</th>
+          <th>Chi nhánh</th>
           <th>Thời gian</th>
         </tr>
       </thead>
@@ -620,7 +629,7 @@ function AuditTable({ items }) {
           const initials = userName.split(' ').filter(Boolean).slice(-2)
             .map((p) => p[0]).join('').toUpperCase() || '?';
           return (
-            <tr key={item.id}>
+            <tr key={item.id} onClick={() => onRowClick && onRowClick(item)} style={{ cursor: 'pointer' }} title="Nhấp để xem chi tiết">
               <td>
                 <div className="audit-logs__user-cell" title={userName}>
                   <span className="audit-logs__user-avatar" aria-hidden="true">{initials}</span>
@@ -641,6 +650,9 @@ function AuditTable({ items }) {
                   {item.description || '—'}
                 </span>
               </td>
+              <td className="audit-logs__cell--branch">
+                {item.branch_name || item.branchId || '—'}
+              </td>
               <td className="audit-logs__cell--time">
                 <div className="audit-logs__time-cell">
                   <span className="audit-logs__time-main" title={t.main}>{t.main}</span>
@@ -652,5 +664,150 @@ function AuditTable({ items }) {
         })}
       </tbody>
     </table>
+  );
+}
+
+// ─── Detail Modal ────────────────────────────────────────────────────
+
+function JsonView({ data }) {
+  if (!data) return <span className="audit-detail__json-empty">—</span>;
+  try {
+    const obj = typeof data === 'string' ? JSON.parse(data) : data;
+    return (
+      <pre className="audit-detail__json">{JSON.stringify(obj, null, 2)}</pre>
+    );
+  } catch {
+    return <span className="audit-detail__json-empty">{String(data)}</span>;
+  }
+}
+
+function AuditLogDetailModal({ log, onClose }) {
+  if (!log) return null;
+  const t = formatLocal(log.logged_at);
+  const userName = log.user_name || 'Hệ thống';
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content audit-detail-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Chi tiết nhật ký</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          {/* Row 1: User + Action */}
+          <div className="audit-detail__row">
+            <div className="audit-detail__field">
+              <label>Người thực hiện</label>
+              <div className="audit-detail__value">
+                <span className="audit-detail__avatar">
+                  {(userName || '?').split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase()}
+                </span>
+                <strong>{userName}</strong>
+                {log.phone_number && <span className="audit-detail__phone">{log.phone_number}</span>}
+              </div>
+            </div>
+            <div className="audit-detail__field">
+              <label>Hành động</label>
+              <div className="audit-detail__value">
+                <span className={`badge ${ACTION_CLASS[log.action] || 'badge--secondary'}`}>
+                  {ACTION_LABELS[log.action] || log.action || '—'}
+                </span>
+              </div>
+            </div>
+            <div className="audit-detail__field">
+              <label>Đối tượng</label>
+              <div className="audit-detail__value">
+                <strong>{TABLE_NAME_VI[log.table_name] || log.table_name || log.entity_name || '—'}</strong>
+                {log.entity_code && <code className="audit-detail__code">{log.entity_code}</code>}
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: IP + Method + Status + Duration */}
+          <div className="audit-detail__row audit-detail__row--secondary">
+            {log.ip_address && (
+              <div className="audit-detail__field">
+                <label>Địa chỉ IP</label>
+                <code className="audit-detail__ip">{log.ip_address}</code>
+              </div>
+            )}
+            {log.request_method && (
+              <div className="audit-detail__field">
+                <label>Method</label>
+                <span className={`badge badge--${log.request_method === 'POST' ? 'success' : log.request_method === 'PUT' || log.request_method === 'PATCH' ? 'info' : log.request_method === 'DELETE' ? 'danger' : 'secondary'}`}>
+                  {log.request_method}
+                </span>
+              </div>
+            )}
+            {log.request_url && (
+              <div className="audit-detail__field audit-detail__field--full">
+                <label>URL</label>
+                <code className="audit-detail__url">{log.request_url}</code>
+              </div>
+            )}
+            {log.response_status && (
+              <div className="audit-detail__field">
+                <label>HTTP Status</label>
+                <span className={`badge badge--${String(log.response_status).startsWith('2') ? 'success' : String(log.response_status).startsWith('4') || String(log.response_status).startsWith('5') ? 'danger' : 'secondary'}`}>
+                  {log.response_status}
+                </span>
+              </div>
+            )}
+            {log.duration_ms != null && (
+              <div className="audit-detail__field">
+                <label>Thời gian xử lý</label>
+                <span className="audit-detail__duration">{log.duration_ms}ms</span>
+              </div>
+            )}
+            {log.branch_name && (
+              <div className="audit-detail__field">
+                <label>Chi nhánh</label>
+                <span>{log.branch_name}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
+          {log.description && (
+            <div className="audit-detail__section">
+              <label>Mô tả</label>
+              <p className="audit-detail__description">{log.description}</p>
+            </div>
+          )}
+
+          {/* Old / New value */}
+          {(log.old_value || log.new_value) && (
+            <div className="audit-detail__diff">
+              {log.old_value && (
+                <div className="audit-detail__diff-col">
+                  <label>Giá trị cũ</label>
+                  <JsonView data={log.old_value} />
+                </div>
+              )}
+              {log.new_value && (
+                <div className="audit-detail__diff-col">
+                  <label>Giá trị mới</label>
+                  <JsonView data={log.new_value} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Request body */}
+          {log.request_body && (
+            <div className="audit-detail__section">
+              <label>Request Body</label>
+              <JsonView data={log.request_body} />
+            </div>
+          )}
+
+          {/* Timestamp */}
+          <div className="audit-detail__timestamp">
+            <span title={t.sub}>{t.main}</span>
+            {log.record_id && <span className="audit-detail__record-id">Record ID: {log.record_id}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

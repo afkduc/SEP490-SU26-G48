@@ -1,6 +1,7 @@
 const DeviceRepository = require('../../infrastructure/repositories/DeviceRepository');
 const ApiError = require('../../utils/ApiError');
 const { emitLoginSessionEvent } = require('../events/LoginSessionEvents');
+const { auditCrud } = require('../../utils/auditHelper');
 
 class DeviceService {
   constructor() {
@@ -24,18 +25,28 @@ class DeviceService {
     const userId = device.userId;
     const userName = device.userName;
 
-    // 1. Chi revoke DEVICE NAY - set is_current = 0
-    // KHONG revoke token_version cua user (vi lam vay se logout TAT CA thiet bi)
+    // 1. Revoke THIS device - set is_current = 0
     await this._revokeDevice(deviceId);
 
-    // 2. Emit SSE event de thong bao cho admin
+    // 2. Check if user has other active devices
+    // If NO other active devices -> increment token_version to invalidate JWT immediately
+    // If YES other devices -> just revoke this device, user can still use other sessions
+    const otherActiveCount = await this.deviceRepository.countActiveByUserId(userId);
+    if (otherActiveCount === 0) {
+      // No other active devices -> must invalidate JWT
+      await this._incrementTokenVersion(userId);
+      console.log(`[DeviceService] User ${userId} has no other devices, token_version incremented`);
+    }
+
+    // 3. Emit SSE event for real-time admin login history update
     emitLoginSessionEvent('force', {
       userId,
       userName,
       deviceId: Number(deviceId),
+      revokedAt: new Date().toISOString(),
     });
 
-    // 3. Notify user about force logout
+    // 4. Send notification to user about force logout
     this._sendForceLogoutNotification(userId, deviceId);
 
     return { revoked: true, deviceId: Number(deviceId), userId };
@@ -116,6 +127,12 @@ class DeviceService {
   /**
    * Admin force logout ALL devices of a user (including current device).
    * Used when admin wants to completely terminate all sessions of a user.
+   *
+   * Flow:
+   * 1. Revoke all devices (set is_current = 0)
+   * 2. Increment token_version -> ALL JWTs of this user become INVALID immediately
+   * 3. Emit SSE event -> Admin login history updates real-time
+   * 4. Send notification to user
    */
   async forceLogoutAllDevices(userId) {
     const userNumId = Number(userId);
@@ -129,22 +146,39 @@ class DeviceService {
       return { revoked: 0, message: 'Khong co thiet bi nao dang hoat dong' };
     }
 
-    // Revoke all devices
+    // 1. Revoke all devices
     await this.deviceRepository.revokeAllDevices(userNumId);
 
-    // Emit SSE event
+    // 2. INCREMENT TOKEN VERSION -> All JWTs of this user become INVALID immediately!
+    await this._incrementTokenVersion(userNumId);
+
+    // 3. Emit SSE event for real-time login history update
     deviceIds.forEach(deviceId => {
       emitLoginSessionEvent('force', {
         userId: userNumId,
         userName,
         deviceId,
+        revokedAt: new Date().toISOString(),
       });
     });
 
-    // Send notification
+    // 4. Send notification to user
     this._sendForceLogoutNotification(userNumId, null);
 
+    console.log(`[DeviceService] Force logout user ${userNumId}, revoked ${devices.length} devices, token_version incremented`);
     return { revoked: devices.length, userId: userNumId };
+  }
+
+  /**
+   * Increment user's token_version to invalidate all existing JWTs.
+   * This makes ALL active sessions of this user immediately invalid.
+   */
+  async _incrementTokenVersion(userId) {
+    const { query } = require('../../infrastructure/database/sqlServer');
+    await query(
+      `UPDATE users SET token_version = ISNULL(token_version, 0) + 1 WHERE id = @p1`,
+      { p1: userId }
+    );
   }
 
   /**

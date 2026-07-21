@@ -1,9 +1,13 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { loginApi, logoutApi, getMeApi } from '../services/authApi';
 import { ROLES } from '../constants/roles';
 import { useHeartbeat } from '../hooks/useHeartbeat';
+import { API_BASE_URL } from '../config';
 
 const AppContext = createContext(null);
+
+// BroadcastChannel for cross-tab session sync (works in same tab too)
+const SESSION_CHANNEL = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('app-session') : null;
 
 /**
  * Load session một cách đồng bộ. Hàm này được gọi TRƯỚC khi Provider
@@ -31,8 +35,27 @@ function loadSession() {
   return { token: null, user: null, permissions: [] };
 }
 
+/**
+ * Broadcast session change to other tabs via BroadcastChannel.
+ * This fires immediately in ALL tabs (including sender).
+ */
+function broadcastSessionChange(session) {
+  if (SESSION_CHANNEL) {
+    SESSION_CHANNEL.postMessage(session);
+  }
+}
+
 function saveSession(token, user, permissions) {
-  const storage = token === localStorage.getItem('token') ? localStorage : sessionStorage;
+  // Xác định storage dựa trên token hiện tại trong từng storage
+  const inLocal = localStorage.getItem('token');
+  const inSession = sessionStorage.getItem('token');
+  const storage = token === inLocal ? localStorage : (token === inSession ? sessionStorage : null);
+
+  if (!storage) {
+    // Fallback: nếu token không match cả 2 storage, bỏ qua (logout flow)
+    return;
+  }
+
   storage.setItem('token', token);
   storage.setItem('user', JSON.stringify(user));
   storage.setItem('permissions', JSON.stringify(permissions || []));
@@ -91,10 +114,81 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (token && user) {
       saveSession(token, user, permissions);
+      // Broadcast to other tabs immediately
+      broadcastSessionChange({ token, user, permissions });
     }
   }, [token, user, permissions]);
 
-  const login = async (email, password, remember = false) => {
+  // Sync state when storage changes from another tab (cross-tab sync via storage event)
+  // Plus listen to BroadcastChannel for same-tab sync
+  useEffect(() => {
+    const syncFromStorage = () => {
+      const newSession = loadSession();
+      // Only update if different from current state (prevent infinite loops)
+      // Read current values directly from state via useState setter's functional update pattern
+      setToken((currentToken) => {
+        if (newSession.token !== currentToken) {
+          return newSession.token;
+        }
+        return currentToken;
+      });
+      setUser((currentUser) => {
+        if (newSession.user !== currentUser) {
+          return newSession.user;
+        }
+        return currentUser;
+      });
+      setPermissions((currentPerms) => {
+        if (JSON.stringify(newSession.permissions) !== JSON.stringify(currentPerms)) {
+          return newSession.permissions;
+        }
+        return currentPerms;
+      });
+    };
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'token' || e.key === 'user' || e.key === 'permissions') {
+        syncFromStorage();
+      }
+    };
+
+    const handleBroadcast = (e) => {
+      if (e.data) {
+        setToken((currentToken) => {
+          if (e.data.token !== currentToken) {
+            return e.data.token;
+          }
+          return currentToken;
+        });
+        setUser((currentUser) => {
+          if (e.data.user !== currentUser) {
+            return e.data.user;
+          }
+          return currentUser;
+        });
+        setPermissions((currentPerms) => {
+          if (JSON.stringify(e.data.permissions) !== JSON.stringify(currentPerms)) {
+            return e.data.permissions || [];
+          }
+          return currentPerms;
+        });
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    if (SESSION_CHANNEL) {
+      SESSION_CHANNEL.addEventListener('message', handleBroadcast);
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      if (SESSION_CHANNEL) {
+        SESSION_CHANNEL.removeEventListener('message', handleBroadcast);
+      }
+    };
+  }, []); // Run once on mount
+
+  const login = useCallback(async (email, password, remember = false) => {
     const result = await loginApi(email, password);
 
     // QUAN TRONG: Phai save token vao storage TRUOC khi goi bat ky
@@ -138,28 +232,63 @@ export function AppProvider({ children }) {
     setPermissions(newPermissions);
 
     return result;
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
+    // QUAN TRONG (sửa lỗi đồng bộ logout):
+    //
+    // Bug cũ:
+    //   - clearSession() xoá localStorage → httpClient đọc token = null
+    //   - window.location.assign('/login') chuyển trang TRƯỚC khi BE trackLogout
+    //     kịp cập nhật login_sessions (status='ended')
+    //   - Kết quả: FE nghĩ đã logout, nhưng DB vẫn 'active' → trang "Lịch sử
+    //     đăng nhập" của admin hiển thị phiên cũ là "Đang hoạt động".
+    //
+    // Fix:
+    //   1. Dùng `fetch` keepalive:true để request logout bay tới BE dù page
+    //      navigate. keepalive cho phép browser giữ request tối đa ~64KB
+    //      và fire-and-forget ngay cả khi tab đã đóng.
+    //   2. Lưu token TRƯỚC khi clearSession() để request keepalive vẫn có
+    //      Authorization header hợp lệ.
+    //   3. Bỏ qua UI loading - ưu tiên tốc độ chuyển trang.
     try {
-      await logoutApi();
-    } catch (e) {
-      // Logout API fail khong quan trong — ta van don dep local.
-      if (typeof console !== 'undefined') {
-        console.warn('[AppContext] logout API failed (tiep tuc logout local):', e?.message);
+      const tokenNow = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (tokenNow) {
+        // fetch keepalive KHÔNG await - fire-and-forget. Browser sẽ đảm bảo
+        // request được gửi dù page reload/navigate ngay sau đó.
+        fetch(`${API_BASE_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokenNow}`,
+          },
+          body: JSON.stringify({}),
+          keepalive: true, // ← critical: cho phép request sống qua page navigation
+        }).catch((err) => {
+          if (typeof console !== 'undefined') {
+            console.warn('[AppContext] logout keepalive fetch failed:', err?.message);
+          }
+        });
       }
+    } catch (e) {
+      // keepalive throw có thể do tokenNow undefined - bo qua
     }
+
     clearSession();
     setToken(null);
     setUser(null);
     setPermissions([]);
-  };
 
-  /**
-   * Reload permissions from localStorage.
-   * Dung sau khi admin thay doi ma tran quyen tren chinh may cua ho.
-   */
-  const reloadPermissions = () => {
+    // FORCE RELOAD: dam bao 100% da user ra khoi trang admin, khong con
+    // bat ky React state nao giu token/user cu. Mot so truong hop (HMR,
+    // strict mode double-effect, navigate bi block) khong clear duoc state
+    // -> user van thay trang admin. Reload toan trang la cach an toan nhat.
+    if (typeof window !== 'undefined' && window.location) {
+      window.location.assign('/login');
+    }
+  }, []);
+
+  const reloadPermissions = useCallback(() => {
     try {
       const stored = localStorage.getItem('permissions') || sessionStorage.getItem('permissions');
       if (stored) {
@@ -169,7 +298,7 @@ export function AppProvider({ children }) {
     } catch {
       /* ignore */
     }
-  };
+  }, []);
 
   const isAuthenticated = Boolean(token && user);
 
@@ -179,8 +308,6 @@ export function AppProvider({ children }) {
       user,
       permissions,
       isAuthenticated,
-      // Flag bao cho cac component con biet rang session da hydrate
-      // xong (khoi can loading spinner cho AuthContext).
       authReady,
       login,
       logout,
@@ -188,7 +315,7 @@ export function AppProvider({ children }) {
       setUser,
       setPermissions,
     }),
-    [token, user, permissions, isAuthenticated, authReady]
+    [token, user, permissions, isAuthenticated, authReady, login, logout, reloadPermissions]
   );
 
   return (

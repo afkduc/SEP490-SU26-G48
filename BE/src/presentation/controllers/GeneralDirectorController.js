@@ -1,8 +1,11 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
+const NotificationService = require('../../application/services/NotificationService');
 
 class GeneralDirectorController {
   constructor(generalDirectorService) {
     this.generalDirectorService = generalDirectorService;
+    this.notificationService = new NotificationService();
     this.getRevenueReports = this.getRevenueReports.bind(this);
     this.getSettlementReports = this.getSettlementReports.bind(this);
     this.getSettlementReportById = this.getSettlementReportById.bind(this);
@@ -131,6 +134,19 @@ class GeneralDirectorController {
   async createBranchManager(req, res, next) {
     try {
       const data = await this.generalDirectorService.createBranchManager(req.body || {});
+      await auditCrud.create(req, {
+        tableName: 'users',
+        entityCode: data?.user_code || data?.employee_code || null,
+        recordId: data?.id || null,
+        entityName: 'Giám đốc chi nhánh',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_MANAGER_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Giám đốc',
+        targetName: data?.full_name || data?.userName || '',
+        targetCode: data?.user_code || '',
+        userId: data?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[GeneralDirectorController] notifyAdmins:', e.message));
       return success(res, data, 'Thêm giám đốc chi nhánh thành công');
     } catch (err) {
       next(err);
@@ -140,6 +156,19 @@ class GeneralDirectorController {
   async updateBranchManager(req, res, next) {
     try {
       const data = await this.generalDirectorService.updateBranchManager(req.params.id, req.body || {});
+      await auditCrud.update(req, {
+        tableName: 'users',
+        entityCode: data?.user_code || `ID-${req.params.id}`,
+        recordId: data?.id || Number(req.params.id) || null,
+        entityName: 'Giám đốc chi nhánh',
+        newData: req.body,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_MANAGER_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Giám đốc',
+        targetName: data?.full_name || data?.userName || `ID-${req.params.id}`,
+        targetCode: data?.user_code || '',
+        userId: data?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[GeneralDirectorController] notifyAdmins:', e.message));
       return success(res, data, 'Cập nhật giám đốc chi nhánh thành công');
     } catch (err) {
       next(err);

@@ -24,8 +24,22 @@ const RULE_KEYS = {
 const DB_MISSING_RE = /Invalid object name 'security_alerts'|'security_alerts' not found/i;
 let lastMissingLogTs = 0;
 
+/**
+ * Deduplication: chi insert alert moi neu chua co alert cung rule_key + user_id
+ * trong vong 25h (tranh spam 5 phut/lan x 300 lan = 1 ngay).
+ */
 async function insertAlert({ severity, title, message, userId, branchId, ruleKey, metadata }) {
   try {
+    if (userId && ruleKey) {
+      const existing = await query(`
+        SELECT 1 FROM security_alerts
+        WHERE user_id = @uid
+          AND rule_key = @rk
+          AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
+      `, { uid: userId, rk: ruleKey });
+      if (existing.recordset && existing.recordset.length > 0) return;
+    }
+
     await query(
       `INSERT INTO security_alerts (severity, title, message, user_id, branch_id, rule_key, metadata)
        VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)`,
@@ -153,24 +167,59 @@ async function checkNewAdminRole() {
 
 /**
  * Rule 3 (MEDIUM): Admin không có action trong audit_logs 30 ngày
+ *
+ * Bug cu (da fix):
+ *   - Chi check `audit_logs` -> neu admin moi login (chua co action nao
+ *     ngoai login) se bi bao sai "30 ngay khong hoat dong".
+ *   - `login_sessions` cung la mot dang "hoat dong" cua admin (login thanh
+ *     cong), nen phai union 2 bang de biet dung admin co thuc su
+ *     inactive hay khong.
+ *
+ * Fix: dem "last_activity_at" = MAX(logged_at, login_time). Neu ca hai
+ * NULL hoac < 30 ngay -> that su inactive.
  */
 async function checkInactiveAdmin() {
   try {
     const result = await query(`
       SELECT TOP 10 u.id, u.user_name, u.email,
-             (SELECT TOP 1 al.logged_at
-              FROM audit_logs al
-              WHERE al.user_id = u.id
-              ORDER BY al.logged_at DESC) AS last_action_at
+             (
+               SELECT MAX(t.last_at)
+               FROM (
+                 SELECT al.logged_at AS last_at
+                 FROM audit_logs al
+                 WHERE al.user_id = u.id
+                 UNION ALL
+                 SELECT ls.login_time AS last_at
+                 FROM login_sessions ls
+                 WHERE ls.user_id = u.id
+                   AND ls.action_type = 'LOGIN'
+               ) t
+             ) AS last_action_at
       FROM users u
       JOIN user_role ur ON ur.user_id = u.id
       JOIN roles r ON r.id = ur.role_id
       WHERE r.role_name = 'admin'
         AND u.status = 'active'
+        -- Loai bo admin dang co session active (khong biet last_action_at
+        -- vi session moi chua co action nao ngoai login -> tranh false alert)
         AND NOT EXISTS (
-          SELECT 1 FROM audit_logs al2
-          WHERE al2.user_id = u.id
-            AND al2.logged_at >= DATEADD(DAY, -30, SYSUTCDATETIME())
+          SELECT 1 FROM login_sessions ls_active
+          WHERE ls_active.user_id = u.id
+            AND ls_active.status = 'active'
+            AND ls_active.action_type = 'LOGIN'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM (
+            SELECT al2.user_id, al2.logged_at AS last_at
+            FROM audit_logs al2
+            UNION ALL
+            SELECT ls2.user_id, ls2.login_time AS last_at
+            FROM login_sessions ls2
+            WHERE ls2.action_type = 'LOGIN'
+          ) recent
+          WHERE recent.user_id = u.id
+            AND recent.last_at >= DATEADD(DAY, -30, SYSUTCDATETIME())
         )
     `);
 

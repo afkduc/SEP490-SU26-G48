@@ -1,4 +1,5 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
 
 class ProfileController {
@@ -28,6 +29,14 @@ class ProfileController {
   async updateMyProfile(req, res, next) {
     try {
       const profile = await this.profileService.updateProfile(req.user.userId, req.body);
+      await auditCrud.update(req, {
+        tableName: 'users',
+        entityCode: req.user.email || `ID-${req.user.userId}`,
+        recordId: req.user.userId,
+        entityName: 'Hồ sơ cá nhân',
+        newData: req.body,
+        description: `Cập nhật hồ sơ cá nhân`,
+      });
       return success(res, profile, 'Cập nhật thông tin thành công');
     } catch (err) {
       next(err);
@@ -38,6 +47,9 @@ class ProfileController {
     try {
       const { currentPassword, newPassword } = req.body;
       await this.profileService.changePassword(req.user.userId, currentPassword, newPassword);
+      await auditCrud.changePassword(req, {
+        targetUserName: req.user.email || `ID-${req.user.userId}`,
+      });
       return success(res, null, 'Đổi mật khẩu thành công');
     } catch (err) {
       next(err);
