@@ -4,8 +4,8 @@ import { useSuppliers } from '../../hooks/inventory/useSuppliers';
 import './SupplierListPage.css';
 
 const STATUS_LABELS = {
-  active: 'Hoat dong',
-  inactive: 'Tam ngung',
+  active: 'Hoạt động',
+  inactive: 'Tạm ngừng',
 };
 
 const STATUS_CLASS = {
@@ -46,9 +46,9 @@ export default function SupplierListPage() {
     <div className="sup-list">
       <div className="sup-list__header">
         <div>
-          <h1 className="sup-list__title">Danh sach nha cung cap</h1>
+          <h1 className="sup-list__title">Danh sách nhà cung cấp</h1>
           <p className="sup-list__subtitle">
-            Thong tin cac nha cung cap phu tung (chi xem, khong sua/xoa o man hinh nay)
+            Thông tin các nhà cung cấp phụ tùng (chỉ xem, không sửa/xóa ở màn hình này)
           </p>
         </div>
       </div>
@@ -58,7 +58,7 @@ export default function SupplierListPage() {
         <input
           className="input input--search"
           type="text"
-          placeholder="Tim theo ma, ten, SDT..."
+          placeholder="Tìm theo mã, tên, SDT..."
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -68,37 +68,37 @@ export default function SupplierListPage() {
           value={draftStatus}
           onChange={(e) => setDraftStatus(e.target.value)}
         >
-          <option value="">Tat ca trang thai</option>
-          <option value="active">Hoat dong</option>
-          <option value="inactive">Tam ngung</option>
+          <option value="">Tất cả trạng thái</option>
+          <option value="active">Hoạt động</option>
+          <option value="inactive">Tạm ngừng</option>
         </select>
-        <button className="btn btn--secondary" onClick={handleApply}>Loc</button>
+        <button className="btn btn--secondary" onClick={handleApply}>Lọc</button>
       </div>
 
       {/* Table */}
       {loading ? (
-        <div className="sup-list__loading">Dang tai...</div>
+        <div className="sup-list__loading">Đang tải...</div>
       ) : error ? (
-        <div className="sup-list__error">Loi: {error}</div>
+        <div className="sup-list__error">Lỗi: {error}</div>
       ) : (
         <div className="table-responsive">
           <table className="table">
             <thead>
               <tr>
-                <th>Ma NCC</th>
-                <th>Ten nha cung cap</th>
-                <th>Nguoi lien he</th>
-                <th>DT</th>
+                <th>Mã NCC</th>
+                <th>Tên nhà cung cấp</th>
+                <th>Người liên hệ</th>
+                <th>ĐT</th>
                 <th>Email</th>
-                <th>Trang thai</th>
-                <th style={{ width: 110 }}>Hanh dong</th>
+                <th>Trạng thái</th>
+                <th style={{ width: 110 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {suppliers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="table__empty">
-                    Khong co nha cung cap nao
+                    Không có nhà cung cấp nào
                   </td>
                 </tr>
               ) : (
@@ -116,7 +116,7 @@ export default function SupplierListPage() {
                     </td>
                     <td className="table__actions">
                       <Link to={`/inventory/suppliers/${s.id}`} className="btn btn--ghost btn--sm">
-                        Chi tiet
+                        Chi tiết
                       </Link>
                     </td>
                   </tr>
