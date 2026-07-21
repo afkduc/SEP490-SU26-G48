@@ -83,9 +83,14 @@ class ManagerService {
     }
 
     const roles = await this.managerRepository.listAssignableRoles();
-    if (!roles.some((role) => Number(role.id) === Number(roleId))) {
+    const selectedRole = roles.find((role) => Number(role.id) === Number(roleId));
+    if (!selectedRole) {
       throw new ApiError(400, 'Vai trò không hợp lệ');
     }
+
+    const specialtyIds = selectedRole.roleName === 'team_leader'
+      ? await this._validateSpecialtyIds(payload.specialtyIds)
+      : undefined;
 
     const passwordHash = bcrypt.hashSync(password, 10);
     const pseudoId = await this.managerRepository.nextPseudoId();
@@ -99,6 +104,7 @@ class ManagerService {
       passwordHash,
       roleId: Number(roleId),
       status: normalizedStatus,
+      specialtyIds: specialtyIds || [],
     });
   }
 
@@ -135,9 +141,14 @@ class ManagerService {
     }
 
     const roles = await this.managerRepository.listAssignableRoles();
-    if (!roles.some((role) => Number(role.id) === Number(roleId))) {
+    const selectedRole = roles.find((role) => Number(role.id) === Number(roleId));
+    if (!selectedRole) {
       throw new ApiError(400, 'Vai trò không hợp lệ');
     }
+
+    const specialtyIds = selectedRole.roleName === 'team_leader'
+      ? await this._validateSpecialtyIds(payload.specialtyIds)
+      : [];
 
     return this.managerRepository.updateEmployee(branchId, id, {
       fullName: fullName.trim(),
@@ -145,6 +156,7 @@ class ManagerService {
       phone: phone.trim(),
       roleId: Number(roleId),
       status: status || existing.status,
+      specialtyIds: specialtyIds || [],
     });
   }
 
@@ -566,81 +578,6 @@ class ManagerService {
     });
   }
 
-  async listTeamLeaders(branchId, filters = {}) {
-    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-
-    const normalized = {
-      search: (filters.search || '').trim(),
-      status: filters.status || 'all',
-    };
-
-    if (normalized.status !== 'all' && !VALID_STATUSES.includes(normalized.status)) {
-      throw new ApiError(400, 'Trạng thái không hợp lệ');
-    }
-
-    return this.managerRepository.listTeamLeaders(branchId, normalized);
-  }
-
-  async getTeamLeaderById(branchId, id) {
-    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-    if (!id) throw new ApiError(400, 'Thiếu mã tổ trưởng');
-
-    const teamLeader = await this.managerRepository.getTeamLeaderById(branchId, id);
-    if (!teamLeader) throw new ApiError(404, 'Không tìm thấy tổ trưởng');
-    return teamLeader;
-  }
-
-  async createTeamLeader(branchId, payload) {
-    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-
-    await this._validateStaffContact(payload, { requirePassword: true });
-
-    const normalizedStatus = payload.status && VALID_STATUSES.includes(payload.status) ? payload.status : 'active';
-
-    const existed = await this.managerRepository.findByEmail(payload.email);
-    if (existed) throw new ApiError(409, 'Email đã tồn tại');
-
-    const passwordHash = bcrypt.hashSync(payload.password, 10);
-    const pseudoId = await this.managerRepository.nextPseudoId();
-
-    return this.managerRepository.createTeamLeader({
-      branchId,
-      pseudoId,
-      fullName: payload.fullName.trim(),
-      email: payload.email.trim(),
-      phone: payload.phone.trim(),
-      passwordHash,
-      status: normalizedStatus,
-    });
-  }
-
-  async updateTeamLeader(branchId, id, payload) {
-    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-    if (!id) throw new ApiError(400, 'Thiếu mã tổ trưởng');
-
-    const existing = await this.managerRepository.getTeamLeaderById(branchId, id);
-    if (!existing) throw new ApiError(404, 'Không tìm thấy tổ trưởng');
-
-    await this._validateStaffContact(payload, { requirePassword: false });
-
-    if (payload.status && !VALID_STATUSES.includes(payload.status)) {
-      throw new ApiError(400, 'Trạng thái không hợp lệ');
-    }
-
-    if (payload.email !== existing.email) {
-      const existed = await this.managerRepository.findByEmail(payload.email);
-      if (existed && Number(existed.id) !== Number(id)) {
-        throw new ApiError(409, 'Email đã tồn tại');
-      }
-    }
-
-    return this.managerRepository.updateTeamLeader(branchId, id, {
-      fullName: payload.fullName.trim(),
-      email: payload.email.trim(),
-      phone: payload.phone.trim(),
-      status: payload.status || existing.status,
-    });
-  }
 }
 
 module.exports = ManagerService;

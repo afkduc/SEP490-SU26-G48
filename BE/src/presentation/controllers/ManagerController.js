@@ -27,10 +27,6 @@ class ManagerController {
     this.getTechnicianById = this.getTechnicianById.bind(this);
     this.createTechnician = this.createTechnician.bind(this);
     this.updateTechnician = this.updateTechnician.bind(this);
-    this.getTeamLeaders = this.getTeamLeaders.bind(this);
-    this.getTeamLeaderById = this.getTeamLeaderById.bind(this);
-    this.createTeamLeader = this.createTeamLeader.bind(this);
-    this.updateTeamLeader = this.updateTeamLeader.bind(this);
   }
 
   async getBranch(req, res, next) {
@@ -267,44 +263,6 @@ class ManagerController {
     }
   }
 
-  async getTeamLeaders(req, res, next) {
-    try {
-      const data = await this.managerService.listTeamLeaders(req.user.branchId, {
-        search: req.query.search || req.query.q || '',
-        status: req.query.status || 'all',
-      });
-      return success(res, data, 'Lấy danh sách tổ trưởng thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async getTeamLeaderById(req, res, next) {
-    try {
-      const data = await this.managerService.getTeamLeaderById(req.user.branchId, req.params.id);
-      return success(res, data, 'Lấy chi tiết tổ trưởng thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async createTeamLeader(req, res, next) {
-    try {
-      const data = await this.managerService.createTeamLeader(req.user.branchId, req.body);
-      return success(res, data, 'Thêm tổ trưởng thành công', 201);
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async updateTeamLeader(req, res, next) {
-    try {
-      const data = await this.managerService.updateTeamLeader(req.user.branchId, req.params.id, req.body);
-      return success(res, data, 'Cập nhật tổ trưởng thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
 }
 
 module.exports = ManagerController;
