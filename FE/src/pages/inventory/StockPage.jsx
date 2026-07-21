@@ -22,16 +22,16 @@ export default function StockPage() {
   if (!branchId) {
     return (
       <div className="stock-page__error">
-        Tai khoan chua duoc gan chi nhanh - lien quan admin de duoc cap nhat.
+        Tài khoản chưa được gán chi nhánh - liên hệ admin để được cập nhật.
       </div>
     );
   }
 
   if (loading && !stockList.items.length) {
-    return <div className="stock-page__loading">Dang tai du lieu ton kho...</div>;
+    return <div className="stock-page__loading">Đang tải dữ liệu tồn kho...</div>;
   }
   if (error) {
-    return <div className="stock-page__error">Loi: {error}</div>;
+    return <div className="stock-page__error">Lỗi: {error}</div>;
   }
 
   const totalPages = Math.max(1, Math.ceil(stockList.total / stockList.limit));
@@ -40,50 +40,50 @@ export default function StockPage() {
     <div className="stock-page">
       <div className="stock-page__header">
         <div>
-          <h1 className="stock-page__title">Ton kho</h1>
+          <h1 className="stock-page__title">Tồn kho</h1>
           <p className="stock-page__subtitle">
-            Quan ly so luong ton kho va canh bao sap het hang theo chi nhanh.
+            Quản lý số lượng tồn kho và cảnh báo sắp hết hàng theo chi nhánh.
           </p>
         </div>
-        <button className="btn btn--ghost" onClick={refetch}>Lam moi</button>
+        <button className="btn btn--ghost" onClick={refetch}>Làm mới</button>
       </div>
 
       {/* KPI cards */}
       <div className="stock-page__kpis">
         <div className="kpi-card">
-          <div className="kpi-card__label">Tong so phu tung</div>
+          <div className="kpi-card__label">Tổng số phụ tùng</div>
           <div className="kpi-card__value">{summary.totalProducts}</div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-card__label">Tong so luong ton</div>
+          <div className="kpi-card__label">Tổng số lượng tồn</div>
           <div className="kpi-card__value">{summary.totalQuantity}</div>
         </div>
         <div className="kpi-card kpi-card--accent">
-          <div className="kpi-card__label">Gia tri ton kho</div>
+          <div className="kpi-card__label">Giá trị tồn kho</div>
           <div className="kpi-card__value">{formatVND(summary.totalValue)}</div>
         </div>
         <div className="kpi-card kpi-card--warn">
-          <div className="kpi-card__label">Sap het hang</div>
+          <div className="kpi-card__label">Sắp hết hàng</div>
           <div className="kpi-card__value">{lowStock.length}</div>
         </div>
       </div>
 
-      {/* Canh bao sap het hang */}
+      {/* Cảnh báo sắp hết hàng */}
       {lowStock.length > 0 && (
         <div className="stock-alert">
-          <h2 className="stock-alert__title">⚠ Canh bao ton kho thap</h2>
+          <h2 className="stock-alert__title">⚠ Cảnh báo tồn kho thấp</h2>
           <p className="stock-alert__desc">
-            Co {lowStock.length} phu tung dang o muc sap het ({'<= '} ton toi thieu). Can nhap them hang.
+            Có {lowStock.length} phụ tùng đang ở mức sắp hết ({'<= '} tồn tối thiểu). Cần nhập thêm hàng.
           </p>
           <div className="table-responsive">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Ma PT</th>
-                  <th>Ten phu tung</th>
-                  <th>SL ton</th>
-                  <th>Ton toi thieu</th>
-                  <th>Thieu</th>
+                  <th>Mã PT</th>
+                  <th>Tên phụ tùng</th>
+                  <th>SL tồn</th>
+                  <th>Tồn tối thiểu</th>
+                  <th>Thiếu</th>
                 </tr>
               </thead>
               <tbody>
@@ -104,18 +104,18 @@ export default function StockPage() {
         </div>
       )}
 
-      {/* Tong hop theo category */}
+      {/* Tổng hợp theo loại */}
       {summary.summary.length > 0 && (
         <div className="stock-summary">
-          <h2 className="stock-summary__title">Tong hop theo loai</h2>
+          <h2 className="stock-summary__title">Tổng hợp theo loại</h2>
           <div className="table-responsive">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Loai</th>
-                  <th>So phu tung</th>
-                  <th>Tong SL ton</th>
-                  <th>Gia tri</th>
+                  <th>Loại</th>
+                  <th>Số phụ tùng</th>
+                  <th>Tổng SL tồn</th>
+                  <th>Giá trị</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,15 +133,15 @@ export default function StockPage() {
         </div>
       )}
 
-      {/* Danh sach ton kho + filter */}
+      {/* Danh sách tồn kho + filter */}
       <div className="stock-list">
-        <h2 className="stock-list__title">Danh sach ton kho</h2>
+        <h2 className="stock-list__title">Danh sách tồn kho</h2>
 
         <div className="stock-list__filters">
           <input
             className="input input--search"
             type="text"
-            placeholder="Tim theo ma, ten phu tung..."
+            placeholder="Tìm theo mã, tên phụ tùng..."
             value={params.search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -150,7 +150,7 @@ export default function StockPage() {
             value={params.category}
             onChange={(e) => setCategory(e.target.value)}
           >
-            <option value="">Tat ca loai</option>
+            <option value="">Tất cả loại</option>
             {categories.map((cat) => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
@@ -161,7 +161,7 @@ export default function StockPage() {
               checked={params.lowStockOnly}
               onChange={(e) => setLowStockOnly(e.target.checked)}
             />
-            Sap het
+            Sắp hết
           </label>
         </div>
 
@@ -169,20 +169,20 @@ export default function StockPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Ma PT</th>
-                <th>Ten phu tung</th>
-                <th>Loai</th>
-                <th>Don vi</th>
-                <th>SL ton</th>
-                <th>Ton toi thieu</th>
-                <th>Trang thai</th>
-                <th>Gia tri</th>
+                <th>Mã PT</th>
+                <th>Tên phụ tùng</th>
+                <th>Loại</th>
+                <th>Đơn vị</th>
+                <th>SL tồn</th>
+                <th>Tồn tối thiểu</th>
+                <th>Trạng thái</th>
+                <th>Giá trị</th>
               </tr>
             </thead>
             <tbody>
               {stockList.items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="table__empty">Khong co du lieu ton kho</td>
+                  <td colSpan={8} className="table__empty">Không có dữ liệu tồn kho</td>
                 </tr>
               ) : (
                 stockList.items.map((p) => {
@@ -201,7 +201,7 @@ export default function StockPage() {
                       <td className="text-right">{p.minStock}</td>
                       <td>
                         <span className={`badge ${isLow ? 'badge--warning' : 'badge--success'}`}>
-                          {isLow ? 'Sap het' : 'Con hang'}
+                          {isLow ? 'Sắp hết' : 'Còn hàng'}
                         </span>
                       </td>
                       <td className="text-right">
@@ -218,23 +218,23 @@ export default function StockPage() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="stock-list__pagination">
-            <button
-              className="btn btn--ghost btn--sm"
-              disabled={params.page <= 1}
-              onClick={() => setPage(params.page - 1)}
-            >
-              ← Truoc
-            </button>
-            <span className="stock-list__page-info">
-              Trang {params.page} / {totalPages} (tong {stockList.total})
-            </span>
-            <button
-              className="btn btn--ghost btn--sm"
-              disabled={params.page >= totalPages}
-              onClick={() => setPage(params.page + 1)}
-            >
-              Sau →
-            </button>
+              <button
+                className="btn btn--ghost btn--sm"
+                disabled={params.page <= 1}
+                onClick={() => setPage(params.page - 1)}
+              >
+                ← Trước
+              </button>
+              <span className="stock-list__page-info">
+                Trang {params.page} / {totalPages} (tổng {stockList.total})
+              </span>
+              <button
+                className="btn btn--ghost btn--sm"
+                disabled={params.page >= totalPages}
+                onClick={() => setPage(params.page + 1)}
+              >
+                Sau →
+              </button>
           </div>
         )}
       </div>
