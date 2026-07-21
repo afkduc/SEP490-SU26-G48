@@ -1090,6 +1090,75 @@
   font-weight: 600;
 }
 
+/* ── Diff Table (human-readable format) ─────────────────── */
+.audit-detail__diff-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.audit-detail__diff-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.audit-detail__diff-table th {
+  background: #f8fafc;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.audit-detail__diff-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.audit-detail__diff-table tr:last-child td {
+  border-bottom: none;
+}
+
+.audit-detail__diff-table .diff-label {
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+  width: 30%;
+}
+
+.audit-detail__diff-table .diff-old {
+  color: #94a3b8;
+  text-decoration: line-through;
+  background: #fef2f2;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.audit-detail__diff-table .diff-new {
+  color: #15803d;
+  background: #dcfce7;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-weight: 500;
+}
+
+.audit-detail__diff-raw {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 600px) {
+  .audit-detail__diff-raw {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 600px) {
   .audit-detail-modal {
     width: 98vw;

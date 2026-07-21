@@ -154,6 +154,10 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           form.roleId && form.roleId !== '';
         const payload = {
           userId: user.id,
+          firstName: form.firstName?.trim() || user.firstName || '',
+          lastName: form.lastName?.trim() || user.lastName || '',
+          email: form.email?.trim() || user.email,
+          phone: form.phone?.trim() || undefined,
           status: form.status,
           branchId: form.branchId ? Number(form.branchId) : null,
         };
