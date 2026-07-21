@@ -749,7 +749,7 @@ class AdminController {
 
   async updateUser(req, res, next) {
     try {
-      const { userId, firstName, lastName, email, phone, status, roleId, branchId } = req.body;
+      const { userId, firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } = req.body;
       console.log('[AdminController] updateUser - req.body:', JSON.stringify(req.body));
       const oldData = {};
       if (userId) {
@@ -775,6 +775,7 @@ class AdminController {
         status,
         roleId,
         branchId,
+        scopeAllBranches,
       });
       await auditCrud.update(req, {
         tableName: 'users',
