@@ -60,13 +60,23 @@
   white-space: nowrap;
 }
 
+/* Desktop: 2 nut (Chi tiet + Sua) - AN MENU 3 CHAM tren desktop */
+@media (min-width: 641px) {
+  .action-btns {
+    display: flex !important;
+  }
+
+  .user-action-menu {
+    display: none !important;
+  }
+}
+
 /* ── Action buttons ── */
 .admin-users__actions-cell {
   white-space: nowrap;
 }
 
 .action-btns {
-  display: flex;
   gap: 6px;
   justify-content: flex-end;
   align-items: center;
@@ -78,7 +88,7 @@
   white-space: nowrap;
 }
 
-/* User action menu (mobile) */
+/* User action menu - MAC DINH LA AN (chi hien tren mobile) */
 .user-action-menu {
   display: none;
   position: relative;

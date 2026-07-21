@@ -1,8 +1,11 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
+const NotificationService = require('../../application/services/NotificationService');
 
 class ProductController {
   constructor({ productService }) {
     this.productService = productService;
+    this.notificationService = new NotificationService();
   }
 
   listUnits = async (req, res, next) => {
@@ -44,11 +47,23 @@ class ProductController {
   create = async (req, res, next) => {
     try {
       const payload = { ...req.body };
-      // Neu client khong truyen branchId thi lay tu token (neu co).
       if (!payload.branchId && req.user?.branchId) {
         payload.branchId = req.user.branchId;
       }
       const product = await this.productService.createProduct(payload);
+      await auditCrud.create(req, {
+        tableName: 'products',
+        entityCode: product?.product_code || product?.code || null,
+        recordId: product?.id || null,
+        entityName: 'Phụ tùng / Sản phẩm',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('PRODUCT_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: product?.name || product?.product_name || `ID-${product?.id}`,
+        targetCode: product?.product_code || product?.code || '',
+        userId: product?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
       return success(res, product, 'Product created', 201);
     } catch (err) {
       next(err);
@@ -58,6 +73,19 @@ class ProductController {
   update = async (req, res, next) => {
     try {
       const product = await this.productService.updateProduct(req.params.id, req.body);
+      await auditCrud.update(req, {
+        tableName: 'products',
+        entityCode: product?.product_code || `ID-${req.params.id}`,
+        recordId: product?.id || Number(req.params.id) || null,
+        entityName: 'Phụ tùng / Sản phẩm',
+        newData: req.body,
+      });
+      await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: product?.name || product?.product_name || `ID-${req.params.id}`,
+        targetCode: product?.product_code || product?.code || '',
+        userId: product?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
       return success(res, product, 'Product updated');
     } catch (err) {
       next(err);
@@ -67,6 +95,19 @@ class ProductController {
   remove = async (req, res, next) => {
     try {
       const product = await this.productService.deleteProduct(req.params.id);
+      await auditCrud.delete(req, {
+        tableName: 'products',
+        entityCode: product?.product_code || `ID-${req.params.id}`,
+        recordId: product?.id || Number(req.params.id) || null,
+        entityName: 'Phụ tùng / Sản phẩm',
+        oldData: product,
+      });
+      await this.notificationService.notifyAdmins('PRODUCT_DELETED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: product?.name || product?.product_name || `ID-${req.params.id}`,
+        targetCode: product?.product_code || product?.code || '',
+        userId: Number(req.params.id) || null,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
       return success(res, product, 'Product deleted');
     } catch (err) {
       next(err);

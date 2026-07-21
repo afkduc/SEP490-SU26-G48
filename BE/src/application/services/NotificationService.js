@@ -1,16 +1,8 @@
 const NotificationSettingsRepository = require('../../infrastructure/repositories/NotificationSettingsRepository');
 const NotificationRepository = require('../../infrastructure/repositories/NotificationRepository');
+const { query } = require('../../infrastructure/database/sqlServer');
 
 // Mapping event -> DB column key thực sự tồn tại trong user_notification_settings.
-// DB chỉ có 4 cột liên quan in-app/browser:
-//   in_app_on_system_alert (security alert, login failed, new device, force logout)
-//   in_app_password_change
-//   browser_on_login
-//   email_on_role_change (role_changed)
-//   email_on_login (login_success)
-//   email_on_failed_login (login_failed)
-// Trước đây code dùng key sai (inAppLogin/inAppSecurityAlert/inAppRoleChange)
-// -> settings[key] luôn undefined -> 3/4 loại notification chết âm thầm.
 const IN_APP_SYSTEM_ALERT = 'inAppOnSystemAlert';
 const IN_APP_PASSWORD_CHANGE = 'inAppPasswordChange';
 const BROWSER_ON_LOGIN = 'browserOnLogin';
@@ -18,9 +10,25 @@ const EMAIL_ON_LOGIN = 'emailOnLogin';
 const EMAIL_ON_FAILED_LOGIN = 'emailOnFailedLogin';
 const EMAIL_ON_ROLE_CHANGE = 'emailOnRoleChange';
 
+// Severity levels cho notification — map voi mau sac o frontend
+// success  = xanh lá  (#10b981) — tạo mới thành công
+// info     = xanh dương (#3b82f6) — cập nhật thông tin
+// warning  = vàng       (#f59e0b) — cảnh báo nhẹ
+// error    = đỏ        (#ef4444) — disable/delete/thất bại
+// critical = đỏ đậm   (#dc2626) — cảnh báo nghiêm trọng
+const SEVERITY = {
+  SUCCESS:  'success',
+  INFO:     'info',
+  WARNING:  'warning',
+  ERROR:    'error',
+  CRITICAL: 'critical',
+};
+
 const NOTIFICATION_EVENTS = {
+  // --- Auth events (existing) ---
   LOGIN_SUCCESS: {
     title: 'Đăng nhập thành công',
+    severity: SEVERITY.SUCCESS,
     messageTemplates: {
       default: 'Bạn đã đăng nhập vào hệ thống.',
       withDevice: 'Bạn đã đăng nhập từ thiết bị mới: {device}.',
@@ -29,6 +37,7 @@ const NOTIFICATION_EVENTS = {
   },
   LOGIN_FAILED: {
     title: 'Cảnh báo đăng nhập',
+    severity: SEVERITY.ERROR,
     messageTemplates: {
       default: 'Có {count} lần đăng nhập thất bại cho tài khoản của bạn.',
     },
@@ -36,6 +45,7 @@ const NOTIFICATION_EVENTS = {
   },
   NEW_DEVICE: {
     title: 'Đăng nhập từ thiết bị mới',
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: 'Phát hiện đăng nhập từ thiết bị mới: {device} từ {location}.',
     },
@@ -43,6 +53,7 @@ const NOTIFICATION_EVENTS = {
   },
   FORCE_LOGOUT: {
     title: 'Phiên đã bị kết thúc',
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: 'Phiên đăng nhập của bạn đã bị kết thúc.',
       byAdmin: 'Tài khoản của bạn đã bị đăng xuất bởi quản trị viên.',
@@ -51,6 +62,7 @@ const NOTIFICATION_EVENTS = {
   },
   PASSWORD_CHANGED: {
     title: 'Mật khẩu đã thay đổi',
+    severity: SEVERITY.INFO,
     messageTemplates: {
       default: 'Mật khẩu của bạn đã được thay đổi thành công.',
       byAdmin: 'Quản trị viên đã đặt lại mật khẩu cho tài khoản của bạn.',
@@ -59,11 +71,265 @@ const NOTIFICATION_EVENTS = {
   },
   ROLE_CHANGED: {
     title: 'Phân quyền đã thay đổi',
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       assigned: 'Bạn đã được gán quyền mới: {roles}.',
       revoked: 'Quyền sau đã bị thu hồi: {roles}.',
     },
     affectsSettings: [EMAIL_ON_ROLE_CHANGE, IN_APP_SYSTEM_ALERT],
+  },
+
+  // --- CRUD activity events (NEW) ---
+  // User management
+  USER_CREATED: {
+    title: 'Người dùng mới được tạo',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã tạo người dùng mới: {targetName} ({targetCode}).',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  USER_UPDATED: {
+    title: 'Người dùng được cập nhật',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật thông tin người dùng: {targetName} ({targetCode}).',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  USER_DISABLED: {
+    title: 'Người dùng bị vô hiệu hóa',
+    severity: SEVERITY.ERROR,
+    messageTemplates: {
+      default: '{actorName} đã vô hiệu hóa tài khoản: {targetName} ({targetCode}).',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  USER_ENABLED: {
+    title: 'Người dùng được kích hoạt',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã kích hoạt tài khoản: {targetName} ({targetCode}).',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  USER_PASSWORD_RESET: {
+    title: 'Mật khẩu người dùng được đặt lại',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã đặt lại mật khẩu cho: {targetName} ({targetCode}).',
+    },
+    affectsSettings: [IN_APP_PASSWORD_CHANGE],
+  },
+
+  // Repair Orders
+  REPAIR_ORDER_CREATED: {
+    title: 'Phiếu sửa chữa mới được tạo',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã tạo phiếu sửa chữa: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  REPAIR_ORDER_UPDATED: {
+    title: 'Phiếu sửa chữa được cập nhật',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật phiếu sửa chữa: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  // Repair Settlements
+  SETTLEMENT_CREATED: {
+    title: 'Phiếu quyết toán mới được tạo',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã tạo phiếu quyết toán: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  SETTLEMENT_UPDATED: {
+    title: 'Phiếu quyết toán được cập nhật',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật phiếu quyết toán: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  // Inventory
+  IMPORT_REQUEST_APPROVED: {
+    title: 'Phiếu nhập kho được duyệt',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã duyệt phiếu nhập kho: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  IMPORT_REQUEST_REJECTED: {
+    title: 'Phiếu nhập kho bị từ chối',
+    severity: SEVERITY.ERROR,
+    messageTemplates: {
+      default: '{actorName} đã từ chối phiếu nhập kho: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  // Branch management
+  BRANCH_CREATED: {
+    title: 'Chi nhánh mới được tạo',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã tạo chi nhánh mới: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  BRANCH_UPDATED: {
+    title: 'Chi nhánh được cập nhật',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật chi nhánh: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  BRANCH_DEACTIVATED: {
+    title: 'Chi nhánh bị ngừng hoạt động',
+    severity: SEVERITY.ERROR,
+    messageTemplates: {
+      default: '{actorName} đã ngừng hoạt động chi nhánh: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  BRANCH_REACTIVATED: {
+    title: 'Chi nhánh được kích hoạt lại',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã kích hoạt lại chi nhánh: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  // Role management
+  ROLE_CREATED: {
+    title: 'Vai trò mới được tạo',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã tạo vai trò: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  ROLE_UPDATED: {
+    title: 'Vai trò được cập nhật',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật vai trò: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  ROLE_DELETED: {
+    title: 'Vai trò bị xóa',
+    severity: SEVERITY.ERROR,
+    messageTemplates: {
+      default: '{actorName} đã xóa vai trò: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  ROLE_ENABLED: {
+    title: 'Vai trò được kích hoạt',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã kích hoạt vai trò: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  // Products
+  PRODUCT_CREATED: {
+    title: 'Sản phẩm mới được tạo',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã tạo sản phẩm: {targetName} ({targetCode}).',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  PRODUCT_UPDATED: {
+    title: 'Sản phẩm được cập nhật',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật sản phẩm: {targetName} ({targetCode}).',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  PRODUCT_DELETED: {
+    title: 'Sản phẩm bị xóa',
+    severity: SEVERITY.ERROR,
+    messageTemplates: {
+      default: '{actorName} đã xóa sản phẩm: {targetName} ({targetCode}).',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  EXPORT_REQUEST_CREATED: {
+    title: 'Phiếu xuất kho được tạo',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã tạo phiếu xuất kho: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  IMPORT_REQUEST_APPROVED: {
+    title: 'Phiếu nhập kho được duyệt',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã duyệt phiếu nhập kho: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  IMPORT_REQUEST_REJECTED: {
+    title: 'Phiếu nhập kho bị từ chối',
+    severity: SEVERITY.ERROR,
+    messageTemplates: {
+      default: '{actorName} đã từ chối phiếu nhập kho: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  CUSTOMER_UPDATED: {
+    title: 'Khách hàng được cập nhật',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật khách hàng: {targetName} ({targetCode}).',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  BRANCH_MANAGER_CREATED: {
+    title: 'Giám đốc chi nhánh được thêm',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã thêm giám đốc chi nhánh: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  BRANCH_MANAGER_UPDATED: {
+    title: 'Giám đốc chi nhánh được cập nhật',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật giám đốc chi nhánh: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+
+  VEHICLE_OWNERSHIP_TRANSFERRED: {
+    title: 'Quyền sở hữu xe được chuyển',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã chuyển quyền sở hữu xe: {targetName} cho khách hàng mới.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
 };
 
@@ -91,8 +357,10 @@ class NotificationService {
    * Gửi notification
    * @param {string} eventType - Loại event (LOGIN_SUCCESS, ROLE_CHANGED, etc.)
    * @param {object} data - Dữ liệu đi kèm
+   * @param {object} options
+   * @param {boolean} options.skipSettings - Bypass notification settings (dùng cho notifyAdmins)
    */
-  async notify(eventType, data) {
+  async notify(eventType, data, { skipSettings = false } = {}) {
     const event = NOTIFICATION_EVENTS[eventType];
     if (!event) {
       console.warn(`[NotificationService] Unknown event type: ${eventType}`);
@@ -105,22 +373,17 @@ class NotificationService {
       return null;
     }
 
-    // Lấy settings để kiểm tra
-    const settings = await this.settingsRepo.findByUserId(userId);
-
-    // Kiểm tra setting tương ứng - phải defensive vì:
-    // 1. settings có thể null nếu findByUserId fail
-    // 2. Một số affectSettings có thể là key không tồn tại (fallback default = false)
-    // Mac dinh: neu tat ca settings key deu undefined -> coi nhu khong bat, khong notify
-    // de tranh spam user voi notification khong mong muon.
-    const shouldNotify = event.affectsSettings.some(setting => {
-      if (!settings || typeof settings[setting] !== 'boolean') {
-        // Key khong ton tai trong settings -> default FALSE (tat)
-        // Tru khi key nam trong whitelist default-on (khoi tao user moi).
-        return false;
-      }
-      return settings[setting];
-    });
+    // Lấy settings để kiểm tra (bypass cho notifyAdmins)
+    let shouldNotify = skipSettings;
+    if (!skipSettings) {
+      const settings = await this.settingsRepo.findByUserId(userId);
+      shouldNotify = event.affectsSettings.some(setting => {
+        if (!settings || typeof settings[setting] !== 'boolean') {
+          return false;
+        }
+        return settings[setting];
+      });
+    }
 
     if (!shouldNotify) {
       console.log(`[NotificationService] Notification disabled for ${eventType} for user ${userId}`);
@@ -136,6 +399,10 @@ class NotificationService {
     if (data.location) message = message.replace('{location}', data.location);
     if (data.count) message = message.replace('{count}', data.count);
     if (data.roles) message = message.replace('{roles}', data.roles);
+    // CRUD placeholders
+    if (data.actorName) message = message.replace('{actorName}', data.actorName);
+    if (data.targetName) message = message.replace('{targetName}', data.targetName);
+    if (data.targetCode) message = message.replace('{targetCode}', data.targetCode);
 
     // Handle different message templates based on data
     if (eventType === 'PASSWORD_CHANGED' && data.resetByAdmin) {
@@ -169,13 +436,17 @@ class NotificationService {
     if (data.resetByAdmin) metadata.resetByAdmin = true;
     if (data.forcedBy) metadata.forcedBy = data.forcedBy;
     if (data.changedBy) metadata.changedBy = data.changedBy;
+    if (data.actorName) metadata.actorName = data.actorName;
+    if (data.targetName) metadata.targetName = data.targetName;
+    if (data.targetCode) metadata.targetCode = data.targetCode;
 
     // Create notification in DB
     const notification = await this.notificationRepo.create({
       userId,
-      title,
+      title: event.title,
       message,
       type: eventType,
+      severity: event.severity || null,
       metadata,
     });
 
@@ -183,6 +454,48 @@ class NotificationService {
     this._emitSSEEvent(userId, notification);
 
     return notification;
+  }
+
+  /**
+   * Gửi notification tới TẤT CẢ admin đang hoạt động.
+   * Dùng cho các sự kiện CRUD — mọi admin đều nhận được thông báo.
+   *
+   * @param {string} eventType - Loại event (USER_CREATED, REPAIR_ORDER_CREATED, ...)
+   * @param {object} data - Dữ liệu đi kèm
+   * @param {object} options
+   * @param {number|null} options.excludeUserId - Loại trừ user ID nào (vd: người thực hiện)
+   */
+  async notifyAdmins(eventType, data, { excludeUserId = null } = {}) {
+    const adminsResult = await query(`
+      SELECT u.id
+      FROM users u
+      JOIN user_role ur ON ur.user_id = u.id
+      JOIN roles r ON r.id = ur.role_id
+      WHERE r.role_name = 'admin'
+        AND u.status = 'active'
+        AND EXISTS (
+          SELECT 1 FROM login_sessions ls
+          WHERE ls.user_id = u.id
+            AND ls.status = 'active'
+            AND ls.action_type = 'LOGIN'
+        )
+    `);
+
+    const adminIds = adminsResult.recordset
+      .map((r) => r.id)
+      .filter((id) => id !== excludeUserId);
+
+    const results = [];
+    for (const adminId of adminIds) {
+      try {
+        // skipSettings: true -> luôn gửi notification cho admin, không bị settings block
+        const result = await this.notify(eventType, { ...data, userId: adminId }, { skipSettings: true });
+        results.push({ adminId, notification: result });
+      } catch (err) {
+        console.warn(`[NotificationService] Failed to notify admin ${adminId}:`, err.message);
+      }
+    }
+    return results;
   }
 
   /**

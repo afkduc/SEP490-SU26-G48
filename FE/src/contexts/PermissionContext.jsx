@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback } from 'react';
+import { createContext, useContext, useCallback, useMemo } from 'react';
 import { useAuth } from './AppContext';
 
 const PermissionContext = createContext(null);
@@ -65,13 +65,16 @@ export function PermissionProvider({ children }) {
     [can]
   );
 
-  const value = {
-    permissions,
-    can,
-    canAll,
-    canAny,
-    permissionCount: Array.isArray(permissions) ? permissions.length : 0,
-  };
+  const value = useMemo(
+    () => ({
+      permissions,
+      can,
+      canAll,
+      canAny,
+      permissionCount: Array.isArray(permissions) ? permissions.length : 0,
+    }),
+    [permissions, can, canAll, canAny]
+  );
 
   return (
     <PermissionContext.Provider value={value}>

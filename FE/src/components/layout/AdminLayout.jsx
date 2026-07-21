@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import ScrollToggleButton from '../common/ScrollToggleButton';
-import NotificationBell from '../NotificationBell';
 import './AdminLayout.css';
 
 const ADMIN_SIDEBAR = [
@@ -253,8 +252,9 @@ export default function AdminLayout({ children }) {
 
   const handleLogout = async () => {
     setUserMenuOpen(false);
+    // AppContext.logout() da tu goi window.location.assign('/login') -> reload
+    // toan trang, dam bao state sach 100%. Khong can navigate o day.
     await logout();
-    navigate('/login', { replace: true });
   };
 
   const handleProfileClick = () => {
@@ -344,8 +344,6 @@ export default function AdminLayout({ children }) {
                 <span className="online-label admin-topbar__online-label">Trực tuyến</span>
               </div>
             )}
-            {/* Notification bell - SSE realtime (push moi notification ngay khi co) */}
-            <NotificationBell />
             <div className="admin-topbar__user" onClick={() => setUserMenuOpen((v) => !v)} ref={userMenuRef}>
               <div className="admin-topbar__avatar">{getInitials(user?.name || '')}</div>
               <div className="admin-topbar__user-info">

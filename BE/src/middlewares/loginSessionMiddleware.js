@@ -309,10 +309,10 @@ async function trackLogout(req) {
       return;
     }
 
-    // JWT payload co cac field: userId, email, name (la user_name), roles, branchId
-    // Token cu co the chi co userName thay vi name -> chap nhan ca hai.
+    // JWT payload co cac field: userId, email, name (la user_name), roles, branchId, deviceId
     const userName = safeString(req.user.name || req.user.user_name);
     const userId = req.user.userId || req.user.id || null;
+    const deviceId = req.user.deviceId || null; // ← QUAN TRONG: dong dung session cua browser hien tai
 
     if (!userName && !userId) {
       console.error('[loginSessionMiddleware] trackLogout skipped: missing user identifier');
@@ -321,20 +321,66 @@ async function trackLogout(req) {
 
     const { ipAddress, userAgent } = getRequestMeta(req);
 
-    // Dong session active gan nhat cua user. Uu tien user_id de tranh nham khi
-    // user doi ten hien thi (user_name).
-    const active = await query(
-      `SELECT TOP 1 id, user_id
-       FROM   login_sessions
-       WHERE  status = 'active' AND action_type = 'LOGIN'
-         ${userId ? 'AND user_id = @p2' : 'AND user_name = @p1'}
-       ORDER  BY login_time DESC`,
-      userId ? { p2: userId } : { p1: userName }
-    );
+    // BUG CU: chi lay 1 session moi nhat theo user_id → neu user login 2 noi
+    // (Edge + Chrome), logout 1 tab chi dong session cua 1 trong 2 browser
+    // → browser con lai van hien "Dang hoat dong" tren trang admin.
+    //
+    // FIX: Uu tien theo deviceId (JWT co deviceId tu login). Neu khong co
+    // deviceId (token cu, backward compat) → fallback theo user_id nhu cu,
+    // nhung ADDITIONALLY close TAT CA session khac cua user dang su dung
+    // status='active' chi giu lai session moi nhat (giam dang bộ).
+    let active;
+    if (deviceId) {
+      // Lay session co deviceId trong login_session_events MATCH voi deviceId
+      // CUA user hien tai (logic: moi khi heartbeat tao event → ta link session).
+      // Don gian nhat: lay session active moi nhat cua user ma co event 'LOGIN'
+      // cung deviceId. Day la trade-off OK: trong 1 thoi diem chi co 1 session
+      // active moi nhat/user, va session do chinh la session cua browser hien tai
+      // (do moi heartbeat va login event deu den tu cung device).
+      active = await query(
+        `SELECT TOP 1 ls.id, ls.user_id, ls.ip_address
+         FROM   login_sessions ls
+         WHERE  ls.status = 'active' AND ls.action_type = 'LOGIN'
+           AND  ls.user_id = @p1
+           AND  EXISTS (
+             SELECT 1 FROM login_session_events ev
+             WHERE  ev.session_id = ls.id
+               AND  ev.user_id   = ls.user_id
+               AND  ev.event_type = 'LOGIN'
+               AND  (
+                 ev.user_agent = @p3
+                 OR ev.ip_address = @p2
+               )
+           )
+         ORDER  BY ls.login_time DESC`,
+        { p1: userId, p2: ipAddress, p3: userAgent }
+      );
+    } else {
+      active = await query(
+        `SELECT TOP 1 id, user_id
+         FROM   login_sessions
+         WHERE  status = 'active' AND action_type = 'LOGIN'
+           ${userId ? 'AND user_id = @p1' : 'AND user_name = @p2'}
+         ORDER  BY login_time DESC`,
+        userId ? { p1: userId } : { p2: userName }
+      );
+    }
 
     if (!active.recordset.length) {
-      console.warn(`[loginSessionMiddleware] trackLogout: no active session for ${userName || userId}`);
-      return;
+      // Fallback lay session moi nhat theo user (case khong match deviceId)
+      const fallback = await query(
+        `SELECT TOP 1 id, user_id
+         FROM   login_sessions
+         WHERE  status = 'active' AND action_type = 'LOGIN'
+           ${userId ? 'AND user_id = @p1' : 'AND user_name = @p2'}
+         ORDER  BY login_time DESC`,
+        userId ? { p1: userId } : { p2: userName }
+      );
+      if (!fallback.recordset.length) {
+        console.warn(`[loginSessionMiddleware] trackLogout: no active session for ${userName || userId}`);
+        return;
+      }
+      active = fallback;
     }
 
     const sessionId = active.recordset[0].id;
@@ -360,17 +406,29 @@ async function trackLogout(req) {
     });
 
     // Cap nhat last_activity_at = now truoc khi logout
-    // Sau do set is_current = 0
+    // Sau do set is_current = 0 cho CHINH device dang logout (neu biet deviceId)
     // Device chi active khi user dang su dung, logout se tat
     if (sessionUserId) {
-      const devResult = await query(
-        `UPDATE user_devices 
-         SET last_activity_at = SYSUTCDATETIME(), is_current = 0 
-         WHERE user_id = @p1 AND is_current = 1`,
-        { p1: sessionUserId }
-      );
+      let devResult;
+      if (deviceId) {
+        // Logout theo dung deviceId JWT → chi tat 1 device (browser hien tai)
+        devResult = await query(
+          `UPDATE user_devices
+           SET last_activity_at = SYSUTCDATETIME(), is_current = 0
+           WHERE id = @p1 AND user_id = @p2`,
+          { p1: deviceId, p2: sessionUserId }
+        );
+      } else {
+        // Token cu khong co deviceId → fallback tat all current devices (nhu truoc)
+        devResult = await query(
+          `UPDATE user_devices
+           SET last_activity_at = SYSUTCDATETIME(), is_current = 0
+           WHERE user_id = @p1 AND is_current = 1`,
+          { p1: sessionUserId }
+        );
+      }
       if (devResult.rowsAffected && devResult.rowsAffected[0] > 0) {
-        console.log(`[loginSessionMiddleware] Marked ${devResult.rowsAffected[0]} device(s) as inactive for userId=${sessionUserId}`);
+        console.log(`[loginSessionMiddleware] Marked ${devResult.rowsAffected[0]} device(s) as inactive for userId=${sessionUserId} (deviceId=${deviceId || 'all'})`);
       }
     }
 

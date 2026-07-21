@@ -16,6 +16,8 @@ const BranchService = require('../../application/services/BranchService');
 const DeviceService = require('../../application/services/DeviceService');
 const SpecialtyService = require('../../application/services/SpecialtyService');
 const SecurityAlertService = require('../../application/services/SecurityAlertService');
+const NotificationService = require('../../application/services/NotificationService');
+const { auditCrud } = require('../../utils/auditHelper');
 
 class AdminController {
   constructor() {
@@ -36,6 +38,7 @@ class AdminController {
     this.deviceService = new DeviceService();
     this.specialtyService = new SpecialtyService();
     this.securityAlertService = new SecurityAlertService();
+    this.notificationService = new NotificationService();
 
     this.getDashboardStats = this.getDashboardStats.bind(this);
     this.listUsers = this.listUsers.bind(this);
@@ -182,6 +185,19 @@ class AdminController {
   createBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.create(req.body);
+      await auditCrud.create(req, {
+        tableName: 'branches',
+        entityCode: branch?.branch_code || branch?.code || null,
+        recordId: branch?.id || null,
+        entityName: 'Chi nhánh',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: branch?.branch_name || branch?.name || '',
+        targetCode: branch?.branch_code || '',
+        userId: branch?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_CREATED:', e.message));
       return success(res, branch, 'Tao chi nhanh thanh cong', 201);
     } catch (err) {
       next(err);
@@ -191,6 +207,19 @@ class AdminController {
   updateBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.update(req.params.id, req.body);
+      await auditCrud.update(req, {
+        tableName: 'branches',
+        entityCode: branch?.branch_code || `ID-${req.params.id}`,
+        recordId: branch?.id || Number(req.params.id) || null,
+        entityName: 'Chi nhánh',
+        newData: req.body,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: branch?.branch_name || '',
+        targetCode: branch?.branch_code || '',
+        userId: branch?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_UPDATED:', e.message));
       return success(res, branch, 'Cap nhat chi nhanh thanh cong');
     } catch (err) {
       next(err);
@@ -200,6 +229,20 @@ class AdminController {
   deactivateBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.deactivate(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'branches',
+        entityCode: branch?.branch_code || `ID-${req.params.id}`,
+        recordId: branch?.id || Number(req.params.id) || null,
+        entityName: 'Chi nhánh',
+        newData: { status: 'inactive' },
+        description: `Ngừng hoạt động chi nhánh ${branch?.branch_code || req.params.id}`,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_DEACTIVATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: branch?.branch_name || '',
+        targetCode: branch?.branch_code || '',
+        userId: branch?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_DEACTIVATED:', e.message));
       return success(res, branch, 'Ngung hoat dong chi nhanh');
     } catch (err) {
       next(err);
@@ -209,6 +252,20 @@ class AdminController {
   reactivateBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.reactivate(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'branches',
+        entityCode: branch?.branch_code || `ID-${req.params.id}`,
+        recordId: branch?.id || Number(req.params.id) || null,
+        entityName: 'Chi nhánh',
+        newData: { status: 'active' },
+        description: `Kích hoạt lại chi nhánh ${branch?.branch_code || req.params.id}`,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_REACTIVATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: branch?.branch_name || '',
+        targetCode: branch?.branch_code || '',
+        userId: branch?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_REACTIVATED:', e.message));
       return success(res, branch, 'Kich hoat lai chi nhanh');
     } catch (err) {
       next(err);
@@ -263,6 +320,14 @@ class AdminController {
         req.params.id,
         Array.isArray(permissionIds) ? permissionIds.map(Number) : []
       );
+      await auditCrud.update(req, {
+        tableName: 'role_permissions',
+        entityCode: `ID-${req.params.id}`,
+        recordId: Number(req.params.id) || null,
+        entityName: 'Phân quyền vai trò',
+        newData: { permissionIds },
+        description: `Cập nhật quyền cho vai trò ID ${req.params.id} (${permissionIds?.length || 0} quyền)`,
+      });
       return success(res, { items: permissions, total: permissions.length }, 'Cap nhat quyen vai tro thanh cong');
     } catch (err) {
       next(err);
@@ -284,6 +349,19 @@ class AdminController {
     try {
       const { roleName, roleLabel } = req.body;
       const role = await this.roleService.createRole({ roleName, roleLabel });
+      await auditCrud.create(req, {
+        tableName: 'roles',
+        entityCode: role?.role_code || roleName || null,
+        recordId: role?.id || null,
+        entityName: 'Vai trò',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('ROLE_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: role?.role_name || role?.roleLabel || '',
+        targetCode: role?.role_code || '',
+        userId: role?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_CREATED:', e.message));
       return success(res, role, 'Tao vai tro thanh cong', 201);
     } catch (err) {
       next(err);
@@ -295,6 +373,19 @@ class AdminController {
     try {
       const { roleLabel } = req.body;
       const role = await this.roleService.updateRole(req.params.id, { roleLabel });
+      await auditCrud.update(req, {
+        tableName: 'roles',
+        entityCode: role?.role_code || `ID-${req.params.id}`,
+        recordId: role?.id || Number(req.params.id) || null,
+        entityName: 'Vai trò',
+        newData: { roleLabel },
+      });
+      await this.notificationService.notifyAdmins('ROLE_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: role?.role_name || `ID-${req.params.id}`,
+        targetCode: role?.role_code || '',
+        userId: role?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_UPDATED:', e.message));
       return success(res, role, 'Cap nhat vai tro thanh cong');
     } catch (err) {
       next(err);
@@ -305,6 +396,19 @@ class AdminController {
   deleteRole = async (req, res, next) => {
     try {
       const result = await this.roleService.deleteRole(req.params.id);
+      await auditCrud.delete(req, {
+        tableName: 'roles',
+        entityCode: `ID-${req.params.id}`,
+        recordId: Number(req.params.id) || null,
+        entityName: 'Vai trò',
+        oldData: result,
+      });
+      await this.notificationService.notifyAdmins('ROLE_DELETED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: `ID-${req.params.id}`,
+        targetCode: '',
+        userId: Number(req.params.id) || null,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_DELETED:', e.message));
       return success(res, result, 'Xoa vai tro thanh cong');
     } catch (err) {
       next(err);
@@ -314,6 +418,20 @@ class AdminController {
   toggleRoleStatus = async (req, res, next) => {
     try {
       const role = await this.roleService.toggleStatus(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'roles',
+        entityCode: role?.role_code || `ID-${req.params.id}`,
+        recordId: role?.id || Number(req.params.id) || null,
+        entityName: 'Vai trò',
+        newData: { isActive: role?.is_active },
+        description: `${role?.is_active ? 'Kích hoạt' : 'Vô hiệu hóa'} vai trò ${role?.role_code || req.params.id}`,
+      });
+      await this.notificationService.notifyAdmins(role?.is_active ? 'ROLE_ENABLED' : 'ROLE_DISABLED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: role?.role_name || `ID-${req.params.id}`,
+        targetCode: role?.role_code || '',
+        userId: role?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins toggleRole:', e.message));
       return success(res, role, 'Cap nhat trang thai vai tro thanh cong');
     } catch (err) {
       next(err);
@@ -353,6 +471,10 @@ class AdminController {
   forceLogoutDevice = async (req, res, next) => {
     try {
       const result = await this.deviceService.forceLogoutDevice(req.params.deviceId);
+      await auditCrud.forceLogout(req, {
+        targetUserName: result?.userName || null,
+        reason: `Đăng xuất thiết bị ${req.params.deviceId}`,
+      });
       return success(res, result, 'Da dang xuat khoi thiet bi');
     } catch (err) {
       next(err);
@@ -364,6 +486,10 @@ class AdminController {
       const { userId } = req.params;
       const { currentDeviceId } = req.query;
       const result = await this.deviceService.forceLogoutAllOtherDevices(userId, currentDeviceId);
+      await auditCrud.forceLogout(req, {
+        targetUserName: `user-${userId}`,
+        reason: `Đăng xuất tất cả thiết bị khác (${result?.revoked || 0} thiết bị)`,
+      });
       return success(res, result, 'Da dang xuat tat ca thiet bi khac');
     } catch (err) {
       next(err);
@@ -381,6 +507,10 @@ class AdminController {
         return res.status(400).json({ message: 'userId la bat buoc' });
       }
       const result = await this.deviceService.forceLogoutAllDevices(userId);
+      await auditCrud.forceLogout(req, {
+        targetUserName: `user-${userId}`,
+        reason: `Buộc đăng xuất toàn bộ thiết bị của user (${result?.revoked || 0} thiết bị)`,
+      });
       return success(res, result, `Da dang xuat ${result.revoked} thiet bi`);
     } catch (err) {
       next(err);
@@ -400,6 +530,13 @@ class AdminController {
   createSpecialty = async (req, res, next) => {
     try {
       const specialty = await this.specialtyService.create(req.body);
+      await auditCrud.create(req, {
+        tableName: 'specialties',
+        entityCode: specialty?.specialty_code || specialty?.code || null,
+        recordId: specialty?.id || null,
+        entityName: 'Chuyên môn',
+        data: req.body,
+      });
       return success(res, specialty, 'Tao chuyen mon thanh cong', 201);
     } catch (err) {
       next(err);
@@ -409,6 +546,13 @@ class AdminController {
   updateSpecialty = async (req, res, next) => {
     try {
       const specialty = await this.specialtyService.update(req.params.id, req.body);
+      await auditCrud.update(req, {
+        tableName: 'specialties',
+        entityCode: specialty?.specialty_code || `ID-${req.params.id}`,
+        recordId: specialty?.id || Number(req.params.id) || null,
+        entityName: 'Chuyên môn',
+        newData: req.body,
+      });
       return success(res, specialty, 'Cap nhat chuyen mon thanh cong');
     } catch (err) {
       next(err);
@@ -418,6 +562,13 @@ class AdminController {
   deleteSpecialty = async (req, res, next) => {
     try {
       const result = await this.specialtyService.delete(req.params.id);
+      await auditCrud.delete(req, {
+        tableName: 'specialties',
+        entityCode: `ID-${req.params.id}`,
+        recordId: Number(req.params.id) || null,
+        entityName: 'Chuyên môn',
+        oldData: result,
+      });
       return success(res, result, 'Xoa chuyen mon thanh cong');
     } catch (err) {
       next(err);
@@ -427,6 +578,14 @@ class AdminController {
   toggleSpecialtyStatus = async (req, res, next) => {
     try {
       const specialty = await this.specialtyService.toggleStatus(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'specialties',
+        entityCode: specialty?.specialty_code || `ID-${req.params.id}`,
+        recordId: specialty?.id || Number(req.params.id) || null,
+        entityName: 'Chuyên môn',
+        newData: { isActive: specialty?.is_active },
+        description: `${specialty?.is_active ? 'Kích hoạt' : 'Vô hiệu hóa'} chuyên môn ${specialty?.specialty_code || req.params.id}`,
+      });
       return success(res, specialty, 'Cap nhat trang thai chuyen mon thanh cong');
     } catch (err) {
       next(err);
@@ -449,6 +608,14 @@ class AdminController {
         req.params.userId,
         Array.isArray(specialtyIds) ? specialtyIds.map(Number) : []
       );
+      await auditCrud.update(req, {
+        tableName: 'user_specialty',
+        entityCode: `ID-${req.params.userId}`,
+        recordId: Number(req.params.userId) || null,
+        entityName: 'Chuyên môn nhân viên',
+        newData: { specialtyIds },
+        description: `Cập nhật chuyên môn cho user ID ${req.params.userId}`,
+      });
       return success(res, { items: specialties, total: specialties.length }, 'Cap nhat chuyen mon nguoi dung thanh cong');
     } catch (err) {
       next(err);
@@ -516,6 +683,10 @@ class AdminController {
     try {
       const { roleIds } = req.body;
       const roles = await this.userRoleService.assignRoles(req.params.userId, roleIds);
+      await auditCrud.assignRole(req, {
+        userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
+        roleName: roles?.[0]?.roleName || roleIds?.join(','),
+      });
       return success(res, roles, 'Gan role thanh cong');
     } catch (err) {
       next(err);
@@ -529,6 +700,10 @@ class AdminController {
         req.params.userId,
         req.params.roleId
       );
+      await auditCrud.removeRole(req, {
+        userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
+        roleName: `role-${req.params.roleId}`,
+      });
       return success(res, roles, 'Xoa role thanh cong');
     } catch (err) {
       next(err);
@@ -538,6 +713,19 @@ class AdminController {
   async createUser(req, res, next) {
     try {
       const user = await this.adminUserService.createUser(req.body);
+      await auditCrud.create(req, {
+        tableName: 'users',
+        entityCode: user?.user_code || user?.userName || null,
+        recordId: user?.id || null,
+        entityName: 'Người dùng',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('USER_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: user?.full_name || user?.userName || '',
+        targetCode: user?.user_code || '',
+        userId: user?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_CREATED:', e.message));
       return success(res, user, 'Tao nguoi dung thanh cong', 201);
     } catch (err) {
       next(err);
@@ -547,12 +735,38 @@ class AdminController {
   async updateUser(req, res, next) {
     try {
       const { userId, status, roleId, branchId } = req.body;
+      const oldData = {};
+      if (userId) {
+        try {
+          const existing = await this.adminUserService.getUserDetail(userId);
+          if (existing) {
+            oldData.status = existing.status;
+            oldData.roleId = existing.roleId;
+            oldData.branchId = existing.branchId;
+          }
+        } catch (_) {}
+      }
       const updated = await this.adminUserService.updateUser({
         userId,
         status,
         roleId,
         branchId,
       });
+      await auditCrud.update(req, {
+        tableName: 'users',
+        entityCode: updated?.user_code || updated?.userName || `ID-${userId}`,
+        recordId: updated?.id || Number(userId) || null,
+        entityName: 'Người dùng',
+        oldData,
+        newData: { status, roleId, branchId },
+      });
+      const eventType = status === 'inactive' ? 'USER_DISABLED' : 'USER_UPDATED';
+      await this.notificationService.notifyAdmins(eventType, {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: updated?.full_name || updated?.userName || `ID-${userId}`,
+        targetCode: updated?.user_code || '',
+        userId: updated?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_UPDATE:', e.message));
       return success(res, updated, 'Cap nhat nguoi dung thanh cong');
     } catch (err) {
       next(err);
@@ -578,7 +792,6 @@ class AdminController {
       const targetUserId = Number(req.params.id);
       const currentUserId = req.user?.userId;
 
-      // Khong cho admin tu reset MK chinh minh (tranh tu khoa tai khoan)
       if (currentUserId && targetUserId === currentUserId) {
         return next(new (require('../../utils/ApiError'))(
           400,
@@ -586,7 +799,6 @@ class AdminController {
         ));
       }
 
-      // `mustChangePassword` mac dinh true (co the client override qua body)
       const mustChangePassword = req.body?.mustChangePassword !== false;
       const newPassword = req.body?.newPassword;
 
@@ -595,6 +807,17 @@ class AdminController {
         mustChangePassword,
         newPassword,
       });
+
+      await auditCrud.resetPassword(req, {
+        targetUserName: result?.userName || result?.user_code || `ID-${targetUserId}`,
+      });
+      await this.notificationService.notifyAdmins('USER_PASSWORD_RESET', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: result?.full_name || result?.userName || '',
+        targetCode: result?.user_code || '',
+        userId: targetUserId,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_PASSWORD_RESET:', e.message));
+
       return success(res, result, result.message);
     } catch (err) {
       next(err);
