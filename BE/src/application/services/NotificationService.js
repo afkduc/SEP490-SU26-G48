@@ -331,6 +331,32 @@ const NOTIFICATION_EVENTS = {
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
+
+  // Specialty management
+  SPECIALTY_CREATED: {
+    title: 'Chuyên môn mới được tạo',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã tạo chuyên môn: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  SPECIALTY_UPDATED: {
+    title: 'Chuyên môn được cập nhật',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật chuyên môn: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  SPECIALTY_DELETED: {
+    title: 'Chuyên môn bị xóa',
+    severity: SEVERITY.ERROR,
+    messageTemplates: {
+      default: '{actorName} đã xóa chuyên môn: {targetName}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
 };
 
 class NotificationService {
@@ -531,7 +557,7 @@ class NotificationService {
    */
   _emitSSEEvent(userId, notification) {
     try {
-      const NotificationEvents = require('./NotificationEvents');
+      const NotificationEvents = require('../events/NotificationEvents');
       NotificationEvents.emitNotification(userId, notification);
     } catch (err) {
       console.error('[NotificationService] Failed to emit SSE event:', err.message);

@@ -681,6 +681,124 @@ function JsonView({ data }) {
   }
 }
 
+/**
+ * Format old/new value thành dạng human-readable
+ * VD: { status: 'active', branchId: 1 } → "Trạng thái: Hoạt động, Chi nhánh: CN-001"
+ */
+const FIELD_LABELS = {
+  status: 'Trạng thái',
+  branchId: 'Chi nhánh',
+  roleId: 'Vai trò',
+  phone: 'SĐT',
+  firstName: 'Họ',
+  lastName: 'Tên',
+  fullName: 'Tên đầy đủ',
+  email: 'Email',
+  userName: 'Tên đăng nhập',
+  specialtyId: 'Chuyên môn',
+  name: 'Tên',
+  branchName: 'Chi nhánh',
+  roleName: 'Vai trò',
+};
+
+const STATUS_LABELS = {
+  active: 'Hoạt động',
+  inactive: 'Ngừng hoạt động',
+  locked: 'Bị khóa',
+};
+
+function formatValue(key, value) {
+  if (value === null || value === undefined) return '—';
+  if (key === 'status') return STATUS_LABELS[value] || value;
+  if (typeof value === 'boolean') return value ? 'Có' : 'Không';
+  if (typeof value === 'string' && value.length > 50) return value.slice(0, 50) + '...';
+  return String(value);
+}
+
+function DiffView({ oldValue, newValue }) {
+  const oldObj = oldValue ? (typeof oldValue === 'string' ? JSON.parse(oldValue) : oldValue) : null;
+  const newObj = newValue ? (typeof newValue === 'string' ? JSON.parse(newValue) : newValue) : null;
+
+  if (!oldObj && !newObj) return <span className="audit-detail__json-empty">—</span>;
+
+  // Nếu là object đơn giản, hiển thị dạng bảng thay đổi
+  const isSimpleObject = (obj) => obj && typeof obj === 'object' && !Array.isArray(obj) &&
+    Object.keys(obj).length <= 10;
+
+  if (isSimpleObject(oldObj) && isSimpleObject(newObj)) {
+    const allKeys = [...new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})])];
+    const changes = allKeys.filter(k => {
+      const oldVal = oldObj?.[k];
+      const newVal = newObj?.[k];
+      return oldVal !== newVal;
+    });
+
+    if (changes.length > 0) {
+      return (
+        <div className="audit-detail__diff-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Trường</th>
+                <th>Giá trị cũ</th>
+                <th>Giá trị mới</th>
+              </tr>
+            </thead>
+            <tbody>
+              {changes.map(key => {
+                const label = FIELD_LABELS[key] || key;
+                return (
+                  <tr key={key}>
+                    <td className="diff-label">{label}</td>
+                    <td className="diff-old">{formatValue(key, oldObj?.[key])}</td>
+                    <td className="diff-new">{formatValue(key, newObj?.[key])}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // Không có thay đổi
+    if (Object.keys(newObj || {}).length > 0) {
+      return (
+        <div className="audit-detail__diff-table">
+          <table>
+            <tbody>
+              {Object.entries(newObj).map(([key, value]) => (
+                <tr key={key}>
+                  <td className="diff-label">{FIELD_LABELS[key] || key}</td>
+                  <td colSpan={2}>{formatValue(key, value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+  }
+
+  // Fallback: hiển thị JSON nếu không parse được
+  return (
+    <div className="audit-detail__diff-raw">
+      {oldObj && (
+        <div className="audit-detail__diff-col">
+          <label>Giá trị cũ</label>
+          <JsonView data={oldValue} />
+        </div>
+      )}
+      {newObj && (
+        <div className="audit-detail__diff-col">
+          <label>Giá trị mới</label>
+          <JsonView data={newValue} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AuditLogDetailModal({ log, onClose }) {
   if (!log) return null;
   const t = formatLocal(log.logged_at);
@@ -778,18 +896,7 @@ function AuditLogDetailModal({ log, onClose }) {
           {/* Old / New value */}
           {(log.old_value || log.new_value) && (
             <div className="audit-detail__diff">
-              {log.old_value && (
-                <div className="audit-detail__diff-col">
-                  <label>Giá trị cũ</label>
-                  <JsonView data={log.old_value} />
-                </div>
-              )}
-              {log.new_value && (
-                <div className="audit-detail__diff-col">
-                  <label>Giá trị mới</label>
-                  <JsonView data={log.new_value} />
-                </div>
-              )}
+              <DiffView oldValue={log.old_value} newValue={log.new_value} />
             </div>
           )}
 
