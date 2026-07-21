@@ -123,7 +123,7 @@ class AdminUserService {
   }
 
   async updateUser(payload) {
-    const { userId, status, roleId, branchId } = payload;
+    const { userId, firstName, lastName, email, phone, status, roleId, branchId } = payload;
 
     if (!userId) {
       throw new ApiError(400, 'userId la bat buoc');
@@ -137,6 +137,22 @@ class AdminUserService {
     const VALID_STATUSES = ['active', 'inactive', 'locked'];
     if (status && !VALID_STATUSES.includes(status)) {
       throw new ApiError(400, 'status khong hop le: active, inactive, locked');
+    }
+
+    // Validate email neu co
+    if (email !== undefined && email !== null && email !== '') {
+      const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!EMAIL_REGEX.test(email)) {
+        throw new ApiError(400, 'Email khong dung dinh dang');
+      }
+    }
+
+    // Validate phone neu co
+    if (phone !== undefined && phone !== null && phone !== '') {
+      const PHONE_REGEX = /^0\d{9,10}$/;
+      if (!PHONE_REGEX.test(String(phone))) {
+        throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
+      }
     }
 
     // Validate branchId neu co
@@ -160,6 +176,10 @@ class AdminUserService {
     try {
       const updated = await this.adminUserRepository.updateUser({
         userId: Number(userId),
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        email: payload.email,
+        phone: payload.phone,
         status,
         roleId: parsedRoleId,
         branchId: parsedBranchId,
