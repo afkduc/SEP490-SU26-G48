@@ -6,6 +6,7 @@ const config = require('./config');
 const routes = require('./presentation/routes');
 const { logger, errorHandler } = require('./middlewares');
 const { getPool } = require('./infrastructure/database/sqlServer');
+const runMigrations = require('./infrastructure/database/migrate');
 const { makeMaintenanceReminderRepository } = require('./infrastructure/repositories');
 
 const MAINTENANCE_REMINDER_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 gio/lan
@@ -50,6 +51,10 @@ app.use(errorHandler);
 async function start() {
   try {
     await getPool();
+
+    // Chay migration TRUOC khi start server (de schema luon khop voi code).
+    // Neu migration fail -> throw -> server khong start -> dev phat hien ngay.
+    await runMigrations();
 
     // Start background jobs
     try {
