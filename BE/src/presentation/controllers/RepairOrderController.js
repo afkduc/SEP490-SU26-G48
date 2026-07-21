@@ -1,8 +1,11 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
+const NotificationService = require('../../application/services/NotificationService');
 
 class RepairOrderController {
   constructor({ repairOrderService }) {
     this.repairOrderService = repairOrderService;
+    this.notificationService = new NotificationService();
   }
 
   // Man "Lenh sua chua" la bang dieu phoi chung cua ca chi nhanh (de bat ky
@@ -41,6 +44,19 @@ class RepairOrderController {
         branchId: req.user.branchId,
         createdBy: req.user.userId,
       });
+      await auditCrud.create(req, {
+        tableName: 'repair_orders',
+        entityCode: item?.code || item?.repair_order_code || null,
+        recordId: item?.id || null,
+        entityName: 'Phiếu sửa chữa',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('REPAIR_ORDER_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: item?.code || item?.repair_order_code || `ID-${item?.id}`,
+        targetCode: item?.code || item?.repair_order_code || '',
+        userId: item?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
       return success(res, item, 'Repair order created', 201);
     } catch (err) {
       next(err);
@@ -53,6 +69,19 @@ class RepairOrderController {
         branchId: req.user.branchId,
         cancelReason: req.body.reason,
       });
+      await auditCrud.update(req, {
+        tableName: 'repair_orders',
+        entityCode: item?.code || item?.repair_order_code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Phiếu sửa chữa',
+        newData: { status: req.body.status, reason: req.body.reason },
+      });
+      await this.notificationService.notifyAdmins('REPAIR_ORDER_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: item?.code || item?.repair_order_code || `ID-${req.params.id}`,
+        targetCode: item?.code || item?.repair_order_code || '',
+        userId: item?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
       return success(res, item, 'Repair order status updated');
     } catch (err) {
       next(err);

@@ -6,6 +6,7 @@ const NOTIFICATION_COLUMNS = `
   title,
   message,
   type,
+  severity,
   metadata,
   is_read,
   created_at
@@ -19,6 +20,7 @@ function toNotificationRow(row) {
     title: row.title,
     message: row.message,
     type: row.type,
+    severity: row.severity || null,
     metadata: row.metadata ? JSON.parse(row.metadata) : null,
     isRead: Boolean(row.is_read),
     createdAt: row.created_at,
@@ -29,17 +31,18 @@ class NotificationRepository {
   /**
    * Tạo notification mới
    */
-  async create({ userId, title, message, type, metadata = null }) {
+  async create({ userId, title, message, type, severity = null, metadata = null }) {
     const result = await query(
-      `INSERT INTO notifications (user_id, title, message, type, metadata)
+      `INSERT INTO notifications (user_id, title, message, type, severity, metadata)
        OUTPUT INSERTED.*
-       VALUES (@p1, @p2, @p3, @p4, @p5)`,
+       VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`,
       {
         p1: userId,
         p2: title,
         p3: message,
         p4: type,
-        p5: metadata ? JSON.stringify(metadata) : null,
+        p5: severity,
+        p6: metadata ? JSON.stringify(metadata) : null,
       }
     );
     return toNotificationRow(result.recordset[0]);

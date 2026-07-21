@@ -13,6 +13,15 @@ const ICON_COLORS = {
   ROLE_CHANGED: '#8b5cf6',
 };
 
+// Màu theo severity — phủ định danh sách cố định + fallback
+const SEVERITY_COLORS = {
+  success:  '#10b981',
+  info:     '#3b82f6',
+  warning:  '#f59e0b',
+  error:    '#ef4444',
+  critical: '#dc2626',
+};
+
 const ICON_LABELS = {
   LOGIN_SUCCESS: 'Đăng nhập',
   LOGIN_FAILED: 'Thất bại',
@@ -20,11 +29,35 @@ const ICON_LABELS = {
   FORCE_LOGOUT: 'Bị đăng xuất',
   PASSWORD_CHANGED: 'Mật khẩu',
   ROLE_CHANGED: 'Phân quyền',
+  USER_CREATED: 'Tạo user',
+  USER_UPDATED: 'Cập nhật user',
+  USER_DISABLED: 'Disable user',
+  USER_ENABLED: 'Kích hoạt user',
+  USER_PASSWORD_RESET: 'Reset mật khẩu',
+  REPAIR_ORDER_CREATED: 'Tạo phiếu sửa',
+  REPAIR_ORDER_UPDATED: 'Cập nhật phiếu sửa',
+  SETTLEMENT_CREATED: 'Tạo quyết toán',
+  SETTLEMENT_UPDATED: 'Cập nhật quyết toán',
+  IMPORT_REQUEST_APPROVED: 'Duyệt nhập kho',
+  IMPORT_REQUEST_REJECTED: 'Từ chối nhập kho',
+  EXPORT_REQUEST_CREATED: 'Tạo xuất kho',
+  BRANCH_CREATED: 'Tạo chi nhánh',
+  BRANCH_UPDATED: 'Cập nhật chi nhánh',
+  BRANCH_DEACTIVATED: 'Ngừng chi nhánh',
+  BRANCH_REACTIVATED: 'Kích hoạt chi nhánh',
+  ROLE_CREATED: 'Tạo vai trò',
+  ROLE_UPDATED: 'Cập nhật vai trò',
+  ROLE_DELETED: 'Xóa vai trò',
+  PRODUCT_CREATED: 'Tạo sản phẩm',
+  PRODUCT_UPDATED: 'Cập nhật sản phẩm',
+  PRODUCT_DELETED: 'Xóa sản phẩm',
+  CUSTOMER_UPDATED: 'Cập nhật KH',
 };
 
 function getIcon(notif) {
-  const color = ICON_COLORS[notif.type] || '#64748b';
-  const label = ICON_LABELS[notif.type] || notif.type;
+  // Ưu tiên: severity → type (legacy)
+  const color = SEVERITY_COLORS[notif.severity] || ICON_COLORS[notif.type] || '#64748b';
+  const label = ICON_LABELS[notif.type] || (notif.title ? notif.title.charAt(0) : '?');
   return (
     <span
       className="notif-bell__item-icon"
