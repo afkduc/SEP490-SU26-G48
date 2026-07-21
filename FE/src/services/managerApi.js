@@ -101,23 +101,6 @@ class ManagerApi {
   updateTechnician(id, payload) {
     return httpClient.put(`/manager/technicians/${id}`, payload);
   }
-
-  getTeamLeaders(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return httpClient.get(`/manager/team-leaders${query ? `?${query}` : ''}`);
-  }
-
-  getTeamLeaderById(id) {
-    return httpClient.get(`/manager/team-leaders/${id}`);
-  }
-
-  createTeamLeader(payload) {
-    return httpClient.post('/manager/team-leaders', payload);
-  }
-
-  updateTeamLeader(id, payload) {
-    return httpClient.put(`/manager/team-leaders/${id}`, payload);
-  }
 }
 
 const managerApi = new ManagerApi();
