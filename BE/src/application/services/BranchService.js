@@ -1,5 +1,6 @@
 const ApiError = require('../../utils/ApiError');
 const BranchRepositoryImpl = require('../../infrastructure/repositories/BranchRepositoryImpl');
+const { auditCrud } = require('../../utils/auditHelper');
 
 class BranchService {
   constructor() {
@@ -30,7 +31,7 @@ class BranchService {
     return this.branchRepository.getBranchStats(Number(branchId));
   }
 
-  async create(payload) {
+  async create(payload, req = {}) {
     const { branchCode, branchName, address, phone, email, managerId } = payload;
 
     if (!branchCode || !branchName) {
@@ -55,10 +56,18 @@ class BranchService {
       managerId: managerId ? Number(managerId) : null,
     });
 
-    return this.branchRepository.findById(id);
+    const branch = await this.branchRepository.findById(id);
+    await auditCrud.create(req, {
+      tableName: 'branches',
+      entityCode: branch?.branchCode || null,
+      recordId: branch?.id || id,
+      entityName: 'Chi nhánh',
+      data: payload,
+    });
+    return branch;
   }
 
-  async update(id, payload) {
+  async update(id, payload, req = {}) {
     const existing = await this.branchRepository.findById(Number(id));
     if (!existing) {
       throw new ApiError(404, 'Chi nhanh khong ton tai');
@@ -70,29 +79,59 @@ class BranchService {
       throw new ApiError(400, 'branchName khong duoc rong');
     }
 
-    return this.branchRepository.update(id, {
+    const updated = await this.branchRepository.update(id, {
       branchName: branchName ? branchName.trim() : undefined,
       address: address !== undefined ? (address ? address.trim() : null) : undefined,
       phone: phone !== undefined ? (phone ? phone.trim() : null) : undefined,
       email: email !== undefined ? (email ? email.trim() : null) : undefined,
       managerId: managerId !== undefined ? (managerId ? Number(managerId) : null) : undefined,
     });
+
+    await auditCrud.update(req, {
+      tableName: 'branches',
+      entityCode: existing.branchCode || null,
+      recordId: existing.id || Number(id),
+      entityName: 'Chi nhánh',
+      oldData: existing,
+      newData: payload,
+    });
+    return updated;
   }
 
-  async deactivate(id) {
+  async deactivate(id, req = {}) {
     const existing = await this.branchRepository.findById(Number(id));
     if (!existing) {
       throw new ApiError(404, 'Chi nhanh khong ton tai');
     }
-    return this.branchRepository.setActive(id, false);
+    const updated = await this.branchRepository.setActive(id, false);
+    await auditCrud.update(req, {
+      tableName: 'branches',
+      entityCode: existing.branchCode || null,
+      recordId: existing.id || Number(id),
+      entityName: 'Chi nhánh',
+      oldData: { ...existing, isActive: true },
+      newData: { isActive: false },
+      description: `Vô hiệu hóa chi nhánh ${existing.branchCode || existing.branchName}`,
+    });
+    return updated;
   }
 
-  async reactivate(id) {
+  async reactivate(id, req = {}) {
     const existing = await this.branchRepository.findById(Number(id));
     if (!existing) {
       throw new ApiError(404, 'Chi nhanh khong ton tai');
     }
-    return this.branchRepository.setActive(id, true);
+    const updated = await this.branchRepository.setActive(id, true);
+    await auditCrud.update(req, {
+      tableName: 'branches',
+      entityCode: existing.branchCode || null,
+      recordId: existing.id || Number(id),
+      entityName: 'Chi nhánh',
+      oldData: { ...existing, isActive: false },
+      newData: { isActive: true },
+      description: `Kích hoạt lại chi nhánh ${existing.branchCode || existing.branchName}`,
+    });
+    return updated;
   }
 }
 

@@ -1,7 +1,8 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { getAdminDashboardStats } from '../../services/adminApi';
+import { getNotifications } from '../../services/notificationApi';
 import './AdminDashboardPage.css';
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
@@ -292,13 +293,16 @@ function getAlertIcon(iconType) {
   }
 }
 
-function getAlertStyle(type) {
-  switch (type) {
-    case 'danger': return { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', iconBg: '#fee2e2' };
-    case 'warning': return { bg: '#fffbeb', border: '#fde68a', color: '#d97706', iconBg: '#fef3c7' };
-    case 'info': return { bg: '#eff6ff', border: '#bfdbfe', color: '#2563eb', iconBg: '#dbeafe' };
-    default: return { bg: '#f8fafc', border: '#e2e8f0', color: '#475569', iconBg: '#f1f5f9' };
-  }
+function getAlertStyle(alert) {
+  // Ưu tiên: severity (notification) > type (legacy) > action (audit)
+  const s = (alert.severity || alert.type || alert.action || '').toLowerCase();
+  if (s === 'success')   return { bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a', iconBg: '#dcfce7' };
+  if (s === 'danger')     return { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', iconBg: '#fee2e2' };
+  if (s === 'warning')   return { bg: '#fffbeb', border: '#fde68a', color: '#d97706', iconBg: '#fef3c7' };
+  if (s === 'info')      return { bg: '#eff6ff', border: '#bfdbfe', color: '#2563eb', iconBg: '#dbeafe' };
+  if (s === 'error')     return { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', iconBg: '#fee2e2' };
+  if (s === 'critical')  return { bg: '#fef2f2', border: '#fca5a5', color: '#991b1b', iconBg: '#fecaca' };
+  return { bg: '#f8fafc', border: '#e2e8f0', color: '#475569', iconBg: '#f1f5f9' };
 }
 
 // Severity: danh gia muc do nghiem trong cua canh bao
@@ -309,10 +313,14 @@ const SEVERITY_LABELS = {
   low: 'Thấp',
 };
 const SEVERITY_STYLES = {
-  critical: { label: 'CRITICAL', bg: '#dc2626', color: '#ffffff' },
-  high: { label: 'HIGH', bg: '#f97316', color: '#ffffff' },
-  medium: { label: 'MEDIUM', bg: '#eab308', color: '#1f2937' },
-  low: { label: 'LOW', bg: '#10b981', color: '#ffffff' },
+  critical: { label: 'CRITICAL', bg: '#991b1b', color: '#ffffff' },
+  high:     { label: 'HIGH',     bg: '#dc2626', color: '#ffffff' },
+  medium:   { label: 'MEDIUM',   bg: '#eab308', color: '#1f2937' },
+  low:      { label: 'LOW',      bg: '#10b981', color: '#ffffff' },
+  success:  { label: 'THANH CONG', bg: '#16a34a', color: '#ffffff' },
+  info:     { label: 'INFO',      bg: '#2563eb', color: '#ffffff' },
+  warning:  { label: 'CANH BAO', bg: '#d97706', color: '#ffffff' },
+  error:    { label: 'LOI',      bg: '#dc2626', color: '#ffffff' },
 };
 
 // Category: phan loai canh bao
@@ -377,9 +385,14 @@ function inferCategory(alert) {
 
 // Severity inference: du vao type va noi dung
 function inferSeverity(alert) {
-  if (alert.severity) return alert.severity.toLowerCase();
-  if (alert.type === 'danger') return 'high';
-  if (alert.type === 'warning') return 'medium';
+  const s = alert.severity || alert.type || '';
+  const sl = s.toLowerCase();
+  if (sl === 'critical') return 'critical';
+  if (sl === 'success') return 'low';
+  if (sl === 'info')    return 'low';
+  if (sl === 'error')  return 'high';
+  if (sl === 'danger') return 'high';
+  if (sl === 'warning') return 'medium';
   return 'low';
 }
 
@@ -388,14 +401,15 @@ function resolveAlertActor(alert) {
   return (
     alert.actor ||
     alert.actorName ||
+    alert.actor_name ||
     alert.user_name ||
     alert.userName ||
-    (alert.affectedEntity ? `Hệ thống (${alert.affectedEntity})` : null)
+    (alert.targetName ? `bởi ${alert.targetName}` : null)
   );
 }
 
 function AlertItem({ alert }) {
-  const style = getAlertStyle(alert.type);
+  const style = getAlertStyle(alert);
   const category = inferCategory(alert);
   const severity = inferSeverity(alert);
   const severityStyle = SEVERITY_STYLES[severity];
@@ -797,6 +811,7 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -815,16 +830,66 @@ export default function AdminDashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Gop alerts tu backend voi alerts tu sinh (auto) de widget luon co noi dung.
-  // Uu tien alerts backend, sau do them alerts auto neu can.
+  // Fetch notifications CRUD gan day (poll 60s de dashboard cap nhat realtime-like)
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId = null;
+
+    const fetchNotifs = async () => {
+      try {
+        const data = await getNotifications({ pageSize: 20 });
+        const items = data?.items || data || [];
+        if (!cancelled) setNotifications(items);
+      } catch (_) {
+        // Silent fail
+      }
+    };
+
+    fetchNotifs();
+    intervalId = setInterval(fetchNotifs, 60_000);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
+
+  // Gop notifications CRUD + alerts tu backend + alerts tu sinh (auto) de widget luon co noi dung.
+  // Hien thi notifications CRUD truoc (mau xanh/vang/do theo action), sau do security alerts.
   const derivedAlerts = (() => {
     if (!stats) return [];
-    const backendAlerts = Array.isArray(stats.alerts) ? stats.alerts : [];
-    if (backendAlerts.length > 0) return backendAlerts;
 
-    // Sinh alerts tu stats neu backend tra rong
-    const autoAlerts = generateAlertsFromStats(stats);
-    return autoAlerts;
+    // 1. Notifications tu CRUD (mau phan biet theo severity)
+    const notifItems = notifications.map((n) => ({
+      id: `notif-${n.id}`,
+      title: n.title,
+      message: n.message,
+      severity: n.severity || null,
+      type: n.severity || 'info',
+      time: n.createdAt || n.timestamp || n.created_at,
+      actorName: n.metadata?.actorName || null,
+      targetName: n.metadata?.targetName || null,
+      affectedEntity: n.metadata?.targetCode || null,
+      _source: 'notification',
+    }));
+
+    // 2. Security alerts tu backend (system alerts)
+    const backendAlerts = Array.isArray(stats.alerts) ? stats.alerts : [];
+
+    // 3. Alerts tu sinh (auto) neu backend tra rong
+    const autoAlerts = (backendAlerts.length === 0 && notifications.length === 0)
+      ? generateAlertsFromStats(stats)
+      : [];
+
+    // Gop + sort theo thoi gian moi nhat
+    const all = [...notifItems, ...backendAlerts, ...autoAlerts];
+    all.sort((a, b) => {
+      const ta = a.time ? new Date(a.time).getTime() : 0;
+      const tb = b.time ? new Date(b.time).getTime() : 0;
+      return tb - ta;
+    });
+
+    return all.slice(0, 20);
   })();
 
   // Gop nhat ky hoat dong voi login sessions, sort theo thoi gian moi nhat.

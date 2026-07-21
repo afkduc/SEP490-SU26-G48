@@ -1,4 +1,5 @@
 const ApiError = require('../../utils/ApiError');
+const { auditCrud } = require('../../utils/auditHelper');
 
 class RoleService {
   constructor({ roleRepository, permissionService }) {
@@ -65,7 +66,7 @@ class RoleService {
   /**
    * Tao role moi
    */
-  async createRole({ roleName, roleLabel }) {
+  async createRole({ roleName, roleLabel }, req = {}) {
     if (!roleName || !roleName.trim()) {
       throw new ApiError(400, 'roleName la bat buoc');
     }
@@ -73,7 +74,6 @@ class RoleService {
       throw new ApiError(400, 'roleLabel la bat buoc');
     }
 
-    // roleName format: lowercase, khong dau, underscore
     const slug = roleName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     if (slug.length < 2) {
       throw new ApiError(400, 'roleName phai co it nhat 2 ky tu (chi chu cai va so)');
@@ -85,13 +85,21 @@ class RoleService {
     }
 
     const id = await this.roleRepository.create({ roleName: slug, roleLabel: roleLabel.trim() });
-    return this.roleRepository.findById(id);
+    const role = await this.roleRepository.findById(id);
+    await auditCrud.create(req, {
+      tableName: 'roles',
+      entityCode: slug,
+      recordId: id,
+      entityName: 'Vai trò',
+      data: { roleName: slug, roleLabel: roleLabel.trim() },
+    });
+    return role;
   }
 
   /**
    * Cap nhat role
    */
-  async updateRole(roleId, { roleLabel }) {
+  async updateRole(roleId, { roleLabel }, req = {}) {
     const role = await this.roleRepository.findById(Number(roleId));
     if (!role) throw new ApiError(404, 'Role khong ton tai');
 
@@ -99,17 +107,25 @@ class RoleService {
       throw new ApiError(400, 'roleLabel khong duoc rong');
     }
 
-    return this.roleRepository.update(roleId, { roleLabel: roleLabel.trim() });
+    const updated = await this.roleRepository.update(roleId, { roleLabel: roleLabel.trim() });
+    await auditCrud.update(req, {
+      tableName: 'roles',
+      entityCode: role.roleName,
+      recordId: Number(roleId),
+      entityName: 'Vai trò',
+      oldData: role,
+      newData: { roleLabel: roleLabel.trim() },
+    });
+    return updated;
   }
 
   /**
    * Xoa role
    */
-  async deleteRole(roleId) {
+  async deleteRole(roleId, req = {}) {
     const role = await this.roleRepository.findById(Number(roleId));
     if (!role) throw new ApiError(404, 'Role khong ton tai');
 
-    // Khong cho xoa role co dinh san
     const protectedRoles = ['admin', 'general_director', 'manager', 'service_advisor', 'team_leader', 'technician', 'warehouse_staff'];
     if (protectedRoles.includes(role.roleName)) {
       throw new ApiError(400, 'Khong the xoa vai tro co san trong he thong');
@@ -119,13 +135,32 @@ class RoleService {
     if (!result.success) {
       throw new ApiError(409, 'Khong the xoa vai tro dang duoc gan cho nguoi dung');
     }
+    await auditCrud.delete(req, {
+      tableName: 'roles',
+      entityCode: role.roleName,
+      recordId: Number(roleId),
+      entityName: 'Vai trò',
+      oldData: role,
+    });
     return { deleted: true, roleId: Number(roleId) };
   }
 
-  async toggleStatus(roleId) {
+  async toggleStatus(roleId, req = {}) {
     const role = await this.roleRepository.findById(Number(roleId));
     if (!role) throw new ApiError(404, 'Role khong ton tai');
-    return this.roleRepository.toggleStatus(roleId);
+    const updated = await this.roleRepository.toggleStatus(roleId);
+    await auditCrud.update(req, {
+      tableName: 'roles',
+      entityCode: role.roleName,
+      recordId: Number(roleId),
+      entityName: 'Vai trò',
+      oldData: { ...role, isActive: role.isActive },
+      newData: { isActive: updated.isActive },
+      description: updated.isActive
+        ? `Kích hoạt vai trò "${role.roleName}"`
+        : `Vô hiệu hóa vai trò "${role.roleName}"`,
+    });
+    return updated;
   }
 }
 

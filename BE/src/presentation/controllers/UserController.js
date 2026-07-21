@@ -1,8 +1,11 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
+const NotificationService = require('../../application/services/NotificationService');
 
 class UserController {
   constructor({ userService }) {
     this.userService = userService;
+    this.notificationService = new NotificationService();
   }
 
   getAll = async (req, res, next) => {
@@ -26,6 +29,19 @@ class UserController {
   create = async (req, res, next) => {
     try {
       const user = await this.userService.createUser(req.body);
+      await auditCrud.create(req, {
+        tableName: 'users',
+        entityCode: user?.user_code || user?.userName || null,
+        recordId: user?.id || null,
+        entityName: 'Người dùng',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('USER_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Quản lý',
+        targetName: user?.full_name || user?.userName || '',
+        targetCode: user?.user_code || '',
+        userId: user?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[UserController] notifyAdmins:', e.message));
       return success(res, user, 'User created', 201);
     } catch (err) {
       next(err);
@@ -35,6 +51,19 @@ class UserController {
   update = async (req, res, next) => {
     try {
       const user = await this.userService.updateUser(req.params.id, req.body, req.user.id);
+      await auditCrud.update(req, {
+        tableName: 'users',
+        entityCode: user?.user_code || user?.userName || `ID-${req.params.id}`,
+        recordId: user?.id || Number(req.params.id) || null,
+        entityName: 'Người dùng',
+        newData: req.body,
+      });
+      await this.notificationService.notifyAdmins('USER_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Quản lý',
+        targetName: user?.full_name || user?.userName || `ID-${req.params.id}`,
+        targetCode: user?.user_code || '',
+        userId: user?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[UserController] notifyAdmins:', e.message));
       return success(res, user, 'User updated');
     } catch (err) {
       next(err);
@@ -44,6 +73,19 @@ class UserController {
   remove = async (req, res, next) => {
     try {
       const user = await this.userService.deleteUser(req.params.id, req.user.id);
+      await auditCrud.delete(req, {
+        tableName: 'users',
+        entityCode: user?.user_code || user?.userName || `ID-${req.params.id}`,
+        recordId: user?.id || Number(req.params.id) || null,
+        entityName: 'Người dùng',
+        oldData: user,
+      });
+      await this.notificationService.notifyAdmins('USER_DISABLED', {
+        actorName: req.user?.name || req.user?.email || 'Quản lý',
+        targetName: user?.full_name || user?.userName || `ID-${req.params.id}`,
+        targetCode: user?.user_code || '',
+        userId: user?.id || Number(req.params.id) || null,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[UserController] notifyAdmins:', e.message));
       return success(res, user, 'User deleted');
     } catch (err) {
       next(err);
