@@ -43,7 +43,10 @@ class AuthService {
     }
 
     if (user.status && user.status !== 'active') {
-      const e = new ApiError(403, 'Tài khoản đã bị khóa');
+      // status la 'inactive' (ngung hoat dong) hoac bat ky gia tri khac active
+      // -> chan login. Migrating tu 'locked' -> 'inactive' (gop 2 status vi
+      // logic giong nhau, chi khac UI badge).
+      const e = new ApiError(403, 'Tài khoản đã ngừng hoạt động');
       e.audit = { userExists: true, user, reason: 'ACCOUNT_DISABLED' };
       throw e;
     }
