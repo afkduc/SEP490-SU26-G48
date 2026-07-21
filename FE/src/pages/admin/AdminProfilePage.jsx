@@ -99,11 +99,17 @@ const IconEdit = ({ size = 16 }) => (
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Format ngay (chi ngay, khong gio) - dung cho avatar card ben trai.
+// Luu y: BE tra Date object UTC (sqlServer useUTC=true). new Date(value)
+// tu convert sang local time theo timezone cua may user, nen "ngay tao"
+// co the lech +/- 1 ngay neu may user dat mui gio khac.
+// neu muon hien thi ngay goc theo VN (+07:00), sua o day.
 function formatDate(value) {
   if (!value) return '—';
   try {
     return new Date(value).toLocaleDateString('vi-VN', {
       day: '2-digit', month: '2-digit', year: 'numeric',
+      timeZone: 'Asia/Ho_Chi_Minh',
     });
   } catch {
     return value;
@@ -113,9 +119,11 @@ function formatDate(value) {
 function formatDateTime(value) {
   if (!value) return '—';
   try {
+    // Ep timezone VN de gio luon hien thi theo gio VN (DB luu UTC).
     return new Date(value).toLocaleString('vi-VN', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
+      timeZone: 'Asia/Ho_Chi_Minh',
     });
   } catch {
     return value;
