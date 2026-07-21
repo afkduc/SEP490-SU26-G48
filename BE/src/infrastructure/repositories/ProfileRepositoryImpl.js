@@ -1,7 +1,7 @@
 const { query } = require('../database/sqlServer');
 
-// Cot chinh cua user (khong bao gom branchName - do query leftJoinUserBranches
-// se add sau neu co row trong user_branches).
+// Cot chinh cua user (khong bao gom branchName - do ProfileBranchService
+// se lay rieng tu users.branch_id va user_branches).
 const PROFILE_COLUMNS = `
   u.id,
   u.user_name,
@@ -15,36 +15,8 @@ const PROFILE_COLUMNS = `
   u.updated_at
 `;
 
-// Lay tat ca branch ma user duoc gan (qua junction user_branches).
-// Tra ve: [{ branchId, branchName }]
-async function leftJoinUserBranches(userId) {
-  const result = await query(
-    `SELECT ub.branch_id, b.branch_name
-     FROM   user_branches ub
-     LEFT   JOIN branches b ON b.id = ub.branch_id
-     WHERE  ub.user_id = @p1
-     ORDER  BY b.branch_name ASC`,
-    { p1: userId }
-  );
-  return result.recordset.map((row) => ({
-    branchId: row.branch_id,
-    branchName: row.branch_name,
-  }));
-}
-
-function toProfileRow(row, assignedBranches = []) {
+function toProfileRow(row, branchName, assignedBranches = []) {
   if (!row) return null;
-
-  // Chon branchName theo thu tu uu tien:
-  //   1. Neu user co 1 row duy nhat trong user_branches -> dung ten do
-  //   2. Neu user co nhieu row trong user_branches -> join bang "Ten1, Ten2"
-  //   3. Neu user_branches rong -> fallback users.branch_id (LEFT JOIN o query)
-  let branchName = null;
-  if (assignedBranches.length === 1) {
-    branchName = assignedBranches[0].branchName;
-  } else if (assignedBranches.length > 1) {
-    branchName = assignedBranches.map((b) => b.branchName).filter(Boolean).join(', ');
-  }
 
   return {
     id: row.id,
@@ -54,7 +26,7 @@ function toProfileRow(row, assignedBranches = []) {
     lastName: row.last_name,
     phone: row.phone,
     branchId: row.branch_id,
-    branchName: branchName || row.branch_name || null,
+    branchName: branchName || null,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -64,19 +36,22 @@ function toProfileRow(row, assignedBranches = []) {
 }
 
 class ProfileRepositoryImpl {
+  /**
+   * Tra ve row thuc cua user (chua roles/branches).
+   * Logic lay assignedBranches da duoc tach sang ProfileBranchService
+   * va do Controller goi rieng -> sua ngay 22/07/2026.
+   */
   async findById(userId) {
     const result = await query(
-      `SELECT ${PROFILE_COLUMNS}, b.branch_name
+      `SELECT ${PROFILE_COLUMNS}
        FROM   users u
-       LEFT   JOIN branches b ON b.id = u.branch_id
        WHERE  u.id = @p1`,
       { p1: userId }
     );
     const row = result.recordset[0];
     if (!row) return null;
 
-    const assignedBranches = await leftJoinUserBranches(userId);
-    const profile = toProfileRow(row, assignedBranches);
+    const profile = toProfileRow(row, null, []);
 
     const rolesResult = await query(
       `SELECT r.role_name, r.role_label
