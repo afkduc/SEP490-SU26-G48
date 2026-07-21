@@ -59,21 +59,8 @@ const SERVICE_ADVISOR_NAV = [
 const MANAGER_NAV = [
   { label: 'Bảng điều khiển', path: '/dashboard' },
   { label: 'Kho', path: '/inventory' },
-  {
-    label: 'Phiếu nhập',
-    icon: '📥',
-    children: [
-      { label: 'Danh sách phiếu nhập', path: '/manager/import-requests' },
-      { label: 'Phiếu cần duyệt', path: '/manager/import-requests?status=pending' },
-    ],
-  },
-  {
-    label: 'Phiếu xuất',
-    icon: '📤',
-    children: [
-      { label: 'Danh sách phiếu xuất', path: '/manager/export-requests' },
-    ],
-  },
+  { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests' },
+  { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests' },
   {
     label: 'Nhân viên',
     children: [
