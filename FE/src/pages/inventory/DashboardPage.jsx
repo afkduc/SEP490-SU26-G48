@@ -44,49 +44,49 @@ export default function DashboardPage() {
   if (!branchId) {
     return (
       <div className="inv-dashboard__error">
-        Tai khoan chua duoc gan chi nhanh - lien quan admin de duoc cap nhat.
+        Tài khoản chưa được gán chi nhánh - liên hệ admin để được cập nhật.
       </div>
     );
   }
 
   return (
     <div className="inv-dashboard">
-      <h1 className="inv-dashboard__title">Tong quan kho</h1>
+      <h1 className="inv-dashboard__title">Tổng quan kho</h1>
       <p className="inv-dashboard__subtitle">
-        So lieu tong quan cua chi nhanh ban phu trach.
+        Số liệu tổng quan của chi nhánh bạn phụ trách.
       </p>
 
-      {loading && <div className="inv-dashboard__loading">Dang tai...</div>}
-      {error && <div className="inv-dashboard__error">Loi: {error}</div>}
+      {loading && <div className="inv-dashboard__loading">Đang tải...</div>}
+      {error && <div className="inv-dashboard__error">Lỗi: {error}</div>}
 
       {summary && (
         <>
           <div className="inv-dashboard__cards">
             <div className="inv-card">
-              <div className="inv-card__label">Tong so phu tung</div>
+              <div className="inv-card__label">Tổng số phụ tùng</div>
               <div className="inv-card__value">{summary.totalProducts ?? 0}</div>
             </div>
             <div className="inv-card">
-              <div className="inv-card__label">Tong so luong ton</div>
+              <div className="inv-card__label">Tổng số lượng tồn</div>
               <div className="inv-card__value">{summary.totalQuantity ?? 0}</div>
             </div>
             <div className="inv-card">
-              <div className="inv-card__label">Gia tri ton kho</div>
+              <div className="inv-card__label">Giá trị tồn kho</div>
               <div className="inv-card__value">{formatVND(summary.totalValue)}</div>
             </div>
           </div>
 
           {summary.summary && summary.summary.length > 0 && (
             <div className="inv-dashboard__section">
-              <h2 className="inv-dashboard__section-title">Phan bo theo loai</h2>
+              <h2 className="inv-dashboard__section-title">Phân bố theo loại</h2>
               <div className="table-responsive">
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Loai</th>
-                      <th className="text-right">So phu tung</th>
-                      <th className="text-right">Tong SL ton</th>
-                      <th className="text-right">Gia tri</th>
+                      <th>Loại</th>
+                      <th className="text-right">Số phụ tùng</th>
+                      <th className="text-right">Tổng SL tồn</th>
+                      <th className="text-right">Giá trị</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -105,9 +105,9 @@ export default function DashboardPage() {
           )}
 
           <div className="inv-dashboard__quicklinks">
-            <Link to="/inventory/parts" className="btn btn--primary">Quan ly phu tung</Link>
-            <Link to="/inventory/stock" className="btn btn--ghost">Xem ton kho</Link>
-            <Link to="/inventory/suppliers" className="btn btn--ghost">Nha cung cap</Link>
+            <Link to="/inventory/parts" className="btn btn--primary">Quản lý phụ tùng</Link>
+            <Link to="/inventory/stock" className="btn btn--ghost">Xem tồn kho</Link>
+            <Link to="/inventory/suppliers" className="btn btn--ghost">Nhà cung cấp</Link>
           </div>
         </>
       )}
