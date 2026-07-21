@@ -6,8 +6,8 @@ import { listUnitsApi } from '../../services/productApi';
 import './PartListPage.css';
 
 const STATUS_LABELS = {
-  active: 'Hoat dong',
-  inactive: 'Tam ngung',
+  active: 'Hoạt động',
+  inactive: 'Tạm ngừng',
 };
 
 const STATUS_CLASS = {
@@ -109,7 +109,7 @@ export default function PartListPage() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Xac nhan xoa phu tung nay?')) return;
+    if (!window.confirm('Xác nhận xóa phụ tùng này?')) return;
     setDeletingId(id);
     try {
       await remove(id);
@@ -123,7 +123,7 @@ export default function PartListPage() {
   if (!branchId) {
     return (
       <div className="part-list__error">
-        Tai khoan chua duoc gan chi nhanh - lien quan admin de duoc cap nhat.
+        Tài khoản chưa được gán chi nhánh - liên hệ admin để được cập nhật.
       </div>
     );
   }
@@ -132,11 +132,11 @@ export default function PartListPage() {
     <div className="part-list">
       <div className="part-list__header">
         <div>
-          <h1 className="part-list__title">Danh sach phu tung</h1>
-          <p className="part-list__subtitle">Quan ly thong tin phu tung (so luong ton duoc cap nhat qua phieu nhap/xuat)</p>
+          <h1 className="part-list__title">Danh sách phụ tùng</h1>
+          <p className="part-list__subtitle">Quản lý thông tin phụ tùng (số lượng tồn được cập nhật qua phiếu nhập/xuất)</p>
         </div>
         <button className="btn btn--primary" onClick={openCreate}>
-          + Them phu tung
+          + Thêm phụ tùng
         </button>
       </div>
 
@@ -145,7 +145,7 @@ export default function PartListPage() {
         <input
           className="input input--search"
           type="text"
-          placeholder="Tim theo ma, ten phu tung..."
+          placeholder="Tìm theo mã, tên phụ tùng..."
           value={params.search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -154,16 +154,16 @@ export default function PartListPage() {
           value={params.status}
           onChange={(e) => setStatus(e.target.value)}
         >
-          <option value="">Tat ca trang thai</option>
-          <option value="active">Hoat dong</option>
-          <option value="inactive">Tam ngung</option>
+          <option value="">Tất cả trạng thái</option>
+          <option value="active">Hoạt động</option>
+          <option value="inactive">Tạm ngừng</option>
         </select>
         <select
           className="input input--select"
           value={params.category}
           onChange={(e) => setCategory(e.target.value)}
         >
-          <option value="">Tat ca loai</option>
+          <option value="">Tất cả loại</option>
           {categories.map((cat) => (
             <option key={cat} value={cat}>{cat}</option>
           ))}
@@ -174,37 +174,37 @@ export default function PartListPage() {
             checked={params.lowStockOnly}
             onChange={(e) => setLowStockOnly(e.target.checked)}
           />
-          Sap het
+          Sắp hết
         </label>
       </div>
 
       {/* Table */}
       {loading ? (
-        <div className="part-list__loading">Dang tai...</div>
+        <div className="part-list__loading">Đang tải...</div>
       ) : error ? (
-        <div className="part-list__error">Loi: {error}</div>
+        <div className="part-list__error">Lỗi: {error}</div>
       ) : (
         <>
           <div className="table-responsive">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Ma PT</th>
-                  <th>Ten phu tung</th>
-                  <th>Loai</th>
-                  <th>Don vi</th>
-                  <th className="text-right">Don gia</th>
-                  <th className="text-right">SL ton</th>
-                  <th className="text-right">Min</th>
-                  <th>Trang thai</th>
-                  <th style={{ width: 160 }}>Hanh dong</th>
+                  <th>Mã PT</th>
+                  <th>Tên phụ tùng</th>
+                  <th>Loại</th>
+                  <th>Đơn vị</th>
+                  <th className="text-right">Đơn giá</th>
+                  <th className="text-right">SL tồn</th>
+                  <th className="text-right">Tối thiểu</th>
+                  <th>Trạng thái</th>
+                  <th style={{ width: 160 }}>Thao tác</th>
                 </tr>
-</thead>
+              </thead>
               <tbody>
                 {parts.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="table__empty">
-                      Khong co phu tung nao
+                      Không có phụ tùng nào
                     </td>
                   </tr>
                 ) : (
@@ -237,17 +237,17 @@ export default function PartListPage() {
                             to={`/inventory/parts/${p.id}`}
                             className="btn btn--ghost btn--sm"
                           >
-                            Chi tiet
+                            Chi tiết
                           </Link>
                           <button className="btn btn--ghost btn--sm" onClick={() => openEdit(p)}>
-                            Sua
+                            Sửa
                           </button>
                           <button
                             className="btn btn--ghost btn--sm btn--danger"
                             onClick={() => handleDelete(p.id)}
                             disabled={deletingId === p.id}
                           >
-                            Xoa
+                            Xóa
                           </button>
                         </td>
                       </tr>
@@ -266,10 +266,10 @@ export default function PartListPage() {
                 disabled={params.page <= 1}
                 onClick={() => setPage(params.page - 1)}
               >
-                ← Truoc
+                ← Trước
               </button>
               <span className="part-list__page-info">
-                Trang {params.page} / {totalPages} (tong {total})
+                Trang {params.page} / {totalPages} (tổng {total})
               </span>
               <button
                 className="btn btn--ghost btn--sm"
@@ -288,7 +288,7 @@ export default function PartListPage() {
         <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && closeModal()}>
           <div className="modal">
             <div className="modal__header">
-              <h2 className="modal__title">{editing ? 'Sua phu tung' : 'Them phu tung'}</h2>
+              <h2 className="modal__title">{editing ? 'Sửa phụ tùng' : 'Thêm phụ tùng'}</h2>
               <button className="modal__close" onClick={closeModal}>×</button>
             </div>
 
@@ -297,37 +297,37 @@ export default function PartListPage() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Ma phu tung <span className="required">*</span></label>
+                  <label className="form-label">Mã phụ tùng <span className="required">*</span></label>
                   <input className="input" value={form.partCode}
                     onChange={(e) => setForm({ ...form, partCode: e.target.value })} required
                     placeholder="VD: SP-0006" disabled={!!editing} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Ten phu tung <span className="required">*</span></label>
+                  <label className="form-label">Tên phụ tùng <span className="required">*</span></label>
                   <input className="input" value={form.partName}
                     onChange={(e) => setForm({ ...form, partName: e.target.value })} required
-                    placeholder="VD: Loc gio Toyota Vios" />
+                    placeholder="VD: Lọc gió Toyota Vios" />
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Loai phu tung</label>
+                  <label className="form-label">Loại phụ tùng</label>
                   <select className="input input--select" value={form.category}
                     onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                    <option value="">Chon loai</option>
-                    <option value="Phu tung dong co">Phu tung dong co</option>
-                    <option value="Phu tung gam">Phu tung gam</option>
-                    <option value="Phu tung dien">Phu tung dien</option>
-                    <option value="Dau nhot &amp; hoa chat">Dau nhot &amp; hoa chat</option>
-                    <option value="Phu kien">Phu kien</option>
+                    <option value="">Chọn loại</option>
+                    <option value="Phụ tùng động cơ">Phụ tùng động cơ</option>
+                    <option value="Phụ tùng gầm">Phụ tùng gầm</option>
+                    <option value="Phụ tùng điện">Phụ tùng điện</option>
+                    <option value="Dầu nhớt &amp; hóa chất">Dầu nhớt &amp; hóa chất</option>
+                    <option value="Phụ kiện">Phụ kiện</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Don vi <span className="required">*</span></label>
+                  <label className="form-label">Đơn vị <span className="required">*</span></label>
                   <select className="input input--select" value={form.unitId} required
                     onChange={(e) => setForm({ ...form, unitId: e.target.value })}>
-                    <option value="">Chon don vi</option>
+                    <option value="">Chọn đơn vị</option>
                     {units.map((u) => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
@@ -337,13 +337,13 @@ export default function PartListPage() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Don gia (VND)</label>
+                  <label className="form-label">Đơn giá (VND)</label>
                   <input className="input" type="number" min="0" value={form.unitPrice}
                     onChange={(e) => setForm({ ...form, unitPrice: e.target.value })}
                     placeholder="0" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Ton toi thieu</label>
+                  <label className="form-label">Tồn tối thiểu</label>
                   <input className="input" type="number" min="0" value={form.minStock}
                     onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
                 </div>
@@ -351,13 +351,13 @@ export default function PartListPage() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Nha cung cap</label>
+                  <label className="form-label">Nhà cung cấp</label>
                   <input className="input" type="number" min="0" value={form.supplierId}
                     onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
-                    placeholder="ID nha cung cap (so)" />
+                    placeholder="ID nhà cung cấp (số)" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Vi tri (Kho)</label>
+                  <label className="form-label">Vị trí (Kho)</label>
                   <input className="input" value={form.location}
                     onChange={(e) => setForm({ ...form, location: e.target.value })}
                     placeholder="VD: K1-A1" />
@@ -366,26 +366,26 @@ export default function PartListPage() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Trang thai</label>
+                  <label className="form-label">Trạng thái</label>
                   <select className="input input--select" value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                    <option value="active">Hoat dong</option>
-                    <option value="low_stock">Sap het</option>
-                    <option value="inactive">Tam ngung</option>
+                    <option value="active">Hoạt động</option>
+                    <option value="low_stock">Sắp hết</option>
+                    <option value="inactive">Tạm ngừng</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Ghi chu</label>
+                  <label className="form-label">Ghi chú</label>
                   <input className="input" value={form.note}
                     onChange={(e) => setForm({ ...form, note: e.target.value })}
-                    placeholder="Ghi chu them..." />
+                    placeholder="Ghi chú thêm..." />
                 </div>
               </div>
 
               <div className="modal__footer">
-                <button type="button" className="btn btn--secondary" onClick={closeModal}>Huy</button>
+                <button type="button" className="btn btn--secondary" onClick={closeModal}>Hủy</button>
                 <button type="submit" className="btn btn--primary">
-                  {editing ? 'Luu thay doi' : 'Tao moi'}
+                  {editing ? 'Lưu thay đổi' : 'Tạo mới'}
                 </button>
               </div>
             </form>

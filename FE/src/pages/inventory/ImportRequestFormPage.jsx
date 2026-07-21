@@ -135,14 +135,14 @@ export default function ImportRequestFormPage() {
   }
 
   function validate() {
-    if (!supplierId) return 'Vui long chon nha cung cap';
-    if (!importDate) return 'Vui long chon ngay nhap';
+    if (!supplierId) return 'Vui lòng chọn nhà cung cấp';
+    if (!importDate) return 'Vui lòng chọn ngày nhập';
     for (let i = 0; i < items.length; i += 1) {
       const it = items[i];
-      if (!it.productCode) return `Dong ${i + 1}: chua chon phu tung`;
+      if (!it.productCode) return `Dòng ${i + 1}: chưa chọn phụ tùng`;
       const q = Number(it.quantity);
       if (!Number.isFinite(q) || q <= 0 || !Number.isInteger(q)) {
-        return `Dong ${i + 1}: so luong phai la so nguyen duong`;
+        return `Dòng ${i + 1}: số lượng phải là số nguyên dương`;
       }
     }
     return '';
@@ -172,7 +172,7 @@ export default function ImportRequestFormPage() {
       });
       navigate(`/inventory/import-requests/${created.id}`);
     } catch (submitErr) {
-      setFormError(submitErr.message || 'Tao phieu that bai');
+      setFormError(submitErr.message || 'Tạo phiếu thất bại');
     }
   }
 
@@ -185,43 +185,43 @@ export default function ImportRequestFormPage() {
     <div className="ir-form">
       <div className="ir-form__header">
         <div>
-          <h1 className="ir-form__title">Tao phieu nhap kho</h1>
+          <h1 className="ir-form__title">Tạo phiếu nhập kho</h1>
           <p className="ir-form__subtitle">
-            Ma phieu se duoc sinh tu dong khi luu. Phieu luu o trang thai
-            &quot;Cho duyet&quot; va can Manager duyet de cong ton kho.
+            Mã phiếu sẽ được sinh tự động khi lưu. Phiếu lưu ở trạng thái
+            &quot;Chờ duyệt&quot; và cần Manager duyệt để cộng tồn kho.
           </p>
         </div>
         <Link to="/inventory/import-requests" className="btn btn--ghost">
-          &laquo; Quay lai
+          &laquo; Quay lại
         </Link>
       </div>
 
       <form onSubmit={handleSubmit} className="ir-form__body">
-        <div className="ir-form__info">
+            <div className="ir-form__info">
           <div className="ir-form__info-row">
             <div className="ir-form__field">
-              <label className="ir-form__label">Ma phieu (se sinh tu dong)</label>
+              <label className="ir-form__label">Mã phiếu (sẽ sinh tự động)</label>
               <input
                 className="input"
                 type="text"
-                value={loadingCode ? 'Dang sinh...' : (nextCode || '')}
+                value={loadingCode ? 'Đang sinh...' : (nextCode || '')}
                 readOnly
                 placeholder="IRB-{branchId}-{YYYYMMDD}-{seq}"
               />
               {codeError && <div className="ir-form__hint ir-form__hint--error">{codeError}</div>}
               {!loadingCode && !codeError && (
                 <div className="ir-form__hint">
-                  Ngay sinh ma: <strong>{codeDate || '—'}</strong>
+                  Ngày sinh mã: <strong>{codeDate || '—'}</strong>
                   &nbsp;
                   <button type="button" className="btn btn--ghost btn--sm" onClick={refetchCode}>
-                    Sinh lai
+                    Sinh lại
                   </button>
                 </div>
               )}
             </div>
 
             <div className="ir-form__field">
-              <label className="ir-form__label">Ngay nhap *</label>
+              <label className="ir-form__label">Ngày nhập *</label>
               <input
                 className="input"
                 type="date"
@@ -234,7 +234,7 @@ export default function ImportRequestFormPage() {
 
           <div className="ir-form__info-row">
             <div className="ir-form__field">
-              <label className="ir-form__label">Nha cung cap *</label>
+              <label className="ir-form__label">Nhà cung cấp *</label>
               <select
                 className="input"
                 value={supplierId}
@@ -242,7 +242,7 @@ export default function ImportRequestFormPage() {
                 required
               >
                 <option value="">
-                  {loadingSuppliers ? 'Dang tai danh sach...' : '-- Chon nha cung cap --'}
+                  {loadingSuppliers ? 'Đang tải danh sách...' : '-- Chọn nhà cung cấp --'}
                 </option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -253,7 +253,7 @@ export default function ImportRequestFormPage() {
             </div>
 
             <div className="ir-form__field">
-              <label className="ir-form__label">So hoa don NCC</label>
+              <label className="ir-form__label">Số hóa đơn NCC</label>
               <input
                 className="input"
                 type="text"
@@ -266,23 +266,23 @@ export default function ImportRequestFormPage() {
           </div>
 
           <div className="ir-form__field">
-            <label className="ir-form__label">Ghi chu</label>
+            <label className="ir-form__label">Ghi chú</label>
             <textarea
               className="input"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               maxLength={500}
-              placeholder="Ghi chu them ve phieu nhap..."
+              placeholder="Ghi chú thêm về phiếu nhập..."
             />
           </div>
         </div>
 
         <div className="ir-form__items">
           <div className="ir-form__items-header">
-            <h2 className="ir-form__items-title">Danh sach phu tung</h2>
+            <h2 className="ir-form__items-title">Danh sách phụ tùng</h2>
             <button type="button" className="btn btn--secondary btn--sm" onClick={addItem}>
-              + Them dong
+              + Thêm dòng
             </button>
           </div>
 
@@ -291,10 +291,10 @@ export default function ImportRequestFormPage() {
               <thead>
                 <tr>
                   <th style={{ width: 40 }}>#</th>
-                  <th style={{ width: '32%' }}>Phu tung *</th>
-                  <th>Ma phu tung</th>
-                  <th>Don vi</th>
-                  <th style={{ width: 130 }}>So luong *</th>
+                  <th style={{ width: '32%' }}>Phụ tùng *</th>
+                  <th>Mã phụ tùng</th>
+                  <th>Đơn vị</th>
+                  <th style={{ width: 130 }}>Số lượng *</th>
                   <th style={{ width: 70 }}></th>
                 </tr>
               </thead>
@@ -307,7 +307,7 @@ export default function ImportRequestFormPage() {
                         className="input"
                         type="text"
                         value={it.searchTerm}
-                        placeholder="Go it nhat 2 ky tu de tim..."
+                        placeholder="Gõ ít nhất 2 ký tự để tìm..."
                         onChange={(e) => {
                           updateItem(it.rowKey, { searchTerm: e.target.value, showDropdown: true });
                           handleSearchProduct(it.rowKey, e.target.value);
@@ -320,9 +320,9 @@ export default function ImportRequestFormPage() {
                       />
                       {it.showDropdown && (it.searchResults.length > 0 || it.searching) && (
                         <div className="ir-form__dropdown">
-                          {it.searching && <div className="ir-form__dropdown-item">Dang tim...</div>}
+                          {it.searching && <div className="ir-form__dropdown-item">Đang tìm...</div>}
                           {!it.searching && it.searchResults.length === 0 && (
-                            <div className="ir-form__dropdown-item">Khong co ket qua</div>
+                            <div className="ir-form__dropdown-item">Không có kết quả</div>
                           )}
                           {!it.searching && it.searchResults.map((p) => (
                             <button
@@ -396,14 +396,14 @@ export default function ImportRequestFormPage() {
 
         <div className="ir-form__actions">
           <Link to="/inventory/import-requests" className="btn btn--ghost">
-            Huy
+            Hủy
           </Link>
           <button
             type="submit"
             className="btn btn--primary"
             disabled={submitting || loadingCode || !nextCode}
           >
-            {submitting ? 'Dang luu...' : 'Tao phieu nhap'}
+            {submitting ? 'Đang lưu...' : 'Tạo phiếu nhập'}
           </button>
         </div>
       </form>
