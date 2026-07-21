@@ -141,6 +141,7 @@ function getInitials(name = '') {
 function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const allItems = ADMIN_SIDEBAR.flatMap((g) => g.items);
   const matchedPaths = allItems
@@ -152,9 +153,15 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
     .sort((a, b) => b.length - a.length);
   const longestMatch = matchedPaths[0];
 
-  // Click on link trong mobile -> close drawer
-  const handleItemClick = () => {
+  // Click sidebar item -> hard reload neu chuyen sang path khac.
+  // Quy tac cua du an: moi lan doi route admin phai F5 1 luot de tranh
+  // stale state (filter, modal, permission gate, layout leak).
+  const handleItemClick = (targetPath) => {
     if (onItemClick) onItemClick();
+    if (!targetPath || targetPath === location.pathname) return;
+    // Dung full reload (window.location.assign) de tat ca React state
+    // (useEffect deps, refs, context cache) duoc reset tu dau.
+    window.location.assign(targetPath);
   };
 
   return (
@@ -199,7 +206,10 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
                   key={item.path}
                   to={item.path}
                   className={() => `admin-sidebar__item ${isActive ? 'admin-sidebar__item--active' : ''}`}
-                  onClick={handleItemClick}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleItemClick(item.path);
+                  }}
                 >
                   <span className="admin-sidebar__item-icon">{item.icon}</span>
                   <span className="admin-sidebar__item-label">{item.label}</span>
