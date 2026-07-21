@@ -440,15 +440,39 @@ export default function AdminProfilePage() {
                 <span className="profile-card__meta-icon"><IconPhone /></span>
                 <span className="profile-card__meta-value">{profile.phone || '—'}</span>
               </div>
-              <div className="profile-card__meta-item">
+              <div className="profile-card__meta-item profile-card__meta-item--branch">
                 <span className="profile-card__meta-icon"><IconBranch /></span>
-                <span className="profile-card__meta-value">{profile.branchName || '—'}</span>
+                <span className="profile-card__meta-value">
+                  {profile.assignedBranches?.length
+                    ? `${profile.assignedBranches.length} chi nhánh`
+                    : profile.branchName || '—'}
+                </span>
               </div>
               <div className="profile-card__meta-item">
                 <span className="profile-card__meta-icon"><IconCalendar /></span>
                 <span className="profile-card__meta-value">{formatDate(profile.createdAt)}</span>
               </div>
             </div>
+
+            {/* Branch chips tren avatar card */}
+            {profile.assignedBranches?.length > 0 && (
+              <div className="profile-card__branches">
+                {profile.assignedBranches.map((b) => {
+                  const isPrimary = Number(b.branchId) === Number(profile.branchId);
+                  return (
+                    <span
+                      key={b.branchId}
+                      className={`branch-chip ${isPrimary ? 'branch-chip--primary' : ''}`}
+                      title={isPrimary ? 'Chi nhánh chính' : 'Chi nhánh được phân công'}
+                    >
+                      <IconBranch size={12} />
+                      {b.branchName}
+                      {isPrimary && <span className="branch-chip__star">★</span>}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="profile-card__roles">
               {profile.roles?.map((r) => (
@@ -562,6 +586,47 @@ export default function AdminProfilePage() {
                       </div>
                     </span>
                   </div>
+                </div>
+
+                {/* ── Section: Danh sách chi nhánh ────────────── */}
+                <div className="profile-branches">
+                  <div className="profile-branches__header">
+                    <IconBranch size={16} />
+                    <h3>Chi nhánh được phân công</h3>
+                    <span className="profile-branches__count">
+                      {profile.assignedBranches?.length || 0}
+                    </span>
+                  </div>
+
+                  {profile.assignedBranches?.length > 0 ? (
+                    <div className="profile-branches__grid">
+                      {profile.assignedBranches.map((b) => {
+                        const isPrimary = Number(b.branchId) === Number(profile.branchId);
+                        return (
+                          <div
+                            key={b.branchId}
+                            className={`branch-card ${isPrimary ? 'branch-card--primary' : ''}`}
+                          >
+                            <div className="branch-card__icon">
+                              <IconBranch size={18} />
+                            </div>
+                            <div className="branch-card__body">
+                              <div className="branch-card__name">{b.branchName}</div>
+                              <div className="branch-card__id">Mã CN: #{b.branchId}</div>
+                            </div>
+                            {isPrimary && (
+                              <span className="branch-card__badge">Chính</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="profile-branches__empty">
+                      <IconBranch size={20} />
+                      <span>Bạn chưa được phân công vào chi nhánh nào.</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
