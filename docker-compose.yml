@@ -30,4 +30,16 @@ services:
       - "3000:80"
     depends_on:
       - be
+      - landing
+    restart: unless-stopped
+
+  landing:
+    build:
+      context: ./Landing
+    # Khong publish port ra ngoai - chi "fe" (nginx) goi vao qua network noi
+    # bo cua Docker Compose bang ten service "landing" (xem FE/nginx.conf,
+    # location "/gioi-thieu"). Landing/.env.production tu duoc doc luc
+    # "npm run build" (xem Landing/Dockerfile), giong cach FE lam voi Vite.
+    depends_on:
+      - be
     restart: unless-stopped
