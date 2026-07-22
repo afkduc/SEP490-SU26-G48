@@ -1,0 +1,278 @@
+.main {
+  flex: 1;
+  /* Header la "position: fixed" (dung cho scroll-snap o trang chu) nen
+     khong con chiem cho trong flow - trang thuong (khong snap) nay phai tu
+     chua khoang trong tren, giong /tra-cuu. */
+  padding: 148px 0 96px;
+}
+
+.article {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  transition: color 0.2s ease;
+}
+
+.back:hover {
+  color: var(--accent);
+}
+
+.backIcon {
+  width: 15px;
+  height: 15px;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 5px 12px;
+  border-radius: 999px;
+  margin-bottom: 16px;
+}
+
+.article h1 {
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  margin-bottom: 16px;
+}
+
+.meta {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 28px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.metaItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.metaIcon {
+  width: 15px;
+  height: 15px;
+  color: var(--accent);
+}
+
+.intro {
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--text);
+  font-weight: 500;
+  margin-bottom: 36px;
+}
+
+.block {
+  margin-bottom: 32px;
+}
+
+.block h2 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.005em;
+  margin-bottom: 12px;
+}
+
+.block p {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.block ul {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.block li {
+  position: relative;
+  padding-left: 22px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.block li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 9px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.callout {
+  padding: 24px 28px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  border: 1px solid rgba(200, 55, 44, 0.25);
+  margin-bottom: 40px;
+}
+
+.callout strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.callout p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.ctaBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 28px 32px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.ctaBox h3 {
+  font-size: 17px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.ctaBox p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ctaBtn {
+  flex-shrink: 0;
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: transform 0.2s ease;
+}
+
+.ctaBtn:hover {
+  transform: translateY(-2px);
+}
+
+.relatedWrap {
+  max-width: 720px;
+  margin: 56px auto 0;
+  padding-top: 40px;
+  border-top: 1px solid var(--border);
+}
+
+.relatedWrap h3 {
+  font-size: 15px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.relatedGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.relatedCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.relatedCard:hover {
+  border-color: var(--accent);
+  transform: translateX(4px);
+}
+
+.relatedIconWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.relatedIcon {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.relatedTag {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.relatedCard h4 {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.relatedArrow {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .ctaBox {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .relatedCard {
+    flex-wrap: wrap;
+  }
+}

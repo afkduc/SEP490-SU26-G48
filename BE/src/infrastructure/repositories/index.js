@@ -9,6 +9,7 @@ const ImportRequestRepositoryImpl = require('./ImportRequestRepositoryImpl');
 const ExportRequestRepositoryImpl = require('./ExportRequestRepositoryImpl');
 const DashboardRepositoryImpl = require('./DashboardRepositoryImpl');
 const MaintenanceReminderRepositoryImpl = require('./MaintenanceReminderRepositoryImpl');
+const ServiceRequestRepositoryImpl = require('./ServiceRequestRepositoryImpl');
 
 function makeUserRepository() {
   return new UserRepositoryImpl();
@@ -54,6 +55,10 @@ function makeMaintenanceReminderRepository() {
   return new MaintenanceReminderRepositoryImpl();
 }
 
+function makeServiceRequestRepository() {
+  return new ServiceRequestRepositoryImpl();
+}
+
 module.exports = {
   makeUserRepository,
   makeProductRepository,
@@ -66,4 +71,5 @@ module.exports = {
 makeExportRequestRepository,
   makeDashboardRepository,
   makeMaintenanceReminderRepository,
+  makeServiceRequestRepository,
 };

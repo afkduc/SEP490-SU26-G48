@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { ROLES } from '../../constants/roles';
 import './Navbar.css';
 
@@ -31,6 +32,7 @@ const ADMIN_NAV = [
 // ===== Service Advisor =====
 const SERVICE_ADVISOR_NAV = [
   { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Yêu cầu', path: '/service-requests' },
   {
     label: 'Quyết toán sửa chữa',
     children: [
@@ -146,7 +148,7 @@ function getInitials(name = '') {
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function NavDropdownItem({ item, currentPath }) {
+function NavDropdownItem({ item, currentPath, badgeCount }) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef(null);
 
@@ -184,6 +186,9 @@ function NavDropdownItem({ item, currentPath }) {
         }
       >
         {item.label}
+        {item.path === '/service-requests' && badgeCount > 0 && (
+          <span className="navbar__badge">{badgeCount > 9 ? '9+' : badgeCount}</span>
+        )}
       </NavLink>
     );
   }
@@ -228,6 +233,7 @@ function NavDropdownItem({ item, currentPath }) {
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { pendingCount } = useServiceRequests();
   const navigate = useNavigate();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -255,7 +261,12 @@ export default function Navbar() {
       <nav className="navbar__nav">
         {supportsDropdown
           ? navItems.map((item) => (
-              <NavDropdownItem key={item.label} item={item} currentPath={location.pathname} />
+              <NavDropdownItem
+                key={item.label}
+                item={item}
+                currentPath={location.pathname}
+                badgeCount={pendingCount}
+              />
             ))
           : navItems.map((item) => (
               <NavLink

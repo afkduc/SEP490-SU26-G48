@@ -60,6 +60,18 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     return RepairOrder.fromPersistence(header, tasksResult.recordset);
   }
 
+  async findByCode(code) {
+    const headerResult = await query(`${HEADER_SELECT} WHERE ro.repair_code = @code`, { code });
+    const header = headerResult.recordset[0];
+    if (!header) return null;
+
+    const tasksResult = await query(
+      `SELECT * FROM repair_order_tasks WHERE repair_order_id = @id ORDER BY id`,
+      { id: header.id }
+    );
+    return RepairOrder.fromPersistence(header, tasksResult.recordset);
+  }
+
   async findTeamLeadersByBranch(branchId) {
     const result = await query(
       `SELECT u.id, u.pseudo_id, u.user_name, u.phone, u.team_size,

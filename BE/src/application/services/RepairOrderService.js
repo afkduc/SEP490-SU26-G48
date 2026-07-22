@@ -1,5 +1,6 @@
 const ApiError = require('../../utils/ApiError');
 const RepairOrderResponseDto = require('../dto/RepairOrderDto');
+const PublicRepairProgressDto = require('../dto/PublicRepairProgressDto');
 
 const UPDATABLE_STATUS_VALUES = ['completed', 'cancelled'];
 
@@ -17,6 +18,18 @@ class RepairOrderService {
     const entity = await this.repairOrderRepository.findById(id);
     if (!entity) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
     return RepairOrderResponseDto.fromEntity(entity);
+  }
+
+  // Public - khong auth, dung cho landing page (khach nhap ma sua chua de
+  // xem tien do). Tra ve DTO rut gon, khong lo thong tin khach hang.
+  async getPublicProgressByCode(code) {
+    const trimmed = (code || '').trim();
+    if (!trimmed) throw new ApiError(400, 'Vui lòng nhập mã sửa chữa');
+
+    const entity = await this.repairOrderRepository.findByCode(trimmed);
+    if (!entity) throw new ApiError(404, 'Không tìm thấy mã sửa chữa này');
+
+    return PublicRepairProgressDto.fromEntity(entity);
   }
 
   async getTeamLeaders(branchId) {
