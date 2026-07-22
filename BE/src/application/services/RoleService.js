@@ -1,6 +1,19 @@
 const ApiError = require('../../utils/ApiError');
 const { auditCrud } = require('../../utils/auditHelper');
 
+// Constants cho last-admin guard
+// Khoa cung role 'admin' khong bao gio duoc phep bi tuoc het 'admin:roles:*'
+// (tranh lockout toan he thong).
+const PROTECTED_ROLES = new Set(['admin']);
+const CRITICAL_PERMISSION_KEYS = new Set([
+  'admin:roles:read',
+  'admin:roles:create',
+  'admin:roles:update',
+  'admin:roles:deactivate',
+  'admin:roles:activate',
+  'admin:roles:manage',
+]);
+
 class RoleService {
   constructor({ roleRepository, permissionService }) {
     this.roleRepository = roleRepository;
@@ -79,6 +92,132 @@ class RoleService {
   }
 
   /**
+   * Bulk set permissions cho nhieu role trong 1 transaction (atomic).
+   * Bao gom:
+   *  - Validate input
+   *  - Last-admin guard: khong cho phep tuoc het admin:roles:* cua role admin
+   *  - 1 transaction cho tat ca changes (atomic — fail = rollback het)
+   *  - Invalidate permission cache cua tat ca users bi anh huong
+   *
+   * @param {{changes: Array<{roleId:number, permissionIds:number[]}>, actorUserId:number}} input
+   * @returns {Promise<{results: Array<{roleId:number, added:number[], removed:number[]}>, invalidations: number, affectedUserIds: number[]}>}
+   */
+  async setRolePermissionsMatrix({ changes, actorUserId }) {
+    if (!Array.isArray(changes) || changes.length === 0) {
+      throw new ApiError(400, 'changes phai la mang khong rong');
+    }
+
+    // Normalize + validate input
+    const normalized = [];
+    for (const c of changes) {
+      if (!c || typeof c.roleId !== 'number' && typeof c.roleId !== 'string') {
+        throw new ApiError(400, 'Moi change phai co roleId (number)');
+      }
+      const roleId = Number(c.roleId);
+      if (!Number.isFinite(roleId) || roleId <= 0) {
+        throw new ApiError(400, `roleId khong hop le: ${c.roleId}`);
+      }
+      const ids = Array.isArray(c.permissionIds) ? c.permissionIds : [];
+      const uniqueIds = Array.from(
+        new Set(
+          ids
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        )
+      );
+      normalized.push({ roleId, permissionIds: uniqueIds });
+    }
+
+    // Validate role ton tai + validate permission IDs ton tai (1 query batch)
+    const validRoleIds = new Set();
+    for (const { roleId } of normalized) {
+      const r = await this.roleRepository.findRoleLite(roleId);
+      if (!r) throw new ApiError(404, `Role khong ton tai: ID ${roleId}`);
+      validRoleIds.add(r.roleName);
+    }
+
+    const allIds = new Set();
+    for (const { permissionIds } of normalized) {
+      permissionIds.forEach((id) => allIds.add(id));
+    }
+    if (allIds.size > 0) {
+      const validPermIds = await this.roleRepository.findAllPermissionIds();
+      const invalid = [...allIds].filter((id) => !validPermIds.has(id));
+      if (invalid.length > 0) {
+        throw new ApiError(400, `Permission ID khong ton tai: ${invalid.join(', ')}`);
+      }
+    }
+
+    // LAST-ADMIN GUARD: kiem tra neu thay doi role 'admin' ma lam mat
+    // toan bo critical permissions (admin:roles:*) -> check con user nao giu khong
+    for (const { roleId, permissionIds } of normalized) {
+      const role = await this.roleRepository.findRoleLite(roleId);
+      if (!PROTECTED_ROLES.has(role.roleName)) continue;
+
+      // Lay permission keys hien tai cua role admin
+      const currentPermsResult = await this.roleRepository.getRolePermissions(roleId);
+      const currentPermKeys = new Set(currentPermsResult.map((p) => p.permissionKey));
+
+      // Map permission IDs trong request -> permission keys
+      const allPerms = await this.roleRepository.findAllPermissions();
+      const idToKey = new Map(allPerms.map((p) => [p.id, p.permissionKey]));
+      const requestedPermKeys = new Set(
+        permissionIds.map((id) => idToKey.get(id)).filter(Boolean)
+      );
+
+      // Check: những critical permission key nào đang có mà sẽ bị mất?
+      const losingCritical = [...CRITICAL_PERMISSION_KEYS].filter(
+        (k) => currentPermKeys.has(k) && !requestedPermKeys.has(k)
+      );
+
+      if (losingCritical.length > 0) {
+        // Dem user con lai co it nhat 1 critical permission
+        let remaining = 0;
+        for (const k of losingCritical) {
+          const cnt = await this.roleRepository.countUsersWithPermission(k);
+          if (cnt > remaining) remaining = cnt;
+        }
+        if (remaining === 0) {
+          throw new ApiError(
+            409,
+            `Khong the tuoc het quyen admin:roles:* cua role "admin" (se khoa toan he thong). Can it nhat 1 user khac dang giu quyen tuong tu.`
+          );
+        }
+      }
+    }
+
+    // Atomic transaction: tat ca changes thanh cong hoac tat ca rollback
+    const results = await this.roleRepository.setRolePermissionsMatrixTx(
+      normalized,
+      actorUserId
+    );
+
+    // Invalidate cache cho users cua cac role bi anh huong
+    let invalidations = 0;
+    const affectedUserIds = new Set();
+    if (this.permissionService) {
+      for (const { roleId } of normalized) {
+        try {
+          const users = await this.roleRepository.getRoleUsers(roleId);
+          for (const user of users) {
+            this.permissionService.invalidateCache(user.id);
+            invalidations++;
+            affectedUserIds.add(user.id);
+          }
+        } catch (_) {
+          // best-effort, khong fail ca bulk neu 1 role khong co users
+        }
+      }
+    }
+
+    return {
+      results,
+      invalidations,
+      affectedUserIds: [...affectedUserIds],
+    };
+  }
+
+  /**
    * Lay danh sach user dang co role
    */
   async getRoleUsers(roleId) {
@@ -141,32 +280,6 @@ class RoleService {
       newData: { roleLabel: roleLabel.trim() },
     });
     return updated;
-  }
-
-  /**
-   * Xoa role
-   */
-  async deleteRole(roleId, req = {}) {
-    const role = await this.roleRepository.findById(Number(roleId));
-    if (!role) throw new ApiError(404, 'Role khong ton tai');
-
-    const protectedRoles = ['admin', 'general_director', 'manager', 'service_advisor', 'team_leader', 'technician', 'warehouse_staff'];
-    if (protectedRoles.includes(role.roleName)) {
-      throw new ApiError(400, 'Khong the xoa vai tro co san trong he thong');
-    }
-
-    const result = await this.roleRepository.delete(roleId);
-    if (!result.success) {
-      throw new ApiError(409, 'Khong the xoa vai tro dang duoc gan cho nguoi dung');
-    }
-    await auditCrud.delete(req, {
-      tableName: 'roles',
-      entityCode: role.roleName,
-      recordId: Number(roleId),
-      entityName: 'Vai trò',
-      oldData: role,
-    });
-    return { deleted: true, roleId: Number(roleId) };
   }
 
   async toggleStatus(roleId, req = {}) {

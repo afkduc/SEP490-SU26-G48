@@ -81,29 +81,6 @@ class SpecialtyService {
     return updated;
   }
 
-  async delete(id, actorInfo = {}) {
-    const existing = await this.specialtyRepository.findById(Number(id));
-    if (!existing) throw new ApiError(404, 'Chuyen mon khong ton tai');
-
-    const result = await this.specialtyRepository.delete(id);
-    if (!result.success) {
-      throw new ApiError(409, 'Khong the xoa chuyen mon dang duoc gan cho nguoi dung');
-    }
-
-    // Gửi notification cho admin
-    if (actorInfo.userId) {
-      this.notificationService.notifyAdmins('SPECIALTY_DELETED', {
-        userId: actorInfo.userId,
-        actorName: actorInfo.name || actorInfo.userName || 'Admin',
-        targetName: existing.specialtyName,
-      }, { excludeUserId: actorInfo.userId }).catch(err => {
-        console.warn('[SpecialtyService] notifyAdmins failed:', err.message);
-      });
-    }
-
-    return { deleted: true, id: Number(id) };
-  }
-
   async toggleStatus(id) {
     const existing = await this.specialtyRepository.findById(Number(id));
     if (!existing) throw new ApiError(404, 'Chuyen mon khong ton tai');
