@@ -5,14 +5,14 @@ import { useExportRequests } from '../../hooks/inventory/useExportRequests';
 import './ExportRequestListPage.css';
 
 const STATUS_META = {
-  completed: { label: 'Da xuat', className: 'badge--success' },
-  cancelled: { label: 'Huy', className: 'badge--danger' },
+  completed: { label: 'Đã xuất', className: 'badge--success' },
+  cancelled: { label: 'Hủy', className: 'badge--danger' },
 };
 
 const STATUS_TABS = [
-  { value: '', label: 'Tat ca' },
-  { value: 'completed', label: 'Da xuat' },
-  { value: 'cancelled', label: 'Huy' },
+  { value: '', label: 'Tất cả' },
+  { value: 'completed', label: 'Đã xuất' },
+  { value: 'cancelled', label: 'Hủy' },
 ];
 
 function formatDate(d) {
@@ -60,13 +60,13 @@ export default function ExportRequestListPage() {
     <div className="er-list">
       <div className="er-list__header">
         <div>
-          <h1 className="er-list__title">Phieu xuat kho</h1>
+          <h1 className="er-list__title">Phiếu xuất kho</h1>
           <p className="er-list__subtitle">
-            Xuat phu tung theo phieu sua chua (Service Order). NV kho tu xuat - khong can Manager duyet.
+            Xuất phụ tùng theo phiếu sửa chữa (Service Order). NV kho tự xuất - không cần Manager duyệt.
           </p>
         </div>
         <Link to="/inventory/export-requests/new" className="btn btn--primary">
-          + Tao phieu xuat
+          + Tạo phiếu xuất
         </Link>
       </div>
 
@@ -89,7 +89,7 @@ export default function ExportRequestListPage() {
         <input
           className="input input--search"
           type="text"
-          placeholder="Tim theo ma phieu, ma phieu sua chua, ghi chu..."
+          placeholder="Tìm theo mã phiếu, mã phiếu sửa chữa, ghi chú..."
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -99,47 +99,47 @@ export default function ExportRequestListPage() {
           type="date"
           value={draftFromDate}
           onChange={(e) => setDraftFromDate(e.target.value)}
-          title="Tu ngay"
+          title="Từ ngày"
         />
         <input
           className="input"
           type="date"
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
-          title="Den ngay"
+          title="Đến ngày"
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
-          Loc
+          Lọc
         </button>
       </div>
 
       {/* Table */}
       {loading ? (
-        <div className="er-list__loading">Dang tai...</div>
+        <div className="er-list__loading">Đang tải...</div>
       ) : error ? (
-        <div className="er-list__error">Loi: {error}</div>
+        <div className="er-list__error">Lỗi: {error}</div>
       ) : (
         <div className="table-responsive">
           <table className="table">
             <thead>
               <tr>
-                <th>Ma phieu</th>
-                <th>Ngay tao</th>
-                <th>Ngay xuat</th>
-                <th>Phieu sua chua</th>
-                <th>Khach hang</th>
-                <th>So dong</th>
-                <th>Tong SL</th>
-                <th>Trang thai</th>
-                <th>Nguoi xuat</th>
-                <th style={{ width: 110 }}>Hanh dong</th>
+                <th>Mã phiếu</th>
+                <th>Ngày tạo</th>
+                <th>Ngày xuất</th>
+                <th>Phiếu sửa chữa</th>
+                <th>Khách hàng</th>
+                <th>Số dòng</th>
+                <th>Tổng SL</th>
+                <th>Trạng thái</th>
+                <th>Người xuất</th>
+                <th style={{ width: 110 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="table__empty">
-                    Khong co phieu xuat nao
+                    Không có phiếu xuất nào
                   </td>
                 </tr>
               ) : (
@@ -163,7 +163,7 @@ export default function ExportRequestListPage() {
                           to={`/inventory/export-requests/${r.id}`}
                           className="btn btn--ghost btn--sm"
                         >
-                          Chi tiet
+                          Chi tiết
                         </Link>
                       </td>
                     </tr>
@@ -179,7 +179,7 @@ export default function ExportRequestListPage() {
       {!loading && total > 0 && (
         <div className="er-list__pagination">
           <span className="er-list__pagination-info">
-            Tong: <strong>{total}</strong> phieu
+            Tổng: <strong>{total}</strong> phiếu
           </span>
           <div className="er-list__pagination-controls">
             <button
@@ -188,7 +188,7 @@ export default function ExportRequestListPage() {
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
             >
-              &laquo; Truoc
+              &laquo; Trước
             </button>
             <span className="er-list__pagination-current">
               Trang {page} / {totalPages}
