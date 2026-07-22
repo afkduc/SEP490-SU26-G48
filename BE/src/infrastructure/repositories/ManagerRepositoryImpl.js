@@ -1,6 +1,11 @@
 const { query } = require('../database/sqlServer');
 
-const EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'accountant'];
+// Tổ trưởng đã gộp vào module Nhân viên (dùng chung listEmployees/createEmployee/...),
+// nên phải nằm trong EMPLOYEE_ROLES để hiện ra trong danh sách/tìm kiếm nhân viên.
+const EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'accountant', 'team_leader'];
+// Vai trò được PHÉP GÁN khi tạo/sửa nhân viên (khác EMPLOYEE_ROLES ở chỗ không cho
+// tạo mới Kế toán qua màn này nữa).
+const ASSIGNABLE_EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'team_leader'];
 const TECHNICIAN_ROLE = 'technician';
 const TEAM_LEADER_ROLE = 'team_leader';
 
@@ -30,6 +35,7 @@ function aggregateEmployees(rows = []) {
         status: row.status,
         statusLabel: statusLabel(row.status),
         teamSize: row.team_size,
+        teamMemberCount: row.team_member_count || 0,
         avatar: row.avatar,
         notes: row.notes,
         createdAt: normalizeDate(row.created_at),
@@ -137,24 +143,6 @@ function mapTechnicianRow(row) {
   };
 }
 
-function mapTeamLeaderRow(row) {
-  return {
-    id: row.id,
-    employeeId: row.pseudo_id || String(row.id),
-    fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
-    email: row.email,
-    phone: row.phone,
-    status: row.status,
-    statusLabel: statusLabel(row.status),
-    notes: row.notes,
-    createdAt: normalizeDate(row.created_at),
-    branch: row.branch_id
-      ? { id: row.branch_id, code: row.branch_code, name: row.branch_name }
-      : null,
-    teamMemberCount: row.team_member_count || 0,
-  };
-}
-
 function mapServiceRow(row) {
   return {
     id: row.id,
@@ -198,7 +186,7 @@ class ManagerRepositoryImpl {
 
   async listAssignableRoles() {
     const result = await query(
-      `SELECT id, role_name, role_label FROM roles WHERE role_name IN ('${EMPLOYEE_ROLES.join("','")}') ORDER BY id ASC`
+      `SELECT id, role_name, role_label FROM roles WHERE role_name IN ('${ASSIGNABLE_EMPLOYEE_ROLES.join("','")}') ORDER BY id ASC`
     );
     return result.recordset.map((row) => ({
       id: row.id,
@@ -226,6 +214,7 @@ class ManagerRepositoryImpl {
           u.phone,
           u.status,
           u.team_size,
+          (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count,
           u.avatar,
           u.notes,
           u.created_at,
@@ -272,6 +261,7 @@ class ManagerRepositoryImpl {
           u.phone,
           u.status,
           u.team_size,
+          (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count,
           u.avatar,
           u.notes,
           u.created_at,
@@ -293,7 +283,24 @@ class ManagerRepositoryImpl {
 
     const mapped = aggregateEmployees(result.recordset);
     if (mapped.length === 0) return null;
-    return mapped[0];
+    const employee = mapped[0];
+
+    if (employee.roles.includes(TEAM_LEADER_ROLE)) {
+      const membersResult = await query(
+        `SELECT id, pseudo_id, user_name FROM users WHERE team_leader_id = @id ORDER BY user_name ASC`,
+        { id: Number(id) }
+      );
+      employee.members = membersResult.recordset.map((r) => ({
+        id: r.id,
+        employeeId: r.pseudo_id,
+        fullName: r.user_name,
+      }));
+
+      const specialtiesByUser = await this._fetchSpecialtiesByUserIds([Number(id)]);
+      employee.specialties = specialtiesByUser.get(Number(id)) || [];
+    }
+
+    return employee;
   }
 
   async findByEmail(email) {
@@ -311,7 +318,7 @@ class ManagerRepositoryImpl {
     return `NV${String(nextNum).padStart(3, '0')}`;
   }
 
-  async createEmployee({ branchId, pseudoId, fullName, email, phone, passwordHash, roleId, status }) {
+  async createEmployee({ branchId, pseudoId, fullName, email, phone, passwordHash, roleId, status, specialtyIds }) {
     const result = await query(
       `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status, team_size, created_at)
        OUTPUT INSERTED.id
@@ -331,10 +338,13 @@ class ManagerRepositoryImpl {
       userId,
       roleId: Number(roleId),
     });
+    if (specialtyIds !== undefined) {
+      await this._syncTechnicianSpecialties(userId, specialtyIds);
+    }
     return this.getEmployeeById(branchId, userId);
   }
 
-  async updateEmployee(branchId, id, { fullName, email, phone, roleId, status }) {
+  async updateEmployee(branchId, id, { fullName, email, phone, roleId, status, specialtyIds }) {
     await query(
       `UPDATE users
        SET user_name = @fullName,
@@ -359,6 +369,10 @@ class ManagerRepositoryImpl {
         id: Number(id),
         roleId: Number(roleId),
       });
+    }
+
+    if (specialtyIds !== undefined) {
+      await this._syncTechnicianSpecialties(id, specialtyIds);
     }
 
     return this.getEmployeeById(branchId, id);
@@ -996,121 +1010,6 @@ class ManagerRepositoryImpl {
     return this.getTechnicianById(branchId, id);
   }
 
-  async listTeamLeaders(branchId, filters = {}) {
-    const params = {
-      branchId: Number(branchId),
-      search: filters.search ? `%${filters.search.trim()}%` : null,
-      status: filters.status && filters.status !== 'all' ? filters.status : null,
-    };
-
-    const result = await query(
-      `SELECT
-          u.id, u.pseudo_id, u.user_name, u.first_name, u.last_name, u.email, u.phone,
-          u.status, u.notes, u.created_at, u.branch_id, b.branch_code, b.branch_name,
-          (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count
-       FROM users u
-       LEFT JOIN branches b ON b.id = u.branch_id
-       WHERE u.branch_id = @branchId
-         AND EXISTS (
-           SELECT 1 FROM user_role ur JOIN roles r ON r.id = ur.role_id
-           WHERE ur.user_id = u.id AND r.role_name = '${TEAM_LEADER_ROLE}'
-         )
-         AND (@status IS NULL OR u.status = @status)
-         AND (
-           @search IS NULL
-           OR u.pseudo_id LIKE @search
-           OR u.user_name LIKE @search
-           OR ISNULL(u.email, '') LIKE @search
-           OR ISNULL(u.phone, '') LIKE @search
-         )
-       ORDER BY
-         CASE WHEN u.status = 'active' THEN 0 ELSE 1 END,
-         u.user_name ASC,
-         u.id ASC`,
-      params
-    );
-
-    return result.recordset.map(mapTeamLeaderRow);
-  }
-
-  async getTeamLeaderById(branchId, id) {
-    const result = await query(
-      `SELECT
-          u.id, u.pseudo_id, u.user_name, u.first_name, u.last_name, u.email, u.phone,
-          u.status, u.notes, u.created_at, u.branch_id, b.branch_code, b.branch_name,
-          (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count
-       FROM users u
-       LEFT JOIN branches b ON b.id = u.branch_id
-       WHERE u.id = @id AND u.branch_id = @branchId
-         AND EXISTS (
-           SELECT 1 FROM user_role ur JOIN roles r ON r.id = ur.role_id
-           WHERE ur.user_id = u.id AND r.role_name = '${TEAM_LEADER_ROLE}'
-         )`,
-      { id: Number(id), branchId: Number(branchId) }
-    );
-
-    const row = result.recordset[0];
-    if (!row) return null;
-
-    const teamLeader = mapTeamLeaderRow(row);
-
-    const membersResult = await query(
-      `SELECT id, pseudo_id, user_name FROM users WHERE team_leader_id = @id ORDER BY user_name ASC`,
-      { id: Number(id) }
-    );
-    teamLeader.members = membersResult.recordset.map((r) => ({
-      id: r.id,
-      employeeId: r.pseudo_id,
-      fullName: r.user_name,
-    }));
-
-    return teamLeader;
-  }
-
-  async createTeamLeader({ branchId, pseudoId, fullName, email, phone, passwordHash, status }) {
-    const result = await query(
-      `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status, team_size, created_at)
-       OUTPUT INSERTED.id
-       VALUES (@pseudoId, @fullName, @email, @passwordHash, @fullName, '', @phone, @branchId, @status, 0, GETDATE())`,
-      {
-        pseudoId,
-        fullName,
-        email,
-        passwordHash,
-        phone: phone || null,
-        branchId: Number(branchId),
-        status,
-      }
-    );
-    const userId = result.recordset[0].id;
-    await query(
-      `INSERT INTO user_role (user_id, role_id) SELECT @userId, id FROM roles WHERE role_name = '${TEAM_LEADER_ROLE}'`,
-      { userId }
-    );
-    return this.getTeamLeaderById(branchId, userId);
-  }
-
-  async updateTeamLeader(branchId, id, { fullName, email, phone, status }) {
-    await query(
-      `UPDATE users
-       SET user_name = @fullName,
-           first_name = @fullName,
-           email = @email,
-           phone = @phone,
-           status = @status
-       WHERE id = @id AND branch_id = @branchId`,
-      {
-        fullName,
-        email,
-        phone: phone || null,
-        status,
-        id: Number(id),
-        branchId: Number(branchId),
-      }
-    );
-
-    return this.getTeamLeaderById(branchId, id);
-  }
 }
 
 module.exports = ManagerRepositoryImpl;
