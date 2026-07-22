@@ -3,6 +3,20 @@ const { query } = require('../database/sqlServer');
 
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
 
+// Loai hinh sua chua THAT (service_order_items.repair_category) - khac voi
+// danh muc dich vu (service_categories) va khac ca LHSC (loai hang muc: cong/
+// vat tu). Gia tri + nhan phai khop voi REPAIR_CATEGORY_OPTIONS trong
+// RepairSettlementPage.jsx. 'OTHER' la bucket cho dong chua duoc gan loai hinh.
+const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'OTHER'];
+const REPAIR_CATEGORY_LABELS = {
+  ER: 'Sửa chữa động cơ',
+  CB: 'Sửa chữa gầm - phanh',
+  EE: 'Sửa chữa điện - điện tử',
+  BP: 'Đồng sơn',
+  PM: 'Bảo dưỡng định kỳ',
+  OTHER: 'Khác',
+};
+
 function monthLabel(monthStart) {
   if (!monthStart) return '';
   const d = new Date(monthStart);
@@ -122,9 +136,40 @@ class DashboardRepositoryImpl extends DashboardRepository {
       params
     );
 
-    // Category performance khong loc theo categoryId (de con so sanh giua cac
-    // danh muc voi nhau) - chi loc theo khoang ngay + trang thai.
-    const categoryResult = await query(
+    // Loai hinh sua chua theo thang - de xem loai nao duoc dung nhieu nhat qua
+    // tung thang. Khong loc theo categoryId (danh muc dich vu la 1 khai niem
+    // khac, khong lien quan).
+    const repairCategoryTrendResult = await query(
+      `WITH date_status_orders AS (
+         SELECT so.id, so.status, so.intake_date
+         FROM   service_orders so
+         WHERE  so.branch_id = @branchId
+           AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
+           AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
+           AND  (@status IS NULL OR so.status = @status)
+       ),
+       item_repair AS (
+         SELECT
+           dso.id AS order_id,
+           DATEFROMPARTS(YEAR(dso.intake_date), MONTH(dso.intake_date), 1) AS month_start,
+           CASE WHEN soi.repair_category IS NULL OR soi.repair_category = '' THEN 'OTHER' ELSE soi.repair_category END AS repair_category
+         FROM   date_status_orders dso
+         JOIN   service_order_items soi ON soi.service_order_id = dso.id
+       ),
+       month_category_orders AS (
+         SELECT DISTINCT month_start, repair_category, order_id
+         FROM   item_repair
+       )
+       SELECT month_start, repair_category, COUNT(*) AS order_count
+       FROM   month_category_orders
+       GROUP BY month_start, repair_category
+       ORDER BY month_start ASC`,
+      { branchId: params.branchId, fromDate: params.fromDate, toDate: params.toDate, status: params.status }
+    );
+
+    // Hieu suat tong theo loai hinh sua chua (khong loc theo categoryId, cung
+    // ly do nhu tren) - dung cho bang "Hieu suat theo loai hinh sua chua".
+    const repairCategoryOverallResult = await query(
       `WITH date_status_orders AS (
          SELECT so.id, so.status
          FROM   service_orders so
@@ -133,43 +178,40 @@ class DashboardRepositoryImpl extends DashboardRepository {
            AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
            AND  (@status IS NULL OR so.status = @status)
        ),
-       item_categories AS (
+       item_repair AS (
          SELECT
            dso.id AS order_id,
            dso.status AS order_status,
-           CASE WHEN soi.lhsc = 'PT' THEN 'PARTS' ELSE CAST(ISNULL(s.category_id, -1) AS NVARCHAR(20)) END AS category_key,
-           CASE WHEN soi.lhsc = 'PT' THEN N'Phụ tùng' ELSE ISNULL(sc.category_name, N'Khác') END AS category_name,
+           CASE WHEN soi.repair_category IS NULL OR soi.repair_category = '' THEN 'OTHER' ELSE soi.repair_category END AS repair_category,
            soi.total AS item_total
          FROM   date_status_orders dso
          JOIN   service_order_items soi ON soi.service_order_id = dso.id
-         LEFT JOIN services s ON s.id = soi.service_id
-         LEFT JOIN service_categories sc ON sc.id = s.category_id
        ),
        category_revenue AS (
-         SELECT category_key, category_name,
+         SELECT repair_category,
                 SUM(CASE WHEN order_status = 'invoiced' THEN item_total ELSE 0 END) AS revenue
-         FROM   item_categories
-         GROUP BY category_key, category_name
+         FROM   item_repair
+         GROUP BY repair_category
        ),
        category_orders AS (
-         SELECT DISTINCT category_key, category_name, order_id, order_status
-         FROM   item_categories
+         SELECT DISTINCT repair_category, order_id, order_status
+         FROM   item_repair
        ),
        category_order_stats AS (
-         SELECT category_key, category_name,
+         SELECT repair_category,
                 COUNT(*) AS order_count,
                 SUM(CASE WHEN order_status = 'invoiced' THEN 1 ELSE 0 END) AS invoiced_count,
                 SUM(CASE WHEN order_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count
          FROM   category_orders
-         GROUP BY category_key, category_name
+         GROUP BY repair_category
        )
        SELECT
-         cos.category_key, cos.category_name, cos.order_count,
+         cos.repair_category, cos.order_count,
          cos.invoiced_count, cos.cancelled_count,
          ISNULL(cr.revenue, 0) AS revenue
        FROM category_order_stats cos
-       LEFT JOIN category_revenue cr ON cr.category_key = cos.category_key
-       ORDER BY revenue DESC`,
+       LEFT JOIN category_revenue cr ON cr.repair_category = cos.repair_category
+       ORDER BY cos.order_count DESC`,
       { branchId: params.branchId, fromDate: params.fromDate, toDate: params.toDate, status: params.status }
     );
 
@@ -212,14 +254,45 @@ class DashboardRepositoryImpl extends DashboardRepository {
       };
     });
 
-    const categoryPerformance = categoryResult.recordset.map((row) => {
+    // Gom du lieu loai hinh sua chua theo thang (moi dong la 1 thang + 1 loai
+    // hinh). Dam bao co du cac thang da xuat hien o monthlyTrend (ke ca thang
+    // khong co dong nao gan loai hinh) de 2 bieu do dung chung 1 truc thang.
+    const repairMonthMap = new Map();
+    for (const m of monthlyTrend) {
+      repairMonthMap.set(m.month, {
+        month: m.month,
+        label: m.label,
+        total: 0,
+        byCategory: Object.fromEntries(REPAIR_CATEGORY_ORDER.map((c) => [c, 0])),
+      });
+    }
+    for (const row of repairCategoryTrendResult.recordset) {
+      const key = monthKey(row.month_start);
+      if (!repairMonthMap.has(key)) {
+        repairMonthMap.set(key, {
+          month: key,
+          label: monthLabel(row.month_start),
+          total: 0,
+          byCategory: Object.fromEntries(REPAIR_CATEGORY_ORDER.map((c) => [c, 0])),
+        });
+      }
+      const bucket = repairMonthMap.get(key);
+      const cat = REPAIR_CATEGORY_ORDER.includes(row.repair_category) ? row.repair_category : 'OTHER';
+      const count = Number(row.order_count || 0);
+      bucket.byCategory[cat] += count;
+      bucket.total += count;
+    }
+    const repairCategoryMonthly = Array.from(repairMonthMap.values()).sort((a, b) => (a.month > b.month ? 1 : -1));
+
+    const repairCategoryPerformance = repairCategoryOverallResult.recordset.map((row) => {
       const invoiced = Number(row.invoiced_count || 0);
       const cancelled = Number(row.cancelled_count || 0);
       const concluded = invoiced + cancelled;
       const revenue = Number(row.revenue || 0);
+      const cat = REPAIR_CATEGORY_ORDER.includes(row.repair_category) ? row.repair_category : 'OTHER';
       return {
-        categoryId: row.category_key,
-        categoryName: row.category_name,
+        repairCategory: cat,
+        repairCategoryName: REPAIR_CATEGORY_LABELS[cat] || cat,
         orders: Number(row.order_count || 0),
         revenue,
         avgOrderValue: invoiced > 0 ? Math.round(revenue / invoiced) : 0,
@@ -236,7 +309,8 @@ class DashboardRepositoryImpl extends DashboardRepository {
       },
       monthlyTrend,
       statusBreakdown,
-      categoryPerformance,
+      repairCategoryMonthly,
+      repairCategoryPerformance,
     };
   }
 
