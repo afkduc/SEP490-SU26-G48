@@ -268,11 +268,10 @@ function PermissionMatrix({ roles, visibleRoles, permissions, rolePermissions, o
         <table className="matrix-table">
           <thead>
             <tr>
-              <th className="matrix-th--module">Quyền / Vai trò</th>
+              <th className="matrix-th--module">Quyền</th>
               {visibleRoles.map((role) => (
-                <th key={role.id} title={role.roleName} className="matrix-th--role">
+                <th key={role.id} title={`${role.roleLabel} (${role.roleName})`} className="matrix-th--role">
                   <div className="matrix-role-label">{role.roleLabel}</div>
-                  <div className="matrix-role-code">{role.roleName}</div>
                 </th>
               ))}
             </tr>
