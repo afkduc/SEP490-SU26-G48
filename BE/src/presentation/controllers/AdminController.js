@@ -18,6 +18,7 @@ const SpecialtyService = require('../../application/services/SpecialtyService');
 const SecurityAlertService = require('../../application/services/SecurityAlertService');
 const NotificationService = require('../../application/services/NotificationService');
 const { auditCrud } = require('../../utils/auditHelper');
+const { emitPermissionChanged } = require('../../application/events/PermissionEvents');
 
 class AdminController {
   constructor() {
@@ -57,10 +58,10 @@ class AdminController {
     this.listPermissions = this.listPermissions.bind(this);
     this.getRolePermissions = this.getRolePermissions.bind(this);
     this.setRolePermissions = this.setRolePermissions.bind(this);
+    this.saveRolePermissionsMatrix = this.saveRolePermissionsMatrix.bind(this);
     this.getRoleUsers = this.getRoleUsers.bind(this);
     this.createRole = this.createRole.bind(this);
     this.updateRole = this.updateRole.bind(this);
-    this.deleteRole = this.deleteRole.bind(this);
     this.toggleRoleStatus = this.toggleRoleStatus.bind(this);
     this.listDevices = this.listDevices.bind(this);
     this.listUserDevices = this.listUserDevices.bind(this);
@@ -70,7 +71,6 @@ class AdminController {
     this.listSpecialties = this.listSpecialties.bind(this);
     this.createSpecialty = this.createSpecialty.bind(this);
     this.updateSpecialty = this.updateSpecialty.bind(this);
-    this.deleteSpecialty = this.deleteSpecialty.bind(this);
     this.toggleSpecialtyStatus = this.toggleSpecialtyStatus.bind(this);
     this.getUserSpecialties = this.getUserSpecialties.bind(this);
     this.setUserSpecialties = this.setUserSpecialties.bind(this);
@@ -345,6 +345,60 @@ class AdminController {
     }
   };
 
+  /**
+   * Bulk save permissions cho nhieu role trong 1 transaction (atomic).
+   * Body: { changes: [{roleId, permissionIds}, ...] }
+   * Dung cho trang "Ma tran quyen" (Permission Matrix).
+   * - 1 call duy nhat, khong N+1
+   * - Last-admin guard trong service (khong cho tuoc het admin:roles:* cua role admin)
+   * - Audit log + permission cache invalidation tu dong
+   */
+  saveRolePermissionsMatrix = async (req, res, next) => {
+    try {
+      const { changes } = req.body;
+      const result = await this.roleService.setRolePermissionsMatrix({
+        changes,
+        actorUserId: req.user?.userId,
+      });
+
+      // Push SSE event de cac user bi anh huong tu refresh permission realtime
+      // (FE nhan event -> goi getMeApi -> cap nhat token + permissions vao storage).
+      // Bo qua neu khong co user nao bi anh huong (best-effort, khong fail request).
+      try {
+        const roleIds = (changes || []).map((c) => Number(c.roleId)).filter(Number.isFinite);
+        emitPermissionChanged({
+          action: 'matrix_updated',
+          userIds: result.affectedUserIds || [],
+          roleIds,
+          actorUserId: req.user?.userId || null,
+        });
+      } catch (eventErr) {
+        // Log nhung khong fail API - SSE chi la optional enhancement.
+        console.warn('[AdminController] emitPermissionChanged failed:', eventErr.message);
+      }
+
+      await auditCrud.update(req, {
+        tableName: 'role_permissions',
+        entityCode: 'MATRIX',
+        recordId: null,
+        entityName: 'Ma trận quyền',
+        newData: {
+          changeCount: changes?.length || 0,
+          invalidations: result.invalidations,
+          affectedUserCount: (result.affectedUserIds || []).length,
+        },
+        description: `Cập nhật ma trận quyền (${changes?.length || 0} vai trò, ${result.invalidations} user bị ảnh hưởng cache)`,
+      });
+      return success(
+        res,
+        result,
+        `Da luu ma tran quyen (${result.results.length} vai tro, ${result.invalidations} user invalidate cache)`
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+
   // UC-11: get users having a role
   getRoleUsers = async (req, res, next) => {
     try {
@@ -398,29 +452,6 @@ class AdminController {
         userId: role?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_UPDATED:', e.message));
       return success(res, role, 'Cap nhat vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: delete role
-  deleteRole = async (req, res, next) => {
-    try {
-      const result = await this.roleService.deleteRole(req.params.id);
-      await auditCrud.delete(req, {
-        tableName: 'roles',
-        entityCode: `ID-${req.params.id}`,
-        recordId: Number(req.params.id) || null,
-        entityName: 'Vai trò',
-        oldData: result,
-      });
-      await this.notificationService.notifyAdmins('ROLE_DELETED', {
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: `ID-${req.params.id}`,
-        targetCode: '',
-        userId: Number(req.params.id) || null,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_DELETED:', e.message));
-      return success(res, result, 'Xoa vai tro thanh cong');
     } catch (err) {
       next(err);
     }
@@ -580,27 +611,6 @@ class AdminController {
     }
   };
 
-  deleteSpecialty = async (req, res, next) => {
-    try {
-      const actorInfo = {
-        userId: req.user?.id,
-        userName: req.user?.user_name,
-        name: req.user?.full_name || req.user?.name,
-      };
-      const result = await this.specialtyService.delete(req.params.id, actorInfo);
-      await auditCrud.delete(req, {
-        tableName: 'specialties',
-        entityCode: `ID-${req.params.id}`,
-        recordId: Number(req.params.id) || null,
-        entityName: 'Chuyên môn',
-        oldData: result,
-      });
-      return success(res, result, 'Xoa chuyen mon thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
   toggleSpecialtyStatus = async (req, res, next) => {
     try {
       const specialty = await this.specialtyService.toggleStatus(req.params.id);
@@ -713,6 +723,17 @@ class AdminController {
         userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
         roleName: roles?.[0]?.roleName || roleIds?.join(','),
       });
+      // SSE push: user vua duoc gan role moi -> can refresh permission ngay.
+      try {
+        emitPermissionChanged({
+          action: 'role_assigned',
+          userIds: [Number(req.params.userId)],
+          roleIds: (roleIds || []).map(Number).filter(Number.isFinite),
+          actorUserId: req.user?.userId || null,
+        });
+      } catch (eventErr) {
+        console.warn('[AdminController] emitPermissionChanged (assignRoles) failed:', eventErr.message);
+      }
       return success(res, roles, 'Gan role thanh cong');
     } catch (err) {
       next(err);
@@ -730,6 +751,17 @@ class AdminController {
         userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
         roleName: `role-${req.params.roleId}`,
       });
+      // SSE push: user vua bi revoke role -> mat quyen, can refresh ngay.
+      try {
+        emitPermissionChanged({
+          action: 'role_revoked',
+          userIds: [Number(req.params.userId)],
+          roleIds: [Number(req.params.roleId)].filter(Number.isFinite),
+          actorUserId: req.user?.userId || null,
+        });
+      } catch (eventErr) {
+        console.warn('[AdminController] emitPermissionChanged (revokeRole) failed:', eventErr.message);
+      }
       return success(res, roles, 'Xoa role thanh cong');
     } catch (err) {
       next(err);

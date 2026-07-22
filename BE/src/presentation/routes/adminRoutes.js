@@ -62,8 +62,10 @@ function buildAdminRouter() {
   router.get('/roles/full', requirePerm('admin:roles:read'), controller.listRolesWithPermissions);
   router.get('/roles/:id', requirePerm('admin:roles:read'), controller.getRoleDetail);
   router.post('/roles', requirePerm('admin:roles:create'), controller.createRole);
+  // Matrix route phai dat TRUOC /roles/:id de tranh Express match 'matrix' lam :id
+  router.put('/roles/matrix/permissions', requirePerm('admin:roles:manage'), controller.saveRolePermissionsMatrix);
   router.put('/roles/:id', requirePerm('admin:roles:update'), controller.updateRole);
-  router.delete('/roles/:id', requirePerm('admin:roles:delete'), controller.deleteRole);
+  // Soft delete: chi co toggle active/inactive, KHONG co DELETE cung.
   router.patch('/roles/:id/toggle-status', requirePerm('admin:roles:manage'), controller.toggleRoleStatus);
   router.get('/permissions', requirePerm('admin:roles:read'), controller.listPermissions);
   router.get('/roles/:id/permissions', requirePerm('admin:roles:read'), controller.getRolePermissions);
@@ -86,7 +88,7 @@ function buildAdminRouter() {
   router.get('/specialties', controller.listSpecialties);
   router.post('/specialties', controller.createSpecialty);
   router.put('/specialties/:id', controller.updateSpecialty);
-  router.delete('/specialties/:id', controller.deleteSpecialty);
+  // Soft delete: chi co toggle active/inactive, KHONG co DELETE cung.
   router.patch('/specialties/:id/toggle-status', controller.toggleSpecialtyStatus);
   router.get('/users/:userId/specialties', controller.getUserSpecialties);
   router.put('/users/:userId/specialties', controller.setUserSpecialties);
