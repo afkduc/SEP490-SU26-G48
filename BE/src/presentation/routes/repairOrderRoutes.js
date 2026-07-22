@@ -18,6 +18,7 @@ function buildRepairOrderRouter() {
   router.get('/:id', controller.getById);
   router.post('/', controller.create);
   router.patch('/:id/status', controller.updateStatus);
+  router.patch('/:id/tasks/:taskId', controller.updateTaskStatus);
 
   return router;
 }

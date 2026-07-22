@@ -5,16 +5,16 @@ import { useImportRequests } from '../../hooks/inventory/useImportRequests';
 import './ImportRequestListPage.css';
 
 const STATUS_META = {
-  pending: { label: 'Cho duyet', className: 'badge--warning' },
-  approved: { label: 'Da duyet', className: 'badge--success' },
-  rejected: { label: 'Tu choi', className: 'badge--danger' },
+  pending: { label: 'Chờ duyệt', className: 'badge--warning' },
+  approved: { label: 'Đã duyệt', className: 'badge--success' },
+  rejected: { label: 'Từ chối', className: 'badge--danger' },
 };
 
 const STATUS_TABS = [
-  { value: '', label: 'Tat ca' },
-  { value: 'pending', label: 'Cho duyet' },
-  { value: 'approved', label: 'Da duyet' },
-  { value: 'rejected', label: 'Tu choi' },
+  { value: '', label: 'Tất cả' },
+  { value: 'pending', label: 'Chờ duyệt' },
+  { value: 'approved', label: 'Đã duyệt' },
+  { value: 'rejected', label: 'Từ chối' },
 ];
 
 function formatDate(d) {
@@ -62,13 +62,13 @@ export default function ImportRequestListPage() {
     <div className="ir-list">
       <div className="ir-list__header">
         <div>
-          <h1 className="ir-list__title">Phieu nhap kho</h1>
+          <h1 className="ir-list__title">Phiếu nhập kho</h1>
           <p className="ir-list__subtitle">
-            Tao, duyet va tu choi phieu nhap phu tung tu nha cung cap.
+            Tạo, duyệt và từ chối phiếu nhập phụ tùng từ nhà cung cấp.
           </p>
         </div>
         <Link to="/inventory/import-requests/new" className="btn btn--primary">
-          + Tao phieu nhap
+          + Tạo phiếu nhập
         </Link>
       </div>
 
@@ -91,7 +91,7 @@ export default function ImportRequestListPage() {
         <input
           className="input input--search"
           type="text"
-          placeholder="Tim theo ma phieu, ghi chu..."
+          placeholder="Tìm theo mã phiếu, ghi chú..."
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -101,46 +101,46 @@ export default function ImportRequestListPage() {
           type="date"
           value={draftFromDate}
           onChange={(e) => setDraftFromDate(e.target.value)}
-          title="Tu ngay"
+          title="Từ ngày"
         />
         <input
           className="input"
           type="date"
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
-          title="Den ngay"
+          title="Đến ngày"
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
-          Loc
+          Lọc
         </button>
       </div>
 
       {/* Table */}
       {loading ? (
-        <div className="ir-list__loading">Dang tai...</div>
+        <div className="ir-list__loading">Đang tải...</div>
       ) : error ? (
-        <div className="ir-list__error">Loi: {error}</div>
+        <div className="ir-list__error">Lỗi: {error}</div>
       ) : (
         <div className="table-responsive">
           <table className="table">
             <thead>
               <tr>
-                <th>Ma phieu</th>
-                <th>Ngay tao</th>
-                <th>Ngay nhap</th>
-                <th>Nha cung cap</th>
-                <th>So dong</th>
-                <th>Tong SL</th>
-                <th>Trang thai</th>
-                <th>Nguoi tao</th>
-                <th style={{ width: 110 }}>Hanh dong</th>
+                <th>Mã phiếu</th>
+                <th>Ngày tạo</th>
+                <th>Ngày nhập</th>
+                <th>Nhà cung cấp</th>
+                <th>Số dòng</th>
+                <th>Tổng SL</th>
+                <th>Trạng thái</th>
+                <th>Người tạo</th>
+                <th style={{ width: 110 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="table__empty">
-                    Khong co phieu nhap nao
+                    Không có phiếu nhập nào
                   </td>
                 </tr>
               ) : (
@@ -163,7 +163,7 @@ export default function ImportRequestListPage() {
                           to={`/inventory/import-requests/${r.id}`}
                           className="btn btn--ghost btn--sm"
                         >
-                          Chi tiet
+                          Chi tiết
                         </Link>
                       </td>
                     </tr>
@@ -179,7 +179,7 @@ export default function ImportRequestListPage() {
       {!loading && total > 0 && (
         <div className="ir-list__pagination">
           <span className="ir-list__pagination-info">
-            Tong: <strong>{total}</strong> phieu
+            Tổng: <strong>{total}</strong> phiếu
           </span>
           <div className="ir-list__pagination-controls">
             <button
@@ -188,7 +188,7 @@ export default function ImportRequestListPage() {
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
             >
-              &laquo; Truoc
+              &laquo; Trước
             </button>
             <span className="ir-list__pagination-current">
               Trang {page} / {totalPages}

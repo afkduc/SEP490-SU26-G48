@@ -61,27 +61,13 @@ const SERVICE_ADVISOR_NAV = [
 const MANAGER_NAV = [
   { label: 'Bảng điều khiển', path: '/dashboard' },
   { label: 'Kho', path: '/inventory' },
-  {
-    label: 'Phiếu nhập',
-    icon: '📥',
-    children: [
-      { label: 'Danh sách phiếu nhập', path: '/manager/import-requests' },
-      { label: 'Phiếu cần duyệt', path: '/manager/import-requests?status=pending' },
-    ],
-  },
-  {
-    label: 'Phiếu xuất',
-    icon: '📤',
-    children: [
-      { label: 'Danh sách phiếu xuất', path: '/manager/export-requests' },
-    ],
-  },
+  { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests' },
+  { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests' },
   {
     label: 'Nhân viên',
     children: [
       { label: 'Nhân viên', path: '/manager/employees' },
       { label: 'Thợ máy', path: '/manager/technicians' },
-      { label: 'Tổ trưởng', path: '/manager/team-leaders' },
     ],
   },
   { label: 'Quyết toán sửa chữa', path: '/manager/settlements' },
@@ -126,6 +112,11 @@ const GENERAL_DIRECTOR_NAV = [
   { label: 'Nhà cung cấp', path: '/inventory/suppliers' },
 ];
 
+// ===== Team Leader (Tổ trưởng kỹ thuật) - chỉ xem công việc được giao =====
+const TEAM_LEADER_NAV = [
+  { label: 'Công việc của tôi', path: '/repair-orders', end: true },
+];
+
 const NAV_ITEMS_BY_ROLE = {
   [ROLES.ADMIN]: ADMIN_NAV,
   general_director: GENERAL_DIRECTOR_NAV,
@@ -133,6 +124,7 @@ const NAV_ITEMS_BY_ROLE = {
   service_advisor: SERVICE_ADVISOR_NAV,
   warehouse_staff: WAREHOUSE_STAFF_NAV,
   accountant: ACCOUNTANT_NAV,
+  team_leader: TEAM_LEADER_NAV,
 };
 
 // Cac role co dropdown (vi cac role khac chi co 1-2 muc khong can dropdown).
