@@ -147,6 +147,60 @@ class RoleRepositoryImpl {
   }
 
   /**
+   * Lay tat ca roles kem permissionIds (dung cho ma tran quyen - tranh N+1 query)
+   * @returns {Promise<Array<{id, roleName, roleLabel, isActive, userCount, permissionIds: number[]}>}
+   */
+  async findAllWithPermissions() {
+    const rolesResult = await query(`
+      SELECT
+        r.id,
+        r.role_name,
+        r.role_label,
+        ISNULL(r.is_active, 1) AS is_active,
+        (SELECT COUNT(*) FROM user_role ur WHERE ur.role_id = r.id) AS user_count
+      FROM roles r
+      ORDER BY r.id ASC
+    `);
+    const roles = rolesResult.recordset.map((row) => ({
+      id: row.id,
+      roleName: row.role_name,
+      roleLabel: row.role_label,
+      isActive: Boolean(row.is_active),
+      userCount: Number(row.user_count),
+      permissionIds: [],
+    }));
+
+    if (roles.length === 0) return roles;
+
+    const ids = roles.map((r) => r.id);
+    const placeholders = ids.map((_, i) => `@p${i + 1}`).join(', ');
+    const rpResult = await query(
+      `SELECT role_id, permission_id FROM role_permissions WHERE role_id IN (${placeholders})`,
+      Object.fromEntries(ids.map((id, i) => [`p${i + 1}`, id]))
+    );
+
+    const byRole = new Map();
+    for (const row of rpResult.recordset) {
+      if (!byRole.has(row.role_id)) byRole.set(row.role_id, []);
+      byRole.get(row.role_id).push(row.permission_id);
+    }
+    for (const role of roles) {
+      role.permissionIds = byRole.get(role.id) || [];
+    }
+    return roles;
+  }
+
+  /**
+   * Lay permission ID hop le (dung de validate setRolePermissions)
+   */
+  async findAllPermissionIds() {
+    const result = await query(
+      `SELECT id FROM permissions`
+    );
+    return new Set(result.recordset.map((row) => Number(row.id)));
+  }
+
+  /**
    * Lay tat ca permissions cua 1 role (join voi permissions table)
    */
   async getRolePermissions(roleId) {

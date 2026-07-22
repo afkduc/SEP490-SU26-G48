@@ -1,6 +1,7 @@
 const express = require('express');
 const AdminController = require('../controllers/AdminController');
 const { authenticate, requireAdmin } = require('../../middlewares/auth');
+const { requirePerm } = require('../../middlewares/permission');
 const { trackActivity } = require('../../middlewares');
 const { validateListUsersQuery } = require('../validators/adminUserValidator');
 
@@ -55,17 +56,19 @@ function buildAdminRouter() {
   router.patch('/branches/:id/deactivate', controller.deactivateBranch);
   router.patch('/branches/:id/reactivate', controller.reactivateBranch);
 
-  // Roles (UC-11)
-  router.get('/roles', controller.listRoles);
-  router.get('/roles/:id', controller.getRoleDetail);
-  router.post('/roles', controller.createRole);
-  router.put('/roles/:id', controller.updateRole);
-  router.delete('/roles/:id', controller.deleteRole);
-  router.patch('/roles/:id/toggle-status', controller.toggleRoleStatus);
-  router.get('/permissions', controller.listPermissions);
-  router.get('/roles/:id/permissions', controller.getRolePermissions);
-  router.put('/roles/:id/permissions', controller.setRolePermissions);
-  router.get('/roles/:id/users', controller.getRoleUsers);
+  // Roles (UC-11) - enforce granular permissions doc theo RBAC thuc te
+  router.get('/roles', requirePerm('admin:roles:read'), controller.listRoles);
+  // Route 'full' phai dat TRUOC /roles/:id de tranh match nhầm
+  router.get('/roles/full', requirePerm('admin:roles:read'), controller.listRolesWithPermissions);
+  router.get('/roles/:id', requirePerm('admin:roles:read'), controller.getRoleDetail);
+  router.post('/roles', requirePerm('admin:roles:create'), controller.createRole);
+  router.put('/roles/:id', requirePerm('admin:roles:update'), controller.updateRole);
+  router.delete('/roles/:id', requirePerm('admin:roles:delete'), controller.deleteRole);
+  router.patch('/roles/:id/toggle-status', requirePerm('admin:roles:manage'), controller.toggleRoleStatus);
+  router.get('/permissions', requirePerm('admin:roles:read'), controller.listPermissions);
+  router.get('/roles/:id/permissions', requirePerm('admin:roles:read'), controller.getRolePermissions);
+  router.put('/roles/:id/permissions', requirePerm('admin:roles:manage'), controller.setRolePermissions);
+  router.get('/roles/:id/users', requirePerm('admin:roles:read'), controller.getRoleUsers);
 
   // User roles (UC-12)
   router.get('/users/:userId/roles', controller.getUserRoles);

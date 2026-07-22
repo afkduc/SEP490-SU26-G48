@@ -302,6 +302,16 @@ class AdminController {
     }
   };
 
+  // UC-11: list roles + permissions (1 call, khong N+1)
+  listRolesWithPermissions = async (req, res, next) => {
+    try {
+      const result = await this.roleService.listRolesWithPermissions();
+      return success(res, result, 'Danh sach vai tro kem quyen');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   // UC-11: get permissions of a role
   getRolePermissions = async (req, res, next) => {
     try {
@@ -316,17 +326,18 @@ class AdminController {
   setRolePermissions = async (req, res, next) => {
     try {
       const { permissionIds } = req.body;
+      // Validation chi tiet (loai bo NaN, check ton tai) lam trong RoleService.setRolePermissions
       const permissions = await this.roleService.setRolePermissions(
         req.params.id,
-        Array.isArray(permissionIds) ? permissionIds.map(Number) : []
+        Array.isArray(permissionIds) ? permissionIds : []
       );
       await auditCrud.update(req, {
         tableName: 'role_permissions',
         entityCode: `ID-${req.params.id}`,
         recordId: Number(req.params.id) || null,
         entityName: 'Phân quyền vai trò',
-        newData: { permissionIds },
-        description: `Cập nhật quyền cho vai trò ID ${req.params.id} (${permissionIds?.length || 0} quyền)`,
+        newData: { permissionIds: Array.isArray(permissionIds) ? permissionIds : [] },
+        description: `Cập nhật quyền cho vai trò ID ${req.params.id} (${permissions.length || 0} quyền)`,
       });
       return success(res, { items: permissions, total: permissions.length }, 'Cap nhat quyen vai tro thanh cong');
     } catch (err) {
