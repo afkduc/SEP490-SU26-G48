@@ -1,4 +1,4 @@
-﻿const GeneralDirectorRepository = require('../../domain/repositories/GeneralDirectorRepository');
+const GeneralDirectorRepository = require('../../domain/repositories/GeneralDirectorRepository');
 const { query } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
 const ApiError = require('../../utils/ApiError');
@@ -1116,8 +1116,8 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
     }
 
     const conflict = await this.getBranchManagerConflict(branchId);
-    if (conflict && conflict.status === 'active') {
-      throw new ApiError(409, 'Chi nhánh này đã có giám đốc đang hoạt động');
+    if (conflict && conflict.status !== 'inactive') {
+      throw new ApiError(409, 'Chỉ có thể thêm giám đốc mới khi giám đốc hiện tại đã ở trạng thái nghỉ');
     }
 
     const role = await this.getManagerRole();
@@ -1219,3 +1219,4 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
 }
 
 module.exports = GeneralDirectorRepositoryImpl;
+
