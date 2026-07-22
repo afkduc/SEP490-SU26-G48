@@ -23,6 +23,27 @@ const STATUS_HUES = {
 const CATEGORY_HUES = ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7', '#e34948', '#e87ba4', '#eb6834'];
 const PARTS_HUE = '#94a3b8';
 
+// Loai hinh sua chua THAT (service_order_items.repair_category) - khop voi
+// REPAIR_CATEGORY_OPTIONS trong RepairSettlementPage.jsx. Tai su dung bang mau
+// CATEGORY_HUES da validate; "Khac" dung mau xam trung tinh nhu PARTS_HUE.
+const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'OTHER'];
+const REPAIR_CATEGORY_LABELS = {
+  ER: 'Sửa chữa động cơ',
+  CB: 'Sửa chữa gầm - phanh',
+  EE: 'Sửa chữa điện - điện tử',
+  BP: 'Đồng sơn',
+  PM: 'Bảo dưỡng định kỳ',
+  OTHER: 'Khác',
+};
+const REPAIR_CATEGORY_HUES = {
+  ER: CATEGORY_HUES[0],
+  CB: CATEGORY_HUES[1],
+  EE: CATEGORY_HUES[2],
+  BP: CATEGORY_HUES[3],
+  PM: CATEGORY_HUES[4],
+  OTHER: PARTS_HUE,
+};
+
 const DATE_PRESETS = [
   { key: 'all', label: 'Tất cả thời gian' },
   { key: 'month', label: 'Tháng này' },
@@ -46,11 +67,6 @@ function computeDateRange(presetKey) {
     return { fromDate: toISODate(new Date(now.getFullYear(), now.getMonth() - 5, 1)), toDate: toISODate(now) };
   }
   return { fromDate: '', toDate: '' };
-}
-
-function categoryColorFor(categoryId, idx) {
-  if (categoryId === 'PARTS') return PARTS_HUE;
-  return CATEGORY_HUES[idx % CATEGORY_HUES.length];
 }
 
 // ─── Stat tile (KPI card) ─────────────────────────────────────────────
@@ -303,34 +319,84 @@ function StatusDonutChart({ data, total }) {
   );
 }
 
-// ─── Horizontal bar chart: Doanh thu theo danh mục dịch vụ ────────────
-function CategoryBarChart({ data }) {
+// ─── Stacked bar chart: Loại hình sửa chữa theo tháng ─────────────────
+function RepairCategoryStackedBarChart({ data, topCategory }) {
+  const width = 340;
+  const height = 220;
+  const padding = { top: 16, right: 8, bottom: 26, left: 30 };
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
+  const [hover, setHover] = useState(null);
+
   if (!data || data.length === 0) {
     return (
-      <div className="empty-state" style={{ minHeight: 180 }}>
+      <div className="empty-state" style={{ minHeight: 220 }}>
         <h3>Chưa có dữ liệu</h3>
       </div>
     );
   }
-  const maxRevenue = Math.max(...data.map((d) => d.revenue), 1);
+
+  const maxTotal = Math.max(...data.map((d) => d.total), 1);
+  const slotW = innerW / data.length;
+  const barW = Math.min(28, slotW - 10);
+  const gap = 2;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {data.map((d, i) => {
-        const pct = maxRevenue > 0 ? (d.revenue / maxRevenue) * 100 : 0;
-        const color = categoryColorFor(d.categoryId, i);
-        return (
-          <div key={d.categoryId}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 4 }}>
-              <span style={{ color: 'var(--gray-700)', fontWeight: 600 }}>{d.categoryName}</span>
-              <span style={{ color: 'var(--gray-600)' }}>{formatCurrency(d.revenue)}</span>
-            </div>
-            <div style={{ background: 'var(--gray-100)', borderRadius: 4, height: 10, overflow: 'hidden' }}>
-              <div style={{ width: `${Math.max(pct, d.revenue > 0 ? 1.5 : 0)}%`, height: '100%', background: color, borderRadius: 4 }} />
-            </div>
+    <div>
+      {topCategory && topCategory.orders > 0 && (
+        <div style={{ fontSize: 11.5, color: 'var(--gray-700)', marginBottom: 10 }}>
+          Được sử dụng nhiều nhất:{' '}
+          <b style={{ color: REPAIR_CATEGORY_HUES[topCategory.repairCategory] }}>{topCategory.repairCategoryName}</b>
+          {' '}({topCategory.orders} phiếu)
+        </div>
+      )}
+      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+        <line x1={padding.left} x2={width - padding.right} y1={padding.top + innerH} y2={padding.top + innerH} stroke="var(--gray-300)" strokeWidth="1" />
+        {data.map((month, mi) => {
+          const x = padding.left + mi * slotW + (slotW - barW) / 2;
+          let cursor = 0;
+          const segments = REPAIR_CATEGORY_ORDER.map((cat) => {
+            const count = month.byCategory[cat] || 0;
+            const hPx = maxTotal > 0 ? (count / maxTotal) * innerH : 0;
+            const bottomY = padding.top + innerH - cursor;
+            const topY = bottomY - hPx;
+            cursor += hPx;
+            return { cat, count, topY, h: Math.max(0, hPx - (count > 0 ? gap : 0)) };
+          });
+          return (
+            <g key={month.month}>
+              {segments.map((seg) => seg.count > 0 && (
+                <rect
+                  key={seg.cat}
+                  x={x} y={seg.topY} width={barW} height={seg.h}
+                  rx={2}
+                  fill={REPAIR_CATEGORY_HUES[seg.cat]}
+                  opacity={hover && (hover.month !== month.month || hover.cat !== seg.cat) ? 0.45 : 1}
+                  onMouseEnter={() => setHover({ month: month.month, cat: seg.cat, count: seg.count, label: month.label })}
+                  onMouseLeave={() => setHover(null)}
+                  style={{ cursor: 'pointer', transition: 'opacity 0.1s' }}
+                />
+              ))}
+              <text x={x + barW / 2} y={height - 6} textAnchor="middle" fontSize="10" fill="var(--gray-500)">{month.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {hover && (
+        <div style={{ fontSize: 11, color: 'var(--gray-700)', textAlign: 'center', marginTop: 2 }}>
+          <b>{REPAIR_CATEGORY_LABELS[hover.cat] || hover.cat}</b> · {hover.label}: {hover.count} phiếu
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 8, justifyContent: 'center' }}>
+        {REPAIR_CATEGORY_ORDER.map((cat) => (
+          <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: REPAIR_CATEGORY_HUES[cat] }} />
+            <span style={{ color: 'var(--gray-600)' }}>{REPAIR_CATEGORY_LABELS[cat]}</span>
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }
@@ -361,7 +427,9 @@ export default function DashboardPage() {
   const kpis = overview?.kpis || { totalOrders: 0, totalRevenue: 0, avgOrderValue: 0, successRate: null };
   const monthlyTrend = overview?.monthlyTrend || [];
   const statusBreakdown = overview?.statusBreakdown || [];
-  const categoryPerformance = overview?.categoryPerformance || [];
+  const repairCategoryMonthly = overview?.repairCategoryMonthly || [];
+  const repairCategoryPerformance = overview?.repairCategoryPerformance || [];
+  const topRepairCategory = repairCategoryPerformance[0];
   const categories = overview?.categories || [];
 
   return (
@@ -422,18 +490,18 @@ export default function DashboardPage() {
           {loading ? <div className="empty-state" style={{ minHeight: 220 }}><p>Đang tải…</p></div> : <StatusStackedBarChart data={monthlyTrend} />}
         </div>
         <div className="dash-card dash-card--chart">
-          <div className="dash-card__title">Doanh thu theo danh mục dịch vụ</div>
-          {loading ? <div className="empty-state" style={{ minHeight: 180 }}><p>Đang tải…</p></div> : <CategoryBarChart data={categoryPerformance} />}
+          <div className="dash-card__title">Loại hình sửa chữa theo tháng</div>
+          {loading ? <div className="empty-state" style={{ minHeight: 180 }}><p>Đang tải…</p></div> : <RepairCategoryStackedBarChart data={repairCategoryMonthly} topCategory={topRepairCategory} />}
         </div>
       </div>
 
       <div className="dash-card" style={{ padding: 0 }}>
-        <div className="dash-card__title" style={{ padding: '16px 20px 0' }}>Hiệu suất theo danh mục dịch vụ</div>
+        <div className="dash-card__title" style={{ padding: '16px 20px 0' }}>Hiệu suất theo loại hình sửa chữa</div>
         <div className="table-wrapper" style={{ border: 'none', boxShadow: 'none' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Danh mục</th>
+                <th>Loại hình sửa chữa</th>
                 <th>Số phiếu</th>
                 <th>Doanh thu</th>
                 <th>TB / phiếu</th>
@@ -444,19 +512,19 @@ export default function DashboardPage() {
               {loading && (
                 <tr><td colSpan={5}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
               )}
-              {!loading && categoryPerformance.length === 0 && (
+              {!loading && repairCategoryPerformance.length === 0 && (
                 <tr><td colSpan={5}>
                   <div className="empty-state">
                     <h3>Chưa có dữ liệu</h3>
                   </div>
                 </td></tr>
               )}
-              {!loading && categoryPerformance.map((row, i) => (
-                <tr key={row.categoryId}>
+              {!loading && repairCategoryPerformance.map((row) => (
+                <tr key={row.repairCategory}>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
-                      <span style={{ width: 9, height: 9, borderRadius: 2, background: categoryColorFor(row.categoryId, i), flexShrink: 0 }} />
-                      {row.categoryName}
+                      <span style={{ width: 9, height: 9, borderRadius: 2, background: REPAIR_CATEGORY_HUES[row.repairCategory], flexShrink: 0 }} />
+                      {row.repairCategoryName}
                     </span>
                   </td>
                   <td>{row.orders}</td>
