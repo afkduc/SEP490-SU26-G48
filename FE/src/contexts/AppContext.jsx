@@ -63,6 +63,7 @@ export function getRoleHome(user) {
   if (roles.includes(ROLES.ADMIN)) return '/admin/dashboard';
   if (roles.includes(ROLES.GENERAL_DIRECTOR)) return '/general-director';
   if (roles.includes(ROLES.MANAGER)) return '/manager';
+  if (roles.includes(ROLES.TEAM_LEADER)) return '/repair-orders';
   if (roles.includes(ROLES.WAREHOUSE_STAFF) || roles.includes(ROLES.ACCOUNTANT)) return '/inventory';
   return '/dashboard';
 }
