@@ -139,6 +139,26 @@ function EmployeeAvatar({ employee }) {
 }
 
 function EmployeeDetailModal({ employee, onClose }) {
+  const [members, setMembers] = useState(null);
+  const [specialties, setSpecialties] = useState(null);
+  const isTeamLeader = employee?.roles?.includes('team_leader');
+
+  useEffect(() => {
+    if (!employee?.id || !isTeamLeader) { setMembers(null); setSpecialties(null); return undefined; }
+    let mounted = true;
+    setMembers(null);
+    setSpecialties(null);
+    managerApi.getEmployeeById(employee.id)
+      .then((data) => {
+        if (!mounted) return;
+        setMembers(data?.members || []);
+        setSpecialties(data?.specialties || []);
+      })
+      .catch(() => { if (mounted) { setMembers([]); setSpecialties([]); } });
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employee?.id, isTeamLeader]);
+
   if (!employee) return null;
   const badge = statusBadge(employee.status);
   return (
@@ -173,6 +193,44 @@ function EmployeeDetailModal({ employee, onClose }) {
             <div className="detail-row"><div className="detail-label">Ngày vào</div><div className="detail-value">{formatDate(employee.createdAt)}</div></div>
             <div className="detail-row"><div className="detail-label">Ghi chú</div><div className="detail-value">{employee.notes || '—'}</div></div>
           </div>
+
+          {isTeamLeader && (
+            <>
+              <div style={{ fontWeight: 700, margin: '16px 0 8px', fontSize: 13, color: 'var(--gray-700)' }}>Chuyên môn</div>
+              {specialties === null && <p className="form-hint">Đang tải…</p>}
+              {specialties && specialties.length === 0 && <p className="form-hint">Chưa gán chuyên môn nào.</p>}
+              {specialties && specialties.length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  {specialties.map((s) => (
+                    <span key={s.id} className="tag">{s.name}</span>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ fontWeight: 700, margin: '16px 0 8px', fontSize: 13, color: 'var(--gray-700)' }}>
+                Thợ máy đang quản lý ({(members || []).length})
+              </div>
+              {members === null && <p className="form-hint">Đang tải…</p>}
+              {members && members.length === 0 && (
+                <p className="form-hint">Chưa có thợ máy nào được gán cho tổ trưởng này.</p>
+              )}
+              {members && members.length > 0 && (
+                <div className="table-wrapper" style={{ boxShadow: 'none' }}>
+                  <table className="data-table">
+                    <thead><tr><th>Mã NV</th><th>Thợ máy</th></tr></thead>
+                    <tbody>
+                      {members.map((m) => (
+                        <tr key={m.id}>
+                          <td style={{ fontFamily: 'monospace' }}>{m.employeeId}</td>
+                          <td>{m.fullName}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
@@ -385,8 +443,9 @@ function EmployeeFormPage({ mode }) {
 
   const [branch, setBranch] = useState(null);
   const [roles, setRoles] = useState([]);
+  const [specialtyOptions, setSpecialtyOptions] = useState([]);
   const [form, setForm] = useState({
-    fullName: '', email: '', phone: '', roleId: '', status: 'active', password: '', confirmPassword: '',
+    fullName: '', email: '', phone: '', roleId: '', status: 'active', password: '', confirmPassword: '', specialtyIds: [],
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -397,6 +456,7 @@ function EmployeeFormPage({ mode }) {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
     managerApi.getRoles().then((data) => { if (mounted) setRoles(data || []); }).catch(() => {});
+    managerApi.getSpecialties().then((data) => { if (mounted) setSpecialtyOptions(data || []); }).catch(() => {});
 
     if (isEdit && id) {
       managerApi
@@ -411,6 +471,7 @@ function EmployeeFormPage({ mode }) {
             status: data.status || 'active',
             password: '',
             confirmPassword: '',
+            specialtyIds: (data.specialties || []).map((s) => s.id),
           });
         })
         .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin nhân viên'); })
@@ -421,9 +482,22 @@ function EmployeeFormPage({ mode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit]);
 
+  const selectedRole = roles.find((r) => String(r.id) === String(form.roleId));
+  const isTeamLeaderRole = selectedRole?.roleName === 'team_leader';
+
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
+  };
+
+  const toggleSpecialty = (specialtyId) => {
+    setForm((prev) => {
+      const exists = prev.specialtyIds.includes(specialtyId);
+      return {
+        ...prev,
+        specialtyIds: exists ? prev.specialtyIds.filter((sid) => sid !== specialtyId) : [...prev.specialtyIds, specialtyId],
+      };
+    });
   };
 
   const validate = () => {
@@ -456,6 +530,7 @@ function EmployeeFormPage({ mode }) {
         phone: form.phone.trim(),
         roleId: Number(form.roleId),
         status: form.status,
+        specialtyIds: isTeamLeaderRole ? form.specialtyIds : [],
       };
 
       if (isEdit) {
@@ -547,6 +622,27 @@ function EmployeeFormPage({ mode }) {
               </div>
             )}
           </div>
+
+          {isTeamLeaderRole && (
+            <div className="form-group" style={{ marginTop: 14 }}>
+              <label className="form-label">Chuyên môn</label>
+              {specialtyOptions.length === 0 ? (
+                <p className="form-hint">Chưa có danh mục chuyên môn nào trong hệ thống.</p>
+              ) : (
+                <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', maxHeight: 220, overflowY: 'auto' }}>
+                  {specialtyOptions.map((s) => (
+                    <label
+                      key={s.id}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, cursor: 'pointer' }}
+                    >
+                      <input type="checkbox" checked={form.specialtyIds.includes(s.id)} onChange={() => toggleSpecialty(s.id)} />
+                      <span>{s.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {!isEdit && (
             <>
@@ -1955,435 +2051,6 @@ function SettlementReportsPage() {
   );
 }
 
-function TeamLeaderDetailModal({ teamLeader, onClose }) {
-  if (!teamLeader) return null;
-  const badge = statusBadge(teamLeader.status);
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">Chi tiết tổ trưởng</h3>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-            <EmployeeAvatar employee={teamLeader} />
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-900)' }}>{teamLeader.fullName}</div>
-              <span className={`badge ${badge.className}`}>{badge.label}</span>
-            </div>
-          </div>
-          <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 16 }}>
-            <div className="detail-row"><div className="detail-label">Mã NV</div><div className="detail-value">{teamLeader.employeeId}</div></div>
-            <div className="detail-row"><div className="detail-label">Email</div><div className="detail-value">{teamLeader.email || '—'}</div></div>
-            <div className="detail-row"><div className="detail-label">Số điện thoại</div><div className="detail-value">{teamLeader.phone || '—'}</div></div>
-            <div className="detail-row"><div className="detail-label">Chi nhánh</div><div className="detail-value">{teamLeader.branch?.name || '—'}</div></div>
-            <div className="detail-row"><div className="detail-label">Ngày vào</div><div className="detail-value">{formatDate(teamLeader.createdAt)}</div></div>
-          </div>
-          <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13, color: 'var(--gray-700)' }}>
-            Thợ máy đang quản lý ({(teamLeader.members || []).length})
-          </div>
-          {(teamLeader.members || []).length === 0 ? (
-            <p className="form-hint">Chưa có thợ máy nào được gán cho tổ trưởng này.</p>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead><tr><th>Mã NV</th><th>Thợ máy</th></tr></thead>
-                <tbody>
-                  {teamLeader.members.map((m) => (
-                    <tr key={m.id}>
-                      <td style={{ fontFamily: 'monospace' }}>{m.employeeId}</td>
-                      <td>{m.fullName}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TeamLeaderListPage() {
-  const navigate = useNavigate();
-  const [teamLeaders, setTeamLeaders] = useState([]);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [activeTeamLeader, setActiveTeamLeader] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const searchTimer = useRef(null);
-  const requestSeq = useRef(0);
-
-  const reload = () => {
-    const seq = ++requestSeq.current;
-    setLoading(true);
-    setError('');
-    managerApi
-      .getTeamLeaders({ search: search.trim(), status })
-      .then((data) => {
-        if (seq !== requestSeq.current) return;
-        setTeamLeaders(data || []);
-        setPage(1);
-      })
-      .catch((err) => {
-        if (seq !== requestSeq.current) return;
-        setTeamLeaders([]);
-        setError(err.message || 'Không tải được danh sách tổ trưởng');
-      })
-      .finally(() => {
-        if (seq === requestSeq.current) setLoading(false);
-      });
-  };
-
-  useEffect(() => {
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(reload, 300);
-    return () => clearTimeout(searchTimer.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status]);
-
-  const clearFilters = () => {
-    setSearch('');
-    setStatus('all');
-  };
-
-  const openDetail = (teamLeader) => {
-    setActiveTeamLeader(teamLeader);
-    setDetailLoading(true);
-    managerApi
-      .getTeamLeaderById(teamLeader.id)
-      .then((data) => setActiveTeamLeader(data || teamLeader))
-      .finally(() => setDetailLoading(false));
-  };
-
-  const totalPages = Math.max(1, Math.ceil(teamLeaders.length / PAGE_SIZE));
-  const pageItems = teamLeaders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>Quản lý tổ trưởng</h1>
-          <div className="breadcrumb">Trang chủ / Tổ trưởng</div>
-        </div>
-        <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-to-truong.csv',
-              ['Mã NV', 'Họ và tên', 'Email', 'Số thợ quản lý', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
-              teamLeaders.map((t) => [t.employeeId, t.fullName, t.email, t.teamMemberCount, t.phone, formatDate(t.createdAt), statusBadge(t.status).label])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/team-leaders/create')}>
-            + Thêm tổ trưởng
-          </button>
-        </div>
-      </div>
-
-      <div className="filter-bar">
-        <div className="search-input">
-          <span className="search-icon">🔍</span>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã NV, tên, email..." />
-        </div>
-
-        <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
-          {EMPLOYEE_STATUS_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-
-        <button type="button" className="btn btn-secondary" onClick={clearFilters}>
-          ✕ Xóa lọc
-        </button>
-      </div>
-
-      {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <span>{error}</span>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
-        </div>
-      )}
-
-      <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 8, textAlign: 'right' }}>
-        Hiển thị {pageItems.length}/{teamLeaders.length} tổ trưởng
-      </div>
-
-      <div className="table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Mã NV</th>
-              <th>Tổ trưởng</th>
-              <th>Số thợ quản lý</th>
-              <th>Số điện thoại</th>
-              <th>Ngày vào</th>
-              <th>Trạng thái</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7}>
-                <div className="empty-state">
-                  <div className="empty-state-icon">⏳</div>
-                  <h3>Đang tải danh sách tổ trưởng</h3>
-                </div>
-              </td></tr>
-            )}
-
-            {!loading && pageItems.length === 0 && !error && (
-              <tr><td colSpan={7}>
-                <div className="empty-state">
-                  <div className="empty-state-icon">📭</div>
-                  <h3>Không có tổ trưởng phù hợp</h3>
-                  <p>Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc, hoặc thêm tổ trưởng mới.</p>
-                </div>
-              </td></tr>
-            )}
-
-            {!loading && pageItems.map((teamLeader) => {
-              const badge = statusBadge(teamLeader.status);
-              return (
-                <tr key={teamLeader.id}>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{teamLeader.employeeId}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <EmployeeAvatar employee={teamLeader} />
-                      <div>
-                        <div style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{teamLeader.fullName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{teamLeader.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>{teamLeader.teamMemberCount} thợ</td>
-                  <td>{teamLeader.phone || '—'}</td>
-                  <td>{formatDate(teamLeader.createdAt)}</td>
-                  <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
-                  <td>
-                    <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(teamLeader)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/team-leaders/${teamLeader.id}/edit`)}>✏️</button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <div className="pagination">
-          <span className="pagination-info">
-            {teamLeaders.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, teamLeaders.length)} trong {teamLeaders.length} kết quả
-          </span>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)' }}>{page}</span>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>›</button>
-          </div>
-        </div>
-      </div>
-
-      {!detailLoading && <TeamLeaderDetailModal teamLeader={activeTeamLeader} onClose={() => setActiveTeamLeader(null)} />}
-    </div>
-  );
-}
-
-function TeamLeaderFormPage({ mode }) {
-  const navigate = useNavigate();
-  const { id } = useParams();
-  const isEdit = mode === 'edit';
-
-  const [branch, setBranch] = useState(null);
-  const [form, setForm] = useState({
-    fullName: '', email: '', phone: '', status: 'active', password: '', confirmPassword: '',
-  });
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [loading, setLoading] = useState(isEdit);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let mounted = true;
-    managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
-
-    if (isEdit && id) {
-      managerApi
-        .getTeamLeaderById(id)
-        .then((data) => {
-          if (!mounted || !data) return;
-          setForm({
-            fullName: data.fullName || '',
-            email: data.email || '',
-            phone: data.phone || '',
-            status: data.status || 'active',
-            password: '',
-            confirmPassword: '',
-          });
-        })
-        .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin tổ trưởng'); })
-        .finally(() => { if (mounted) setLoading(false); });
-    }
-
-    return () => { mounted = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, isEdit]);
-
-  const setField = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-    setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
-  };
-
-  const validate = () => {
-    const errors = {};
-    if (!form.fullName.trim()) errors.fullName = 'Vui lòng nhập họ và tên';
-    if (!form.email.trim()) errors.email = 'Vui lòng nhập email';
-    else if (!EMAIL_REGEX.test(form.email.trim())) errors.email = 'Email không đúng định dạng';
-    if (!form.phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại';
-    else if (!PHONE_REGEX.test(form.phone.trim())) errors.phone = 'Số điện thoại không hợp lệ';
-    if (!isEdit) {
-      if (!form.password) errors.password = 'Vui lòng nhập mật khẩu tạm thời';
-      else if (form.password.length < 8) errors.password = 'Mật khẩu tối thiểu 8 ký tự';
-      if (form.confirmPassword !== form.password) errors.confirmPassword = 'Xác nhận mật khẩu không khớp';
-    }
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError('');
-    if (!validate()) return;
-
-    setSubmitting(true);
-    try {
-      const payload = {
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        status: form.status,
-      };
-
-      if (isEdit) {
-        await managerApi.updateTeamLeader(id, payload);
-      } else {
-        await managerApi.createTeamLeader({ ...payload, password: form.password, confirmPassword: form.confirmPassword });
-      }
-      navigate('/manager/team-leaders');
-    } catch (err) {
-      setError(err.message || 'Có lỗi xảy ra, vui lòng thử lại');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="empty-state">
-        <div className="empty-state-icon">⏳</div>
-        <h3>Đang tải thông tin tổ trưởng</h3>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>{isEdit ? 'Chỉnh sửa tổ trưởng' : 'Thêm tổ trưởng'}</h1>
-          <div className="breadcrumb">Tổ trưởng / {isEdit ? 'Chỉnh sửa' : 'Thêm mới'}</div>
-        </div>
-      </div>
-
-      {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit}>
-        <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">👤 Thông tin tổ trưởng</div>
-
-          {branch && (
-            <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
-              📍 Chi nhánh: <strong>{branch.name}</strong>
-              {!isEdit && ' — Tổ trưởng mới sẽ được thêm vào chi nhánh này.'}
-            </div>
-          )}
-
-          <div className="form-grid form-grid-2">
-            <div className="form-group">
-              <label className="form-label required">Họ và tên</label>
-              <input className="form-input" value={form.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Nhập họ và tên" />
-              {fieldErrors.fullName && <span className="form-error">{fieldErrors.fullName}</span>}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label required">Email</label>
-              <input className="form-input" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="email@autogara.vn" />
-              {fieldErrors.email && <span className="form-error">{fieldErrors.email}</span>}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label required">Số điện thoại</label>
-              <input className="form-input" value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="0xxxxxxxxx" />
-              {fieldErrors.phone && <span className="form-error">{fieldErrors.phone}</span>}
-            </div>
-
-            {isEdit && (
-              <div className="form-group">
-                <label className="form-label required">Trạng thái</label>
-                <select className="form-select" value={form.status} onChange={(e) => setField('status', e.target.value)}>
-                  <option value="active">Đang làm việc</option>
-                  <option value="inactive">Nghỉ việc</option>
-                </select>
-              </div>
-            )}
-          </div>
-
-          {!isEdit && (
-            <>
-              <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Thông tin đăng nhập</div>
-              <div className="form-grid form-grid-2">
-                <div className="form-group">
-                  <label className="form-label required">Mật khẩu tạm thời</label>
-                  <input type="password" className="form-input" value={form.password} onChange={(e) => setField('password', e.target.value)} placeholder="Tối thiểu 8 ký tự" />
-                  {fieldErrors.password && <span className="form-error">{fieldErrors.password}</span>}
-                </div>
-                <div className="form-group">
-                  <label className="form-label required">Xác nhận mật khẩu</label>
-                  <input type="password" className="form-input" value={form.confirmPassword} onChange={(e) => setField('confirmPassword', e.target.value)} placeholder="Nhập lại mật khẩu" />
-                  {fieldErrors.confirmPassword && <span className="form-error">{fieldErrors.confirmPassword}</span>}
-                </div>
-              </div>
-              <p className="form-hint" style={{ marginTop: 8 }}>Tổ trưởng sẽ đổi mật khẩu lần đầu đăng nhập.</p>
-            </>
-          )}
-        </div>
-
-        <div className="form-actions">
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/manager/team-leaders')}>Hủy</button>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Đang lưu...' : isEdit ? '🔄 Cập nhật' : '+ Thêm tổ trưởng'}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
 function TechnicianDetailModal({ technician, onClose }) {
   if (!technician) return null;
   const badge = statusBadge(technician.status);
@@ -2907,9 +2574,6 @@ export default function ManagerPage() {
       <Route path="technicians" element={<TechnicianListPage />} />
       <Route path="technicians/create" element={<TechnicianFormPage mode="create" />} />
       <Route path="technicians/:id/edit" element={<TechnicianFormPage mode="edit" />} />
-      <Route path="team-leaders" element={<TeamLeaderListPage />} />
-      <Route path="team-leaders/create" element={<TeamLeaderFormPage mode="create" />} />
-      <Route path="team-leaders/:id/edit" element={<TeamLeaderFormPage mode="edit" />} />
       <Route path="services" element={<ServiceListPage />} />
       <Route path="services/create" element={<ServiceFormPage mode="create" />} />
       <Route path="services/:id/edit" element={<ServiceFormPage mode="edit" />} />

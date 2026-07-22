@@ -79,7 +79,6 @@ const MANAGER_NAV = [
     children: [
       { label: 'Nhân viên', path: '/manager/employees' },
       { label: 'Thợ máy', path: '/manager/technicians' },
-      { label: 'Tổ trưởng', path: '/manager/team-leaders' },
     ],
   },
   { label: 'Quyết toán sửa chữa', path: '/manager/settlements' },
