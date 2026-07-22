@@ -152,6 +152,8 @@ const adminBranchesApi = new AdminBranchesApi();
  *   - create(payload):          POST /api/admin/roles
  *   - update(id, payload):      PUT /api/admin/roles/:id
  *   - delete(id):               DELETE /api/admin/roles/:id
+ *   - list():                   GET /api/admin/roles
+ *   - listWithPermissions():    GET /api/admin/roles/full  (1 call, tranh N+1)
  *   - listPermissions():         GET /api/admin/permissions
  *   - getRolePermissions(id):    GET /api/admin/roles/:id/permissions
  *   - setRolePermissions(id, permIds[]): PUT /api/admin/roles/:id/permissions
@@ -160,6 +162,10 @@ const adminBranchesApi = new AdminBranchesApi();
 class AdminRolesApi {
   list() {
     return httpClient.get('/admin/roles');
+  }
+
+  listWithPermissions() {
+    return httpClient.get('/admin/roles/full');
   }
 
   getDetail(id) {

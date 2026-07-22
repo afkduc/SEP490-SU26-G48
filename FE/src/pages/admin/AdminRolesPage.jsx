@@ -73,6 +73,34 @@ function groupPermissionsByModule(permissions) {
   return groups;
 }
 
+// ─── Confirm Modal ──────────────────────────────────────────────
+
+function ConfirmModal({ title, body, confirmLabel = 'Xác nhận', cancelLabel = 'Hủy', variant = 'danger', onConfirm, onCancel }) {
+  return (
+    <div className="role-modal-overlay" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div className="role-modal" style={{ maxWidth: '420px' }}>
+        <div className="role-modal__header">
+          <h2 className="role-modal__title">{title}</h2>
+          <button className="role-modal__close" onClick={onCancel} type="button"><IconX /></button>
+        </div>
+        <div className="role-modal__body">
+          <div style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.55 }}>{body}</div>
+        </div>
+        <div className="role-modal__footer">
+          <button type="button" className="btn btn--secondary" onClick={onCancel}>{cancelLabel}</button>
+          <button
+            type="button"
+            className={`btn ${variant === 'danger' ? 'btn--warning' : 'btn--primary'}`}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Role Form Modal ──────────────────────────────────────────────
 
 function RoleFormModal({ role, onClose, onSuccess }) {
@@ -196,7 +224,7 @@ function RoleUsersModal({ role, users, onClose }) {
 
 // ─── Role Card ──────────────────────────────────────────────────
 
-function RoleCard({ role, onEdit, onToggleStatus, onUsers }) {
+function RoleCard({ role, onAction }) {
   return (
     <div className={`role-card ${role.isActive ? '' : 'role-card--inactive'}`}>
       <div className="role-card__header">
@@ -219,15 +247,15 @@ function RoleCard({ role, onEdit, onToggleStatus, onUsers }) {
         </span>
       </div>
       <div className="role-card__actions">
-        <button className="btn btn--sm btn--secondary" onClick={() => onUsers(role)} title="Xem người dùng">
+        <button className="btn btn--sm btn--secondary" onClick={() => onAction('users', role)} title="Xem người dùng">
           <IconUsers /> Người dùng
         </button>
-        <button className="btn btn--sm btn--secondary" onClick={() => onEdit(role)} title="Chỉnh sửa">
+        <button className="btn btn--sm btn--secondary" onClick={() => onAction('edit', role)} title="Chỉnh sửa">
           <IconEdit /> Sửa
         </button>
         <button
           className={`btn btn--sm ${role.isActive ? 'btn--warning' : 'btn--success-outline'}`}
-          onClick={() => onToggleStatus(role)}
+          onClick={() => onAction('toggle', role)}
           title={role.isActive ? 'Tắt vai trò' : 'Kích hoạt vai trò'}
         >
           {role.isActive ? 'Tắt' : 'Kích hoạt'}
@@ -347,6 +375,36 @@ export default function AdminRolesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editRole, setEditRole] = useState(null);
   const [usersModal, setUsersModal] = useState(null); // { role, users }
+  const [confirmToggle, setConfirmToggle] = useState(null); // role dang can confirm toggle
+
+  function handleRoleAction(action, role) {
+    if (action === 'users') return handleUsersModal(role);
+    if (action === 'edit') {
+      setEditRole(role);
+      setShowForm(true);
+      return;
+    }
+    if (action === 'toggle') {
+      // Neu role dang active va co user -> confirm truoc
+      if (role.isActive && (role.userCount ?? 0) > 0) {
+        setConfirmToggle(role);
+      } else {
+        doToggleStatus(role);
+      }
+    }
+  }
+
+  async function doToggleStatus(role) {
+    try {
+      await adminRolesApi.toggleStatus(role.id);
+      toast.success('Cập nhật trạng thái thành công');
+      loadRoles();
+    } catch (err) {
+      toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
+    } finally {
+      setConfirmToggle(null);
+    }
+  }
 
   async function loadRoles() {
     setLoading(true);
@@ -364,25 +422,17 @@ export default function AdminRolesPage() {
   async function loadMatrix() {
     setMatrixLoading(true);
     try {
-      const [permsRes, rolesRes] = await Promise.all([
+      const [permsRes, rolesFullRes] = await Promise.all([
         adminRolesApi.listPermissions(),
-        adminRolesApi.list(),
+        adminRolesApi.listWithPermissions(),
       ]);
       setPermissions(permsRes?.items || []);
-      const rolesList = rolesRes?.items || [];
-
-      // Load role permissions sequentially to avoid overwhelming DB
+      const rolesList = rolesFullRes?.items || [];
+      // Map permissionIds (number[]) vao state rolePermissions (1 call, khong N+1)
       const permsByRole = {};
-      await Promise.all(
-        rolesList.map(async (role) => {
-          try {
-            const res = await adminRolesApi.getRolePermissions(role.id);
-            permsByRole[role.id] = (res?.items || []).map((p) => p.id);
-          } catch {
-            permsByRole[role.id] = [];
-          }
-        })
-      );
+      for (const r of rolesList) {
+        permsByRole[r.id] = Array.isArray(r.permissionIds) ? r.permissionIds : [];
+      }
       setRolePermissions(permsByRole);
     } catch (err) {
       console.error('Matrix load error:', err);
@@ -392,7 +442,7 @@ export default function AdminRolesPage() {
   }
 
   useEffect(() => { loadRoles(); }, []);
-  useEffect(() => { if (tab === 'matrix' && permissions.length === 0) loadMatrix(); }, [tab]);
+  useEffect(() => { if (tab === 'matrix') loadMatrix(); }, [tab]);
 
   // Matrix hien thi TAT CA roles (gồm system roles + custom roles).
   // Truoc day chi loc theo ROLE_VALUES -> custom roles bi an va khong luu duoc.
@@ -417,6 +467,9 @@ export default function AdminRolesPage() {
       setMatrixDirty(false);
 
       // Refresh token với permissions mới từ DB
+      // Neu refresh that bai -> chi warn, KHONG hien "thanh cong" gia
+      // (BE da luu DB thanh cong nhung token con cu)
+      let refreshOk = false;
       try {
         const result = await refreshPermissionsApi();
         if (result?.token || result?.permissions) {
@@ -425,26 +478,21 @@ export default function AdminRolesPage() {
           if (result.permissions) {
             storage.setItem('permissions', JSON.stringify(result.permissions));
           }
+          refreshOk = true;
         }
-      } catch {
-        // Neu refresh that bai, van thong bao thanh cong (BE da luu DB)
+      } catch (err) {
+        console.warn('[AdminRolesPage] refresh-permissions fail:', err);
       }
 
-      toast.success('Đã lưu ma trận quyền. Thay đổi sẽ có hiệu lực ngay.');
+      if (refreshOk) {
+        toast.success('Đã lưu ma trận quyền. Thay đổi có hiệu lực ngay.');
+      } else {
+        toast.warn('Đã lưu vào DB nhưng token chưa cập nhật. Vui lòng đăng nhập lại để thấy thay đổi quyền.');
+      }
     } catch (err) {
       toast.error('Lỗi khi lưu: ' + (err.message || 'Không rõ'));
     } finally {
       setMatrixSaving(false);
-    }
-  }
-
-  async function handleToggleStatus(role) {
-    try {
-      await adminRolesApi.toggleStatus(role.id);
-      toast.success('Cập nhật trạng thái thành công');
-      loadRoles();
-    } catch (err) {
-      toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
     }
   }
 
@@ -531,9 +579,7 @@ export default function AdminRolesPage() {
                 <RoleCard
                   key={role.id}
                   role={role}
-                  onEdit={(r) => { setEditRole(r); setShowForm(true); }}
-                  onToggleStatus={handleToggleStatus}
-                  onUsers={handleUsersModal}
+                  onAction={handleRoleAction}
                 />
               ))}
             </div>
@@ -587,6 +633,26 @@ export default function AdminRolesPage() {
           role={usersModal.role}
           users={usersModal.users}
           onClose={() => setUsersModal(null)}
+        />
+      )}
+
+      {confirmToggle && (
+        <ConfirmModal
+          title={`Tắt vai trò "${confirmToggle.roleLabel}"?`}
+          body={
+            <div>
+              <p style={{ margin: '0 0 8px' }}>
+                Vai trò này đang có <strong>{confirmToggle.userCount}</strong> người dùng.
+              </p>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem' }}>
+                Khi tắt, những người dùng này sẽ mất quyền tương ứng nhưng vẫn giữ tài khoản.
+              </p>
+            </div>
+          }
+          confirmLabel={`Tắt vai trò (${confirmToggle.userCount} người dùng)`}
+          variant="danger"
+          onConfirm={() => doToggleStatus(confirmToggle)}
+          onCancel={() => setConfirmToggle(null)}
         />
       )}
     </div>

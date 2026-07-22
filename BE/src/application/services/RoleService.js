@@ -12,6 +12,14 @@ class RoleService {
     return { items: roles, total: roles.length };
   }
 
+  /**
+   * Lay roles kem permissionIds trong 1 call (phuc vu ma tran quyen - tranh N+1)
+   */
+  async listRolesWithPermissions() {
+    const roles = await this.roleRepository.findAllWithPermissions();
+    return { items: roles, total: roles.length };
+  }
+
   async getRoleDetail(roleId) {
     if (!roleId) throw new ApiError(400, 'roleId la bat buoc');
     const role = await this.roleRepository.findById(Number(roleId));
@@ -37,11 +45,27 @@ class RoleService {
 
   /**
    * Gan permissions cho 1 role
+   * Validate permission IDs ton tai truoc khi gan (tranh FK constraint fail)
    */
   async setRolePermissions(roleId, permissionIds) {
     const role = await this.roleRepository.findById(Number(roleId));
     if (!role) throw new ApiError(404, 'Role khong ton tai');
-    await this.roleRepository.setRolePermissions(roleId, permissionIds);
+
+    // Validate: permissionIds phai la mang number va cac ID phai ton tai
+    const ids = (permissionIds || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    const uniqueIds = Array.from(new Set(ids));
+    if (uniqueIds.length > 0) {
+      const validIds = await this.roleRepository.findAllPermissionIds();
+      const invalidIds = uniqueIds.filter((id) => !validIds.has(id));
+      if (invalidIds.length > 0) {
+        throw new ApiError(400, `Permission ID khong ton tai: ${invalidIds.join(', ')}`);
+      }
+    }
+
+    await this.roleRepository.setRolePermissions(roleId, uniqueIds);
 
     // Invalidate cache cho tat ca users có role này
     if (this.permissionService) {
