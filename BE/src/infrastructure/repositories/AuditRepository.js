@@ -17,11 +17,11 @@ const AUDIT_LOG_COLUMNS = `
   al.response_status,
   al.duration_ms,
   al.branch_id,
+  al.branch_name,
   al.description,
   al.old_value,
   al.new_value,
-  al.logged_at,
-  b.branch_name
+  al.logged_at
 `;
 
 const LOGIN_SESSION_COLUMNS = `
@@ -314,7 +314,7 @@ async function getAuditLogs(filters = {}) {
   // Get count and stats in parallel
   const [countResult, statsResult] = await Promise.all([
     query(
-      `SELECT COUNT(*) AS total FROM audit_logs al WHERE ${whereClause}`,
+      `SELECT COUNT(*) AS total FROM v_audit_logs_with_branch al WHERE ${whereClause}`,
       params
     ),
     query(
@@ -323,7 +323,7 @@ async function getAuditLogs(filters = {}) {
         SUM(CASE WHEN al.action IN ('CREATE', 'INSERT') THEN 1 ELSE 0 END) AS create_count,
         SUM(CASE WHEN al.action IN ('UPDATE', 'EDIT') THEN 1 ELSE 0 END) AS update_count,
         SUM(CASE WHEN al.action IN ('DELETE', 'REMOVE') THEN 1 ELSE 0 END) AS delete_count
-       FROM audit_logs al WHERE ${whereClause}`,
+       FROM v_audit_logs_with_branch al WHERE ${whereClause}`,
       params
     ),
   ]);
@@ -333,8 +333,7 @@ async function getAuditLogs(filters = {}) {
 
   const dataResult = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
-     FROM   audit_logs al
-     LEFT   JOIN branches b ON b.id = al.branch_id
+     FROM   v_audit_logs_with_branch al
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY`,
@@ -363,8 +362,7 @@ async function getAuditLogs(filters = {}) {
 async function getAuditLogById(id) {
   const result = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
-     FROM   audit_logs al
-     LEFT   JOIN branches b ON b.id = al.branch_id
+     FROM   v_audit_logs_with_branch al
      WHERE  al.id = @p1`,
     { p1: id }
   );
@@ -485,8 +483,7 @@ async function getAuditLogsForExport(filters = {}) {
 
   const dataResult = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
-     FROM   audit_logs al
-     LEFT   JOIN branches b ON b.id = al.branch_id
+     FROM   v_audit_logs_with_branch al
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
      OFFSET 0 ROWS FETCH NEXT @p_limit ROWS ONLY`,
@@ -645,8 +642,7 @@ async function getAuditLogsByUser(userId, limit = 10) {
   const safeLimit = Math.max(1, parseInt(limit, 10) || 10);
   const result = await query(
     `SELECT TOP (@p2) ${AUDIT_LOG_COLUMNS}
-     FROM   audit_logs al
-     LEFT   JOIN branches b ON b.id = al.branch_id
+     FROM   v_audit_logs_with_branch al
      WHERE  al.user_id = @p1
      ORDER  BY al.logged_at DESC, al.id DESC`,
     { p1: userId, p2: safeLimit }

@@ -393,12 +393,13 @@
   table-layout: fixed;
 }
 
-/* Phân bổ độ rộng cột (tổng = 100%) ở mặc định ≥1100px */
-.table colgroup col:nth-child(1)  { width: 160px; }  /* Người dùng */
-.table colgroup col:nth-child(2)  { width: 100px; }  /* Hành động */
-.table colgroup col:nth-child(3)  { width: auto;  }  /* Mô tả — chiếm phần còn lại */
-.table colgroup col:nth-child(4)  { width: 120px; }  /* Chi nhánh */
-.table colgroup col:nth-child(5)  { width: 150px; }  /* Thời gian */
+/* Phân bổ độ rộng cột theo tỉ lệ % (tổng = 100%) — đều nhau ở mọi viewport ≥1100px.
+   Ưu tiên cột Mô tả (description) vì chứa text dài nhất. */
+.table colgroup col:nth-child(1)  { width: 17%;  }  /* Người dùng */
+.table colgroup col:nth-child(2)  { width: 12%;  }  /* Hành động */
+.table colgroup col:nth-child(3)  { width: 38%;  }  /* Mô tả — chiếm phần lớn nhất */
+.table colgroup col:nth-child(4)  { width: 14%;  }  /* Chi nhánh */
+.table colgroup col:nth-child(5)  { width: 19%;  }  /* Thời gian */
 
 .table thead tr {
   background: #f8fafc;
@@ -419,9 +420,45 @@
   text-overflow: ellipsis;
 }
 
+.table tbody td {
+  padding: 12px 14px;
+  color: #334155;
+  vertical-align: middle;
+  /* Mặc định: 1 dòng + ellipsis. Description (line-clamp-2) sẽ override bên dưới. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Các span nội dung trong cell cũng phải truncate theo */
+.table tbody td > * {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Description: cho phép xuống tối đa 2 dòng để không bị mất thông tin,
+   giữ các row cao đều nhau (line-height 1.4 → ~2 dòng = 2.8em). */
+.table tbody td > .audit-logs__description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  line-height: 1.4;
+  max-height: calc(1.4em * 2);
+}
+
+/* Đặt chiều cao tối thiểu cho mỗi row để tất cả row cao đều nhau
+   (đủ chứa 2 dòng description + padding). */
 .table tbody tr {
   border-bottom: 1px solid #f1f5f9;
   transition: background 0.12s;
+  min-height: 60px;
 }
 
 .table tbody tr:nth-child(even) {
@@ -437,22 +474,7 @@
 }
 
 .table tbody td {
-  padding: 10px 12px;
-  color: #334155;
-  vertical-align: middle;
-  /* Truncate dài: 1 dòng + ellipsis, hover cell sẽ thấy title (set ở từng span) */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Các span nội dung trong cell cũng phải truncate theo */
-.table tbody td > * {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-height: 60px;
 }
 
 /* Time-cell là container flex-column chứa 3 dòng (main / ago / utc).
@@ -613,12 +635,16 @@
 .audit-logs__description {
   font-size: 0.83rem;
   color: #334155;
-  line-height: 1.45;
+  line-height: 1.4;
   word-break: break-word;
+  /* white-space + overflow + text-overflow được override bởi rule
+     .table tbody td > .audit-logs__description ở trên (line-clamp 2 dòng). */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .audit-logs__entity {
@@ -802,10 +828,12 @@
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 1100px) {
-  .table colgroup col:nth-child(1) { width: 140px; }  /* Người dùng */
-  .table colgroup col:nth-child(2) { width: 90px;  }  /* Hành động */
-  .table colgroup col:nth-child(4) { width: 100px; }  /* Chi nhánh */
-  .table colgroup col:nth-child(5) { width: 130px; }  /* Thời gian */
+  /* Màn trung bình: giữ tỉ lệ % nhưng ưu tiên thu gọn cột Người dùng + Thời gian */
+  .table colgroup col:nth-child(1) { width: 15%;  }  /* Người dùng */
+  .table colgroup col:nth-child(2) { width: 11%;  }  /* Hành động */
+  .table colgroup col:nth-child(3) { width: 40%;  }  /* Mô tả */
+  .table colgroup col:nth-child(4) { width: 14%;  }  /* Chi nhánh */
+  .table colgroup col:nth-child(5) { width: 20%;  }  /* Thời gian */
 }
 
 @media (max-width: 900px) {
