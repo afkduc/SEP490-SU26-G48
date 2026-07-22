@@ -55,11 +55,6 @@ function buildManagerRouter() {
   router.post('/technicians', controller.createTechnician);
   router.put('/technicians/:id', controller.updateTechnician);
 
-  router.get('/team-leaders', controller.getTeamLeaders);
-  router.get('/team-leaders/:id', controller.getTeamLeaderById);
-  router.post('/team-leaders', controller.createTeamLeader);
-  router.put('/team-leaders/:id', controller.updateTeamLeader);
-
   // ===== Phieu nhap kho (Manager) =====
   // Manager truy cap /manager/import-requests ... de xem va duyet phieu
   // cua chi nhanh minh quan ly.

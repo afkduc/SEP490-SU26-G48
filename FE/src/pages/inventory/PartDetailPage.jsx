@@ -7,9 +7,9 @@ import { listUnitsApi } from '../../services/productApi';
 import './PartDetailPage.css';
 
 const STATUS_LABELS = {
-  active: 'Hoat dong',
-  low_stock: 'Sap het',
-  inactive: 'Tam ngung',
+  active: 'Hoạt động',
+  low_stock: 'Sắp hết',
+  inactive: 'Tạm ngừng',
 };
 
 export default function PartDetailPage() {
@@ -77,7 +77,7 @@ export default function PartDetailPage() {
   }
 
   async function handleDelete() {
-    if (!window.confirm('Xac nhan xoa phu tung nay?')) return;
+    if (!window.confirm('Xác nhận xóa phụ tùng này?')) return;
     setDeleting(true);
     setFormError('');
     try {
@@ -89,9 +89,9 @@ export default function PartDetailPage() {
     }
   }
 
-  if (loading) return <div className="detail-loading">Dang tai...</div>;
-  if (error) return <div className="detail-error">Loi: {error}</div>;
-  if (!part) return <div className="detail-error">Khong tim thay phu tung</div>;
+  if (loading) return <div className="detail-loading">Đang tải...</div>;
+  if (error) return <div className="detail-error">Lỗi: {error}</div>;
+  if (!part) return <div className="detail-error">Không tìm thấy phụ tùng</div>;
 
   const stock = Number(part.stockQuantity ?? 0);
   const min = Number(part.minStock ?? 0);
@@ -108,21 +108,21 @@ export default function PartDetailPage() {
           <div className="part-detail__actions">
             {!editing && (
               <>
-                <button className="btn btn--secondary" onClick={startEdit}>Sua</button>
+                <button className="btn btn--secondary" onClick={startEdit}>Sửa</button>
                 <button
                   className="btn btn--ghost btn--danger"
                   onClick={handleDelete}
                   disabled={deleting}
                 >
-                  {deleting ? 'Dang xoa...' : 'Xoa'}
+                  {deleting ? 'Đang xóa...' : 'Xóa'}
                 </button>
               </>
             )}
-            <Link to="/inventory/parts" className="btn btn--ghost">Quay lai</Link>
+            <Link to="/inventory/parts" className="btn btn--ghost">Quay lại</Link>
           </div>
         </div>
         <span className={`badge ${isLow ? 'badge--warning' : 'badge--success'}`}>
-          {isLow ? 'Canh bao sap het hang' : 'Con hang'}
+          {isLow ? 'Cảnh báo sắp hết hàng' : 'Còn hàng'}
         </span>
       </div>
 
@@ -136,29 +136,29 @@ export default function PartDetailPage() {
               {formError && <div className="form-error">{formError}</div>}
 
               <div className="form-group">
-                <label className="form-label">Ten phu tung <span className="required">*</span></label>
+                <label className="form-label">Tên phụ tùng <span className="required">*</span></label>
                 <input className="input" value={form.productName}
                   onChange={(e) => setForm({ ...form, productName: e.target.value })} required />
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Loai</label>
+                  <label className="form-label">Loại</label>
                   <select className="input input--select" value={form.category}
                     onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                    <option value="">Chon loai</option>
-                    <option value="Phu tung dong co">Phu tung dong co</option>
-                    <option value="Phu tung gam">Phu tung gam</option>
-                    <option value="Phu tung dien">Phu tung dien</option>
-                    <option value="Dau nhot & hoa chat">Dau nhot & hoa chat</option>
-                    <option value="Phu kien">Phu kien</option>
+                    <option value="">Chọn loại</option>
+                    <option value="Phụ tùng động cơ">Phụ tùng động cơ</option>
+                    <option value="Phụ tùng gầm">Phụ tùng gầm</option>
+                    <option value="Phụ tùng điện">Phụ tùng điện</option>
+                    <option value="Dầu nhớt & hóa chất">Dầu nhớt & hóa chất</option>
+                    <option value="Phụ kiện">Phụ kiện</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Don vi <span className="required">*</span></label>
+                  <label className="form-label">Đơn vị <span className="required">*</span></label>
                   <select className="input input--select" value={form.unitId} required
                     onChange={(e) => setForm({ ...form, unitId: e.target.value })}>
-                    <option value="">Chon don vi</option>
+                    <option value="">Chọn đơn vị</option>
                     {units.map((u) => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
@@ -168,12 +168,12 @@ export default function PartDetailPage() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Don gia (VND)</label>
+                  <label className="form-label">Đơn giá (VND)</label>
                   <input className="input" type="number" min="0" value={form.unitPrice}
                     onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Ton toi thieu</label>
+                  <label className="form-label">Tồn tối thiểu</label>
                   <input className="input" type="number" min="0" value={form.minStock}
                     onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
                 </div>
@@ -181,13 +181,13 @@ export default function PartDetailPage() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Nha cung cap (ID)</label>
+                  <label className="form-label">Nhà cung cấp (ID)</label>
                   <input className="input" type="number" min="0" value={form.supplierId ?? ''}
                     onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
-                    placeholder="ID nha cung cap" />
+                    placeholder="ID nhà cung cấp" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Vi tri kho</label>
+                  <label className="form-label">Vị trí kho</label>
                   <input className="input" value={form.location}
                     onChange={(e) => setForm({ ...form, location: e.target.value })}
                     placeholder="VD: K1-A1" />
@@ -195,50 +195,50 @@ export default function PartDetailPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Trang thai</label>
+                <label className="form-label">Trạng thái</label>
                 <select className="input input--select" value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                  <option value="active">Hoat dong</option>
-                  <option value="low_stock">Sap het</option>
-                  <option value="inactive">Tam ngung</option>
+                  <option value="active">Hoạt động</option>
+                  <option value="low_stock">Sắp hết</option>
+                  <option value="inactive">Tạm ngừng</option>
                 </select>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Ghi chu</label>
+                <label className="form-label">Ghi chú</label>
                 <textarea className="input" rows={2} value={form.note}
                   onChange={(e) => setForm({ ...form, note: e.target.value })} />
               </div>
 
               <div className="detail-form__footer">
-                <button type="button" className="btn btn--secondary" onClick={cancelEdit}>Huy</button>
+                <button type="button" className="btn btn--secondary" onClick={cancelEdit}>Hủy</button>
                 <button type="submit" className="btn btn--primary" disabled={saving}>
-                  {saving ? 'Dang luu...' : 'Luu thay doi'}
+                  {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>
               </div>
             </form>
           ) : (
             <div className="detail-info-list">
-              <DetailRow label="Ma phu tung" value={<span className="font-mono">{part.productCode}</span>} />
-              <DetailRow label="Ten phu tung" value={part.productName} />
-              <DetailRow label="Loai" value={part.category || '—'} />
-              <DetailRow label="Thuong hieu" value={part.brandName || '—'} />
-              <DetailRow label="Don vi" value={part.unitName || '—'} />
-              <DetailRow label="Nha cung cap" value={part.supplierName || part.supplierId || '—'} />
+              <DetailRow label="Mã phụ tùng" value={<span className="font-mono">{part.productCode}</span>} />
+              <DetailRow label="Tên phụ tùng" value={part.productName} />
+              <DetailRow label="Loại" value={part.category || '—'} />
+              <DetailRow label="Thương hiệu" value={part.brandName || '—'} />
+              <DetailRow label="Đơn vị" value={part.unitName || '—'} />
+              <DetailRow label="Nhà cung cấp" value={part.supplierName || part.supplierId || '—'} />
             </div>
           )}
         </div>
 
         <div className="detail-card">
-          <h3 className="detail-card__title">Ton kho (chi doc)</h3>
+          <h3 className="detail-card__title">Tồn kho (chỉ đọc)</h3>
           <div className={`stock-highlight ${isLow ? 'stock-highlight--warn' : 'stock-highlight--ok'}`}>
             <span className="stock-highlight__number">{stock}</span>
             <span className="stock-highlight__unit">{part.unitName || ''}</span>
           </div>
           <div className="detail-info-list">
-            <DetailRow label="Ton toi thieu" value={min} />
+            <DetailRow label="Tồn tối thiểu" value={min} />
             <DetailRow
-              label="Gia tri ton kho"
+              label="Giá trị tồn kho"
               value={
                 part.unitPrice != null
                   ? (stock * Number(part.unitPrice)).toLocaleString('vi-VN') + ' đ'
@@ -246,41 +246,41 @@ export default function PartDetailPage() {
               }
             />
             <DetailRow
-              label="Don gia"
+              label="Đơn giá"
               value={part.unitPrice != null ? Number(part.unitPrice).toLocaleString('vi-VN') + ' đ' : '—'}
             />
-            <DetailRow label="Vi tri" value={part.location || '—'} />
+            <DetailRow label="Vị trí" value={part.location || '—'} />
             <DetailRow
-              label="Trang thai"
+              label="Trạng thái"
               value={<span className={`badge ${isLow ? 'badge--warning' : 'badge--success'}`}>
-                {isLow ? 'Sap het' : 'Con hang'}
+                {isLow ? 'Sắp hết' : 'Còn hàng'}
               </span>}
             />
           </div>
           <p className="detail-hint">
-            So luong ton chi duoc thay doi qua phieu nhap/xuat kho (se them o phase sau).
+            Số lượng tồn chỉ được thay đổi qua phiếu nhập/xuất kho (sẽ thêm ở phase sau).
           </p>
         </div>
       </div>
 
-      {/* Lich su ton kho */}
+      {/* Lịch sử tồn kho */}
       <div className="detail-card detail-card--full">
-        <h3 className="detail-card__title">Lich su ton kho</h3>
+        <h3 className="detail-card__title">Lịch sử tồn kho</h3>
         {history.length === 0 ? (
           <p className="detail-empty">
-            Chua co giao dich nao (lich su se hien thi khi co phieu nhap/xuat).
+            Chưa có giao dịch nào (lịch sử sẽ hiển thị khi có phiếu nhập/xuất).
           </p>
         ) : (
           <div className="table-responsive">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Ma phieu</th>
-                  <th>Loai</th>
-                  <th>So luong</th>
-                  <th>Ngay</th>
-                  <th>Nguoi thuc hien</th>
-                  <th>Ghi chu</th>
+                  <th>Mã phiếu</th>
+                  <th>Loại</th>
+                  <th>Số lượng</th>
+                  <th>Ngày</th>
+                  <th>Người thực hiện</th>
+                  <th>Ghi chú</th>
                 </tr>
               </thead>
               <tbody>
