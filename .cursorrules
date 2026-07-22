@@ -146,3 +146,7 @@ Sau khi sửa bất kỳ flow nào liên quan đến login/auth/heartbeat, PHẢ
 - [ ] Token hết hạn → SessionExpiredModal hiện 1 lần, không nhấp nháy.
 - [ ] Resize browser xuống mobile → sidebar drawer, pagination gọn, action menu 3 chấm.
 - [ ] Logout → token bị xóa CẢ 2 storage, modal không hiện oan khi request cũ về.
+
+
+- không được tạo file migrate mà phải gen câu lệnh sql để tôi tự thêm vào sql server
+- khi commit chỉ được để author là tôi chứ không được thêm author khác ( như cursoragent)
