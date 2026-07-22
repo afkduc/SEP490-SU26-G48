@@ -7,6 +7,7 @@ const { authenticate } = require('../../middlewares/auth');
 const { trackLogout } = require('../../middlewares/loginSessionMiddleware');
 const { success } = require('../../utils/response');
 const ApiError = require('../../utils/ApiError');
+const { query } = require('../../infrastructure/database/sqlServer');
 
 function buildAuthRouter() {
   const router = express.Router();
@@ -18,6 +19,72 @@ function buildAuthRouter() {
 
   router.post('/login', controller.login);
   router.get('/me', authenticate, controller.getMe);
+
+  /**
+   * POST /api/auth/refresh-permissions
+   *
+   * Re-issue JWT voi permissions moi nhat tu DB (bo qua cache).
+   *
+   * Use case:
+   *   - FE nhan SSE event 'permission-changed' tu /api/sse/permissions
+   *     (admin vua thay doi ma tran quyen / gan role / revoke role).
+   *   - Token hien tai van co permissions cu trong payload (24h cache).
+   *   - FE goi endpoint nay de lay token moi + permissions moi -> luu vao
+   *     localStorage -> PermissionGate re-render ngay.
+   *
+   * Tra ve:
+   *   200 { token, user } - thanh cong, FE save vao storage
+   *   401 - token khong hop le
+   *   503 - DB loi (khong the lay permission moi)
+   *
+   * LUU Y: endpoint nay KHONG thay doi tokenVersion, KHONG logout cac
+   * thiet bi khac (giong nhu "soft refresh"). No chi tao JWT moi voi
+   * permission list moi nhat, user van giu session cu.
+   */
+  router.post('/refresh-permissions', authenticate, async (req, res, next) => {
+    try {
+      const userId = req.user && req.user.userId;
+      if (!userId) {
+        return next(new ApiError(401, 'Token khong chua userId'));
+      }
+
+      // Lay user info moi tu DB (can cho token payload)
+      let freshUser;
+      try {
+        const result = await query(
+          `SELECT id, pseudo_id, user_name, email,
+                  first_name, last_name, phone, branch_id, status, avatar,
+                  must_change_password, token_version
+           FROM   users
+           WHERE  id = @userId AND status = 'active'`,
+          { userId }
+        );
+        freshUser = result.recordset[0] || null;
+      } catch (dbErr) {
+        console.error('[auth.refresh-permissions] query user failed:', dbErr?.message || dbErr);
+        return next(new ApiError(503, 'Khong the lay thong tin user tu DB'));
+      }
+      if (!freshUser) {
+        return next(new ApiError(401, 'User khong ton tai hoac bi vo hieu hoa'));
+      }
+
+      // Re-issue token voi permissions moi tu DB. PermissionService se
+      // bypass cache neu vua invalidate (case user vua bi admin thay doi).
+      let refreshed;
+      try {
+        const deviceId = req.user.deviceId || null;
+        refreshed = await service.issueTokenWithDevice(freshUser, deviceId);
+      } catch (signErr) {
+        console.error('[auth.refresh-permissions] issueToken failed:', signErr?.message || signErr);
+        return next(new ApiError(503, 'Khong the tao token moi'));
+      }
+
+      return success(res, refreshed, 'Refresh permissions thanh cong');
+    } catch (err) {
+      console.error('[auth.refresh-permissions] unexpected:', err?.message || err);
+      return next(new ApiError(500, 'Loi may chu noi bo'));
+    }
+  });
   router.post('/logout', authenticate, async (req, res, next) => {
     // QUAN TRONG (try/catch 2 lop):
     // - trackLogout internal da co try/catch rieng (line 315-397 middleware),

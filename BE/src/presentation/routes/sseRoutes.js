@@ -1,12 +1,19 @@
 /**
  * SSE Routes - Server-Sent Events endpoints cho realtime updates.
  *
- * Hien chi co /api/sse/login-sessions endpoint.
- * Client ket noi SSE, server push events khi co login/logout/force logout.
+ * Hien co 3 endpoint:
+ *   - /api/sse/login-sessions    : admin watch login/logout/force events
+ *   - /api/sse/notifications     : moi user nhan notification cua chinh minh
+ *   - /api/sse/permissions       : moi user nhan event khi admin thay doi
+ *                                  ma tran quyen / gan role / revoke role
+ *                                  -> FE tu refresh permissions, khong can F5
+ *
+ * Client ket noi SSE, server push events khi co thay doi.
  *
  * QUAN TRONG (security):
  *   - Phai authenticate JWT (Bearer token tu query string `?token=` hoac
- *     Authorization header) va chi cho admin/manager ket noi.
+ *     Authorization header) va chi cho admin/manager ket noi (login-sessions).
+ *   - Permissions/notifications: moi user authenticated deu ket noi duoc.
  *   - Truoc day route nay KHONG co auth -> bat ky ai cung stream duoc PII
  *     (email, IP, user-agent) -> SECURITY LEAK nghiem trong.
  *   - EventSource API cua browser KHONG ho tro custom headers, nen support
@@ -19,6 +26,7 @@ const config = require('../../config');
 const ApiError = require('../../utils/ApiError');
 const { onLoginSession } = require('../../application/events/LoginSessionEvents');
 const NotificationEvents = require('../../application/events/NotificationEvents');
+const { onPermissionChanged } = require('../../application/events/PermissionEvents');
 const { query } = require('../../infrastructure/database/sqlServer');
 
 const ADMIN_ROLES = ['admin', 'manager', 'general_director'];
@@ -228,6 +236,95 @@ function buildSSERouter() {
     });
 
     // Heartbeat keep-alive 30s
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: heartbeat\n\n`);
+      } catch {
+        clearInterval(heartbeat);
+      }
+    }, 30_000);
+
+    const cleanup = () => {
+      clearInterval(heartbeat);
+      try {
+        unsubscribe();
+      } catch {
+        /* ignore */
+      }
+    };
+    req.on('close', cleanup);
+    req.on('error', cleanup);
+  });
+
+  /**
+   * GET /api/sse/permissions?token=<JWT>
+   *
+   * Stream permission matrix changes cho user hien tai.
+   * Moi khi admin thay doi ma tran quyen (role_permissions), gan role, hoac
+   * revoke role -> server push SSE event 'permission-changed' den cac user
+   * bi anh huong (filter theo userId tu JWT).
+   *
+   * Client (FE) nhan event -> goi GET /api/auth/me -> save token + permissions
+   * moi vao localStorage -> PermissionGate re-render ngay (khong can F5).
+   *
+   * Event format:
+   *   event: permission-changed
+   *   data: {"action":"matrix_updated","roleIds":[2],"timestamp":"...","actorUserId":1}
+   *
+   * Security:
+   *   - JWT required (Bearer hoac ?token=).
+   *   - User chi nhan event neu co trong userIds cua payload (server-side filter).
+   *   - Khong can role admin - moi user deu can lang nghe de refresh khi bi admin thay doi.
+   */
+  router.get('/permissions', async (req, res) => {
+    const decoded = await authenticateSSE(req, res);
+    if (!decoded) return; // response already sent
+
+    const userId = Number(decoded.userId);
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Token khong chua userId',
+        code: 'NO_USER_ID',
+      });
+      return;
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    res.write(
+      `event: connected\ndata: ${JSON.stringify({
+        status: 'connected',
+        userId,
+      })}\n\n`
+    );
+
+    // Subscribe to PermissionEvents, filter theo userId cua connection nay.
+    const unsubscribe = onPermissionChanged((eventData) => {
+      try {
+        // Chi push neu user hien tai co trong userIds bi anh huong
+        const affected = Array.isArray(eventData.userIds) ? eventData.userIds : [];
+        if (!affected.includes(userId)) return;
+
+        // Push event (KHONG gui userIds/roleIds voi sensitive data lon)
+        const payload = {
+          action: eventData.action,
+          roleIds: eventData.roleIds || [],
+          timestamp: eventData.timestamp,
+          actorUserId: eventData.actorUserId,
+        };
+        res.write(`event: permission-changed\ndata: ${JSON.stringify(payload)}\n\n`);
+      } catch (writeErr) {
+        console.debug('[sse.permissions] write after disconnect:', writeErr && writeErr.message);
+      }
+    });
+
+    // Heartbeat keep-alive 30s (giong cac SSE route khac)
     const heartbeat = setInterval(() => {
       try {
         res.write(`: heartbeat\n\n`);

@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback } 
 import { loginApi, logoutApi, getMeApi } from '../services/authApi';
 import { ROLES } from '../constants/roles';
 import { useHeartbeat } from '../hooks/useHeartbeat';
+import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
+import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
 
 const AppContext = createContext(null);
@@ -323,6 +325,9 @@ export function AppProvider({ children }) {
       {/* HeartbeatRunner: goi POST /api/auth/heartbeat moi 60s.
           Tu tat khi user logout. Tu backoff khi nhan 401 de tranh spam. */}
       {isAuthenticated ? <HeartbeatRunner /> : null}
+      {/* PermissionEventsRunner: SSE listener de refresh quyen realtime khi admin
+          thay doi ma tran quyen / gan role / revoke role. Tu tat khi logout. */}
+      {isAuthenticated ? <PermissionEventsRunner /> : null}
       {children}
     </AppContext.Provider>
   );
@@ -335,6 +340,43 @@ export function AppProvider({ children }) {
  */
 function HeartbeatRunner() {
   useHeartbeat({ enabled: true });
+  return null;
+}
+
+/**
+ * PermissionEventsRunner: lang nghe SSE /api/sse/permissions.
+ *
+ * Khi nhan event 'permission-changed' (admin vua thay doi permission cua
+ * user hien tai), hook se:
+ *   1. POST /api/auth/refresh-permissions de lay token moi
+ *   2. Save token + permissions moi vao localStorage (storage-first pattern)
+ *   3. Hien toast "Quyen cua ban vua duoc cap nhat"
+ *   4. React PermissionGate se re-render do storage event -> AppContext state update
+ *
+ * LUU Y: hook usePermissionEventsSSE da tu luu vao storage va dispatch
+ * 'storage' event -> AppContext state setter se tu dong duoc goi qua
+ * listener o useEffect ben tren. Khong can setState thu cong o day.
+ */
+function PermissionEventsRunner() {
+  const { token } = useAuth();
+  const toast = useToast();
+
+  usePermissionEventsSSE({
+    enabled: true,
+    token,
+    onPermissionChanged: (event) => {
+      // Toast thong bao cho user biet quyen vua duoc cap nhat.
+      // action: 'matrix_updated' | 'role_assigned' | 'role_revoked'
+      const actionLabels = {
+        matrix_updated: 'Ma trận quyền đã được cập nhật',
+        role_assigned: 'Bạn vừa được gán vai trò mới',
+        role_revoked: 'Một vai trò của bạn đã bị thu hồi',
+      };
+      const label = actionLabels[event?.action] || 'Quyền của bạn đã được cập nhật';
+      toast.info(label + '. Đang tải lại...', 4000);
+    },
+  });
+
   return null;
 }
 
