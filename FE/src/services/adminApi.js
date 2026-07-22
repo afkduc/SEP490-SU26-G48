@@ -151,13 +151,15 @@ const adminBranchesApi = new AdminBranchesApi();
  *   - getDetail(id):            GET /api/admin/roles/:id
  *   - create(payload):          POST /api/admin/roles
  *   - update(id, payload):      PUT /api/admin/roles/:id
- *   - delete(id):               DELETE /api/admin/roles/:id
- *   - list():                   GET /api/admin/roles
+ *   - toggleStatus(id):         PATCH /api/admin/roles/:id/toggle-status (soft delete only)
  *   - listWithPermissions():    GET /api/admin/roles/full  (1 call, tranh N+1)
  *   - listPermissions():         GET /api/admin/permissions
  *   - getRolePermissions(id):    GET /api/admin/roles/:id/permissions
  *   - setRolePermissions(id, permIds[]): PUT /api/admin/roles/:id/permissions
+ *   - saveMatrix(changes[]):            PUT /api/admin/roles/matrix/permissions
  *   - getRoleUsers(id):         GET /api/admin/roles/:id/users
+ *
+ * LUU Y: KHONG co `delete()` - he thong chi dung soft delete (active/inactive).
  */
 class AdminRolesApi {
   list() {
@@ -180,10 +182,6 @@ class AdminRolesApi {
     return httpClient.put(`/admin/roles/${id}`, payload);
   }
 
-  delete(id) {
-    return httpClient.delete(`/admin/roles/${id}`);
-  }
-
   toggleStatus(id) {
     return httpClient.patch(`/admin/roles/${id}/toggle-status`);
   }
@@ -198,6 +196,14 @@ class AdminRolesApi {
 
   setRolePermissions(id, permissionIds) {
     return httpClient.put(`/admin/roles/${id}/permissions`, { permissionIds });
+  }
+
+  /**
+   * Bulk save permissions cho nhieu role trong 1 call (atomic).
+   * changes: [{roleId, permissionIds}, ...]
+   */
+  saveMatrix(changes) {
+    return httpClient.put('/admin/roles/matrix/permissions', { changes });
   }
 
   getRoleUsers(id) {
@@ -331,9 +337,11 @@ export { AdminDevicesApi, adminDevicesApi };
  *   - list():              GET /api/admin/specialties
  *   - create(payload):    POST /api/admin/specialties
  *   - update(id, payload): PUT /api/admin/specialties/:id
- *   - delete(id):         DELETE /api/admin/specialties/:id
+ *   - toggleStatus(id):   PATCH /api/admin/specialties/:id/toggle-status (soft delete only)
  *   - getUserSpecialties(userId): GET /api/admin/users/:userId/specialties
  *   - setUserSpecialties(userId, ids[]): PUT /api/admin/users/:userId/specialties
+ *
+ * LUU Y: KHONG co `delete()` - he thong chi dung soft delete (active/inactive).
  */
 class AdminSpecialtiesApi {
   list() {
@@ -346,10 +354,6 @@ class AdminSpecialtiesApi {
 
   update(id, payload) {
     return httpClient.put(`/admin/specialties/${id}`, payload);
-  }
-
-  delete(id) {
-    return httpClient.delete(`/admin/specialties/${id}`);
   }
 
   toggleStatus(id) {
