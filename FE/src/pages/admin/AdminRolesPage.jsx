@@ -458,12 +458,12 @@ export default function AdminRolesPage() {
   async function handleMatrixSave() {
     setMatrixSaving(true);
     try {
-      await Promise.all(
-        visibleRoles.map(async (role) => {
-          const permIds = rolePermissions[role.id] || [];
-          await adminRolesApi.setRolePermissions(role.id, permIds);
-        })
-      );
+      const changes = visibleRoles.map((role) => ({
+        roleId: role.id,
+        permissionIds: rolePermissions[role.id] || [],
+      }));
+      // 1 bulk call thay vi Promise.all(setRolePermissions N lan)
+      const result = await adminRolesApi.saveMatrix(changes);
       setMatrixDirty(false);
 
       // Refresh token với permissions mới từ DB
@@ -471,12 +471,12 @@ export default function AdminRolesPage() {
       // (BE da luu DB thanh cong nhung token con cu)
       let refreshOk = false;
       try {
-        const result = await refreshPermissionsApi();
-        if (result?.token || result?.permissions) {
+        const refreshResult = await refreshPermissionsApi();
+        if (refreshResult?.token || refreshResult?.permissions) {
           const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
-          if (result.token) storage.setItem('token', result.token);
-          if (result.permissions) {
-            storage.setItem('permissions', JSON.stringify(result.permissions));
+          if (refreshResult.token) storage.setItem('token', refreshResult.token);
+          if (refreshResult.permissions) {
+            storage.setItem('permissions', JSON.stringify(refreshResult.permissions));
           }
           refreshOk = true;
         }
@@ -490,6 +490,7 @@ export default function AdminRolesPage() {
         toast.warn('Đã lưu vào DB nhưng token chưa cập nhật. Vui lòng đăng nhập lại để thấy thay đổi quyền.');
       }
     } catch (err) {
+      // Hien thi loi tu backend (vd: last-admin guard 409)
       toast.error('Lỗi khi lưu: ' + (err.message || 'Không rõ'));
     } finally {
       setMatrixSaving(false);

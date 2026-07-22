@@ -1,4 +1,4 @@
-const { query } = require('../database/sqlServer');
+const { query, executeTransaction } = require('../database/sqlServer');
 
 class RoleRepositoryImpl {
   /**
@@ -86,23 +86,6 @@ class RoleRepositoryImpl {
       { p1: id, p2: roleLabel }
     );
     return this.findById(id);
-  }
-
-  /**
-   * Xoa role (chi xoa neu khong co user_role tham chieu)
-   */
-  async delete(id) {
-    const check = await query(
-      'SELECT COUNT(*) AS cnt FROM user_role WHERE role_id = @p1',
-      { p1: id }
-    );
-    if (check.recordset[0].cnt > 0) {
-      return { success: false, reason: 'has_users' };
-    }
-    // Xoa cac role_permissions truoc
-    await query('DELETE FROM role_permissions WHERE role_id = @p1', { p1: id });
-    await query('DELETE FROM roles WHERE id = @p1', { p1: id });
-    return { success: true };
   }
 
   /**
@@ -239,6 +222,91 @@ class RoleRepositoryImpl {
         params
       );
     }
+  }
+
+  /**
+   * Lay role theo id, tra ve chi id + role_name (dung cho guard checks).
+   * @param {number} roleId
+   * @returns {Promise<{id:number, roleName:string}|null>}
+   */
+  async findRoleLite(roleId) {
+    const result = await query(
+      'SELECT id, role_name FROM roles WHERE id = @p1',
+      { p1: roleId }
+    );
+    const row = result.recordset[0];
+    if (!row) return null;
+    return { id: row.id, roleName: row.role_name };
+  }
+
+  /**
+   * Dem so user dang co 1 permission cu the (qua role_permissions).
+   * Dung cho last-admin guard.
+   * @param {string} permissionKey
+   * @returns {Promise<number>}
+   */
+  async countUsersWithPermission(permissionKey) {
+    const result = await query(`
+      SELECT COUNT(DISTINCT ur.user_id) AS cnt
+      FROM user_role ur
+      JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
+      JOIN role_permissions rp ON rp.role_id = r.id
+      JOIN permissions p ON p.id = rp.permission_id
+      WHERE p.permission_key = @p1
+        AND ISNULL(ur.is_active, 1) = 1
+    `, { p1: permissionKey });
+    return Number(result.recordset[0]?.cnt || 0);
+  }
+
+  /**
+   * Bulk set permissions cho nhieu role trong 1 transaction (atomic).
+   * @param {Array<{roleId:number, permissionIds:number[]}>} changes
+   * @returns {Promise<{roleId:number, added:number[], removed:number[]}[]>}
+   */
+  async setRolePermissionsMatrixTx(changes, actorUserId) {
+    return executeTransaction(async (txQuery) => {
+      const results = [];
+
+      for (const change of changes) {
+        const { roleId, permissionIds } = change;
+
+        // Lay permission hien tai
+        const beforeResult = await txQuery(
+          'SELECT permission_id FROM role_permissions WHERE role_id = @p1',
+          { p1: roleId }
+        );
+        const beforeIds = new Set(beforeResult.recordset.map((r) => Number(r.permission_id)));
+        const afterIds = new Set((permissionIds || []).map(Number));
+
+        // Diff
+        const removed = [...beforeIds].filter((id) => !afterIds.has(id));
+        const added = [...afterIds].filter((id) => !beforeIds.has(id));
+
+        // Xoa cu
+        if (beforeIds.size > 0) {
+          await txQuery(
+            'DELETE FROM role_permissions WHERE role_id = @p1',
+            { p1: roleId }
+          );
+        }
+
+        // Chen moi
+        if (afterIds.size > 0) {
+          const ids = [...afterIds];
+          const values = ids.map((_, i) => `(@p1, @p${i + 2})`).join(', ');
+          const params = { p1: roleId };
+          ids.forEach((pid, i) => { params[`p${i + 2}`] = pid; });
+          await txQuery(
+            `INSERT INTO role_permissions (role_id, permission_id) VALUES ${values}`,
+            params
+          );
+        }
+
+        results.push({ roleId, added, removed });
+      }
+
+      return results;
+    });
   }
 
   /**
