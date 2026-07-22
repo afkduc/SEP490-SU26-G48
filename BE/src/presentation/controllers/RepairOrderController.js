@@ -30,6 +30,16 @@ class RepairOrderController {
     }
   };
 
+  // Public - khong auth (xem publicRoutes.js), khong duoc dung req.user o day.
+  lookupPublicProgress = async (req, res, next) => {
+    try {
+      const result = await this.repairOrderService.getPublicProgressByCode(req.params.code);
+      return success(res, result, 'Repair progress retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getTeamLeaders = async (req, res, next) => {
     try {
       const items = await this.repairOrderService.getTeamLeaders(req.user.branchId);
