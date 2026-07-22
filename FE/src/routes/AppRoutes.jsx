@@ -16,6 +16,7 @@ const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/Repair
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
 const CustomerHistoryPage = lazy(() => import('../pages/customer/CustomerHistoryPage'));
 const CustomerCarePage = lazy(() => import('../pages/customercare/CustomerCarePage'));
+const ServiceRequestsPage = lazy(() => import('../pages/servicerequests/ServiceRequestsPage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
@@ -153,6 +154,18 @@ function AppRoutes() {
             <ProtectedRoute>
               <AppLayout>
                 <CustomerHistoryPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Yeu cau tu van tu landing page - CVDV tiep nhan + tao lich hen */}
+        <Route
+          path="/service-requests"
+          element={
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
+              <AppLayout>
+                <ServiceRequestsPage />
               </AppLayout>
             </ProtectedRoute>
           }
