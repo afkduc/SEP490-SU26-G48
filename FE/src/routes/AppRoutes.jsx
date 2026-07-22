@@ -7,7 +7,7 @@ import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
-import { ToastProvider } from '../components/common/ToastContext';
+// import { ToastProvider } from '../components/common/ToastContext'; // moved to main.jsx
 import { SharedDataProvider } from '../contexts/SharedDataContext';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
@@ -54,7 +54,7 @@ function Loading() {
 
 function AppRoutes() {
   return (
-    <ToastProvider>
+    <>
       <SharedDataProvider>
         <SessionExpiredModal />
         <Suspense fallback={<Loading />}>
@@ -218,7 +218,7 @@ function AppRoutes() {
       </Routes>
       </Suspense>
     </SharedDataProvider>
-  </ToastProvider>
+    </>
   );
 }
 
