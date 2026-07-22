@@ -9,8 +9,8 @@ class RepairOrderService {
     this.repairOrderRepository = repairOrderRepository;
   }
 
-  async getAll({ branchId } = {}) {
-    const items = await this.repairOrderRepository.findAll({ branchId });
+  async getAll({ branchId, teamLeaderId } = {}) {
+    const items = await this.repairOrderRepository.findAll({ branchId, teamLeaderId });
     return RepairOrderResponseDto.fromEntityList(items);
   }
 
@@ -85,9 +85,31 @@ class RepairOrderService {
     if (existing.status !== 'inprogress') {
       throw new ApiError(409, 'Lệnh đã kết thúc (hoàn thành/hủy), không thể đổi trạng thái nữa');
     }
+    if (status === 'completed' && existing.tasks.some((t) => !t.isDone)) {
+      throw new ApiError(409, 'Cần tích hoàn thành tất cả đầu mục công việc trước khi kết thúc lệnh');
+    }
 
     const entity = await this.repairOrderRepository.updateStatus(id, status, cancelReason);
     return RepairOrderResponseDto.fromEntity(entity);
+  }
+
+  async updateTaskStatus(id, taskId, isDone, { userId, branchId } = {}) {
+    const existing = await this.repairOrderRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
+    if (String(existing.branchId) !== String(branchId)) {
+      throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
+    }
+    if (String(existing.teamLeaderId) !== String(userId)) {
+      throw new ApiError(403, 'Chỉ tổ trưởng được phân công lệnh này mới có quyền cập nhật đầu mục');
+    }
+    if (existing.status !== 'inprogress') {
+      throw new ApiError(409, 'Lệnh đã kết thúc, không thể cập nhật đầu mục công việc');
+    }
+    const task = existing.tasks.find((t) => String(t.id) === String(taskId));
+    if (!task) throw new ApiError(404, 'Không tìm thấy đầu mục công việc');
+
+    await this.repairOrderRepository.updateTaskStatus(taskId, isDone);
+    return this.getById(id);
   }
 }
 
