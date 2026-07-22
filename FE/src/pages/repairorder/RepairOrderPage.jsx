@@ -9,7 +9,9 @@ import {
   createRepairOrderApi,
   getRepairOrderApi,
   updateRepairOrderStatusApi,
+  updateRepairOrderTaskApi,
 } from '../../services/repairOrderApi';
+import { ROLES } from '../../constants/roles';
 import { printWorkList } from '../repairsettlement/RepairSettlementPage';
 
 const LHSC_LABELS = { DV: 'Dịch vụ', PT: 'Phụ tùng', BH: 'Bảo hành', HD: 'Hợp đồng' };
@@ -17,7 +19,7 @@ const LHSC_LABELS = { DV: 'Dịch vụ', PT: 'Phụ tùng', BH: 'Bảo hành', H
 // toán đã ở trạng thái "Chờ sửa chữa" nhưng CHƯA có lệnh sửa chữa/tổ trưởng.
 const STATUS_LABELS = {
   pending_assignment: { label: 'Đang chờ phân công', badge: 'badge-pending' },
-  in_progress: { label: 'Đang sửa chữa', badge: 'badge-inprogress' },
+  inprogress: { label: 'Đang sửa chữa', badge: 'badge-inprogress' },
   completed: { label: 'Hoàn thành', badge: 'badge-completed' },
   cancelled: { label: 'Hủy', badge: 'badge-cancelled' },
 };
@@ -591,14 +593,14 @@ function RepairOrderList() {
                       {r.kind === 'pending' && r.status === 'cancelled' && (
                         <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewSettlementId(r.id)}>Xem chi tiết</button>
                       )}
-                      {r.kind === 'order' && r.status === 'in_progress' && (
+                      {r.kind === 'order' && r.status === 'inprogress' && (
                         <>
                           <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => handleMarkComplete(r.id)}>Hoàn thành</button>
                           <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'order', id: r.id })}>Hủy</button>
                           <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewOrderId(r.id)}>Xem chi tiết</button>
                         </>
                       )}
-                      {r.kind === 'order' && r.status !== 'in_progress' && (
+                      {r.kind === 'order' && r.status !== 'inprogress' && (
                         <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewOrderId(r.id)}>Xem chi tiết</button>
                       )}
                     </div>
@@ -928,7 +930,185 @@ function RepairOrderCreate() {
   );
 }
 
+// ─── Tổ trưởng: "Công việc của tôi" - dạng card, tick từng đầu mục ────
+// BE đã tự lọc GET /repair-orders theo team_leader_id = user hiện tại nên
+// không cần truyền tham số gì thêm - danh sách trả về luôn là của chính mình.
+function TeamLeaderTaskCards() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [busyTaskKey, setBusyTaskKey] = useState(null);
+  const [busyOrderId, setBusyOrderId] = useState(null);
+
+  const loadAll = () => {
+    setLoading(true);
+    setLoadError('');
+    return listRepairOrdersApi()
+      .then((data) => setOrders(data || []))
+      .catch((err) => setLoadError(err.message || 'Không tải được danh sách công việc'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadAll().then(() => {}).catch(() => {});
+  }, []);
+
+  const filteredOrders = filterStatus ? orders.filter((o) => o.status === filterStatus) : orders;
+
+  const toggleTask = async (order, task) => {
+    const key = `${order.id}-${task.id}`;
+    setBusyTaskKey(key);
+    setActionError('');
+    try {
+      const updated = await updateRepairOrderTaskApi(order.id, task.id, !task.isDone);
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+    } catch (err) {
+      setActionError(err.message || 'Không cập nhật được đầu mục công việc');
+    } finally {
+      setBusyTaskKey(null);
+    }
+  };
+
+  const handleComplete = async (order) => {
+    setBusyOrderId(order.id);
+    setActionError('');
+    try {
+      await updateRepairOrderStatusApi(order.id, 'completed');
+      await loadAll();
+    } catch (err) {
+      setActionError(err.message || 'Không đánh dấu hoàn thành được');
+    } finally {
+      setBusyOrderId(null);
+    }
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Công việc của tôi</h1>
+          <div className="breadcrumb">Trang chủ / Công việc của tôi</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 16 }}>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: 180 }}>
+          <label className="form-label">Trạng thái</label>
+          <select className="form-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="">Tất cả trạng thái</option>
+            <option value="inprogress">Đang sửa chữa</option>
+            <option value="completed">Hoàn thành</option>
+            <option value="cancelled">Hủy</option>
+          </select>
+        </div>
+        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)', alignSelf: 'center' }}>
+          {filteredOrders.length} / {orders.length} công việc
+        </div>
+      </div>
+
+      {(loadError || actionError) && (
+        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#C62828' }}>
+          {loadError || actionError}
+        </div>
+      )}
+
+      {loading && (
+        <div className="empty-state"><p>Đang tải danh sách công việc…</p></div>
+      )}
+
+      {!loading && filteredOrders.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-state-icon">📭</div>
+          <h3>Chưa có công việc nào được giao</h3>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+        {filteredOrders.map((order) => {
+          const st = STATUS_LABELS[order.status] || { label: order.status, badge: 'badge-inactive' };
+          const tasks = order.tasks || [];
+          const doneCount = tasks.filter((t) => t.isDone).length;
+          const allDone = tasks.length > 0 && doneCount === tasks.length;
+          const isActive = order.status === 'inprogress';
+
+          return (
+            <div
+              key={order.id}
+              style={{ background: 'var(--white)', border: '1px solid var(--gray-200)', borderRadius: 10, padding: 16, boxShadow: 'var(--shadow-sm)' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8 }}>
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)', fontSize: 14 }}>{order.code}</div>
+                  <div style={{ fontWeight: 700, marginTop: 2 }}>{order.customer?.fullName}</div>
+                  <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>{order.vehicle?.licensePlate} · {order.vehicle?.vehicleModel}</div>
+                </div>
+                <span className={`badge ${st.badge}`}>{st.label}</span>
+              </div>
+
+              {order.notes && (
+                <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 10px', fontSize: 12, marginBottom: 12 }}>
+                  {order.notes}
+                </div>
+              )}
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+                Đầu mục công việc ({doneCount}/{tasks.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                {tasks.map((task) => {
+                  const key = `${order.id}-${task.id}`;
+                  const isBusy = busyTaskKey === key;
+                  return (
+                    <label
+                      key={task.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                        background: task.isDone ? '#E8F5E9' : 'var(--gray-50)', borderRadius: 6,
+                        fontSize: 13, cursor: isActive ? 'pointer' : 'default',
+                        textDecoration: task.isDone ? 'line-through' : 'none',
+                        color: task.isDone ? '#2E7D32' : 'var(--gray-900)',
+                        opacity: isBusy ? 0.6 : 1,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={task.isDone}
+                        disabled={!isActive || isBusy}
+                        onChange={() => toggleTask(order, task)}
+                      />
+                      <span>{task.taskName}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {isActive && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  disabled={!allDone || busyOrderId === order.id}
+                  title={!allDone ? 'Cần tích hoàn thành tất cả đầu mục trước' : ''}
+                  onClick={() => handleComplete(order)}
+                >
+                  {busyOrderId === order.id ? 'Đang xử lý…' : 'Hoàn thành'}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+    </div>
+  );
+}
+
 export default function RepairOrderPage() {
+  const { user } = useAuth();
+  if (user?.primaryRole === ROLES.TEAM_LEADER) {
+    return <TeamLeaderTaskCards />;
+  }
   return (
     <Routes>
       <Route index element={<RepairOrderList />} />
