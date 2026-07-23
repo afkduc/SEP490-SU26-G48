@@ -29,12 +29,24 @@ async function authenticate(req, res, next) {
 
   try {
     const result = await query(
-      `SELECT token_version FROM users WHERE id = @userId`,
+      `SELECT u.token_version, u.status, u.branch_id, b.is_active AS branch_is_active
+       FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       WHERE u.id = @userId`,
       { userId: decoded.userId }
     );
-    const dbVersion = result.recordset[0]?.token_version;
+    const authRow = result.recordset[0];
+    const dbVersion = authRow?.token_version;
     if (dbVersion !== undefined && decoded.tokenVersion !== dbVersion) {
       return next(new ApiError(401, 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.'));
+    }
+
+    if (authRow?.status && authRow.status !== 'active') {
+      return next(new ApiError(401, 'Tài khoản đã bị khóa. Vui lòng đăng nhập lại sau khi được kích hoạt.'));
+    }
+
+    if (authRow?.branch_id && authRow.branch_is_active !== undefined && !Boolean(authRow.branch_is_active)) {
+      return next(new ApiError(401, 'Chi nhánh của tài khoản này đang bị ngưng hoạt động.'));
     }
 
     // Kiem tra device con active khong (per-device logout)
