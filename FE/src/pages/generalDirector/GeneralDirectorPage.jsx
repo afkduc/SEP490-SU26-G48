@@ -1256,54 +1256,86 @@ function BranchManagerListPage() {
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionLoadingId, setActionLoadingId] = useState(null);
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadBranches() {
-      try {
-        const response = await generalDirectorApi.getBranches();
-        if (mounted) setBranches(response || []);
-      } catch {
-        if (mounted) setBranches([]);
-      }
+  const loadBranches = async (mountedRef) => {
+    try {
+      const response = await generalDirectorApi.getBranches();
+      if (!mountedRef || mountedRef.current) setBranches(response || []);
+    } catch {
+      if (!mountedRef || mountedRef.current) setBranches([]);
     }
+  };
 
-    loadBranches();
+  const loadBranchManagers = async (overrides = {}) => {
+    const seq = ++requestSeq.current;
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await generalDirectorApi.getBranchManagers({
+        search: overrides.search ?? search.trim(),
+        branchId: overrides.branchId ?? branchId,
+        status: overrides.status ?? status,
+      });
+      if (seq !== requestSeq.current) return;
+      setBranchManagers(response || []);
+    } catch (err) {
+      if (seq !== requestSeq.current) return;
+      setBranchManagers([]);
+      setError(err.message || 'Không tải được danh sách giám đốc chi nhánh');
+    } finally {
+      if (seq === requestSeq.current) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const mountedRef = { current: true };
+    loadBranches(mountedRef);
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
   useEffect(() => {
     clearTimeout(searchTimer.current);
 
-    searchTimer.current = setTimeout(async () => {
-      const seq = ++requestSeq.current;
-      setLoading(true);
-      setError('');
-
-      try {
-        const response = await generalDirectorApi.getBranchManagers({
-          search: search.trim(),
-          branchId,
-          status,
-        });
-        if (seq !== requestSeq.current) return;
-        setBranchManagers(response || []);
-      } catch (err) {
-        if (seq !== requestSeq.current) return;
-        setBranchManagers([]);
-        setError(err.message || 'Không tải được danh sách giám đốc chi nhánh');
-      } finally {
-        if (seq === requestSeq.current) setLoading(false);
-      }
+    searchTimer.current = setTimeout(() => {
+      loadBranchManagers();
     }, 300);
 
     return () => clearTimeout(searchTimer.current);
   }, [search, branchId, status]);
+
+  const handleBranchActivation = async (row, nextActive) => {
+    if (!row?.branch?.id) return;
+
+    const actionLabel = nextActive ? 'kích hoạt lại' : 'ngưng hoạt động';
+    const confirmed = window.confirm(
+      nextActive
+        ? `Kích hoạt lại chi nhánh ${row.branch.name}? Nhân sự thuộc chi nhánh này sẽ có thể đăng nhập lại.`
+        : `Ngưng hoạt động chi nhánh ${row.branch.name}? Tất cả tài khoản thuộc chi nhánh này sẽ bị dừng hoạt động và các phiên đăng nhập hiện tại sẽ hết hiệu lực.`
+    );
+    if (!confirmed) return;
+
+    setActionLoadingId(row.branch.id);
+    setError('');
+
+    try {
+      if (nextActive) {
+        await generalDirectorApi.reactivateBranch(row.branch.id);
+      } else {
+        await generalDirectorApi.deactivateBranch(row.branch.id);
+      }
+      await Promise.all([loadBranches(), loadBranchManagers()]);
+    } catch (err) {
+      setError(err.message || `Không thể ${actionLabel} chi nhánh`);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   return (
     <div>
@@ -1405,11 +1437,19 @@ function BranchManagerListPage() {
 
             {!loading && branchManagers.map((row) => {
               const badge = employeeStatusBadge(row.status);
+              const isBranchActive = row.branch?.isActive !== false;
               return (
                 <tr key={row.id}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--primary-dark)' }}>{row.managerId || row.id}</td>
                   <td style={{ fontWeight: 700 }}>{row.fullName || '—'}</td>
-                  <td><BranchBadge branch={row.branch} /></td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <BranchBadge branch={row.branch} />
+                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: isBranchActive ? '#ECFDF5' : '#FEF2F2', color: isBranchActive ? '#0F766E' : '#B91C1C', fontSize: 11, fontWeight: 800 }}>
+                        {isBranchActive ? 'CN hoạt động' : 'CN bị khóa'}
+                      </span>
+                    </div>
+                  </td>
                   <td>{row.phone || '—'}</td>
                   <td>{row.email || '—'}</td>
                   <td>
@@ -1423,6 +1463,18 @@ function BranchManagerListPage() {
                     </button>
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(`/general-director/branch-managers/${row.id}/edit`)}>
                       Sửa
+                    </button>
+                    <button
+                      type="button"
+                      className={isBranchActive ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm'}
+                      onClick={() => handleBranchActivation(row, !isBranchActive)}
+                      disabled={!row.branch?.id || actionLoadingId === row.branch?.id}
+                    >
+                      {actionLoadingId === row.branch?.id
+                        ? 'Đang xử lý...'
+                        : isBranchActive
+                          ? 'Khóa chi nhánh'
+                          : 'Mở chi nhánh'}
                     </button>
                   </td>
                 </tr>
