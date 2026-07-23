@@ -15,6 +15,8 @@ class GeneralDirectorController {
     this.getBranchManagerById = this.getBranchManagerById.bind(this);
     this.createBranchManager = this.createBranchManager.bind(this);
     this.updateBranchManager = this.updateBranchManager.bind(this);
+    this.deactivateBranch = this.deactivateBranch.bind(this);
+    this.reactivateBranch = this.reactivateBranch.bind(this);
   }
 
   async getRevenueReports(req, res, next) {
@@ -141,6 +143,24 @@ class GeneralDirectorController {
     try {
       const data = await this.generalDirectorService.updateBranchManager(req.params.id, req.body || {});
       return success(res, data, 'Cập nhật giám đốc chi nhánh thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deactivateBranch(req, res, next) {
+    try {
+      const data = await this.generalDirectorService.deactivateBranch(req.params.id);
+      return success(res, data, 'Ngưng hoạt động chi nhánh thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async reactivateBranch(req, res, next) {
+    try {
+      const data = await this.generalDirectorService.reactivateBranch(req.params.id);
+      return success(res, data, 'Kích hoạt lại chi nhánh thành công');
     } catch (err) {
       next(err);
     }
