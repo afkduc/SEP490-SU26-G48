@@ -807,7 +807,7 @@ const QUICK_ACTIONS = [
 ];
 
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1087,6 +1087,7 @@ export default function AdminDashboardPage() {
           </div>
         </>
       )}
+
     </div>
   );
 }

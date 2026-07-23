@@ -1,14 +1,15 @@
-import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
 import SessionExpiredModal from '../components/SessionExpiredModal';
+import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
-// import { ToastProvider } from '../components/common/ToastContext'; // moved to main.jsx
 import { SharedDataProvider } from '../contexts/SharedDataContext';
+import { useGlobalError } from '../contexts/GlobalErrorContext';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
@@ -44,6 +45,45 @@ const ExportRequestListPage = lazy(() => import('../pages/inventory/ExportReques
 const ExportRequestFormPage = lazy(() => import('../pages/inventory/ExportRequestFormPage'));
 const ExportRequestDetailPage = lazy(() => import('../pages/inventory/ExportRequestDetailPage'));
 
+/**
+ * ErrorHandler — bắt lỗi 403 toàn cục từ error event.
+ * Khi component con throw error với status=403, component này
+ * sẽ hiển thị UnauthorizedPage.
+ */
+function ErrorHandler() {
+  const { globalError, clearError } = useGlobalError();
+
+  useEffect(() => {
+    if (!globalError) return;
+
+    const handlePopState = () => {
+      if (window.location.pathname !== '/unauthorized') {
+        clearError();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [globalError, clearError]);
+
+  if (!globalError) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 9999,
+      background: '#f9fafb',
+      overflow: 'auto',
+    }}>
+      <UnauthorizedPage
+        permissionKey={globalError.permissionKey}
+        customMessage={globalError.message}
+      />
+    </div>
+  );
+}
+
 function Loading() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -57,6 +97,8 @@ function AppRoutes() {
     <>
       <SharedDataProvider>
         <SessionExpiredModal />
+        <ForbiddenModal />
+        <ErrorHandler />
         <Suspense fallback={<Loading />}>
           <Routes>
           {/* Public */}
@@ -88,7 +130,11 @@ function AppRoutes() {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="users" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="admin:users:read">
+              <AdminUsersPage />
+            </ProtectedRoute>
+          } />
           <Route path="branches" element={<AdminBranchesPage />} />
           <Route path="roles" element={<AdminRolesPage />} />
           <Route path="devices" element={<AdminDevicesPage />} />

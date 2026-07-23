@@ -19,6 +19,8 @@ const SecurityAlertService = require('../../application/services/SecurityAlertSe
 const NotificationService = require('../../application/services/NotificationService');
 const { auditCrud } = require('../../utils/auditHelper');
 const { emitPermissionChanged } = require('../../application/events/PermissionEvents');
+const PermissionGroupService = require('../../application/services/PermissionGroupService');
+const PermissionGroupRepositoryImpl = require('../../infrastructure/repositories/PermissionGroupRepositoryImpl');
 
 class AdminController {
   constructor() {
@@ -33,6 +35,14 @@ class AdminController {
     const roleRepo = new RoleRepositoryImpl();
     const userRepo = new UserRepositoryImpl();
     this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo, userRepository: userRepo });
+
+    // Permission Groups (Phase 3)
+    const groupRepository = new PermissionGroupRepositoryImpl();
+    this.permissionGroupService = new PermissionGroupService({
+      groupRepository,
+      permissionService,
+      roleRepository,
+    });
 
     this.auditService = new AuditService(AuditRepository);
     this.branchService = new BranchService();
@@ -60,6 +70,11 @@ class AdminController {
     this.setRolePermissions = this.setRolePermissions.bind(this);
     this.saveRolePermissionsMatrix = this.saveRolePermissionsMatrix.bind(this);
     this.getRoleUsers = this.getRoleUsers.bind(this);
+    this.listPermissionGroups = this.listPermissionGroups.bind(this);
+    this.getPermissionGroupDetail = this.getPermissionGroupDetail.bind(this);
+    this.getRoleGroupIds = this.getRoleGroupIds.bind(this);
+    this.setRoleGroups = this.setRoleGroups.bind(this);
+    this.setRoleGroupsMatrix = this.setRoleGroupsMatrix.bind(this);
     this.createRole = this.createRole.bind(this);
     this.updateRole = this.updateRole.bind(this);
     this.toggleRoleStatus = this.toggleRoleStatus.bind(this);
@@ -87,6 +102,7 @@ class AdminController {
     this.resetPassword = this.resetPassword.bind(this);
     this.reissueToken = this.reissueToken.bind(this);
     this.refreshPermissions = this.refreshPermissions.bind(this);
+    this.debugPermissions = this.debugPermissions.bind(this);
     this.cleanupDuplicateSessions = this.cleanupDuplicateSessions.bind(this);
   }
 
@@ -993,6 +1009,76 @@ class AdminController {
   };
 
   /**
+   * GET /api/admin/debug-permissions
+   * Tra ve THÔNG TIN DEBUG về permissions từ JWT hiện tại và từ DB.
+   * Endpoint này KHÔNG bị cache, luôn query DB mới nhất.
+   * Dùng để debug khi FE PermissionGate không hiển thị nút.
+   */
+  debugPermissions = async (req, res, next) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return next(new (require('../../utils/ApiError'))(401, 'Token khong hop le'));
+      }
+
+      const { query } = require('../../infrastructure/database/sqlServer');
+
+      // 1. Permissions từ JWT (trong req.user đã được auth middleware decode)
+      const jwtPermissions = req.user?.permissions || [];
+
+      // 2. Roles từ JWT
+      const jwtRoles = req.user?.roles || [];
+
+      // 3. Permissions từ DB (không cache - luôn query mới)
+      const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+      const PermissionService = require('../../application/services/PermissionService');
+      const roleRepo = new RoleRepositoryImpl();
+      const permService = new PermissionService({ roleRepository: roleRepo });
+
+      // Invalidate cache trước khi query
+      permService.invalidateCache(userId);
+
+      const dbPermissions = await permService.getUserPermissions(userId);
+      const dbPermissionKeys = Array.from(dbPermissions);
+
+      // 4. Kiểm tra user_role assignment
+      const roleResult = await query(`
+        SELECT r.role_name, ur.is_active
+        FROM user_role ur
+        JOIN roles r ON r.id = ur.role_id
+        WHERE ur.user_id = @p1
+      `, { p1: userId });
+
+      // 5. Kiểm tra role_permissions cho admin role
+      const adminRoleResult = await query(`
+        SELECT p.permission_key
+        FROM role_permissions rp
+        JOIN permissions p ON p.id = rp.permission_id
+        JOIN roles r ON r.id = rp.role_id
+        WHERE r.role_name = 'admin'
+        AND p.permission_key LIKE 'admin:branches:%'
+      `);
+
+      return success(res, {
+        userId,
+        jwt: {
+          roles: jwtRoles,
+          permissions: jwtPermissions,
+          hasAdminBranchesCreate: jwtPermissions.includes('admin:branches:create'),
+        },
+        database: {
+          permissions: dbPermissionKeys,
+          hasAdminBranchesCreate: dbPermissionKeys.includes('admin:branches:create'),
+        },
+        userRoleAssignments: roleResult.recordset,
+        adminRoleBranchesPermissions: adminRoleResult.recordset.map(r => r.permission_key),
+      }, 'Debug permissions info');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
    * POST /api/admin/sessions/cleanup
    * Don dep cac session trung lap: chi giu lai session moi nhat cho moi user.
    * Dung de xu ly cac session active trung lap trong database.
@@ -1047,6 +1133,68 @@ class AdminController {
           ? `Da dong ${closedSessions} session trung lap`
           : 'Khong co session trung lap',
       }, 'Don dep session thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // ============================================================
+  // PERMISSION GROUPS (Phase 3)
+  // ============================================================
+
+  listPermissionGroups = async (req, res, next) => {
+    try {
+      const result = await this.permissionGroupService.listGroups();
+      return success(res, result, 'Danh sach nhom quyen');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPermissionGroupDetail = async (req, res, next) => {
+    try {
+      const group = await this.permissionGroupService.getGroupDetail(req.params.id);
+      return success(res, group, 'Chi tiet nhom quyen');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getRoleGroupIds = async (req, res, next) => {
+    try {
+      const result = await this.permissionGroupService.getRoleGroupIds(req.params.id);
+      return success(res, result, 'Danh sach nhom quyen cua vai tro');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setRoleGroups = async (req, res, next) => {
+    try {
+      const { groupIds } = req.body;
+      const result = await this.permissionGroupService.setRoleGroups(
+        req.params.id,
+        Array.isArray(groupIds) ? groupIds : [],
+        req
+      );
+      return success(res, result, 'Cap nhat nhom quyen cho vai tro thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setRoleGroupsMatrix = async (req, res, next) => {
+    try {
+      const { changes } = req.body;
+      const result = await this.permissionGroupService.setRoleGroupsMatrix({ changes }, req);
+      await auditCrud.update(req, {
+        tableName: 'role_permissions',
+        entityCode: 'MATRIX',
+        entityName: 'Ma tran nhom quyen',
+        newData: { roleCount: result.updatedRoles },
+        description: `Cap nhat ma tran nhom quyen (${result.updatedRoles} vai tro, ${result.affectedUserCount} user bi anh huong)`,
+      });
+      return success(res, result, 'Cap nhat ma tran nhom quyen thanh cong');
     } catch (err) {
       next(err);
     }

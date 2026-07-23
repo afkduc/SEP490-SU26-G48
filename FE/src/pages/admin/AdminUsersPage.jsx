@@ -2,11 +2,14 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
+import { useGlobalError } from '../../contexts/GlobalErrorContext';
+import { usePermission } from '../../contexts';
 import {
   adminUsersApi,
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { useToast } from '../../components/common/ToastContext';
+import PermissionGate from '../../components/PermissionGate';
 import UserFormModal from './users/UserFormModal';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import AdminPagination from './components/AdminPagination';
@@ -88,13 +91,15 @@ function UserActionMenu({ user, onView, onEdit }) {
             </svg>
             Chi tiet
           </button>
-          <button type="button" onClick={() => { setOpen(false); onEdit(); }} role="menuitem">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-            Sua
-          </button>
+          <PermissionGate permission="admin:users:update">
+            <button type="button" onClick={() => { setOpen(false); onEdit(); }} role="menuitem">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              Sua
+            </button>
+          </PermissionGate>
         </div>
       )}
     </div>
@@ -102,6 +107,15 @@ function UserActionMenu({ user, onView, onEdit }) {
 }
 
 export default function AdminUsersPage() {
+  const { can } = usePermission();
+  const { set403Error } = useGlobalError();
+
+  // Check permission: neu khong co quyen doc user -> hien trang 403
+  if (!can('admin:users:read')) {
+    set403Error('admin:users:read', 'Bạn không có quyền truy cập trang quản lý người dùng.');
+    return null;
+  }
+
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -266,15 +280,17 @@ export default function AdminUsersPage() {
             </svg>
             <span className="admin-page__btn-label">{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
           </button>
-          <button
-            className="btn btn--primary admin-page__btn-icon-text"
-            onClick={() => { setEditUser(null); setShowModal(true); }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            <span className="admin-page__btn-label">Tạo người dùng</span>
-          </button>
+          <PermissionGate permission="admin:users:create">
+            <button
+              className="btn btn--primary admin-page__btn-icon-text"
+              onClick={() => { setEditUser(null); setShowModal(true); }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span className="admin-page__btn-label">Tạo người dùng</span>
+            </button>
+          </PermissionGate>
         </div>
         {exportError && (
           <div className="admin-users__error" style={{ marginTop: 12, width: '100%' }}>
@@ -463,16 +479,18 @@ export default function AdminUsersPage() {
                               </svg>
                               <span>Chi tiết</span>
                             </button>
-                            <button
-                              className="btn btn--sm btn--edit"
-                              onClick={() => { setEditUser(u); setShowModal(true); }}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                              </svg>
-                              <span>Sửa</span>
-                            </button>
+                            <PermissionGate permission="admin:users:update">
+                              <button
+                                className="btn btn--sm btn--edit"
+                                onClick={() => { setEditUser(u); setShowModal(true); }}
+                              >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <span>Sửa</span>
+                              </button>
+                            </PermissionGate>
                           </div>
                           {/* Mobile: menu 3 cham (Chi tiet + Sua) - Phan quyen trong modal Sua */}
                           <UserActionMenu
