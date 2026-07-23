@@ -53,6 +53,14 @@ class GeneralDirectorApi {
   updateBranchManager(id, payload) {
     return httpClient.put(`/general-director/branch-managers/${id}`, payload);
   }
+
+  deactivateBranch(id) {
+    return httpClient.patch(`/general-director/branches/${id}/deactivate`);
+  }
+
+  reactivateBranch(id) {
+    return httpClient.patch(`/general-director/branches/${id}/reactivate`);
+  }
 }
 
 const generalDirectorApi = new GeneralDirectorApi();
