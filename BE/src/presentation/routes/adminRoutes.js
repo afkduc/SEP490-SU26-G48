@@ -3,6 +3,7 @@ const AdminController = require('../controllers/AdminController');
 const { authenticate, requireAdmin } = require('../../middlewares/auth');
 const { trackActivity } = require('../../middlewares');
 const { validateListUsersQuery } = require('../validators/adminUserValidator');
+const buildPermissionMatrixRouter = require('./permissionMatrixRoutes');
 
 /**
  * Admin routes - chi danh cho user co role admin
@@ -31,6 +32,10 @@ function buildAdminRouter() {
 
   // Refresh permissions sau khi admin sua ma tran quyen
   router.post('/refresh-permissions', authenticate, trackActivity, controller.refreshPermissions);
+
+  // Permission matrix (Role x Screen) - admin-only.
+  // Mount sub-router voi requireAdmin rieng de tranh conflict voi /reissue-token.
+  router.use('/permission-matrix', authenticate, requireAdmin, trackActivity, buildPermissionMatrixRouter());
 
   router.use(authenticate, requireAdmin, trackActivity);
 
