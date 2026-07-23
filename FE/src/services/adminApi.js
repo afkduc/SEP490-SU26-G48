@@ -446,3 +446,30 @@ class AdminSecurityAlertsApi {
 const adminSecurityAlertsApi = new AdminSecurityAlertsApi();
 
 export { AdminSecurityAlertsApi, adminSecurityAlertsApi };
+
+/**
+ * Permission Matrix API (admin-only)
+ *   - getMatrix():      GET   /api/admin/permission-matrix
+ *                       tra ve: { roles: [...], screens: [...], grants: [{roleId,permissionId}], generatedAt }
+ *   - toggleCell(payload): PATCH /api/admin/permission-matrix
+ *                       payload: { roleId, permissionId, granted: boolean }
+ *   - bulkToggle(payload): POST  /api/admin/permission-matrix/bulk
+ *                       payload: { cells: [{roleId, permissionId, granted}, ...] }
+ */
+class PermissionMatrixApi {
+  getMatrix() {
+    return httpClient.get('/admin/permission-matrix');
+  }
+
+  toggleCell({ roleId, permissionId, granted }) {
+    return httpClient.patch('/admin/permission-matrix', { roleId, permissionId, granted });
+  }
+
+  bulkToggle(cells) {
+    return httpClient.post('/admin/permission-matrix/bulk', { cells });
+  }
+}
+
+const permissionMatrixApi = new PermissionMatrixApi();
+
+export { PermissionMatrixApi, permissionMatrixApi };

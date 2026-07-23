@@ -20,6 +20,8 @@ const buildProfileRouter = require('./profileRoutes');
 const buildDashboardRouter = require('./dashboardRoutes');
 const buildMaintenanceReminderRouter = require('./maintenanceReminderRoutes');
 const buildSSERouter = require('./sseRoutes');
+const buildPublicRouter = require('./publicRoutes');
+const buildServiceRequestRouter = require('./serviceRequestRoutes');
 
 const router = express.Router();
 
@@ -60,6 +62,11 @@ router.use('/export-requests', buildExportRequestRouter());
 router.use('/profile', buildProfileRouter());
 router.use('/dashboard', buildDashboardRouter());
 router.use('/maintenance-reminders', buildMaintenanceReminderRouter());
+router.use('/service-requests', buildServiceRequestRouter());
 router.use('/sse', buildSSERouter());
+// Public - khong qua authenticate, dung cho landing page (tra cuu tien do
+// sua chua bang ma, khong can dang nhap). Mount rieng, KHONG dat trong
+// repairOrderRoutes.js vi file do gan authenticate cho ca router.
+router.use('/public', buildPublicRouter());
 
 module.exports = router;

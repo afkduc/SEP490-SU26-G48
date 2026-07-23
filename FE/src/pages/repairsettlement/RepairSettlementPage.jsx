@@ -112,6 +112,30 @@ function emptyItem() {
   return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: 'KHT', repairCategory: '', unit: 'Công', qty: 1, unitPrice: 0, discount: 0, total: 0 };
 }
 
+// Suy luan lai nhom "dich vu/goi da chon + phu tung/dich vu con tu dong chen
+// kem theo" tu du lieu da luu (BE khong luu quan he cha-con, groupId chi ton
+// tai o FE). Dau nhom la 1 dich vu le that (co serviceId, don gia > 0) hoac 1
+// dong goi combo (khong co serviceId). Cac dong ngay sau no la PT hoac DV gia
+// 0 (dich vu con cua goi) deu la "con" cua dau nhom gan nhat, cho den khi gap
+// dau nhom tiep theo - dung de khi Xoa/chon lai dau nhom thi don dep dung cac
+// dong con di kem, khong de sot lai orphan.
+function assignGroupIds(items, nextGroupId) {
+  let currentGroupId = null;
+  return items.map((it) => {
+    const isHead = it.lhsc === 'DV' && (!it.serviceId || (it.unitPrice || 0) > 0);
+    if (isHead) {
+      currentGroupId = nextGroupId();
+      return { ...it, groupId: currentGroupId, isGroupParent: true };
+    }
+    const isChild = currentGroupId && (it.lhsc === 'PT' || (it.lhsc === 'DV' && (it.unitPrice || 0) === 0));
+    if (isChild) {
+      return { ...it, groupId: currentGroupId };
+    }
+    currentGroupId = null;
+    return it;
+  });
+}
+
 // Che dữ liệu nhạy cảm (điện thoại, email, CCCD) khi hiển thị dữ liệu đã tra cứu
 // từ DB — chỉ hiện 4 ký tự cuối, phần còn lại thay bằng dấu *.
 function maskLast4(value) {
@@ -499,7 +523,7 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
 }
 
 // ─── Modal xem chi tiết phiếu ────────────────────────────────────────
-function DetailModal({ order, onClose, onComplete, onPreview, canManage }) {
+function DetailModal({ order, onClose, onPreview }) {
   const st = STATUS_LABELS[order.status];
   const exemptedAmount = (order.items || [])
     .filter((i) => !i.isFree && isExemptFromCustomerBilling(i))
@@ -618,6 +642,35 @@ function DetailModal({ order, onClose, onComplete, onPreview, canManage }) {
             </table>
           </div>
 
+          {(() => {
+            const serviceTasks = (order.tasks || []).filter((t) => t.taskType === 'service');
+            if (serviceTasks.length === 0) return null;
+            const doneCount = serviceTasks.filter((t) => t.isDone).length;
+            return (
+              <div style={{ marginTop: 16 }}>
+                <div className="form-section-title">
+                  Tiến độ công việc (Tổ trưởng) ({doneCount}/{serviceTasks.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {serviceTasks.map((t) => (
+                    <label
+                      key={t.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                        background: t.isDone ? '#E8F5E9' : 'var(--gray-50)', borderRadius: 6,
+                        fontSize: 13, textDecoration: t.isDone ? 'line-through' : 'none',
+                        color: t.isDone ? '#2E7D32' : 'var(--gray-900)',
+                      }}
+                    >
+                      <input type="checkbox" checked={t.isDone} disabled readOnly />
+                      <span>{t.taskName}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
             <div className="summary-box" style={{ minWidth: 300 }}>
               {[
@@ -635,12 +688,9 @@ function DetailModal({ order, onClose, onComplete, onPreview, canManage }) {
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
-          {order.status === 'inprogress' && (<>
+          {order.status === 'inprogress' && (
             <button className="btn btn-secondary" onClick={() => { onClose(); printWorkList(order); }}>In danh sách công việc</button>
-            {canManage && (
-              <button className="btn btn-primary" onClick={() => { onClose(); onComplete(order.id); }}>Đánh dấu hoàn thành</button>
-            )}
-          </>)}
+          )}
           {(order.status === 'waiting_payment' || order.status === 'invoiced') && (
             <button className="btn btn-primary" style={{ background: '#2E7D32', borderColor: '#2E7D32' }}
               onClick={() => { onClose(); onPreview(order); }}>
@@ -669,14 +719,32 @@ function RepairSettlementList() {
   const [cancelTarget, setCancelTarget] = useState(null);
   const PAGE_SIZE = 10;
 
+  // silent=true dung cho auto-refresh nen (poll/focus lai tab) - khong bat
+  // loading/spinner de tranh giat man hinh. Can thiet vi trang nay khong tu
+  // cap nhat khi to truong ben kia bam Hoan thanh (chi doi bang truc tiep
+  // trong DB, khong co websocket) - neu khong co polling thi co van phai
+  // F5 tay moi thay phieu nhay sang "Cho thanh toan".
+  const loadAll = ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    if (!silent) setLoadError('');
+    return listRepairSettlementsApi({ limit: 200 })
+      .then((result) => setOrders(result.items || []))
+      .catch((err) => { if (!silent) setLoadError(err.message || 'Không tải được danh sách phiếu quyết toán'); })
+      .finally(() => { if (!silent) setLoading(false); });
+  };
+
   useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    listRepairSettlementsApi({ limit: 200 })
-      .then((result) => { if (alive) setOrders(result.items || []); })
-      .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được danh sách phiếu quyết toán'); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
+    loadAll();
+    const intervalId = setInterval(() => loadAll({ silent: true }), 20000);
+    const onFocus = () => loadAll({ silent: true });
+    const onVisibility = () => { if (document.visibilityState === 'visible') loadAll({ silent: true }); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   const counts = {
@@ -723,12 +791,6 @@ function RepairSettlementList() {
 
   const handlePreview = async (o) => {
     setPreviewOrder(await fetchFullOrder(o));
-  };
-
-  const handleComplete = async (id) => {
-    const updated = await updateRepairSettlementStatusApi(id, 'waiting_payment');
-    setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
-    setTab('waiting_payment');
   };
 
   const handleInvoice = async (id) => {
@@ -855,12 +917,9 @@ function RepairSettlementList() {
                         <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget(o)}>Hủy</button>
                       </>)}
 
-                      {o.status === 'inprogress' && (<>
+                      {o.status === 'inprogress' && (
                         <button className="btn btn-sm" style={{ fontSize: 11, background: '#00897B', color: '#fff' }} onClick={() => handlePrintWorkList(o)}>In danh sách CV</button>
-                        {canManage && (
-                          <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => handleComplete(o.id)}>Hoàn thành</button>
-                        )}
-                      </>)}
+                      )}
 
                       {o.status === 'waiting_payment' && (
                         <button className="btn btn-primary btn-sm" style={{ fontSize: 11, background: '#2E7D32', borderColor: '#2E7D32' }}
@@ -873,7 +932,7 @@ function RepairSettlementList() {
                         <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => handlePreview(o)}>Xem / In lại</button>
                       )}
 
-                      {canManage && o.status !== 'invoiced' && (
+                      {canManage && o.status !== 'invoiced' && o.status !== 'waiting_payment' && (
                         // Khong truyen state={{ order: o }} - dong o lay tu danh sach KHONG co
                         // items day du (xem fetchFullOrder), truyen thang vao se lam form luu
                         // ghi de mat het hang muc cong viec cua phieu. De trang Chinh sua tu
@@ -904,9 +963,7 @@ function RepairSettlementList() {
         <DetailModal
           order={view}
           onClose={() => setView(null)}
-          onComplete={handleComplete}
           onPreview={setPreviewOrder}
-          canManage={canManage}
         />
       )}
 
@@ -1037,13 +1094,21 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
   const [nextKm, setNextKm] = useState(existingOrder?.nextMaintenanceKm || '');
   const [nextDate, setNextDate] = useState(existingOrder?.nextMaintenanceDate || '');
-  const [items, setItems] = useState(existingOrder?.items?.length ? existingOrder.items : [emptyItem()]);
+  // Bo dem chung sinh groupId - dung ca luc tai du lieu cu (assignGroupIds)
+  // lan luc chon dich vu/goi moi trong phien lam viec nay (xem selectCatalog*).
+  const catalogGroupSeq = useRef(0);
+  const nextGroupId = () => ++catalogGroupSeq.current;
+  const [items, setItems] = useState(() => assignGroupIds(
+    existingOrder?.items?.length ? existingOrder.items : [emptyItem()],
+    nextGroupId
+  ));
   // Tra cứu hạng mục công việc / gói combo thật trong DB khi gõ ô "Mã hạng mục".
   const [activeCatalogIdx, setActiveCatalogIdx] = useState(null); // dòng nào đang mở dropdown gợi ý
   const [catalogSuggestions, setCatalogSuggestions] = useState({}); // idx -> { services, packages }
   // Toạ độ (viewport) của ô đang mở dropdown - dropdown render qua portal ra
   // ngoài table-wrapper (vốn overflow:auto để cuộn ngang bảng) để không bị cắt/cuộn kẹt.
   const [catalogDropdownRect, setCatalogDropdownRect] = useState(null);
+  const catalogInputRef = useRef(null); // input dang mo dropdown - dung de tinh lai vi tri khi cuon trang
   const catalogSearchSeq = useRef(0);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1218,7 +1283,18 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // dịch vụ nào) thì dùng addPartItem.
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
   const addPartItem = () => setItems((prev) => [...prev, { ...emptyItem(), lhsc: 'PT', unit: 'Cái' }]);
-  const removeItem = (idx) => setItems((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+  // Xoa 1 dong "dau nhom" (dich vu/goi vua chon tu catalog) thi don dep luon
+  // cac dong phu tung/dich vu con tu dong chen kem theo no - tranh de sot lai
+  // hang muc mo coi khong con gan voi dich vu/goi nao ca. Xoa 1 dong con rieng
+  // le (vi du chi xoa 1 dong phu tung trong nhom) thi van chi xoa dung dong do.
+  const removeItem = (idx) => setItems((prev) => {
+    if (prev.length <= 1) return prev;
+    const target = prev[idx];
+    const remaining = (target?.isGroupParent && target.groupId)
+      ? prev.filter((it, i) => i !== idx && it.groupId !== target.groupId)
+      : prev.filter((_, i) => i !== idx);
+    return remaining.length > 0 ? remaining : prev;
+  });
 
   const handleItemDescription = (idx, val) => {
     setItem(idx, 'description', val);
@@ -1265,13 +1341,36 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
     setActiveCatalogIdx((cur) => (cur === idx ? null : cur));
     setCatalogDropdownRect(null);
+    catalogInputRef.current = null;
   };
 
   const openCatalogDropdown = (idx, inputEl) => {
+    catalogInputRef.current = inputEl;
     const rect = inputEl.getBoundingClientRect();
     setCatalogDropdownRect({ top: rect.bottom, left: rect.left, width: rect.width });
     setActiveCatalogIdx(idx);
   };
+
+  // Toa do duoc chup 1 lan luc focus - neu trang cuon (form nay rat dai) trong
+  // luc go chu cho toi khi ket qua tra ve, dropdown (position: fixed) se dung
+  // yen tai vi tri cu trong khi o input da di chuyen tren man hinh, gay ra
+  // hien tuong dropdown "troi" sang vi tri khac (vd de len khu vuc Lich bao
+  // duong/Tong ket ben duoi). Can tinh lai vi tri moi khi trang cuon/resize.
+  useEffect(() => {
+    if (activeCatalogIdx === null) return undefined;
+    const updateRect = () => {
+      const el = catalogInputRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setCatalogDropdownRect({ top: rect.bottom, left: rect.left, width: rect.width });
+    };
+    window.addEventListener('scroll', updateRect, true);
+    window.addEventListener('resize', updateRect);
+    return () => {
+      window.removeEventListener('scroll', updateRect, true);
+      window.removeEventListener('resize', updateRect);
+    };
+  }, [activeCatalogIdx]);
 
   // Chọn 1 hạng mục đơn lẻ từ catalog -> điền đúng dòng đang gõ, không giảm
   // giá, tự điền luôn Loại hình sửa chữa đã khai báo sẵn cho dịch vụ này (nếu
@@ -1281,9 +1380,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const selectCatalogService = (idx, svc) => {
     const repairCategory = svc.repairCategory || '';
     setItems((prev) => {
-      let next = [...prev];
-      next[idx] = recalcItem({ ...next[idx], code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', discount: 0, repairCategory });
-      next.splice(idx + 1, 0, ...buildPartRows(svc.parts, repairCategory));
+      // Dong nay truoc do da la dau nhom (vd doi sang dich vu khac) -> bo het
+      // phu tung cu di kem truoc khi chen bo phu tung moi, tranh de sot orphan.
+      const oldGroupId = prev[idx]?.groupId;
+      const base = oldGroupId ? prev.filter((it, i) => i === idx || it.groupId !== oldGroupId) : prev;
+      let next = [...base];
+      const groupId = nextGroupId();
+      next[idx] = recalcItem({ ...next[idx], code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', discount: 0, repairCategory, groupId, isGroupParent: true });
+      const partRows = buildPartRows(svc.parts, repairCategory).map((r) => ({ ...r, groupId }));
+      next.splice(idx + 1, 0, ...partRows);
       return next;
     });
     closeCatalogSuggestions(idx);
@@ -1301,7 +1406,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     // de trong, cho van chi can sua lai 1 lan neu chua dung.
     const repairCategory = pkg.repairCategory || pkg.items.find((it) => it.repairCategory)?.repairCategory || '';
     setItems((prev) => {
-      let next = [...prev];
+      // Dong nay truoc do da la dau nhom (vd doi sang goi khac) -> bo het dich
+      // vu con/phu tung cu di kem truoc khi chen bo moi, tranh de sot orphan.
+      const oldGroupId = prev[idx]?.groupId;
+      const base = oldGroupId ? prev.filter((it, i) => i === idx || it.groupId !== oldGroupId) : prev;
+      let next = [...base];
+      const groupId = nextGroupId();
       next[idx] = recalcItem({
         ...next[idx],
         code: pkg.code,
@@ -1314,6 +1424,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         lhsc: 'DV',
         discount: 0,
         repairCategory,
+        groupId,
+        isGroupParent: true,
       });
       const subServiceRows = pkg.items.map((it) => recalcItem({
         ...emptyItem(),
@@ -1325,8 +1437,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         qty: 1,
         lhsc: 'DV',
         repairCategory,
+        groupId,
       }));
-      next.splice(idx + 1, 0, ...subServiceRows, ...buildPartRows(mergePackageParts(pkg), repairCategory));
+      const partRows = buildPartRows(mergePackageParts(pkg), repairCategory).map((r) => ({ ...r, groupId }));
+      next.splice(idx + 1, 0, ...subServiceRows, ...partRows);
       return next;
     });
     closeCatalogSuggestions(idx);

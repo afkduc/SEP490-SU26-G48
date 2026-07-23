@@ -13,7 +13,11 @@ class RepairOrderController {
   // khong loc theo advisorId nhu man "Phieu quyet toan", show het theo branch.
   getAll = async (req, res, next) => {
     try {
-      const result = await this.repairOrderService.getAll({ branchId: req.user.branchId });
+      const isTeamLeader = (req.user.roles || []).includes('team_leader');
+      const result = await this.repairOrderService.getAll({
+        branchId: req.user.branchId,
+        teamLeaderId: isTeamLeader ? req.user.userId : undefined,
+      });
       return success(res, result, 'Repair orders retrieved');
     } catch (err) {
       next(err);
@@ -24,6 +28,16 @@ class RepairOrderController {
     try {
       const item = await this.repairOrderService.getById(req.params.id);
       return success(res, item, 'Repair order retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Public - khong auth (xem publicRoutes.js), khong duoc dung req.user o day.
+  lookupPublicProgress = async (req, res, next) => {
+    try {
+      const result = await this.repairOrderService.getPublicProgressByCode(req.params.code);
+      return success(res, result, 'Repair progress retrieved');
     } catch (err) {
       next(err);
     }
@@ -83,6 +97,20 @@ class RepairOrderController {
         userId: item?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
       return success(res, item, 'Repair order status updated');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateTaskStatus = async (req, res, next) => {
+    try {
+      const item = await this.repairOrderService.updateTaskStatus(
+        req.params.id,
+        req.params.taskId,
+        Boolean(req.body.isDone),
+        { userId: req.user.userId, branchId: req.user.branchId }
+      );
+      return success(res, item, 'Task status updated');
     } catch (err) {
       next(err);
     }
