@@ -1044,6 +1044,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // Toạ độ (viewport) của ô đang mở dropdown - dropdown render qua portal ra
   // ngoài table-wrapper (vốn overflow:auto để cuộn ngang bảng) để không bị cắt/cuộn kẹt.
   const [catalogDropdownRect, setCatalogDropdownRect] = useState(null);
+  const catalogInputRef = useRef(null); // input dang mo dropdown - dung de tinh lai vi tri khi cuon trang
   const catalogSearchSeq = useRef(0);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1265,13 +1266,36 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
     setActiveCatalogIdx((cur) => (cur === idx ? null : cur));
     setCatalogDropdownRect(null);
+    catalogInputRef.current = null;
   };
 
   const openCatalogDropdown = (idx, inputEl) => {
+    catalogInputRef.current = inputEl;
     const rect = inputEl.getBoundingClientRect();
     setCatalogDropdownRect({ top: rect.bottom, left: rect.left, width: rect.width });
     setActiveCatalogIdx(idx);
   };
+
+  // Toa do duoc chup 1 lan luc focus - neu trang cuon (form nay rat dai) trong
+  // luc go chu cho toi khi ket qua tra ve, dropdown (position: fixed) se dung
+  // yen tai vi tri cu trong khi o input da di chuyen tren man hinh, gay ra
+  // hien tuong dropdown "troi" sang vi tri khac (vd de len khu vuc Lich bao
+  // duong/Tong ket ben duoi). Can tinh lai vi tri moi khi trang cuon/resize.
+  useEffect(() => {
+    if (activeCatalogIdx === null) return undefined;
+    const updateRect = () => {
+      const el = catalogInputRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setCatalogDropdownRect({ top: rect.bottom, left: rect.left, width: rect.width });
+    };
+    window.addEventListener('scroll', updateRect, true);
+    window.addEventListener('resize', updateRect);
+    return () => {
+      window.removeEventListener('scroll', updateRect, true);
+      window.removeEventListener('resize', updateRect);
+    };
+  }, [activeCatalogIdx]);
 
   // Chọn 1 hạng mục đơn lẻ từ catalog -> điền đúng dòng đang gõ, không giảm
   // giá, tự điền luôn Loại hình sửa chữa đã khai báo sẵn cho dịch vụ này (nếu
