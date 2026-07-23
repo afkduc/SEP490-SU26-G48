@@ -159,6 +159,14 @@ const NOTIFICATION_EVENTS = {
   },
 
   // Inventory
+  PERMISSION_REQUEST: {
+    title: 'Yêu cầu cấp quyền mới',
+    severity: SEVERITY.WARNING,
+    messageTemplates: {
+      default: '{actorName} ({targetCode}) yêu cầu cấp quyền: {permissionKey}{reason}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
   IMPORT_REQUEST_APPROVED: {
     title: 'Phiếu nhập kho được duyệt',
     severity: SEVERITY.SUCCESS,
@@ -429,6 +437,8 @@ class NotificationService {
     if (data.actorName) message = message.replace('{actorName}', data.actorName);
     if (data.targetName) message = message.replace('{targetName}', data.targetName);
     if (data.targetCode) message = message.replace('{targetCode}', data.targetCode);
+    if (data.permissionKey) message = message.replace('{permissionKey}', data.permissionKey);
+    if (data.reason) message = message.replace('{reason}', data.reason);
 
     // Handle different message templates based on data
     if (eventType === 'PASSWORD_CHANGED' && data.resetByAdmin) {

@@ -35,6 +35,8 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
   const tokenRef = useRef(token);
   const onEventRef = useRef(onPermissionChanged);
   const enabledRef = useRef(enabled);
+  // Dem so lan SSE fail lien tiep - neu >= 2 lan -> refresh token truoc
+  const authFailCountRef = useRef(0);
 
   // Sync refs khi props thay doi (tranh stale closure nhung khong reconnect)
   useEffect(() => {
@@ -189,6 +191,8 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
           if (isCancelled) return;
           setConnected(true);
           setError(null);
+          // Reset fail counter khi SSE ket noi thanh cong
+          authFailCountRef.current = 0;
         });
 
         es.addEventListener('permission-changed', (e) => {
@@ -208,11 +212,32 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
           }
         });
 
-        // Native error handler - reconnect (tru auth fail)
+        // Native error handler - reconnect (tru auth fail).
+        // EventSource khong expose status code, nhung:
+        // - neu server dong ngay lap tuc (< 1s sau khi connect) -> 401 (token invalid)
+        // - neu reconnect lap lai lien tuc -> 401
+        // Chung ta dung 'authFailCount' de phat hien pattern nay.
         es.onerror = () => {
           if (isCancelled) return;
           setConnected(false);
-          // Neu server da dong connection (401) -> khong reconnect
+          authFailCountRef.current += 1;
+          // Neu da fail >= 2 lan lien tiep -> co the la auth fail, thu refresh
+          // token truoc khi reconnect (fix: SSE kem voi token stale khi BE
+          // da invalidate JWT qua trackLogin).
+          if (authFailCountRef.current >= 2) {
+            // Close connection cu, refresh token, sau do reconnect
+            if (eventSourceRef.current) {
+              eventSourceRef.current.close();
+              eventSourceRef.current = null;
+            }
+            // Refresh async, sau do goi connect() voi token moi
+            refreshPermissions().finally(() => {
+              authFailCountRef.current = 0;
+              if (!isCancelled) connect();
+            });
+            return;
+          }
+          // Neu server da dong connection ngay (401) -> khong reconnect ngay
           if (es.readyState === EventSource.CLOSED) {
             setError('SSE connection closed (auth?)');
             return;

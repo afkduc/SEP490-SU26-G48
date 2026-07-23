@@ -2,6 +2,7 @@ import { useEffect, useState, Fragment } from 'react';
 import { adminRolesApi, refreshPermissionsApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
 import { useAuth } from '../../contexts/AppContext';
+import PermissionGate from '../../components/PermissionGate';
 import { ROLE_VALUES } from '../../constants/roles';
 import './AdminRolesPage.css';
 
@@ -103,7 +104,7 @@ function ConfirmModal({ title, body, confirmLabel = 'Xác nhận', cancelLabel =
 
 // ─── Role Form Modal ──────────────────────────────────────────────
 
-function RoleFormModal({ role, onClose, onSuccess }) {
+function RoleFormModal({ role, groups, byModule, onClose, onSuccess }) {
   const isEdit = Boolean(role?.id);
   const [form, setForm] = useState({ roleName: role?.roleName || '', roleLabel: role?.roleLabel || '' });
   const [saving, setSaving] = useState(false);
@@ -122,7 +123,23 @@ function RoleFormModal({ role, onClose, onSuccess }) {
       if (isEdit) {
         await adminRolesApi.update(role.id, { roleLabel: form.roleLabel.trim() });
       } else {
-        await adminRolesApi.create({ roleName: form.roleName.trim(), roleLabel: form.roleLabel.trim() });
+        const created = await adminRolesApi.create({ roleName: form.roleName.trim(), roleLabel: form.roleLabel.trim() });
+        // Phase 3.3: auto-preset nhom quyen theo module tuong ung.
+        // Neu role khong co trong ROLE_MODULE_MAP -> bo qua, admin tu tick sau.
+        const moduleEntry = ROLE_MODULE_MAP[form.roleName.trim()];
+        if (moduleEntry && moduleEntry !== 'all') {
+          const newRoleId = created?.id ?? created?.item?.id ?? created?.roleId;
+          const moduleGroups = byModule?.[moduleEntry] || [];
+          const groupIds = moduleGroups.map((g) => g.id);
+          if (newRoleId && groupIds.length > 0) {
+            try {
+              await adminRolesApi.setRoleGroups(newRoleId, groupIds);
+            } catch (presetErr) {
+              console.warn('[RoleFormModal] auto-preset groups fail:', presetErr);
+              // Tiep tuc khong throw de modal van bao success (role da tao OK)
+            }
+          }
+        }
       }
       onSuccess();
     } catch (err) {
@@ -247,20 +264,200 @@ function RoleCard({ role, onAction }) {
         </span>
       </div>
       <div className="role-card__actions">
-        <button className="btn btn--sm btn--secondary" onClick={() => onAction('users', role)} title="Xem người dùng">
-          <IconUsers /> Người dùng
-        </button>
-        <button className="btn btn--sm btn--secondary" onClick={() => onAction('edit', role)} title="Chỉnh sửa">
-          <IconEdit /> Sửa
-        </button>
-        <button
-          className={`btn btn--sm ${role.isActive ? 'btn--warning' : 'btn--success-outline'}`}
-          onClick={() => onAction('toggle', role)}
-          title={role.isActive ? 'Tắt vai trò' : 'Kích hoạt vai trò'}
+        <PermissionGate permission="admin:user_roles:read">
+          <button className="btn btn--sm btn--secondary" onClick={() => onAction('users', role)} title="Xem người dùng">
+            <IconUsers /> Người dùng
+          </button>
+        </PermissionGate>
+        <PermissionGate permission="admin:roles:update">
+          <button className="btn btn--sm btn--secondary" onClick={() => onAction('edit', role)} title="Chỉnh sửa">
+            <IconEdit /> Sửa
+          </button>
+        </PermissionGate>
+        <PermissionGate
+          permission={role.isActive ? 'admin:roles:deactivate' : 'admin:roles:activate'}
         >
-          {role.isActive ? 'Tắt' : 'Kích hoạt'}
-        </button>
+          <button
+            className={`btn btn--sm ${role.isActive ? 'btn--warning' : 'btn--success-outline'}`}
+            onClick={() => onAction('toggle', role)}
+            title={role.isActive ? 'Tắt vai trò' : 'Kích hoạt vai trò'}
+          >
+            {role.isActive ? 'Tắt' : 'Kích hoạt'}
+          </button>
+        </PermissionGate>
       </div>
+    </div>
+  );
+}
+
+// ─── Group Matrix (Phase 3) - moi role = 1 card voi cac nhom checkbox ──
+
+const MODULE_LABELS = {
+  admin: 'Quản trị hệ thống',
+  general_director: 'Giám đốc điều hành',
+  manager: 'Quản lý chi nhánh',
+  warehouse_staff: 'Nhân viên kho',
+  service_advisor: 'Cố vấn dịch vụ',
+  team_leader: 'Tổ trưởng kỹ thuật',
+  technician: 'Kỹ thuật viên',
+};
+
+// Phase 3.3: Mapping roleName -> module. Admin thay tat ca cac module
+// (vi admin co quyen gan nhom cho moi role), cac role khac chi thay 1 module
+// tuong ung de tranh tick nham nhom cua role khac (vd: manager tick nhom admin).
+const ROLE_MODULE_MAP = {
+  admin: 'all',
+  general_director: 'general_director',
+  manager: 'manager',
+  warehouse_staff: 'warehouse_staff',
+  service_advisor: 'service_advisor',
+  team_leader: 'team_leader',
+  technician: 'technician',
+};
+
+function getModulesForRole(roleName) {
+  const entry = ROLE_MODULE_MAP[roleName];
+  if (!entry) return []; // role khong co mapping -> rong (can warning o ngoai)
+  if (entry === 'all') return Object.keys(MODULE_LABELS); // admin thay tat ca
+  return [entry];
+}
+
+function GroupMatrix({ roles, groups, byModule, roleGroupIds, onChange, onSave, saving, dirty }) {
+  function isChecked(roleId, groupId) {
+    return (roleGroupIds[roleId] || []).includes(groupId);
+  }
+
+  function toggle(roleId, groupId) {
+    const current = roleGroupIds[roleId] || [];
+    const next = current.includes(groupId)
+      ? current.filter((g) => g !== groupId)
+      : [...current, groupId];
+    onChange(roleId, next);
+  }
+
+  function toggleAll(roleId, groupIdsInModule) {
+    const current = roleGroupIds[roleId] || [];
+    const moduleGroupIds = groupIdsInModule.map((g) => g.id);
+    const allChecked = moduleGroupIds.length > 0 && moduleGroupIds.every((id) => current.includes(id));
+    const next = allChecked
+      ? current.filter((id) => !moduleGroupIds.includes(id))
+      : Array.from(new Set([...current, ...moduleGroupIds]));
+    onChange(roleId, next);
+  }
+
+  function isModuleAllChecked(roleId, moduleGroups) {
+    const current = roleGroupIds[roleId] || [];
+    if (moduleGroups.length === 0) return false;
+    return moduleGroups.every((g) => current.includes(g.id));
+  }
+
+  return (
+    <div className="groups-matrix">
+      <div className="groups-matrix__header">
+        <h2>Phân quyền theo nhóm — Vai trò &amp; Nhóm chức năng</h2>
+        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+          {groups.length} nhóm · {roles.length} vai trò · Tick 1 nhóm = cấp toàn bộ quyền trong nhóm
+        </span>
+      </div>
+
+      <div className="groups-matrix__cards">
+        {roles.map((role) => {
+          // Phase 3.3: moi role chi thay modules cua role do (admin thay tat ca)
+          const moduleKeys = getModulesForRole(role.roleName);
+          const noMapping = moduleKeys.length === 0;
+          return (
+          <div key={role.id} className={`groups-matrix__card ${role.isActive ? '' : 'groups-matrix__card--inactive'}`}>
+            <div className="groups-matrix__card-header">
+              <div>
+                <div className="groups-matrix__role-name">{role.roleLabel}</div>
+                <div className="groups-matrix__role-meta">
+                  <span className="groups-matrix__role-code">{role.roleName}</span>
+                  <span className={`groups-matrix__status ${role.isActive ? 'is-active' : 'is-inactive'}`}>
+                    {role.isActive ? 'Hoạt động' : 'Tắt'}
+                  </span>
+                  <span className="groups-matrix__role-count">
+                    {(roleGroupIds[role.id] || []).length} nhóm
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {noMapping ? (
+              <div className="groups-matrix__warning">
+                Vai trò <code>{role.roleName}</code> chưa có ánh xạ module.
+                Thêm vào <code>ROLE_MODULE_MAP</code> trong <code>AdminRolesPage.jsx</code>.
+              </div>
+            ) : (
+            <div className="groups-matrix__modules">
+              {moduleKeys.map((moduleKey) => {
+                const moduleGroups = byModule[moduleKey] || [];
+                if (moduleGroups.length === 0) return null;
+                const allChecked = isModuleAllChecked(role.id, moduleGroups);
+                const someChecked = moduleGroups.some((g) => (roleGroupIds[role.id] || []).includes(g.id));
+                return (
+                  <div key={moduleKey} className="groups-matrix__module">
+                    <div className="groups-matrix__module-header">
+                      <label className="groups-matrix__module-toggle">
+                        <input
+                          type="checkbox"
+                          checked={allChecked}
+                          ref={(el) => { if (el) el.indeterminate = !allChecked && someChecked; }}
+                          onChange={() => toggleAll(role.id, moduleGroups)}
+                        />
+                        <span className="groups-matrix__module-name">
+                          {MODULE_LABELS[moduleKey] || moduleKey}
+                        </span>
+                      </label>
+                      <span className="groups-matrix__module-count">{moduleGroups.length} nhóm</span>
+                    </div>
+
+                    <div className="groups-matrix__group-list">
+                      {moduleGroups.map((g) => {
+                        const checked = isChecked(role.id, g.id);
+                        const permCount = (g.permissionKeys || []).length;
+                        return (
+                          <label
+                            key={g.id}
+                            className={`groups-matrix__group ${checked ? 'is-checked' : ''}`}
+                            title={g.groupLabel || g.groupName}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggle(role.id, g.id)}
+                            />
+                            <span className="groups-matrix__group-name">{g.groupName}</span>
+                            <span className="groups-matrix__group-perms">
+                              {permCount > 0 ? `${permCount} quyền` : '0 quyền'}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            )}
+          </div>
+          );
+        })}
+      </div>
+
+      {dirty && (
+        <div className="matrix-save-bar">
+          <span className="matrix-save-bar__info">
+            Đã thay đổi. Nhấn "Lưu" để cập nhật tất cả vai trò cùng lúc.
+          </span>
+          <div className="matrix-save-bar__actions">
+            <PermissionGate permission="admin:roles:manage">
+              <button className="btn btn--secondary btn--sm" onClick={onSave} disabled={saving}>
+                {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+              </button>
+            </PermissionGate>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -343,9 +540,11 @@ function PermissionMatrix({ roles, visibleRoles, permissions, rolePermissions, o
             Đã thay đổi. Nhấn "Lưu" để cập nhật tất cả vai trò cùng lúc.
           </span>
           <div className="matrix-save-bar__actions">
-            <button className="btn btn--secondary btn--sm" onClick={onSave} disabled={saving}>
-              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-            </button>
+            <PermissionGate permission="admin:roles:manage">
+              <button className="btn btn--secondary btn--sm" onClick={onSave} disabled={saving}>
+                {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+              </button>
+            </PermissionGate>
           </div>
         </div>
       )}
@@ -358,18 +557,26 @@ function PermissionMatrix({ roles, visibleRoles, permissions, rolePermissions, o
 export default function AdminRolesPage() {
   const toast = useToast();
   const { reloadPermissions } = useAuth();
-  const [tab, setTab] = useState('list'); // 'list' | 'matrix'
+  const [tab, setTab] = useState('list'); // 'list' | 'matrix' | 'groups'
 
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Matrix data
+  // Matrix data (legacy)
   const [permissions, setPermissions] = useState([]);
   const [rolePermissions, setRolePermissions] = useState({}); // { roleId: [permId, ...] }
   const [matrixLoading, setMatrixLoading] = useState(false);
   const [matrixDirty, setMatrixDirty] = useState(false);
   const [matrixSaving, setMatrixSaving] = useState(false);
+
+  // Groups matrix data (Phase 3)
+  const [groups, setGroups] = useState([]);
+  const [groupsByModule, setGroupsByModule] = useState({});
+  const [roleGroupIds, setRoleGroupIds] = useState({}); // { roleId: [groupId, ...] }
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsDirty, setGroupsDirty] = useState(false);
+  const [groupsSaving, setGroupsSaving] = useState(false);
 
   // Modals
   const [showForm, setShowForm] = useState(false);
@@ -441,8 +648,35 @@ export default function AdminRolesPage() {
     }
   }
 
+  // Phase 3: Load groups + role-group mapping trong 1 luot
+  async function loadGroups() {
+    setGroupsLoading(true);
+    try {
+      const groupsRes = await adminRolesApi.listPermissionGroups();
+      const allGroups = groupsRes?.items || [];
+      setGroups(allGroups);
+      setGroupsByModule(groupsRes?.byModule || {});
+
+      // Lay groupIds cho tung role (parallel - 1 roundtrip)
+      const roleIds = roles.map((r) => r.id);
+      const results = await Promise.all(
+        roleIds.map((rid) => adminRolesApi.getRoleGroupIds(rid).catch(() => ({ roleId: rid, groupIds: [] })))
+      );
+      const mapping = {};
+      for (const { roleId, groupIds } of results) {
+        mapping[roleId] = Array.isArray(groupIds) ? groupIds : [];
+      }
+      setRoleGroupIds(mapping);
+    } catch (err) {
+      console.error('Groups load error:', err);
+    } finally {
+      setGroupsLoading(false);
+    }
+  }
+
   useEffect(() => { loadRoles(); }, []);
   useEffect(() => { if (tab === 'matrix') loadMatrix(); }, [tab]);
+  useEffect(() => { if (tab === 'groups' && roles.length > 0) loadGroups(); }, [tab, roles.length]);
 
   // Matrix hien thi TAT CA roles (gồm system roles + custom roles).
   // Truoc day chi loc theo ROLE_VALUES -> custom roles bi an va khong luu duoc.
@@ -506,6 +740,43 @@ export default function AdminRolesPage() {
     }
   }
 
+  function handleGroupsChange(roleId, groupIds) {
+    setRoleGroupIds((prev) => ({ ...prev, [roleId]: groupIds }));
+    setGroupsDirty(true);
+  }
+
+  async function handleGroupsSave() {
+    setGroupsSaving(true);
+    try {
+      const changes = roles.map((role) => ({
+        roleId: role.id,
+        groupIds: roleGroupIds[role.id] || [],
+      }));
+      const result = await adminRolesApi.saveRoleGroupsMatrix(changes);
+      setGroupsDirty(false);
+      toast.success(`Đã lưu nhóm quyền cho ${result.updatedRoles} vai trò (${result.affectedUserCount} người dùng bị ảnh hưởng).`);
+
+      // Reload permissions token để các user đang online refresh
+      try {
+        const refreshResult = await refreshPermissionsApi();
+        if (refreshResult?.token || refreshResult?.permissions) {
+          const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
+          if (refreshResult.token) storage.setItem('token', refreshResult.token);
+          if (refreshResult.permissions) {
+            storage.setItem('permissions', JSON.stringify(refreshResult.permissions));
+          }
+          await reloadPermissions?.();
+        }
+      } catch (err) {
+        console.warn('[AdminRolesPage] refresh-permissions after groups save failed:', err);
+      }
+    } catch (err) {
+      toast.error('Lỗi khi lưu nhóm quyền: ' + (err.message || 'Không rõ'));
+    } finally {
+      setGroupsSaving(false);
+    }
+  }
+
   return (
     <div className="admin-roles">
       {/* Header */}
@@ -521,12 +792,14 @@ export default function AdminRolesPage() {
           {roles.length > 0 && (
             <span className="admin-roles__total-badge">{roles.length} vai trò</span>
           )}
-          <button className="btn btn--primary" onClick={() => { setEditRole(null); setShowForm(true); }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Thêm vai trò
-          </button>
+          <PermissionGate permission="admin:roles:create">
+            <button className="btn btn--primary" onClick={() => { setEditRole(null); setShowForm(true); }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Thêm vai trò
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -539,10 +812,16 @@ export default function AdminRolesPage() {
           Danh sách vai trò
         </button>
         <button
+          className={`admin-roles__tab ${tab === 'groups' ? 'admin-roles__tab--active' : ''}`}
+          onClick={() => setTab('groups')}
+        >
+          Phân quyền theo nhóm
+        </button>
+        <button
           className={`admin-roles__tab ${tab === 'matrix' ? 'admin-roles__tab--active' : ''}`}
           onClick={() => setTab('matrix')}
         >
-          Ma trận quyền
+          Ma trận quyền (chi tiết)
         </button>
       </div>
 
@@ -570,7 +849,9 @@ export default function AdminRolesPage() {
             <div className="admin-roles__empty">
               <IconShield />
               <p>Chưa có vai trò nào</p>
-              <button className="btn btn--primary" onClick={() => setShowForm(true)}>Thêm vai trò đầu tiên</button>
+              <PermissionGate permission="admin:roles:create">
+                <button className="btn btn--primary" onClick={() => setShowForm(true)}>Thêm vai trò đầu tiên</button>
+              </PermissionGate>
             </div>
           )}
 
@@ -584,6 +865,33 @@ export default function AdminRolesPage() {
                 />
               ))}
             </div>
+          )}
+        </>
+      )}
+
+      {/* Tab: Groups (Phase 3) */}
+      {tab === 'groups' && (
+        <>
+          {groupsLoading ? (
+            <div className="admin-roles__loading">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+              <span>Đang tải nhóm quyền...</span>
+            </div>
+          ) : (
+            groups.length > 0 && (
+              <GroupMatrix
+                roles={roles}
+                groups={groups}
+                byModule={groupsByModule}
+                roleGroupIds={roleGroupIds}
+                onChange={handleGroupsChange}
+                onSave={handleGroupsSave}
+                saving={groupsSaving}
+                dirty={groupsDirty}
+              />
+            )
           )}
         </>
       )}
@@ -619,12 +927,20 @@ export default function AdminRolesPage() {
       {showForm && (
         <RoleFormModal
           role={editRole}
+          groups={groups}
+          byModule={groupsByModule}
           onClose={() => { setShowForm(false); setEditRole(null); }}
           onSuccess={() => {
+            const createdNew = !editRole;
             toast.success(editRole ? 'Cập nhật vai trò thành công' : 'Tạo vai trò mới thành công');
             setShowForm(false);
             setEditRole(null);
-            loadRoles();
+            loadRoles().then(async () => {
+              // Phase 3.3: neu vua tao role moi, reload groups de UI hien thi auto-preset
+              if (createdNew) {
+                await loadGroups();
+              }
+            });
           }}
         />
       )}
