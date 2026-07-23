@@ -48,6 +48,12 @@ class AuthService {
       throw e;
     }
 
+    if (user.branch_id && user.branch_is_active !== undefined && !Boolean(user.branch_is_active)) {
+      const e = new ApiError(403, 'Chi nhánh của tài khoản này đang bị ngưng hoạt động');
+      e.audit = { userExists: true, user, reason: 'BRANCH_DISABLED' };
+      throw e;
+    }
+
     // Increment token version de revoke token cu
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
     user.token_version = newTokenVersion;
