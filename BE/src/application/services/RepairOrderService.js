@@ -1,5 +1,6 @@
 const ApiError = require('../../utils/ApiError');
 const RepairOrderResponseDto = require('../dto/RepairOrderDto');
+const PublicRepairProgressDto = require('../dto/PublicRepairProgressDto');
 
 const UPDATABLE_STATUS_VALUES = ['completed', 'cancelled'];
 
@@ -8,8 +9,8 @@ class RepairOrderService {
     this.repairOrderRepository = repairOrderRepository;
   }
 
-  async getAll({ branchId } = {}) {
-    const items = await this.repairOrderRepository.findAll({ branchId });
+  async getAll({ branchId, teamLeaderId } = {}) {
+    const items = await this.repairOrderRepository.findAll({ branchId, teamLeaderId });
     return RepairOrderResponseDto.fromEntityList(items);
   }
 
@@ -17,6 +18,18 @@ class RepairOrderService {
     const entity = await this.repairOrderRepository.findById(id);
     if (!entity) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
     return RepairOrderResponseDto.fromEntity(entity);
+  }
+
+  // Public - khong auth, dung cho landing page (khach nhap ma sua chua de
+  // xem tien do). Tra ve DTO rut gon, khong lo thong tin khach hang.
+  async getPublicProgressByCode(code) {
+    const trimmed = (code || '').trim();
+    if (!trimmed) throw new ApiError(400, 'Vui lòng nhập mã sửa chữa');
+
+    const entity = await this.repairOrderRepository.findByCode(trimmed);
+    if (!entity) throw new ApiError(404, 'Không tìm thấy mã sửa chữa này');
+
+    return PublicRepairProgressDto.fromEntity(entity);
   }
 
   async getTeamLeaders(branchId) {
@@ -72,9 +85,44 @@ class RepairOrderService {
     if (existing.status !== 'inprogress') {
       throw new ApiError(409, 'Lệnh đã kết thúc (hoàn thành/hủy), không thể đổi trạng thái nữa');
     }
+    // Chi dau muc "dich vu" (task_type='service') can tich - phu tung
+    // (task_type='product') chi de hien thi, khong tinh vao dieu kien hoan thanh.
+    if (status === 'completed' && existing.tasks.some((t) => t.taskType === 'service' && !t.isDone)) {
+      throw new ApiError(409, 'Cần tích hoàn thành tất cả đầu mục công việc trước khi kết thúc lệnh');
+    }
 
     const entity = await this.repairOrderRepository.updateStatus(id, status, cancelReason);
     return RepairOrderResponseDto.fromEntity(entity);
+  }
+
+  async updateTaskStatus(id, taskId, isDone, { userId, branchId } = {}) {
+    const existing = await this.repairOrderRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
+    if (String(existing.branchId) !== String(branchId)) {
+      throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
+    }
+    if (String(existing.teamLeaderId) !== String(userId)) {
+      throw new ApiError(403, 'Chỉ tổ trưởng được phân công lệnh này mới có quyền cập nhật đầu mục');
+    }
+    if (existing.status !== 'inprogress') {
+      throw new ApiError(409, 'Lệnh đã kết thúc, không thể cập nhật đầu mục công việc');
+    }
+    const task = existing.tasks.find((t) => String(t.id) === String(taskId));
+    if (!task) throw new ApiError(404, 'Không tìm thấy đầu mục công việc');
+    if (task.taskType !== 'service') {
+      throw new ApiError(400, 'Chỉ đầu mục dịch vụ mới cần tích hoàn thành');
+    }
+    // Tich xong la chot luon, khong cho tich lai/bo tich - tranh to truong
+    // (hoac goi thang API) sua di sua lai trang thai da xac nhan hoan thanh.
+    if (task.isDone) {
+      throw new ApiError(409, 'Đầu mục này đã được xác nhận hoàn thành, không thể thay đổi lại');
+    }
+    if (!isDone) {
+      throw new ApiError(400, 'Không thể bỏ tích đầu mục công việc');
+    }
+
+    await this.repairOrderRepository.updateTaskStatus(taskId, isDone);
+    return this.getById(id);
   }
 }
 

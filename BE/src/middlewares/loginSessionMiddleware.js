@@ -165,12 +165,17 @@ function _sendLoginNotification(userId, browser, os, ipAddress, deviceId) {
   try {
     const NotificationService = require('../application/services/NotificationService');
     const ns = new NotificationService();
+    // notify() la async - PHAI bat .catch() vi khong await o day (fire-and-
+    // forget), neu khong reject se thanh unhandled rejection va lam crash
+    // ca process (Node moi mac dinh thoat process khi co unhandled rejection).
     ns.notify('LOGIN_SUCCESS', {
       userId,
       browser,
       os,
       ip: ipAddress,
       deviceId,
+    }).catch((err) => {
+      console.error('[loginSessionMiddleware] Failed to send login notification:', err.message);
     });
   } catch (err) {
     console.error('[loginSessionMiddleware] Failed to send login notification:', err.message);

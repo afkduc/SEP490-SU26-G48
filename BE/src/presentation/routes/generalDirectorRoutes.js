@@ -31,6 +31,8 @@ function buildGeneralDirectorRouter() {
   router.get('/branch-managers/:id', controller.getBranchManagerById);
   router.post('/branch-managers', controller.createBranchManager);
   router.put('/branch-managers/:id', controller.updateBranchManager);
+  router.patch('/branches/:id/deactivate', controller.deactivateBranch);
+  router.patch('/branches/:id/reactivate', controller.reactivateBranch);
 
   return router;
 }

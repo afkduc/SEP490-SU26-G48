@@ -79,7 +79,7 @@ export default function ExportRequestFormPage() {
   async function handlePickRo(ro) {
     setFormError('');
     if (ro.alreadyExported) {
-      setFormError(`Lenh sua chua ${ro.repairOrderCode} da duoc xuat kho truoc do.`);
+      setFormError(`Lệnh sửa chữa ${ro.repairOrderCode} đã được xuất kho trước đó.`);
       return;
     }
     try {
@@ -97,7 +97,7 @@ export default function ExportRequestFormPage() {
       setItems(builtItems);
       setShowRoPicker(false);
     } catch (err) {
-      setFormError(err.message || 'Khong the tai lenh sua chua');
+      setFormError(err.message || 'Không thể tải lệnh sửa chữa');
     }
   }
 
@@ -141,17 +141,17 @@ export default function ExportRequestFormPage() {
   }
 
   function validate() {
-    if (!selectedRo) return 'Vui long chon lenh sua chua';
-    if (!exportDate) return 'Vui long chon ngay xuat';
-    if (items.length === 0) return 'Phieu xuat phai co it nhat 1 dong phu tung';
+    if (!selectedRo) return 'Vui lòng chọn lệnh sửa chữa';
+    if (!exportDate) return 'Vui lòng chọn ngày xuất';
+    if (items.length === 0) return 'Phiếu xuất phải có ít nhất 1 dòng phụ tùng';
     for (let i = 0; i < items.length; i += 1) {
       const it = items[i];
       const q = Number(it.quantity);
       if (!Number.isFinite(q) || q <= 0 || !Number.isInteger(q)) {
-        return `Dong ${i + 1}: so luong phai la so nguyen duong`;
+        return `Dòng ${i + 1}: số lượng phải là số nguyên dương`;
       }
       if (it.currentStock != null && q > it.currentStock) {
-        return `Dong ${i + 1}: ton kho chi con ${it.currentStock} (can xuat ${q})`;
+        return `Dòng ${i + 1}: tồn kho chỉ còn ${it.currentStock} (cần xuất ${q})`;
       }
     }
     return '';
@@ -180,7 +180,7 @@ export default function ExportRequestFormPage() {
       });
       navigate(`/inventory/export-requests/${created.id}`);
     } catch (submitErr) {
-      setFormError(submitErr.message || 'Tao phieu xuat that bai');
+      setFormError(submitErr.message || 'Tạo phiếu xuất thất bại');
     }
   }
 
@@ -193,45 +193,45 @@ export default function ExportRequestFormPage() {
     <div className="er-form">
       <div className="er-form__header">
         <div>
-          <h1 className="er-form__title">Tao phieu xuat kho</h1>
+          <h1 className="er-form__title">Tạo phiếu xuất kho</h1>
           <p className="er-form__subtitle">
-            Chon phieu sua chua (Service Order) can xuat phu tung, dieu chinh so luong va luu.
-            Ton kho se bi tru ngay khi tao phieu.
+            Chọn phiếu sửa chữa (Service Order) cần xuất phụ tùng, điều chỉnh số lượng và lưu.
+            Tồn kho sẽ bị trừ ngay khi tạo phiếu.
           </p>
         </div>
         <Link to="/inventory/export-requests" className="btn btn--ghost">
-          &laquo; Quay lai
+          &laquo; Quay lại
         </Link>
       </div>
 
       <form onSubmit={handleSubmit} className="er-form__body">
-        {/* Chon lenh sua chua */}
+        {/* Chọn lệnh sửa chữa */}
         <div className="er-form__section">
-          <h2 className="er-form__section-title">Lenh sua chua (Repair Order)</h2>
+          <h2 className="er-form__section-title">Lệnh sửa chữa (Repair Order)</h2>
           {!selectedRo ? (
             <div className="er-form__so-picker">
               <input
                 className="input"
                 type="text"
-                placeholder="Tim theo ma LSC, ma RO, ten khach, bien so xe..."
+                placeholder="Tìm theo mã LSC, mã RO, tên khách, biển số xe..."
                 value={roSearchTerm}
                 onChange={(e) => setRoSearchTerm(e.target.value)}
               />
               {loadingRepairOrders ? (
-                <div className="er-form__hint">Dang tai danh sach LSC...</div>
+                <div className="er-form__hint">Đang tải danh sách LSC...</div>
               ) : repairOrders.length === 0 ? (
-                <div className="er-form__hint">Khong co lenh sua chua nao can xuat kho.</div>
+                <div className="er-form__hint">Không có lệnh sửa chữa nào cần xuất kho.</div>
               ) : (
                 <div className="table-responsive">
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Ma LSC</th>
-                        <th>Ma RO</th>
-                        <th>Khach hang</th>
+                        <th>Mã LSC</th>
+                        <th>Mã RO</th>
+                        <th>Khách hàng</th>
                         <th>Xe</th>
-                        <th>Trang thai</th>
-                        <th className="text-right">So PT</th>
+                        <th>Trạng thái</th>
+                        <th className="text-right">Số PT</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -244,9 +244,9 @@ export default function ExportRequestFormPage() {
                           <td>{ro.vehiclePlate || '—'}</td>
                           <td>
                             {ro.alreadyExported ? (
-                              <span className="badge badge--danger">Da xuat</span>
+                              <span className="badge badge--danger">Đã xuất</span>
                             ) : (
-                              <span className="badge badge--success">Chua xuat</span>
+                              <span className="badge badge--success">Chưa xuất</span>
                             )}
                           </td>
                           <td className="text-right">{ro.partTaskCount ?? 0}</td>
@@ -277,7 +277,7 @@ export default function ExportRequestFormPage() {
                 <div><strong>To truong:</strong> {selectedRo.teamLeaderName || '—'}</div>
               </div>
               <button type="button" className="btn btn--ghost btn--sm" onClick={handleChangeRo}>
-                Doi phieu khac
+                Đổi phiếu khác
               </button>
             </div>
           )}
@@ -289,28 +289,28 @@ export default function ExportRequestFormPage() {
             <div className="er-form__info">
               <div className="er-form__info-row">
                 <div className="er-form__field">
-                  <label className="er-form__label">Ma phieu (se sinh tu dong)</label>
+                  <label className="er-form__label">Mã phiếu (sẽ sinh tự động)</label>
                   <input
                     className="input"
                     type="text"
-                    value={loadingCode ? 'Dang sinh...' : (nextCode || '')}
+                    value={loadingCode ? 'Đang sinh...' : (nextCode || '')}
                     readOnly
                     placeholder="EXB-{branchId}-{YYYYMMDD}-{seq}"
                   />
                   {codeError && <div className="er-form__hint er-form__hint--error">{codeError}</div>}
                   {!loadingCode && !codeError && (
                     <div className="er-form__hint">
-                      Ngay sinh ma: <strong>{codeDate || '—'}</strong>
+                      Ngày sinh mã: <strong>{codeDate || '—'}</strong>
                       &nbsp;
                       <button type="button" className="btn btn--ghost btn--sm" onClick={refetchCode}>
-                        Sinh lai
+                        Sinh lại
                       </button>
                     </div>
                   )}
                 </div>
 
                 <div className="er-form__field">
-                  <label className="er-form__label">Ngay xuat *</label>
+                  <label className="er-form__label">Ngày xuất *</label>
                   <input
                     className="input"
                     type="date"
@@ -322,30 +322,30 @@ export default function ExportRequestFormPage() {
               </div>
 
               <div className="er-form__field">
-                <label className="er-form__label">Ghi chu</label>
+                <label className="er-form__label">Ghi chú</label>
                 <textarea
                   className="input"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   maxLength={500}
-                  placeholder="Ghi chu them ve phieu xuat..."
+                  placeholder="Ghi chú thêm về phiếu xuất..."
                 />
               </div>
             </div>
 
             <div className="er-form__items">
               <div className="er-form__items-header">
-                <h2 className="er-form__items-title">Danh sach phu tung xuat</h2>
+                <h2 className="er-form__items-title">Danh sách phụ tùng xuất</h2>
                 <span className="er-form__hint">
-                  Co the dieu chinh so luong, them phu tung phat sinh hoac xoa dong khong can xuat.
-                  {loadingRoDetail && ' Dang tai...'}
+                  Có thể điều chỉnh số lượng, thêm phụ tùng phát sinh hoặc xóa dòng không cần xuất.
+                  {loadingRoDetail && ' Đang tải...'}
                 </span>
               </div>
 
               {items.length === 0 ? (
                 <p className="er-form__empty">
-                  Phieu sua chua khong co phu tung (PART) nao. Ban co the them thu cong ben duoi.
+                  Phiếu sửa chữa không có phụ tùng (PART) nào. Bạn có thể thêm thủ công bên dưới.
                 </p>
               ) : (
                 <div className="table-responsive">
@@ -353,12 +353,12 @@ export default function ExportRequestFormPage() {
                     <thead>
                       <tr>
                         <th style={{ width: 40 }}>#</th>
-                        <th>Ma phu tung</th>
-                        <th>Ten phu tung</th>
-                        <th>Don vi</th>
-                        <th className="text-right" style={{ width: 100 }}>Yeu cau</th>
-                        <th className="text-right" style={{ width: 100 }}>Ton kho</th>
-                        <th style={{ width: 130 }}>Xuat *</th>
+                        <th>Mã phụ tùng</th>
+                        <th>Tên phụ tùng</th>
+                        <th>Đơn vị</th>
+                        <th className="text-right" style={{ width: 100 }}>Yêu cầu</th>
+                        <th className="text-right" style={{ width: 100 }}>Tồn kho</th>
+                        <th style={{ width: 130 }}>Xuất *</th>
                         <th style={{ width: 70 }}></th>
                       </tr>
                     </thead>
@@ -412,18 +412,18 @@ export default function ExportRequestFormPage() {
                 </div>
               )}
 
-              {/* Them phu tung thu cong (cho phep tu LSC khong co PART task) */}
+              {/* Thêm phụ tùng thủ công (cho phép từ LSC không có PART task) */}
               <div className="er-form__add-product">
-                <h3 className="er-form__add-title">+ Them phu tung</h3>
+                <h3 className="er-form__add-title">+ Thêm phụ tùng</h3>
                 <input
                   className="input"
                   type="text"
-                  placeholder="Nhap ma hoac ten phu tung (it nhat 2 ky tu)..."
+                  placeholder="Nhập mã hoặc tên phụ tùng (ít nhất 2 ký tự)..."
                   value={productSearchTerm}
                   onChange={(e) => setProductSearchTerm(e.target.value)}
                 />
                 {searchingProducts && (
-                  <div className="er-form__hint">Dang tim...</div>
+                  <div className="er-form__hint">Đang tìm...</div>
                 )}
                 {!searchingProducts && productSearchResults.length > 0 && (
                   <ul className="er-form__product-results">
@@ -439,7 +439,7 @@ export default function ExportRequestFormPage() {
                   </ul>
                 )}
                 {!searchingProducts && productSearchTerm.trim().length >= 2 && productSearchResults.length === 0 && (
-                  <div className="er-form__hint">Khong tim thay phu tung phu hop.</div>
+                  <div className="er-form__hint">Không tìm thấy phụ tùng phù hợp.</div>
                 )}
               </div>
             </div>
@@ -452,14 +452,14 @@ export default function ExportRequestFormPage() {
         {selectedRo && (
           <div className="er-form__actions">
             <Link to="/inventory/export-requests" className="btn btn--ghost">
-              Huy
+              Hủy
             </Link>
             <button
               type="submit"
               className="btn btn--primary"
               disabled={submitting || loadingCode || !nextCode || items.length === 0}
             >
-              {submitting ? 'Dang luu...' : 'Tao phieu xuat'}
+              {submitting ? 'Đang lưu...' : 'Tạo phiếu xuất'}
             </button>
           </div>
         )}
