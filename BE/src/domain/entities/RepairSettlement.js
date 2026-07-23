@@ -36,9 +36,12 @@ class RepairSettlement {
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel, frameNumber, engineNumber, purchaseDate, currentKm }
     this.advisor = data.advisor ?? null; // { id, name, phone }
     this.items = data.items ?? []; // [{ id, code, serviceId, description, lhsc, httt, repairCategory, unit, qty, unitPrice, discount, isFree, total }]
+    // Chi co du lieu khi phieu da duoc gan to truong (co repair_order) - dung
+    // de co van xem tien do tung dau viec To truong da tich (xem [{ id, taskName, taskType, isDone }]).
+    this.tasks = data.tasks ?? [];
   }
 
-  static fromPersistence(headerRow, itemRows = []) {
+  static fromPersistence(headerRow, itemRows = [], taskRows = []) {
     if (!headerRow) return null;
     return new RepairSettlement({
       id: headerRow.id,
@@ -107,6 +110,12 @@ class RepairSettlement {
         discount: r.discount_pct,
         isFree: Boolean(r.is_free),
         total: r.total,
+      })),
+      tasks: taskRows.map((r) => ({
+        id: r.id,
+        taskName: r.task_name,
+        taskType: r.task_type,
+        isDone: Boolean(r.is_done),
       })),
     });
   }

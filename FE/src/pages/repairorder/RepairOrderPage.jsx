@@ -9,18 +9,30 @@ import {
   createRepairOrderApi,
   getRepairOrderApi,
   updateRepairOrderStatusApi,
+  updateRepairOrderTaskApi,
 } from '../../services/repairOrderApi';
+import { ROLES } from '../../constants/roles';
 import { printWorkList } from '../repairsettlement/RepairSettlementPage';
+import './RepairOrderPage.css';
 
 const LHSC_LABELS = { DV: 'Dịch vụ', PT: 'Phụ tùng', BH: 'Bảo hành', HD: 'Hợp đồng' };
 // "pending_assignment" là trạng thái ảo (không lưu ở BE) cho các phiếu quyết
 // toán đã ở trạng thái "Chờ sửa chữa" nhưng CHƯA có lệnh sửa chữa/tổ trưởng.
 const STATUS_LABELS = {
   pending_assignment: { label: 'Đang chờ phân công', badge: 'badge-pending' },
-  in_progress: { label: 'Đang sửa chữa', badge: 'badge-inprogress' },
+  inprogress: { label: 'Đang sửa chữa', badge: 'badge-inprogress' },
   completed: { label: 'Hoàn thành', badge: 'badge-completed' },
   cancelled: { label: 'Hủy', badge: 'badge-cancelled' },
 };
+
+// 2 tab trang thai cho man To truong (giong kieu pill-tab co dem so luong o
+// trang Phieu quyet toan sua chua) - to truong chi can phan biet viec dang
+// lam va viec da xong, khong can xem "huy" o day.
+const TEAM_LEADER_TABS = [
+  { key: 'inprogress', label: 'Đang sửa chữa' },
+  { key: 'completed', label: 'Hoàn thành' },
+];
+const TEAM_LEADER_ACTIVE_TAB_COLOR = '#E65100';
 
 // Ngay o day luon o dang chuoi dd/mm/yyyy (BE format san qua toDDMMYYYY, ca
 // cho phieu quyet toan lan lenh sua chua) - parse ve Date de loc/sap xep.
@@ -299,6 +311,45 @@ function CancelReasonModal({ title, onConfirm, onClose }) {
           <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Trở lại</button>
           <button className="btn btn-danger" onClick={handleConfirm} disabled={submitting}>
             {submitting ? 'Đang xử lý…' : 'Xác nhận hủy'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal xác nhận hoàn thành 1 đầu mục công việc (To truong) - thay cho
+// window.confirm cua trinh duyet de dong bo giao dien voi phan con lai cua app ──
+function ConfirmDoneModal({ taskName, onConfirm, onClose }) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">Xác nhận hoàn thành</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <p style={{ margin: 0, fontSize: 14 }}>Bạn đã hoàn thành xong đầu việc:</p>
+          <p style={{ margin: '8px 0 0', fontWeight: 700, fontSize: 15 }}>{taskName}</p>
+          <p style={{ marginTop: 12, fontSize: 12.5, color: 'var(--gray-600)' }}>
+            Sau khi xác nhận sẽ không sửa lại được.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Hủy</button>
+          <button className="btn btn-primary" onClick={handleConfirm} disabled={submitting}>
+            {submitting ? 'Đang lưu…' : 'Xác nhận hoàn thành'}
           </button>
         </div>
       </div>
@@ -591,14 +642,14 @@ function RepairOrderList() {
                       {r.kind === 'pending' && r.status === 'cancelled' && (
                         <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewSettlementId(r.id)}>Xem chi tiết</button>
                       )}
-                      {r.kind === 'order' && r.status === 'in_progress' && (
+                      {r.kind === 'order' && r.status === 'inprogress' && (
                         <>
                           <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => handleMarkComplete(r.id)}>Hoàn thành</button>
                           <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'order', id: r.id })}>Hủy</button>
                           <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewOrderId(r.id)}>Xem chi tiết</button>
                         </>
                       )}
-                      {r.kind === 'order' && r.status !== 'in_progress' && (
+                      {r.kind === 'order' && r.status !== 'inprogress' && (
                         <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewOrderId(r.id)}>Xem chi tiết</button>
                       )}
                     </div>
@@ -928,7 +979,262 @@ function RepairOrderCreate() {
   );
 }
 
+// ─── Tổ trưởng: "Công việc của tôi" - dạng card, tick từng đầu mục ────
+// BE đã tự lọc GET /repair-orders theo team_leader_id = user hiện tại nên
+// không cần truyền tham số gì thêm - danh sách trả về luôn là của chính mình.
+function TeamLeaderTaskCards() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [filterStatus, setFilterStatus] = useState('inprogress');
+  const [busyTaskKey, setBusyTaskKey] = useState(null);
+  const [busyOrderId, setBusyOrderId] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null); // { order, task } - dang cho xac nhan hoan thanh
+
+  // silent=true dung cho auto-refresh nen (poll/focus lai tab) - khong bat
+  // loading/spinner de tranh giat man hinh khi khong co gi thay doi.
+  const loadAll = ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    if (!silent) setLoadError('');
+    return listRepairOrdersApi()
+      .then((data) => setOrders(data || []))
+      .catch((err) => { if (!silent) setLoadError(err.message || 'Không tải được danh sách công việc'); })
+      .finally(() => { if (!silent) setLoading(false); });
+  };
+
+  useEffect(() => {
+    loadAll().then(() => {}).catch(() => {});
+    // Chua co websocket/push nen tu dong lam moi: cu vong lap 1 lan/20s va
+    // moi khi quay lai tab, de tho truong thay ngay phieu vua duoc co van
+    // phan cong ma khong phai F5 tay.
+    const intervalId = setInterval(() => loadAll({ silent: true }), 20000);
+    const onFocus = () => loadAll({ silent: true });
+    const onVisibility = () => { if (document.visibilityState === 'visible') loadAll({ silent: true }); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
+  const filteredOrders = orders.filter((o) => o.status === filterStatus);
+  const tabCounts = orders.reduce((acc, o) => {
+    acc[o.status] = (acc[o.status] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Tich xong la chot luon, khong bo tich lai duoc (checkbox tu khoa ngay sau
+  // khi tich - xem disabled={... || task.isDone} o cho render) nen ham nay
+  // trong thuc te chi con chay theo chieu tich (false -> true). Xac nhan qua
+  // modal rieng cua app (ConfirmDoneModal) thay vi window.confirm cua trinh
+  // duyet, dong bo giao dien voi phan con lai cua he thong.
+  const toggleTask = async (order, task) => {
+    const key = `${order.id}-${task.id}`;
+    setBusyTaskKey(key);
+    setActionError('');
+    try {
+      const updated = await updateRepairOrderTaskApi(order.id, task.id, true);
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+    } catch (err) {
+      setActionError(err.message || 'Không cập nhật được đầu mục công việc');
+    } finally {
+      setBusyTaskKey(null);
+    }
+  };
+
+  const handleConfirmDone = async () => {
+    if (!confirmTarget) return;
+    await toggleTask(confirmTarget.order, confirmTarget.task);
+    setConfirmTarget(null);
+  };
+
+  const handleComplete = async (order) => {
+    setBusyOrderId(order.id);
+    setActionError('');
+    try {
+      await updateRepairOrderStatusApi(order.id, 'completed');
+      await loadAll();
+    } catch (err) {
+      setActionError(err.message || 'Không đánh dấu hoàn thành được');
+    } finally {
+      setBusyOrderId(null);
+    }
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Công việc của tôi</h1>
+          <div className="breadcrumb">Trang chủ / Công việc của tôi</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        {TEAM_LEADER_TABS.map((t) => {
+          const isActive = filterStatus === t.key;
+          const count = tabCounts[t.key] ?? 0;
+          return (
+            <button key={t.key} onClick={() => setFilterStatus(t.key)}
+              style={{
+                padding: '7px 16px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', border: '2px solid',
+                borderColor: isActive ? TEAM_LEADER_ACTIVE_TAB_COLOR : 'var(--gray-300)',
+                background: isActive ? TEAM_LEADER_ACTIVE_TAB_COLOR : 'var(--gray-100)',
+                color: isActive ? 'white' : 'var(--gray-700)',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+              {t.label}
+              <span style={{
+                background: isActive ? 'rgba(255,255,255,0.3)' : 'var(--gray-300)',
+                color: isActive ? 'white' : 'var(--gray-600)',
+                borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700,
+              }}>{count}</span>
+            </button>
+          );
+        })}
+        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)' }}>
+          {filteredOrders.length} / {orders.length} công việc
+        </div>
+      </div>
+
+      {(loadError || actionError) && (
+        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#C62828' }}>
+          {loadError || actionError}
+        </div>
+      )}
+
+      {loading && (
+        <div className="empty-state"><p>Đang tải danh sách công việc…</p></div>
+      )}
+
+      {!loading && filteredOrders.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-state-icon">📭</div>
+          <h3>Chưa có công việc nào được giao</h3>
+        </div>
+      )}
+
+      <div className="team-leader-card-grid">
+        {filteredOrders.map((order) => {
+          const st = STATUS_LABELS[order.status] || { label: order.status, badge: 'badge-inactive' };
+          const tasks = order.tasks || [];
+          // Chi "cong viec" (dich vu) moi can tich hoan thanh - phu tung chi
+          // hien thi de to truong biet can dung phu tung gi, khong phai tick.
+          const serviceTasks = tasks.filter((t) => t.taskType === 'service');
+          const partTasks = tasks.filter((t) => t.taskType !== 'service');
+          const doneCount = serviceTasks.filter((t) => t.isDone).length;
+          const allDone = serviceTasks.length > 0 && doneCount === serviceTasks.length;
+          const isActive = order.status === 'inprogress';
+
+          return (
+            <div
+              key={order.id}
+              style={{ background: 'var(--white)', border: '1px solid var(--gray-200)', borderRadius: 10, padding: 16, boxShadow: 'var(--shadow-sm)' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8 }}>
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)', fontSize: 14 }}>{order.code}</div>
+                  <div style={{ fontWeight: 700, marginTop: 2 }}>{order.customer?.fullName}</div>
+                  <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>{order.vehicle?.licensePlate} · {order.vehicle?.vehicleModel}</div>
+                </div>
+                <span className={`badge ${st.badge}`}>{st.label}</span>
+              </div>
+
+              {order.notes && (
+                <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 10px', fontSize: 12, marginBottom: 12 }}>
+                  {order.notes}
+                </div>
+              )}
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+                Đầu mục công việc ({doneCount}/{serviceTasks.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: partTasks.length > 0 ? 10 : 14 }}>
+                {serviceTasks.map((task) => {
+                  const key = `${order.id}-${task.id}`;
+                  const isBusy = busyTaskKey === key;
+                  return (
+                    <label
+                      key={task.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                        background: task.isDone ? '#E8F5E9' : 'var(--gray-50)', borderRadius: 6,
+                        fontSize: 13, cursor: isActive ? 'pointer' : 'default',
+                        textDecoration: task.isDone ? 'line-through' : 'none',
+                        color: task.isDone ? '#2E7D32' : 'var(--gray-900)',
+                        opacity: isBusy ? 0.6 : 1,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={task.isDone}
+                        disabled={!isActive || isBusy || task.isDone}
+                        onChange={() => setConfirmTarget({ order, task })}
+                      />
+                      <span>{task.taskName}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {partTasks.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+                    Phụ tùng cần dùng
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {partTasks.map((task) => (
+                      <div
+                        key={task.id}
+                        style={{
+                          display: 'flex', justifyContent: 'space-between', gap: 8, padding: '6px 10px',
+                          background: 'var(--gray-50)', borderRadius: 6, fontSize: 12, color: 'var(--gray-700)',
+                        }}
+                      >
+                        <span>{task.taskName}</span>
+                        {task.quantity > 1 && <span style={{ color: 'var(--gray-500)' }}>x{task.quantity}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isActive && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  disabled={!allDone || busyOrderId === order.id}
+                  title={!allDone ? 'Cần tích hoàn thành tất cả đầu mục trước' : ''}
+                  onClick={() => handleComplete(order)}
+                >
+                  {busyOrderId === order.id ? 'Đang xử lý…' : 'Hoàn thành'}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {confirmTarget && (
+        <ConfirmDoneModal
+          taskName={confirmTarget.task.taskName}
+          onClose={() => setConfirmTarget(null)}
+          onConfirm={handleConfirmDone}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function RepairOrderPage() {
+  const { user } = useAuth();
+  if (user?.primaryRole === ROLES.TEAM_LEADER) {
+    return <TeamLeaderTaskCards />;
+  }
   return (
     <Routes>
       <Route index element={<RepairOrderList />} />

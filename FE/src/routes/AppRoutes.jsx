@@ -17,6 +17,7 @@ const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/Repair
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
 const CustomerHistoryPage = lazy(() => import('../pages/customer/CustomerHistoryPage'));
 const CustomerCarePage = lazy(() => import('../pages/customercare/CustomerCarePage'));
+const ServiceRequestsPage = lazy(() => import('../pages/servicerequests/ServiceRequestsPage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
@@ -27,6 +28,7 @@ const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
+const AdminPermissionMatrixPage = lazy(() => import('../pages/admin/AdminPermissionMatrixPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -139,6 +141,7 @@ function AppRoutes() {
           <Route path="roles" element={<AdminRolesPage />} />
           <Route path="devices" element={<AdminDevicesPage />} />
           <Route path="specialties" element={<AdminSpecialtiesPage />} />
+          <Route path="permission-matrix" element={<AdminPermissionMatrixPage />} />
           <Route path="logs" element={<AuditLogsPage />} />
           <Route path="login-sessions" element={<LoginSessionsPage />} />
           <Route path="profile" element={<AdminProfilePage />} />
@@ -149,7 +152,7 @@ function AppRoutes() {
                   path="/general-director/*"
                   element={
                     <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
-                      <AppLayout>
+                      <AppLayout showNavbar={false}>
                         <GeneralDirectorPage />
                       </AppLayout>
                     </ProtectedRoute>
@@ -199,6 +202,18 @@ function AppRoutes() {
             <ProtectedRoute>
               <AppLayout>
                 <CustomerHistoryPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Yeu cau tu van tu landing page - CVDV tiep nhan + tao lich hen */}
+        <Route
+          path="/service-requests"
+          element={
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
+              <AppLayout>
+                <ServiceRequestsPage />
               </AppLayout>
             </ProtectedRoute>
           }

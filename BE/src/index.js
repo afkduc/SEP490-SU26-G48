@@ -24,11 +24,18 @@ async function syncMaintenanceReminders() {
 const app = express();
 
 // CORS config - phai la origin string khi credentials=true
+// CORS_ORIGIN: danh sach origin duoc phep, phan cach boi dau phay - cho phep
+// them origin thuc te khi deploy (IP/domain server) ma khong phai sua code,
+// mac dinh giu nguyen 2 origin dev cu neu khong set.
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, or same-origin)
-    // Or requests from localhost:3000 or 127.0.0.1:3000
-    if (!origin || origin === 'http://localhost:3000' || origin === 'http://127.0.0.1:3000') {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

@@ -1,11 +1,8 @@
 const { success } = require('../../utils/response');
-const { auditCrud } = require('../../utils/auditHelper');
-const NotificationService = require('../../application/services/NotificationService');
 
 class ManagerController {
   constructor(managerService) {
     this.managerService = managerService;
-    this.notificationService = new NotificationService();
     this.getBranch = this.getBranch.bind(this);
     this.getRoles = this.getRoles.bind(this);
     this.getEmployees = this.getEmployees.bind(this);
@@ -30,10 +27,6 @@ class ManagerController {
     this.getTechnicianById = this.getTechnicianById.bind(this);
     this.createTechnician = this.createTechnician.bind(this);
     this.updateTechnician = this.updateTechnician.bind(this);
-    this.getTeamLeaders = this.getTeamLeaders.bind(this);
-    this.getTeamLeaderById = this.getTeamLeaderById.bind(this);
-    this.createTeamLeader = this.createTeamLeader.bind(this);
-    this.updateTeamLeader = this.updateTeamLeader.bind(this);
   }
 
   async getBranch(req, res, next) {
@@ -79,13 +72,6 @@ class ManagerController {
   async createEmployee(req, res, next) {
     try {
       const data = await this.managerService.createEmployee(req.user.branchId, req.body);
-      await auditCrud.create(req, {
-        tableName: 'users',
-        entityCode: data?.employee_code || data?.user_code || null,
-        recordId: data?.id || null,
-        entityName: 'Nhân viên',
-        data: req.body,
-      });
       return success(res, data, 'Thêm nhân viên thành công', 201);
     } catch (err) {
       next(err);
@@ -95,13 +81,6 @@ class ManagerController {
   async updateEmployee(req, res, next) {
     try {
       const data = await this.managerService.updateEmployee(req.user.branchId, req.params.id, req.body);
-      await auditCrud.update(req, {
-        tableName: 'users',
-        entityCode: data?.employee_code || data?.user_code || `ID-${req.params.id}`,
-        recordId: data?.id || Number(req.params.id) || null,
-        entityName: 'Nhân viên',
-        newData: req.body,
-      });
       return success(res, data, 'Cập nhật nhân viên thành công');
     } catch (err) {
       next(err);
@@ -151,13 +130,6 @@ class ManagerController {
   async createService(req, res, next) {
     try {
       const data = await this.managerService.createService(req.user.branchId, req.body);
-      await auditCrud.create(req, {
-        tableName: 'services',
-        entityCode: data?.service_code || data?.code || null,
-        recordId: data?.id || null,
-        entityName: 'Dịch vụ',
-        data: req.body,
-      });
       return success(res, data, 'Thêm dịch vụ thành công', 201);
     } catch (err) {
       next(err);
@@ -167,13 +139,6 @@ class ManagerController {
   async updateService(req, res, next) {
     try {
       const data = await this.managerService.updateService(req.user.branchId, req.params.id, req.body);
-      await auditCrud.update(req, {
-        tableName: 'services',
-        entityCode: data?.service_code || `ID-${req.params.id}`,
-        recordId: data?.id || Number(req.params.id) || null,
-        entityName: 'Dịch vụ',
-        newData: req.body,
-      });
       return success(res, data, 'Cập nhật dịch vụ thành công');
     } catch (err) {
       next(err);
@@ -204,13 +169,6 @@ class ManagerController {
   async createServicePackage(req, res, next) {
     try {
       const data = await this.managerService.createServicePackage(req.user.branchId, req.body);
-      await auditCrud.create(req, {
-        tableName: 'service_packages',
-        entityCode: data?.package_code || data?.code || null,
-        recordId: data?.id || null,
-        entityName: 'Gói dịch vụ',
-        data: req.body,
-      });
       return success(res, data, 'Thêm gói dịch vụ thành công', 201);
     } catch (err) {
       next(err);
@@ -220,13 +178,6 @@ class ManagerController {
   async updateServicePackage(req, res, next) {
     try {
       const data = await this.managerService.updateServicePackage(req.user.branchId, req.params.id, req.body);
-      await auditCrud.update(req, {
-        tableName: 'service_packages',
-        entityCode: data?.package_code || `ID-${req.params.id}`,
-        recordId: data?.id || Number(req.params.id) || null,
-        entityName: 'Gói dịch vụ',
-        newData: req.body,
-      });
       return success(res, data, 'Cập nhật gói dịch vụ thành công');
     } catch (err) {
       next(err);
@@ -297,13 +248,6 @@ class ManagerController {
   async createTechnician(req, res, next) {
     try {
       const data = await this.managerService.createTechnician(req.user.branchId, req.body);
-      await auditCrud.create(req, {
-        tableName: 'users',
-        entityCode: data?.employee_code || data?.user_code || null,
-        recordId: data?.id || null,
-        entityName: 'Thợ máy',
-        data: req.body,
-      });
       return success(res, data, 'Thêm thợ máy thành công', 201);
     } catch (err) {
       next(err);
@@ -313,71 +257,12 @@ class ManagerController {
   async updateTechnician(req, res, next) {
     try {
       const data = await this.managerService.updateTechnician(req.user.branchId, req.params.id, req.body);
-      await auditCrud.update(req, {
-        tableName: 'users',
-        entityCode: data?.employee_code || `ID-${req.params.id}`,
-        recordId: data?.id || Number(req.params.id) || null,
-        entityName: 'Thợ máy',
-        newData: req.body,
-      });
       return success(res, data, 'Cập nhật thợ máy thành công');
     } catch (err) {
       next(err);
     }
   }
 
-  async getTeamLeaders(req, res, next) {
-    try {
-      const data = await this.managerService.listTeamLeaders(req.user.branchId, {
-        search: req.query.search || req.query.q || '',
-        status: req.query.status || 'all',
-      });
-      return success(res, data, 'Lấy danh sách tổ trưởng thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async getTeamLeaderById(req, res, next) {
-    try {
-      const data = await this.managerService.getTeamLeaderById(req.user.branchId, req.params.id);
-      return success(res, data, 'Lấy chi tiết tổ trưởng thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async createTeamLeader(req, res, next) {
-    try {
-      const data = await this.managerService.createTeamLeader(req.user.branchId, req.body);
-      await auditCrud.create(req, {
-        tableName: 'users',
-        entityCode: data?.employee_code || data?.user_code || null,
-        recordId: data?.id || null,
-        entityName: 'Tổ trưởng',
-        data: req.body,
-      });
-      return success(res, data, 'Thêm tổ trưởng thành công', 201);
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async updateTeamLeader(req, res, next) {
-    try {
-      const data = await this.managerService.updateTeamLeader(req.user.branchId, req.params.id, req.body);
-      await auditCrud.update(req, {
-        tableName: 'users',
-        entityCode: data?.employee_code || `ID-${req.params.id}`,
-        recordId: data?.id || Number(req.params.id) || null,
-        entityName: 'Tổ trưởng',
-        newData: req.body,
-      });
-      return success(res, data, 'Cập nhật tổ trưởng thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
 }
 
 module.exports = ManagerController;
