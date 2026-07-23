@@ -1,9 +1,22 @@
 import { API_BASE_URL } from '../config';
 
 export const SESSION_EXPIRED_KEY = 'SESSION_EXPIRED';
+export const FORBIDDEN_KEY = 'FORBIDDEN_DENIED';
 
 export function showSessionExpired() {
   window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_KEY));
+}
+
+/**
+ * Dispatch khi API tra 403 Forbidden.
+ * - permissionKey (optional): permission bi thieu (BE tra trong payload.metadata)
+ * - message: thong bao tu BE
+ * - path/to: url dang goi (debug)
+ */
+export function showForbidden({ permissionKey = null, message = '', path = '' } = {}) {
+  window.dispatchEvent(new CustomEvent(FORBIDDEN_KEY, {
+    detail: { permissionKey, message, path },
+  }));
 }
 
 class HttpClient {
@@ -40,6 +53,19 @@ class HttpClient {
     if (!response.ok) {
       const currentToken = localStorage.getItem('token') || sessionStorage.getItem('token');
       const belongsToCurrentSession = Boolean(token && token === currentToken);
+
+      // 403 = da dang nhap nhung khong du quyen.
+      // -> dispatch FORBIDDEN_KEY de FE show trang 403 (toan man hinh).
+      // Anti-spam: chi dispatch khi thuoc session hien tai (tranh stale request
+      // cua user da logout).
+      if (response.status === 403 && belongsToCurrentSession) {
+        showForbidden({
+          permissionKey: payload?.metadata?.permissionKey || null,
+          message: (payload && payload.message) || 'Bạn không có quyền thực hiện thao tác này',
+          path,
+        });
+      }
+
       if (response.status === 401 && belongsToCurrentSession && !skipSessionExpired) {
         showSessionExpired();
       }
@@ -47,6 +73,10 @@ class HttpClient {
       const error = new Error(message);
       error.status = response.status;
       error.payload = payload;
+      // Attach permissionKey from response metadata if present
+      if (response.status === 403 && payload?.metadata?.permissionKey) {
+        error.permissionKey = payload.metadata.permissionKey;
+      }
       throw error;
     }
 
