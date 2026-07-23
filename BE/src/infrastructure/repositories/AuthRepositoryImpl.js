@@ -4,11 +4,13 @@ const { query } = require('../database/sqlServer');
 class AuthRepositoryImpl extends AuthRepository {
   async findUserByEmail(email) {
     const result = await query(
-      `SELECT id, pseudo_id, user_name, email, user_password,
-              first_name, last_name, phone, branch_id, status, avatar,
+      `SELECT u.id, u.pseudo_id, u.user_name, u.email, u.user_password,
+              u.first_name, u.last_name, u.phone, u.branch_id, u.status, u.avatar,
+              b.is_active AS branch_is_active,
               must_change_password, token_version
-       FROM   users
-       WHERE  email = @email AND status = 'active'`,
+       FROM   users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       WHERE  u.email = @email`,
       { email }
     );
     return result.recordset[0] || null;

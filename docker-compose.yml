@@ -1,0 +1,45 @@
+services:
+  be:
+    build:
+      context: ./BE
+    env_file:
+      - ./BE/.env
+    environment:
+      # Override rieng cho container - BE/.env giu IP that de `npm run dev`
+      # chay truc tiep (khong Docker) van dung duoc binh thuong. DB dang cai
+      # san tren chinh may Windows nay (ngoai Docker) nen container phai goi
+      # qua host.docker.internal, khong dung duoc localhost/127.0.0.1 (trong
+      # container do la chinh container, khong phai may host).
+      - DB_SERVER=host.docker.internal
+    ports:
+      - "5000:5000"
+    # extra_hosts dam bao host.docker.internal luon phan giai duoc, ke ca khi
+    # chay bang Docker Engine/WSL2 thuan (khong qua Docker Desktop).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  fe:
+    build:
+      context: ./FE
+    # Khong can env_file o day: Vite tu doc FE/.env.production (chi ap dung
+    # cho `npm run build`, khong anh huong `npm run dev`) va "nuong" bien
+    # VITE_* thang vao file JS ngay trong buoc build (xem FE/Dockerfile) -
+    # nginx chi serve file tinh, khong doc bien moi truong luc chay nua.
+    ports:
+      - "3000:80"
+    depends_on:
+      - be
+      - landing
+    restart: unless-stopped
+
+  landing:
+    build:
+      context: ./Landing
+    # Khong publish port ra ngoai - chi "fe" (nginx) goi vao qua network noi
+    # bo cua Docker Compose bang ten service "landing" (xem FE/nginx.conf,
+    # location "/gioi-thieu"). Landing/.env.production tu duoc doc luc
+    # "npm run build" (xem Landing/Dockerfile), giong cach FE lam voi Vite.
+    depends_on:
+      - be
+    restart: unless-stopped
