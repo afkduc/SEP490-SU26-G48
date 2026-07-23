@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminSpecialtiesApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
+import PermissionGate from '../../components/PermissionGate';
 import './AdminSpecialtiesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -161,12 +162,14 @@ export default function AdminSpecialtiesPage() {
           </div>
         </div>
         <div className="admin-specialties__actions">
-          <button className="btn btn--primary" onClick={() => { setEditSpecialty(null); setShowForm(true); }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Thêm chuyên môn
-          </button>
+          <PermissionGate permission="admin:specialties:create">
+            <button className="btn btn--primary" onClick={() => { setEditSpecialty(null); setShowForm(true); }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Thêm chuyên môn
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -196,9 +199,11 @@ export default function AdminSpecialtiesPage() {
             <div className="admin-specialties__empty">
               <IconWrench />
               <p>Chưa có chuyên môn nào</p>
-              <button className="btn btn--primary" onClick={() => setShowForm(true)}>
-                Thêm chuyên môn đầu tiên
-              </button>
+              <PermissionGate permission="admin:specialties:create">
+                <button className="btn btn--primary" onClick={() => setShowForm(true)}>
+                  Thêm chuyên môn đầu tiên
+                </button>
+              </PermissionGate>
             </div>
           ) : (
             <div className="specialties-table-wrapper">
@@ -223,20 +228,26 @@ export default function AdminSpecialtiesPage() {
                       </td>
                       <td className="specialty-actions-cell">
                         <div className="specialty-actions">
-                          <button
-                            className="btn btn--secondary btn--sm"
-                            onClick={() => { setEditSpecialty(s); setShowForm(true); }}
-                            title="Chỉnh sửa"
+                          <PermissionGate permission="admin:specialties:update">
+                            <button
+                              className="btn btn--secondary btn--sm"
+                              onClick={() => { setEditSpecialty(s); setShowForm(true); }}
+                              title="Chỉnh sửa"
+                            >
+                              <IconEdit /> Sửa
+                            </button>
+                          </PermissionGate>
+                          <PermissionGate
+                            permission={s.isActive ? 'admin:specialties:deactivate' : 'admin:specialties:activate'}
                           >
-                            <IconEdit /> Sửa
-                          </button>
-                          <button
-                            className={`btn btn--sm ${s.isActive ? 'btn--warning' : 'btn--success-outline'}`}
-                            onClick={() => handleToggleStatus(s)}
-                            title={s.isActive ? 'Tắt chuyên môn' : 'Kích hoạt chuyên môn'}
-                          >
-                            {s.isActive ? 'Tắt' : 'Kích hoạt'}
-                          </button>
+                            <button
+                              className={`btn btn--sm ${s.isActive ? 'btn--warning' : 'btn--success-outline'}`}
+                              onClick={() => handleToggleStatus(s)}
+                              title={s.isActive ? 'Tắt chuyên môn' : 'Kích hoạt chuyên môn'}
+                            >
+                              {s.isActive ? 'Tắt' : 'Kích hoạt'}
+                            </button>
+                          </PermissionGate>
                         </div>
                       </td>
                     </tr>

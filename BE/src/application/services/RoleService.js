@@ -1,5 +1,6 @@
 const ApiError = require('../../utils/ApiError');
 const { auditCrud } = require('../../utils/auditHelper');
+const { emitPermissionChanged } = require('../events/PermissionEvents');
 
 // Constants cho last-admin guard
 // Khoa cung role 'admin' khong bao gio duoc phep bi tuoc het 'admin:roles:*'
@@ -81,12 +82,21 @@ class RoleService {
     await this.roleRepository.setRolePermissions(roleId, uniqueIds);
 
     // Invalidate cache cho tat ca users có role này
+    const affectedUserIds = new Set();
     if (this.permissionService) {
       const users = await this.roleRepository.getRoleUsers(roleId);
       for (const user of users) {
         this.permissionService.invalidateCache(user.id);
+        affectedUserIds.add(user.id);
       }
     }
+
+    // Emit SSE event de FE refresh permission ngay (khong can F5/logout)
+    emitPermissionChanged({
+      action: 'matrix_updated',
+      userIds: [...affectedUserIds],
+      roleIds: [roleId],
+    });
 
     return this.roleRepository.getRolePermissions(roleId);
   }
@@ -209,6 +219,15 @@ class RoleService {
         }
       }
     }
+
+    // Emit SSE event de push permission-changed toi cac user dang online
+    // (filter theo userId o SSE route). Frontend nhan event -> refresh token.
+    emitPermissionChanged({
+      action: 'matrix_updated',
+      userIds: [...affectedUserIds],
+      roleIds: normalized.map((c) => c.roleId),
+      actorUserId,
+    });
 
     return {
       results,
