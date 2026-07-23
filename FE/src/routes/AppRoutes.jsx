@@ -104,7 +104,7 @@ function AppRoutes() {
                   path="/general-director/*"
                   element={
                     <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
-                      <AppLayout>
+                      <AppLayout showNavbar={false}>
                         <GeneralDirectorPage />
                       </AppLayout>
                     </ProtectedRoute>
