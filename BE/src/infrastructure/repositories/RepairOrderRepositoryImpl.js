@@ -2,6 +2,7 @@ const RepairOrderRepository = require('../../domain/repositories/RepairOrderRepo
 const RepairOrder = require('../../domain/entities/RepairOrder');
 const { query, sql } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const { buildDesiredTasks } = require('./repairOrderTaskBuilder');
 
 // Cot join dung chung cho findAll/findById - lay ten chi nhanh, to truong,
 // nguoi tao, xe va khach hang (khach hang di qua service_orders vi repair_orders
@@ -138,10 +139,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
 
   async create(data, { branchId, createdBy }) {
     const newId = await runInTransaction(async (tx) => {
-      const itemsResult = await tx
-        .request()
-        .input('serviceOrderId', sql.BigInt, data.serviceOrderId)
-        .query(`SELECT * FROM service_order_items WHERE service_order_id = @serviceOrderId ORDER BY id`);
+      const desiredTasks = await buildDesiredTasks(tx, data.serviceOrderId);
 
       const headerResult = await tx
         .request()
@@ -183,55 +181,8 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
           `);
       };
 
-      // Dich vu le da duoc tao task tu viec no 1 dong "goi" (xem duoi) - dung
-      // de khong tao task trung khi FE cung chen them cac dong dich vu con
-      // (unitPrice 0) ngay sau dong goi de hien thi chi tiet tren phieu.
-      const coveredServiceIds = new Set();
-
-      for (const item of itemsResult.recordset) {
-        // Dong "goi dich vu" trong service_order_items la 1 dong duy nhat, khong
-        // co service_id (chi dich vu le duoc chon rieng moi co service_id), va
-        // luu ma goi trong item_code. Tach dong nay thanh N task con (1 task /
-        // 1 dich vu le trong goi) de to truong tick tung dau muc rieng.
-        const isPackageRow = item.item_type === 'service' && !item.service_id;
-
-        if (isPackageRow) {
-          const pkgServicesResult = await tx
-            .request()
-            .input('code', sql.VarChar(30), item.item_code)
-            .query(`
-              SELECT s.id AS service_id, s.service_name
-              FROM   service_packages sp
-              JOIN   service_package_items spi ON spi.package_id = sp.id
-              JOIN   services s ON s.id = spi.service_id
-              WHERE  sp.package_code = @code
-              ORDER  BY s.service_name
-            `);
-
-          if (pkgServicesResult.recordset.length > 0) {
-            for (const svc of pkgServicesResult.recordset) {
-              coveredServiceIds.add(String(svc.service_id));
-              await insertTask({ taskName: svc.service_name, taskType: 'service', quantity: 1, unitPrice: 0 });
-            }
-            continue;
-          }
-          // Khong tim thay goi (du lieu la, hiem) -> roi xuong tao 1 task gom
-          // chung nhu cu de khong mat viec.
-        }
-
-        // Dong dich vu le nam trong 1 goi vua duoc no task o tren (FE chen
-        // rieng de hien thi chi tiet) - bo qua, tranh trung dau muc voi to truong.
-        if (item.service_id && coveredServiceIds.has(String(item.service_id))) {
-          continue;
-        }
-
-        await insertTask({
-          taskName: item.item_description,
-          taskType: item.item_type,
-          productId: item.product_id,
-          quantity: item.quantity,
-          unitPrice: item.unit_price,
-        });
+      for (const t of desiredTasks) {
+        await insertTask(t);
       }
 
       await tx
@@ -282,6 +233,24 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
             FROM   service_orders so
             JOIN   repair_orders ro ON ro.service_order_id = so.id
             WHERE  ro.id = @id
+          `);
+      }
+
+      // To truong bam Hoan thanh -> tu dong chuyen luon phieu quyet toan goc
+      // sang "Cho thanh toan", co van khong phai vao bam Hoan thanh lan nua.
+      // Chi cap nhat khi phieu quyet toan dang o trang thai "inprogress" (con
+      // dang sua chua) de khong ghi de nham 1 phieu da huy/da xuat hoa don.
+      if (status === 'completed') {
+        await tx
+          .request()
+          .input('id', sql.BigInt, id)
+          .query(`
+            UPDATE so
+            SET    so.status = 'waiting_payment',
+                   so.completed_date = GETDATE()
+            FROM   service_orders so
+            JOIN   repair_orders ro ON ro.service_order_id = so.id
+            WHERE  ro.id = @id AND so.status = 'inprogress'
           `);
       }
     });
