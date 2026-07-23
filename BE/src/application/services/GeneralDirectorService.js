@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const ApiError = require('../../utils/ApiError');
+const BranchRepositoryImpl = require('../../infrastructure/repositories/BranchRepositoryImpl');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^(0[0-9]{9,10})$/;
@@ -8,6 +9,7 @@ const VALID_STATUSES = ['active', 'inactive'];
 class GeneralDirectorService {
   constructor(generalDirectorRepository) {
     this.generalDirectorRepository = generalDirectorRepository;
+    this.branchRepository = new BranchRepositoryImpl();
   }
 
   async getRevenueReports(filters = {}) {
@@ -201,6 +203,24 @@ class GeneralDirectorService {
       branchId: Number(branchId),
       status: normalizedStatus,
     });
+  }
+
+  async deactivateBranch(id) {
+    const existing = await this.branchRepository.findById(Number(id));
+    if (!existing) {
+      throw new ApiError(404, 'Chi nhánh không tồn tại');
+    }
+
+    return this.branchRepository.setActive(Number(id), false);
+  }
+
+  async reactivateBranch(id) {
+    const existing = await this.branchRepository.findById(Number(id));
+    if (!existing) {
+      throw new ApiError(404, 'Chi nhánh không tồn tại');
+    }
+
+    return this.branchRepository.setActive(Number(id), true);
   }
 }
 
