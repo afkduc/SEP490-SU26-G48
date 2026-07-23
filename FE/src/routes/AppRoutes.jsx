@@ -27,6 +27,7 @@ const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
+const AdminPermissionMatrixPage = lazy(() => import('../pages/admin/AdminPermissionMatrixPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -94,6 +95,7 @@ function AppRoutes() {
           <Route path="roles" element={<AdminRolesPage />} />
           <Route path="devices" element={<AdminDevicesPage />} />
           <Route path="specialties" element={<AdminSpecialtiesPage />} />
+          <Route path="permission-matrix" element={<AdminPermissionMatrixPage />} />
           <Route path="logs" element={<AuditLogsPage />} />
           <Route path="login-sessions" element={<LoginSessionsPage />} />
           <Route path="profile" element={<AdminProfilePage />} />
