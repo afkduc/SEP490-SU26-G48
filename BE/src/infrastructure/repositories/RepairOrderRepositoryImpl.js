@@ -183,6 +183,11 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
           `);
       };
 
+      // Dich vu le da duoc tao task tu viec no 1 dong "goi" (xem duoi) - dung
+      // de khong tao task trung khi FE cung chen them cac dong dich vu con
+      // (unitPrice 0) ngay sau dong goi de hien thi chi tiet tren phieu.
+      const coveredServiceIds = new Set();
+
       for (const item of itemsResult.recordset) {
         // Dong "goi dich vu" trong service_order_items la 1 dong duy nhat, khong
         // co service_id (chi dich vu le duoc chon rieng moi co service_id), va
@@ -195,7 +200,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
             .request()
             .input('code', sql.VarChar(30), item.item_code)
             .query(`
-              SELECT s.service_name
+              SELECT s.id AS service_id, s.service_name
               FROM   service_packages sp
               JOIN   service_package_items spi ON spi.package_id = sp.id
               JOIN   services s ON s.id = spi.service_id
@@ -205,12 +210,19 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
 
           if (pkgServicesResult.recordset.length > 0) {
             for (const svc of pkgServicesResult.recordset) {
+              coveredServiceIds.add(String(svc.service_id));
               await insertTask({ taskName: svc.service_name, taskType: 'service', quantity: 1, unitPrice: 0 });
             }
             continue;
           }
           // Khong tim thay goi (du lieu la, hiem) -> roi xuong tao 1 task gom
           // chung nhu cu de khong mat viec.
+        }
+
+        // Dong dich vu le nam trong 1 goi vua duoc no task o tren (FE chen
+        // rieng de hien thi chi tiet) - bo qua, tranh trung dau muc voi to truong.
+        if (item.service_id && coveredServiceIds.has(String(item.service_id))) {
+          continue;
         }
 
         await insertTask({

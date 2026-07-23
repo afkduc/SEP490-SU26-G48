@@ -85,7 +85,9 @@ class RepairOrderService {
     if (existing.status !== 'inprogress') {
       throw new ApiError(409, 'Lệnh đã kết thúc (hoàn thành/hủy), không thể đổi trạng thái nữa');
     }
-    if (status === 'completed' && existing.tasks.some((t) => !t.isDone)) {
+    // Chi dau muc "dich vu" (task_type='service') can tich - phu tung
+    // (task_type='product') chi de hien thi, khong tinh vao dieu kien hoan thanh.
+    if (status === 'completed' && existing.tasks.some((t) => t.taskType === 'service' && !t.isDone)) {
       throw new ApiError(409, 'Cần tích hoàn thành tất cả đầu mục công việc trước khi kết thúc lệnh');
     }
 
@@ -107,6 +109,9 @@ class RepairOrderService {
     }
     const task = existing.tasks.find((t) => String(t.id) === String(taskId));
     if (!task) throw new ApiError(404, 'Không tìm thấy đầu mục công việc');
+    if (task.taskType !== 'service') {
+      throw new ApiError(400, 'Chỉ đầu mục dịch vụ mới cần tích hoàn thành');
+    }
 
     await this.repairOrderRepository.updateTaskStatus(taskId, isDone);
     return this.getById(id);
