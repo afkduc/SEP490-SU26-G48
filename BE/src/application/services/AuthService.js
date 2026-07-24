@@ -105,9 +105,11 @@ class AuthService {
       tokenVersion: userDto.tokenVersion,
     };
 
-    // Chi them deviceId neu co (backward compat voi token cu)
     if (deviceId) {
       tokenPayload.deviceId = deviceId;
+    }
+    if (user.sessionId) {
+      tokenPayload.sessionId = user.sessionId;
     }
 
     const token = jwt.sign(tokenPayload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });

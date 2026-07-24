@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate, requireAdmin } = require('../../middlewares/auth');
+const { requireScreen } = require('../../middlewares/permission');
 const { trackActivity } = require('../../middlewares');
 const { success } = require('../../utils/response');
 const AuditService = require('../../application/services/AuditService');
@@ -20,7 +21,7 @@ function buildAuditRouter() {
   const repository = AuditRepository;
   const auditService = new AuditService(repository);
 
-  router.use(authenticate, requireAdmin, trackActivity);
+  router.use(authenticate, requireAdmin, requireScreen('audit_logs', 'access'), trackActivity);
 
   /**
    * GET /api/audit
