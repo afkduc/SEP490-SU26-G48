@@ -202,3 +202,13 @@
   margin-top: 28px;
   text-align: center;
 }
+
+/* Man dien thoai nho - card sat mep man hinh, giam padding de con du cho */
+@media (max-width: 420px) {
+  .login-bg {
+    padding: 16px;
+  }
+  .login-card {
+    padding: 28px 20px;
+  }
+}
