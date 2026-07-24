@@ -109,7 +109,10 @@ function numberToVietnamese(num) {
 }
 
 function emptyItem() {
-  return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: 'KHT', repairCategory: '', unit: 'Công', qty: 1, unitPrice: 0, discount: 0, total: 0 };
+  // httt de trong (chua chon) - chi mac dinh "Khach hang thanh toan" SAU KHI
+  // co van chon 1 dich vu/goi/phu tung that tu catalog (xem selectCatalog*),
+  // tranh hien thi san 1 gia tri nhu da chon roi trong khi dong con dang trong.
+  return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: '', repairCategory: '', unit: 'Công', qty: 1, unitPrice: 0, discount: 0, total: 0 };
 }
 
 // Suy luan lai nhom "dich vu/goi da chon + phu tung/dich vu con tu dong chen
@@ -1254,24 +1257,67 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     });
   };
 
-  // Dong "chinh" cua 1 dich vu/goi (co gia, khong phai dong thong tin sinh
-  // kem hay phu tung) - dung de xac dinh pham vi lan Loai hinh sua chua xuong
-  // cac dong con ben duoi.
-  const isPrimaryServiceRow = (it) => it.lhsc === 'DV' && (it.unitPrice || 0) > 0;
+  // Dong con (duoc tu dong chen kem theo 1 dich vu/goi da chon - dich vu con
+  // trong goi hoac phu tung tieu hao) khong duoc sua/xoa rieng le - chi dau
+  // nhom (isGroupParent) moi thao tac duoc, xoa dau nhom se xoa het ca cum.
+  const isChildRow = (it) => Boolean(it.groupId) && !it.isGroupParent;
 
-  // Doi Loai hinh sua chua tren dong dich vu/goi chinh -> tu dong ap dung
-  // luon cho cac dong con da tu dien kem theo (dich vu con trong goi, phu
-  // tung tieu hao) ngay ben duoi, cho toi khi gap dong dich vu/goi chinh tiep
-  // theo - vi thuc te ca nhom nay luon cung 1 loai hinh sua chua, khong ai
-  // chon rieng cho tung dong phu tung tieu hao ben trong 1 goi ca.
-  const handleRepairCategoryChange = (idx, value) => {
+  // Doi Hinh thuc thanh toan tren dong dau nhom (dich vu/goi chinh) -> tu
+  // dong ap dung luon cho tat ca cac dong con cung nhom (dich vu con, phu
+  // tung) - vi thuc te ca nhom luon thanh toan chung 1 hinh thuc, khong ai
+  // chon rieng cho tung dong phu tung ben trong 1 goi ca.
+  const handleHtttChange = (idx, value) => {
     setItems((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], repairCategory: value };
-      if (isPrimaryServiceRow(next[idx])) {
-        for (let j = idx + 1; j < next.length; j += 1) {
-          if (isPrimaryServiceRow(next[j])) break;
-          next[j] = { ...next[j], repairCategory: value };
+      const groupId = next[idx]?.groupId;
+      next[idx] = { ...next[idx], httt: value };
+      if (next[idx].isGroupParent && groupId) {
+        for (let j = 0; j < next.length; j += 1) {
+          if (j !== idx && next[j].groupId === groupId) {
+            next[j] = { ...next[j], httt: value };
+          }
+        }
+      }
+      return next;
+    });
+  };
+
+  // Doi So luong tren dong dau nhom -> tinh lai theo ty le (so luong moi /
+  // so luong cu) cho tat ca dong con cung nhom (dich vu con + phu tung), vi
+  // dinh muc phu tung/dich vu con duoc tinh theo 1 lan lam goi/dich vu nay.
+  // rawValue la chuoi tho tu input (khong Number() truoc) de cho phep go
+  // "xoa het roi go so khac" di qua trang thai rong that su thay vi bi ep
+  // ve 0 - ep ve 0 se lam mat moc so luong cu that (0 la falsy).
+  //
+  // "qtyBasis" luu ngay trong tung dong (KHONG dung ref/bien ngoai) de nho
+  // moc so luong hop le gan nhat, song vuot qua nhip go rong tam thoi luc
+  // xoa-roi-go-lai. Bat buoc phai la state thuan (khong side-effect ben
+  // ngoai) vi React StrictMode (dev) goi ham cap nhat cua setState 2 lan de
+  // kiem tra do "thuan" - neu dung ref bi mutate ben trong ham cap nhat, lan
+  // goi dau (se bi huy) da lam ref "chay truoc" gia tri moi, khien lan goi
+  // thu 2 (lan duoc giu lai) tinh oldQty = newQty -> ty le = 1 -> nhin như
+  // khong doi (day chinh la nguyen nhan bug "doi so luong dau nhom nhung
+  // dong con khong doi theo").
+  const handleGroupQtyChange = (idx, rawValue) => {
+    setItems((prev) => {
+      const next = [...prev];
+      const target = next[idx];
+      const isEmpty = rawValue === '';
+      const parsed = Number(rawValue);
+      const newQty = isEmpty || Number.isNaN(parsed) ? '' : parsed;
+      const oldQty = target.qtyBasis || target.qty || 1;
+      const updatedHead = recalcItem({ ...target, qty: newQty });
+      if (typeof newQty === 'number' && newQty > 0) {
+        updatedHead.qtyBasis = newQty;
+      }
+      next[idx] = updatedHead;
+      if (target.isGroupParent && target.groupId && oldQty > 0 && typeof newQty === 'number' && newQty > 0) {
+        const ratio = newQty / oldQty;
+        for (let j = 0; j < next.length; j += 1) {
+          if (j !== idx && next[j].groupId === target.groupId) {
+            const scaledQty = Math.max(1, Math.round((next[j].qty || 1) * ratio));
+            next[j] = recalcItem({ ...next[j], qty: scaledQty });
+          }
         }
       }
       return next;
@@ -1293,7 +1339,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     const remaining = (target?.isGroupParent && target.groupId)
       ? prev.filter((it, i) => i !== idx && it.groupId !== target.groupId)
       : prev.filter((_, i) => i !== idx);
-    return remaining.length > 0 ? remaining : prev;
+    // Xoa 1 goi/dich vu ma no la TOAN BO cac dong dang co (vi du chi vua chon
+    // 1 goi combo duy nhat, chua co dong nao khac) se lam remaining rong -
+    // luc do tra ve 1 dong Dich vu trong moi (giong luc moi mo form), KHONG
+    // tra ve nguyen "prev" cu (truoc day tra "prev" khien bam Xoa nhu khong
+    // co gi xay ra, vi remaining rong bi coi la "khong hop le").
+    return remaining.length > 0 ? remaining : [emptyItem()];
   });
 
   const handleItemDescription = (idx, val) => {
@@ -1316,6 +1367,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       unit: p.unitName || 'Cái',
       qty: p.quantity || 1,
       lhsc: 'PT',
+      httt: 'KHT',
       repairCategory: repairCategory || '',
     }));
   }
@@ -1386,7 +1438,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       const base = oldGroupId ? prev.filter((it, i) => i === idx || it.groupId !== oldGroupId) : prev;
       let next = [...base];
       const groupId = nextGroupId();
-      next[idx] = recalcItem({ ...next[idx], code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', discount: 0, repairCategory, groupId, isGroupParent: true });
+      next[idx] = recalcItem({ ...next[idx], code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', httt: 'KHT', discount: 0, repairCategory, groupId, isGroupParent: true });
       const partRows = buildPartRows(svc.parts, repairCategory).map((r) => ({ ...r, groupId }));
       next.splice(idx + 1, 0, ...partRows);
       return next;
@@ -1422,6 +1474,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         unit: 'Công',
         qty: 1,
         lhsc: 'DV',
+        httt: 'KHT',
         discount: 0,
         repairCategory,
         groupId,
@@ -1436,6 +1489,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         unit: 'Công',
         qty: 1,
         lhsc: 'DV',
+        httt: 'KHT',
         repairCategory,
         groupId,
       }));
@@ -1460,6 +1514,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         unitPrice: product.unitPrice || 0,
         unit: product.unitName || next[idx].unit,
         lhsc: 'PT',
+        httt: 'KHT',
         discount: 0,
       });
       return next;
@@ -1792,6 +1847,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   const renderRow = ({ item, idx }) => {
                     const suggestion = catalogSuggestions[idx];
                     const isPartRow = item.lhsc === 'PT';
+                    const isChild = isChildRow(item);
                     const hasSuggestions = activeCatalogIdx === idx && suggestion && (
                       suggestion.type === 'product'
                         ? suggestion.products?.length > 0
@@ -1803,9 +1859,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         <input className="form-input" style={{ fontSize: 11, fontFamily: 'monospace' }} value={item.code || ''} readOnly />
                       </td>
                       <td style={{ position: 'relative' }}>
-                        <input className="form-input" style={{ fontSize: 12 }} value={item.description} disabled={!canSave}
+                        <input className="form-input" style={{ fontSize: 12 }} value={item.description} disabled={!canSave} readOnly={isChild}
                           onChange={(e) => handleItemDescription(idx, e.target.value)}
-                          onFocus={(e) => openCatalogDropdown(idx, e.target)}
+                          onFocus={(e) => !isChild && openCatalogDropdown(idx, e.target)}
                           onBlur={() => setTimeout(() => closeCatalogSuggestions(idx), 180)}
                           placeholder={canSave ? (isPartRow ? 'Nhập tên/mã phụ tùng trong kho...' : 'Nhập tên dịch vụ / gói combo...') : 'Vui lòng chọn khách hàng và xe trước'} />
                         {hasSuggestions && catalogDropdownRect && createPortal(
@@ -1853,19 +1909,25 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         )}
                       </td>
                       <td>
-                        <select className="form-select" style={{ fontSize: 12 }} value={item.repairCategory} onChange={(e) => handleRepairCategoryChange(idx, e.target.value)}>
-                          <option value=""></option>
-                          {REPAIR_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        <input className="form-input" style={{ fontSize: 12 }}
+                          value={REPAIR_CATEGORY_LABEL_BY_VALUE[item.repairCategory] || ''} readOnly
+                          title="Loại hình sửa chữa lấy tự động theo dịch vụ/gói đã chọn, không chỉnh sửa trực tiếp trên form" />
                       </td>
                       <td>
-                        <select className="form-select" style={{ fontSize: 12 }} value={item.httt} onChange={(e) => setItem(idx, 'httt', e.target.value)}>
-                          {HTTT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        {isChild ? (
+                          <input className="form-input" style={{ fontSize: 12 }} value={HTTT_LABEL_BY_VALUE[item.httt] || ''} readOnly />
+                        ) : (
+                          <select className="form-select" style={{ fontSize: 12 }} value={item.httt} onChange={(e) => handleHtttChange(idx, e.target.value)}>
+                            <option value=""></option>
+                            {HTTT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                        )}
                       </td>
                       <td>
                         {item.lhsc === 'DV' ? (
                           <input className="form-input" style={{ fontSize: 12 }} value="Công" readOnly />
+                        ) : isChild ? (
+                          <input className="form-input" style={{ fontSize: 12 }} value={item.unit} readOnly />
                         ) : (
                           <select className="form-select" style={{ fontSize: 12 }} value={item.unit} onChange={(e) => setItem(idx, 'unit', e.target.value)}>
                             {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -1873,7 +1935,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         )}
                       </td>
                       <td>
-                        <input className="form-input" style={{ fontSize: 12 }} type="number" min={1} value={item.qty} onChange={(e) => setItem(idx, 'qty', Number(e.target.value))} />
+                        <input className="form-input" style={{ fontSize: 12 }} type="number" min={1} value={item.qty} readOnly={isChild} onChange={(e) => handleGroupQtyChange(idx, e.target.value)} />
                       </td>
                       <td>
                         <input className="form-input" style={{ fontSize: 12 }}
@@ -1881,11 +1943,13 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                           title="Đơn giá lấy theo catalog/kho phụ tùng, không chỉnh sửa trực tiếp trên form" />
                       </td>
                       <td>
-                        <input className="form-input" style={{ fontSize: 12 }} type="number" min={0} max={100} value={item.discount} onChange={(e) => setItem(idx, 'discount', Number(e.target.value))} />
+                        <input className="form-input" style={{ fontSize: 12 }} type="number" min={0} max={100} value={item.discount} readOnly={isChild} onChange={(e) => setItem(idx, 'discount', Number(e.target.value))} />
                       </td>
                       <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{(item.total || 0).toLocaleString('vi-VN')}</td>
                       <td>
-                        <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => removeItem(idx)}>Xóa</button>
+                        {!isChild && (
+                          <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => removeItem(idx)}>Xóa</button>
+                        )}
                       </td>
                     </tr>
                     );
