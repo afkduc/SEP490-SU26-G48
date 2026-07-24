@@ -1,5 +1,7 @@
 .sup-list {
   padding: 8px 4px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .sup-list__header {
@@ -7,6 +9,8 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .sup-list__title {
@@ -26,6 +30,12 @@
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .sup-list { padding: 12px 4px; }
+  .sup-list__title { font-size: 18px; }
 }
 
 .sup-list__filters .input--search {
