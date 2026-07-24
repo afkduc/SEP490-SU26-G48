@@ -243,9 +243,9 @@ async function trackLogin(req, user) {
     const insertResult = await query(
       `INSERT INTO login_sessions
          (action_type, user_id, user_name, phone, ip_address, user_agent,
-          browser, os, branch_id, status, login_time)
+          browser, os, branch_id, status, login_time, last_activity_at)
        VALUES
-         ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'active', SYSUTCDATETIME());
+         ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'active', SYSUTCDATETIME(), SYSUTCDATETIME());
        SELECT @@IDENTITY AS new_id;`,
       {
         p1: userId,
@@ -275,10 +275,18 @@ async function trackLogin(req, user) {
 
     // Buoc 5: Update device CHO USER HIEN TAI (chi anh huong device cua user nay)
     // Khong anh huong device cua user khac
-    // Tra ve deviceId de AuthService co the them vao JWT
     let deviceId = null;
     if (userId && ipAddress) {
       deviceId = await upsertDevice(userId, userAgent, ipAddress);
+    }
+
+    // Link session voi device sau khi upsert xong. Tu day logout khong can
+    // suy doan bang IP/User-Agent nua.
+    if (sessionId && deviceId) {
+      await query(
+        'UPDATE login_sessions SET device_id = @p1 WHERE id = @p2 AND user_id = @p3',
+        { p1: deviceId, p2: sessionId, p3: userId }
+      );
     }
 
     // Emit SSE event (sau khi co deviceId)
@@ -299,11 +307,11 @@ async function trackLogin(req, user) {
       _sendLoginNotification(userId, browser, os, ipAddress, deviceId);
     }
 
-    // Tra ve deviceId de AuthService co the them vao JWT
-    return { deviceId };
+    // Tra ve ca deviceId va sessionId de dua vao JWT.
+    return { deviceId, sessionId };
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLogin failed:', err.message ? err.message : err);
-    return { deviceId: null };
+    return { deviceId: null, sessionId: null };
   }
 }
 
@@ -317,7 +325,8 @@ async function trackLogout(req) {
     // JWT payload co cac field: userId, email, name (la user_name), roles, branchId, deviceId
     const userName = safeString(req.user.name || req.user.user_name);
     const userId = req.user.userId || req.user.id || null;
-    const deviceId = req.user.deviceId || null; // ← QUAN TRONG: dong dung session cua browser hien tai
+    const deviceId = req.user.deviceId || null;
+    const sessionId = req.user.sessionId || null; // ← QUAN TRONG: dong dung session cua browser hien tai
 
     if (!userName && !userId) {
       console.error('[loginSessionMiddleware] trackLogout skipped: missing user identifier');
@@ -335,44 +344,42 @@ async function trackLogout(req) {
     // nhung ADDITIONALLY close TAT CA session khac cua user dang su dung
     // status='active' chi giu lai session moi nhat (giam dang bộ).
     let active;
-    if (deviceId) {
-      // Lay session co deviceId trong login_session_events MATCH voi deviceId
-      // CUA user hien tai (logic: moi khi heartbeat tao event → ta link session).
-      // Don gian nhat: lay session active moi nhat cua user ma co event 'LOGIN'
-      // cung deviceId. Day la trade-off OK: trong 1 thoi diem chi co 1 session
-      // active moi nhat/user, va session do chinh la session cua browser hien tai
-      // (do moi heartbeat va login event deu den tu cung device).
+    if (sessionId) {
       active = await query(
-        `SELECT TOP 1 ls.id, ls.user_id, ls.ip_address
-         FROM   login_sessions ls
-         WHERE  ls.status = 'active' AND ls.action_type = 'LOGIN'
-           AND  ls.user_id = @p1
-           AND  EXISTS (
-             SELECT 1 FROM login_session_events ev
-             WHERE  ev.session_id = ls.id
-               AND  ev.user_id   = ls.user_id
-               AND  ev.event_type = 'LOGIN'
-               AND  (
-                 ev.user_agent = @p3
-                 OR ev.ip_address = @p2
-               )
-           )
-         ORDER  BY ls.login_time DESC`,
-        { p1: userId, p2: ipAddress, p3: userAgent }
+        `SELECT TOP 1 id, user_id, ip_address
+         FROM login_sessions
+         WHERE id = @p1 AND user_id = @p2
+           AND status = 'active' AND action_type = 'LOGIN'`,
+        { p1: sessionId, p2: userId }
+      );
+    } else if (deviceId) {
+      active = await query(
+        `SELECT TOP 1 id, user_id, ip_address
+         FROM login_sessions
+         WHERE device_id = @p1 AND user_id = @p2
+           AND status = 'active' AND action_type = 'LOGIN'`,
+        { p1: deviceId, p2: userId }
       );
     } else {
       active = await query(
         `SELECT TOP 1 id, user_id
-         FROM   login_sessions
-         WHERE  status = 'active' AND action_type = 'LOGIN'
+         FROM login_sessions
+         WHERE status = 'active' AND action_type = 'LOGIN'
            ${userId ? 'AND user_id = @p1' : 'AND user_name = @p2'}
-         ORDER  BY login_time DESC`,
+         ORDER BY login_time DESC`,
         userId ? { p1: userId } : { p2: userName }
       );
     }
 
     if (!active.recordset.length) {
-      // Fallback lay session moi nhat theo user (case khong match deviceId)
+      // Token moi luon phai logout theo session/device ID; khong fallback sang
+      // session khac cua cung user vi se dong nham phien dang nhap.
+      if (sessionId || deviceId) {
+        console.warn(`[loginSessionMiddleware] trackLogout: session not found for sessionId=${sessionId || 'n/a'}, deviceId=${deviceId || 'n/a'}`);
+        return;
+      }
+
+      // Token cu khong co ID moi dung fallback theo user.
       const fallback = await query(
         `SELECT TOP 1 id, user_id
          FROM   login_sessions
@@ -388,7 +395,7 @@ async function trackLogout(req) {
       active = fallback;
     }
 
-    const sessionId = active.recordset[0].id;
+    const endedSessionId = active.recordset[0].id;
     const sessionUserId = active.recordset[0].user_id;
 
     await query(
@@ -398,11 +405,11 @@ async function trackLogout(req) {
               session_duration_seconds   = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
               status                     = 'ended'
        WHERE  id = @p1`,
-      { p1: sessionId }
+      { p1: endedSessionId }
     );
 
     await logSessionEvent({
-      sessionId,
+      sessionId: endedSessionId,
       eventType: 'LOGOUT',
       userId: sessionUserId,
       userName,
@@ -439,7 +446,7 @@ async function trackLogout(req) {
 
     // Emit SSE event
     emitLoginSessionEvent('logout', {
-      sessionId,
+      sessionId: endedSessionId,
       userId: sessionUserId,
       userName,
       ipAddress,
