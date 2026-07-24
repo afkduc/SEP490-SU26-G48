@@ -1,5 +1,7 @@
 .ir-detail {
   padding: 24px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .ir-detail__loading,
@@ -20,6 +22,12 @@
   align-items: flex-start;
   gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .ir-detail { padding: 16px; }
+  .ir-detail__actions { flex-direction: column; }
 }
 
 .ir-detail__title-row {
