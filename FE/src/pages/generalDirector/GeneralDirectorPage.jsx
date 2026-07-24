@@ -866,9 +866,9 @@ function EmployeeListPage() {
           </div>
           <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
             <div style={{ fontSize: 12, opacity: 0.72 }}>Tổng nhân sự</div>
-            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{employees.length}</div>
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{filteredEmployees.length}</div>
             <div style={{ fontSize: 12, opacity: 0.72, marginTop: 8 }}>Đang làm</div>
-            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{employees.filter((item) => item.status === 'active').length}</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{filteredEmployees.filter((item) => item.status === 'active').length}</div>
           </div>
         </div>
       </div>
@@ -1231,9 +1231,9 @@ function TechnicianListPage() {
           </div>
           <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
             <div style={{ fontSize: 12, opacity: 0.72 }}>Tổng kỹ thuật viên</div>
-            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{technicians.length}</div>
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{filteredTechnicians.length}</div>
             <div style={{ fontSize: 12, opacity: 0.72, marginTop: 8 }}>Đang làm</div>
-            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{technicians.filter((item) => item.status === 'active').length}</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{filteredTechnicians.filter((item) => item.status === 'active').length}</div>
           </div>
         </div>
       </div>
@@ -1627,9 +1627,9 @@ function BranchManagerListPage() {
           </div>
           <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
             <div style={{ fontSize: 12, opacity: 0.72 }}>Tổng giám đốc chi nhánh</div>
-            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{branchManagers.length}</div>
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{filteredManagers.length}</div>
             <div style={{ fontSize: 12, opacity: 0.72, marginTop: 8 }}>Đang hoạt động</div>
-            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{branchManagers.filter((item) => item.status === 'active').length}</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{filteredManagers.filter((item) => item.status === 'active').length}</div>
           </div>
         </div>
         <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>👤 {user?.name || 'General Director'}</div>
