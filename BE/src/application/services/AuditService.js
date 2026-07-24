@@ -5,6 +5,36 @@ class AuditService {
     this.auditRepository = auditRepository;
   }
 
+  /**
+   * Alias gon cho insertAuditLog - nhieu controller dang goi this.auditService.log().
+   * Giu ten cu de tuong thich nguoc, ngoai ra cung cap insertAuditLog() cho
+   * code cu.
+   *
+   * Auto-map field alias de tuong thich voi nhieu controller dang goi voi
+   * ten field khac nhau:
+   *   - actorEmail / actorName / actorUserName -> user_name
+   *   - resource / resourceType -> table_name
+   *   - actorId -> user_id
+   */
+  async log(logData) {
+    if (!logData || typeof logData !== 'object') {
+      throw new ApiError(400, 'logData la bat buoc');
+    }
+
+    const normalized = { ...logData };
+    if (!normalized.user_name) {
+      normalized.user_name = normalized.actorEmail || normalized.actorName || normalized.actorUserName || null;
+    }
+    if (!normalized.table_name) {
+      normalized.table_name = normalized.resource || normalized.resourceType || 'unknown';
+    }
+    if (!normalized.user_id && normalized.actorId) {
+      normalized.user_id = normalized.actorId;
+    }
+
+    return this.insertAuditLog(normalized);
+  }
+
   async insertAuditLog(logData) {
     if (!logData || typeof logData !== 'object') {
       throw new ApiError(400, 'logData la bat buoc');

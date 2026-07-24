@@ -18,8 +18,10 @@ class AuthController {
       // 2. Track login with full user info to get deviceId
       const trackResult = await trackLogin(req, user);
       const deviceId = trackResult?.deviceId || null;
+      const sessionId = trackResult?.sessionId || null;
+      user.sessionId = sessionId;
 
-      // 3. Tao token voi deviceId (chi tao 1 lan)
+      // 3. Tao token voi deviceId/sessionId (chi tao 1 lan)
       const result = await this.authService.issueTokenWithDevice(user, deviceId);
       return success(res, result, 'Đăng nhập thành công');
     } catch (err) {

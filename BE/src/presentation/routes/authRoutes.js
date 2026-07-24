@@ -73,6 +73,7 @@ function buildAuthRouter() {
       let refreshed;
       try {
         const deviceId = req.user.deviceId || null;
+        freshUser.sessionId = req.user.sessionId || null;
         refreshed = await service.issueTokenWithDevice(freshUser, deviceId);
       } catch (signErr) {
         console.error('[auth.refresh-permissions] issueToken failed:', signErr?.message || signErr);
