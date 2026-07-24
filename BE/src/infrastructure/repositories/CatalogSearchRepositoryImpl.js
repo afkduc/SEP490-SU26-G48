@@ -19,7 +19,7 @@ class CatalogSearchRepositoryImpl extends CatalogSearchRepository {
   async findAllActivePackagesWithItems(branchId) {
     const result = await query(
       `SELECT sp.id AS package_id, sp.package_code, sp.package_name, sp.category_id,
-              sp.applicable_km, sp.total_price, sp.repair_category AS package_repair_category,
+              sp.total_price, sp.repair_category AS package_repair_category,
               s.id AS service_id, s.service_code, s.service_name, s.unit_price, s.repair_category AS service_repair_category
        FROM   service_packages sp
        JOIN   service_package_items spi ON spi.package_id = sp.id

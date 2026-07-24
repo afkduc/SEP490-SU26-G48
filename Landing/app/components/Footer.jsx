@@ -1,11 +1,18 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, Phone, Mail } from "lucide-react";
+import { API_BASE_URL } from "../config";
 import styles from "./Footer.module.css";
 
 const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61592097516986";
 
 const menuLinks = [
   { href: "/#trang-chu", label: "Trang chủ" },
+  { href: "/#vi-sao-chon", label: "Vì sao chọn AutoGara" },
+  { href: "/#goi-dich-vu", label: "Gói dịch vụ" },
+  { href: "/#chi-nhanh", label: "Chi nhánh" },
   { href: "/#meo-bao-duong", label: "Kinh nghiệm" },
   { href: "/#gui-yeu-cau", label: "Liên hệ" },
   { href: "/tra-cuu", label: "Tra cứu tiến độ" },
@@ -22,29 +29,50 @@ function FacebookIcon(props) {
 }
 
 export default function Footer() {
+  const [branches, setBranches] = useState([]);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/public/branches`)
+      .then((res) => res.json())
+      .then((body) => {
+        if (body?.success) setBranches(body.data);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <footer className={styles.footer}>
       <div className={`container ${styles.grid}`}>
         <div className={styles.col}>
           <p className={styles.logo}>
-            Auto<span>Gara</span>
+            <span>Auto</span>Gara
           </p>
-          <p className={styles.item}>
-            <MapPin className={styles.icon} />
-            Thạch Hòa, Thạch Thất, Hà Nội
-          </p>
-          <a href="tel:0337426789" className={styles.item}>
-            <Phone className={styles.icon} />
-            0337 426 789
-          </a>
-          <a href="tel:0388515151" className={styles.item}>
-            <Phone className={styles.icon} />
-            0388 515 151
-          </a>
+          <p className={styles.about}>Gara ủy quyền chính hãng Kia & Mazda.</p>
           <a href="mailto:cskh@autogara.vn" className={styles.item}>
             <Mail className={styles.icon} />
             cskh@autogara.vn
           </a>
+        </div>
+
+        <div className={styles.col}>
+          <h4>Chi nhánh</h4>
+          {branches.map((b) => (
+            <div key={b.id} className={styles.branch}>
+              <p className={styles.branchName}>{b.name}</p>
+              {b.address && (
+                <p className={styles.item}>
+                  <MapPin className={styles.icon} />
+                  {b.address}
+                </p>
+              )}
+              {b.phone && (
+                <a href={`tel:${b.phone}`} className={styles.item}>
+                  <Phone className={styles.icon} />
+                  {b.phone}
+                </a>
+              )}
+            </div>
+          ))}
         </div>
 
         <div className={styles.col}>
