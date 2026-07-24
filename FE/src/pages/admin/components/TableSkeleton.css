@@ -13,8 +13,16 @@
   display: inline-block;
 }
 
+.table-skeleton-wrap {
+  padding: 0;
+}
+
 .table-skeleton {
   width: 100%;
+}
+
+.table--skeleton thead th {
+  background: #f8fafc;
 }
 
 .table-skeleton__row {

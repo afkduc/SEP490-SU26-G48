@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
 
@@ -90,6 +91,18 @@ const EMPLOYEE_STATUS_META = {
   inactive: { label: 'Nghỉ', color: '#B91C1C', background: '#FEF2F2' },
 };
 
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const FILTER_ROW_STYLE = {
+  display: 'flex',
+  gap: 10,
+  flexWrap: 'nowrap',
+  alignItems: 'center',
+  overflowX: 'auto',
+  paddingBottom: 4,
+  whiteSpace: 'nowrap',
+};
+
 function statusBadge(status) {
   const meta = STATUS_META[status] || STATUS_META.waiting_repair;
   return {
@@ -118,6 +131,110 @@ function repairStatusLabel(status) {
 function percent(value) {
   const safeValue = Number(value || 0);
   return `${safeValue.toFixed(2)}%`;
+}
+
+function textIncludes(source, keyword) {
+  const normalize = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  const text = normalize(source);
+  const needle = normalize(keyword);
+  if (!needle) return true;
+  return text.includes(needle);
+}
+
+function paginateItems(items = [], page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+  const source = Array.isArray(items) ? items : [];
+  const safePageSize = Math.max(1, Number(pageSize) || DEFAULT_PAGE_SIZE);
+  const total = source.length;
+  const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+  const currentPage = Math.min(Math.max(1, Number(page) || 1), totalPages);
+  const startIndex = (currentPage - 1) * safePageSize;
+
+  return {
+    total,
+    totalPages,
+    currentPage,
+    items: source.slice(startIndex, startIndex + safePageSize),
+  };
+}
+
+function buildPageItems(currentPage, totalPages) {
+  const pages = [];
+  for (let i = 1; i <= totalPages; i += 1) {
+    if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+      pages.push(i);
+    } else if (pages[pages.length - 1] !== '...') {
+      pages.push('...');
+    }
+  }
+  return pages;
+}
+
+function DataPagination({ total, page, pageSize, onPageChange, onPageSizeChange, label, loading = false }) {
+  if (!total) return null;
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const from = (currentPage - 1) * pageSize + 1;
+  const to = Math.min(currentPage * pageSize, total);
+
+  return (
+    <div className="pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <span className="pagination-info">Hiển thị {from}-{to} / {total} {label}</span>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <select
+          className="form-select"
+          value={pageSize}
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+          disabled={loading}
+          style={{ height: 34, minWidth: 92 }}
+        >
+          {PAGE_SIZE_OPTIONS.map((size) => (
+            <option key={size} value={size}>{size}/trang</option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={loading || currentPage <= 1}
+        >
+          Trước
+        </button>
+
+        {buildPageItems(currentPage, totalPages).map((item, index) => (
+          item === '...'
+            ? <span key={`ellipsis-${index}`} style={{ color: '#94A3B8' }}>...</span>
+            : (
+              <button
+                key={item}
+                type="button"
+                className={item === currentPage ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
+                onClick={() => onPageChange(item)}
+                disabled={loading}
+              >
+                {item}
+              </button>
+            )
+        ))}
+
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={loading || currentPage >= totalPages}
+        >
+          Sau
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function BranchBadge({ branch }) {
@@ -339,6 +456,8 @@ function RevenueOverviewPage() {
   const [branchId, setBranchId] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [branchStatsPage, setBranchStatsPage] = useState(1);
+  const [branchStatsPageSize, setBranchStatsPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [report, setReport] = useState({
     summary: {
       currentMonthTotalRevenue: 0,
@@ -406,6 +525,17 @@ function RevenueOverviewPage() {
   const summary = report?.summary || {};
   const monthlyTrend = report?.monthlyTrend || [];
   const branchStats = report?.branchStats || [];
+  const branchStatsPagination = paginateItems(branchStats, branchStatsPage, branchStatsPageSize);
+
+  useEffect(() => {
+    setBranchStatsPage(1);
+  }, [branchId]);
+
+  useEffect(() => {
+    if (branchStatsPagination.currentPage !== branchStatsPage) {
+      setBranchStatsPage(branchStatsPagination.currentPage);
+    }
+  }, [branchStatsPagination.currentPage, branchStatsPage]);
 
   const selectedBranchName = branchId === 'all'
     ? 'Tất cả chi nhánh'
@@ -557,7 +687,7 @@ function RevenueOverviewPage() {
             </div>
           )}
 
-          {!loading && branchStats.length > 0 && (
+          {!loading && branchStatsPagination.total > 0 && (
             <div className="table-wrapper" style={{ boxShadow: 'none', marginBottom: 0 }}>
               <table className="data-table">
                 <thead>
@@ -569,7 +699,7 @@ function RevenueOverviewPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {branchStats.map((row) => (
+                  {branchStatsPagination.items.map((row) => (
                     <tr key={row.branch?.id || row.branch?.code}>
                       <td style={{ fontWeight: 700 }}>{row.branch?.name || '—'}</td>
                       <td>{currency(row.serviceRevenue)}</td>
@@ -586,6 +716,18 @@ function RevenueOverviewPage() {
                   ))}
                 </tbody>
               </table>
+              <DataPagination
+                total={branchStatsPagination.total}
+                page={branchStatsPagination.currentPage}
+                pageSize={branchStatsPageSize}
+                onPageChange={setBranchStatsPage}
+                onPageSizeChange={(size) => {
+                  setBranchStatsPageSize(size);
+                  setBranchStatsPage(1);
+                }}
+                label="chi nhánh"
+                loading={loading}
+              />
             </div>
           )}
         </div>
@@ -599,15 +741,18 @@ function EmployeeListPage() {
   const [employees, setEmployees] = useState([]);
   const [branches, setBranches] = useState([]);
   const [search, setSearch] = useState('');
+  const [employeeCodeFilter, setEmployeeCodeFilter] = useState('');
+  const [phoneFilter, setPhoneFilter] = useState('');
   const [branchId, setBranchId] = useState('all');
   const [status, setStatus] = useState('all');
   const [role, setRole] = useState('all');
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeEmployee, setActiveEmployee] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
@@ -659,6 +804,24 @@ function EmployeeListPage() {
     return () => clearTimeout(searchTimer.current);
   }, [search, branchId, status, role]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, branchId, status, role, employeeCodeFilter, phoneFilter]);
+
+  const filteredEmployees = employees.filter((employee) => {
+    if (!textIncludes(employee.employeeId || employee.id, employeeCodeFilter)) return false;
+    if (!textIncludes(employee.phone, phoneFilter)) return false;
+    return true;
+  });
+
+  const employeePagination = paginateItems(filteredEmployees, page, pageSize);
+
+  useEffect(() => {
+    if (employeePagination.currentPage !== page) {
+      setPage(employeePagination.currentPage);
+    }
+  }, [employeePagination.currentPage, page]);
+
   const openDetail = async (employee) => {
     setActiveEmployee(employee);
     setDetailError('');
@@ -705,14 +868,14 @@ function EmployeeListPage() {
           </div>
           <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
             <div style={{ fontSize: 12, opacity: 0.72 }}>Tổng nhân sự</div>
-            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{employees.length}</div>
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{filteredEmployees.length}</div>
             <div style={{ fontSize: 12, opacity: 0.72, marginTop: 8 }}>Đang làm</div>
-            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{employees.filter((item) => item.status === 'active').length}</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{filteredEmployees.filter((item) => item.status === 'active').length}</div>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
           <span className="search-icon">🔍</span>
           <input
@@ -729,31 +892,49 @@ function EmployeeListPage() {
           ))}
         </select>
 
-        <button type="button" className="btn btn-secondary" onClick={() => setShowAdvanced((prev) => !prev)}>
-          {showAdvanced ? 'Ẩn Filter' : 'Filter nâng cao'}
+        <select className="form-select" value={status} onChange={(event) => setStatus(event.target.value)} style={{ minWidth: 180, height: 42 }}>
+          {EMPLOYEE_STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+
+        <select className="form-select" value={role} onChange={(event) => setRole(event.target.value)} style={{ minWidth: 220, height: 42 }}>
+          {EMPLOYEE_ROLE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+
+        <input
+          className="form-input"
+          value={employeeCodeFilter}
+          onChange={(event) => setEmployeeCodeFilter(event.target.value)}
+          placeholder="Lọc mã nhân viên"
+          style={{ minWidth: 180, height: 42 }}
+        />
+
+        <input
+          className="form-input"
+          value={phoneFilter}
+          onChange={(event) => setPhoneFilter(event.target.value)}
+          placeholder="Lọc số điện thoại"
+          style={{ minWidth: 200, height: 42 }}
+        />
+
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => {
+            setSearch('');
+            setEmployeeCodeFilter('');
+            setPhoneFilter('');
+            setBranchId('all');
+            setStatus('all');
+            setRole('all');
+          }}
+        >
+          Xóa bộ lọc
         </button>
       </div>
-
-      {showAdvanced && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginBottom: 14, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 12 }}>
-          <div>
-            <label className="form-label">Trạng thái</label>
-            <select className="form-select" value={status} onChange={(event) => setStatus(event.target.value)}>
-              {EMPLOYEE_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Chức vụ</label>
-            <select className="form-select" value={role} onChange={(event) => setRole(event.target.value)}>
-              {EMPLOYEE_ROLE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      )}
 
       {error && (
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
@@ -787,7 +968,7 @@ function EmployeeListPage() {
               </tr>
             )}
 
-            {!loading && employees.length === 0 && !error && (
+            {!loading && employeePagination.total === 0 && !error && (
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state">
@@ -799,7 +980,7 @@ function EmployeeListPage() {
               </tr>
             )}
 
-            {!loading && employees.map((employee) => {
+            {!loading && employeePagination.items.map((employee) => {
               const badge = employeeStatusBadge(employee.status);
               return (
                 <tr key={employee.id}>
@@ -827,9 +1008,18 @@ function EmployeeListPage() {
           </tbody>
         </table>
 
-        <div className="pagination">
-          <span className="pagination-info">{employees.length} nhân sự</span>
-        </div>
+        <DataPagination
+          total={employeePagination.total}
+          page={employeePagination.currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          label="nhân sự"
+          loading={loading}
+        />
       </div>
 
       {(activeEmployee || detailLoading || detailError) && (
@@ -897,6 +1087,8 @@ function TechnicianListPage() {
   const [technicians, setTechnicians] = useState([]);
   const [branches, setBranches] = useState([]);
   const [search, setSearch] = useState('');
+  const [specialtyFilter, setSpecialtyFilter] = useState('');
+  const [minActiveAssignments, setMinActiveAssignments] = useState('');
   const [branchId, setBranchId] = useState('all');
   const [skillGroup, setSkillGroup] = useState('all');
   const [status, setStatus] = useState('all');
@@ -906,6 +1098,8 @@ function TechnicianListPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [reloadTick, setReloadTick] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
@@ -915,6 +1109,8 @@ function TechnicianListPage() {
 
   const clearFilters = () => {
     setSearch('');
+    setSpecialtyFilter('');
+    setMinActiveAssignments('');
     setBranchId('all');
     setSkillGroup('all');
     setStatus('all');
@@ -968,6 +1164,26 @@ function TechnicianListPage() {
     return () => clearTimeout(searchTimer.current);
   }, [search, branchId, skillGroup, status, reloadTick]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, branchId, skillGroup, status, specialtyFilter, minActiveAssignments]);
+
+  const filteredTechnicians = technicians.filter((item) => {
+    if (!textIncludes(item.specialty, specialtyFilter)) return false;
+    if (minActiveAssignments !== '' && Number(item.activeAssignments || 0) < Number(minActiveAssignments || 0)) {
+      return false;
+    }
+    return true;
+  });
+
+  const technicianPagination = paginateItems(filteredTechnicians, page, pageSize);
+
+  useEffect(() => {
+    if (technicianPagination.currentPage !== page) {
+      setPage(technicianPagination.currentPage);
+    }
+  }, [technicianPagination.currentPage, page]);
+
   const openDetail = async (technician) => {
     setActiveTechnician(technician);
     setDetailError('');
@@ -1017,14 +1233,14 @@ function TechnicianListPage() {
           </div>
           <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
             <div style={{ fontSize: 12, opacity: 0.72 }}>Tổng kỹ thuật viên</div>
-            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{technicians.length}</div>
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{filteredTechnicians.length}</div>
             <div style={{ fontSize: 12, opacity: 0.72, marginTop: 8 }}>Đang làm</div>
-            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{technicians.filter((item) => item.status === 'active').length}</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{filteredTechnicians.filter((item) => item.status === 'active').length}</div>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
           <span className="search-icon">🔍</span>
           <input
@@ -1052,6 +1268,24 @@ function TechnicianListPage() {
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
+
+        <input
+          className="form-input"
+          value={specialtyFilter}
+          onChange={(event) => setSpecialtyFilter(event.target.value)}
+          placeholder="Lọc theo kỹ năng"
+          style={{ minWidth: 200, height: 42 }}
+        />
+
+        <input
+          className="form-input"
+          type="number"
+          min="0"
+          value={minActiveAssignments}
+          onChange={(event) => setMinActiveAssignments(event.target.value)}
+          placeholder="Đang xử lý từ..."
+          style={{ minWidth: 170, height: 42 }}
+        />
 
         <button type="button" className="btn btn-secondary" onClick={clearFilters}>
           Xóa bộ lọc
@@ -1098,7 +1332,7 @@ function TechnicianListPage() {
               </tr>
             )}
 
-            {!loading && technicians.length === 0 && !error && (
+            {!loading && technicianPagination.total === 0 && !error && (
               <tr>
                 <td colSpan={8}>
                   <div className="empty-state">
@@ -1110,7 +1344,7 @@ function TechnicianListPage() {
               </tr>
             )}
 
-            {!loading && technicians.map((technician) => {
+            {!loading && technicianPagination.items.map((technician) => {
               const badge = employeeStatusBadge(technician.status);
               return (
                 <tr key={technician.id}>
@@ -1139,9 +1373,18 @@ function TechnicianListPage() {
           </tbody>
         </table>
 
-        <div className="pagination">
-          <span className="pagination-info">{technicians.length} kỹ thuật viên</span>
-        </div>
+        <DataPagination
+          total={technicianPagination.total}
+          page={technicianPagination.currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          label="kỹ thuật viên"
+          loading={loading}
+        />
       </div>
 
       {(activeTechnician || detailLoading || detailError) && (
@@ -1252,58 +1495,113 @@ function BranchManagerListPage() {
   const [branchManagers, setBranchManagers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [search, setSearch] = useState('');
+  const [emailFilter, setEmailFilter] = useState('');
+  const [branchActiveFilter, setBranchActiveFilter] = useState('all');
   const [branchId, setBranchId] = useState('all');
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadBranches() {
-      try {
-        const response = await generalDirectorApi.getBranches();
-        if (mounted) setBranches(response || []);
-      } catch {
-        if (mounted) setBranches([]);
-      }
+  const loadBranches = async (mountedRef) => {
+    try {
+      const response = await generalDirectorApi.getBranches();
+      if (!mountedRef || mountedRef.current) setBranches(response || []);
+    } catch {
+      if (!mountedRef || mountedRef.current) setBranches([]);
     }
+  };
 
-    loadBranches();
+  const loadBranchManagers = async (overrides = {}) => {
+    const seq = ++requestSeq.current;
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await generalDirectorApi.getBranchManagers({
+        search: overrides.search ?? search.trim(),
+        branchId: overrides.branchId ?? branchId,
+        status: overrides.status ?? status,
+      });
+      if (seq !== requestSeq.current) return;
+      setBranchManagers(response || []);
+    } catch (err) {
+      if (seq !== requestSeq.current) return;
+      setBranchManagers([]);
+      setError(err.message || 'Không tải được danh sách giám đốc chi nhánh');
+    } finally {
+      if (seq === requestSeq.current) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const mountedRef = { current: true };
+    loadBranches(mountedRef);
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
   useEffect(() => {
     clearTimeout(searchTimer.current);
 
-    searchTimer.current = setTimeout(async () => {
-      const seq = ++requestSeq.current;
-      setLoading(true);
-      setError('');
-
-      try {
-        const response = await generalDirectorApi.getBranchManagers({
-          search: search.trim(),
-          branchId,
-          status,
-        });
-        if (seq !== requestSeq.current) return;
-        setBranchManagers(response || []);
-      } catch (err) {
-        if (seq !== requestSeq.current) return;
-        setBranchManagers([]);
-        setError(err.message || 'Không tải được danh sách giám đốc chi nhánh');
-      } finally {
-        if (seq === requestSeq.current) setLoading(false);
-      }
+    searchTimer.current = setTimeout(() => {
+      loadBranchManagers();
     }, 300);
 
     return () => clearTimeout(searchTimer.current);
   }, [search, branchId, status]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, branchId, status, emailFilter, branchActiveFilter]);
+
+  const filteredManagers = branchManagers.filter((row) => {
+    if (!textIncludes(row.email, emailFilter)) return false;
+    if (branchActiveFilter === 'active' && row.branch?.isActive === false) return false;
+    if (branchActiveFilter === 'inactive' && row.branch?.isActive !== false) return false;
+    return true;
+  });
+
+  const managerPagination = paginateItems(filteredManagers, page, pageSize);
+
+  useEffect(() => {
+    if (managerPagination.currentPage !== page) {
+      setPage(managerPagination.currentPage);
+    }
+  }, [managerPagination.currentPage, page]);
+
+  const handleBranchActivation = async (row, nextActive) => {
+    if (!row?.branch?.id) return;
+
+    const actionLabel = nextActive ? 'kích hoạt lại' : 'ngưng hoạt động';
+    const confirmed = window.confirm(
+      nextActive
+        ? `Kích hoạt lại chi nhánh ${row.branch.name}? Nhân sự thuộc chi nhánh này sẽ có thể đăng nhập lại.`
+        : `Ngưng hoạt động chi nhánh ${row.branch.name}? Tất cả tài khoản thuộc chi nhánh này sẽ bị dừng hoạt động và các phiên đăng nhập hiện tại sẽ hết hiệu lực.`
+    );
+    if (!confirmed) return;
+
+    setActionLoadingId(row.branch.id);
+    setError('');
+
+    try {
+      if (nextActive) {
+        await generalDirectorApi.reactivateBranch(row.branch.id);
+      } else {
+        await generalDirectorApi.deactivateBranch(row.branch.id);
+      }
+      await Promise.all([loadBranches(), loadBranchManagers()]);
+    } catch (err) {
+      setError(err.message || `Không thể ${actionLabel} chi nhánh`);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   return (
     <div>
@@ -1331,15 +1629,15 @@ function BranchManagerListPage() {
           </div>
           <div style={{ minWidth: 240, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 16 }}>
             <div style={{ fontSize: 12, opacity: 0.72 }}>Tổng giám đốc chi nhánh</div>
-            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{branchManagers.length}</div>
+            <div style={{ fontWeight: 900, fontSize: 28, marginTop: 4 }}>{filteredManagers.length}</div>
             <div style={{ fontSize: 12, opacity: 0.72, marginTop: 8 }}>Đang hoạt động</div>
-            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{branchManagers.filter((item) => item.status === 'active').length}</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{filteredManagers.filter((item) => item.status === 'active').length}</div>
           </div>
         </div>
         <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>👤 {user?.name || 'General Director'}</div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
           <span className="search-icon">🔍</span>
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo mã, tên, email, điện thoại..." />
@@ -1357,6 +1655,39 @@ function BranchManagerListPage() {
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
+
+        <input
+          className="form-input"
+          value={emailFilter}
+          onChange={(event) => setEmailFilter(event.target.value)}
+          placeholder="Lọc email"
+          style={{ minWidth: 200, height: 42 }}
+        />
+
+        <select
+          className="form-select"
+          value={branchActiveFilter}
+          onChange={(event) => setBranchActiveFilter(event.target.value)}
+          style={{ minWidth: 180, height: 42 }}
+        >
+          <option value="all">Tất cả trạng thái CN</option>
+          <option value="active">CN hoạt động</option>
+          <option value="inactive">CN bị khóa</option>
+        </select>
+
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => {
+            setSearch('');
+            setEmailFilter('');
+            setBranchActiveFilter('all');
+            setBranchId('all');
+            setStatus('all');
+          }}
+        >
+          Xóa bộ lọc
+        </button>
       </div>
 
       {error && (
@@ -1391,7 +1722,7 @@ function BranchManagerListPage() {
               </tr>
             )}
 
-            {!loading && branchManagers.length === 0 && !error && (
+            {!loading && managerPagination.total === 0 && !error && (
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state">
@@ -1403,13 +1734,21 @@ function BranchManagerListPage() {
               </tr>
             )}
 
-            {!loading && branchManagers.map((row) => {
+            {!loading && managerPagination.items.map((row) => {
               const badge = employeeStatusBadge(row.status);
+              const isBranchActive = row.branch?.isActive !== false;
               return (
                 <tr key={row.id}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--primary-dark)' }}>{row.managerId || row.id}</td>
                   <td style={{ fontWeight: 700 }}>{row.fullName || '—'}</td>
-                  <td><BranchBadge branch={row.branch} /></td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <BranchBadge branch={row.branch} />
+                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: isBranchActive ? '#ECFDF5' : '#FEF2F2', color: isBranchActive ? '#0F766E' : '#B91C1C', fontSize: 11, fontWeight: 800 }}>
+                        {isBranchActive ? 'CN hoạt động' : 'CN bị khóa'}
+                      </span>
+                    </div>
+                  </td>
                   <td>{row.phone || '—'}</td>
                   <td>{row.email || '—'}</td>
                   <td>
@@ -1424,6 +1763,18 @@ function BranchManagerListPage() {
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(`/general-director/branch-managers/${row.id}/edit`)}>
                       Sửa
                     </button>
+                    <button
+                      type="button"
+                      className={isBranchActive ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm'}
+                      onClick={() => handleBranchActivation(row, !isBranchActive)}
+                      disabled={!row.branch?.id || actionLoadingId === row.branch?.id}
+                    >
+                      {actionLoadingId === row.branch?.id
+                        ? 'Đang xử lý...'
+                        : isBranchActive
+                          ? 'Khóa chi nhánh'
+                          : 'Mở chi nhánh'}
+                    </button>
                   </td>
                 </tr>
               );
@@ -1431,9 +1782,18 @@ function BranchManagerListPage() {
           </tbody>
         </table>
 
-        <div className="pagination">
-          <span className="pagination-info">{branchManagers.length} giám đốc chi nhánh</span>
-        </div>
+        <DataPagination
+          total={managerPagination.total}
+          page={managerPagination.currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          label="giám đốc chi nhánh"
+          loading={loading}
+        />
       </div>
     </div>
   );
@@ -1804,6 +2164,10 @@ function SettlementReportsPage() {
   const [reports, setReports] = useState([]);
   const [branches, setBranches] = useState([]);
   const [search, setSearch] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
+  const [plateFilter, setPlateFilter] = useState('');
+  const [serviceTypeFilter, setServiceTypeFilter] = useState('');
+  const [advisorFilter, setAdvisorFilter] = useState('');
   const [status, setStatus] = useState('all');
   const [branchId, setBranchId] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -1811,6 +2175,8 @@ function SettlementReportsPage() {
   const [error, setError] = useState('');
   const [detailError, setDetailError] = useState('');
   const [activeReport, setActiveReport] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
@@ -1861,7 +2227,27 @@ function SettlementReportsPage() {
     return () => clearTimeout(searchTimer.current);
   }, [search, status, branchId]);
 
-  const stats = reports.reduce(
+  useEffect(() => {
+    setPage(1);
+  }, [search, status, branchId, customerFilter, plateFilter, serviceTypeFilter, advisorFilter]);
+
+  const filteredReports = reports.filter((item) => {
+    if (!textIncludes(item.customer?.fullName, customerFilter)) return false;
+    if (!textIncludes(item.vehicle?.licensePlate, plateFilter)) return false;
+    if (!textIncludes(item.serviceType, serviceTypeFilter)) return false;
+    if (!textIncludes(item.advisor?.name, advisorFilter)) return false;
+    return true;
+  });
+
+  const reportPagination = paginateItems(filteredReports, page, pageSize);
+
+  useEffect(() => {
+    if (reportPagination.currentPage !== page) {
+      setPage(reportPagination.currentPage);
+    }
+  }, [reportPagination.currentPage, page]);
+
+  const stats = filteredReports.reduce(
     (acc, item) => {
       acc.total += 1;
       acc[item.status] = (acc[item.status] || 0) + 1;
@@ -1939,7 +2325,7 @@ function SettlementReportsPage() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ ...FILTER_ROW_STYLE, marginBottom: 14 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
           <span className="search-icon">🔍</span>
           <input
@@ -1961,6 +2347,54 @@ function SettlementReportsPage() {
             <option key={branch.id} value={branch.id}>{branch.name}</option>
           ))}
         </select>
+
+        <input
+          className="form-input"
+          value={customerFilter}
+          onChange={(event) => setCustomerFilter(event.target.value)}
+          placeholder="Lọc khách hàng"
+          style={{ minWidth: 200, height: 42 }}
+        />
+
+        <input
+          className="form-input"
+          value={plateFilter}
+          onChange={(event) => setPlateFilter(event.target.value)}
+          placeholder="Lọc biển số"
+          style={{ minWidth: 170, height: 42 }}
+        />
+
+        <input
+          className="form-input"
+          value={serviceTypeFilter}
+          onChange={(event) => setServiceTypeFilter(event.target.value)}
+          placeholder="Lọc loại dịch vụ"
+          style={{ minWidth: 190, height: 42 }}
+        />
+
+        <input
+          className="form-input"
+          value={advisorFilter}
+          onChange={(event) => setAdvisorFilter(event.target.value)}
+          placeholder="Lọc tư vấn"
+          style={{ minWidth: 170, height: 42 }}
+        />
+
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => {
+            setSearch('');
+            setCustomerFilter('');
+            setPlateFilter('');
+            setServiceTypeFilter('');
+            setAdvisorFilter('');
+            setStatus('all');
+            setBranchId('all');
+          }}
+        >
+          Xóa bộ lọc
+        </button>
       </div>
 
       {error && (
@@ -1999,7 +2433,7 @@ function SettlementReportsPage() {
               </tr>
             )}
 
-            {!loading && reports.length === 0 && !error && (
+            {!loading && reportPagination.total === 0 && !error && (
               <tr>
                 <td colSpan={11}>
                   <div className="empty-state">
@@ -2011,7 +2445,7 @@ function SettlementReportsPage() {
               </tr>
             )}
 
-            {!loading && reports.map((report) => {
+            {!loading && reportPagination.items.map((report) => {
               const badge = statusBadge(report.status);
               return (
                 <tr key={report.id}>
@@ -2051,9 +2485,18 @@ function SettlementReportsPage() {
           </tbody>
         </table>
 
-        <div className="pagination">
-          <span className="pagination-info">{reports.length} phiếu</span>
-        </div>
+        <DataPagination
+          total={reportPagination.total}
+          page={reportPagination.currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          label="phiếu"
+          loading={loading}
+        />
       </div>
 
       {detailError && (
@@ -2077,14 +2520,70 @@ export default function GeneralDirectorPage() {
   return (
     <Routes>
       <Route index element={<Navigate to="reports/settlements" replace />} />
-      <Route path="reports/settlements" element={<SettlementReportsPage />} />
-      <Route path="reports/revenue" element={<RevenueOverviewPage />} />
-      <Route path="employees" element={<EmployeeListPage />} />
-      <Route path="technicians" element={<TechnicianListPage />} />
-      <Route path="branch-managers" element={<BranchManagerListPage />} />
-      <Route path="branch-managers/create" element={<BranchManagerCreatePage />} />
-      <Route path="branch-managers/:id" element={<BranchManagerDetailPage />} />
-      <Route path="branch-managers/:id/edit" element={<BranchManagerEditPage />} />
+      <Route
+        path="reports/settlements"
+        element={
+          <ProtectedRoute permission="screen:general_director:settlements:access">
+            <SettlementReportsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="reports/revenue"
+        element={
+          <ProtectedRoute permission="screen:general_director:reports:access">
+            <RevenueOverviewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="employees"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <EmployeeListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="technicians"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <TechnicianListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="branch-managers"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <BranchManagerListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="branch-managers/create"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <BranchManagerCreatePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="branch-managers/:id"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <BranchManagerDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="branch-managers/:id/edit"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <BranchManagerEditPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="reports/settlements" replace />} />
     </Routes>
   );

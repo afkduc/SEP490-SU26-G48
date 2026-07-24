@@ -1,8 +1,6 @@
-import { useEffect, useState, Fragment } from 'react';
-import { adminRolesApi, refreshPermissionsApi } from '../../services/adminApi';
+import { useEffect, useState } from 'react';
+import { adminRolesApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
-import { useAuth } from '../../contexts/AppContext';
-import { ROLE_VALUES } from '../../constants/roles';
 import './AdminRolesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -26,26 +24,12 @@ const IconEdit = () => (
   </svg>
 );
 
-const IconTrash = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"/>
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-  </svg>
-);
-
-const IconMatrix = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }}>
-    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-    <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-  </svg>
-);
-
 const IconUsers = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-      <circle cx="9" cy="7" r="4"/>
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
   </svg>
 );
 
@@ -62,15 +46,6 @@ function getInitials(name = '') {
   const parts = name.trim().split(' ');
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function groupPermissionsByModule(permissions) {
-  const groups = {};
-  for (const p of permissions) {
-    if (!groups[p.module]) groups[p.module] = [];
-    groups[p.module].push(p);
-  }
-  return groups;
 }
 
 // ─── Role Form Modal ──────────────────────────────────────────────
@@ -237,112 +212,16 @@ function RoleCard({ role, onEdit, onToggleStatus, onUsers }) {
   );
 }
 
-// ─── Permission Matrix ───────────────────────────────────────────
-
-function PermissionMatrix({ roles, visibleRoles, permissions, rolePermissions, onChange, onSave, saving, dirty }) {
-  const grouped = groupPermissionsByModule(permissions);
-
-  function isChecked(roleId, permId) {
-    const perms = rolePermissions[roleId] || [];
-    return perms.includes(permId);
-  }
-
-  function toggle(roleId, permId) {
-    const perms = rolePermissions[roleId] || [];
-    const next = perms.includes(permId)
-      ? perms.filter((p) => p !== permId)
-      : [...perms, permId];
-    onChange(roleId, next);
-  }
-
-  return (
-    <div className="matrix-container">
-      <div className="matrix-header">
-        <h2>Ma trận quyền — Vai trò &amp; Quyền</h2>
-        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-          {permissions.length} quyền · {visibleRoles.length} vai trò
-        </span>
-      </div>
-
-      <div className="matrix-scroll">
-        <table className="matrix-table">
-          <thead>
-            <tr>
-              <th className="matrix-th--module">Quyền / Vai trò</th>
-              {visibleRoles.map((role) => (
-                <th key={role.id} title={role.roleName} className="matrix-th--role">
-                  <div className="matrix-role-label">{role.roleLabel}</div>
-                  <div className="matrix-role-code">{role.roleName}</div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-              {Object.entries(grouped).map(([module, modulePerms]) => (
-                <Fragment key={`mod-${module}`}>
-                  <tr className="matrix-module-row">
-                    <td colSpan={visibleRoles.length + 1} className="matrix-module-cell">
-                      {module}
-                    </td>
-                  </tr>
-                  {modulePerms.map((p) => (
-                    <tr key={p.id} className="matrix-perm-row">
-                      <td className="matrix-perm-label" title={`${p.resource}:${p.action}`}>
-                        <span className="matrix-perm-action">{p.action}</span>
-                        <span className="matrix-perm-key">{p.permissionKey}</span>
-                      </td>
-                      {visibleRoles.map((role) => (
-                        <td key={role.id} className="matrix-check-cell">
-                          <input
-                            type="checkbox"
-                            className="matrix-checkbox"
-                            checked={isChecked(role.id, p.id)}
-                            onChange={() => toggle(role.id, p.id)}
-                            title={`${role.roleLabel} — ${p.permissionKey}`}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {dirty && (
-        <div className="matrix-save-bar">
-          <span className="matrix-save-bar__info">
-            Đã thay đổi. Nhấn "Lưu" để cập nhật tất cả vai trò cùng lúc.
-          </span>
-          <div className="matrix-save-bar__actions">
-            <button className="btn btn--secondary btn--sm" onClick={onSave} disabled={saving}>
-              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Main ────────────────────────────────────────────────────────
 
 export default function AdminRolesPage() {
   const toast = useToast();
-  const { reloadPermissions } = useAuth();
-  const [tab, setTab] = useState('list'); // 'list' | 'matrix'
+  // Trang nay chi quan ly danh sach vai tro + CRUD.
+  // Ma tran quyen (Role x Screen) da chuyen sang trang rieng: /admin/permission-matrix.
 
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Matrix data
-  const [permissions, setPermissions] = useState([]);
-  const [rolePermissions, setRolePermissions] = useState({}); // { roleId: [permId, ...] }
-  const [matrixLoading, setMatrixLoading] = useState(false);
-  const [matrixDirty, setMatrixDirty] = useState(false);
-  const [matrixSaving, setMatrixSaving] = useState(false);
 
   // Modals
   const [showForm, setShowForm] = useState(false);
@@ -362,78 +241,7 @@ export default function AdminRolesPage() {
     }
   }
 
-  async function loadMatrix() {
-    setMatrixLoading(true);
-    try {
-      const [permsRes, rolesRes] = await Promise.all([
-        adminRolesApi.listPermissions(),
-        adminRolesApi.list(),
-      ]);
-      setPermissions(permsRes?.items || []);
-      const rolesList = rolesRes?.items || [];
-
-      // Load role permissions sequentially to avoid overwhelming DB
-      const permsByRole = {};
-      await Promise.all(
-        rolesList.map(async (role) => {
-          try {
-            const res = await adminRolesApi.getRolePermissions(role.id);
-            permsByRole[role.id] = (res?.items || []).map((p) => p.id);
-          } catch {
-            permsByRole[role.id] = [];
-          }
-        })
-      );
-      setRolePermissions(permsByRole);
-    } catch (err) {
-      console.error('Matrix load error:', err);
-    } finally {
-      setMatrixLoading(false);
-    }
-  }
-
   useEffect(() => { loadRoles(); }, []);
-  useEffect(() => { if (tab === 'matrix' && permissions.length === 0) loadMatrix(); }, [tab]);
-
-  const visibleRoles = roles.filter((r) => ROLE_VALUES.includes(r.roleName));
-
-  function handleMatrixChange(roleId, permIds) {
-    setRolePermissions((prev) => ({ ...prev, [roleId]: permIds }));
-    setMatrixDirty(true);
-  }
-
-  async function handleMatrixSave() {
-    setMatrixSaving(true);
-    try {
-      await Promise.all(
-        visibleRoles.map(async (role) => {
-          const permIds = rolePermissions[role.id] || [];
-          await adminRolesApi.setRolePermissions(role.id, permIds);
-        })
-      );
-      setMatrixDirty(false);
-
-      // Refresh token với permissions mới từ DB
-      try {
-        const result = await refreshPermissionsApi();
-        if (result?.token || result?.permissions) {
-          const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
-          if (result.token) storage.setItem('token', result.token);
-          if (result.permissions) {
-            storage.setItem('permissions', JSON.stringify(result.permissions));
-          }
-        }
-      } catch {
-        // Neu refresh that bai, van thong bao thanh cong (BE da luu DB)
-      }
-
-      toast.success('Đã lưu ma trận quyền. Thay đổi sẽ có hiệu lực ngay.');
-    } catch (err) {
-      toast.error('Lỗi khi lưu: ' + (err.message || 'Không rõ'));
-    } finally {
-      setMatrixSaving(false);
-    }
-  }
 
   async function handleToggleStatus(role) {
     try {
@@ -462,7 +270,7 @@ export default function AdminRolesPage() {
           <div className="admin-roles__title-icon"><IconShield /></div>
           <div className="admin-roles__title-group">
             <h1>Vai trò &amp; Quyền hạn</h1>
-            <p className="admin-roles__subtitle">Quản lý vai trò, phân quyền và ma trận quyền hạn</p>
+            <p className="admin-roles__subtitle">Quản lý vai trò và người dùng được gán vai trò</p>
           </div>
         </div>
         <div className="admin-roles__actions">
@@ -478,91 +286,44 @@ export default function AdminRolesPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="admin-roles__tabs">
-        <button
-          className={`admin-roles__tab ${tab === 'list' ? 'admin-roles__tab--active' : ''}`}
-          onClick={() => setTab('list')}
-        >
-          Danh sách vai trò
-        </button>
-        <button
-          className={`admin-roles__tab ${tab === 'matrix' ? 'admin-roles__tab--active' : ''}`}
-          onClick={() => setTab('matrix')}
-        >
-          Ma trận quyền
-        </button>
-      </div>
-
-      {/* Tab: List */}
-      {tab === 'list' && (
-        <>
-          {loading && (
-            <div className="admin-roles__loading">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
-                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+      {/* List */}
+      {loading && (
+        <div className="admin-roles__loading">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
           </svg>
-              <span>Đang tải...</span>
+          <span>Đang tải...</span>
         </div>
       )}
 
-          {error && !loading && (
-            <div className="admin-roles__error">
-              <IconAlert />
-              <span>{error}</span>
-              <button className="btn btn--secondary btn--sm" onClick={loadRoles}>Thử lại</button>
+      {error && !loading && (
+        <div className="admin-roles__error">
+          <IconAlert />
+          <span>{error}</span>
+          <button className="btn btn--secondary btn--sm" onClick={loadRoles}>Thử lại</button>
         </div>
       )}
 
-          {!loading && !error && roles.length === 0 && (
-            <div className="admin-roles__empty">
-              <IconShield />
-              <p>Chưa có vai trò nào</p>
-              <button className="btn btn--primary" onClick={() => setShowForm(true)}>Thêm vai trò đầu tiên</button>
-            </div>
-          )}
-
-          {!loading && !error && roles.length > 0 && (
-            <div className="admin-roles__cards">
-              {roles.map((role) => (
-                <RoleCard
-                  key={role.id}
-                  role={role}
-                  onEdit={(r) => { setEditRole(r); setShowForm(true); }}
-                  onToggleStatus={handleToggleStatus}
-                  onUsers={handleUsersModal}
-                />
-              ))}
-            </div>
-          )}
-        </>
+      {!loading && !error && roles.length === 0 && (
+        <div className="admin-roles__empty">
+          <IconShield />
+          <p>Chưa có vai trò nào</p>
+          <button className="btn btn--primary" onClick={() => setShowForm(true)}>Thêm vai trò đầu tiên</button>
+        </div>
       )}
 
-      {/* Tab: Matrix */}
-      {tab === 'matrix' && (
-        <>
-          {matrixLoading ? (
-            <div className="admin-roles__loading">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
-                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-              </svg>
-              <span>Đang tải quyền hạn...</span>
-            </div>
-          ) : (
-            permissions.length > 0 && (
-              <PermissionMatrix
-                roles={roles}
-                visibleRoles={visibleRoles}
-                permissions={permissions}
-                rolePermissions={rolePermissions}
-                onChange={handleMatrixChange}
-                onSave={handleMatrixSave}
-                saving={matrixSaving}
-                dirty={matrixDirty}
-              />
-            )
-          )}
-        </>
+      {!loading && !error && roles.length > 0 && (
+        <div className="admin-roles__cards">
+          {roles.map((role) => (
+            <RoleCard
+              key={role.id}
+              role={role}
+              onEdit={(r) => { setEditRole(r); setShowForm(true); }}
+              onToggleStatus={handleToggleStatus}
+              onUsers={handleUsersModal}
+            />
+          ))}
+        </div>
       )}
 
       {/* Modals */}

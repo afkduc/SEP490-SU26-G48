@@ -44,6 +44,7 @@ class RepairSettlementResponseDto {
       vehicle: entity.vehicle ? { ...entity.vehicle, purchaseDate: toISODate(entity.vehicle.purchaseDate) } : null,
       customerRequest: entity.customerRequest,
       items: entity.items,
+      tasks: entity.tasks,
       subtotal: entity.subtotal,
       discountAmount: entity.discountAmount,
       afterDiscount: entity.afterDiscount,

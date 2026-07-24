@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminUsersApi } from '../../../services/adminApi';
+import PermissionGate from '../../../components/PermissionGate';
 import AssignRoleModal from './AssignRoleModal';
 import ResetPasswordModal from './ResetPasswordModal';
 import '../components/AdminDrawer.css';
@@ -220,27 +221,31 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
         </div>
 
         <div className="drawer__footer">
-          <button
-            className="drawer__btn-secondary"
-            onClick={() => setShowReset(true)}
-            type="button"
-            disabled={!user?.id}
-            title="Tạo mật khẩu mới ngẫu nhiên cho người dùng này"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-            Đặt lại mật khẩu
-          </button>
-          <button className="drawer__btn-assign" onClick={() => setShowAssign(true)} type="button">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              <line x1="12" y1="8" x2="12" y2="16"/>
-              <line x1="8" y1="12" x2="16" y2="12"/>
-            </svg>
-            Phân quyền
-          </button>
+          <PermissionGate permission="admin:users:update">
+            <button
+              className="drawer__btn-secondary"
+              onClick={() => setShowReset(true)}
+              type="button"
+              disabled={!user?.id}
+              title="Tạo mật khẩu mới ngẫu nhiên cho người dùng này"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              Đặt lại mật khẩu
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="admin:user_roles:assign">
+            <button className="drawer__btn-assign" onClick={() => setShowAssign(true)} type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <line x1="12" y1="8" x2="12" y2="16"/>
+                <line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              Phân quyền
+            </button>
+          </PermissionGate>
         </div>
       </div>
 

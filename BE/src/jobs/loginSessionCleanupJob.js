@@ -1,37 +1,59 @@
 /**
- * Job tu dong cleanup cac phien dang nhap stale (>= 24 gio chua logout)
+ * Job tu dong cleanup cac phien dang nhap stale (khong heartbeat >= 15 phut)
  * va backfill du lieu browser/os cho cac row cu.
  *
- * Chay ngay khi server khoi dong va moi 1 gio.
+ * Chay ngay khi server khoi dong va moi 5 phut.
  *
  * Vi sao can job nay:
  *   - User dong tab / mat ket noi -> khong goi duoc /api/auth/logout
  *   -> phien mac dinh o trang thai 'active' mai mai
- *   - Job se tu dong dong cac phien > 24h voi logout_reason = 'TIMEOUT'
- *   - Dong thoi backfill browser/os cho row cu bi NULL (inserted truoc khi fix)
+ *   - Job se tu dong dong cac phien co last_activity_at < 15 phut truoc
+ *     (last_activity_at duoc cap nhat moi 60s qua heartbeat).
+ *   - Dong thoi backfill browser/os cho row cu bi NULL (inserted truoc khi fix).
+ *
+ * THRESHOLD GOC: 24h. VI LY DO:
+ *   - Admin logout nhung session van 'active' → visible 24h qua trang "Lich su"
+ *   - Cleanup nhat 1h/lan → moi session stale co the ton tai 24-25h.
+ *
+ * THRESHOLD MOI: 15 phut tu last heartbeat. Job chay moi 5 phut.
+ *   → User dong tab khong logout → toi da 20 phut sau session bi close.
+ *   → Trang "Lich su" luon phan anh trang thai that (< 20 phut lag).
  */
 
 const { query } = require('../infrastructure/database/sqlServer');
 
-const STALE_HOURS = parseInt(process.env.LOGIN_SESSION_STALE_HOURS || '24', 10);
+// Nguong stale: 15 phut khong co heartbeat → session bi close.
+// Job chay moi 5 phut → toi da session stale = 20 phut.
+const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '15', 10);
+const STALE_HOURS = STALE_MINUTES / 60; // giu tuong thich voi code cu
+// Gioi han de tranh CPU lock neu backlog rat lon (millions rows).
+// Moi batch update TOP(@p1) rows, sau do delay 1s de DB va event loop thay.
+// MAX_ITERATIONS an toan de 1 lan job khong chay qua lau (max ~30 phut).
 const BACKFILL_BATCH = 1000;
+const BACKFILL_MAX_ITERATIONS = 100; // 100 * 1000 = 100k rows moi lan runAll
+const BACKFILL_DELAY_MS = 1000; // delay giua moi batch
 
 async function cleanupStaleSessions() {
   try {
+    // QUAN TRONG: dung last_activity_at (cap nhat boi heartbeat moi 60s), KHONG
+    // dung login_time. Vi login_time chi cap nhat khi login, con last_activity_at
+    // la "lan hoat dong cuoi cung" (heartbeat). Neu user login 1h truoc, van
+    // dang dung (heartbeat vua chay) → KHONG close. Neu user dong tab 16 phut
+    // truoc → close ngay lap tuc.
     const result = await query(
       `UPDATE login_sessions
-       SET    logout_time              = DATEADD(HOUR, @p1, login_time),
+       SET    logout_time              = SYSUTCDATETIME(),
               logout_reason            = 'TIMEOUT',
-              session_duration_seconds = @p1 * 3600,
+              session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
               status                   = 'ended'
-       WHERE  status = 'active'
-         AND  action_type = 'LOGIN'
-         AND  login_time  < DATEADD(HOUR, -@p1, SYSUTCDATETIME())`,
-      { p1: STALE_HOURS }
+       WHERE  status               = 'active'
+         AND  action_type          = 'LOGIN'
+         AND  COALESCE(last_activity_at, login_time) < DATEADD(MINUTE, -@p1, SYSUTCDATETIME())`,
+      { p1: STALE_MINUTES }
     );
     const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
     if (affected > 0) {
-      console.log(`[loginSessionJob] Cleaned ${affected} stale sessions (>= ${STALE_HOURS}h)`);
+      console.log(`[loginSessionJob] Cleaned ${affected} stale sessions (>= ${STALE_MINUTES} min no heartbeat)`);
     }
   } catch (err) {
     console.error('[loginSessionJob] cleanupStaleSessions failed:', err && err.message ? err.message : err);
@@ -39,23 +61,38 @@ async function cleanupStaleSessions() {
 }
 
 /**
- * Dong tat ca device co is_current=1 nhung user khong co session active nao.
+ * Dong tat ca device co is_current=1 nhung khong co session active nao
+ * (hoac session cua no da stale > 15 phut khong heartbeat).
+ *
  * Vi du: user bi dong tab, device van la is_current=1 nhung session da
  * bi cleanup job dong roi.
  */
 async function cleanupOrphanedDevices() {
   try {
+    // Dong bo theo 2 tieu chi:
+    //  (a) device is_current=1 nhung khong con session active nao
+    //  (b) device is_current=1 nhung session active da stale > 15 phut
     const result = await query(
       `UPDATE ud
        SET    ud.is_current = 0
        FROM   user_devices ud
        WHERE  ud.is_current = 1
-         AND  NOT EXISTS (
-           SELECT 1 FROM login_sessions ls
-           WHERE  ls.user_id = ud.user_id
-             AND  ls.status = 'active'
-             AND  ls.action_type = 'LOGIN'
-         )`
+         AND (
+           NOT EXISTS (
+             SELECT 1 FROM login_sessions ls
+             WHERE  ls.user_id = ud.user_id
+               AND  ls.status = 'active'
+               AND  ls.action_type = 'LOGIN'
+           )
+           OR EXISTS (
+             SELECT 1 FROM login_sessions ls
+             WHERE  ls.user_id = ud.user_id
+               AND  ls.status = 'active'
+               AND  ls.action_type = 'LOGIN'
+               AND  COALESCE(ls.last_activity_at, ls.login_time) < DATEADD(MINUTE, -@p1, SYSUTCDATETIME())
+           )
+         )`,
+      { p1: STALE_MINUTES }
     );
     const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
     if (affected > 0) {
@@ -67,37 +104,54 @@ async function cleanupOrphanedDevices() {
 }
 
 async function backfillBrowserOs(limit = BACKFILL_BATCH) {
-  try {
-    const result = await query(
-      `UPDATE TOP (@p1) login_sessions
-       SET    browser = CASE
-                       WHEN user_agent LIKE '%Edg/%'   THEN 'Edge'
-                       WHEN user_agent LIKE '%Firefox/%' THEN 'Firefox'
-                       WHEN user_agent LIKE '%OPR/%'    THEN 'Opera'
-                       WHEN user_agent LIKE '%Chrome/%' THEN 'Chrome'
-                       WHEN user_agent LIKE '%Safari/%' THEN 'Safari'
-                       ELSE 'Unknown'
-                     END,
-              os      = CASE
-                       WHEN user_agent LIKE '%Windows%'  THEN 'Windows'
-                       WHEN user_agent LIKE '%Android%'  THEN 'Android'
-                       WHEN user_agent LIKE '%iPhone%' OR user_agent LIKE '%iPad%' THEN 'iOS'
-                       WHEN user_agent LIKE '%Mac OS%' OR user_agent LIKE '%Macintosh%' THEN 'macOS'
-                       WHEN user_agent LIKE '%Linux%'    THEN 'Linux'
-                       ELSE 'Unknown'
-                     END
-       WHERE  browser IS NULL OR os IS NULL`,
-      { p1: limit }
-    );
-    const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
-    if (affected > 0) {
-      console.log(`[loginSessionJob] Backfilled ${affected} rows browser/os`);
-      // Tiep tuc cho den khi het
-      setImmediate(() => backfillBrowserOs(limit));
+  // Dung iterative loop (khong recursive setImmediate) de:
+  //  - Gioi han so iteration (MAX_ITERATIONS) tranh CPU lock khi backlog lon.
+  //  - Co the await Promise-based delay giua moi batch -> event loop tho hang.
+  //  - Co the break som khi khong con row nao can backfill (affected = 0).
+  const start = Date.now();
+  let total = 0;
+  for (let i = 0; i < BACKFILL_MAX_ITERATIONS; i++) {
+    let affected = 0;
+    try {
+      const result = await query(
+        `UPDATE TOP (@p1) login_sessions
+         SET    browser = CASE
+                         WHEN user_agent LIKE '%Edg/%'   THEN 'Edge'
+                         WHEN user_agent LIKE '%Firefox/%' THEN 'Firefox'
+                         WHEN user_agent LIKE '%OPR/%'    THEN 'Opera'
+                         WHEN user_agent LIKE '%Chrome/%' THEN 'Chrome'
+                         WHEN user_agent LIKE '%Safari/%' THEN 'Safari'
+                         ELSE 'Unknown'
+                       END,
+                os      = CASE
+                         WHEN user_agent LIKE '%Windows%'  THEN 'Windows'
+                         WHEN user_agent LIKE '%Android%'  THEN 'Android'
+                         WHEN user_agent LIKE '%iPhone%' OR user_agent LIKE '%iPad%' THEN 'iOS'
+                         WHEN user_agent LIKE '%Mac OS%' OR user_agent LIKE '%Macintosh%' THEN 'macOS'
+                         WHEN user_agent LIKE '%Linux%'    THEN 'Linux'
+                         ELSE 'Unknown'
+                       END
+         WHERE  browser IS NULL OR os IS NULL`,
+        { p1: limit }
+      );
+      affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
+    } catch (err) {
+      console.error('[loginSessionJob] backfillBrowserOs failed:', err && err.message ? err.message : err);
+      return total;
     }
-  } catch (err) {
-    console.error('[loginSessionJob] backfillBrowserOs failed:', err && err.message ? err.message : err);
+
+    total += affected;
+    if (affected === 0) break; // Het row can backfill -> dung som
+
+    // Delay giua cac batch de DB va event loop khong bi qua tai.
+    await new Promise((r) => setTimeout(r, BACKFILL_DELAY_MS));
   }
+
+  const elapsed = Date.now() - start;
+  if (total > 0) {
+    console.log(`[loginSessionJob] Backfilled ${total} rows browser/os in ${elapsed}ms`);
+  }
+  return total;
 }
 
 async function backfillLogoutReason() {
@@ -128,9 +182,9 @@ let timer = null;
 function start() {
   // Chay 1 lan ngay khi server start
   setImmediate(runAll);
-  // Lap lai moi 1h
-  timer = setInterval(runAll, 60 * 60 * 1000);
-  console.log('[loginSessionJob] Started - cleanup every 60 minutes, stale threshold = ' + STALE_HOURS + 'h');
+  // Lap lai moi 5 phut (thay vi 1h) → session stale toi da = 15+5=20 phut.
+  timer = setInterval(runAll, 5 * 60 * 1000);
+  console.log(`[loginSessionJob] Started - cleanup every 5 minutes, stale threshold = ${STALE_MINUTES} min (no heartbeat)`);
 }
 
 function stop() {

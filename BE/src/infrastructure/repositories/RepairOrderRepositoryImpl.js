@@ -2,6 +2,7 @@ const RepairOrderRepository = require('../../domain/repositories/RepairOrderRepo
 const RepairOrder = require('../../domain/entities/RepairOrder');
 const { query, sql } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const { buildDesiredTasks } = require('./repairOrderTaskBuilder');
 
 // Cot join dung chung cho findAll/findById - lay ten chi nhanh, to truong,
 // nguoi tao, xe va khach hang (khach hang di qua service_orders vi repair_orders
@@ -40,12 +41,42 @@ function genCode(prefix, id) {
 class RepairOrderRepositoryImpl extends RepairOrderRepository {
   // Man "Lenh sua chua" la bang dieu phoi chung ca chi nhanh - khong loc theo
   // advisorId, de bat ky co van dich vu nao cung thay het de gan to truong.
-  async findAll({ branchId } = {}) {
-    const result = await query(
-      `${HEADER_SELECT} WHERE ro.branch_id = @branchId ORDER BY ro.id DESC`,
-      { branchId }
+  // Rieng to truong dang nhap (teamLeaderId duoc truyen vao) thi CHI thay
+  // dung lenh duoc giao cho minh - xem "Cong viec cua toi".
+  async findAll({ branchId, teamLeaderId } = {}) {
+    const params = { branchId };
+    let sqlText = `${HEADER_SELECT} WHERE ro.branch_id = @branchId`;
+    if (teamLeaderId) {
+      params.teamLeaderId = Number(teamLeaderId);
+      sqlText += ` AND ro.team_leader_id = @teamLeaderId`;
+    }
+    sqlText += ` ORDER BY ro.id DESC`;
+    const result = await query(sqlText, params);
+    const rows = result.recordset;
+
+    // Man dieu phoi cua co van khong can hien task tung dong (chi xem qua modal
+    // chi tiet rieng) nen giu nguyen [] cho nhe. Rieng man "Cong viec cua toi"
+    // cua to truong (loc theo teamLeaderId) hien task ngay tren card nen phai
+    // lay kem danh sach task cho tung lenh.
+    if (!teamLeaderId || rows.length === 0) {
+      return rows.map((row) => RepairOrder.fromPersistence(row, []));
+    }
+
+    const ids = rows.map((row) => row.id);
+    const inClause = ids.map((_, i) => `@id${i}`).join(',');
+    const taskParams = {};
+    ids.forEach((rid, i) => { taskParams[`id${i}`] = rid; });
+    const tasksResult = await query(
+      `SELECT * FROM repair_order_tasks WHERE repair_order_id IN (${inClause}) ORDER BY id`,
+      taskParams
     );
-    return result.recordset.map((row) => RepairOrder.fromPersistence(row, []));
+    const tasksByOrder = new Map();
+    tasksResult.recordset.forEach((t) => {
+      if (!tasksByOrder.has(t.repair_order_id)) tasksByOrder.set(t.repair_order_id, []);
+      tasksByOrder.get(t.repair_order_id).push(t);
+    });
+
+    return rows.map((row) => RepairOrder.fromPersistence(row, tasksByOrder.get(row.id) || []));
   }
 
   async findById(id) {
@@ -56,6 +87,18 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     const tasksResult = await query(
       `SELECT * FROM repair_order_tasks WHERE repair_order_id = @id ORDER BY id`,
       { id }
+    );
+    return RepairOrder.fromPersistence(header, tasksResult.recordset);
+  }
+
+  async findByCode(code) {
+    const headerResult = await query(`${HEADER_SELECT} WHERE ro.repair_code = @code`, { code });
+    const header = headerResult.recordset[0];
+    if (!header) return null;
+
+    const tasksResult = await query(
+      `SELECT * FROM repair_order_tasks WHERE repair_order_id = @id ORDER BY id`,
+      { id: header.id }
     );
     return RepairOrder.fromPersistence(header, tasksResult.recordset);
   }
@@ -96,10 +139,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
 
   async create(data, { branchId, createdBy }) {
     const newId = await runInTransaction(async (tx) => {
-      const itemsResult = await tx
-        .request()
-        .input('serviceOrderId', sql.BigInt, data.serviceOrderId)
-        .query(`SELECT * FROM service_order_items WHERE service_order_id = @serviceOrderId ORDER BY id`);
+      const desiredTasks = await buildDesiredTasks(tx, data.serviceOrderId);
 
       const headerResult = await tx
         .request()
@@ -126,19 +166,23 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
       await tx.request().input('id', sql.BigInt, id).input('code', sql.VarChar(30), genCode('LSC', id))
         .query(`UPDATE repair_orders SET repair_code = @code WHERE id = @id`);
 
-      for (const item of itemsResult.recordset) {
+      const insertTask = async ({ taskName, taskType, productId, quantity, unitPrice }) => {
         await tx
           .request()
           .input('repairOrderId', sql.BigInt, id)
-          .input('taskName', sql.NVarChar(300), item.item_description)
-          .input('taskType', sql.VarChar(10), item.item_type)
-          .input('productId', sql.BigInt, item.product_id || null)
-          .input('quantity', sql.Int, item.quantity || 0)
-          .input('unitPrice', sql.Decimal(18, 2), item.unit_price || 0)
+          .input('taskName', sql.NVarChar(300), taskName)
+          .input('taskType', sql.VarChar(10), taskType)
+          .input('productId', sql.BigInt, productId || null)
+          .input('quantity', sql.Int, quantity || 0)
+          .input('unitPrice', sql.Decimal(18, 2), unitPrice || 0)
           .query(`
             INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done)
             VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0)
           `);
+      };
+
+      for (const t of desiredTasks) {
+        await insertTask(t);
       }
 
       await tx
@@ -151,6 +195,13 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     });
 
     return this.findById(newId);
+  }
+
+  async updateTaskStatus(taskId, isDone) {
+    await query('UPDATE repair_order_tasks SET is_done = @isDone WHERE id = @taskId', {
+      taskId: Number(taskId),
+      isDone: isDone ? 1 : 0,
+    });
   }
 
   async updateStatus(id, status, cancelReason) {
@@ -182,6 +233,24 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
             FROM   service_orders so
             JOIN   repair_orders ro ON ro.service_order_id = so.id
             WHERE  ro.id = @id
+          `);
+      }
+
+      // To truong bam Hoan thanh -> tu dong chuyen luon phieu quyet toan goc
+      // sang "Cho thanh toan", co van khong phai vao bam Hoan thanh lan nua.
+      // Chi cap nhat khi phieu quyet toan dang o trang thai "inprogress" (con
+      // dang sua chua) de khong ghi de nham 1 phieu da huy/da xuat hoa don.
+      if (status === 'completed') {
+        await tx
+          .request()
+          .input('id', sql.BigInt, id)
+          .query(`
+            UPDATE so
+            SET    so.status = 'waiting_payment',
+                   so.completed_date = GETDATE()
+            FROM   service_orders so
+            JOIN   repair_orders ro ON ro.service_order_id = so.id
+            WHERE  ro.id = @id AND so.status = 'inprogress'
           `);
       }
     });

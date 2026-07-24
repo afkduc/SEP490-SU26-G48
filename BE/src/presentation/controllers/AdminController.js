@@ -7,6 +7,7 @@ const RoleService = require('../../application/services/RoleService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const UserRoleService = require('../../application/services/UserRoleService');
 const UserRoleRepositoryImpl = require('../../infrastructure/repositories/UserRoleRepositoryImpl');
+const UserRepositoryImpl = require('../../infrastructure/repositories/UserRepositoryImpl');
 const PermissionService = require('../../application/services/PermissionService');
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
@@ -15,6 +16,11 @@ const BranchService = require('../../application/services/BranchService');
 const DeviceService = require('../../application/services/DeviceService');
 const SpecialtyService = require('../../application/services/SpecialtyService');
 const SecurityAlertService = require('../../application/services/SecurityAlertService');
+const NotificationService = require('../../application/services/NotificationService');
+const { auditCrud } = require('../../utils/auditHelper');
+const { emitPermissionChanged } = require('../../application/events/PermissionEvents');
+const PermissionGroupService = require('../../application/services/PermissionGroupService');
+const PermissionGroupRepositoryImpl = require('../../infrastructure/repositories/PermissionGroupRepositoryImpl');
 
 class AdminController {
   constructor() {
@@ -27,13 +33,23 @@ class AdminController {
 
     const userRoleRepository = new UserRoleRepositoryImpl();
     const roleRepo = new RoleRepositoryImpl();
-    this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo });
+    const userRepo = new UserRepositoryImpl();
+    this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo, userRepository: userRepo });
+
+    // Permission Groups (Phase 3)
+    const groupRepository = new PermissionGroupRepositoryImpl();
+    this.permissionGroupService = new PermissionGroupService({
+      groupRepository,
+      permissionService,
+      roleRepository,
+    });
 
     this.auditService = new AuditService(AuditRepository);
     this.branchService = new BranchService();
     this.deviceService = new DeviceService();
     this.specialtyService = new SpecialtyService();
     this.securityAlertService = new SecurityAlertService();
+    this.notificationService = new NotificationService();
 
     this.getDashboardStats = this.getDashboardStats.bind(this);
     this.listUsers = this.listUsers.bind(this);
@@ -52,10 +68,15 @@ class AdminController {
     this.listPermissions = this.listPermissions.bind(this);
     this.getRolePermissions = this.getRolePermissions.bind(this);
     this.setRolePermissions = this.setRolePermissions.bind(this);
+    this.saveRolePermissionsMatrix = this.saveRolePermissionsMatrix.bind(this);
     this.getRoleUsers = this.getRoleUsers.bind(this);
+    this.listPermissionGroups = this.listPermissionGroups.bind(this);
+    this.getPermissionGroupDetail = this.getPermissionGroupDetail.bind(this);
+    this.getRoleGroupIds = this.getRoleGroupIds.bind(this);
+    this.setRoleGroups = this.setRoleGroups.bind(this);
+    this.setRoleGroupsMatrix = this.setRoleGroupsMatrix.bind(this);
     this.createRole = this.createRole.bind(this);
     this.updateRole = this.updateRole.bind(this);
-    this.deleteRole = this.deleteRole.bind(this);
     this.toggleRoleStatus = this.toggleRoleStatus.bind(this);
     this.listDevices = this.listDevices.bind(this);
     this.listUserDevices = this.listUserDevices.bind(this);
@@ -65,7 +86,6 @@ class AdminController {
     this.listSpecialties = this.listSpecialties.bind(this);
     this.createSpecialty = this.createSpecialty.bind(this);
     this.updateSpecialty = this.updateSpecialty.bind(this);
-    this.deleteSpecialty = this.deleteSpecialty.bind(this);
     this.toggleSpecialtyStatus = this.toggleSpecialtyStatus.bind(this);
     this.getUserSpecialties = this.getUserSpecialties.bind(this);
     this.setUserSpecialties = this.setUserSpecialties.bind(this);
@@ -82,6 +102,7 @@ class AdminController {
     this.resetPassword = this.resetPassword.bind(this);
     this.reissueToken = this.reissueToken.bind(this);
     this.refreshPermissions = this.refreshPermissions.bind(this);
+    this.debugPermissions = this.debugPermissions.bind(this);
     this.cleanupDuplicateSessions = this.cleanupDuplicateSessions.bind(this);
   }
 
@@ -180,6 +201,19 @@ class AdminController {
   createBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.create(req.body);
+      await auditCrud.create(req, {
+        tableName: 'branches',
+        entityCode: branch?.branch_code || branch?.code || null,
+        recordId: branch?.id || null,
+        entityName: 'Chi nhánh',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: branch?.branch_name || branch?.name || '',
+        targetCode: branch?.branch_code || '',
+        userId: branch?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_CREATED:', e.message));
       return success(res, branch, 'Tao chi nhanh thanh cong', 201);
     } catch (err) {
       next(err);
@@ -189,6 +223,19 @@ class AdminController {
   updateBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.update(req.params.id, req.body);
+      await auditCrud.update(req, {
+        tableName: 'branches',
+        entityCode: branch?.branch_code || `ID-${req.params.id}`,
+        recordId: branch?.id || Number(req.params.id) || null,
+        entityName: 'Chi nhánh',
+        newData: req.body,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: branch?.branch_name || '',
+        targetCode: branch?.branch_code || '',
+        userId: branch?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_UPDATED:', e.message));
       return success(res, branch, 'Cap nhat chi nhanh thanh cong');
     } catch (err) {
       next(err);
@@ -198,6 +245,20 @@ class AdminController {
   deactivateBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.deactivate(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'branches',
+        entityCode: branch?.branch_code || `ID-${req.params.id}`,
+        recordId: branch?.id || Number(req.params.id) || null,
+        entityName: 'Chi nhánh',
+        newData: { status: 'inactive' },
+        description: `Ngừng hoạt động chi nhánh ${branch?.branch_code || req.params.id}`,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_DEACTIVATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: branch?.branch_name || '',
+        targetCode: branch?.branch_code || '',
+        userId: branch?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_DEACTIVATED:', e.message));
       return success(res, branch, 'Ngung hoat dong chi nhanh');
     } catch (err) {
       next(err);
@@ -207,6 +268,20 @@ class AdminController {
   reactivateBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.reactivate(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'branches',
+        entityCode: branch?.branch_code || `ID-${req.params.id}`,
+        recordId: branch?.id || Number(req.params.id) || null,
+        entityName: 'Chi nhánh',
+        newData: { status: 'active' },
+        description: `Kích hoạt lại chi nhánh ${branch?.branch_code || req.params.id}`,
+      });
+      await this.notificationService.notifyAdmins('BRANCH_REACTIVATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: branch?.branch_name || '',
+        targetCode: branch?.branch_code || '',
+        userId: branch?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_REACTIVATED:', e.message));
       return success(res, branch, 'Kich hoat lai chi nhanh');
     } catch (err) {
       next(err);
@@ -243,6 +318,16 @@ class AdminController {
     }
   };
 
+  // UC-11: list roles + permissions (1 call, khong N+1)
+  listRolesWithPermissions = async (req, res, next) => {
+    try {
+      const result = await this.roleService.listRolesWithPermissions();
+      return success(res, result, 'Danh sach vai tro kem quyen');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   // UC-11: get permissions of a role
   getRolePermissions = async (req, res, next) => {
     try {
@@ -257,11 +342,74 @@ class AdminController {
   setRolePermissions = async (req, res, next) => {
     try {
       const { permissionIds } = req.body;
+      // Validation chi tiet (loai bo NaN, check ton tai) lam trong RoleService.setRolePermissions
       const permissions = await this.roleService.setRolePermissions(
         req.params.id,
-        Array.isArray(permissionIds) ? permissionIds.map(Number) : []
+        Array.isArray(permissionIds) ? permissionIds : []
       );
+      await auditCrud.update(req, {
+        tableName: 'role_permissions',
+        entityCode: `ID-${req.params.id}`,
+        recordId: Number(req.params.id) || null,
+        entityName: 'Phân quyền vai trò',
+        newData: { permissionIds: Array.isArray(permissionIds) ? permissionIds : [] },
+        description: `Cập nhật quyền cho vai trò ID ${req.params.id} (${permissions.length || 0} quyền)`,
+      });
       return success(res, { items: permissions, total: permissions.length }, 'Cap nhat quyen vai tro thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * Bulk save permissions cho nhieu role trong 1 transaction (atomic).
+   * Body: { changes: [{roleId, permissionIds}, ...] }
+   * Dung cho trang "Ma tran quyen" (Permission Matrix).
+   * - 1 call duy nhat, khong N+1
+   * - Last-admin guard trong service (khong cho tuoc het admin:roles:* cua role admin)
+   * - Audit log + permission cache invalidation tu dong
+   */
+  saveRolePermissionsMatrix = async (req, res, next) => {
+    try {
+      const { changes } = req.body;
+      const result = await this.roleService.setRolePermissionsMatrix({
+        changes,
+        actorUserId: req.user?.userId,
+      });
+
+      // Push SSE event de cac user bi anh huong tu refresh permission realtime
+      // (FE nhan event -> goi getMeApi -> cap nhat token + permissions vao storage).
+      // Bo qua neu khong co user nao bi anh huong (best-effort, khong fail request).
+      try {
+        const roleIds = (changes || []).map((c) => Number(c.roleId)).filter(Number.isFinite);
+        emitPermissionChanged({
+          action: 'matrix_updated',
+          userIds: result.affectedUserIds || [],
+          roleIds,
+          actorUserId: req.user?.userId || null,
+        });
+      } catch (eventErr) {
+        // Log nhung khong fail API - SSE chi la optional enhancement.
+        console.warn('[AdminController] emitPermissionChanged failed:', eventErr.message);
+      }
+
+      await auditCrud.update(req, {
+        tableName: 'role_permissions',
+        entityCode: 'MATRIX',
+        recordId: null,
+        entityName: 'Ma trận quyền',
+        newData: {
+          changeCount: changes?.length || 0,
+          invalidations: result.invalidations,
+          affectedUserCount: (result.affectedUserIds || []).length,
+        },
+        description: `Cập nhật ma trận quyền (${changes?.length || 0} vai trò, ${result.invalidations} user bị ảnh hưởng cache)`,
+      });
+      return success(
+        res,
+        result,
+        `Da luu ma tran quyen (${result.results.length} vai tro, ${result.invalidations} user invalidate cache)`
+      );
     } catch (err) {
       next(err);
     }
@@ -282,6 +430,19 @@ class AdminController {
     try {
       const { roleName, roleLabel } = req.body;
       const role = await this.roleService.createRole({ roleName, roleLabel });
+      await auditCrud.create(req, {
+        tableName: 'roles',
+        entityCode: role?.role_code || roleName || null,
+        recordId: role?.id || null,
+        entityName: 'Vai trò',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('ROLE_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: role?.role_name || role?.roleLabel || '',
+        targetCode: role?.role_code || '',
+        userId: role?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_CREATED:', e.message));
       return success(res, role, 'Tao vai tro thanh cong', 201);
     } catch (err) {
       next(err);
@@ -293,17 +454,20 @@ class AdminController {
     try {
       const { roleLabel } = req.body;
       const role = await this.roleService.updateRole(req.params.id, { roleLabel });
+      await auditCrud.update(req, {
+        tableName: 'roles',
+        entityCode: role?.role_code || `ID-${req.params.id}`,
+        recordId: role?.id || Number(req.params.id) || null,
+        entityName: 'Vai trò',
+        newData: { roleLabel },
+      });
+      await this.notificationService.notifyAdmins('ROLE_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: role?.role_name || `ID-${req.params.id}`,
+        targetCode: role?.role_code || '',
+        userId: role?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_UPDATED:', e.message));
       return success(res, role, 'Cap nhat vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: delete role
-  deleteRole = async (req, res, next) => {
-    try {
-      const result = await this.roleService.deleteRole(req.params.id);
-      return success(res, result, 'Xoa vai tro thanh cong');
     } catch (err) {
       next(err);
     }
@@ -312,6 +476,20 @@ class AdminController {
   toggleRoleStatus = async (req, res, next) => {
     try {
       const role = await this.roleService.toggleStatus(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'roles',
+        entityCode: role?.role_code || `ID-${req.params.id}`,
+        recordId: role?.id || Number(req.params.id) || null,
+        entityName: 'Vai trò',
+        newData: { isActive: role?.is_active },
+        description: `${role?.is_active ? 'Kích hoạt' : 'Vô hiệu hóa'} vai trò ${role?.role_code || req.params.id}`,
+      });
+      await this.notificationService.notifyAdmins(role?.is_active ? 'ROLE_ENABLED' : 'ROLE_DISABLED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: role?.role_name || `ID-${req.params.id}`,
+        targetCode: role?.role_code || '',
+        userId: role?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins toggleRole:', e.message));
       return success(res, role, 'Cap nhat trang thai vai tro thanh cong');
     } catch (err) {
       next(err);
@@ -351,6 +529,10 @@ class AdminController {
   forceLogoutDevice = async (req, res, next) => {
     try {
       const result = await this.deviceService.forceLogoutDevice(req.params.deviceId);
+      await auditCrud.forceLogout(req, {
+        targetUserName: result?.userName || null,
+        reason: `Đăng xuất thiết bị ${req.params.deviceId}`,
+      });
       return success(res, result, 'Da dang xuat khoi thiet bi');
     } catch (err) {
       next(err);
@@ -362,6 +544,10 @@ class AdminController {
       const { userId } = req.params;
       const { currentDeviceId } = req.query;
       const result = await this.deviceService.forceLogoutAllOtherDevices(userId, currentDeviceId);
+      await auditCrud.forceLogout(req, {
+        targetUserName: `user-${userId}`,
+        reason: `Đăng xuất tất cả thiết bị khác (${result?.revoked || 0} thiết bị)`,
+      });
       return success(res, result, 'Da dang xuat tat ca thiet bi khac');
     } catch (err) {
       next(err);
@@ -379,6 +565,10 @@ class AdminController {
         return res.status(400).json({ message: 'userId la bat buoc' });
       }
       const result = await this.deviceService.forceLogoutAllDevices(userId);
+      await auditCrud.forceLogout(req, {
+        targetUserName: `user-${userId}`,
+        reason: `Buộc đăng xuất toàn bộ thiết bị của user (${result?.revoked || 0} thiết bị)`,
+      });
       return success(res, result, `Da dang xuat ${result.revoked} thiet bi`);
     } catch (err) {
       next(err);
@@ -397,7 +587,19 @@ class AdminController {
 
   createSpecialty = async (req, res, next) => {
     try {
-      const specialty = await this.specialtyService.create(req.body);
+      const actorInfo = {
+        userId: req.user?.id,
+        userName: req.user?.user_name,
+        name: req.user?.full_name || req.user?.name,
+      };
+      const specialty = await this.specialtyService.create(req.body, actorInfo);
+      await auditCrud.create(req, {
+        tableName: 'specialties',
+        entityCode: specialty?.specialty_code || specialty?.code || null,
+        recordId: specialty?.id || null,
+        entityName: 'Chuyên môn',
+        data: req.body,
+      });
       return success(res, specialty, 'Tao chuyen mon thanh cong', 201);
     } catch (err) {
       next(err);
@@ -406,17 +608,20 @@ class AdminController {
 
   updateSpecialty = async (req, res, next) => {
     try {
-      const specialty = await this.specialtyService.update(req.params.id, req.body);
+      const actorInfo = {
+        userId: req.user?.id,
+        userName: req.user?.user_name,
+        name: req.user?.full_name || req.user?.name,
+      };
+      const specialty = await this.specialtyService.update(req.params.id, req.body, actorInfo);
+      await auditCrud.update(req, {
+        tableName: 'specialties',
+        entityCode: specialty?.specialty_code || `ID-${req.params.id}`,
+        recordId: specialty?.id || Number(req.params.id) || null,
+        entityName: 'Chuyên môn',
+        newData: req.body,
+      });
       return success(res, specialty, 'Cap nhat chuyen mon thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  deleteSpecialty = async (req, res, next) => {
-    try {
-      const result = await this.specialtyService.delete(req.params.id);
-      return success(res, result, 'Xoa chuyen mon thanh cong');
     } catch (err) {
       next(err);
     }
@@ -425,6 +630,14 @@ class AdminController {
   toggleSpecialtyStatus = async (req, res, next) => {
     try {
       const specialty = await this.specialtyService.toggleStatus(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'specialties',
+        entityCode: specialty?.specialty_code || `ID-${req.params.id}`,
+        recordId: specialty?.id || Number(req.params.id) || null,
+        entityName: 'Chuyên môn',
+        newData: { isActive: specialty?.is_active },
+        description: `${specialty?.is_active ? 'Kích hoạt' : 'Vô hiệu hóa'} chuyên môn ${specialty?.specialty_code || req.params.id}`,
+      });
       return success(res, specialty, 'Cap nhat trang thai chuyen mon thanh cong');
     } catch (err) {
       next(err);
@@ -447,6 +660,14 @@ class AdminController {
         req.params.userId,
         Array.isArray(specialtyIds) ? specialtyIds.map(Number) : []
       );
+      await auditCrud.update(req, {
+        tableName: 'user_specialty',
+        entityCode: `ID-${req.params.userId}`,
+        recordId: Number(req.params.userId) || null,
+        entityName: 'Chuyên môn nhân viên',
+        newData: { specialtyIds },
+        description: `Cập nhật chuyên môn cho user ID ${req.params.userId}`,
+      });
       return success(res, { items: specialties, total: specialties.length }, 'Cap nhat chuyen mon nguoi dung thanh cong');
     } catch (err) {
       next(err);
@@ -514,6 +735,21 @@ class AdminController {
     try {
       const { roleIds } = req.body;
       const roles = await this.userRoleService.assignRoles(req.params.userId, roleIds);
+      await auditCrud.assignRole(req, {
+        userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
+        roleName: roles?.[0]?.roleName || roleIds?.join(','),
+      });
+      // SSE push: user vua duoc gan role moi -> can refresh permission ngay.
+      try {
+        emitPermissionChanged({
+          action: 'role_assigned',
+          userIds: [Number(req.params.userId)],
+          roleIds: (roleIds || []).map(Number).filter(Number.isFinite),
+          actorUserId: req.user?.userId || null,
+        });
+      } catch (eventErr) {
+        console.warn('[AdminController] emitPermissionChanged (assignRoles) failed:', eventErr.message);
+      }
       return success(res, roles, 'Gan role thanh cong');
     } catch (err) {
       next(err);
@@ -527,6 +763,21 @@ class AdminController {
         req.params.userId,
         req.params.roleId
       );
+      await auditCrud.removeRole(req, {
+        userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
+        roleName: `role-${req.params.roleId}`,
+      });
+      // SSE push: user vua bi revoke role -> mat quyen, can refresh ngay.
+      try {
+        emitPermissionChanged({
+          action: 'role_revoked',
+          userIds: [Number(req.params.userId)],
+          roleIds: [Number(req.params.roleId)].filter(Number.isFinite),
+          actorUserId: req.user?.userId || null,
+        });
+      } catch (eventErr) {
+        console.warn('[AdminController] emitPermissionChanged (revokeRole) failed:', eventErr.message);
+      }
       return success(res, roles, 'Xoa role thanh cong');
     } catch (err) {
       next(err);
@@ -536,6 +787,19 @@ class AdminController {
   async createUser(req, res, next) {
     try {
       const user = await this.adminUserService.createUser(req.body);
+      await auditCrud.create(req, {
+        tableName: 'users',
+        entityCode: user?.user_code || user?.userName || null,
+        recordId: user?.id || null,
+        entityName: 'Người dùng',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('USER_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: user?.full_name || user?.userName || '',
+        targetCode: user?.user_code || '',
+        userId: user?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_CREATED:', e.message));
       return success(res, user, 'Tao nguoi dung thanh cong', 201);
     } catch (err) {
       next(err);
@@ -544,13 +808,60 @@ class AdminController {
 
   async updateUser(req, res, next) {
     try {
-      const { userId, status, roleId, branchId } = req.body;
+      const { userId, firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } = req.body;
+      console.log('[AdminController] updateUser - req.body:', JSON.stringify(req.body));
+      const oldData = {};
+      if (userId) {
+        try {
+          const existing = await this.adminUserService.getUserDetail(userId);
+          if (existing) {
+            oldData.firstName = existing.firstName;
+            oldData.lastName = existing.lastName;
+            oldData.email = existing.email;
+            oldData.phone = existing.phone;
+            oldData.status = existing.status;
+            oldData.roleId = existing.roleId;
+            oldData.branchId = existing.branchId;
+          }
+        } catch (_) {}
+      }
       const updated = await this.adminUserService.updateUser({
         userId,
+        firstName,
+        lastName,
+        email,
+        phone,
         status,
         roleId,
         branchId,
+        scopeAllBranches,
       });
+      await auditCrud.update(req, {
+        tableName: 'users',
+        entityCode: updated?.user_code || updated?.userName || `ID-${userId}`,
+        recordId: updated?.id || Number(userId) || null,
+        entityName: 'Người dùng',
+        oldData,
+        newData: { firstName, lastName, email, phone, status, roleId, branchId },
+      });
+      const eventType = status === 'inactive' ? 'USER_DISABLED' : 'USER_UPDATED';
+
+      // Gui notification cho chinh admin thuc hien
+      await this.notificationService.notify(eventType, {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: updated?.full_name || updated?.userName || `ID-${userId}`,
+        targetCode: updated?.user_code || '',
+        userId: req.user?.userId,
+      }).catch((e) => console.warn('[AdminController] notify USER_UPDATE:', e.message));
+
+      // Gui notification cho cac admin khac (exclude chinh minh)
+      await this.notificationService.notifyAdmins(eventType, {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: updated?.full_name || updated?.userName || `ID-${userId}`,
+        targetCode: updated?.user_code || '',
+        userId: updated?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_UPDATE:', e.message));
+
       return success(res, updated, 'Cap nhat nguoi dung thanh cong');
     } catch (err) {
       next(err);
@@ -576,7 +887,6 @@ class AdminController {
       const targetUserId = Number(req.params.id);
       const currentUserId = req.user?.userId;
 
-      // Khong cho admin tu reset MK chinh minh (tranh tu khoa tai khoan)
       if (currentUserId && targetUserId === currentUserId) {
         return next(new (require('../../utils/ApiError'))(
           400,
@@ -584,7 +894,6 @@ class AdminController {
         ));
       }
 
-      // `mustChangePassword` mac dinh true (co the client override qua body)
       const mustChangePassword = req.body?.mustChangePassword !== false;
       const newPassword = req.body?.newPassword;
 
@@ -593,6 +902,17 @@ class AdminController {
         mustChangePassword,
         newPassword,
       });
+
+      await auditCrud.resetPassword(req, {
+        targetUserName: result?.userName || result?.user_code || `ID-${targetUserId}`,
+      });
+      await this.notificationService.notifyAdmins('USER_PASSWORD_RESET', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: result?.full_name || result?.userName || '',
+        targetCode: result?.user_code || '',
+        userId: targetUserId,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_PASSWORD_RESET:', e.message));
+
       return success(res, result, result.message);
     } catch (err) {
       next(err);
@@ -689,6 +1009,76 @@ class AdminController {
   };
 
   /**
+   * GET /api/admin/debug-permissions
+   * Tra ve THÔNG TIN DEBUG về permissions từ JWT hiện tại và từ DB.
+   * Endpoint này KHÔNG bị cache, luôn query DB mới nhất.
+   * Dùng để debug khi FE PermissionGate không hiển thị nút.
+   */
+  debugPermissions = async (req, res, next) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return next(new (require('../../utils/ApiError'))(401, 'Token khong hop le'));
+      }
+
+      const { query } = require('../../infrastructure/database/sqlServer');
+
+      // 1. Permissions từ JWT (trong req.user đã được auth middleware decode)
+      const jwtPermissions = req.user?.permissions || [];
+
+      // 2. Roles từ JWT
+      const jwtRoles = req.user?.roles || [];
+
+      // 3. Permissions từ DB (không cache - luôn query mới)
+      const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+      const PermissionService = require('../../application/services/PermissionService');
+      const roleRepo = new RoleRepositoryImpl();
+      const permService = new PermissionService({ roleRepository: roleRepo });
+
+      // Invalidate cache trước khi query
+      permService.invalidateCache(userId);
+
+      const dbPermissions = await permService.getUserPermissions(userId);
+      const dbPermissionKeys = Array.from(dbPermissions);
+
+      // 4. Kiểm tra user_role assignment
+      const roleResult = await query(`
+        SELECT r.role_name, ur.is_active
+        FROM user_role ur
+        JOIN roles r ON r.id = ur.role_id
+        WHERE ur.user_id = @p1
+      `, { p1: userId });
+
+      // 5. Kiểm tra role_permissions cho admin role
+      const adminRoleResult = await query(`
+        SELECT p.permission_key
+        FROM role_permissions rp
+        JOIN permissions p ON p.id = rp.permission_id
+        JOIN roles r ON r.id = rp.role_id
+        WHERE r.role_name = 'admin'
+        AND p.permission_key LIKE 'admin:branches:%'
+      `);
+
+      return success(res, {
+        userId,
+        jwt: {
+          roles: jwtRoles,
+          permissions: jwtPermissions,
+          hasAdminBranchesCreate: jwtPermissions.includes('admin:branches:create'),
+        },
+        database: {
+          permissions: dbPermissionKeys,
+          hasAdminBranchesCreate: dbPermissionKeys.includes('admin:branches:create'),
+        },
+        userRoleAssignments: roleResult.recordset,
+        adminRoleBranchesPermissions: adminRoleResult.recordset.map(r => r.permission_key),
+      }, 'Debug permissions info');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
    * POST /api/admin/sessions/cleanup
    * Don dep cac session trung lap: chi giu lai session moi nhat cho moi user.
    * Dung de xu ly cac session active trung lap trong database.
@@ -743,6 +1133,68 @@ class AdminController {
           ? `Da dong ${closedSessions} session trung lap`
           : 'Khong co session trung lap',
       }, 'Don dep session thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // ============================================================
+  // PERMISSION GROUPS (Phase 3)
+  // ============================================================
+
+  listPermissionGroups = async (req, res, next) => {
+    try {
+      const result = await this.permissionGroupService.listGroups();
+      return success(res, result, 'Danh sach nhom quyen');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPermissionGroupDetail = async (req, res, next) => {
+    try {
+      const group = await this.permissionGroupService.getGroupDetail(req.params.id);
+      return success(res, group, 'Chi tiet nhom quyen');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getRoleGroupIds = async (req, res, next) => {
+    try {
+      const result = await this.permissionGroupService.getRoleGroupIds(req.params.id);
+      return success(res, result, 'Danh sach nhom quyen cua vai tro');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setRoleGroups = async (req, res, next) => {
+    try {
+      const { groupIds } = req.body;
+      const result = await this.permissionGroupService.setRoleGroups(
+        req.params.id,
+        Array.isArray(groupIds) ? groupIds : [],
+        req
+      );
+      return success(res, result, 'Cap nhat nhom quyen cho vai tro thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setRoleGroupsMatrix = async (req, res, next) => {
+    try {
+      const { changes } = req.body;
+      const result = await this.permissionGroupService.setRoleGroupsMatrix({ changes }, req);
+      await auditCrud.update(req, {
+        tableName: 'role_permissions',
+        entityCode: 'MATRIX',
+        entityName: 'Ma tran nhom quyen',
+        newData: { roleCount: result.updatedRoles },
+        description: `Cap nhat ma tran nhom quyen (${result.updatedRoles} vai tro, ${result.affectedUserCount} user bi anh huong)`,
+      });
+      return success(res, result, 'Cap nhat ma tran nhom quyen thanh cong');
     } catch (err) {
       next(err);
     }

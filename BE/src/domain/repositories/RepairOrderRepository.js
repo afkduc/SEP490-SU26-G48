@@ -1,10 +1,14 @@
 class RepairOrderRepository {
-  async findAll({ branchId } = {}) {
+  async findAll({ branchId, teamLeaderId } = {}) {
     throw new Error('Method findAll() must be implemented');
   }
 
   async findById(id) {
     throw new Error('Method findById() must be implemented');
+  }
+
+  async findByCode(code) {
+    throw new Error('Method findByCode() must be implemented');
   }
 
   async findTeamLeadersByBranch(branchId) {
@@ -21,6 +25,10 @@ class RepairOrderRepository {
 
   async updateStatus(id, status) {
     throw new Error('Method updateStatus() must be implemented');
+  }
+
+  async updateTaskStatus(taskId, isDone) {
+    throw new Error('Method updateTaskStatus() must be implemented');
   }
 }
 

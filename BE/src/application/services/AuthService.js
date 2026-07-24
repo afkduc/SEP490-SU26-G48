@@ -43,8 +43,17 @@ class AuthService {
     }
 
     if (user.status && user.status !== 'active') {
-      const e = new ApiError(403, 'Tài khoản đã bị khóa');
+      // status la 'inactive' (ngung hoat dong) hoac bat ky gia tri khac active
+      // -> chan login. Migrating tu 'locked' -> 'inactive' (gop 2 status vi
+      // logic giong nhau, chi khac UI badge).
+      const e = new ApiError(403, 'Tài khoản đã ngừng hoạt động');
       e.audit = { userExists: true, user, reason: 'ACCOUNT_DISABLED' };
+      throw e;
+    }
+
+    if (user.branch_id && user.branch_is_active !== undefined && !Boolean(user.branch_is_active)) {
+      const e = new ApiError(403, 'Chi nhánh của tài khoản này đang bị ngưng hoạt động');
+      e.audit = { userExists: true, user, reason: 'BRANCH_DISABLED' };
       throw e;
     }
 
@@ -96,9 +105,11 @@ class AuthService {
       tokenVersion: userDto.tokenVersion,
     };
 
-    // Chi them deviceId neu co (backward compat voi token cu)
     if (deviceId) {
       tokenPayload.deviceId = deviceId;
+    }
+    if (user.sessionId) {
+      tokenPayload.sessionId = user.sessionId;
     }
 
     const token = jwt.sign(tokenPayload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
