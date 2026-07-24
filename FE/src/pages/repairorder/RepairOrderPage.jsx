@@ -24,6 +24,15 @@ const STATUS_LABELS = {
   cancelled: { label: 'Hủy', badge: 'badge-cancelled' },
 };
 
+// 2 tab trang thai cho man To truong (giong kieu pill-tab co dem so luong o
+// trang Phieu quyet toan sua chua) - to truong chi can phan biet viec dang
+// lam va viec da xong, khong can xem "huy" o day.
+const TEAM_LEADER_TABS = [
+  { key: 'inprogress', label: 'Đang sửa chữa' },
+  { key: 'completed', label: 'Hoàn thành' },
+];
+const TEAM_LEADER_ACTIVE_TAB_COLOR = '#E65100';
+
 // Ngay o day luon o dang chuoi dd/mm/yyyy (BE format san qua toDDMMYYYY, ca
 // cho phieu quyet toan lan lenh sua chua) - parse ve Date de loc/sap xep.
 function parseDDMMYYYY(value) {
@@ -938,24 +947,43 @@ function TeamLeaderTaskCards() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState('inprogress');
   const [busyTaskKey, setBusyTaskKey] = useState(null);
   const [busyOrderId, setBusyOrderId] = useState(null);
 
-  const loadAll = () => {
-    setLoading(true);
-    setLoadError('');
+  // silent=true dung cho auto-refresh nen (poll/focus lai tab) - khong bat
+  // loading/spinner de tranh giat man hinh khi khong co gi thay doi.
+  const loadAll = ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    if (!silent) setLoadError('');
     return listRepairOrdersApi()
       .then((data) => setOrders(data || []))
-      .catch((err) => setLoadError(err.message || 'Không tải được danh sách công việc'))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (!silent) setLoadError(err.message || 'Không tải được danh sách công việc'); })
+      .finally(() => { if (!silent) setLoading(false); });
   };
 
   useEffect(() => {
     loadAll().then(() => {}).catch(() => {});
+    // Chua co websocket/push nen tu dong lam moi: cu vong lap 1 lan/20s va
+    // moi khi quay lai tab, de tho truong thay ngay phieu vua duoc co van
+    // phan cong ma khong phai F5 tay.
+    const intervalId = setInterval(() => loadAll({ silent: true }), 20000);
+    const onFocus = () => loadAll({ silent: true });
+    const onVisibility = () => { if (document.visibilityState === 'visible') loadAll({ silent: true }); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
-  const filteredOrders = filterStatus ? orders.filter((o) => o.status === filterStatus) : orders;
+  const filteredOrders = orders.filter((o) => o.status === filterStatus);
+  const tabCounts = orders.reduce((acc, o) => {
+    acc[o.status] = (acc[o.status] || 0) + 1;
+    return acc;
+  }, {});
 
   const toggleTask = async (order, task) => {
     const key = `${order.id}-${task.id}`;
@@ -993,17 +1021,30 @@ function TeamLeaderTaskCards() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 16 }}>
-        <div className="form-group" style={{ marginBottom: 0, minWidth: 180 }}>
-          <label className="form-label">Trạng thái</label>
-          <select className="form-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="">Tất cả trạng thái</option>
-            <option value="inprogress">Đang sửa chữa</option>
-            <option value="completed">Hoàn thành</option>
-            <option value="cancelled">Hủy</option>
-          </select>
-        </div>
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)', alignSelf: 'center' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        {TEAM_LEADER_TABS.map((t) => {
+          const isActive = filterStatus === t.key;
+          const count = tabCounts[t.key] ?? 0;
+          return (
+            <button key={t.key} onClick={() => setFilterStatus(t.key)}
+              style={{
+                padding: '7px 16px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', border: '2px solid',
+                borderColor: isActive ? TEAM_LEADER_ACTIVE_TAB_COLOR : 'var(--gray-300)',
+                background: isActive ? TEAM_LEADER_ACTIVE_TAB_COLOR : 'var(--gray-100)',
+                color: isActive ? 'white' : 'var(--gray-700)',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+              {t.label}
+              <span style={{
+                background: isActive ? 'rgba(255,255,255,0.3)' : 'var(--gray-300)',
+                color: isActive ? 'white' : 'var(--gray-600)',
+                borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700,
+              }}>{count}</span>
+            </button>
+          );
+        })}
+        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)' }}>
           {filteredOrders.length} / {orders.length} công việc
         </div>
       </div>
@@ -1029,8 +1070,12 @@ function TeamLeaderTaskCards() {
         {filteredOrders.map((order) => {
           const st = STATUS_LABELS[order.status] || { label: order.status, badge: 'badge-inactive' };
           const tasks = order.tasks || [];
-          const doneCount = tasks.filter((t) => t.isDone).length;
-          const allDone = tasks.length > 0 && doneCount === tasks.length;
+          // Chi "cong viec" (dich vu) moi can tich hoan thanh - phu tung chi
+          // hien thi de to truong biet can dung phu tung gi, khong phai tick.
+          const serviceTasks = tasks.filter((t) => t.taskType === 'service');
+          const partTasks = tasks.filter((t) => t.taskType !== 'service');
+          const doneCount = serviceTasks.filter((t) => t.isDone).length;
+          const allDone = serviceTasks.length > 0 && doneCount === serviceTasks.length;
           const isActive = order.status === 'inprogress';
 
           return (
@@ -1054,10 +1099,10 @@ function TeamLeaderTaskCards() {
               )}
 
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
-                Đầu mục công việc ({doneCount}/{tasks.length})
+                Đầu mục công việc ({doneCount}/{serviceTasks.length})
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-                {tasks.map((task) => {
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: partTasks.length > 0 ? 10 : 14 }}>
+                {serviceTasks.map((task) => {
                   const key = `${order.id}-${task.id}`;
                   const isBusy = busyTaskKey === key;
                   return (
@@ -1083,6 +1128,28 @@ function TeamLeaderTaskCards() {
                   );
                 })}
               </div>
+
+              {partTasks.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+                    Phụ tùng cần dùng
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {partTasks.map((task) => (
+                      <div
+                        key={task.id}
+                        style={{
+                          display: 'flex', justifyContent: 'space-between', gap: 8, padding: '6px 10px',
+                          background: 'var(--gray-50)', borderRadius: 6, fontSize: 12, color: 'var(--gray-700)',
+                        }}
+                      >
+                        <span>{task.taskName}</span>
+                        {task.quantity > 1 && <span style={{ color: 'var(--gray-500)' }}>x{task.quantity}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {isActive && (
                 <button
