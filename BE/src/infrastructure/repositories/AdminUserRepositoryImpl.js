@@ -10,7 +10,8 @@ const ADMIN_USER_COLUMNS = `
   u.branch_id,
   b.branch_name,
   u.status,
-  u.created_at
+  u.created_at,
+  (SELECT COUNT(*) FROM user_branches ub WHERE ub.user_id = u.id) AS assigned_branch_count
 `;
 
 function toAdminUserRow(row) {
@@ -24,10 +25,42 @@ function toAdminUserRow(row) {
     phone: row.phone,
     branchId: row.branch_id,
     branchName: row.branch_name,
+    // scopeAllBranches = true neu user co >= 1 row trong user_branches
+    // (junction table luu ds branch user duoc phep truy cap).
+    // Vd: Admin cap cao chon "Tat ca chi nhanh" -> them row cho moi branch active.
+    scopeAllBranches: Number(row.assigned_branch_count) > 0
+      || row.branch_id === null
+      || row.branch_id === undefined,
     status: row.status,
     createdAt: row.created_at,
     roles: [],
   };
+}
+
+/**
+ * Load (userId -> array of branchId) tu bang user_branches.
+ * Chi dung cho tap user IDs da biet (tranh query toan bang).
+ */
+async function loadUserBranches(userIds) {
+  if (!userIds || userIds.length === 0) return {};
+  const params = {};
+  const placeholders = userIds.map((_, i) => {
+    const key = `p${i + 1}`;
+    params[key] = userIds[i];
+    return `@${key}`;
+  }).join(',');
+  const r = await query(
+    `SELECT user_id, branch_id
+     FROM   user_branches
+     WHERE  user_id IN (${placeholders})`,
+    params
+  );
+  const out = {};
+  for (const row of r.recordset) {
+    if (!out[row.user_id]) out[row.user_id] = [];
+    out[row.user_id].push(row.branch_id);
+  }
+  return out;
 }
 
 class AdminUserRepositoryImpl {
@@ -255,6 +288,11 @@ class AdminUserRepositoryImpl {
       roleId: r.role_id,
       roleName: r.role_name,
     }));
+
+    // Lay assignedBranchIds tu junction user_branches
+    const branchesMap = await loadUserBranches([Number(id)]);
+    user.assignedBranchIds = branchesMap[Number(id)] || [];
+
     return user;
   }
 
@@ -276,14 +314,22 @@ class AdminUserRepositoryImpl {
     return `NV${String(nextNum).padStart(3, '0')}`;
   }
 
-  async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId }) {
+  async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId, scopeAllBranches = false }) {
     // Generate pseudo_id automatically (e.g., NV001, NV002, ...)
     const pseudoId = await this.nextPseudoId();
+    // scopeAllBranches = true (admin cap cao chon "Tat ca chi nhanh") ->
+    //   - users.branch_id = NULL (khong co branch chinh cu the)
+    //   - insert 1 row vao user_branches cho moi branch active
+    // scopeAllBranches = false + branchId la so ->
+    //   - users.branch_id = branchId (branch chinh)
+    //   - insert 1 row vao user_branches (de query thong nhat)
+    const userBranchId = scopeAllBranches ? null : branchId;
+
     const result = await query(
       `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, team_size, status, created_at)
        OUTPUT INSERTED.id
        VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 0, 'active', GETDATE())`,
-      { p1: pseudoId, p2: name, p3: email, p4: passwordHash, p5: firstName || name, p6: lastName || '', p7: phone, p8: branchId }
+      { p1: pseudoId, p2: name, p3: email, p4: passwordHash, p5: firstName || name, p6: lastName || '', p7: phone, p8: userBranchId }
     );
     const userId = result.recordset[0].id;
     if (roleId) {
@@ -292,22 +338,119 @@ class AdminUserRepositoryImpl {
         { p1: userId, p2: roleId }
       );
     }
-    return { id: userId, email };
-  }
 
-  async updateUser({ userId, status, roleId, branchId }) {
-    if (status !== undefined) {
+    // Gan branch(es) cho user
+    if (scopeAllBranches) {
+      await this.assignAllBranchesToUser(userId);
+    } else if (branchId) {
       await query(
-        `UPDATE users SET status = @p1 WHERE id = @p2`,
-        { p1: status, p2: userId }
+        'INSERT INTO user_branches (user_id, branch_id) VALUES (@p1, @p2)',
+        { p1: userId, p2: branchId }
       );
     }
 
-    if (branchId !== undefined) {
+    return { id: userId, email };
+  }
+
+  /**
+   * Lay danh sach id cac branch dang active (is_active = 1).
+   * Dung khi admin muon gan user vao "Tat ca chi nhanh".
+   */
+  async getActiveBranchIds() {
+    const r = await query('SELECT id FROM branches WHERE is_active = 1');
+    return r.recordset.map((row) => row.id);
+  }
+
+  /**
+   * Gan user vao TAT CA branch active (admin cap cao).
+   * Xoa het row cu trong user_branches (neu co) truoc khi insert moi.
+   */
+  async assignAllBranchesToUser(userId) {
+    const branchIds = await this.getActiveBranchIds();
+    await query('DELETE FROM user_branches WHERE user_id = @p1', { p1: userId });
+    if (branchIds.length === 0) return 0;
+    const values = branchIds.map((_, i) => `(@p1, @p${i + 2})`).join(',');
+    const params = { p1: userId };
+    branchIds.forEach((id, i) => { params[`p${i + 2}`] = id; });
+    await query(
+      `INSERT INTO user_branches (user_id, branch_id) VALUES ${values}`,
+      params
+    );
+    return branchIds.length;
+  }
+
+  /**
+   * Gan user vao 1 branch cu the (giu nguyen semantics).
+   * Neu user da co nhieu branch (admin all), se thu hep con 1 branch.
+   */
+  async assignSingleBranchToUser(userId, branchId) {
+    await query('DELETE FROM user_branches WHERE user_id = @p1', { p1: userId });
+    if (!branchId) return 0;
+    await query(
+      'INSERT INTO user_branches (user_id, branch_id) VALUES (@p1, @p2)',
+      { p1: userId, p2: branchId }
+    );
+    return 1;
+  }
+
+  async updateUser({ userId, firstName, lastName, email, phone, status, roleId, branchId, shouldUpdateBranchId = false, scopeAllBranches = false }) {
+    // Build dynamic UPDATE query
+    const updates = [];
+    const params = {};
+    let paramIndex = 1;
+
+    if (firstName !== undefined) {
+      updates.push(`first_name = @p${paramIndex}`);
+      params[`p${paramIndex}`] = firstName;
+      paramIndex++;
+    }
+    if (lastName !== undefined) {
+      updates.push(`last_name = @p${paramIndex}`);
+      params[`p${paramIndex}`] = lastName;
+      paramIndex++;
+    }
+    if (email !== undefined) {
+      updates.push(`email = @p${paramIndex}`);
+      params[`p${paramIndex}`] = email;
+      paramIndex++;
+    }
+    if (phone !== undefined) {
+      updates.push(`phone = @p${paramIndex}`);
+      params[`p${paramIndex}`] = phone || null;
+      paramIndex++;
+    }
+    if (status !== undefined) {
+      updates.push(`status = @p${paramIndex}`);
+      params[`p${paramIndex}`] = status;
+      paramIndex++;
+    }
+    // Chi update branch_id khi service co gui len (shouldUpdateBranchId === true).
+    // - scopeAllBranches === true -> gan user vao TAT CA branch active
+    //   (users.branch_id = NULL + assignAllBranchesToUser)
+    // - scopeAllBranches === false + branchId la so -> gan user vao 1 branch
+    //   (users.branch_id = branchId + assignSingleBranchToUser)
+    // Khi shouldUpdateBranchId === false -> KHONG dong vao SET -> giu nguyen branch_id hien tai.
+    if (shouldUpdateBranchId) {
+      updates.push(`branch_id = @p${paramIndex}`);
+      params[`p${paramIndex}`] = scopeAllBranches ? null : branchId;
+      paramIndex++;
+    }
+
+    if (updates.length > 0) {
+      params[`p${paramIndex}`] = userId;
       await query(
-        `UPDATE users SET branch_id = @p1 WHERE id = @p2`,
-        { p1: branchId, p2: userId }
+        `UPDATE users SET ${updates.join(', ')} WHERE id = @p${paramIndex}`,
+        params
       );
+    }
+
+    // Cap nhat junction user_branches neu co yeu cau
+    if (shouldUpdateBranchId) {
+      if (scopeAllBranches) {
+        await this.assignAllBranchesToUser(userId);
+      } else if (branchId) {
+        await this.assignSingleBranchToUser(userId, branchId);
+      }
     }
 
     if (roleId !== undefined) {
@@ -351,8 +494,7 @@ class AdminUserRepositoryImpl {
         SELECT
           COUNT(*) AS total,
           SUM(CASE WHEN status = 'active'   THEN 1 ELSE 0 END) AS activeCount,
-          SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) AS inactiveCount,
-          SUM(CASE WHEN status = 'locked'   THEN 1 ELSE 0 END) AS lockedCount
+          SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) AS inactiveCount
         FROM users
       `),
       query('SELECT COUNT(*) AS total FROM branches WHERE is_active = 1'),
@@ -498,7 +640,10 @@ class AdminUserRepositoryImpl {
       totalUsers: Number(users.total),
       activeUsers: Number(users.activeCount),
       inactiveUsers: Number(users.inactiveCount),
-      lockedUsers: Number(users.lockedCount),
+      // Bo field lockedUsers (status 'locked' da bi goop vao 'inactive').
+      // Giu lai key cu voi gia tri 0 de FE Dashboard cu (neu co) khong crash
+      // khi truy cap object[key].
+      lockedUsers: 0,
       totalBranches: Number(branchCount.recordset[0].total),
       totalRoles: Number(roleCount.recordset[0].total),
       recentLogs,

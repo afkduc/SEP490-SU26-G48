@@ -1,8 +1,11 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
+const NotificationService = require('../../application/services/NotificationService');
 
 class RepairSettlementController {
   constructor({ repairSettlementService }) {
     this.repairSettlementService = repairSettlementService;
+    this.notificationService = new NotificationService();
   }
 
   getAll = async (req, res, next) => {
@@ -57,6 +60,19 @@ class RepairSettlementController {
         branchId: req.user.branchId,
         advisorId: req.user.userId,
       });
+      await auditCrud.create(req, {
+        tableName: 'repair_settlements',
+        entityCode: item?.settlement_code || item?.code || null,
+        recordId: item?.id || null,
+        entityName: 'Phiếu quyết toán',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('SETTLEMENT_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: item?.settlement_code || item?.code || `ID-${item?.id}`,
+        targetCode: item?.settlement_code || item?.code || '',
+        userId: item?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairSettlementController] notifyAdmins:', e.message));
       return success(res, item, 'Repair settlement created', 201);
     } catch (err) {
       next(err);
@@ -66,6 +82,19 @@ class RepairSettlementController {
   update = async (req, res, next) => {
     try {
       const item = await this.repairSettlementService.update(req.params.id, req.body);
+      await auditCrud.update(req, {
+        tableName: 'repair_settlements',
+        entityCode: item?.settlement_code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Phiếu quyết toán',
+        newData: req.body,
+      });
+      await this.notificationService.notifyAdmins('SETTLEMENT_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: item?.settlement_code || `ID-${req.params.id}`,
+        targetCode: item?.settlement_code || '',
+        userId: item?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairSettlementController] notifyAdmins:', e.message));
       return success(res, item, 'Repair settlement updated');
     } catch (err) {
       next(err);
@@ -78,6 +107,19 @@ class RepairSettlementController {
         issuedBy: req.user.userId,
         cancelReason: req.body.reason,
       });
+      await auditCrud.update(req, {
+        tableName: 'repair_settlements',
+        entityCode: item?.settlement_code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Phiếu quyết toán',
+        newData: { status: req.body.status, reason: req.body.reason },
+      });
+      await this.notificationService.notifyAdmins('SETTLEMENT_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: item?.settlement_code || `ID-${req.params.id}`,
+        targetCode: item?.settlement_code || '',
+        userId: item?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairSettlementController] notifyAdmins:', e.message));
       return success(res, item, 'Repair settlement status updated');
     } catch (err) {
       next(err);

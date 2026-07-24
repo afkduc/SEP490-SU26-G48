@@ -1,14 +1,15 @@
-import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
 import SessionExpiredModal from '../components/SessionExpiredModal';
+import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
-import { ToastProvider } from '../components/common/ToastContext';
 import { SharedDataProvider } from '../contexts/SharedDataContext';
+import { useGlobalError } from '../contexts/GlobalErrorContext';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
@@ -16,6 +17,7 @@ const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/Repair
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
 const CustomerHistoryPage = lazy(() => import('../pages/customer/CustomerHistoryPage'));
 const CustomerCarePage = lazy(() => import('../pages/customercare/CustomerCarePage'));
+const ServiceRequestsPage = lazy(() => import('../pages/servicerequests/ServiceRequestsPage'));
 const UnauthorizedPage = lazy(() => import('../pages/errors/UnauthorizedPage'));
 const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralDirectorPage'));
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
@@ -26,6 +28,7 @@ const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
+const AdminPermissionMatrixPage = lazy(() => import('../pages/admin/AdminPermissionMatrixPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -44,6 +47,45 @@ const ExportRequestListPage = lazy(() => import('../pages/inventory/ExportReques
 const ExportRequestFormPage = lazy(() => import('../pages/inventory/ExportRequestFormPage'));
 const ExportRequestDetailPage = lazy(() => import('../pages/inventory/ExportRequestDetailPage'));
 
+/**
+ * ErrorHandler — bắt lỗi 403 toàn cục từ error event.
+ * Khi component con throw error với status=403, component này
+ * sẽ hiển thị UnauthorizedPage.
+ */
+function ErrorHandler() {
+  const { globalError, clearError } = useGlobalError();
+
+  useEffect(() => {
+    if (!globalError) return;
+
+    const handlePopState = () => {
+      if (window.location.pathname !== '/unauthorized') {
+        clearError();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [globalError, clearError]);
+
+  if (!globalError) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 9999,
+      background: '#f9fafb',
+      overflow: 'auto',
+    }}>
+      <UnauthorizedPage
+        permissionKey={globalError.permissionKey}
+        customMessage={globalError.message}
+      />
+    </div>
+  );
+}
+
 function Loading() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -54,9 +96,11 @@ function Loading() {
 
 function AppRoutes() {
   return (
-    <ToastProvider>
+    <>
       <SharedDataProvider>
         <SessionExpiredModal />
+        <ForbiddenModal />
+        <ErrorHandler />
         <Suspense fallback={<Loading />}>
           <Routes>
           {/* Public */}
@@ -88,13 +132,46 @@ function AppRoutes() {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="users" element={<AdminUsersPage />} />
-          <Route path="branches" element={<AdminBranchesPage />} />
-          <Route path="roles" element={<AdminRolesPage />} />
-          <Route path="devices" element={<AdminDevicesPage />} />
-          <Route path="specialties" element={<AdminSpecialtiesPage />} />
-          <Route path="logs" element={<AuditLogsPage />} />
-          <Route path="login-sessions" element={<LoginSessionsPage />} />
+          <Route path="users" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="admin:users:read">
+              <AdminUsersPage />
+            </ProtectedRoute>
+          } />
+          <Route path="branches" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:branches:access">
+              <AdminBranchesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="roles" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:roles:access">
+              <AdminRolesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="devices" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:devices:access">
+              <AdminDevicesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="specialties" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:specialties:access">
+              <AdminSpecialtiesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="permission-matrix" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:permission_matrix:access">
+              <AdminPermissionMatrixPage />
+            </ProtectedRoute>
+          } />
+          <Route path="logs" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:audit_logs:access">
+              <AuditLogsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="login-sessions" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:login_sessions:access">
+              <LoginSessionsPage />
+            </ProtectedRoute>
+          } />
           <Route path="profile" element={<AdminProfilePage />} />
           <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
         </Route>
@@ -103,7 +180,7 @@ function AppRoutes() {
                   path="/general-director/*"
                   element={
                     <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
-                      <AppLayout>
+                      <AppLayout showNavbar={false}>
                         <GeneralDirectorPage />
                       </AppLayout>
                     </ProtectedRoute>
@@ -153,6 +230,18 @@ function AppRoutes() {
             <ProtectedRoute>
               <AppLayout>
                 <CustomerHistoryPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Yeu cau tu van tu landing page - CVDV tiep nhan + tao lich hen */}
+        <Route
+          path="/service-requests"
+          element={
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
+              <AppLayout>
+                <ServiceRequestsPage />
               </AppLayout>
             </ProtectedRoute>
           }
@@ -218,7 +307,7 @@ function AppRoutes() {
       </Routes>
       </Suspense>
     </SharedDataProvider>
-  </ToastProvider>
+    </>
   );
 }
 

@@ -1,4 +1,5 @@
 const { query } = require('../database/sqlServer');
+const ApiError = require('../../utils/ApiError');
 
 class SpecialtyRepository {
   /**
@@ -86,15 +87,13 @@ class SpecialtyRepository {
    * Xoa specialty (chi xoa neu khong co user_specialty tham chieu)
    */
   async delete(id) {
-    const check = await query(
-      'SELECT COUNT(*) AS cnt FROM user_specialty WHERE specialty_id = @p1',
-      { p1: id }
+    // Hard delete KHONG con duoc ho tro - he thong chi dung toggle active/inactive.
+    // Giu method nay de tranh loi runtime neu code khac con goi,
+    // nhung throw ApiError(405) som de developer biet ngay.
+    throw new ApiError(
+      405,
+      'Xoa cung (hard delete) khong con duoc ho tro. Su dung toggle active/inactive.'
     );
-    if (check.recordset[0].cnt > 0) {
-      return { success: false, reason: 'has_users' };
-    }
-    await query('DELETE FROM specialties WHERE id = @p1', { p1: id });
-    return { success: true };
   }
 
   /**

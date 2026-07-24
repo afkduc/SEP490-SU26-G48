@@ -9,3 +9,9 @@
   flex: 1;
   padding: 24px;
 }
+
+@media (max-width: 600px) {
+  .app-layout__main {
+    padding: 12px;
+  }
+}

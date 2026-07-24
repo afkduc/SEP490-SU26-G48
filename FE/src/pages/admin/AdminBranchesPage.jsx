@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { adminBranchesApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
+import { useApiError } from '../../hooks/useApiError';
+import PermissionGate from '../../components/PermissionGate';
 import './AdminBranchesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -147,7 +149,9 @@ function BranchFormModal({ branch, onClose, onSuccess, managerCandidates }) {
       }
       onSuccess();
     } catch (err) {
-      setError(err.message || 'Lỗi khi lưu chi nhánh');
+      if (!handleApiError(err, isEdit ? 'admin:branches:update' : 'admin:branches:create')) {
+        setError(err.message || 'Lỗi khi lưu chi nhánh');
+      }
     } finally {
       setSaving(false);
     }
@@ -351,15 +355,22 @@ function BranchCard({ branch, onEdit, onDeactivate, onStats }) {
           <IconRefresh />
           Thống kê
         </button>
-        <button className="btn btn--sm btn--secondary" onClick={() => onEdit(branch)} title="Chỉnh sửa">
-          <IconEdit />
-          Sửa
-        </button>
-        {branch.isActive ? (
-          <button className="btn btn--sm btn--danger" onClick={() => onDeactivate(branch)} title="Ngưng hoạt động">
-            <IconTrash />
-            Ngưng
+        {/*
+          Restore PermissionGate. Nếu nút không hiện -> permissions chưa được grant đúng trong DB.
+        */}
+        <PermissionGate permission="admin:branches:update">
+          <button className="btn btn--sm btn--secondary" onClick={() => onEdit(branch)} title="Chỉnh sửa">
+            <IconEdit />
+            Sửa
           </button>
+        </PermissionGate>
+        {branch.isActive ? (
+          <PermissionGate permission="admin:branches:deactivate">
+            <button className="btn btn--sm btn--danger" onClick={() => onDeactivate(branch)} title="Ngưng hoạt động">
+              <IconTrash />
+              Ngưng
+            </button>
+          </PermissionGate>
         ) : null}
       </div>
     </div>
@@ -417,6 +428,7 @@ function StatsModal({ branch, stats, onClose }) {
 
 export default function AdminBranchesPage() {
   const toast = useToast();
+  const { handleApiError } = useApiError();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -480,7 +492,9 @@ export default function AdminBranchesPage() {
       setDeactivateTarget(null);
       loadData();
     } catch (err) {
-      toast.error(err.message || 'Lỗi khi ngưng hoạt động chi nhánh');
+      if (!handleApiError(err, 'admin:branches:deactivate')) {
+        toast.error(err.message || 'Lỗi khi ngưng hoạt động chi nhánh');
+      }
     } finally {
       setDeactivateLoading(false);
     }

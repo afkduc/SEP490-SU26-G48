@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
+import { useAuth } from '../../contexts/AppContext';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
@@ -354,18 +355,83 @@ function SessionTable({ items, onViewUser, onViewSession }) {
 export default function AdminLoginSessionsPage() {
   const sessions = useLoginSessions();
   const { branches, branchesError } = useSharedBranches();
+  const { token } = useAuth();
   const [detailUserId, setDetailUserId] = useState(null);
   const [detailSession, setDetailSession] = useState(null);
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
 
-  // SSE: nhan su kien realtime tu server, chi refetch khi co su kien moi
+  // Debounce refetch SSE - gom nhieu event thanh 1 lan refetch
+  // (tranh nhap nhay khi user click nhieu action cung luc)
+  const sseRefetchTimerRef = useRef(null);
+
+  // Lay current items qua ref (tranh closure stale)
+  const dataRef = useRef(sessions.data);
+  const paramsRef = useRef(sessions.params);
+  useEffect(() => {
+    dataRef.current = sessions.data;
+  }, [sessions.data]);
+  useEffect(() => {
+    paramsRef.current = sessions.params;
+  }, [sessions.params]);
+
+  // SSE: smart refetch thay vi full refetch moi event.
+  // - Neu filter dang nhu "user X" va event khong phai user X -> bo qua.
+  // - Neu chi co action_type filter va event khong match -> bo qua.
+  // - Debounce 500ms de gom nhieu event.
   const handleSessionEvent = (eventData) => {
-    console.log('[AdminLoginSessionsPage] SSE event:', eventData);
-    // Co su kien -> refetch full list de dam bao du lieu dong bo
-    sessions.refetch();
+    const eventType = eventData && eventData.type;
+    const sessionUserName = eventData && eventData.userName;
+    const sessionUserId = eventData && eventData.userId;
+
+    // Filter matching (de khong refetch khi event khong thuoc filter hien tai)
+    const p = paramsRef.current;
+    const filterUserName = (p.userName || '').toLowerCase().trim();
+    const filterActionType = p.actionType || '';
+    const filterStatus = p.status || '';
+    const filterBranchId = p.branchId;
+
+    if (filterUserName && sessionUserName) {
+      if (!String(sessionUserName).toLowerCase().includes(filterUserName)) {
+        return; // Khong match filter -> bo qua
+      }
+    }
+    if (filterActionType && eventType) {
+      const actionMap = { login: 'LOGIN', logout: 'LOGOUT', force: 'FORCE_LOGOUT', login_failed: 'LOGIN_FAILED' };
+      const expectedAction = actionMap[eventType] || eventType.toUpperCase();
+      if (filterActionType !== expectedAction && filterActionType !== eventType) {
+        return; // Khong match action filter
+      }
+    }
+    if (filterStatus) {
+      const statusByEvent = { login: 'active', logout: 'ended', force: 'ended', login_failed: 'failed' };
+      const eventStatus = statusByEvent[eventType];
+      if (eventStatus && filterStatus !== eventStatus) return;
+    }
+    // void for future use
+    void sessionUserId;
+    void filterBranchId;
+
+    // Debounce: gom nhieu event trong 500ms thanh 1 lan refetch
+    if (sseRefetchTimerRef.current) {
+      clearTimeout(sseRefetchTimerRef.current);
+    }
+    sseRefetchTimerRef.current = setTimeout(() => {
+      sessions.refetch();
+      sseRefetchTimerRef.current = null;
+    }, 500);
   };
 
-  const { connected } = useLoginSessionsSSE(handleSessionEvent, realtimeEnabled);
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (sseRefetchTimerRef.current) {
+        clearTimeout(sseRefetchTimerRef.current);
+        sseRefetchTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const { connected } = useLoginSessionsSSE(handleSessionEvent, realtimeEnabled, token);
 
   const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
   const hasFilters = sessions.params.userName || sessions.params.phone ||

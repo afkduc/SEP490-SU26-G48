@@ -289,73 +289,69 @@
 
 .matrix-scroll {
   overflow-x: auto;
+  /* Su dung custom property de tinh toan width cua cac cot role */
+  --matrix-role-width: clamp(72px, 8vw, 110px);
 }
 
 .matrix-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 700px;
+  table-layout: fixed;
+  min-width: 0;
 }
 
 .matrix-table th {
-  padding: 12px 16px;
+  padding: 10px 8px;
   background: #f8fafc;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   text-align: center;
   border-bottom: 1px solid #e2e8f0;
   border-right: 1px solid #e2e8f0;
-  position: sticky;
-  left: 0;
   z-index: 2;
 }
 
 .matrix-th--module {
   text-align: left !important;
-  min-width: 200px;
+  width: clamp(140px, 22vw, 200px);
+  min-width: 140px;
   background: #f1f5f9 !important;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   border-right: 1px solid #e2e8f0;
 }
 
 .matrix-th--role {
-  min-width: 150px;
-  padding: 10px 12px !important;
+  width: var(--matrix-role-width);
+  min-width: 72px;
+  padding: 8px 4px !important;
   background: #f8fafc !important;
-  white-space: nowrap;
+  white-space: normal;
+  vertical-align: bottom;
+  line-height: 1.15;
 }
 
 .matrix-role-label {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: #1e293b;
   text-transform: none;
   letter-spacing: 0;
-  display: block;
-  line-height: 1.2;
-  margin-bottom: 2px;
-  writing-mode: horizontal-tb;
-  transform: none;
-}
-
-.matrix-role-code {
-  font-size: 0.68rem;
-  color: #94a3b8;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: 0;
-  font-family: monospace;
-  display: block;
-  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  hyphens: auto;
   writing-mode: horizontal-tb;
   transform: none;
 }
 
 .matrix-table td {
-  padding: 10px 16px;
+  padding: 8px 10px;
   border-bottom: 1px solid #f1f5f0;
   border-right: 1px solid #f1f5f0;
   vertical-align: middle;
@@ -372,11 +368,16 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  min-width: 200px;
+  width: clamp(140px, 22vw, 200px);
+  min-width: 140px;
+  max-width: 200px;
 }
 
 .matrix-table td:not(:first-child) {
   text-align: center;
+  width: var(--matrix-role-width);
+  min-width: 72px;
+  padding: 8px 4px;
 }
 
 .matrix-module-row td {
@@ -403,33 +404,41 @@
 .matrix-perm-label {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 16px !important;
+  gap: 1px;
+  padding: 6px 10px !important;
 }
 
 .matrix-perm-action {
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .matrix-perm-key {
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   color: #94a3b8;
   font-weight: 400;
   font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .matrix-check-cell {
   text-align: center;
-  padding: 10px 16px !important;
+  padding: 6px 2px !important;
 }
 
 .matrix-checkbox {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   cursor: pointer;
   accent-color: #4f46e5;
+  margin: 0;
+  vertical-align: middle;
 }
 
 /* ── Modal ────────────────────────────────────────────────────────── */
@@ -725,4 +734,317 @@
   font-weight: 600;
   background: #eef2ff;
   color: #4f46e5;
+}
+
+/* ── Matrix compact: dam bao khong can cuon ngang o >=1024px ─────── */
+/* Tinh tong width: cot module (200) + N cot role (110) phai < viewport */
+/* 200 + N*110 < viewport => N < (viewport-200)/110 */
+/* 1024px: N < 7.5 (toi da 7 cot role) */
+/* 1280px: N < 9.8 (toi da 9 cot role) */
+/* 768px:  luon cuon ngang - dung scroll */
+
+@media (max-width: 1023px) {
+  .matrix-scroll {
+    --matrix-role-width: 90px;
+  }
+}
+
+@media (max-width: 767px) {
+  .matrix-scroll {
+    --matrix-role-width: 72px;
+  }
+  .admin-roles {
+    padding: 16px 12px;
+  }
+  .matrix-th--module,
+  .matrix-table td:first-child {
+    width: 110px;
+    min-width: 110px;
+    max-width: 130px;
+  }
+  .matrix-perm-label {
+    padding: 6px 8px !important;
+  }
+  .matrix-perm-action { font-size: 0.72rem; }
+  .matrix-perm-key { font-size: 0.6rem; }
+  .matrix-checkbox { width: 14px; height: 14px; }
+}
+
+/* ── Matrix scroll behaviors ─────────────────────────────────────── */
+/* Dam bao header module row luon sticky-top khi cuon doc */
+.matrix-module-row td {
+  position: sticky;
+  top: 0;
+}
+
+/* Dam bao thead (cot role header) cung sticky-top, stack voi module row */
+.matrix-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.matrix-table thead th.matrix-th--module {
+  /* Fix xung dot: cot module khong can sticky-top rieng, no nam trong thead */
+  top: 0;
+}
+
+/* Khi cuon ngang, cot dau tien giu nguyen */
+.matrix-th--module,
+.matrix-table td:first-child {
+  position: sticky;
+  left: 0;
+}
+
+/* ============================================================
+ * GROUPS MATRIX (Phase 3) - moi role = 1 card voi cac nhom checkbox
+ * ============================================================ */
+
+.groups-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.groups-matrix__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+}
+
+.groups-matrix__header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.groups-matrix__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 16px;
+}
+
+.groups-matrix__card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.groups-matrix__card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  border-color: #cbd5e1;
+}
+
+.groups-matrix__card--inactive {
+  opacity: 0.55;
+  background: #f8fafc;
+}
+
+.groups-matrix__card-header {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+}
+
+.groups-matrix__role-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.groups-matrix__role-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.groups-matrix__role-code {
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #475569;
+  font-size: 0.72rem;
+}
+
+.groups-matrix__status {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+.groups-matrix__status.is-active {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.groups-matrix__status.is-inactive {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.groups-matrix__role-count {
+  color: #6366f1;
+  font-weight: 600;
+  background: #e0e7ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.groups-matrix__modules {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.groups-matrix__warning {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.groups-matrix__warning code {
+  background: #fde68a;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: #78350f;
+}
+
+.groups-matrix__module {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.groups-matrix__module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.groups-matrix__module-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.88rem;
+}
+
+.groups-matrix__module-toggle input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+.groups-matrix__module-name {
+  user-select: none;
+}
+
+.groups-matrix__module-count {
+  font-size: 0.72rem;
+  color: #64748b;
+  background: #ffffff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.groups-matrix__group-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px;
+}
+
+.groups-matrix__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.82rem;
+}
+
+.groups-matrix__group:hover {
+  border-color: #6366f1;
+  background: #f5f3ff;
+}
+
+.groups-matrix__group.is-checked {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+
+.groups-matrix__group input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: #6366f1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.groups-matrix__group-name {
+  flex: 1;
+  min-width: 0;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groups-matrix__group-perms {
+  font-size: 0.7rem;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.groups-matrix__group.is-checked .groups-matrix__group-perms {
+  background: #c7d2fe;
+  color: #4338ca;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .groups-matrix__cards {
+    grid-template-columns: 1fr;
+  }
+  .groups-matrix__group-list {
+    grid-template-columns: 1fr;
+  }
+  .groups-matrix__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
