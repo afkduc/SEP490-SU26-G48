@@ -112,6 +112,14 @@ class RepairOrderService {
     if (task.taskType !== 'service') {
       throw new ApiError(400, 'Chỉ đầu mục dịch vụ mới cần tích hoàn thành');
     }
+    // Tich xong la chot luon, khong cho tich lai/bo tich - tranh to truong
+    // (hoac goi thang API) sua di sua lai trang thai da xac nhan hoan thanh.
+    if (task.isDone) {
+      throw new ApiError(409, 'Đầu mục này đã được xác nhận hoàn thành, không thể thay đổi lại');
+    }
+    if (!isDone) {
+      throw new ApiError(400, 'Không thể bỏ tích đầu mục công việc');
+    }
 
     await this.repairOrderRepository.updateTaskStatus(taskId, isDone);
     return this.getById(id);
