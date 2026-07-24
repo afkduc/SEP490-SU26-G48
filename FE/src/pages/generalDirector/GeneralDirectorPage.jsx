@@ -132,8 +132,14 @@ function percent(value) {
 }
 
 function textIncludes(source, keyword) {
-  const text = String(source || '').toLowerCase();
-  const needle = String(keyword || '').trim().toLowerCase();
+  const normalize = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  const text = normalize(source);
+  const needle = normalize(keyword);
   if (!needle) return true;
   return text.includes(needle);
 }
