@@ -92,6 +92,14 @@ const EMPLOYEE_STATUS_META = {
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const FILTER_ROW_STYLE = {
+  display: 'flex',
+  gap: 10,
+  flexWrap: 'nowrap',
+  alignItems: 'center',
+  overflowX: 'auto',
+  paddingBottom: 4,
+};
 
 function statusBadge(status) {
   const meta = STATUS_META[status] || STATUS_META.waiting_repair;
@@ -859,7 +867,7 @@ function EmployeeListPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'nowrap', alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
+      <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
           <span className="search-icon">🔍</span>
           <input
@@ -1224,7 +1232,7 @@ function TechnicianListPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'nowrap', alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
+      <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
           <span className="search-icon">🔍</span>
           <input
@@ -1621,7 +1629,7 @@ function BranchManagerListPage() {
         <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>👤 {user?.name || 'General Director'}</div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'nowrap', alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
+      <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
           <span className="search-icon">🔍</span>
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo mã, tên, email, điện thoại..." />
@@ -2309,7 +2317,7 @@ function SettlementReportsPage() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'nowrap', alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
+      <div style={{ ...FILTER_ROW_STYLE, marginBottom: 14 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
           <span className="search-icon">🔍</span>
           <input
