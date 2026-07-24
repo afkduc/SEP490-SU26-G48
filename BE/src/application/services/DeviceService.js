@@ -25,9 +25,9 @@ class DeviceService {
     const userId = device.userId;
     const userName = device.userName;
 
-    // 1. End session thuoc device nay (status -> 'ended', logout_reason = FORCE_LOGOUT)
+    // 1. End session thuoc device nay (status -> 'ended', logout_reason = FORCE_LOGO)
     //    Phai lam TRUOC khi revoke device de tranh mat FK linkage.
-    await this._endSessionsByDeviceId(Number(deviceId), 'FORCE_LOGOUT');
+    await this._endSessionsByDeviceId(Number(deviceId), 'FORCE_LOGO');
 
     // 2. Revoke THIS device - set is_current = 0
     await this._revokeDevice(deviceId);
@@ -62,7 +62,7 @@ class DeviceService {
       const ns = new NotificationService();
       // .catch() bat buoc - notify() la async, khong await o day (fire-and-
       // forget) nen reject se thanh unhandled rejection lam crash ca process.
-      ns.notify('FORCE_LOGOUT', { userId, deviceId }).catch((err) => {
+      ns.notify('FORCE_LOGO', { userId, deviceId }).catch((err) => {
         console.error('[DeviceService] Failed to send force logout notification:', err.message);
       });
     } catch (err) {
@@ -92,7 +92,7 @@ class DeviceService {
    *   - forceLogoutAllOtherDevices (admin da cac device khac cua user)
    *
    * Sau khi UPDATE login_sessions (status -> 'ended'), ghi event
-   * FORCE_LOGOUT vao login_session_events cho moi session bi end
+   * FORCE_LOGO vao login_session_events cho moi session bi end
    * de audit log ro rang va admin co the theo doi realtime qua SSE.
    *
    * QUAN TRONG:
@@ -100,7 +100,7 @@ class DeviceService {
    *     FK tu login_sessions.device_id co the chan hoac thanh NULL.
    *   - Tra ve so session da end de log + audit.
    */
-  async _endSessionsByDeviceId(deviceId, logoutReason = 'FORCE_LOGOUT') {
+  async _endSessionsByDeviceId(deviceId, logoutReason = 'FORCE_LOGO') {
     const { query } = require('../../infrastructure/database/sqlServer');
     const deviceNum = Number(deviceId);
     if (!deviceNum) return 0;
@@ -135,7 +135,7 @@ class DeviceService {
     );
     const endedCount = upd.rowsAffected && upd.rowsAffected[0] ? upd.rowsAffected[0] : 0;
 
-    // Ghi FORCE_LOGOUT event cho moi session bi end (khong dan den qua nhieu row:
+    // Ghi FORCE_LOGO event cho moi session bi end (khong dan den qua nhieu row:
     // 1 user chi co 1 active session / device trong single-session mode).
     for (const s of sessionRows) {
       try {
@@ -145,7 +145,7 @@ class DeviceService {
            VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`,
           {
             p1: s.id,
-            p2: 'FORCE_LOGOUT',
+            p2: 'FORCE_LOGO',
             p3: s.user_id,
             p4: s.user_name,
             p5: s.ip_address,
@@ -153,7 +153,7 @@ class DeviceService {
           }
         );
       } catch (evErr) {
-        console.error('[DeviceService] Failed to write FORCE_LOGOUT event for session', s.id, evErr.message);
+        console.error('[DeviceService] Failed to write FORCE_LOGO event for session', s.id, evErr.message);
       }
     }
 
@@ -165,7 +165,7 @@ class DeviceService {
    * End active sessions theo list deviceIds (dung cho forceLogoutAllDevices).
    * Tra ve tong so session da end.
    */
-  async _endSessionsByDeviceIds(deviceIds, logoutReason = 'FORCE_LOGOUT') {
+  async _endSessionsByDeviceIds(deviceIds, logoutReason = 'FORCE_LOGO') {
     let total = 0;
     for (const id of deviceIds) {
       const n = await this._endSessionsByDeviceId(id, logoutReason);
@@ -217,7 +217,7 @@ class DeviceService {
       { p1: userNum, p2: cur }
     );
     const deviceIdsToDelete = (deviceIdsRes.recordset || []).map(r => r.id);
-    await this._endSessionsByDeviceIds(deviceIdsToDelete, 'FORCE_LOGOUT');
+    await this._endSessionsByDeviceIds(deviceIdsToDelete, 'FORCE_LOGO');
 
     // Thuc su xoa (logic giu nguyen repository.deleteOtherDevices)
     const totalDeleted = await this.deviceRepository.deleteOtherDevices(userNum, cur);
@@ -259,7 +259,7 @@ class DeviceService {
 
     // 1. End all active sessions thuoc cac device cua user (TRUOC khi revoke
     //    de tranh FK device_id NULL/INVALID sau revoke lam session orphan).
-    await this._endSessionsByDeviceIds(deviceIds, 'FORCE_LOGOUT');
+    await this._endSessionsByDeviceIds(deviceIds, 'FORCE_LOGO');
 
     // 2. Revoke all devices
     await this.deviceRepository.revokeAllDevices(userNumId);
@@ -311,10 +311,26 @@ class DeviceService {
    * truong hop clock client sai lam UI hien thi sai last_activity_at.
    */
   async heartbeat(deviceId) {
-    const updated = await this.deviceRepository.updateLastActivityIfNeeded(Number(deviceId));
+    const { query } = require('../../infrastructure/database/sqlServer');
+    const devId = Number(deviceId);
+    // 1. Update user_devices.last_activity_at (existing logic)
+    const updatedDevice = await this.deviceRepository.updateLastActivityIfNeeded(devId);
+    // 2. Update login_sessions.last_activity_at (BUG FIX: was missing)
+    //    This ensures the cleanup job can correctly identify stale sessions.
+    //    Use throttle: only update if >= 60s since last update to avoid DB spam.
+    await query(
+      `UPDATE TOP (1) login_sessions
+       SET    last_activity_at = SYSUTCDATETIME()
+       WHERE  device_id = @p1
+         AND  status    = 'active'
+         AND  action_type = 'LOGIN'
+         AND  (last_activity_at IS NULL
+               OR last_activity_at < DATEADD(SECOND, -60, SYSUTCDATETIME()))`,
+      { p1: devId }
+    );
     return {
-      updated,
-      deviceId: Number(deviceId),
+      updated: updatedDevice,
+      deviceId: devId,
       serverTime: new Date().toISOString(),
     };
   }
