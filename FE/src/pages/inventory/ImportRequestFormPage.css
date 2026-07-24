@@ -44,6 +44,15 @@
   margin-bottom: 12px;
 }
 
+@media (max-width: 768px) {
+  .ir-form { padding: 16px; }
+  .ir-form__info-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .ir-form { padding: 12px; }
+}
+
 .ir-form__field {
   display: flex;
   flex-direction: column;
