@@ -24,6 +24,24 @@ class ServiceRequestController {
     }
   };
 
+  getPublicServicePackages = async (req, res, next) => {
+    try {
+      const packages = await this.serviceRequestService.getPublicServicePackages();
+      return success(res, packages, 'Service packages retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPublicServicePackageByCode = async (req, res, next) => {
+    try {
+      const pkg = await this.serviceRequestService.getPublicServicePackageByCode(req.params.code);
+      return success(res, pkg, 'Service package retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   createPublic = async (req, res, next) => {
     try {
       const result = await this.serviceRequestService.createPublic(req.body);
