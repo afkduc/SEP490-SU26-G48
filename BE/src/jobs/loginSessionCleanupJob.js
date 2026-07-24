@@ -48,7 +48,7 @@ async function cleanupStaleSessions() {
               status                   = 'ended'
        WHERE  status               = 'active'
          AND  action_type          = 'LOGIN'
-         AND  last_activity_at     < DATEADD(MINUTE, -@p1, SYSUTCDATETIME())`,
+         AND  COALESCE(last_activity_at, login_time) < DATEADD(MINUTE, -@p1, SYSUTCDATETIME())`,
       { p1: STALE_MINUTES }
     );
     const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
@@ -89,7 +89,7 @@ async function cleanupOrphanedDevices() {
              WHERE  ls.user_id = ud.user_id
                AND  ls.status = 'active'
                AND  ls.action_type = 'LOGIN'
-               AND  ls.last_activity_at < DATEADD(MINUTE, -@p1, SYSUTCDATETIME())
+               AND  COALESCE(ls.last_activity_at, ls.login_time) < DATEADD(MINUTE, -@p1, SYSUTCDATETIME())
            )
          )`,
       { p1: STALE_MINUTES }

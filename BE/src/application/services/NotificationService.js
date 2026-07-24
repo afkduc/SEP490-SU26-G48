@@ -51,7 +51,7 @@ const NOTIFICATION_EVENTS = {
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
-  FORCE_LOGOUT: {
+  FORCE_LOGO: {
     title: 'Phiên đã bị kết thúc',
     severity: SEVERITY.WARNING,
     messageTemplates: {
@@ -450,7 +450,7 @@ class NotificationService {
     if (eventType === 'ROLE_CHANGED' && data.action === 'ASSIGNED') {
       message = event.messageTemplates.assigned;
     }
-    if (eventType === 'FORCE_LOGOUT' && data.forcedBy) {
+    if (eventType === 'FORCE_LOGO' && data.forcedBy) {
       message = event.messageTemplates.byAdmin;
     }
     if (eventType === 'LOGIN_SUCCESS' && data.isNewDevice) {
