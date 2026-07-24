@@ -123,6 +123,22 @@ class PermissionMatrixRepository {
     if (granted) return this.grant(roleId, permissionId);
     return this.revoke(roleId, permissionId);
   }
+
+  /**
+   * Lay danh sach userId dang giu role nay (de emit SSE khi admin toggle).
+   * Dung trong PermissionMatrixController de push realtime update toi cac
+   * user dang online (filter theo userId trong JWT).
+   */
+  async getUsersByRole(roleId) {
+    if (!roleId) return [];
+    const result = await query(
+      `SELECT DISTINCT ur.user_id AS id
+       FROM user_role ur
+       WHERE ur.role_id = @p1`,
+      { p1: roleId }
+    );
+    return result.recordset.map((row) => Number(row.id)).filter(Number.isFinite);
+  }
 }
 
 module.exports = PermissionMatrixRepository;

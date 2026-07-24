@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { usePermission } from '../../contexts';
 import ScrollToggleButton from '../common/ScrollToggleButton';
 import './AdminLayout.css';
 
@@ -35,6 +36,7 @@ const ADMIN_SIDEBAR = [
           </svg>
         ),
         badge: 'Hệ thống',
+        permission: 'screen:users:access',
       },
       {
         label: 'Chi nhánh',
@@ -45,6 +47,7 @@ const ADMIN_SIDEBAR = [
             <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
           </svg>
         ),
+        permission: 'screen:branches:access',
       },
       {
         label: 'Vai trò',
@@ -54,6 +57,7 @@ const ADMIN_SIDEBAR = [
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
         ),
+        permission: 'screen:roles:access',
       },
       {
         label: 'Ma trận quyền',
@@ -67,6 +71,7 @@ const ADMIN_SIDEBAR = [
             <line x1="3" y1="15" x2="21" y2="15"/>
           </svg>
         ),
+        permission: 'screen:permission_matrix:access',
       },
     ],
   },
@@ -85,6 +90,7 @@ const ADMIN_SIDEBAR = [
             <polyline points="10 9 9 9 8 9"/>
           </svg>
         ),
+        permission: 'screen:audit_logs:access',
       },
       {
         label: 'Lịch sử đăng nhập',
@@ -95,6 +101,7 @@ const ADMIN_SIDEBAR = [
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         ),
+        permission: 'screen:login_sessions:access',
       },
       {
         label: 'Thiết bị',
@@ -106,6 +113,7 @@ const ADMIN_SIDEBAR = [
             <line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
         ),
+        permission: 'screen:devices:access',
       },
       {
         label: 'Chuyên môn',
@@ -115,6 +123,7 @@ const ADMIN_SIDEBAR = [
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
           </svg>
         ),
+        permission: 'screen:specialties:access',
       },
     ],
   },
@@ -153,10 +162,16 @@ function getInitials(name = '') {
 
 function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
   const { user } = useAuth();
+  const { can } = usePermission();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const allItems = ADMIN_SIDEBAR.flatMap((g) => g.items);
+  const isItemVisible = (item) => !item.permission || can(item.permission);
+
+  const visibleGroups = ADMIN_SIDEBAR
+    .map((g) => ({ ...g, items: g.items.filter(isItemVisible) }))
+    .filter((g) => g.items.length > 0);
+  const allItems = visibleGroups.flatMap((g) => g.items);
   const matchedPaths = allItems
     .filter((i) =>
       location.pathname === i.path
@@ -207,7 +222,7 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
       </div>
 
       <nav className="admin-sidebar__nav">
-        {ADMIN_SIDEBAR.map((group, gi) => (
+        {visibleGroups.map((group, gi) => (
           <div key={gi} className="admin-sidebar__group">
             {group.group && (
               <div className="admin-sidebar__group-label">{group.group}</div>
@@ -239,12 +254,18 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
 
 export default function AdminLayout({ children }) {
   const { user, logout } = useAuth();
+  const { can } = usePermission();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
+
+  const isItemVisible = (item) => !item.permission || can(item.permission);
+  const visibleGroups = ADMIN_SIDEBAR
+    .map((g) => ({ ...g, items: g.items.filter(isItemVisible) }))
+    .filter((g) => g.items.length > 0);
 
   // Close mobile drawer when route changes
   useEffect(() => {
@@ -285,7 +306,7 @@ export default function AdminLayout({ children }) {
     navigate('/admin/profile');
   };
 
-  const allItems = ADMIN_SIDEBAR.flatMap((g) => g.items);
+  const allItems = visibleGroups.flatMap((g) => g.items);
   const matchedPaths = allItems
     .filter((i) =>
       location.pathname === i.path

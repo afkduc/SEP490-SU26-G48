@@ -137,13 +137,41 @@ function AppRoutes() {
               <AdminUsersPage />
             </ProtectedRoute>
           } />
-          <Route path="branches" element={<AdminBranchesPage />} />
-          <Route path="roles" element={<AdminRolesPage />} />
-          <Route path="devices" element={<AdminDevicesPage />} />
-          <Route path="specialties" element={<AdminSpecialtiesPage />} />
-          <Route path="permission-matrix" element={<AdminPermissionMatrixPage />} />
-          <Route path="logs" element={<AuditLogsPage />} />
-          <Route path="login-sessions" element={<LoginSessionsPage />} />
+          <Route path="branches" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:branches:access">
+              <AdminBranchesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="roles" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:roles:access">
+              <AdminRolesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="devices" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:devices:access">
+              <AdminDevicesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="specialties" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:specialties:access">
+              <AdminSpecialtiesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="permission-matrix" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:permission_matrix:access">
+              <AdminPermissionMatrixPage />
+            </ProtectedRoute>
+          } />
+          <Route path="logs" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:audit_logs:access">
+              <AuditLogsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="login-sessions" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:login_sessions:access">
+              <LoginSessionsPage />
+            </ProtectedRoute>
+          } />
           <Route path="profile" element={<AdminProfilePage />} />
           <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
         </Route>
