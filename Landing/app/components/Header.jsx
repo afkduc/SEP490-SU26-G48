@@ -19,9 +19,11 @@ import styles from "./Header.module.css";
 // lai co che cuon-toi-id da chay dung cho cac muc khac.
 const navLinks = [
   { href: "/#trang-chu", label: "Trang chủ" },
+  { href: "/#vi-sao-chon", label: "Vì sao chọn AutoGara" },
+  { href: "/#goi-dich-vu", label: "Gói dịch vụ" },
+  { href: "/#chi-nhanh", label: "Chi nhánh" },
   { href: "/#meo-bao-duong", label: "Kinh nghiệm" },
   { href: "/#gui-yeu-cau", label: "Liên hệ" },
-  { href: "/#meo-bao-duong", label: "Mẹo kiểm tra" },
 ];
 
 export default function Header() {
