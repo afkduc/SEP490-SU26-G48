@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { permissionMatrixApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
+import usePermissionEventsSSE from '../../hooks/admin/usePermissionEventsSSE';
 import './AdminPermissionMatrixPage.css';
 
 // ─── Mapping: role nao "so huu" module nao ──────────────────────────
@@ -167,12 +168,15 @@ export default function AdminPermissionMatrixPage() {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(() => new Set());
   const [search, setSearch] = useState('');
+  // Ref de tranh stale closure khi SSE callback chay sau khi component unmount.
+  const matrixRef = useRef(matrix);
 
   const loadMatrix = useCallback(async () => {
     setLoading(true);
     try {
       const data = await permissionMatrixApi.getMatrix();
       setMatrix(data);
+      matrixRef.current = data;
     } catch (err) {
       showToast({ message: err.message || 'Lỗi tải ma trận quyền', type: 'error' });
     } finally {
@@ -184,6 +188,41 @@ export default function AdminPermissionMatrixPage() {
     loadMatrix();
   }, [loadMatrix]);
 
+  /**
+   * SSE: lang nghe permission-changed tu server.
+   *
+   * - Khi admin khac (hoac chinh minh qua tab khac) tick/revoke permission,
+   *   BE emit SSE -> hook nay se:
+   *     1. Goi /api/auth/refresh-permissions (BE re-issue JWT moi)
+   *     2. Luu token + permissions moi vao storage
+   *     3. Update React state (AppContext)
+   *     4. PermissionGate re-render ngay (khong can F5)
+   *
+   * - Ngoai ra, page matrix can reload grants de hien thi dung.
+   *   -> goi loadMatrix() o day de cap nhat UI ngay khi event den.
+   *
+   * - isOwnUpdate flag: khi admin chinh minh tick 1 cell -> BE cung emit
+   *   event (do toggleCell emit cho userIds dang giu role). De tranh
+   *   reload khong can thiet (UI da update local qua setMatrix o handleToggle),
+   *   chi reload khi event den tu nguoi khac.
+   */
+  usePermissionEventsSSE({
+    enabled: true,
+    onPermissionChanged: (data) => {
+      // Hien toast thong bao de admin biet co thay doi moi.
+      const isMatrixUpdate = data?.action === 'matrix_updated';
+      const roles = Array.isArray(data?.roleIds) ? data.roleIds : [];
+      showToast({
+        message: isMatrixUpdate
+          ? `Ma tran quyen vua duoc cap nhat (${roles.length} role${roles.length > 1 ? 's' : ''}) - tu dong reload.`
+          : 'Quyen cua ban vua duoc cap nhat.',
+        type: 'info',
+      });
+      // Reload matrix de cap nhat UI (cells moi nhat tu DB).
+      loadMatrix();
+    },
+  });
+
   const grantSet = useMemo(() => {
     if (!matrix) return new Set();
     return new Set(matrix.grants.map((g) => `${g.roleId}_${g.permissionId}`));
@@ -193,12 +232,16 @@ export default function AdminPermissionMatrixPage() {
     const key = `${roleId}_${permissionId}`;
     setToggling((prev) => new Set(prev).add(key));
     try {
-      await permissionMatrixApi.toggleCell({ roleId, permissionId, granted });
+      const result = await permissionMatrixApi.toggleCell({ roleId, permissionId, granted });
+      const changed = result?.changed !== false;
+      if (!changed) {
+        throw new Error('Quyền không thay đổi trên máy chủ');
+      }
       setMatrix((prev) => {
         if (!prev) return prev;
-        const newGrants = prev.grants.filter((g) => !(g.roleId === roleId && g.permissionId === permissionId));
+        const newGrants = prev.grants.filter((g) => !(Number(g.roleId) === Number(roleId) && Number(g.permissionId) === Number(permissionId)));
         if (granted) newGrants.push({ roleId, permissionId });
-        return { ...prev, grants: newGrants };
+        return { ...prev, grants: newGrants, generatedAt: new Date().toISOString() };
       });
       showToast({ message: granted ? 'Đã cấp quyền truy cập màn hình' : 'Đã thu hồi quyền truy cập màn hình', type: 'success' });
     } catch (err) {
@@ -244,7 +287,7 @@ export default function AdminPermissionMatrixPage() {
             <h1 className="matrix-page__title">Phân quyền truy cập theo vai trò</h1>
             <p className="matrix-page__subtitle">
               Mỗi vai trò chỉ hiển thị các màn hình liên quan đến công việc của họ.
-              Admin thấy tất cả. Sau khi thay đổi, người dùng cần <strong>đăng xuất và đăng nhập lại</strong> để nhận quyền mới.
+              Admin thấy tất cả. Sau khi thay đổi, hệ thống <strong>tự động cập nhật quyền</strong> cho các user đang online trong vài giây — không cần F5 hay đăng nhập lại.
             </p>
           </div>
         </div>
