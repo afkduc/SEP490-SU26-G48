@@ -10,6 +10,7 @@
   align-items: flex-start;
   margin-bottom: 24px;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .er-form__title {
@@ -104,6 +105,16 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .er-form { padding: 16px; }
+  .er-form__info-row,
+  .er-form__info-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .er-form { padding: 12px; }
 }
 
 .er-form__field {
