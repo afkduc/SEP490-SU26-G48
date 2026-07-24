@@ -21,6 +21,11 @@
   align-items: flex-start;
   margin-bottom: 24px;
   gap: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .er-detail { padding: 16px; }
 }
 
 .back-link {

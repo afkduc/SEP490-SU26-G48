@@ -11,6 +11,7 @@
   align-items: flex-start;
   margin-bottom: 24px;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .er-list__title {
