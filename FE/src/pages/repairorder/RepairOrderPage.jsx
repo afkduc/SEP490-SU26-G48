@@ -13,6 +13,7 @@ import {
 } from '../../services/repairOrderApi';
 import { ROLES } from '../../constants/roles';
 import { printWorkList } from '../repairsettlement/RepairSettlementPage';
+import './RepairOrderPage.css';
 
 const LHSC_LABELS = { DV: 'Dịch vụ', PT: 'Phụ tùng', BH: 'Bảo hành', HD: 'Hợp đồng' };
 // "pending_assignment" là trạng thái ảo (không lưu ở BE) cho các phiếu quyết
@@ -310,6 +311,45 @@ function CancelReasonModal({ title, onConfirm, onClose }) {
           <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Trở lại</button>
           <button className="btn btn-danger" onClick={handleConfirm} disabled={submitting}>
             {submitting ? 'Đang xử lý…' : 'Xác nhận hủy'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal xác nhận hoàn thành 1 đầu mục công việc (To truong) - thay cho
+// window.confirm cua trinh duyet de dong bo giao dien voi phan con lai cua app ──
+function ConfirmDoneModal({ taskName, onConfirm, onClose }) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">Xác nhận hoàn thành</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <p style={{ margin: 0, fontSize: 14 }}>Bạn đã hoàn thành xong đầu việc:</p>
+          <p style={{ margin: '8px 0 0', fontWeight: 700, fontSize: 15 }}>{taskName}</p>
+          <p style={{ marginTop: 12, fontSize: 12.5, color: 'var(--gray-600)' }}>
+            Sau khi xác nhận sẽ không sửa lại được.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Hủy</button>
+          <button className="btn btn-primary" onClick={handleConfirm} disabled={submitting}>
+            {submitting ? 'Đang lưu…' : 'Xác nhận hoàn thành'}
           </button>
         </div>
       </div>
@@ -950,6 +990,7 @@ function TeamLeaderTaskCards() {
   const [filterStatus, setFilterStatus] = useState('inprogress');
   const [busyTaskKey, setBusyTaskKey] = useState(null);
   const [busyOrderId, setBusyOrderId] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null); // { order, task } - dang cho xac nhan hoan thanh
 
   // silent=true dung cho auto-refresh nen (poll/focus lai tab) - khong bat
   // loading/spinner de tranh giat man hinh khi khong co gi thay doi.
@@ -985,18 +1026,29 @@ function TeamLeaderTaskCards() {
     return acc;
   }, {});
 
+  // Tich xong la chot luon, khong bo tich lai duoc (checkbox tu khoa ngay sau
+  // khi tich - xem disabled={... || task.isDone} o cho render) nen ham nay
+  // trong thuc te chi con chay theo chieu tich (false -> true). Xac nhan qua
+  // modal rieng cua app (ConfirmDoneModal) thay vi window.confirm cua trinh
+  // duyet, dong bo giao dien voi phan con lai cua he thong.
   const toggleTask = async (order, task) => {
     const key = `${order.id}-${task.id}`;
     setBusyTaskKey(key);
     setActionError('');
     try {
-      const updated = await updateRepairOrderTaskApi(order.id, task.id, !task.isDone);
+      const updated = await updateRepairOrderTaskApi(order.id, task.id, true);
       setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
     } catch (err) {
       setActionError(err.message || 'Không cập nhật được đầu mục công việc');
     } finally {
       setBusyTaskKey(null);
     }
+  };
+
+  const handleConfirmDone = async () => {
+    if (!confirmTarget) return;
+    await toggleTask(confirmTarget.order, confirmTarget.task);
+    setConfirmTarget(null);
   };
 
   const handleComplete = async (order) => {
@@ -1066,7 +1118,7 @@ function TeamLeaderTaskCards() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+      <div className="team-leader-card-grid">
         {filteredOrders.map((order) => {
           const st = STATUS_LABELS[order.status] || { label: order.status, badge: 'badge-inactive' };
           const tasks = order.tasks || [];
@@ -1120,8 +1172,8 @@ function TeamLeaderTaskCards() {
                       <input
                         type="checkbox"
                         checked={task.isDone}
-                        disabled={!isActive || isBusy}
-                        onChange={() => toggleTask(order, task)}
+                        disabled={!isActive || isBusy || task.isDone}
+                        onChange={() => setConfirmTarget({ order, task })}
                       />
                       <span>{task.taskName}</span>
                     </label>
@@ -1167,6 +1219,13 @@ function TeamLeaderTaskCards() {
         })}
       </div>
 
+      {confirmTarget && (
+        <ConfirmDoneModal
+          taskName={confirmTarget.task.taskName}
+          onClose={() => setConfirmTarget(null)}
+          onConfirm={handleConfirmDone}
+        />
+      )}
     </div>
   );
 }
