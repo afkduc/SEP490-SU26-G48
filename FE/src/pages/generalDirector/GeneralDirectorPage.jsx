@@ -378,8 +378,23 @@ function DetailModal({ report, onClose }) {
 }
 
 function ModuleActionBar() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   return (
     <div style={{ marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: '#64748B' }}>👤 {user?.name || 'General Director'}</span>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={handleLogout}>
+          Đăng xuất
+        </button>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         {GENERAL_DIRECTOR_ACTIONS.map((item) => (
           <NavLink
