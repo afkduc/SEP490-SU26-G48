@@ -6,7 +6,7 @@ const ACTION_TYPES = {
   DELETE: 'DELETE',
   LOGIN: 'LOGIN',
   LOGOUT: 'LOGOUT',
-  FORCE_LOGOUT: 'FORCE_LOGOUT',
+  FORCE_LOGO: 'FORCE_LOGO',
   CHANGE_PASSWORD: 'CHANGE_PASSWORD',
   RESET_PASSWORD: 'RESET_PASSWORD',
   ASSIGN_ROLE: 'ASSIGN_ROLE',
@@ -254,7 +254,7 @@ const auditCrud = {
   async forceLogout(req, { targetUserName, reason }) {
     await auditLog({
       req,
-      action: ACTION_TYPES.FORCE_LOGOUT,
+      action: ACTION_TYPES.FORCE_LOGO,
       tableName: 'login_sessions',
       description: `Buộc đăng xuất${targetUserName ? ` user ${targetUserName}` : ''}${reason ? `: ${reason}` : ''}`,
       responseStatus: 200,
