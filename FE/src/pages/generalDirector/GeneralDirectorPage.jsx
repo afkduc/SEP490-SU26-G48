@@ -99,6 +99,7 @@ const FILTER_ROW_STYLE = {
   alignItems: 'center',
   overflowX: 'auto',
   paddingBottom: 4,
+  whiteSpace: 'nowrap',
 };
 
 function statusBadge(status) {
