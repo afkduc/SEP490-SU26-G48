@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useParts } from '../../hooks/inventory/useParts';
 import { listUnitsApi } from '../../services/productApi';
+import { getSuppliersApi } from '../../services/supplierApi';
 import './PartListPage.css';
 
 const STATUS_LABELS = {
@@ -46,9 +47,13 @@ export default function PartListPage() {
   const [formError, setFormError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
   const [units, setUnits] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
 
   useEffect(() => {
     listUnitsApi().then(setUnits).catch(() => setUnits([]));
+    getSuppliersApi({ status: 'active' })
+      .then((res) => setSuppliers(res.items || []))
+      .catch(() => setSuppliers([]));
   }, []);
 
   function openCreate() {
@@ -352,9 +357,13 @@ export default function PartListPage() {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Nhà cung cấp</label>
-                  <input className="input" type="number" min="0" value={form.supplierId}
-                    onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
-                    placeholder="ID nhà cung cấp (số)" />
+                  <select className="input input--select" value={form.supplierId}
+                    onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
+                    <option value="">-- Chọn nhà cung cấp --</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.supplierName} ({s.supplierCode})</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Vị trí (Kho)</label>
