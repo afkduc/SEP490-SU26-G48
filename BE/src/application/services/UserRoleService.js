@@ -1,9 +1,10 @@
 const ApiError = require('../../utils/ApiError');
 
 class UserRoleService {
-  constructor({ userRoleRepository, roleRepository }) {
+  constructor({ userRoleRepository, roleRepository, userRepository }) {
     this.userRoleRepository = userRoleRepository;
     this.roleRepository = roleRepository;
+    this.userRepository = userRepository;
   }
 
   /**
@@ -27,6 +28,10 @@ class UserRoleService {
     }
     const ids = Array.isArray(roleIds) ? roleIds : [Number(roleIds)];
     const assignedRoles = [];
+    if (this.userRepository && typeof this.userRepository.findById === 'function') {
+      const targetUser = await this.userRepository.findById(Number(userId));
+      if (!targetUser) throw new ApiError(404, `User id=${userId} khong ton tai`);
+    }
     for (const roleId of ids) {
       const role = await this.roleRepository.findById(roleId);
       if (!role) throw new ApiError(404, `Role id=${roleId} khong ton tai`);
@@ -50,7 +55,12 @@ class UserRoleService {
   async revokeRole(userId, roleId, changedBy) {
     if (!userId) throw new ApiError(400, 'userId la bat buoc');
     if (!roleId) throw new ApiError(400, 'roleId la bat buoc');
-    
+
+    if (this.userRepository && typeof this.userRepository.findById === 'function') {
+      const targetUser = await this.userRepository.findById(Number(userId));
+      if (!targetUser) throw new ApiError(404, `User id=${userId} khong ton tai`);
+    }
+
     // Get role info before revoking for notification
     const role = await this.roleRepository.findById(roleId);
     const roleName = role ? (role.role_label || role.role_name) : '';

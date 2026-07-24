@@ -34,17 +34,34 @@ export async function getServerTime() {
 
 /**
  * Heartbeat: cap nhat last_activity_at theo dinh ky (60s throttle phia BE).
- * Tra ve { updated, deviceId, serverTime }.
- * Loi (401, network) -> nuot, khong anh huong UI.
+ *
+ * Tra ve:
+ *   { updated, deviceId, serverTime } neu thanh cong
+ *   { unauthorized: true } neu nhan 401/403 (FE xu ly rieng)
+ *   null neu loi khac (network / 5xx)
+ *
+ * QUAN TRONG: heartbeat TU KHONG show SessionExpiredModal.
+ * 401 vao day co the la do request STALE dang chay sau khi user logout/login moi.
+ * Hook useHeartbeat da co logic backoff rieng, no se quyet dinh khi nao modal.
  */
 export async function heartbeatApi() {
   try {
-    const data = await httpClient.post('/auth/heartbeat', {});
+    const data = await httpClient.post(
+      '/auth/heartbeat',
+      {},
+      { skipSessionExpired: true } // Hook xu ly 401 rieng, khong trigger modal
+    );
     return data;
   } catch (err) {
-    // Request cu dang chay se khong bat modal neu token da duoc thay moi;
-    // 401 cua chinh token hien tai van thong bao het phien binh thuong.
-    if (typeof console !== 'undefined') console.debug('[heartbeat] skipped:', err && err.message);
+    const status = err?.status;
+    // 401/403 -> hook se quyet dinh co show modal hay khong (chi show 1 lan)
+    if (status === 401 || status === 403) {
+      return { unauthorized: true, status };
+    }
+    // Loi khac (network, 5xx) -> null
+    if (typeof console !== 'undefined') {
+      console.debug('[heartbeat] skipped:', err && err.message);
+    }
     return null;
   }
 }

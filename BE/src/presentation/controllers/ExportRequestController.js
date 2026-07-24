@@ -1,5 +1,7 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
 const ApiError = require('../../utils/ApiError');
+const NotificationService = require('../../application/services/NotificationService');
 
 /**
  * Controller cho NV Kho (Warehouse Staff) xu ly phieu xuat kho.
@@ -12,6 +14,7 @@ const ApiError = require('../../utils/ApiError');
 class ExportRequestController {
   constructor({ exportRequestService }) {
     this.exportRequestService = exportRequestService;
+    this.notificationService = new NotificationService();
   }
 
   list = async (req, res, next) => {
@@ -102,6 +105,19 @@ class ExportRequestController {
         payload.branchId = req.user.branchId;
       }
       const created = await this.exportRequestService.create(payload);
+      await auditCrud.create(req, {
+        tableName: 'export_requests',
+        entityCode: created?.request_code || created?.code || null,
+        recordId: created?.id || null,
+        entityName: 'Phiếu xuất kho',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('EXPORT_REQUEST_CREATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: created?.request_code || created?.code || `ID-${created?.id}`,
+        targetCode: created?.request_code || created?.code || '',
+        userId: created?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ExportRequestController] notifyAdmins:', e.message));
       return success(res, created, 'Export request created', 201);
     } catch (err) {
       next(err);

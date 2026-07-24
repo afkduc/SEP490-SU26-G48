@@ -99,11 +99,17 @@ const IconEdit = ({ size = 16 }) => (
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Format ngay (chi ngay, khong gio) - dung cho avatar card ben trai.
+// Luu y: BE tra Date object UTC (sqlServer useUTC=true). new Date(value)
+// tu convert sang local time theo timezone cua may user, nen "ngay tao"
+// co the lech +/- 1 ngay neu may user dat mui gio khac.
+// neu muon hien thi ngay goc theo VN (+07:00), sua o day.
 function formatDate(value) {
   if (!value) return '—';
   try {
     return new Date(value).toLocaleDateString('vi-VN', {
       day: '2-digit', month: '2-digit', year: 'numeric',
+      timeZone: 'Asia/Ho_Chi_Minh',
     });
   } catch {
     return value;
@@ -113,9 +119,11 @@ function formatDate(value) {
 function formatDateTime(value) {
   if (!value) return '—';
   try {
+    // Ep timezone VN de gio luon hien thi theo gio VN (DB luu UTC).
     return new Date(value).toLocaleString('vi-VN', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
+      timeZone: 'Asia/Ho_Chi_Minh',
     });
   } catch {
     return value;
@@ -184,7 +192,7 @@ function PasswordInput({ label, id, value, onChange, placeholder, error }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AdminProfilePage() {
-  const { user } = useAuth();
+  const { user, setUser, reloadPermissions } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [profile, setProfile] = useState(null);
@@ -195,10 +203,11 @@ export default function AdminProfilePage() {
   const forcedChange = searchParams.get('reason') === 'forced';
 
   // Tab: 'view' | 'edit' | 'password'
-  // Doc tu query param ?tab=password de auto switch khi redirect tu login
+  // Doc tu query param ?tab=edit de auto switch khi can.
+  // Tab 'password' da bi an (se lam luong rieng qua email) -> fallback 'view'.
   const initialTab = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(
-    initialTab === 'password' || initialTab === 'edit' ? initialTab : 'view'
+    initialTab === 'edit' ? 'edit' : 'view'
   );
 
   // Edit form state
@@ -249,8 +258,11 @@ export default function AdminProfilePage() {
   }, []);
 
   // Switch tab resets messages
+  // Tab 'password' bi an nen neu co ai do goi handleTabChange('password') qua
+  // query param cu, fallback ve 'view' de tranh render content bi an.
   function handleTabChange(tab) {
-    setActiveTab(tab);
+    const safeTab = tab === 'password' ? 'view' : tab;
+    setActiveTab(safeTab);
     setEditError(null);
     setEditSuccess(null);
     setPwSuccess(null);
@@ -283,18 +295,41 @@ export default function AdminProfilePage() {
       setProfile(updated);
       setEditSuccess('Cập nhật thông tin thành công!');
 
-      // Update localStorage user so Navbar/AppContext picks up the change on next reload
+      // Update localStorage user va AppContext user + permissions de Navbar,
+      // permission gate va role badge dong bo ngay (khong can F5).
+      // Bug cu: chi setProfile local + luu 1 phan vao localStorage. Neu BE
+      // tra updated.roles hoac updated.permissions (khi admin thay doi role
+      // cua chinh minh), Navbar va PermissionGate van hien thi role cu.
       try {
         const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const updatedUser = {
-            ...parsed,
-            email: updated.email,
-            name: `${updated.firstName || ''} ${updated.lastName || ''}`.trim(),
-          };
-          const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
-          storage.setItem('user', JSON.stringify(updatedUser));
+        const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
+
+        const updatedUser = {
+          ...(raw ? JSON.parse(raw) : {}),
+          ...updated,
+          // Dam bao cac field chinh xac nhat quan he giua FE va BE
+          id: updated.id ?? updated.userId,
+          email: updated.email,
+          userName: updated.userName || updated.name,
+          name:
+            `${updated.firstName || ''} ${updated.lastName || ''}`.trim() ||
+            updated.name,
+          firstName: updated.firstName,
+          lastName: updated.lastName,
+          phone: updated.phone,
+          roles: updated.roles,
+          permissions: updated.permissions,
+          branchId: updated.branchId,
+          branchName: updated.branchName,
+        };
+        storage.setItem('user', JSON.stringify(updatedUser));
+
+        // Cap nhat AppContext state de component khac (Navbar, AdminLayout)
+        // re-render voi thong tin moi ngay lap tuc.
+        setUser(updatedUser);
+        // Re-load permissions tu storage (BE co the da tra permissions moi).
+        if (typeof reloadPermissions === 'function') {
+          reloadPermissions();
         }
       } catch (_) {}
 
@@ -405,15 +440,39 @@ export default function AdminProfilePage() {
                 <span className="profile-card__meta-icon"><IconPhone /></span>
                 <span className="profile-card__meta-value">{profile.phone || '—'}</span>
               </div>
-              <div className="profile-card__meta-item">
+              <div className="profile-card__meta-item profile-card__meta-item--branch">
                 <span className="profile-card__meta-icon"><IconBranch /></span>
-                <span className="profile-card__meta-value">{profile.branchName || '—'}</span>
+                <span className="profile-card__meta-value">
+                  {profile.assignedBranches?.length
+                    ? `${profile.assignedBranches.length} chi nhánh`
+                    : profile.branchName || '—'}
+                </span>
               </div>
               <div className="profile-card__meta-item">
                 <span className="profile-card__meta-icon"><IconCalendar /></span>
                 <span className="profile-card__meta-value">{formatDate(profile.createdAt)}</span>
               </div>
             </div>
+
+            {/* Branch chips tren avatar card */}
+            {profile.assignedBranches?.length > 0 && (
+              <div className="profile-card__branches">
+                {profile.assignedBranches.map((b) => {
+                  const isPrimary = Number(b.branchId) === Number(profile.branchId);
+                  return (
+                    <span
+                      key={b.branchId}
+                      className={`branch-chip ${isPrimary ? 'branch-chip--primary' : ''}`}
+                      title={isPrimary ? 'Chi nhánh chính' : 'Chi nhánh được phân công'}
+                    >
+                      <IconBranch size={12} />
+                      {b.branchName}
+                      {isPrimary && <span className="branch-chip__star">★</span>}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="profile-card__roles">
               {profile.roles?.map((r) => (
@@ -458,13 +517,17 @@ export default function AdminProfilePage() {
                 <IconEdit size={15} />
                 Chỉnh sửa
               </button>
-              <button
-                className={`profile-tabs__btn ${activeTab === 'password' ? 'profile-tabs__btn--active' : ''}`}
-                onClick={() => handleTabChange('password')}
-              >
-                <IconLock size={15} />
-                Đổi mật khẩu
-              </button>
+              {/* Tab "Đổi mật khẩu" đã được ẩn theo yêu cầu — sẽ làm luồng */}
+              {/* riêng (qua email) sau, KHÔNG xóa component để dễ bật lại. */}
+              {false && (
+                <button
+                  className={`profile-tabs__btn ${activeTab === 'password' ? 'profile-tabs__btn--active' : ''}`}
+                  onClick={() => handleTabChange('password')}
+                >
+                  <IconLock size={15} />
+                  Đổi mật khẩu
+                </button>
+              )}
             </div>
 
             {/* ── Tab: View ───────────────────────────────── */}
@@ -509,7 +572,7 @@ export default function AdminProfilePage() {
                   </div>
                   <div className="profile-info-item">
                     <span className="profile-info-item__label">Cập nhật lần cuối</span>
-                    <span className="profile-info-item__value">{formatDateTime(profile.createdAt)}</span>
+                    <span className="profile-info-item__value">{formatDateTime(profile.updatedAt || profile.createdAt)}</span>
                   </div>
                   <div className="profile-info-item profile-info-item--full">
                     <span className="profile-info-item__label">Vai tro</span>
@@ -523,6 +586,47 @@ export default function AdminProfilePage() {
                       </div>
                     </span>
                   </div>
+                </div>
+
+                {/* ── Section: Danh sách chi nhánh ────────────── */}
+                <div className="profile-branches">
+                  <div className="profile-branches__header">
+                    <IconBranch size={16} />
+                    <h3>Chi nhánh được phân công</h3>
+                    <span className="profile-branches__count">
+                      {profile.assignedBranches?.length || 0}
+                    </span>
+                  </div>
+
+                  {profile.assignedBranches?.length > 0 ? (
+                    <div className="profile-branches__grid">
+                      {profile.assignedBranches.map((b) => {
+                        const isPrimary = Number(b.branchId) === Number(profile.branchId);
+                        return (
+                          <div
+                            key={b.branchId}
+                            className={`branch-card ${isPrimary ? 'branch-card--primary' : ''}`}
+                          >
+                            <div className="branch-card__icon">
+                              <IconBranch size={18} />
+                            </div>
+                            <div className="branch-card__body">
+                              <div className="branch-card__name">{b.branchName}</div>
+                              <div className="branch-card__id">Mã CN: #{b.branchId}</div>
+                            </div>
+                            {isPrimary && (
+                              <span className="branch-card__badge">Chính</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="profile-branches__empty">
+                      <IconBranch size={20} />
+                      <span>Bạn chưa được phân công vào chi nhánh nào.</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

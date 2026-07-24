@@ -1,8 +1,11 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
+const NotificationService = require('../../application/services/NotificationService');
 
 class InventoryController {
   constructor({ inventoryService }) {
     this.inventoryService = inventoryService;
+    this.notificationService = new NotificationService();
   }
 
   getStockList = async (req, res, next) => {
@@ -63,6 +66,14 @@ class InventoryController {
         Number(branchId),
         qtyNum,
       );
+      await auditCrud.update(req, {
+        tableName: 'inventory_transactions',
+        entityCode: result?.transaction_code || null,
+        recordId: result?.id || null,
+        entityName: 'Tồn kho',
+        newData: { productId: Number(productId), branchId: Number(branchId), quantity: qtyNum },
+        description: `Điều chỉnh tồn kho sản phẩm ID ${productId} tại chi nhánh ${branchId}: ${qtyNum > 0 ? '+' : ''}${qtyNum}`,
+      });
       return success(res, result, 'Stock adjusted');
     } catch (err) {
       next(err);

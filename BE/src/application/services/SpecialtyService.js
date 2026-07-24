@@ -1,9 +1,12 @@
 const SpecialtyRepository = require('../../infrastructure/repositories/SpecialtyRepository');
 const ApiError = require('../../utils/ApiError');
+const { auditCrud } = require('../../utils/auditHelper');
+const NotificationService = require('./NotificationService');
 
 class SpecialtyService {
   constructor() {
     this.specialtyRepository = new SpecialtyRepository();
+    this.notificationService = new NotificationService();
   }
 
   async list() {
@@ -16,7 +19,7 @@ class SpecialtyService {
     return specialty;
   }
 
-  async create(payload) {
+  async create(payload, actorInfo = {}) {
     const { specialtyCode, specialtyName } = payload;
 
     if (!specialtyCode || !specialtyCode.trim()) {
@@ -36,10 +39,23 @@ class SpecialtyService {
       specialtyName: specialtyName.trim(),
     });
 
-    return this.specialtyRepository.findById(id);
+    const specialty = await this.specialtyRepository.findById(id);
+
+    // Gửi notification cho admin
+    if (actorInfo.userId) {
+      this.notificationService.notifyAdmins('SPECIALTY_CREATED', {
+        userId: actorInfo.userId,
+        actorName: actorInfo.name || actorInfo.userName || 'Admin',
+        targetName: specialty.specialtyName,
+      }, { excludeUserId: actorInfo.userId }).catch(err => {
+        console.warn('[SpecialtyService] notifyAdmins failed:', err.message);
+      });
+    }
+
+    return specialty;
   }
 
-  async update(id, payload) {
+  async update(id, payload, actorInfo = {}) {
     const existing = await this.specialtyRepository.findById(Number(id));
     if (!existing) throw new ApiError(404, 'Chuyen mon khong ton tai');
 
@@ -48,18 +64,21 @@ class SpecialtyService {
       throw new ApiError(400, 'specialtyName khong duoc rong');
     }
 
-    return this.specialtyRepository.update(id, { specialtyName: specialtyName.trim() });
-  }
+    const result = await this.specialtyRepository.update(id, { specialtyName: specialtyName.trim() });
+    const updated = await this.specialtyRepository.findById(id);
 
-  async delete(id) {
-    const existing = await this.specialtyRepository.findById(Number(id));
-    if (!existing) throw new ApiError(404, 'Chuyen mon khong ton tai');
-
-    const result = await this.specialtyRepository.delete(id);
-    if (!result.success) {
-      throw new ApiError(409, 'Khong the xoa chuyen mon dang duoc gan cho nguoi dung');
+    // Gửi notification cho admin
+    if (actorInfo.userId) {
+      this.notificationService.notifyAdmins('SPECIALTY_UPDATED', {
+        userId: actorInfo.userId,
+        actorName: actorInfo.name || actorInfo.userName || 'Admin',
+        targetName: updated.specialtyName,
+      }, { excludeUserId: actorInfo.userId }).catch(err => {
+        console.warn('[SpecialtyService] notifyAdmins failed:', err.message);
+      });
     }
-    return { deleted: true, id: Number(id) };
+
+    return updated;
   }
 
   async toggleStatus(id) {

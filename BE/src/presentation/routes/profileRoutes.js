@@ -41,6 +41,10 @@ function buildProfileRouter() {
   // Lấy số thông báo chưa đọc
   router.get('/me/notifications/unread-count', authenticate, controller.getUnreadCount);
 
+  // === Permission Request ===
+  // Gửi yêu cầu cấp quyền cho admin
+  router.post('/me/request-permission', authenticate, controller.requestPermission);
+
   return router;
 }
 

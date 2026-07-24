@@ -1,13 +1,13 @@
 const ApiError = require('../../utils/ApiError');
 
-const VALID_STATUSES = ['active', 'inactive', 'locked'];
+const VALID_STATUSES = ['active', 'inactive'];
 
 /**
  * Validate query params cho GET /api/admin/users
  * - search    : chuoi (optional)
  * - branchId  : so nguyen duong (optional)
  * - roleId    : chuoi (optional)
- * - status    : active | inactive | locked (optional)
+ * - status    : active | inactive (optional)
  * - page      : so nguyen >= 1 (optional, mac dinh 1)
  * - pageSize  : so nguyen 1..100 (optional, mac dinh 10)
  */

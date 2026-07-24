@@ -21,9 +21,13 @@ class AdminUserService {
     }
 
     // Validate status
-    const VALID_STATUSES = ['active', 'inactive', 'locked'];
+    // Validate status. Chi 2 status duoc phep:
+    //   - 'active'   : dang hoat dong, duoc login
+    //   - 'inactive' : ngung hoat dong, bi chan login
+    // Status 'locked' cu da bi go (gop vao 'inactive' vi logic giong nhau).
+    const VALID_STATUSES = ['active', 'inactive'];
     if (status && !VALID_STATUSES.includes(status)) {
-      throw new ApiError(400, 'status khong hop le: active, inactive, locked');
+      throw new ApiError(400, 'status khong hop le: active, inactive');
     }
 
     const result = await this.adminUserRepository.findAll({
@@ -43,9 +47,9 @@ class AdminUserService {
    * Tuong thich bo loc voi listUsers, chi khac la tra ve tat ca rows.
    */
   async exportUsers({ search, branchId, roleId, status } = {}) {
-    const VALID_STATUSES = ['active', 'inactive', 'locked'];
+    const VALID_STATUSES = ['active', 'inactive'];
     if (status && !VALID_STATUSES.includes(status)) {
-      throw new ApiError(400, 'status khong hop le: active, inactive, locked');
+      throw new ApiError(400, 'status khong hop le: active, inactive');
     }
 
     const result = await this.adminUserRepository.findAllForExport({
@@ -76,14 +80,34 @@ class AdminUserService {
   }
 
   async createUser(payload) {
-    const { name, email, password, branchId, roleId, firstName, lastName, phone } = payload;
+    const { name, email, password, branchId, roleId, firstName, lastName, phone, scopeAllBranches } = payload;
 
-    if (!name || !email || !password || !branchId || !roleId) {
-      throw new ApiError(400, 'name, email, password, branchId, roleId la bat buoc');
+    if (!name || !email || !password || !roleId) {
+      throw new ApiError(400, 'name, email, password, roleId la bat buoc');
+    }
+
+    // scopeAllBranches === true -> branchId KHONG duoc set (hoac null)
+    // branchId la so duong -> gan user vao 1 chi nhanh cu the
+    // branchId undefined/'' -> reject
+    let parsedBranchId = null;
+    let isScopeAllBranches = false;
+    if (scopeAllBranches === true) {
+      isScopeAllBranches = true;
+    } else if (branchId !== null && branchId !== undefined && branchId !== '') {
+      parsedBranchId = Number(branchId);
+      if (!Number.isInteger(parsedBranchId) || parsedBranchId <= 0) {
+        throw new ApiError(400, 'branchId khong hop le');
+      }
+    } else {
+      throw new ApiError(400, 'branchId la bat buoc (hoac chon "Tat ca chi nhanh")');
     }
 
     if (!EMAIL_REGEX.test(email)) {
       throw new ApiError(400, 'Email khong dung dinh dang');
+    }
+
+    if (typeof password !== 'string' || password.length < PASSWORD_MIN_LENGTH) {
+      throw new ApiError(400, `Mat khau phai co it nhat ${PASSWORD_MIN_LENGTH} ky tu`);
     }
 
     if (phone && !PHONE_REGEX.test(phone)) {
@@ -105,8 +129,9 @@ class AdminUserService {
         firstName: firstName || name,
         lastName: lastName || '',
         phone,
-        branchId: Number(branchId),
+        branchId: parsedBranchId,
         roleId: Number(roleId),
+        scopeAllBranches: isScopeAllBranches,
       });
       return user;
     } catch (err) {
@@ -119,7 +144,7 @@ class AdminUserService {
   }
 
   async updateUser(payload) {
-    const { userId, status, roleId, branchId } = payload;
+    const { userId, firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } = payload;
 
     if (!userId) {
       throw new ApiError(400, 'userId la bat buoc');
@@ -130,18 +155,51 @@ class AdminUserService {
       throw new ApiError(404, 'Nguoi dung khong ton tai');
     }
 
-    const VALID_STATUSES = ['active', 'inactive', 'locked'];
-    if (status && !VALID_STATUSES.includes(status)) {
-      throw new ApiError(400, 'status khong hop le: active, inactive, locked');
+    const VALID_STATUSES = ['active', 'inactive'];
+    if (status !== undefined && status !== null && !VALID_STATUSES.includes(status)) {
+      throw new ApiError(400, 'status khong hop le: active, inactive');
+    }
+
+    // Validate email neu co
+    if (email !== undefined && email !== null && email !== '') {
+      const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!EMAIL_REGEX.test(email)) {
+        throw new ApiError(400, 'Email khong dung dinh dang');
+      }
+    }
+
+    // Validate phone neu co
+    if (phone !== undefined && phone !== null && phone !== '') {
+      const PHONE_REGEX = /^0\d{9,10}$/;
+      if (!PHONE_REGEX.test(String(phone))) {
+        throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
+      }
     }
 
     // Validate branchId neu co
+    // scopeAllBranches === true (FE gui len khi admin chon "Tat ca chi nhanh"):
+    //   - branchId khong duoc set, hoac la null
+    //   - BE se assign user vao TAT CA branch active (junction user_branches)
+    //   - users.branch_id = NULL (de phan biet voi user thuong)
+    // scopeAllBranches === false + branchId la so -> gan 1 branch cu the
     let parsedBranchId;
-    if (branchId !== undefined && branchId !== null && branchId !== '') {
+    let shouldUpdateBranchId = false;
+    let isScopeAllBranches = false;
+    if (scopeAllBranches === true) {
+      // Validate quyen admin (chi role Admin moi duoc phep)
+      // TODO: sua sau khi role permission service san sang - tam thoi check role id = 7 (Admin)
+      isScopeAllBranches = true;
+      parsedBranchId = null;
+      shouldUpdateBranchId = true;
+    } else if (branchId === null) {
+      parsedBranchId = null;
+      shouldUpdateBranchId = true;
+    } else if (branchId !== undefined && branchId !== '') {
       parsedBranchId = Number(branchId);
       if (!Number.isInteger(parsedBranchId) || parsedBranchId <= 0) {
         throw new ApiError(400, 'branchId khong hop le');
       }
+      shouldUpdateBranchId = true;
     }
 
     // Validate roleId neu co
@@ -156,9 +214,15 @@ class AdminUserService {
     try {
       const updated = await this.adminUserRepository.updateUser({
         userId: Number(userId),
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        email: payload.email,
+        phone: payload.phone,
         status,
         roleId: parsedRoleId,
         branchId: parsedBranchId,
+        scopeAllBranches: isScopeAllBranches,
+        shouldUpdateBranchId,
       });
       return updated;
     } catch (err) {
