@@ -17,7 +17,6 @@ const initialForm = {
   purchaseBranchId: "",
   purchaseBranchOther: "",
   vehicleBrandId: "",
-  vehicleBrandOther: "",
   nearestBranchId: "",
 };
 
@@ -74,11 +73,7 @@ export default function CustomerRequestForm() {
               ? Number(form.purchaseBranchId)
               : null,
           purchaseBranchOther: form.purchaseBranchId === "other" ? form.purchaseBranchOther : null,
-          vehicleBrandId:
-            form.vehicleBrandId && form.vehicleBrandId !== "other"
-              ? Number(form.vehicleBrandId)
-              : null,
-          vehicleBrandOther: form.vehicleBrandId === "other" ? form.vehicleBrandOther : null,
+          vehicleBrandId: form.vehicleBrandId ? Number(form.vehicleBrandId) : null,
           nearestBranchId: Number(form.nearestBranchId),
         }),
       });
@@ -189,32 +184,22 @@ export default function CustomerRequestForm() {
                   )}
                 </div>
 
-                <div className={styles.row}>
-                  <label className={styles.field}>
-                    <span>Hãng xe</span>
-                    <select name="vehicleBrandId" value={form.vehicleBrandId} onChange={handleChange}>
-                      <option value="" disabled>
-                        Xe của bạn thuộc hãng xe nào?
+                <label className={styles.field}>
+                  <span>Hãng xe</span>
+                  <select name="vehicleBrandId" value={form.vehicleBrandId} onChange={handleChange}>
+                    <option value="" disabled>
+                      Xe của bạn là Kia hay Mazda?
+                    </option>
+                    {vehicleBrands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
                       </option>
-                      {vehicleBrands.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                      <option value="other">Khác</option>
-                    </select>
-                  </label>
-                  {form.vehicleBrandId === "other" && (
-                    <label className={styles.field}>
-                      <span>Hãng xe khác</span>
-                      <input
-                        name="vehicleBrandOther"
-                        value={form.vehicleBrandOther}
-                        onChange={handleChange}
-                      />
-                    </label>
-                  )}
-                </div>
+                    ))}
+                  </select>
+                  <span className={styles.hint}>
+                    AutoGara hiện chỉ nhận bảo dưỡng, sửa chữa xe Kia và Mazda.
+                  </span>
+                </label>
 
                 <label className={styles.field}>
                   <span>Vị trí *</span>

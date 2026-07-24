@@ -328,7 +328,7 @@ class ManagerService {
   }
 
   async _validateServicePackagePayload(branchId, payload, { requireServiceIds }) {
-    const { packageName, categoryId, applicableKm, totalPrice, serviceIds } = payload;
+    const { packageName, categoryId, totalPrice, serviceIds } = payload;
 
     if (!packageName || !categoryId || totalPrice === undefined || totalPrice === null || totalPrice === '') {
       throw new ApiError(400, 'Tên gói, danh mục và giá gói là bắt buộc');
@@ -337,14 +337,6 @@ class ManagerService {
     const price = Number(totalPrice);
     if (Number.isNaN(price) || price < 0) {
       throw new ApiError(400, 'Giá gói không hợp lệ');
-    }
-
-    let km = null;
-    if (applicableKm !== undefined && applicableKm !== null && applicableKm !== '') {
-      km = Number(applicableKm);
-      if (Number.isNaN(km) || km < 0) {
-        throw new ApiError(400, 'Mốc km áp dụng không hợp lệ');
-      }
     }
 
     if (payload.repairCategory && !REPAIR_CATEGORY_VALUES.includes(payload.repairCategory)) {
@@ -369,13 +361,13 @@ class ManagerService {
       normalizedServiceIds = serviceIds.map(Number);
     }
 
-    return { price, km, serviceIds: normalizedServiceIds };
+    return { price, serviceIds: normalizedServiceIds };
   }
 
   async createServicePackage(branchId, payload) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
 
-    const { price, km, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
+    const { price, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
       requireServiceIds: true,
     });
     const packageCode = await this.managerRepository.nextPackageCode(branchId);
@@ -385,9 +377,9 @@ class ManagerService {
       packageCode,
       packageName: payload.packageName.trim(),
       categoryId: Number(payload.categoryId),
-      applicableKm: km,
       totalPrice: price,
       description: (payload.description || '').trim() || null,
+      purpose: (payload.purpose || '').trim() || null,
       repairCategory: payload.repairCategory || null,
       serviceIds,
     });
@@ -400,16 +392,16 @@ class ManagerService {
     const existing = await this.managerRepository.getServicePackageById(branchId, id);
     if (!existing) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
 
-    const { price, km, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
+    const { price, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
       requireServiceIds: false,
     });
 
     return this.managerRepository.updateServicePackage(branchId, id, {
       packageName: payload.packageName.trim(),
       categoryId: Number(payload.categoryId),
-      applicableKm: km,
       totalPrice: price,
       description: (payload.description || '').trim() || null,
+      purpose: (payload.purpose || '').trim() || null,
       isActive: payload.isActive !== undefined ? !!payload.isActive : existing.isActive,
       repairCategory: payload.repairCategory || null,
       serviceIds,
