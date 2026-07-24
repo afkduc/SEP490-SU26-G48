@@ -70,6 +70,7 @@ async function authenticate(req, res, next) {
       permissions: decoded.permissions || [],
       branchId: decoded.branchId,
       tokenVersion: decoded.tokenVersion,
+      sessionId: decoded.sessionId || null,
       deviceId: decoded.deviceId || null,
     };
     next();

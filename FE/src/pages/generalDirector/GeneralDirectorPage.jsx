@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
 
@@ -2129,14 +2130,70 @@ export default function GeneralDirectorPage() {
   return (
     <Routes>
       <Route index element={<Navigate to="reports/settlements" replace />} />
-      <Route path="reports/settlements" element={<SettlementReportsPage />} />
-      <Route path="reports/revenue" element={<RevenueOverviewPage />} />
-      <Route path="employees" element={<EmployeeListPage />} />
-      <Route path="technicians" element={<TechnicianListPage />} />
-      <Route path="branch-managers" element={<BranchManagerListPage />} />
-      <Route path="branch-managers/create" element={<BranchManagerCreatePage />} />
-      <Route path="branch-managers/:id" element={<BranchManagerDetailPage />} />
-      <Route path="branch-managers/:id/edit" element={<BranchManagerEditPage />} />
+      <Route
+        path="reports/settlements"
+        element={
+          <ProtectedRoute permission="screen:general_director:settlements:access">
+            <SettlementReportsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="reports/revenue"
+        element={
+          <ProtectedRoute permission="screen:general_director:reports:access">
+            <RevenueOverviewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="employees"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <EmployeeListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="technicians"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <TechnicianListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="branch-managers"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <BranchManagerListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="branch-managers/create"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <BranchManagerCreatePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="branch-managers/:id"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <BranchManagerDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="branch-managers/:id/edit"
+        element={
+          <ProtectedRoute permission="screen:general_director:employees:access">
+            <BranchManagerEditPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="reports/settlements" replace />} />
     </Routes>
   );
