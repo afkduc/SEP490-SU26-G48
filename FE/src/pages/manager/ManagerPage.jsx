@@ -1263,9 +1263,9 @@ function ServicePackageDetailModal({ pkg, onClose }) {
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 16 }}>
             <div className="detail-row"><div className="detail-label">Mã gói</div><div className="detail-value">{pkg.code}</div></div>
             <div className="detail-row"><div className="detail-label">Danh mục</div><div className="detail-value">{pkg.categoryName || '—'}</div></div>
-            <div className="detail-row"><div className="detail-label">Mốc km áp dụng</div><div className="detail-value">{pkg.applicableKm ? `${pkg.applicableKm} km` : '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Giá gói</div><div className="detail-value">{formatCurrency(pkg.totalPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{pkg.description || '—'}</div></div>
+            <div className="detail-row"><div className="detail-label">Giải thích chi tiết</div><div className="detail-value">{pkg.purpose || '—'}</div></div>
           </div>
           <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13, color: 'var(--gray-700)' }}>
             Dịch vụ trong gói ({(pkg.services || []).length})
@@ -1490,7 +1490,7 @@ function ServicePackageFormPage({ mode }) {
   const [availableServices, setAvailableServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [form, setForm] = useState({
-    packageName: '', categoryId: '', applicableKm: '', totalPrice: '', description: '', isActive: true, repairCategory: '', serviceIds: [],
+    packageName: '', categoryId: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [],
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1511,9 +1511,9 @@ function ServicePackageFormPage({ mode }) {
           setForm({
             packageName: data.name || '',
             categoryId: data.categoryId ? String(data.categoryId) : '',
-            applicableKm: data.applicableKm ?? '',
             totalPrice: data.totalPrice ?? '',
             description: data.description || '',
+            purpose: data.purpose || '',
             isActive: data.isActive,
             repairCategory: data.repairCategory || '',
             serviceIds: (data.services || []).map((s) => s.id),
@@ -1565,9 +1565,9 @@ function ServicePackageFormPage({ mode }) {
       const payload = {
         packageName: form.packageName.trim(),
         categoryId: Number(form.categoryId),
-        applicableKm: form.applicableKm === '' ? null : Number(form.applicableKm),
         totalPrice: Number(form.totalPrice),
         description: form.description.trim(),
+        purpose: form.purpose.trim(),
         isActive: form.isActive,
         repairCategory: form.repairCategory || null,
         serviceIds: form.serviceIds,
@@ -1683,6 +1683,17 @@ function ServicePackageFormPage({ mode }) {
           <div className="form-group" style={{ marginTop: 14 }}>
             <label className="form-label">Mô tả</label>
             <textarea className="form-textarea" value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Mô tả ngắn về gói dịch vụ" />
+          </div>
+
+          <div className="form-group" style={{ marginTop: 14 }}>
+            <label className="form-label">Giải thích chi tiết (hiển thị ở trang chi tiết gói trên landing page)</label>
+            <textarea
+              className="form-textarea"
+              rows={5}
+              value={form.purpose}
+              onChange={(e) => setField('purpose', e.target.value)}
+              placeholder="Gói này dùng để làm gì, khi nào nên thực hiện, vì sao cần thiết..."
+            />
           </div>
 
           <div className="form-group" style={{ marginTop: 14 }}>
