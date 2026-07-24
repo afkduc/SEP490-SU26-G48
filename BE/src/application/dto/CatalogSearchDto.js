@@ -47,7 +47,6 @@ function groupPackageRows(rows, partsByServiceId = new Map()) {
         code: row.package_code,
         name: row.package_name,
         categoryId: row.category_id,
-        applicableKm: row.applicable_km,
         totalPrice: row.total_price,
         repairCategory: row.package_repair_category,
         items: [],
