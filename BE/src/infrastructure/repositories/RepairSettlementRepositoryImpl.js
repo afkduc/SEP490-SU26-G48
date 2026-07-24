@@ -3,6 +3,7 @@ const RepairSettlement = require('../../domain/entities/RepairSettlement');
 const { query, sql } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
 const { nowVN } = require('../../utils/dateVN');
+const { buildDesiredTasks } = require('./repairOrderTaskBuilder');
 
 // Cot join dung chung cho findAll/findById - lay du thong tin khach hang,
 // xe (kem ngay mua tu warranty_records), co van dich vu va to truong.
@@ -142,7 +143,19 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
       `SELECT * FROM service_order_items WHERE service_order_id = @id ORDER BY id`,
       { id }
     );
-    return RepairSettlement.fromPersistence(header, itemsResult.recordset);
+
+    // Chi co khi phieu da duoc gan to truong (co repair_order) - de co van xem
+    // duoc tien do tung dau viec To truong da tich, khong can qua man rieng.
+    const tasksResult = await query(
+      `SELECT rot.id, rot.task_name, rot.task_type, rot.is_done
+       FROM   repair_order_tasks rot
+       JOIN   repair_orders ro ON ro.id = rot.repair_order_id
+       WHERE  ro.service_order_id = @id
+       ORDER  BY rot.id`,
+      { id }
+    );
+
+    return RepairSettlement.fromPersistence(header, itemsResult.recordset, tasksResult.recordset);
   }
 
   // 1 khach hang + 1 xe chi duoc co TOI DA 1 phieu quyet toan dang xu ly
@@ -251,6 +264,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
 
       await tx.request().input('id', sql.BigInt, id).query(`DELETE FROM service_order_items WHERE service_order_id = @id`);
       await this._insertItems(tx, id, data.items);
+      await this._syncRepairOrderTasks(tx, id);
 
       if (data.vehicleId) {
         await this._bumpVehicleKm(tx, data.vehicleId, data.currentKm);
@@ -258,6 +272,54 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     });
 
     return this.findById(id);
+  }
+
+  // Co van sua phieu quyet toan (them/bot hang muc) sau khi da gan to truong
+  // -> dong bo lai checklist ben To truong (repair_order_tasks) cho khop, thay
+  // vi de nguyen danh sach cu tu luc gan viec. Chi dong bo khi lenh sua chua
+  // con "inprogress" (chua hoan thanh/huy) - task nao van con trong danh sach
+  // moi thi GIU NGUYEN is_done (khong reset ve chua tich).
+  async _syncRepairOrderTasks(tx, serviceOrderId) {
+    const roResult = await tx
+      .request()
+      .input('serviceOrderId', sql.BigInt, serviceOrderId)
+      .query(`SELECT id FROM repair_orders WHERE service_order_id = @serviceOrderId AND status = 'inprogress'`);
+    const repairOrder = roResult.recordset[0];
+    if (!repairOrder) return;
+
+    const desired = await buildDesiredTasks(tx, serviceOrderId);
+
+    const existingResult = await tx
+      .request()
+      .input('repairOrderId', sql.BigInt, repairOrder.id)
+      .query(`SELECT id, task_name, task_type, product_id FROM repair_order_tasks WHERE repair_order_id = @repairOrderId`);
+    const existing = existingResult.recordset;
+
+    const keyOf = (taskType, taskName, productId) => `${taskType}|${taskName}|${productId || ''}`;
+    const existingKeys = new Set(existing.map((t) => keyOf(t.task_type, t.task_name, t.product_id)));
+    const desiredKeys = new Set(desired.map((t) => keyOf(t.taskType, t.taskName, t.productId)));
+
+    const toDelete = existing.filter((t) => !desiredKeys.has(keyOf(t.task_type, t.task_name, t.product_id)));
+    const toInsert = desired.filter((t) => !existingKeys.has(keyOf(t.taskType, t.taskName, t.productId)));
+
+    for (const t of toDelete) {
+      await tx.request().input('id', sql.BigInt, t.id).query(`DELETE FROM repair_order_tasks WHERE id = @id`);
+    }
+
+    for (const t of toInsert) {
+      await tx
+        .request()
+        .input('repairOrderId', sql.BigInt, repairOrder.id)
+        .input('taskName', sql.NVarChar(300), t.taskName)
+        .input('taskType', sql.VarChar(10), t.taskType)
+        .input('productId', sql.BigInt, t.productId || null)
+        .input('quantity', sql.Int, t.quantity || 0)
+        .input('unitPrice', sql.Decimal(18, 2), t.unitPrice || 0)
+        .query(`
+          INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done)
+          VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0)
+        `);
+    }
   }
 
   async updateStatus(id, status, { issuedBy, cancelReason } = {}) {

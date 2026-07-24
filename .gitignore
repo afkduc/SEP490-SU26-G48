@@ -12,3 +12,5 @@ dist/
 *.sqlite3
 *.dump
 *.bak
+FE/.env.production
+Landing/.env.production

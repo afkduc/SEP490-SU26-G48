@@ -75,6 +75,22 @@
   font-weight: 600;
 }
 
+.navbar__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 /* Caret for dropdown triggers */
 .navbar__link-caret {
   font-size: 10px;
@@ -300,4 +316,21 @@
   .navbar__display-name,
   .navbar__role-badge { display: none; }
   .navbar__name { display: none; }
+}
+
+/* Man dien thoai rat nho - bo bot chu "Truc tuyen", chi giu cham xanh, tranh
+   xo lech voi muc menu + avatar tren cung 1 hang. */
+@media (max-width: 420px) {
+  .navbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .navbar__online-indicator {
+    padding: 4px 8px;
+  }
+  .online-label { display: none; }
+  .navbar__link {
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
 }

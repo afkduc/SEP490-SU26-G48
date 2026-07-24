@@ -19,3 +19,7 @@ export async function createRepairOrderApi(payload) {
 export async function updateRepairOrderStatusApi(id, status, reason) {
   return httpClient.patch(`/repair-orders/${id}/status`, { status, reason });
 }
+
+export async function updateRepairOrderTaskApi(id, taskId, isDone) {
+  return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}`, { isDone });
+}

@@ -106,6 +106,50 @@ function requireAnyPerm(...permKeys) {
 }
 
 /**
+ * Middleware factory: kiem tra user co quyen vao 1 SCREEN (UI page) hay khong.
+ *
+ * Su dung cho permission matrix: moi UI page tuong ung voi 1 permission_key
+ *   `screen:<module>:<resource>:access`
+ *
+ * Cach dung:
+ *   router.get('/admin/users', authenticate, requireScreen('admin', 'users'), handler)
+ *
+ * Khi user khong co permission -> 403 voi message thong bao screen bi khoa.
+ */
+function requireScreen(module, resource) {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+    }
+
+    const userId = req.user.userId || req.user.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Không xác định được user' });
+    }
+
+    const screenKey = `screen:${module}:${resource}:access`;
+
+    try {
+      const ps = getPermissionService();
+      const ok = await ps.can(userId, screenKey);
+
+      if (!ok) {
+        return res.status(403).json({
+          success: false,
+          message: `Không có quyền truy cập màn hình "${module}/${resource}". Liên hệ admin để được cấp quyền.`,
+          required: [screenKey],
+        });
+      }
+
+      next();
+    } catch (err) {
+      console.error('[requireScreen] Error checking permission:', err);
+      return res.status(500).json({ success: false, message: 'Lỗi kiểm tra quyền' });
+    }
+  };
+}
+
+/**
  * Invalidate cache của 1 user (export để controller gọi khi cần).
  */
 function invalidateUserCache(userId) {
@@ -113,4 +157,4 @@ function invalidateUserCache(userId) {
   ps.invalidateCache(userId);
 }
 
-module.exports = { requirePerm, requireAnyPerm, invalidateUserCache };
+module.exports = { requirePerm, requireAnyPerm, requireScreen, invalidateUserCache };

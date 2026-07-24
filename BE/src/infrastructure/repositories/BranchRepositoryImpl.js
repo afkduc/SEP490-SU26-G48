@@ -1,4 +1,5 @@
 const { query } = require('../database/sqlServer');
+const { runInTransaction } = require('../../utils/sqlTransaction');
 
 class BranchRepositoryImpl {
   /**
@@ -202,10 +203,21 @@ class BranchRepositoryImpl {
    * Kich hoat / ngung hoat dong branch
    */
   async setActive(id, isActive) {
-    await query(
-      'UPDATE branches SET is_active = @p2 WHERE id = @p1',
-      { p1: id, p2: isActive ? 1 : 0 }
-    );
+    await runInTransaction(async (tx) => {
+      await tx
+        .request()
+        .input('branchId', Number(id))
+        .input('isActive', isActive ? 1 : 0)
+        .query('UPDATE branches SET is_active = @isActive WHERE id = @branchId');
+
+      if (!isActive) {
+        await tx
+          .request()
+          .input('branchId', Number(id))
+          .query('UPDATE users SET token_version = token_version + 1 WHERE branch_id = @branchId');
+      }
+    });
+
     return this.findById(id);
   }
 

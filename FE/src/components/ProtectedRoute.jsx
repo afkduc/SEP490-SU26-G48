@@ -2,36 +2,26 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AppContext';
 import { usePermission } from '../contexts';
 import { getRoleHome, normalizeRoles } from '../contexts/AppContext';
+import { useGlobalError } from '../contexts/GlobalErrorContext';
+import { useEffect, useRef } from 'react';
 
 /**
  * ProtectedRoute — bảo vệ route bằng role và/hoặc permission.
  *
- * Cac cach su dung:
+ * Phan biet 2 loai chan truy cap (production-grade):
  *
- * 1. Chi can login:
- *    <ProtectedRoute>
- *      <DashboardPage />
- *    </ProtectedRoute>
+ * - Sai ROLE (VD: user dang nhap nhung khong phai admin)
+ *   -> Redirect ve trang home cua role (UX binh thuong, khong gay so)
  *
- * 2. Can role cu the:
- *    <ProtectedRoute roles={['admin']}>
- *      <AdminPage />
- *    </ProtectedRoute>
+ * - Sai PERMISSION (user co role admin nhung admin vua tick bo permission)
+ *   -> Show trang 403 full-screen voi nut "Yeu cau cap quyen"
+ *   -> Day moi la dung production-grade: nguoi dung hieu ro quyen cua minh,
+ *      khong bi "redirect home" am tham.
  *
- * 3. Can permission cu the:
- *    <ProtectedRoute permission="users:read">
- *      <UserListPage />
- *    </ProtectedRoute>
- *
- * 4. Can nhieu permissions (AND):
- *    <ProtectedRoute permissions={['users:read', 'users:delete']}>
- *      <UserPage />
- *    </ProtectedRoute>
- *
- * 5. Can nhieu permissions (OR):
- *    <ProtectedRoute permissions={['users:create']} match="any">
- *      <CreateUserPage />
- *    </ProtectedRoute>
+ * Permission check doc tu JWT permissions (frontend cache cua AuthService).
+ * BE cung check real-time qua PermissionService, vi the neu admin vua thu hoi
+ * quyen o tab khac, SSE se push permission-changed -> FE refresh token ->
+ * usePermission tu cap nhat -> ProtectedRoute re-render -> set403Error.
  */
 export default function ProtectedRoute({
   children,
@@ -42,7 +32,10 @@ export default function ProtectedRoute({
 }) {
   const { isAuthenticated, user } = useAuth();
   const { can, canAll, canAny } = usePermission();
+  const { set403Error, clearError } = useGlobalError();
   const location = useLocation();
+  // Anti-spam: tranh set403Error lien tuc neu component re-render nhieu lan
+  const firedRef = useRef(null);
 
   // Buoc 1: Kiem tra authentication
   if (!isAuthenticated) {
@@ -53,6 +46,7 @@ export default function ProtectedRoute({
   if (roles && roles.length > 0) {
     const hasRole = normalizeRoles(user?.roles).some((r) => roles.includes(r));
     if (!hasRole) {
+      // Sai role -> redirect home (cu - khong phai 403 permission)
       return <Navigate to={getRoleHome(user)} replace />;
     }
   }
@@ -64,16 +58,36 @@ export default function ProtectedRoute({
     ? [permission]
     : [];
 
-  if (permKeys.length > 0) {
-    const hasPermission =
-      match === 'any'
-        ? canAny(...permKeys)
-        : canAll(...permKeys);
+  const hasPermission = permKeys.length === 0
+    ? true
+    : (match === 'any' ? canAny(...permKeys) : canAll(...permKeys));
 
-    if (!hasPermission) {
-      // Redirect ve trang chinh cua user thay vi /unauthorized
-      return <Navigate to={getRoleHome(user)} replace />;
+  const missingKey = hasPermission
+    ? null
+    : (permKeys.find((k) => !can(k)) || permKeys[0]);
+
+  // Effect dong bo: khi permission thay doi (admin vua tick bo) -> set403Error,
+  // khi permission duoc tra lai -> clearError.
+  useEffect(() => {
+    if (missingKey) {
+      // Chi dispatch 1 lan cho moi permission key (tranh spam)
+      if (firedRef.current !== missingKey) {
+        firedRef.current = missingKey;
+        set403Error(
+          missingKey,
+          `Bạn không có quyền "${missingKey}" để truy cập trang này.`
+        );
+      }
+    } else if (firedRef.current) {
+      // Permission duoc tra lai (admin vua tick lai) -> clear
+      firedRef.current = null;
+      clearError();
     }
+  }, [missingKey, set403Error, clearError]);
+
+  if (missingKey) {
+    // Render null trong khi ErrorHandler show UnauthorizedPage full-screen
+    return null;
   }
 
   return children;

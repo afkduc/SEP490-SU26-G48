@@ -9,8 +9,38 @@ const STATUS_OPTIONS = [
 ];
 
 /**
- * Lay roleId tu user.roles (da hoac chua fetch roles list)
- * @param {Array} userRoles - roles array tu user object (string[] hoac object[])
+ * Sentinel value gui tu FE -> BE de yeu cau set branch_id = NULL (quan ly tat ca chi nhanh).
+ * BE AdminUserService.updateUser se nhan gia tri nay va chuyen thanh NULL.
+ */
+const ALL_BRANCHES_SENTINEL = '__ALL__';
+
+/**
+ * Role Admin id (hardcoded theo DB seed hien tai).
+ * Chi user co role Admin moi duoc chon "Tat ca chi nhanh".
+ * TODO: thay bang role check qua permission service khi san sang.
+ */
+const ADMIN_ROLE_ID = 7;
+
+/**
+ * Kiem tra role set co chua Admin hay khong.
+ */
+function hasAdminRole(userRoles) {
+  if (!Array.isArray(userRoles)) return false;
+  return userRoles.some((r) => {
+    const id = typeof r === 'object' && r !== null ? r.roleId : r;
+    return Number(id) === ADMIN_ROLE_ID;
+  });
+}
+
+/**
+ * Lay roleId tu user.roles (da hoac chua fetch roles list).
+ *
+ * Tra ve:
+ *   - roleId neu user chi co 1 role (normal case)
+ *   - '' neu user co nhieu role (FE phai canh bao admin -> dung modal rieng AssignRoleModal)
+ *   - '' neu user khong co role nao
+ *
+ * @param {Array} userRoles - roles array tu user object [{roleId, roleName}, ...]
  * @param {Array} allRoles  - roles tu API dropdown
  * @returns {string} roleId hoac ''
  */
@@ -19,19 +49,29 @@ function resolveRoleId(userRoles, allRoles) {
   const first = userRoles[0];
 
   // Backend moi: { roleId, roleName }
+  let resolvedId = '';
   if (typeof first === 'object' && first !== null) {
-    return first.roleId !== undefined && first.roleId !== null
+    resolvedId = first.roleId !== undefined && first.roleId !== null
       ? String(first.roleId)
       : '';
-  }
-
-  // Backend cu: ['Admin', ...] -> map ten -> id
-  if (typeof first === 'string') {
+  } else if (typeof first === 'string') {
+    // Backend cu: ['Admin', ...] -> map ten -> id
     const match = allRoles.find((r) => r.roleName === first || String(r.id) === first);
-    return match ? String(match.id) : '';
+    resolvedId = match ? String(match.id) : '';
   }
 
-  return '';
+  // Neu user co >= 2 role -> tra ve '' de form.roleId bi empty.
+  // Caller se hien thi canh bao: "User nay co N vai tro, hay dung modal Phan quyen rieng".
+  // Ly do: backend updateUser voi roleId != undefined se DELETE toan bo roles cu va
+  // INSERT 1 role moi -> MAT TOAN BO vai tro khac (data loss nghiem trong).
+  return resolvedId;
+}
+
+/**
+ * Kiem tra user co nhieu role khong (de canh bao trong UI).
+ */
+function hasMultipleRoles(userRoles) {
+  return Array.isArray(userRoles) && userRoles.length >= 2;
 }
 
 export default function UserFormModal({ user, onClose, onSuccess }) {
@@ -47,6 +87,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     branchId: '',
     roleId: '',
     status: 'active',
+    scopeAllBranches: false,
   });
 
   const [branches, setBranches] = useState([]);
@@ -80,6 +121,19 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     // Neu roles chua load xong, bo qua (effect tiep theo se trigger)
     const resolvedRoleId = resolveRoleId(user.roles, roles);
 
+    // Phan biet user "all branches" (co row trong user_branches) vs user 1 branch
+    // - assignedBranchIds tu BE co nhieu hon 1 row, hoac user.branchId null -> ALL
+    // - assignedBranchIds co 1 row -> set dropdown theo row do
+    const isAllBranches = Array.isArray(user.assignedBranchIds)
+      ? user.assignedBranchIds.length > 0
+      : (user.branchId === null || user.branchId === undefined);
+    let branchIdValue = '';
+    if (isAllBranches) {
+      branchIdValue = ALL_BRANCHES_SENTINEL;
+    } else if (user.branchId !== undefined && user.branchId !== null) {
+      branchIdValue = String(user.branchId);
+    }
+
     setForm({
       name: user.name || '',
       email: user.email || '',
@@ -87,12 +141,10 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       phone: user.phone || '',
-      branchId:
-        user.branchId !== undefined && user.branchId !== null
-          ? String(user.branchId)
-          : '',
+      branchId: branchIdValue,
       roleId: resolvedRoleId,
       status: user.status || 'active',
+      scopeAllBranches: isAllBranches,
     });
   }, [user, JSON.stringify(roles)]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -107,8 +159,13 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     if (form.phone && !/^0[0-9]{9,10}$/.test(form.phone)) {
       errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
     }
-    if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc';
-    if (!form.roleId) errs.roleId = 'Vai trò là bắt buộc';
+    if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc (hoặc chọn "Tất cả chi nhánh")';
+    // Bug #10: Khi user co nhieu vai tro va admin KHONG thay doi dropdown
+    // -> form.roleId se empty (resolveRoleId returns '' for first multi-role).
+    // Tranh block submit neu admin khong thay vai tro.
+    if (!form.roleId && !(isEdit && hasMultipleRoles(user?.roles))) {
+      errs.roleId = 'Vai trò là bắt buộc';
+    }
     return errs;
   }
 
@@ -125,12 +182,29 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
 
     try {
       if (isEdit) {
+        // Bug #10 (data loss): neu user co nhieu vai tro va admin KHONG doi
+        // dropdown role -> KHONG gui roleId (undefined) de BE khong DELETE + INSERT.
+        // Neu admin doi dropdown -> gui roleId moi (BE se DELETE all + INSERT moi
+        // -> mat vai tro phu, nhan roi qua warning).
+        const shouldSendRoleId =
+          form.roleId && form.roleId !== '';
         const payload = {
           userId: user.id,
+          firstName: form.firstName?.trim() || user.firstName || '',
+          lastName: form.lastName?.trim() || user.lastName || '',
+          email: form.email?.trim() || user.email,
+          phone: form.phone?.trim() || undefined,
           status: form.status,
-          roleId: form.roleId ? Number(form.roleId) : null,
-          branchId: form.branchId ? Number(form.branchId) : null,
         };
+        if (form.scopeAllBranches) {
+          payload.scopeAllBranches = true;
+          payload.branchId = null;
+        } else {
+          payload.branchId = form.branchId ? Number(form.branchId) : null;
+        }
+        if (shouldSendRoleId) {
+          payload.roleId = Number(form.roleId);
+        }
         await adminUsersApi.update(payload);
       } else {
         const payload = {
@@ -140,9 +214,14 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           firstName: form.firstName.trim() || form.name.trim(),
           lastName: form.lastName.trim(),
           phone: form.phone.trim() || undefined,
-          branchId: Number(form.branchId),
           roleId: Number(form.roleId),
         };
+        if (form.scopeAllBranches) {
+          payload.scopeAllBranches = true;
+          payload.branchId = null;
+        } else {
+          payload.branchId = Number(form.branchId);
+        }
         await adminUsersApi.create(payload);
       }
       onSuccess?.();
@@ -155,7 +234,14 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
   }
 
   function handleChange(field, value) {
-    setForm((f) => ({ ...f, [field]: value }));
+    setForm((f) => {
+      const next = { ...f, [field]: value };
+      // Khi chon chi nhanh -> tu dong set scopeAllBranches
+      if (field === 'branchId') {
+        next.scopeAllBranches = value === ALL_BRANCHES_SENTINEL;
+      }
+      return next;
+    });
     setErrors((e) => ({ ...e, [field]: undefined }));
   }
 
@@ -272,6 +358,43 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
             {/* Section: Phân công */}
             <div className="form__section">
               <div className="form__section-title">Phân công & trạng thái</div>
+
+              {/* Canh bao khi user co >=2 vai tro (de tranh data loss).
+                  Bug cu: resolveRoleId chi lay role[0], FE gui 1 role duy nhat ->
+                  BE AdminUserRepositoryImpl.updateUser DELETE all + INSERT 1 ->
+                  mat toan bo vai tro khac.
+
+                  Fix hien tai:
+                  - Neu admin KHONG doi dropdown vai tro -> FE bo qua field roleId
+                    trong payload -> BE giữ nguyên toàn bộ vai tro.
+                  - Neu admin DOI dropdown -> BE sẽ DELETE các vai trò khác.
+                    Admin phải dùng modal Phân quyền riêng để quản lý nhiều vai trò. */}
+              {isEdit && hasMultipleRoles(user?.roles) && (
+                <div
+                  className="form__warning"
+                  style={{
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    color: '#92400e',
+                    padding: '10px 12px',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    marginBottom: 12,
+                    lineHeight: 1.5,
+                  }}
+                  role="alert"
+                >
+                  ⚠️ User này đang có <b>{user.roles.length} vai trò</b>:{' '}
+                  {user.roles.map((r) => r.roleName).join(', ')}.
+                  <br />
+                  Nếu bạn <b>không thay đổi</b> dropdown Vai trò bên dưới thì các
+                  vai trò hiện tại được giữ nguyên.
+                  <br />
+                  Nếu bạn <b>chọn vai trò khác</b>, các vai trò còn lại sẽ bị
+                  xóa — hãy dùng modal <b>Phân quyền</b> riêng để quản lý.
+                </div>
+              )}
+
               <div className="form__row">
                 <div className="form__field">
                   <label className="form__label">Chi nhánh <span className="required">*</span></label>
@@ -281,10 +404,22 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                     onChange={(e) => handleChange('branchId', e.target.value)}
                   >
                     <option value="">-- Chọn chi nhánh --</option>
+                    {/* Option "Tat ca chi nhanh" chi hien thi khi user co role Admin
+                        (edit mode: user dang co role Admin) hoac role dang chon la Admin
+                        (create mode: admin form chon role Admin). */}
+                    {((isEdit && hasAdminRole(user?.roles)) ||
+                      (!isEdit && Number(form.roleId) === ADMIN_ROLE_ID)) && (
+                      <option value={ALL_BRANCHES_SENTINEL}>Tất cả chi nhánh (Admin)</option>
+                    )}
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>{b.branchName}</option>
                     ))}
                   </select>
+                  {form.branchId === ALL_BRANCHES_SENTINEL && (
+                    <span style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
+                      Backend sẽ tự động gom tất cả chi nhánh đang hoạt động cho user này
+                    </span>
+                  )}
                   {errors.branchId && <span className="form__err">{errors.branchId}</span>}
                 </div>
                 <div className="form__field">

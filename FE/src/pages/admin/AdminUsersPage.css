@@ -5,16 +5,30 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  min-width: 0;
+}
+
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .user-name-cell__main {
   font-weight: 500;
   color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-name-cell__sub {
   font-size: 0.78rem;
   color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Avatar in table ── */
@@ -46,13 +60,23 @@
   white-space: nowrap;
 }
 
+/* Desktop: 2 nut (Chi tiet + Sua) - AN MENU 3 CHAM tren desktop */
+@media (min-width: 641px) {
+  .action-btns {
+    display: flex !important;
+  }
+
+  .user-action-menu {
+    display: none !important;
+  }
+}
+
 /* ── Action buttons ── */
 .admin-users__actions-cell {
   white-space: nowrap;
 }
 
 .action-btns {
-  display: flex;
   gap: 6px;
   justify-content: flex-end;
   align-items: center;
@@ -64,6 +88,85 @@
   white-space: nowrap;
 }
 
+/* User action menu - MAC DINH LA AN (chi hien tren mobile) */
+.user-action-menu {
+  display: none;
+  position: relative;
+}
+
+.user-action-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.user-action-menu__trigger:hover {
+  background: #f1f5f9;
+}
+
+.user-action-menu__dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
+  min-width: 160px;
+  padding: 6px;
+  z-index: 30;
+  animation: dropdownIn 0.15s ease-out;
+}
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.user-action-menu__dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #1e293b;
+  cursor: pointer;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.user-action-menu__dropdown button:hover {
+  background: #f1f5f9;
+}
+
+.user-action-menu__dropdown svg {
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+/* ── Table scroll wrapper (cho phep overflow-x:auto nhung khong anh huong layout) ── */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll > .table {
+  min-width: 720px;
+}
+
+/* ── Buttons color ── */
 .btn--view {
   background: #eff6ff;
   color: #2563eb;
@@ -82,16 +185,6 @@
 
 .btn--edit:hover:not(:disabled) {
   background: #dcfce7;
-}
-
-.btn--role {
-  background: #fef9c3;
-  color: #92400e;
-  border-color: #fde68a;
-}
-
-.btn--role:hover:not(:disabled) {
-  background: #fef3c7;
 }
 
 .btn--success-ghost {
@@ -120,7 +213,43 @@
   color: #64748b;
 }
 
-/* ── Mobile card view ────────────────────────────────────── */
+.user-table__email {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.user-table__muted {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.user-table__empty {
+  color: #cbd5e1;
+  font-size: 0.8rem;
+}
+
+.user-table__roles {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* ── Reset filter button responsive ── */
+.filter-row__reset {
+  width: auto;
+}
+
+@media (max-width: 900px) {
+  .filter-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .filter-row__reset {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+/* ── Mobile card view ── */
 @media (max-width: 640px) {
   .admin-page {
     padding: 16px 12px;
@@ -146,12 +275,28 @@
     font-size: 1.1rem;
   }
 
+  .admin-page__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .admin-page__actions {
     width: 100%;
     justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .admin-page__total-badge {
+    display: none;
+  }
+
+  .admin-page__btn-icon-text {
+    padding: 8px 10px;
+  }
+
+  /* Icon-only buttons on small screens */
+  .admin-page__btn-label {
     display: none;
   }
 
@@ -164,17 +309,21 @@
     gap: 10px;
   }
 
+  .filter-row__reset {
+    grid-column: auto;
+  }
+
   .input--search {
     min-width: unset;
   }
 
   /* Hide table header on mobile */
-  .table thead {
+  .table-card .table thead {
     display: none;
   }
 
   /* Convert table rows to cards */
-  .table tbody tr {
+  .table-card .table tbody tr {
     display: flex;
     flex-direction: column;
     padding: 12px 14px;
@@ -185,38 +334,44 @@
     gap: 10px;
   }
 
-  .table tbody td {
+  .table-card .table tbody td {
     padding: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-bottom: none;
+    gap: 12px;
   }
 
-  .table tbody td::before {
+  .table-card .table tbody td::before {
     content: attr(data-label);
     font-size: 0.72rem;
     font-weight: 600;
     color: #94a3b8;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    flex-shrink: 0;
   }
 
-  .table tbody td:last-child {
+  .table-card .table tbody td:last-child {
     padding-top: 10px;
     border-top: 1px solid #f1f5f9;
-    justify-content: flex-start;
+    justify-content: flex-end;
     flex-wrap: wrap;
     gap: 8px;
   }
 
-  .table tbody td:last-child::before {
+  .table-card .table tbody td:last-child::before {
     display: none;
   }
 
+  /* Switch to action menu instead of 3 buttons */
   .action-btns {
-    width: 100%;
-    justify-content: flex-start;
+    display: none;
+  }
+
+  .user-action-menu {
+    display: inline-flex;
   }
 
   .user-name-cell {
@@ -227,11 +382,6 @@
     display: none;
   }
 
-  .btn--sm {
-    padding: 6px 10px;
-    font-size: 0.75rem;
-  }
-
   .table-card {
     overflow: visible;
   }
@@ -239,31 +389,11 @@
   .table-card__header {
     padding: 14px;
   }
-
-  .skeleton {
-    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 4px;
-  }
-
-  .skeleton--circle {
-    border-radius: 50%;
-  }
-
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
 }
 
-/* Tablet adjustments */
-@media (min-width: 641px) and (max-width: 900px) {
-  .admin-page {
-    padding: 20px 20px;
-  }
-
-  .filter-row {
-    grid-template-columns: repeat(2, 1fr);
+@media (min-width: 641px) {
+  /* Hien thi action 3 nut, an menu 3 cham */
+  .user-action-menu {
+    display: none !important;
   }
 }
