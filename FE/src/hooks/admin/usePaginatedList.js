@@ -165,6 +165,17 @@ export function usePaginatedList({
     callApi(getEffectiveParams(paramsRef.current));
   }, [callApi]);
 
+  /**
+   * Patch items inline (khong goi API). Dung cho SSE de update row
+   * khi co event moi ma khong can refetch full page.
+   */
+  const setItems = useCallback((updater) => {
+    setData((prev) => {
+      const nextItems = typeof updater === 'function' ? updater(prev.items) : updater;
+      return { ...prev, items: Array.isArray(nextItems) ? nextItems : [] };
+    });
+  }, []);
+
   return {
     data,
     loading,
@@ -174,5 +185,6 @@ export function usePaginatedList({
     params,
     setParams,
     updateParam,
+    setItems,
   };
 }

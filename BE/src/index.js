@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 require('./config/env');
 
@@ -67,9 +68,14 @@ async function start() {
       console.warn('[BE] Failed to start background jobs:', jobErr.message);
     }
 
-    app.listen(config.port, () => {
+    const server = http.createServer({ maxHeaderSize: 32768 }, app);
+    server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);
     });
+
+    // Keep timeouts reasonable for dev/prod
+    server.headersTimeout = 60000;
+    server.requestTimeout = 60000;
 
     syncMaintenanceReminders();
     setInterval(syncMaintenanceReminders, MAINTENANCE_REMINDER_SYNC_INTERVAL_MS);
@@ -80,3 +86,6 @@ async function start() {
 }
 
 start();
+
+
+

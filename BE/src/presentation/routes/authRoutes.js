@@ -69,12 +69,13 @@ function buildAuthRouter() {
       }
 
       // Re-issue token voi permissions moi tu DB. PermissionService se
-      // bypass cache neu vua invalidate (case user vua bi admin thay doi).
+      // bypass cache (chi refresh path) de dam bao lay permission moi nhat
+      // ngay sau khi admin thay doi (tranh 60s cache TTL).
       let refreshed;
       try {
         const deviceId = req.user.deviceId || null;
         freshUser.sessionId = req.user.sessionId || null;
-        refreshed = await service.issueTokenWithDevice(freshUser, deviceId);
+        refreshed = await service.issueTokenWithDevice(freshUser, deviceId, { skipCache: true });
       } catch (signErr) {
         console.error('[auth.refresh-permissions] issueToken failed:', signErr?.message || signErr);
         return next(new ApiError(503, 'Khong the tao token moi'));

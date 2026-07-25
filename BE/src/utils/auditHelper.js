@@ -320,10 +320,155 @@ const auditCrud = {
   },
 };
 
+/**
+ * Mapping action_type -> notification event (dung cho auditAndNotify).
+ * Cap nhat: theo yeu cau cua user -
+ *   CREATE -> success (xanh la)
+ *   UPDATE -> info (xanh duong)
+ *   DELETE / DEACTIVATE / DISABLE -> error/critical (do)
+ *   LOGIN -> success (xanh)
+ *   LOGIN_FAILED -> error (do)
+ *   ACTION_TYPES khac -> warning (vang)
+ */
+const ACTION_TO_NOTIFICATION_EVENT = {
+  CREATE: 'USER_CREATED',           // generic - admin can override
+  UPDATE: 'USER_UPDATED',           // generic
+  DELETE: 'USER_DISABLED',          // generic - tom tat la xoa/disable
+  LOGIN: 'LOGIN_SUCCESS',
+  LOGOUT: 'FORCE_LOGO',
+  FORCE_LOGO: 'FORCE_LOGO',
+  CHANGE_PASSWORD: 'PASSWORD_CHANGED',
+  RESET_PASSWORD: 'USER_PASSWORD_RESET',
+  ASSIGN_ROLE: 'ROLE_CHANGED',
+  REMOVE_ROLE: 'ROLE_CHANGED',
+  FAILED_LOGIN: 'LOGIN_FAILED',
+};
+
+/**
+ * Helper: vua ghi audit log vua notify (theo yeu cau "cứ ghi log là thông báo").
+ * - Ghi audit log (qua auditCrud)
+ * - Tao notification cho admin (qua NotificationService.notifyAdmins)
+ * - KHONG fail main flow neu notification fail (best-effort)
+ *
+ * Vi du:
+ *   await auditNotify.create(req, { tableName: 'users', entityName: 'Người dùng', ... })
+ *
+ * Params giong auditCrud, them:
+ *   - notificationEvent: optional override event (vi du 'USER_CREATED' thay vi generic)
+ *   - targetUserId: optional, neu muon notify 1 user cu the (khong phai admin)
+ *   - details: optional, merge vao notification data
+ */
+const auditNotify = {
+  async create(req, opts) {
+    await auditCrud.create(req, opts);
+    await _fireNotification(req, opts, 'CREATE');
+  },
+
+  async update(req, opts) {
+    await auditCrud.update(req, opts);
+    await _fireNotification(req, opts, 'UPDATE');
+  },
+
+  async delete(req, opts) {
+    await auditCrud.delete(req, opts);
+    await _fireNotification(req, opts, 'DELETE');
+  },
+
+  async login(req, opts) {
+    await auditCrud.login(req, opts);
+    await _fireNotification(req, opts, opts.success === false ? 'FAILED_LOGIN' : 'LOGIN');
+  },
+
+  async logout(req, opts) {
+    if (auditCrud.logout) await auditCrud.logout(req, opts);
+    await _fireNotification(req, opts, 'LOGOUT');
+  },
+
+  async forceLogout(req, opts) {
+    if (auditCrud.forceLogout) await auditCrud.forceLogout(req, opts);
+    await _fireNotification(req, opts, 'FORCE_LOGO');
+  },
+
+  async changePassword(req, opts) {
+    if (auditCrud.changePassword) await auditCrud.changePassword(req, opts);
+    await _fireNotification(req, opts, 'CHANGE_PASSWORD');
+  },
+
+  async resetPassword(req, opts) {
+    if (auditCrud.resetPassword) await auditCrud.resetPassword(req, opts);
+    await _fireNotification(req, opts, 'RESET_PASSWORD');
+  },
+
+  async assignRole(req, opts) {
+    if (auditCrud.assignRole) await auditCrud.assignRole(req, opts);
+    await _fireNotification(req, opts, 'ASSIGN_ROLE');
+  },
+
+  async removeRole(req, opts) {
+    if (auditCrud.removeRole) await auditCrud.removeRole(req, opts);
+    await _fireNotification(req, opts, 'REMOVE_ROLE');
+  },
+
+  /**
+   * CRUD generic - goi dung khi khong match method cu the.
+   * actionType: 'CREATE' | 'UPDATE' | 'DELETE' | ...
+   */
+  async withAction(req, { actionType, ...opts }) {
+    const fn = auditCrud[actionType?.toLowerCase?.()] || auditCrud.create;
+    await fn(req, opts);
+    await _fireNotification(req, opts, actionType);
+  },
+};
+
+/**
+ * Fire notification (private). Best-effort, khong throw.
+ */
+async function _fireNotification(req, opts, actionType) {
+  try {
+    const NotificationService = require('../application/services/NotificationService');
+    const ns = new NotificationService();
+
+    // Xac dinh event type theo:
+    //   1. opts.notificationEvent (explicit override)
+    //   2. Mapping action -> event
+    //   3. Generic fallback theo tableName
+    let eventType = opts.notificationEvent || ACTION_TO_NOTIFICATION_EVENT[actionType];
+    if (!eventType) {
+      if (opts.tableName === 'users') {
+        eventType = actionType === 'CREATE' ? 'USER_CREATED' : actionType === 'DELETE' ? 'USER_DISABLED' : 'USER_UPDATED';
+      } else {
+        // Skip: khong co event mapping, chi ghi log
+        return;
+      }
+    }
+
+    const data = {
+      actorName: req?.user?.name || req?.user?.email || 'system',
+      actorId: req?.user?.userId || req?.user?.id,
+      targetName: opts.entityName || opts.entityCode || opts.tableName || 'unknown',
+      targetCode: opts.entityCode || opts.recordId || '',
+      ...opts.details,
+    };
+
+    // Neu co targetUserId -> notify user do
+    if (opts.targetUserId) {
+      await ns.notify(eventType, { ...data, userId: opts.targetUserId }).catch(() => {});
+    } else {
+      // Mac dinh: notify all admins
+      await ns.notifyAdmins(eventType, data).catch(() => {});
+    }
+  } catch (err) {
+    // Best-effort: chi log, khong fail main flow
+    console.warn('[auditHelper] notification failed (non-blocking):', err.message);
+  }
+}
+
 module.exports = {
   auditLog,
   auditCrud,
+  auditNotify,
   ACTION_TYPES,
+  ACTION_TO_NOTIFICATION_EVENT,
   sanitizeBody,
   getClientIp,
 };

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useParts } from '../../hooks/inventory/useParts';
 import { listUnitsApi } from '../../services/productApi';
+import { PermissionGate } from '../../components/PermissionGate';
 import './PartListPage.css';
 
 const STATUS_LABELS = {
@@ -135,9 +136,11 @@ export default function PartListPage() {
           <h1 className="part-list__title">Danh sách phụ tùng</h1>
           <p className="part-list__subtitle">Quản lý thông tin phụ tùng (số lượng tồn được cập nhật qua phiếu nhập/xuất)</p>
         </div>
-        <button className="btn btn--primary" onClick={openCreate}>
-          + Thêm phụ tùng
-        </button>
+        <PermissionGate permission="inventory:products:create">
+          <button className="btn btn--primary" onClick={openCreate}>
+            + Thêm phụ tùng
+          </button>
+        </PermissionGate>
       </div>
 
       {/* Filters */}
@@ -239,16 +242,20 @@ export default function PartListPage() {
                           >
                             Chi tiết
                           </Link>
-                          <button className="btn btn--ghost btn--sm" onClick={() => openEdit(p)}>
-                            Sửa
-                          </button>
-                          <button
-                            className="btn btn--ghost btn--sm btn--danger"
-                            onClick={() => handleDelete(p.id)}
-                            disabled={deletingId === p.id}
-                          >
-                            Xóa
-                          </button>
+                          <PermissionGate permission="inventory:products:update">
+                            <button className="btn btn--ghost btn--sm" onClick={() => openEdit(p)}>
+                              Sửa
+                            </button>
+                          </PermissionGate>
+                          <PermissionGate permission="inventory:products:delete">
+                            <button
+                              className="btn btn--ghost btn--sm btn--danger"
+                              onClick={() => handleDelete(p.id)}
+                              disabled={deletingId === p.id}
+                            >
+                              Xóa
+                            </button>
+                          </PermissionGate>
                         </td>
                       </tr>
                     );

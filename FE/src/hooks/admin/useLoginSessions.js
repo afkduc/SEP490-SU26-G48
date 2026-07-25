@@ -34,5 +34,6 @@ export function useLoginSessions() {
     updateParam: list.updateParam,
     refetch: list.refetch,
     refresh: list.refresh,
+    setItems: list.setItems,
   };
 }

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-do
 import { useAuth } from '../../contexts/AppContext';
 import { formatCurrency, formatDate } from '../../utils';
 import managerApi from '../../services/managerApi';
+import { PermissionGate } from '../../components/PermissionGate';
 import ManagerImportRequestListPage from './ManagerImportRequestListPage';
 import ManagerImportRequestDetailPage from './ManagerImportRequestDetailPage';
 import ManagerExportRequestListPage from './ManagerExportRequestListPage';
@@ -306,12 +307,16 @@ function EmployeeListPage() {
           <div className="breadcrumb">Trang chủ / Nhân viên</div>
         </div>
         <div className="page-header-right">
-          <button type="button" className="btn btn-secondary" onClick={() => exportEmployeesCsv(employees)}>
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/employees/create')}>
-            + Thêm nhân viên
-          </button>
+          <PermissionGate permission="manager:employees:read">
+            <button type="button" className="btn btn-secondary" onClick={() => exportEmployeesCsv(employees)}>
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="manager:employees:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/employees/create')}>
+              + Thêm nhân viên
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -403,8 +408,12 @@ function EmployeeListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="manager:employees:read">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="manager:employees:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -806,20 +815,24 @@ function ServiceListPage() {
           <div className="breadcrumb">Trang chủ / Dịch vụ lẻ</div>
         </div>
         <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-dich-vu.csv',
-              ['Mã DV', 'Tên dịch vụ', 'Danh mục', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
-              services.map((s) => [s.code, s.name, s.categoryName, s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/services/create')}>
-            + Thêm dịch vụ
-          </button>
+          <PermissionGate permission="manager:services:read">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCsv(
+                'danh-sach-dich-vu.csv',
+                ['Mã DV', 'Tên dịch vụ', 'Danh mục', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
+                services.map((s) => [s.code, s.name, s.categoryName, s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
+              )}
+            >
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="manager:services:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/services/create')}>
+              + Thêm dịch vụ
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -903,8 +916,12 @@ function ServiceListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="manager:services:read">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="manager:services:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -1363,20 +1380,24 @@ function ServicePackageListPage() {
           <div className="breadcrumb">Trang chủ / Gói dịch vụ</div>
         </div>
         <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-goi-dich-vu.csv',
-              ['Mã gói', 'Tên gói', 'Danh mục', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
-              packages.map((p) => [p.code, p.name, p.categoryName, p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/service-packages/create')}>
-            + Thêm gói dịch vụ
-          </button>
+          <PermissionGate permission="manager:services:read">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCsv(
+                'danh-sach-goi-dich-vu.csv',
+                ['Mã gói', 'Tên gói', 'Danh mục', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
+                packages.map((p) => [p.code, p.name, p.categoryName, p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
+              )}
+            >
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="manager:services:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/service-packages/create')}>
+              + Thêm gói dịch vụ
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -1453,8 +1474,12 @@ function ServicePackageListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="manager:services:read">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="manager:services:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -2161,24 +2186,28 @@ function TechnicianListPage() {
           <div className="breadcrumb">Trang chủ / Thợ máy</div>
         </div>
         <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-tho-may.csv',
-              ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Chuyên môn', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
-              technicians.map((t) => [
-                t.employeeId, t.fullName, t.email, t.teamLeaderName,
-                (t.specialties || []).map((s) => s.name).join('; '),
-                t.phone, formatDate(t.createdAt), statusBadge(t.status).label,
-              ])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/technicians/create')}>
-            + Thêm thợ máy
-          </button>
+          <PermissionGate permission="manager:technicians:read">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCsv(
+                'danh-sach-tho-may.csv',
+                ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Chuyên môn', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
+                technicians.map((t) => [
+                  t.employeeId, t.fullName, t.email, t.teamLeaderName,
+                  (t.specialties || []).map((s) => s.name).join('; '),
+                  t.phone, formatDate(t.createdAt), statusBadge(t.status).label,
+                ])
+              )}
+            >
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="manager:technicians:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/technicians/create')}>
+              + Thêm thợ máy
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -2280,8 +2309,12 @@ function TechnicianListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="manager:technicians:read">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="manager:technicians:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
