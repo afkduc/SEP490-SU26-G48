@@ -473,3 +473,63 @@ class PermissionMatrixApi {
 const permissionMatrixApi = new PermissionMatrixApi();
 
 export { PermissionMatrixApi, permissionMatrixApi };
+
+/**
+ * Role Screen Matrix API (admin-only) - granular action-per-screen.
+ *   - getAvailableScreens(): GET   /api/admin/role-screen-matrix/screens
+ *   - getMatrix(roleId):     GET   /api/admin/role-screen-matrix?roleId=1
+ *   - saveMatrix(roleId, items): PUT /api/admin/role-screen-matrix?roleId=1
+ *       items: [{ screenKey, canView, canCreate, canUpdate, canDelete, canExport }]
+ *   - compareMatrix(roleIds): GET  /api/admin/role-screen-matrix/compare?roleIds=1,2,3
+ */
+class RoleScreenMatrixApi {
+  getAvailableScreens() {
+    return httpClient.get('/admin/role-screen-matrix/screens');
+  }
+
+  getMatrix(roleId) {
+    return httpClient.get(`/admin/role-screen-matrix?roleId=${roleId}`);
+  }
+
+  saveMatrix(roleId, items) {
+    return httpClient.put(`/admin/role-screen-matrix?roleId=${roleId}`, { items });
+  }
+
+  compareMatrix(roleIds) {
+    return httpClient.get(`/admin/role-screen-matrix/compare?roleIds=${roleIds.join(',')}`);
+  }
+}
+
+const roleScreenMatrixApi = new RoleScreenMatrixApi();
+
+export { RoleScreenMatrixApi, roleScreenMatrixApi };
+
+/**
+ * User Screen Permissions API (admin-only) - override quyen cho 1 user cu the.
+ *   - getPermissions(userId):     GET   /api/admin/users/:userId/screen-permissions
+ *   - savePermissions(userId, items): PUT /api/admin/users/:userId/screen-permissions
+ *       items: [{ screenKey, canView, canCreate, canUpdate, canDelete, canExport, overrideType, note }]
+ *   - clearPermissions(userId):   DELETE /api/admin/users/:userId/screen-permissions
+ *   - getEffective(userId):       GET   /api/admin/users/:userId/screen-permissions/effective
+ */
+class UserScreenPermissionsApi {
+  getPermissions(userId) {
+    return httpClient.get(`/admin/users/${userId}/screen-permissions`);
+  }
+
+  savePermissions(userId, items) {
+    return httpClient.put(`/admin/users/${userId}/screen-permissions`, { items });
+  }
+
+  clearPermissions(userId) {
+    return httpClient.delete(`/admin/users/${userId}/screen-permissions`);
+  }
+
+  getEffective(userId) {
+    return httpClient.get(`/admin/users/${userId}/screen-permissions/effective`);
+  }
+}
+
+const userScreenPermissionsApi = new UserScreenPermissionsApi();
+
+export { UserScreenPermissionsApi, userScreenPermissionsApi };

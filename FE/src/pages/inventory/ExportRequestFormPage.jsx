@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useExportRequestForm } from '../../hooks/inventory/useExportRequestForm';
 import { productApi } from '../../services';
+import { PermissionGate } from '../../components/PermissionGate';
 import './ExportRequestFormPage.css';
 
 function todayIso() {
@@ -454,13 +455,15 @@ export default function ExportRequestFormPage() {
             <Link to="/inventory/export-requests" className="btn btn--ghost">
               Hủy
             </Link>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={submitting || loadingCode || !nextCode || items.length === 0}
-            >
-              {submitting ? 'Đang lưu...' : 'Tạo phiếu xuất'}
-            </button>
+            <PermissionGate permission="export_requests:create">
+              <button
+                type="submit"
+                className="btn btn--primary"
+                disabled={submitting || loadingCode || !nextCode || items.length === 0}
+              >
+                {submitting ? 'Đang lưu...' : 'Tạo phiếu xuất'}
+              </button>
+            </PermissionGate>
           </div>
         )}
       </form>

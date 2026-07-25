@@ -76,22 +76,24 @@ class AuthService {
   /**
    * Tao JWT moi co deviceId (dung khi login thanh cong)
    */
-  async issueTokenWithDevice(user, deviceId) {
-    return this._signToken(user, deviceId);
+  async issueTokenWithDevice(user, deviceId, options = {}) {
+    return this._signToken(user, deviceId, options);
   }
 
   /**
    * Tao token nhung chua co deviceId - du lieu user phai co token_version
    */
-  async issueTokenWithoutDevice(user) {
-    return this._signToken(user, null);
+  async issueTokenWithoutDevice(user, options = {}) {
+    return this._signToken(user, null, options);
   }
 
-  async _signToken(user, deviceId) {
+  async _signToken(user, deviceId, options = {}) {
     const roles = await this.authRepository.findUserRoles(user.id);
     const permissionService = this._getPermissionService();
-    const permissions = await permissionService.getUserPermissions(user.id);
-    const permissionKeys = Array.from(permissions);
+    // Dung compact set cho JWT (chi Layer 1 + screen:*:access), khong flatten
+    // Layer 2b vi se lam JWT qua lon (status 431).
+    // options.skipCache = true: dung khi refresh permissions (admin vua thay doi).
+    const permissionKeys = await permissionService.getUserPermissionsCompact(user.id, options);
 
     const userDto = toUserDto({ ...user, token_version: user.token_version }, roles, permissionKeys);
 

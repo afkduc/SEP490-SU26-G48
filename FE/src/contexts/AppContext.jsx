@@ -5,6 +5,7 @@ import { useHeartbeat } from '../hooks/useHeartbeat';
 import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
 import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
+import { resetSessionExpiredFlag, cancelAllPendingRequests, resetLoggedOutFlag } from '../services/httpClient';
 
 const AppContext = createContext(null);
 
@@ -94,7 +95,8 @@ export function getRoleHome(user) {
   if (roles.includes(ROLES.GENERAL_DIRECTOR)) return '/general-director';
   if (roles.includes(ROLES.MANAGER)) return '/manager';
   if (roles.includes(ROLES.TEAM_LEADER)) return '/repair-orders';
-  if (roles.includes(ROLES.WAREHOUSE_STAFF) || roles.includes(ROLES.ACCOUNTANT)) return '/inventory';
+  if (roles.includes(ROLES.WAREHOUSE_STAFF)) return '/inventory';
+  if (roles.includes(ROLES.ACCOUNTANT)) return '/accountant';
   return '/dashboard';
 }
 
@@ -210,6 +212,15 @@ export function AppProvider({ children }) {
     storage.setItem('token', result.token);
     storage.setItem('user', JSON.stringify(result.user));
 
+    // Reset anti-spam flag cua SessionExpiredModal (login moi = session moi).
+    if (typeof resetSessionExpiredFlag === 'function') {
+      resetSessionExpiredFlag();
+    }
+    // Reset "logged out" flag (login moi cho phep request moi duoc gui di).
+    if (typeof resetLoggedOutFlag === 'function') {
+      resetLoggedOutFlag();
+    }
+
     // Lay quyen moi nhat tu server (permissions trong JWT co the STALE neu
     // admin vua thay doi ma tran quyen o mot tab khac). Fallback ve
     // permissions tu JWT neu API fail (mang chap / 401).
@@ -234,6 +245,22 @@ export function AppProvider({ children }) {
     setUser(result.user);
     setPermissions(newPermissions);
 
+    // Sync clockOffset (clockOffset = serverTime - clientTime) de cac
+    // timestamp hien thi tren man login-history / devices luon khop voi
+    // server (tranh sai lech do may client set sai gio he thong).
+    try {
+      const serverTimeRes = await getServerTime();
+      if (serverTimeRes?.serverTime) {
+        const serverMs = new Date(serverTimeRes.serverTime).getTime();
+        const clientMs = Date.now();
+        const offset = serverMs - clientMs;
+        sessionStorage.setItem('clockOffset', String(offset));
+        localStorage.setItem('clockOffset', String(offset));
+      }
+    } catch (e) {
+      console.warn('[AppContext] sync clockOffset failed:', e?.message);
+    }
+
     return result;
   }, []);
 
@@ -254,6 +281,27 @@ export function AppProvider({ children }) {
     //   2. Lưu token TRƯỚC khi clearSession() để request keepalive vẫn có
     //      Authorization header hợp lệ.
     //   3. Bỏ qua UI loading - ưu tiên tốc độ chuyển trang.
+    //
+    // Bug cũ (2) - 401 storm khi logout:
+    //   - Trước khi reload trang, có hàng chục request đang in-flight
+    //     (heartbeat, SSE refresh, getMatrix, getBranches, getRoles...).
+    //     Sau khi clearSession(), token = null, các request này hoàn tất và
+    //     trả 401 trong console -> "Phiên đăng nhập đã hết hạn" nhảy lên.
+    //   - Fix: gọi cancelAllPendingRequests() NGAY đầu hàm để:
+    //     (a) abort tất cả request đang bay (fetch reject với AbortError,
+    //         nuot o httpClient), và
+    //     (b) set flag "logged out" để mọi request phát sinh SAU đó (queued
+    //         setTimeout, effect chạy muộn, ...) đều bị abort trước khi tới
+    //         server.
+    try {
+      cancelAllPendingRequests();
+    } catch (e) {
+      // Khong duoc de exception nay chan logout flow.
+      if (typeof console !== 'undefined') {
+        console.warn('[AppContext] cancelAllPendingRequests failed:', e?.message);
+      }
+    }
+
     try {
       const tokenNow = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (tokenNow) {
@@ -281,6 +329,11 @@ export function AppProvider({ children }) {
     setToken(null);
     setUser(null);
     setPermissions([]);
+
+    // Reset anti-spam flag de lan sau login moi se reset (optional - flag tu reset sau 60s).
+    if (typeof resetSessionExpiredFlag === 'function') {
+      resetSessionExpiredFlag();
+    }
 
     // FORCE RELOAD: dam bao 100% da user ra khoi trang admin, khong con
     // bat ky React state nao giu token/user cu. Mot so truong hop (HMR,

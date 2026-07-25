@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useImportRequestForm } from '../../hooks/inventory/useImportRequestForm';
 import { getSuppliersApi } from '../../services/supplierApi';
+import { PermissionGate } from '../../components/PermissionGate';
 import { searchProductsApi } from '../../services/productApi';
 import './ImportRequestFormPage.css';
 
@@ -398,13 +399,15 @@ export default function ImportRequestFormPage() {
           <Link to="/inventory/import-requests" className="btn btn--ghost">
             Hủy
           </Link>
-          <button
-            type="submit"
-            className="btn btn--primary"
-            disabled={submitting || loadingCode || !nextCode}
-          >
-            {submitting ? 'Đang lưu...' : 'Tạo phiếu nhập'}
-          </button>
+          <PermissionGate permission="import_requests:create">
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={submitting || loadingCode || !nextCode}
+            >
+              {submitting ? 'Đang lưu...' : 'Tạo phiếu nhập'}
+            </button>
+          </PermissionGate>
         </div>
       </form>
     </div>

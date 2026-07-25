@@ -22,6 +22,8 @@ const buildMaintenanceReminderRouter = require('./maintenanceReminderRoutes');
 const buildSSERouter = require('./sseRoutes');
 const buildPublicRouter = require('./publicRoutes');
 const buildServiceRequestRouter = require('./serviceRequestRoutes');
+const buildRoleScreenMatrixRouter = require('./roleScreenMatrixRoutes');
+const buildUserScreenPermissionsRouter = require('./userScreenPermissionsRoutes');
 
 const router = express.Router();
 
@@ -46,6 +48,8 @@ router.get('/_debug/whoami', (req, res) => {
 router.use('/auth', buildAuthRouter());
 router.use('/users', buildUserRouter());
 router.use('/vehicles', buildVehicleRouter());
+router.use('/admin/role-screen-matrix', buildRoleScreenMatrixRouter());
+router.use('/admin/users/:userId/screen-permissions', buildUserScreenPermissionsRouter());
 router.use('/admin', buildAdminRouter());
 router.use('/products', buildProductRouter());
 router.use('/inventory', buildInventoryRouter());
