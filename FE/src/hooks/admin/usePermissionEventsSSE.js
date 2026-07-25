@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../../config';
+import { LOGOUT_KEY } from '../../services/httpClient';
 
 const SSE_RECONNECT_DELAY_MS = 5000;
 const REFRESH_API_TIMEOUT_MS = 10000;
@@ -167,6 +168,24 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
 
     let isCancelled = false;
 
+    // Lang nghe logout: dong SSE va huy refresh dang chay de khong gay
+    // them 401 sau khi user da clear session.
+    const onLogout = () => {
+      isCancelled = true;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (eventSourceRef.current) {
+        try { eventSourceRef.current.close(); } catch { /* ignore */ }
+        eventSourceRef.current = null;
+      }
+      setConnected(false);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener(LOGOUT_KEY, onLogout);
+    }
+
     const connect = () => {
       if (isCancelled) return;
       if (reconnectTimerRef.current) {
@@ -268,6 +287,9 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(LOGOUT_KEY, onLogout);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

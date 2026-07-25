@@ -20,13 +20,21 @@ class PermissionService {
 
   /**
    * Lấy toàn bộ permission keys của 1 user (từ cache hoặc DB).
+   * Bao gom Layer 1 + Layer 2b (flatten) + User Override.
+   * Day la set FULL - dung cho PermissionService.can() middleware.
+   *
    * @param {number} userId
+   * @param {object} [options]
+   * @param {boolean} [options.skipCache=false] - Bypass cache (chi moi lan load)
+   *   Dung khi admin vua thay doi permission cua user va can check ngay.
    * @returns {Promise<Set<string>>}
    */
-  async getUserPermissions(userId) {
-    const cached = permissionCache.get(userId);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      return cached.permissions;
+  async getUserPermissions(userId, options = {}) {
+    if (!options.skipCache) {
+      const cached = permissionCache.get(userId);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return cached.permissions;
+      }
     }
 
     const perms = await this.roleRepository.getUserPermissionKeys(userId);
@@ -41,16 +49,48 @@ class PermissionService {
   }
 
   /**
+   * Lay permission keys "compact" (Layer 1 + screen:*:access, KHONG flatten Layer 2b).
+   * Dung cho JWT de tranh token qua lon (status 431).
+   * Cache rieng voi key prefix 'compact:'.
+   *
+   * @param {number} userId
+   * @param {object} [options]
+   * @param {boolean} [options.skipCache=false] - Bypass cache
+   * @returns {Promise<string[]>}
+   */
+  async getUserPermissionsCompact(userId, options = {}) {
+    const cacheKey = `compact:${userId}`;
+    if (!options.skipCache) {
+      const cached = permissionCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return Array.from(cached.permissions);
+      }
+    }
+
+    const perms = await this.roleRepository.getUserPermissionKeysCompact(userId);
+    const permSet = new Set(perms);
+
+    permissionCache.set(cacheKey, {
+      permissions: permSet,
+      timestamp: Date.now(),
+    });
+
+    return Array.from(permSet);
+  }
+
+  /**
    * Kiểm tra user có một permission cụ thể không.
    * @param {number} userId
    * @param {string} permissionKey  vd: 'admin:users:create'
+   * @param {object} [options]
+   * @param {boolean} [options.skipCache=false] - Bypass cache khi check
    * @returns {Promise<boolean>}
    */
-  async can(userId, permissionKey) {
+  async can(userId, permissionKey, options = {}) {
     if (!userId) return false;
     if (!permissionKey) return false;
 
-    const perms = await this.getUserPermissions(userId);
+    const perms = await this.getUserPermissions(userId, options);
 
     // Wildcard check: nếu user có '*' → full access
     if (perms.has('*')) return true;

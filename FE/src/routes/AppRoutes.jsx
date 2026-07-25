@@ -29,6 +29,7 @@ const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
 const AdminPermissionMatrixPage = lazy(() => import('../pages/admin/AdminPermissionMatrixPage'));
+const RoleScreenMatrixPage = lazy(() => import('../pages/admin/RoleScreenMatrixPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -46,6 +47,7 @@ const ImportRequestDetailPage = lazy(() => import('../pages/inventory/ImportRequ
 const ExportRequestListPage = lazy(() => import('../pages/inventory/ExportRequestListPage'));
 const ExportRequestFormPage = lazy(() => import('../pages/inventory/ExportRequestFormPage'));
 const ExportRequestDetailPage = lazy(() => import('../pages/inventory/ExportRequestDetailPage'));
+const AccountantDashboardPage = lazy(() => import('../pages/accountant/AccountantDashboardPage'));
 
 /**
  * ErrorHandler — bắt lỗi 403 toàn cục từ error event.
@@ -160,6 +162,11 @@ function AppRoutes() {
           <Route path="permission-matrix" element={
             <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:permission_matrix:access">
               <AdminPermissionMatrixPage />
+            </ProtectedRoute>
+          } />
+          <Route path="role-screen-matrix" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:role_screen_matrix:access">
+              <RoleScreenMatrixPage />
             </ProtectedRoute>
           } />
           <Route path="logs" element={
@@ -300,6 +307,18 @@ function AppRoutes() {
             }
           />
         ))}
+
+        {/* Accountant dashboard - chỉ xem báo cáo */}
+        <Route
+          path={ROUTES.ACCOUNTANT}
+          element={
+            <ProtectedRoute roles={[ROLES.ACCOUNTANT, ROLES.ADMIN]} permission="screen:accountant:access">
+              <AppLayout>
+                <AccountantDashboardPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* Redirects */}
         <Route path="/" element={<RoleAwareRedirect />} />

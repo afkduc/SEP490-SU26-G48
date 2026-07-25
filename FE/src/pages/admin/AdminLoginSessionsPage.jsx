@@ -374,16 +374,20 @@ export default function AdminLoginSessionsPage() {
     paramsRef.current = sessions.params;
   }, [sessions.params]);
 
-  // SSE: smart refetch thay vi full refetch moi event.
-  // - Neu filter dang nhu "user X" va event khong phai user X -> bo qua.
-  // - Neu chi co action_type filter va event khong match -> bo qua.
-  // - Debounce 500ms de gom nhieu event.
+  // SSE: smart patch thay vi full refetch moi event.
+  // - Neu co sessionId va ta biet id do, patch row tuong ung (khong refetch).
+  // - Chi refetch full khi:
+  //   (a) event khong co sessionId (khoang hiem)
+  //   (b) row dang xem khong co trong page hien tai (do filter)
+  // - Debounce 400ms de gom nhieu event.
   const handleSessionEvent = (eventData) => {
     const eventType = eventData && eventData.type;
     const sessionUserName = eventData && eventData.userName;
     const sessionUserId = eventData && eventData.userId;
+    const sessionId = eventData && eventData.sessionId;
+    const deviceId = eventData && eventData.deviceId;
 
-    // Filter matching (de khong refetch khi event khong thuoc filter hien tai)
+    // Filter matching (de khong patch khi event khong thuoc filter hien tai)
     const p = paramsRef.current;
     const filterUserName = (p.userName || '').toLowerCase().trim();
     const filterActionType = p.actionType || '';
@@ -410,16 +414,67 @@ export default function AdminLoginSessionsPage() {
     // void for future use
     void sessionUserId;
     void filterBranchId;
+    void deviceId;
 
-    // Debounce: gom nhieu event trong 500ms thanh 1 lan refetch
+    // Patch row inline (khong refetch full)
+    if (sessionId && eventType) {
+      const currentItems = dataRef.current?.items || [];
+      const existingRow = currentItems.find((i) => i.id === sessionId);
+      const newRow = buildRowFromEvent(eventType, eventData, existingRow);
+      if (existingRow) {
+        // Row ton tai trong page -> patch ngay
+        sessions.setItems((prev) => prev.map((i) => (i.id === sessionId ? newRow : i)));
+        return;
+      }
+      // Row moi chua co trong page -> can refetch de lay item moi (insert)
+      // Debounce de gom nhieu event cung sessionId
+      if (sseRefetchTimerRef.current) {
+        clearTimeout(sseRefetchTimerRef.current);
+      }
+      sseRefetchTimerRef.current = setTimeout(() => {
+        sessions.refetch();
+        sseRefetchTimerRef.current = null;
+      }, 400);
+      return;
+    }
+
+    // Fallback: khong co sessionId -> refetch (de an toan)
     if (sseRefetchTimerRef.current) {
       clearTimeout(sseRefetchTimerRef.current);
     }
     sseRefetchTimerRef.current = setTimeout(() => {
       sessions.refetch();
       sseRefetchTimerRef.current = null;
-    }, 500);
+    }, 400);
   };
+
+  // Build row moi tu SSE event (de patch inline)
+  function buildRowFromEvent(eventType, eventData, existing) {
+    const base = existing || {};
+    const now = eventData.serverTime || eventData.timestamp || new Date().toISOString();
+    const isLogin = eventType === 'login';
+    const isLogout = eventType === 'logout' || eventType === 'force';
+    const isFailed = eventType === 'login_failed';
+
+    return {
+      ...base,
+      id: eventData.sessionId,
+      user_id: eventData.userId || base.user_id,
+      user_name: eventData.userName || base.user_name,
+      phone_number: eventData.phone || base.phone_number,
+      ip_address: eventData.ipAddress || base.ip_address,
+      user_agent: eventData.userAgent || base.user_agent,
+      browser: eventData.browser || base.browser,
+      os: eventData.os || base.os,
+      branch_id: eventData.branchId || base.branch_id,
+      action_type: isLogin ? 'LOGIN' : isFailed ? 'LOGIN_FAILED' : 'LOGOUT',
+      status: isLogin ? 'active' : isFailed ? 'failed' : 'ended',
+      login_time: isLogin ? now : base.login_time,
+      logout_time: isLogout ? now : base.logout_time,
+      last_activity_at: now,
+      ...(isLogin ? { session_duration_seconds: null } : {}),
+    };
+  }
 
   // Cleanup debounce timer on unmount
   useEffect(() => {

@@ -2157,7 +2157,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="technicians"
         element={
-          <ProtectedRoute permission="screen:general_director:employees:access">
+          <ProtectedRoute permission="screen:general_director:technicians:access">
             <TechnicianListPage />
           </ProtectedRoute>
         }
@@ -2165,7 +2165,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="branch-managers"
         element={
-          <ProtectedRoute permission="screen:general_director:employees:access">
+          <ProtectedRoute permission="screen:general_director:branch_managers:access">
             <BranchManagerListPage />
           </ProtectedRoute>
         }
@@ -2173,7 +2173,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="branch-managers/create"
         element={
-          <ProtectedRoute permission="screen:general_director:employees:access">
+          <ProtectedRoute permission="screen:general_director:branch_managers:access">
             <BranchManagerCreatePage />
           </ProtectedRoute>
         }
@@ -2181,7 +2181,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="branch-managers/:id"
         element={
-          <ProtectedRoute permission="screen:general_director:employees:access">
+          <ProtectedRoute permission="screen:general_director:branch_managers:access">
             <BranchManagerDetailPage />
           </ProtectedRoute>
         }
@@ -2189,7 +2189,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="branch-managers/:id/edit"
         element={
-          <ProtectedRoute permission="screen:general_director:employees:access">
+          <ProtectedRoute permission="screen:general_director:branch_managers:access">
             <BranchManagerEditPage />
           </ProtectedRoute>
         }

@@ -984,7 +984,7 @@ class AdminController {
       const PermissionService = require('../../application/services/PermissionService');
       const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
       const ps = new PermissionService({ roleRepository: new RoleRepositoryImpl() });
-      const permissions = await ps.getUserPermissions(userId);
+      const permissions = await ps.getUserPermissions(userId, { skipCache: true });
       const permissionKeys = Array.from(permissions);
 
       const newToken = jwt.sign(
