@@ -39,14 +39,14 @@ function buildAdminRouter() {
 
   // Permission matrix (Role x Screen) - admin-only.
   // Mount sub-router voi requireAdmin rieng de tranh conflict voi /reissue-token.
-  router.use('/permission-matrix', authenticate, requireAdmin, requireScreen('permission_matrix', 'access'), trackActivity, buildPermissionMatrixRouter());
+  router.use('/permission-matrix', authenticate, requireAdmin, requireScreen('permission_matrix'), trackActivity, buildPermissionMatrixRouter());
 
-  router.use(authenticate, requireAdmin, requireScreen('dashboard', 'access'), trackActivity);
+  router.use(authenticate, requireAdmin, requireScreen('dashboard'), trackActivity);
 
   router.get('/dashboard', controller.getDashboardStats);
 
   // Users - enforce granular permissions theo RBAC matrix
-  router.use('/users', requireScreen('users', 'access'));
+  router.use('/users', requireScreen('users'));
   router.get('/users', requirePerm('admin:users:read'), validateListUsersQuery, controller.listUsers);
   router.get('/users/export', requirePerm('admin:users:read'), controller.exportUsers);
   router.get('/users/:id', requirePerm('admin:users:read'), controller.getUserDetail);
@@ -55,7 +55,7 @@ function buildAdminRouter() {
   router.post('/users/:id/reset-password', requirePerm('admin:users:update'), controller.resetPassword);
 
   // Branches - granular permissions
-  router.use('/branches', requireScreen('branches', 'access'));
+  router.use('/branches', requireScreen('branches'));
   router.get('/branches', requirePerm('admin:branches:read'), controller.listBranches);
   router.get('/branches/full', requirePerm('admin:branches:read'), controller.listBranchesFull);
   router.get('/branches/manager-candidates', requirePerm('admin:branches:read'), controller.getManagerCandidates);
@@ -67,7 +67,7 @@ function buildAdminRouter() {
   router.patch('/branches/:id/reactivate', requirePerm('admin:branches:activate'), controller.reactivateBranch);
 
   // Roles (UC-11) - enforce granular permissions doc theo RBAC thuc te
-  router.use('/roles', requireScreen('roles', 'access'));
+  router.use('/roles', requireScreen('roles'));
   router.get('/roles', requirePerm('admin:roles:read'), controller.listRoles);
   // Route 'full' phai dat TRUOC /roles/:id de tranh match nhầm
   router.get('/roles/full', requirePerm('admin:roles:read'), controller.listRolesWithPermissions);
@@ -85,7 +85,7 @@ function buildAdminRouter() {
 
   // Permission Groups (Phase 3) - hien thi ma tran quyen dang GROUP
   // /permission-groups/:id phai dat TRUOC /roles/:id/groups (route dai hon) cho de doc
-  router.use('/permission-groups', requireScreen('roles', 'access'));
+  router.use('/permission-groups', requireScreen('roles'));
   router.get('/permission-groups', requirePerm('admin:roles:read'), controller.listPermissionGroups);
   router.get('/permission-groups/:id', requirePerm('admin:roles:read'), controller.getPermissionGroupDetail);
   router.get('/roles/:id/groups', requirePerm('admin:roles:read'), controller.getRoleGroupIds);
@@ -102,7 +102,7 @@ function buildAdminRouter() {
   // Khong check route nao khong co requirePerm vi neu admin role bi revoke
   // devices permissions van bi chan. Day la diem khac biet giua
   // role-check va permission-check (production-grade).
-  router.use('/devices', requireScreen('devices', 'access'));
+  router.use('/devices', requireScreen('devices'));
   router.get('/devices', requirePerm('admin:devices:read'), controller.listDevices);
   router.get('/devices/user/:userId', requirePerm('admin:devices:read'), controller.listUserDevices);
   router.delete('/devices/:deviceId', requirePerm('admin:devices:deactivate'), controller.forceLogoutDevice);
@@ -110,7 +110,7 @@ function buildAdminRouter() {
   router.delete('/devices/user/:userId/all', requirePerm('admin:devices:deactivate'), controller.forceLogoutAllDevices);
 
   // Specialties - granular permissions
-  router.use('/specialties', requireScreen('specialties', 'access'));
+  router.use('/specialties', requireScreen('specialties'));
   router.get('/specialties', requirePerm('admin:specialties:read'), controller.listSpecialties);
   router.post('/specialties', requirePerm('admin:specialties:create'), controller.createSpecialty);
   router.put('/specialties/:id', requirePerm('admin:specialties:update'), controller.updateSpecialty);
@@ -120,13 +120,13 @@ function buildAdminRouter() {
   router.put('/users/:userId/specialties', requirePerm('admin:specialties:manage'), controller.setUserSpecialties);
 
   // Security Alerts - granular permissions
-  router.use('/security-alerts', requireScreen('security_alerts', 'access'));
+  router.use('/security-alerts', requireScreen('security_alerts'));
   router.get('/security-alerts', requirePerm('admin:security_alerts:read'), controller.listSecurityAlerts);
   router.get('/security-alerts/counts', requirePerm('admin:security_alerts:read'), controller.acknowledgeAlertCounts);
   router.patch('/security-alerts/:id/ack', requirePerm('admin:security_alerts:update'), controller.acknowledgeAlert);
 
   // Login sessions (UC: lich su dang nhap)
-  router.use('/login-sessions', requireScreen('login_sessions', 'access'));
+  router.use('/login-sessions', requireScreen('login_sessions'));
   router.post('/sessions/cleanup', requirePerm('admin:login_sessions:manage'), controller.cleanupDuplicateSessions);
   router.get('/login-sessions/recent', requirePerm('admin:login_sessions:read'), controller.getRecentLoginSessions);
 
