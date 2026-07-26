@@ -172,10 +172,20 @@ class ProductRepositoryImpl extends ProductRepository {
   }
 
   async delete(id) {
+    // Soft-disable: không hard DELETE (đồng bộ nghiệp vụ Disable/Ngừng).
     const before = await this.findById(id);
     if (!before) return null;
-    await query(`DELETE FROM products WHERE id = @id`, { id });
-    return before;
+    if (before.status === 'inactive') return before;
+    await query(`UPDATE products SET status = N'inactive' WHERE id = @id`, { id });
+    return this.findById(id);
+  }
+
+  async reactivate(id) {
+    const before = await this.findById(id);
+    if (!before) return null;
+    if (before.status === 'active') return before;
+    await query(`UPDATE products SET status = N'active' WHERE id = @id`, { id });
+    return this.findById(id);
   }
 
   async count({ branchId, status, search, category, lowStockOnly } = {}) {

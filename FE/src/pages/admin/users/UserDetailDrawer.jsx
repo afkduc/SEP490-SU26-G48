@@ -1,19 +1,18 @@
 import { useEffect, useState } from 'react';
 import { adminUsersApi } from '../../../services/adminApi';
 import PermissionGate from '../../../components/PermissionGate';
-import AssignRoleModal from './AssignRoleModal';
 import ResetPasswordModal from './ResetPasswordModal';
 import '../components/AdminDrawer.css';
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
-  inactive: 'Ngừng hoạt động',
+  inactive: 'Không hoạt động',
   locked: 'Bị khóa',
 };
 
 const STATUS_CLASS = {
   active: 'badge--success',
-  inactive: 'badge--secondary',
+  inactive: 'badge--danger',
   locked: 'badge--danger',
 };
 
@@ -76,7 +75,6 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showAssign, setShowAssign] = useState(false);
   const [showReset, setShowReset] = useState(false);
 
   useEffect(() => {
@@ -198,7 +196,11 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                 <div className="detail-list__group">
                   <DetailRow
                     label="Chi nhánh"
-                    value={user.branchName || '—'}
+                    value={
+                      user.scopeAllBranches
+                        ? 'Tất cả chi nhánh'
+                        : (user.branchName || '—')
+                    }
                   />
                 </div>
 
@@ -236,29 +238,8 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
               Đặt lại mật khẩu
             </button>
           </PermissionGate>
-          <PermissionGate permission="admin:user_roles:assign">
-            <button className="drawer__btn-assign" onClick={() => setShowAssign(true)} type="button">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                <line x1="12" y1="8" x2="12" y2="16"/>
-                <line x1="8" y1="12" x2="16" y2="12"/>
-              </svg>
-              Phân quyền
-            </button>
-          </PermissionGate>
         </div>
       </div>
-
-      {showAssign && user && (
-        <AssignRoleModal
-          userId={user.id}
-          onClose={() => setShowAssign(false)}
-          onSuccess={() => {
-            onRolesChanged?.();
-            onClose?.();
-          }}
-        />
-      )}
 
       {showReset && user && (
         <ResetPasswordModal

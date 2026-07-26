@@ -442,10 +442,28 @@ class RoleRepositoryImpl {
    * @returns {Promise<string[]>}
    */
   async getUserPermissionKeysCompact(userId) {
+    // Optimization: neu user da co wildcard '*' thi khong can enumerate
+    // 350+ keys screen:* vi permissionService.can() se short-circuit tai `*`.
+    // Tra ve compact set chi chua '*' de JWT rat ngan (fix status 431).
+    const star = await query(
+      `SELECT TOP 1 p.id
+       FROM user_role ur
+       JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
+       JOIN role_permissions rp ON rp.role_id = r.id
+       JOIN permissions p ON p.id = rp.permission_id
+       WHERE ur.user_id = @p1
+         AND ISNULL(ur.is_active, 1) = 1
+         AND p.permission_key = '*'`,
+      { p1: userId }
+    );
+    if (star.recordset.length > 0) {
+      return ['*'];
+    }
+
     const result = await query(`
       SELECT DISTINCT CAST(perm_key AS NVARCHAR(500)) COLLATE database_default AS perm_key
       FROM (
-        -- Layer 1
+        -- Layer 1 (khong bao gom screen:*:access vi user khong co wildcard)
         SELECT CAST(p.permission_key AS NVARCHAR(500)) COLLATE database_default AS perm_key
         FROM user_role ur
         JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
@@ -453,6 +471,7 @@ class RoleRepositoryImpl {
         JOIN permissions p ON p.id = rp.permission_id
         WHERE ur.user_id = @p1
           AND ISNULL(ur.is_active, 1) = 1
+          AND p.permission_key NOT LIKE 'screen:%:access' COLLATE database_default
 
         UNION
 

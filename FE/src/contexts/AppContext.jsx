@@ -1,11 +1,18 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { loginApi, logoutApi, getMeApi } from '../services/authApi';
+import { loginApi, logoutApi, getMeApi, getServerTime, getMyLoginChallengesApi } from '../services/authApi';
 import { ROLES } from '../constants/roles';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
+import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
-import { resetSessionExpiredFlag, cancelAllPendingRequests, resetLoggedOutFlag } from '../services/httpClient';
+import LoginChallengeModal from '../components/LoginChallengeModal';
+import {
+  resetSessionExpiredFlag,
+  cancelAllPendingRequests,
+  resetLoggedOutFlag,
+  SESSION_LOGGED_OUT_EVENT,
+} from '../services/httpClient';
 
 const AppContext = createContext(null);
 
@@ -94,9 +101,9 @@ export function getRoleHome(user) {
   if (roles.includes(ROLES.ADMIN)) return '/admin/dashboard';
   if (roles.includes(ROLES.GENERAL_DIRECTOR)) return '/general-director';
   if (roles.includes(ROLES.MANAGER)) return '/manager';
+  if (roles.includes(ROLES.SERVICE_ADVISOR)) return '/dashboard';
   if (roles.includes(ROLES.TEAM_LEADER)) return '/repair-orders';
   if (roles.includes(ROLES.WAREHOUSE_STAFF)) return '/inventory';
-  if (roles.includes(ROLES.ACCOUNTANT)) return '/accountant';
   return '/dashboard';
 }
 
@@ -180,21 +187,34 @@ export function AppProvider({ children }) {
       }
     };
 
+    // SESSION_LOGGED_OUT event: SessionExpiredModal hoac ForbiddenModal
+    // clear localStorage khi user click "Dang nhap lai" -> phai clear luon
+    // React state de LoginPage co the render form (khong bi redirect ve home).
+    const handleSessionLoggedOut = () => {
+      setToken(null);
+      setUser(null);
+      setPermissions([]);
+    };
+
     window.addEventListener('storage', handleStorageChange);
     if (SESSION_CHANNEL) {
       SESSION_CHANNEL.addEventListener('message', handleBroadcast);
     }
+    // SESSION_LOGGED_OUT: SessionExpiredModal hoac cac cho khac clear
+    // localStorage khi user click "Dang nhap lai" -> clear luon React state.
+    window.addEventListener(SESSION_LOGGED_OUT_EVENT, handleSessionLoggedOut);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       if (SESSION_CHANNEL) {
         SESSION_CHANNEL.removeEventListener('message', handleBroadcast);
       }
+      window.removeEventListener(SESSION_LOGGED_OUT_EVENT, handleSessionLoggedOut);
     };
   }, []); // Run once on mount
 
-  const login = useCallback(async (email, password, remember = false, branchId) => {
-    const result = await loginApi(email, password, branchId);
+  const login = useCallback(async (email, password, remember = false, branchId, options = {}) => {
+    const result = await loginApi(email, password, branchId, options);
 
     // QUAN TRONG: Phai save token vao storage TRUOC khi goi bat ky
     // authenticated API nao (nhu getMeApi). Vi httpClient luon doc token
@@ -221,19 +241,20 @@ export function AppProvider({ children }) {
       resetLoggedOutFlag();
     }
 
-    // Lay quyen moi nhat tu server (permissions trong JWT co the STALE neu
-    // admin vua thay doi ma tran quyen o mot tab khac). Fallback ve
-    // permissions tu JWT neu API fail (mang chap / 401).
-    let newPermissions = result.user?.permissions || [];
+    // Full permissions (L1 + L2 flatten) cho UI ẩn/hiện nút.
+    // JWT vẫn compact — không dùng JWT permissions làm nguồn chính cho FE.
+    let newPermissions =
+      (Array.isArray(result.effectivePermissions) && result.effectivePermissions) ||
+      result.user?.permissions ||
+      [];
     try {
       const me = await getMeApi();
       if (me && Array.isArray(me.permissions)) {
         newPermissions = me.permissions;
       }
     } catch (e) {
-      // Nuot loi — permissions tu JWT van OK cho lan render dau tien.
       if (typeof console !== 'undefined') {
-        console.warn('[AppContext] getMe after login failed, fallback to JWT perms:', e?.message);
+        console.warn('[AppContext] getMe after login failed, fallback to login perms:', e?.message);
       }
     }
 
@@ -379,9 +400,8 @@ export function AppProvider({ children }) {
       {/* HeartbeatRunner: goi POST /api/auth/heartbeat moi 60s.
           Tu tat khi user logout. Tu backoff khi nhan 401 de tranh spam. */}
       {isAuthenticated ? <HeartbeatRunner /> : null}
-      {/* PermissionEventsRunner: SSE listener de refresh quyen realtime khi admin
-          thay doi ma tran quyen / gan role / revoke role. Tu tat khi logout. */}
       {isAuthenticated ? <PermissionEventsRunner /> : null}
+      {isAuthenticated ? <LoginChallengeRunner /> : null}
       {children}
     </AppContext.Provider>
   );
@@ -432,6 +452,66 @@ function PermissionEventsRunner() {
   });
 
   return null;
+}
+
+function LoginChallengeRunner() {
+  const { token } = useAuth();
+  // SSE notifications (bell + challenge event). Poll challenges làm backup nếu SSE trễ.
+  useNotifications(token);
+  const [challenge, setChallenge] = useState(null);
+
+  useEffect(() => {
+    const onChallenge = (e) => {
+      const detail = e?.detail;
+      if (!detail?.pendingId) return;
+      setChallenge((prev) => (prev?.pendingId === detail.pendingId ? prev : detail));
+    };
+    window.addEventListener('login-challenge', onChallenge);
+    return () => window.removeEventListener('login-challenge', onChallenge);
+  }, []);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const data = await getMyLoginChallengesApi();
+        const items = data?.items || data || [];
+        const first = Array.isArray(items) ? items[0] : null;
+        if (cancelled || !first?.pendingId) return;
+        const meta = first.clientMeta || {};
+        setChallenge((prev) => {
+          if (prev?.pendingId === first.pendingId) return prev;
+          return {
+            pendingId: first.pendingId,
+            metadata: meta,
+            device: [meta.browser, meta.os].filter(Boolean).join(' · ') || 'Thiết bị khác',
+            ip: meta.ip,
+            title: 'Yêu cầu đăng nhập mới',
+            message: 'Có thiết bị khác đang cố đăng nhập tài khoản của bạn.',
+          };
+        });
+      } catch {
+        // ignore poll errors
+      }
+    };
+
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [token]);
+
+  if (!challenge) return null;
+  return (
+    <LoginChallengeModal
+      challenge={challenge}
+      onClose={() => setChallenge(null)}
+    />
+  );
 }
 
 export function useAuth() {

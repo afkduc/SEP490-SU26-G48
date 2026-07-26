@@ -1,13 +1,16 @@
 const { success } = require('../../utils/response');
 const ApiError = require('../../utils/ApiError');
+const { query } = require('../../infrastructure/database/sqlServer');
 const PermissionMatrixRepository = require('../../infrastructure/repositories/PermissionMatrixRepository');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const RoleScreenMatrixRepository = require('../../infrastructure/repositories/RoleScreenMatrixRepository');
+const AuthRepositoryImpl = require('../../infrastructure/repositories/AuthRepositoryImpl');
+const UserRepositoryImpl = require('../../infrastructure/repositories/UserRepositoryImpl');
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
 const PermissionService = require('../../application/services/PermissionService');
 const { emitPermissionChanged } = require('../../application/events/PermissionEvents');
-const { generatePermissionKeys } = require('../../../scripts/auto-discover-permissions');
+const { generatePermissionKeys } = require('../../infrastructure/utils/autoDiscoverPermissions');
 
 
 /**
@@ -33,15 +36,32 @@ class PermissionMatrixController {
     this.permissionService = new PermissionService({
       roleRepository: new RoleRepositoryImpl(),
     });
+    this.authRepo = new AuthRepositoryImpl();
+    this.userRepo = new UserRepositoryImpl();
   }
 
   getMatrix = async (req, res, next) => {
     try {
-      const [roles, screens, grants] = await Promise.all([
+      const [roles, screens, grants, labelRows] = await Promise.all([
         this.repo.getRoles(),
         this.repo.getScreens(),
         this.repo.getGrants(),
+        query(
+          `SELECT screen_key, screen_label, group_label
+           FROM screen_routes
+           WHERE is_active = 1`
+        ).catch(() => ({ recordset: [] })),
       ]);
+
+      const screenLabels = {};
+      for (const row of labelRows.recordset || []) {
+        if (row.screen_key) {
+          screenLabels[row.screen_key] = {
+            screenLabel: row.screen_label || null,
+            groupLabel: row.group_label || null,
+          };
+        }
+      }
 
       // Build "screens by role" theo 2D matrix (screen x actions)
       // - Tra ve tat ca auto-discovered screens cho moi role (104+ screens).
@@ -52,7 +72,7 @@ class PermissionMatrixController {
       // L2 screen_keys per role (de FE derive scope day du)
       const roleScreenKeys = {};
       for (const role of roles) {
-        screensByRole[role.id] = await this.buildScreenPermissionsForRole(role);
+        screensByRole[role.id] = await this.buildScreenPermissionsForRole(role, screenLabels);
         // Lay danh sach screen_key (module:resource) tu role_screen_permissions
         const l2Matrix = await this.roleScreenRepo.getMatrixByRole(role.id);
         roleScreenKeys[role.id] = Array.from(l2Matrix.keys());
@@ -64,6 +84,7 @@ class PermissionMatrixController {
         grants,
         screensByRole,
         roleScreenKeys,
+        screenLabels,
         generatedAt: new Date().toISOString(),
       }, 'Ma tran quyen (role x screen)');
     } catch (err) {
@@ -83,7 +104,7 @@ class PermissionMatrixController {
    *   - Role thuong: chi hien thi screens co hasAccess || hasAnyAction.
    *   - Admin: hien thi tat ca.
    */
-  buildScreenPermissionsForRole = async (role) => {
+  buildScreenPermissionsForRole = async (role, screenLabels = {}) => {
     const roleId = role.id;
 
     // L1 grants cho role (permissions table)
@@ -103,8 +124,11 @@ class PermissionMatrixController {
     for (const p of perms) {
       const key = `${p.module}:${p.resource}`;
       if (!screensMap.has(key)) {
+        const meta = screenLabels[key] || {};
         screensMap.set(key, {
           screenKey: key,
+          screenLabel: meta.screenLabel || null,
+          groupLabel: meta.groupLabel || null,
           module: p.module,
           resource: p.resource,
           accessKey: `screen:${p.module}:${p.resource}:access`,
@@ -131,8 +155,11 @@ class PermissionMatrixController {
           const parts = screenKey.split(':');
           const m = parts[0];
           const r = parts.slice(1).join(':') || '';
+          const meta = screenLabels[screenKey] || {};
           screensMap.set(screenKey, {
             screenKey,
+            screenLabel: meta.screenLabel || null,
+            groupLabel: meta.groupLabel || null,
             module: m,
             resource: r,
             accessKey: `screen:${m}:${r}:access`,
@@ -140,6 +167,9 @@ class PermissionMatrixController {
               view: true, create: true, update: true, delete: true, export: true,
             },
           });
+        } else if (!screensMap.get(screenKey).screenLabel && screenLabels[screenKey]?.screenLabel) {
+          screensMap.get(screenKey).screenLabel = screenLabels[screenKey].screenLabel;
+          screensMap.get(screenKey).groupLabel = screenLabels[screenKey].groupLabel || null;
         }
       }
     }
@@ -147,8 +177,11 @@ class PermissionMatrixController {
     // Map sang response: hasAccess + 5 action bits
     const screens = Array.from(screensMap.values()).map((s) => {
       const l2 = l2Matrix.get(s.screenKey);
+      const meta = screenLabels[s.screenKey] || {};
       return {
         ...s,
+        screenLabel: s.screenLabel || meta.screenLabel || null,
+        groupLabel: s.groupLabel || meta.groupLabel || null,
         hasAccess: l1Keys.has(s.accessKey),
         canView: l2 ? Boolean(l2.canView) : false,
         canCreate: l2 ? Boolean(l2.canCreate) : false,
@@ -190,11 +223,10 @@ class PermissionMatrixController {
       // Invalidate cache toan bo user de permission moi co hieu luc ngay.
       this.permissionService.invalidateAllCache();
 
-      // Emit SSE permission-changed den cac user dang giu role nay (real-time).
-      // Truong hop khong co user nao giu role (chi sua permission "tuong lai"
-      // cho role chua ai co) -> skip emit theo PermissionEvents design.
+      // Emit SSE + thu thap affectedUserIds (khai bao ngoai try de dung cho audit/notify)
+      let affectedUserIds = [];
       try {
-        const affectedUserIds = await this.repo.getUsersByRole(roleId);
+        affectedUserIds = await this.repo.getUsersByRole(roleId);
         if (affectedUserIds.length > 0) {
           emitPermissionChanged({
             action: 'matrix_updated',
@@ -203,6 +235,14 @@ class PermissionMatrixController {
             actorUserId: req.user?.userId || null,
             details: { permissionKey: permissionKey || null, permissionId: permissionId || null, granted },
           });
+
+          // Bump token_version cho user bi anh huong -> JWT cu vo hieu luc -> user
+          // se bi 401 o request tiep theo -> SessionExpiredModal hien -> user login
+          // lai de nhan quyen moi. Day dam bao user khong the giu quyen cu qua
+          // session JWT khi admin vua revoke.
+          if (!granted) {
+            await this._bumpTokenVersions(affectedUserIds, req);
+          }
         }
       } catch (eventErr) {
         // Log nhung khong fail API - SSE chi la optional enhancement.
@@ -211,28 +251,53 @@ class PermissionMatrixController {
 
       // Audit log + notification (theo yeu cau "cứ ghi log là thông báo")
       try {
+        const actorName = req.user?.name || req.user?.email || 'Quản trị viên';
+        const permLabel = permissionKey || `id:${permissionId}`;
         await this.auditService.log({
           actorId: req.user?.userId,
           actorEmail: req.user?.email,
           action: granted ? 'GRANT_SCREEN' : 'REVOKE_SCREEN',
           resource: 'permission_matrix',
-          resourceId: `${roleId}_${permissionId}`,
-          details: { roleId, permissionId, granted, changed },
+          resourceId: `${roleId}_${permissionKey || permissionId}`,
+          details: { roleId, permissionId, permissionKey, granted, changed },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
 
-        // Thong bao cho cac user bi anh huong (GRANT/REVOKE permission)
-        if (affectedUserIds.length > 0) {
-          const NotificationService = require('../../application/services/NotificationService');
-          const ns = new NotificationService();
-          for (const userId of affectedUserIds) {
+        const NotificationService = require('../../application/services/NotificationService');
+        const ns = new NotificationService();
+
+        // Thong bao admin (ma tran doi)
+        await ns.notifyAdmins('PERMISSION_MATRIX_UPDATED', {
+          actorName,
+          permissionKey: `${granted ? 'Cấp' : 'Thu hồi'} ${permLabel}`,
+          actorId: req.user?.userId,
+        }, { excludeUserId: req.user?.userId }).catch((err) =>
+          console.warn('[PermissionMatrix] notifyAdmins failed:', err.message),
+        );
+
+        // Thong bao user bi anh huong
+        for (const userId of affectedUserIds) {
+          if (granted) {
+            await ns.notify('PERMISSION_GRANTED', {
+              userId,
+              permissionKey: permLabel,
+              fromMatrix: true,
+              actorName,
+              actorId: req.user?.userId,
+            }, { skipSettings: true }).catch((err) =>
+              console.warn('[PermissionMatrix] notify user failed:', err.message),
+            );
+          } else {
             await ns.notify('ROLE_CHANGED', {
               userId,
-              roles: `${granted ? 'Cấp' : 'Thu hồi'} permission ${permissionId}`,
-              actorName: req.user?.name || req.user?.email || 'admin',
+              roles: `Thu hồi ${permLabel}`,
+              action: 'REVOKED',
+              actorName,
               actorId: req.user?.userId,
-            }).catch((err) => console.warn('[PermissionMatrix] notify failed:', err.message));
+            }, { skipSettings: true }).catch((err) =>
+              console.warn('[PermissionMatrix] notify user failed:', err.message),
+            );
           }
         }
       } catch (auditErr) {
@@ -283,30 +348,48 @@ class PermissionMatrixController {
       // Emit SSE den tat ca user dang giu cac role bi thay doi.
       // Chi emit 1 lan voi union userIds de tranh spam.
       let affectedUserCount = 0;
+      let affectedUserIds = [];
       try {
         if (affectedRoleIds.size > 0) {
-          const affectedUserIds = new Set();
+          const userSet = new Set();
+          const grantedByRole = new Map();
+          for (const cell of cells) {
+            if (cell && cell.roleId && typeof cell.granted === 'boolean') {
+              if (!grantedByRole.has(Number(cell.roleId))) {
+                grantedByRole.set(Number(cell.roleId), cell.granted);
+              }
+            }
+          }
           for (const rid of affectedRoleIds) {
             const users = await this.repo.getUsersByRole(rid);
-            users.forEach((u) => affectedUserIds.add(u));
+            users.forEach((u) => userSet.add(u));
           }
-          affectedUserCount = affectedUserIds.size;
+          affectedUserIds = [...userSet];
+          affectedUserCount = affectedUserIds.length;
           if (affectedUserCount > 0) {
             emitPermissionChanged({
               action: 'matrix_updated',
-              userIds: [...affectedUserIds],
+              userIds: affectedUserIds,
               roleIds: [...affectedRoleIds],
               actorUserId: req.user?.userId || null,
               details: { count: cells.length },
             });
+
+            // Chi revoke (granted=false) moi can bump token_version.
+            // Neu bat ky cell nao trong bulk la revoke, user phai login lai.
+            const hasRevoke = [...grantedByRole.values()].some((g) => g === false);
+            if (hasRevoke) {
+              await this._bumpTokenVersions(affectedUserIds, req);
+            }
           }
         }
       } catch (eventErr) {
         console.warn('[PermissionMatrixController] emit SSE (bulk) failed:', eventErr.message);
       }
 
-      // Audit log - non-blocking (action column VARCHAR(10) co the tran).
+      // Audit log + notify
       try {
+        const actorName = req.user?.name || req.user?.email || 'Quản trị viên';
         await this.auditService.log({
           actorId: req.user?.userId,
           actorEmail: req.user?.email,
@@ -317,6 +400,29 @@ class PermissionMatrixController {
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
+
+        const NotificationService = require('../../application/services/NotificationService');
+        const ns = new NotificationService();
+        await ns.notifyAdmins('PERMISSION_MATRIX_UPDATED', {
+          actorName,
+          bulk: true,
+          count: cells.length,
+          permissionKey: `${cells.length} ô`,
+          actorId: req.user?.userId,
+        }, { excludeUserId: req.user?.userId }).catch((err) =>
+          console.warn('[PermissionMatrix] bulk notifyAdmins failed:', err.message),
+        );
+
+        for (const userId of affectedUserIds) {
+          await ns.notify('ROLE_CHANGED', {
+            userId,
+            roles: `Cập nhật hàng loạt ma trận quyền (${cells.length} ô)`,
+            actorName,
+            actorId: req.user?.userId,
+          }, { skipSettings: true }).catch((err) =>
+            console.warn('[PermissionMatrix] bulk notify user failed:', err.message),
+          );
+        }
       } catch (auditErr) {
         console.warn('[PermissionMatrixController] audit log (bulk) failed (non-blocking):', auditErr.message);
       }
@@ -328,6 +434,29 @@ class PermissionMatrixController {
       );
     } catch (err) {
       next(err);
+    }
+  };
+
+  /**
+   * Bump token_version cho 1 danh sach userId -> JWT cu cua ho vo hieu luc.
+   * Moi user trong danh sach se nhan 401 o request tiep theo -> SessionExpiredModal
+   * hien -> user phai login lai de nhan quyen moi.
+   *
+   * @param {number[]} userIds
+   * @param {object} req - request object (de lay actor info cho audit)
+   */
+  _bumpTokenVersions = async (userIds, req) => {
+    if (!Array.isArray(userIds) || userIds.length === 0) return;
+    const actorId = req.user?.userId;
+    const actorEmail = req.user?.email;
+    for (const userId of userIds) {
+      try {
+        // Skip actor (admin dang thao tac) de khong tu logout minh
+        if (Number(userId) === Number(actorId)) continue;
+        await this.authRepo.incrementTokenVersion(userId);
+      } catch (err) {
+        console.warn(`[PermissionMatrixController] bump token_version cho user ${userId} failed:`, err.message);
+      }
     }
   };
 }

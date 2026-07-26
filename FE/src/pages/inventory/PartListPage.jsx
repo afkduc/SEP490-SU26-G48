@@ -39,14 +39,14 @@ export default function PartListPage() {
     parts, total, loading, error, categories,
     params,
     setSearch, setStatus, setCategory, setLowStockOnly, setPage,
-    create, update, remove,
+    create, update, deactivate, reactivate,
   } = useParts({ branchId });
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm());
   const [formError, setFormError] = useState('');
-  const [deletingId, setDeletingId] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
   const [units, setUnits] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
 
@@ -114,13 +114,18 @@ export default function PartListPage() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('Xác nhận xóa phụ tùng này?')) return;
-    setDeletingId(id);
+  async function handleToggleStatus(p) {
+    const isActive = p.status === 'active';
+    const msg = isActive
+      ? 'Xác nhận tạm ngừng phụ tùng này?'
+      : 'Xác nhận kích hoạt lại phụ tùng này?';
+    if (!window.confirm(msg)) return;
+    setTogglingId(p.id);
     try {
-      await remove(id);
+      if (isActive) await deactivate(p.id);
+      else await reactivate(p.id);
     } finally {
-      setDeletingId(null);
+      setTogglingId(null);
     }
   }
 
@@ -141,7 +146,7 @@ export default function PartListPage() {
           <h1 className="part-list__title">Danh sách phụ tùng</h1>
           <p className="part-list__subtitle">Quản lý thông tin phụ tùng (số lượng tồn được cập nhật qua phiếu nhập/xuất)</p>
         </div>
-        <PermissionGate permission="inventory:products:create">
+        <PermissionGate permission="screen:inventory:products:create">
           <button className="btn btn--primary" onClick={openCreate}>
             + Thêm phụ tùng
           </button>
@@ -247,18 +252,18 @@ export default function PartListPage() {
                           >
                             Chi tiết
                           </Link>
-                          <PermissionGate permission="inventory:products:update">
+                          <PermissionGate permission="screen:inventory:products:update">
                             <button className="btn btn--ghost btn--sm" onClick={() => openEdit(p)}>
                               Sửa
                             </button>
                           </PermissionGate>
-                          <PermissionGate permission="inventory:products:delete">
+                          <PermissionGate permission="screen:inventory:products:delete">
                             <button
                               className="btn btn--ghost btn--sm btn--danger"
-                              onClick={() => handleDelete(p.id)}
-                              disabled={deletingId === p.id}
+                              onClick={() => handleToggleStatus(p)}
+                              disabled={togglingId === p.id}
                             >
-                              Xóa
+                              {p.status === 'active' ? 'Ngừng' : 'Kích hoạt'}
                             </button>
                           </PermissionGate>
                         </td>

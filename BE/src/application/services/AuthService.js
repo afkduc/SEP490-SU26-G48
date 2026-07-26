@@ -5,6 +5,9 @@ const { toUserDto } = require('../dto/AuthDto');
 const config = require('../../config');
 const PermissionService = require('./PermissionService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+const PendingLoginStore = require('./PendingLoginStore');
+
+const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '5', 10);
 
 class AuthService {
   constructor(authRepository) {
@@ -21,31 +24,73 @@ class AuthService {
     return this._permissionService;
   }
 
-  async login(email, password, branchId) {
-    if (!email || !password) {
-      const e = new ApiError(400, 'Email và mật khẩu không được để trống');
+  /**
+   * Đóng session "ma" (không heartbeat trong STALE_MINUTES) trước khi check conflict.
+   */
+  async _closeStaleSessionsForUser(userId) {
+    const { query } = require('../../infrastructure/database/sqlServer');
+    await query(
+      `UPDATE login_sessions
+       SET    logout_time              = SYSUTCDATETIME(),
+              logout_reason            = 'TIMEOUT',
+              session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+              status                   = 'ended'
+       WHERE  user_id     = @p1
+         AND  status      = 'active'
+         AND  action_type = 'LOGIN'
+         AND  COALESCE(last_activity_at, login_time) < DATEADD(MINUTE, -@p2, SYSUTCDATETIME())`,
+      { p1: userId, p2: STALE_MINUTES }
+    );
+  }
+
+  async _findLiveSession(userId) {
+    const { query } = require('../../infrastructure/database/sqlServer');
+    const active = await query(
+      `SELECT TOP 1 id, browser, os, ip_address, login_time, last_activity_at
+       FROM login_sessions
+       WHERE user_id = @p1
+         AND status = 'active'
+         AND action_type = 'LOGIN'
+         AND COALESCE(last_activity_at, login_time) >= DATEADD(MINUTE, -@p2, SYSUTCDATETIME())
+       ORDER BY COALESCE(last_activity_at, login_time) DESC`,
+      { p1: userId, p2: STALE_MINUTES }
+    );
+    return active.recordset[0] || null;
+  }
+
+  /**
+   * @param {object} opts
+   * @param {boolean} [opts.force] - DEPRECATED: chỉ giữ tương thích, không còn override phiên cũ
+   * @param {string} [opts.pendingId] - hoàn tất sau khi phiên cũ approve
+   * @param {object} [opts.clientMeta] - { ip, userAgent, browser, os }
+   */
+  async login(identifier, password, branchId, { force = false, pendingId = null, clientMeta = {} } = {}) {
+    if (!identifier || !password) {
+      const e = new ApiError(400, 'Email/số điện thoại và mật khẩu không được để trống');
       e.audit = { skip: true };
       throw e;
     }
 
-    const user = await this.authRepository.findUserByEmail(email);
+    // Hoàn tất sau khi phiên cũ đã approve
+    if (pendingId) {
+      return this._completePendingLogin(pendingId, identifier, password);
+    }
+
+    const user = await this.authRepository.findUserByEmailOrPhone(identifier);
     if (!user) {
-      const e = new ApiError(401, 'Email hoặc mật khẩu không đúng');
+      const e = new ApiError(401, 'Email/số điện thoại hoặc mật khẩu không đúng');
       e.audit = { userExists: false };
       throw e;
     }
 
     const isMatch = await this._verifyPassword(password, user.user_password);
     if (!isMatch) {
-      const e = new ApiError(401, 'Email hoặc mật khẩu không đúng');
+      const e = new ApiError(401, 'Email/số điện thoại hoặc mật khẩu không đúng');
       e.audit = { userExists: true, user, reason: 'WRONG_PASSWORD' };
       throw e;
     }
 
     if (user.status && user.status !== 'active') {
-      // status la 'inactive' (ngung hoat dong) hoac bat ky gia tri khac active
-      // -> chan login. Migrating tu 'locked' -> 'inactive' (gop 2 status vi
-      // logic giong nhau, chi khac UI badge).
       const e = new ApiError(403, 'Tài khoản đã ngừng hoạt động');
       e.audit = { userExists: true, user, reason: 'ACCOUNT_DISABLED' };
       throw e;
@@ -57,13 +102,6 @@ class AuthService {
       throw e;
     }
 
-    // Tai khoan gan voi 1 chi nhanh cu the thi bat buoc phai chon dung chi
-    // nhanh do o man dang nhap moi cho vao - tranh nhan vien chi nhanh nay
-    // dang nhap nham "voi tu cach" chi nhanh khac. Rieng admin/giam doc
-    // (general_director) quan ly toan he thong nen duoc mien kiem tra nay du
-    // trong DB ho van co the dang gan voi 1 branch_id cu the (VD: chi nhanh
-    // chinh de thong ke) - khong dung branch_id == null de xac dinh vi du
-    // lieu thuc te khong dam bao dieu do.
     const roles = await this.authRepository.findUserRoles(user.id);
     const isBranchExempt = roles.some(
       (r) => r.role_name === 'admin' || r.role_name === 'general_director'
@@ -75,12 +113,176 @@ class AuthService {
       throw e;
     }
 
-    // Increment token version de revoke token cu
+    // Dọn session stale rồi mới xét conflict thật (heartbeat còn sống)
+    await this._closeStaleSessionsForUser(user.id);
+    const live = await this._findLiveSession(user.id);
+
+    if (live) {
+      // Không cho thiết bị mới tự force. Tạo pending → phiên cũ xác nhận.
+      const pending = PendingLoginStore.createPending({
+        userId: user.id,
+        identifier: String(identifier).trim(),
+        branchId: branchId || null,
+        passwordFingerprint: await bcrypt.hash(password, 4), // nhẹ, chỉ để verify lại lúc complete
+        clientMeta: {
+          ip: clientMeta.ip || null,
+          userAgent: clientMeta.userAgent || null,
+          browser: clientMeta.browser || null,
+          os: clientMeta.os || null,
+        },
+        activeSession: {
+          id: live.id,
+          browser: live.browser,
+          os: live.os,
+          ip: live.ip_address,
+          startedAt: live.login_time,
+        },
+      });
+
+      this._notifyLoginChallenge(user.id, pending).catch(() => {});
+
+      const e = new ApiError(
+        409,
+        'Tài khoản đang được sử dụng trên thiết bị khác. Đã gửi yêu cầu xác nhận tới phiên đang đăng nhập. Vui lòng chờ họ đồng ý.'
+      );
+      e.code = 'LOGIN_PENDING';
+      e.details = {
+        code: 'LOGIN_PENDING',
+        pendingId: pending.id,
+        expiresAt: new Date(pending.expiresAt).toISOString(),
+        session: pending.activeSession,
+      };
+      e.audit = { skip: true };
+      throw e;
+    }
+
+    // force flag cũ: bỏ qua (không còn override). Giữ tham số để FE cũ không crash.
+    void force;
+
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
     user.token_version = newTokenVersion;
 
-    // Tra ve user object (CHUA CO TOKEN) - controller se tao token sau khi co deviceId
-    return { user };
+    return { user, pendingComplete: false };
+  }
+
+  async _completePendingLogin(pendingId, identifier, password) {
+    const pending = PendingLoginStore.getPending(pendingId);
+    if (!pending) {
+      throw new ApiError(404, 'Yêu cầu đăng nhập không tồn tại hoặc đã hết hạn');
+    }
+    if (pending.status === 'rejected') {
+      const e = new ApiError(403, 'Yêu cầu đăng nhập đã bị từ chối bởi phiên đang đăng nhập.');
+      e.code = 'LOGIN_REJECTED';
+      throw e;
+    }
+    if (pending.status === 'expired' || pending.expiresAt <= Date.now()) {
+      PendingLoginStore.updatePending(pendingId, { status: 'expired' });
+      throw new ApiError(410, 'Yêu cầu đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+    if (pending.status !== 'approved') {
+      const e = new ApiError(409, 'Đang chờ phiên hiện tại xác nhận đăng nhập...');
+      e.code = 'LOGIN_PENDING';
+      e.details = { code: 'LOGIN_PENDING', pendingId, status: pending.status };
+      throw e;
+    }
+
+    if (String(identifier).trim().toLowerCase() !== String(pending.identifier).trim().toLowerCase()) {
+      throw new ApiError(400, 'Thông tin đăng nhập không khớp yêu cầu đang chờ');
+    }
+
+    const ok = await bcrypt.compare(password, pending.passwordFingerprint);
+    if (!ok) {
+      throw new ApiError(401, 'Email/số điện thoại hoặc mật khẩu không đúng');
+    }
+
+    const user = await this.authRepository.findUserByEmailOrPhone(identifier);
+    if (!user || String(user.id) !== String(pending.userId)) {
+      throw new ApiError(401, 'Không thể hoàn tất đăng nhập');
+    }
+
+    const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
+    user.token_version = newTokenVersion;
+
+    PendingLoginStore.updatePending(pendingId, { status: 'completed' });
+    return { user, pendingComplete: true, pending };
+  }
+
+  async approvePendingLogin(userId, pendingId) {
+    const pending = PendingLoginStore.getPending(pendingId);
+    if (!pending || String(pending.userId) !== String(userId)) {
+      throw new ApiError(404, 'Không tìm thấy yêu cầu đăng nhập');
+    }
+    if (pending.status !== 'pending') {
+      throw new ApiError(409, `Yêu cầu đã ở trạng thái: ${pending.status}`);
+    }
+    if (pending.expiresAt <= Date.now()) {
+      PendingLoginStore.updatePending(pendingId, { status: 'expired' });
+      throw new ApiError(410, 'Yêu cầu đã hết hạn');
+    }
+    return PendingLoginStore.updatePending(pendingId, { status: 'approved', decidedAt: Date.now() });
+  }
+
+  async rejectPendingLogin(userId, pendingId) {
+    const pending = PendingLoginStore.getPending(pendingId);
+    if (!pending || String(pending.userId) !== String(userId)) {
+      throw new ApiError(404, 'Không tìm thấy yêu cầu đăng nhập');
+    }
+    if (pending.status !== 'pending') {
+      throw new ApiError(409, `Yêu cầu đã ở trạng thái: ${pending.status}`);
+    }
+    return PendingLoginStore.updatePending(pendingId, { status: 'rejected', decidedAt: Date.now() });
+  }
+
+  getPendingStatus(pendingId) {
+    const pending = PendingLoginStore.getPending(pendingId);
+    if (!pending) {
+      return { status: 'expired', pendingId };
+    }
+    if (pending.status === 'pending' && pending.expiresAt <= Date.now()) {
+      PendingLoginStore.updatePending(pendingId, { status: 'expired' });
+      return { status: 'expired', pendingId };
+    }
+    return {
+      status: pending.status,
+      pendingId,
+      expiresAt: new Date(pending.expiresAt).toISOString(),
+      session: pending.activeSession || null,
+    };
+  }
+
+  /** Phiên đang online poll để hiện alert lớn khi có thiết bị khác xin vào. */
+  listPendingChallengesForUser(userId) {
+    return PendingLoginStore.listPendingForUser(userId).map((p) => ({
+      pendingId: p.id,
+      status: p.status,
+      expiresAt: new Date(p.expiresAt).toISOString(),
+      clientMeta: p.clientMeta || null,
+      activeSession: p.activeSession || null,
+    }));
+  }
+
+  async _notifyLoginChallenge(userId, pending) {
+    try {
+      const NotificationService = require('./NotificationService');
+      const ns = new NotificationService();
+      const deviceLabel = [pending.clientMeta?.browser, pending.clientMeta?.os]
+        .filter(Boolean)
+        .join(' · ') || 'Thiết bị khác';
+      await ns.notify(
+        'LOGIN_CHALLENGE',
+        {
+          userId,
+          device: deviceLabel,
+          ip: pending.clientMeta?.ip,
+          browser: pending.clientMeta?.browser,
+          os: pending.clientMeta?.os,
+          pendingId: pending.id,
+        },
+        { skipSettings: true }
+      );
+    } catch (err) {
+      console.warn('[AuthService] LOGIN_CHALLENGE notify failed:', err.message);
+    }
   }
 
   async _verifyPassword(input, stored) {
@@ -108,19 +310,21 @@ class AuthService {
   async _signToken(user, deviceId, options = {}) {
     const roles = await this.authRepository.findUserRoles(user.id);
     const permissionService = this._getPermissionService();
-    // Dung compact set cho JWT (chi Layer 1 + screen:*:access), khong flatten
-    // Layer 2b vi se lam JWT qua lon (status 431).
+    // JWT: compact (L1 + screen:*:access + feature keys) — tránh 431.
+    // FE UI: effectivePermissions (full flatten L2 view/create/...) lưu localStorage.
     // options.skipCache = true: dung khi refresh permissions (admin vua thay doi).
-    const permissionKeys = await permissionService.getUserPermissionsCompact(user.id, options);
+    const compactKeys = await permissionService.getUserPermissionsCompact(user.id, options);
+    const fullPermSet = await permissionService.getUserPermissions(user.id, options);
+    const effectivePermissions = Array.from(fullPermSet);
 
-    const userDto = toUserDto({ ...user, token_version: user.token_version }, roles, permissionKeys);
+    const userDto = toUserDto({ ...user, token_version: user.token_version }, roles, compactKeys);
 
     const tokenPayload = {
       userId: userDto.id,
       email: userDto.email,
       name: userDto.name,
       roles: userDto.roles,
-      permissions: userDto.permissions,
+      permissions: compactKeys,
       branchId: userDto.branchId,
       tokenVersion: userDto.tokenVersion,
     };
@@ -134,7 +338,7 @@ class AuthService {
 
     const token = jwt.sign(tokenPayload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
 
-    return { token, user: userDto };
+    return { token, user: userDto, effectivePermissions };
   }
 }
 

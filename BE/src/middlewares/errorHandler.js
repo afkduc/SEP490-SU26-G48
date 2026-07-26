@@ -9,7 +9,10 @@ function errorHandler(err, req, res, next) {
   }
 
   if (err instanceof ApiError) {
-    return error(res, err.message, err.statusCode);
+    return error(res, err.message, err.statusCode, null, {
+      code: err.code || null,
+      details: err.details || null,
+    });
   }
 
   return error(res, err.message || 'Internal Server Error', 500);

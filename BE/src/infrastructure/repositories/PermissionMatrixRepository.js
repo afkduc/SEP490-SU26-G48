@@ -4,7 +4,7 @@ const { query } = require('../database/sqlServer');
  * PermissionMatrixRepository — read/write cho admin permission matrix UI.
  *
  * Tra ve:
- *   - getRoles(): 7 roles (admin + 6 business)
+ *   - getRoles(): business roles (khong gom admin — admin = wildcard *)
  *   - getScreens(): tat ca screen permission_key (screen:*:access)
  *   - getGrants(roleIds, screenIds): Set `${roleId}_${screenId}` = granted
  *
@@ -22,18 +22,17 @@ class PermissionMatrixRepository {
         ISNULL(r.is_active, 1) AS is_active
       FROM roles r
       WHERE r.role_name IN (
-        'admin', 'manager', 'general_director', 'warehouse_staff',
+        'manager', 'general_director', 'warehouse_staff',
         'service_advisor', 'team_leader', 'technician'
       )
       ORDER BY
         CASE r.role_name
-          WHEN 'admin' THEN 1
+          WHEN 'general_director' THEN 1
           WHEN 'manager' THEN 2
-          WHEN 'general_director' THEN 3
-          WHEN 'warehouse_staff' THEN 4
-          WHEN 'service_advisor' THEN 5
-          WHEN 'team_leader' THEN 6
-          WHEN 'technician' THEN 7
+          WHEN 'warehouse_staff' THEN 3
+          WHEN 'service_advisor' THEN 4
+          WHEN 'team_leader' THEN 5
+          WHEN 'technician' THEN 6
           ELSE 99
         END
     `);
@@ -186,6 +185,25 @@ class PermissionMatrixRepository {
       { p1: roleId, p2: permissionId }
     );
     return true;
+  }
+
+  /**
+   * Lay TAT CA permission_key trong permissions table co shape L1
+   * (screen:*:access hoac *).
+   *
+   * Dung cho auto-sync L1 theo L2: can biet cac L1 keys hop le (FK target)
+   * truoc khi grant, neu khong se bi FK violation.
+   *
+   * @returns {Promise<Set<string>>}
+   */
+  async getAllL1AccessKeys() {
+    const result = await query(
+      `SELECT permission_key
+       FROM permissions
+       WHERE (permission_key LIKE 'screen:%:access' OR permission_key = '*')
+         AND permission_key IS NOT NULL`
+    );
+    return new Set(result.recordset.map((r) => String(r.permission_key)));
   }
 
   async revoke(roleId, permissionId) {
