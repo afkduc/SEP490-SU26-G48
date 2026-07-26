@@ -191,8 +191,8 @@ export function AppProvider({ children }) {
     };
   }, []); // Run once on mount
 
-  const login = useCallback(async (email, password, remember = false) => {
-    const result = await loginApi(email, password);
+  const login = useCallback(async (email, password, remember = false, branchId) => {
+    const result = await loginApi(email, password, branchId);
 
     // QUAN TRONG: Phai save token vao storage TRUOC khi goi bat ky
     // authenticated API nao (nhu getMeApi). Vi httpClient luon doc token

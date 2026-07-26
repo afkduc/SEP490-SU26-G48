@@ -27,7 +27,8 @@ const HEADER_SELECT = `
          adv.user_name AS advisor_name,
          adv.phone     AS advisor_phone,
          tl.user_name  AS team_leader_name,
-         inv.issued_at AS invoice_issued_at
+         inv.issued_at AS invoice_issued_at,
+         ro.id         AS repair_order_id
   FROM   service_orders so
   JOIN   branches  b   ON b.id = so.branch_id
   JOIN   customers c   ON c.id = so.customer_id
@@ -46,6 +47,16 @@ const HEADER_SELECT = `
       WHERE  i.service_order_id = so.id
       ORDER  BY i.issued_at DESC
   ) inv
+  OUTER APPLY (
+      -- Lenh sua chua DANG HIEN HANH cua phieu nay (bo qua lenh da huy - xem
+      -- RepairOrderRepositoryImpl.findByServiceOrderCode ly do tuong tu) -
+      -- dung de CVDV huy truc tiep tu man Phieu quyet toan khi phieu dang
+      -- "inprogress", khong can qua man "Lenh sua chua" (da bo).
+      SELECT TOP 1 r.id
+      FROM   repair_orders r
+      WHERE  r.service_order_id = so.id AND r.status <> 'cancelled'
+      ORDER  BY r.id DESC
+  ) ro
 `;
 
 function genCode(prefix, id) {

@@ -55,6 +55,7 @@ class RepairSettlementResponseDto {
       nextMaintenanceDate: toDDMMYYYY(entity.nextMaintenanceDate),
       isWarranty: entity.isWarranty,
       teamLeader: entity.teamLeaderName,
+      repairOrderId: entity.repairOrderId,
       status: entity.status,
       cancelReason: entity.cancelReason,
     };
