@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
@@ -16,20 +16,22 @@ import AdminPagination from './components/AdminPagination';
 import TableSkeleton from './components/TableSkeleton';
 import './AdminUsersPage.css';
 
+const AdminRolesPage = lazy(() => import('./AdminRolesPage'));
+
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
   { value: 'active', label: 'Hoạt động' },
-  { value: 'inactive', label: 'Ngừng hoạt động' },
+  { value: 'inactive', label: 'Không hoạt động' },
 ];
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
-  inactive: 'Ngừng hoạt động',
+  inactive: 'Không hoạt động',
 };
 
 const STATUS_CLASS = {
   active: 'badge--success',
-  inactive: 'badge--secondary',
+  inactive: 'badge--danger',
 };
 
 function formatDate(value) {
@@ -109,13 +111,6 @@ function UserActionMenu({ user, onView, onEdit }) {
 export default function AdminUsersPage() {
   const { can } = usePermission();
   const { set403Error } = useGlobalError();
-
-  // Check permission: neu khong co quyen doc user -> hien trang 403
-  if (!can('admin:users:read')) {
-    set403Error('admin:users:read', 'Bạn không có quyền truy cập trang quản lý người dùng.');
-    return null;
-  }
-
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -144,13 +139,58 @@ export default function AdminUsersPage() {
     if (roles && roles.length > 0) setLocalRoles(roles);
   }, [roles]);
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [detailUserId, setDetailUserId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
+
+  const hasReadPermission = can('admin:users:read');
+  const canManageRoles = can('screen:roles:access');
+  const activeTab = searchParams.get('tab') === 'roles' && canManageRoles ? 'roles' : 'users';
+
+  const setActiveTab = useCallback((tab) => {
+    setSearchParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      if (tab === 'roles') {
+        sp.set('tab', 'roles');
+        // Clear user list query noise when switching to roles catalog
+        sp.delete('search');
+        sp.delete('branchId');
+        sp.delete('status');
+        sp.delete('page');
+        sp.delete('create');
+      } else {
+        sp.delete('tab');
+      }
+      return sp;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleFilterUsersByRole = useCallback((roleId) => {
+    setSearchParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      sp.delete('tab');
+      if (roleId != null) sp.set('roleId', String(roleId));
+      else sp.delete('roleId');
+      sp.delete('page');
+      return sp;
+    }, { replace: true });
+    setParams((p) => ({
+      ...p,
+      roleId: roleId != null ? Number(roleId) : undefined,
+      page: 1,
+    }));
+  }, [setSearchParams, setParams]);
+
+  // Không gọi setState trong render — chuyển sang effect (tránh vỡ hooks / action buttons)
+  useEffect(() => {
+    if (!hasReadPermission) {
+      set403Error('admin:users:read', 'Bạn không có quyền truy cập trang quản lý người dùng.');
+    }
+  }, [hasReadPermission, set403Error]);
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -168,16 +208,21 @@ export default function AdminUsersPage() {
       return;
     }
 
-    const sp = new URLSearchParams();
-    if (params.search) sp.set('search', params.search);
-    if (params.branchId) sp.set('branchId', params.branchId);
-    if (params.roleId) sp.set('roleId', params.roleId);
-    if (params.status) sp.set('status', params.status);
-    if (params.page > 1) sp.set('page', params.page);
-    const qs = sp.toString();
+    if (activeTab !== 'users') return;
+
+    const sp = new URLSearchParams(window.location.search);
+    const tab = sp.get('tab');
+    const next = new URLSearchParams();
+    if (tab) next.set('tab', tab);
+    if (params.search) next.set('search', params.search);
+    if (params.branchId) next.set('branchId', params.branchId);
+    if (params.roleId) next.set('roleId', params.roleId);
+    if (params.status) next.set('status', params.status);
+    if (params.page > 1) next.set('page', params.page);
+    const qs = next.toString();
     const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
     window.history.replaceState(null, '', newUrl);
-  }, [params.search, params.branchId, params.roleId, params.status, params.page]);
+  }, [params.search, params.branchId, params.roleId, params.status, params.page, activeTab, location.pathname]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -207,17 +252,21 @@ export default function AdminUsersPage() {
     updateParam('page', page);
   }
 
+  if (!hasReadPermission) {
+    return null;
+  }
+
   async function handleToggleStatus(userId, newStatus) {
     const isDeactivate = newStatus === 'inactive';
     const confirmMsg = isDeactivate
-      ? 'Ngừng hoạt động tài khoản này? User sẽ không thể đăng nhập.'
+      ? 'Khóa tài khoản này? User sẽ không thể đăng nhập.'
       : 'Kích hoạt lại tài khoản này?';
     if (!window.confirm(confirmMsg)) return;
 
     setTogglingId(userId);
     try {
       await adminUsersApi.update({ userId, status: newStatus });
-      toast.success(isDeactivate ? 'Đã ngừng hoạt động tài khoản' : 'Đã kích hoạt tài khoản');
+      toast.success(isDeactivate ? 'Đã khóa tài khoản' : 'Đã kích hoạt tài khoản');
       refresh();
     } catch (err) {
       toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
@@ -256,49 +305,82 @@ export default function AdminUsersPage() {
             </svg>
           </div>
           <div className="admin-page__title-group">
-            <h1>Quản lý người dùng</h1>
+            <h1>Người dùng &amp; Vai trò</h1>
             <p className="admin-page__subtitle">
-              Danh sách tài khoản hệ thống
+              Quản lý tài khoản và danh mục vai trò hệ thống
             </p>
           </div>
         </div>
-        <div className="admin-page__actions">
-          <span className="admin-page__total-badge" title="Tổng số người dùng">
-            {loading ? '...' : data.total} tài khoản
-          </span>
-          <button
-            className="btn btn--secondary admin-page__btn-icon-text"
-            onClick={handleExportExcel}
-            disabled={exporting || loading}
-            title="Xuất danh sách người dùng"
-            aria-label="Xuất Excel"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <span className="admin-page__btn-label">{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
-          </button>
-          <PermissionGate permission="admin:users:create">
+        {activeTab === 'users' && (
+          <div className="admin-page__actions">
+            <span className="admin-page__total-badge" title="Tổng số người dùng">
+              {loading ? '...' : data.total} tài khoản
+            </span>
             <button
-              className="btn btn--primary admin-page__btn-icon-text"
-              onClick={() => { setEditUser(null); setShowModal(true); }}
+              className="btn btn--secondary admin-page__btn-icon-text"
+              onClick={handleExportExcel}
+              disabled={exporting || loading}
+              title="Xuất danh sách người dùng"
+              aria-label="Xuất Excel"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              <span className="admin-page__btn-label">Tạo người dùng</span>
+              <span className="admin-page__btn-label">{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
             </button>
-          </PermissionGate>
-        </div>
-        {exportError && (
+            <PermissionGate permission="admin:users:create">
+              <button
+                className="btn btn--primary admin-page__btn-icon-text"
+                onClick={() => { setEditUser(null); setShowModal(true); }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span className="admin-page__btn-label">Tạo người dùng</span>
+              </button>
+            </PermissionGate>
+          </div>
+        )}
+        {exportError && activeTab === 'users' && (
           <div className="admin-users__error" style={{ marginTop: 12, width: '100%' }}>
             <strong>Xuất Excel thất bại:</strong> {exportError}
           </div>
         )}
       </div>
 
+      {canManageRoles && (
+        <nav className="admin-users__tabs" aria-label="Người dùng và vai trò">
+          <button
+            type="button"
+            className={`admin-users__tab ${activeTab === 'users' ? 'admin-users__tab--active' : ''}`}
+            onClick={() => setActiveTab('users')}
+          >
+            Người dùng
+          </button>
+          <button
+            type="button"
+            className={`admin-users__tab ${activeTab === 'roles' ? 'admin-users__tab--active' : ''}`}
+            onClick={() => setActiveTab('roles')}
+          >
+            Vai trò
+          </button>
+        </nav>
+      )}
+
+      {activeTab === 'roles' ? (
+        <Suspense
+          fallback={
+            <div className="admin-users__roles-fallback" role="status">
+              Đang tải quản lý vai trò...
+            </div>
+          }
+        >
+          <AdminRolesPage embedded onFilterUsersByRole={handleFilterUsersByRole} />
+        </Suspense>
+      ) : (
+        <>
       {/* Filters */}
       <div className="filter-card">
         <div className="filter-row">
@@ -383,7 +465,7 @@ export default function AdminUsersPage() {
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
                     <th>Ngày tạo</th>
-                    <th className="table__actions-col" style={{ textAlign: 'right' }}>Hành động</th>
+                    <th className="table__actions-col">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -415,24 +497,20 @@ export default function AdminUsersPage() {
                           </div>
                         </td>
                         <td data-label="Email" className="user-table__email">{u.email || '—'}</td>
-                        <td data-label="Chi nhánh" className="user-table__muted">
+                        <td data-label="Chi nhánh">
                           {u.scopeAllBranches ? (
                             <span
-                              className="badge badge--all-branches"
-                              style={{
-                                background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                                color: '#fff',
-                                fontSize: 11,
-                                fontWeight: 600,
-                                padding: '3px 10px',
-                                borderRadius: 10,
-                              }}
+                              className="badge badge--branch"
                               title="Người dùng quản lý tất cả chi nhánh"
                             >
                               Tất cả chi nhánh
                             </span>
+                          ) : u.branchName ? (
+                            <span className="badge badge--branch" title={u.branchName}>
+                              {u.branchName}
+                            </span>
                           ) : (
-                            u.branchName || '—'
+                            <span className="user-table__empty">—</span>
                           )}
                         </td>
                         <td data-label="Vai trò">
@@ -457,19 +535,19 @@ export default function AdminUsersPage() {
                             </span>
                             <button
                               className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
-                              title={u.status === 'active' ? 'Ngừng hoạt động tài khoản' : 'Kích hoạt lại tài khoản'}
+                              title={u.status === 'active' ? 'Khóa tài khoản' : 'Kích hoạt lại tài khoản'}
                               onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
                               disabled={togglingId === u.id}
                             >
-                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Ngừng' : 'Kích hoạt')}
+                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khóa' : 'Kích hoạt')}
                             </button>
                           </div>
                         </td>
                         <td data-label="Ngày tạo" className="admin-users__date">{formatDate(u.createdAt)}</td>
                         <td className="admin-users__actions-cell" data-label="Hành động">
-                          {/* Desktop: 2 nut (Chi tiet + Sua) - Phan quyen chuyen vao Edit modal */}
                           <div className="action-btns">
                             <button
+                              type="button"
                               className="btn btn--sm btn--view"
                               onClick={() => setDetailUserId(u.id)}
                             >
@@ -481,6 +559,7 @@ export default function AdminUsersPage() {
                             </button>
                             <PermissionGate permission="admin:users:update">
                               <button
+                                type="button"
                                 className="btn btn--sm btn--edit"
                                 onClick={() => { setEditUser(u); setShowModal(true); }}
                               >
@@ -492,7 +571,6 @@ export default function AdminUsersPage() {
                               </button>
                             </PermissionGate>
                           </div>
-                          {/* Mobile: menu 3 cham (Chi tiet + Sua) - Phan quyen trong modal Sua */}
                           <UserActionMenu
                             user={u}
                             onView={() => setDetailUserId(u.id)}
@@ -519,6 +597,8 @@ export default function AdminUsersPage() {
           </>
         )}
       </div>
+        </>
+      )}
 
       {showModal && (
         <UserFormModal

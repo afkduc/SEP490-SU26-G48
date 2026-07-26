@@ -104,10 +104,10 @@ class PermissionService {
    * @param {string[]} permissionKeys
    * @returns {Promise<boolean>}
    */
-  async canAll(userId, permissionKeys) {
+  async canAll(userId, permissionKeys, options = {}) {
     if (!Array.isArray(permissionKeys) || permissionKeys.length === 0) return true;
     for (const key of permissionKeys) {
-      const ok = await this.can(userId, key);
+      const ok = await this.can(userId, key, options);
       if (!ok) return false;
     }
     return true;
@@ -119,10 +119,10 @@ class PermissionService {
    * @param {string[]} permissionKeys
    * @returns {Promise<boolean>}
    */
-  async canAny(userId, permissionKeys) {
+  async canAny(userId, permissionKeys, options = {}) {
     if (!Array.isArray(permissionKeys) || permissionKeys.length === 0) return true;
     for (const key of permissionKeys) {
-      const ok = await this.can(userId, key);
+      const ok = await this.can(userId, key, options);
       if (ok) return true;
     }
     return false;

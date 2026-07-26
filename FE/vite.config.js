@@ -5,6 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    // HMR SU DUNG PORT rieng (khong di qua proxy) de tranh 431 Request Header
+    // Fields Too Large. Mac dinh Vite dung cung port 3000 cho HMR nhung
+    // neu co proxy rewrite, header se ton dong. Dat HMR qua WebSocket rieng.
+    hmr: {
+      port: 3001,
+      clientPort: 3001,
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:5000',

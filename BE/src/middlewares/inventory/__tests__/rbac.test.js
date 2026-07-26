@@ -18,17 +18,13 @@ test('manager duoc duyet phieu nhap nhung khong co quyen admin', () => {
   assert.equal(can('manager', 'reports:read'), true);
 });
 
-test('accountant chi xem bao cao', () => {
-  assert.equal(can('accountant', 'reports:read'), true);
-  assert.equal(can('accountant', 'stock:write'), false);
-});
-
 test('role khong ton tai thi tu choi', () => {
   assert.equal(can('ghost', 'parts:read'), false);
 });
 
-test('ROLE_PERMISSIONS co du 5 role chinh', () => {
-  for (const r of ['admin', 'general_director', 'manager', 'warehouse_staff', 'accountant']) {
+test('ROLE_PERMISSIONS co du role kho chinh', () => {
+  for (const r of ['admin', 'general_director', 'manager', 'warehouse_staff']) {
     assert.ok(ROLE_PERMISSIONS[r], `thieu role ${r}`);
   }
+  assert.equal(ROLE_PERMISSIONS.accountant, undefined);
 });

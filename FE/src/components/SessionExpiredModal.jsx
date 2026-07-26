@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SESSION_EXPIRED_KEY } from '../services/httpClient';
+import { SESSION_EXPIRED_KEY, SESSION_LOGGED_OUT_EVENT } from '../services/httpClient';
 
 // Module-level flag da chong spam DUNG ROI giua cac instance StrictMode/HMR.
 // Su dung module-level (khong phai useRef) de:
@@ -51,6 +51,10 @@ export default function SessionExpiredModal() {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('permissions');
+    // Dispatch event de AppContext clear React state (token/user/permissions).
+    // Neu khong co buoc nay, isAuthenticated van true -> LoginPage useEffect
+    // redirect ve home ngay khi vua navigate xong -> user khong the login.
+    window.dispatchEvent(new CustomEvent(SESSION_LOGGED_OUT_EVENT));
     navigate('/login', { replace: true });
   }
 

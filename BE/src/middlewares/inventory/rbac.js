@@ -3,7 +3,7 @@
  * - ADMIN: full quyen
  * - WAREHOUSE_STAFF: thuc hien thao tac hang ngay (nhap, xuat, kiem ke)
  * - MANAGER: duyet phieu nhap / xuat
- * - ACCOUNTANT: xem bao cao
+ * - GENERAL_DIRECTOR: xem bao cao
  *
  * Moi role tuong ung 1 mang permission.
  * Endpoint nao can check quyen chi can `requirePerm('parts:read')` la xong.
@@ -29,11 +29,6 @@ const ROLE_PERMISSIONS = {
     'suppliers:read',
     'import_requests:read', 'import_requests:create',
     'export_requests:read', 'export_requests:create',
-  ],
-  accountant: [
-    'parts:read', 'stock:read', 'suppliers:read',
-    'import_requests:read', 'export_requests:read',
-    'reports:read',
   ],
 };
 
