@@ -160,7 +160,7 @@ function getInitials(name = '') {
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
+function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd, onContentRefresh }) {
   const { user } = useAuth();
   const { can } = usePermission();
   const location = useLocation();
@@ -181,15 +181,19 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
     .sort((a, b) => b.length - a.length);
   const longestMatch = matchedPaths[0];
 
-  // Click sidebar item -> hard reload neu chuyen sang path khac.
-  // Quy tac cua du an: moi lan doi route admin phai F5 1 luot de tranh
-  // stale state (filter, modal, permission gate, layout leak).
+  // SPA navigate nhanh — không full reload (tránh trắng màn hình lâu)
   const handleItemClick = (targetPath) => {
     if (onItemClick) onItemClick();
-    if (!targetPath || targetPath === location.pathname) return;
-    // Dung full reload (window.location.assign) de tat ca React state
-    // (useEffect deps, refs, context cache) duoc reset tu dau.
-    window.location.assign(targetPath);
+    if (!targetPath) return;
+    onNavStart?.();
+    // Cùng trang hoặc đổi trang: luôn remount content (soft F5) để state sạch
+    if (targetPath !== location.pathname) {
+      navigate(targetPath);
+    }
+    onContentRefresh?.();
+    requestAnimationFrame(() => {
+      setTimeout(() => onNavEnd?.(), 180);
+    });
   };
 
   return (
@@ -260,7 +264,19 @@ export default function AdminLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [navLoading, setNavLoading] = useState(false);
+  const [contentKey, setContentKey] = useState(0);
   const userMenuRef = useRef(null);
+
+  // Clear leftover dark-theme preference (admin luôn dùng light)
+  useEffect(() => {
+    try { localStorage.removeItem('admin-theme'); } catch { /* ignore */ }
+    document.documentElement.removeAttribute('data-theme');
+  }, []);
+
+  const refreshContent = () => {
+    setContentKey((k) => k + 1);
+  };
 
   const isItemVisible = (item) => !item.permission || can(item.permission);
   const visibleGroups = ADMIN_SIDEBAR
@@ -318,7 +334,9 @@ export default function AdminLayout({ children }) {
   const currentPage = allItems.find((i) => i.path === longestMatch);
 
   return (
-    <div className={`admin-shell ${collapsed ? 'admin-shell--collapsed' : ''}`}>
+    <div
+      className={`admin-shell ${collapsed ? 'admin-shell--collapsed' : ''}`}
+    >
 
       {/* Mobile drawer overlay */}
       {mobileOpen && (
@@ -334,7 +352,38 @@ export default function AdminLayout({ children }) {
         isMobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         onItemClick={() => setMobileOpen(false)}
+        onNavStart={() => setNavLoading(true)}
+        onNavEnd={() => setNavLoading(false)}
+        onContentRefresh={refreshContent}
       />
+
+      {navLoading && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 5000,
+            background: 'rgba(248, 250, 252, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+          aria-hidden="true"
+        >
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              border: '3px solid #c7d2fe',
+              borderTopColor: '#4f46e5',
+              animation: 'admin-nav-spin 0.7s linear infinite',
+            }}
+          />
+          <style>{`@keyframes admin-nav-spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
 
       {/* Desktop collapse button (desktop only) */}
       <button
@@ -416,7 +465,7 @@ export default function AdminLayout({ children }) {
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                       <circle cx="12" cy="7" r="4"/>
                     </svg>
-                    Ho sơ cá nhân
+                    Hồ sơ cá nhân
                   </button>
                   <button className="admin-topbar__dropdown-item admin-topbar__dropdown-item--danger" onClick={handleLogout}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -433,7 +482,9 @@ export default function AdminLayout({ children }) {
         </header>
 
         <main className="admin-content">
-          {children}
+          <div key={`${location.pathname}::${contentKey}`} className="admin-content__remount">
+            {children}
+          </div>
         </main>
 
         <ScrollToggleButton />

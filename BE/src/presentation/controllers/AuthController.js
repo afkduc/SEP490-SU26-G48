@@ -1,33 +1,61 @@
 const { success } = require('../../utils/response');
 const { trackLogin, trackLoginFailed } = require('../../middlewares/loginSessionMiddleware');
+const PermissionService = require('../../application/services/PermissionService');
+const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+const PasswordResetService = require('../../application/services/PasswordResetService');
+const AuthRepositoryImpl = require('../../infrastructure/repositories/AuthRepositoryImpl');
+const NotificationService = require('../../application/services/NotificationService');
+const { auditCrud } = require('../../utils/auditHelper');
 
 class AuthController {
   constructor(authService) {
     this.authService = authService;
+    this.passwordResetService = new PasswordResetService(new AuthRepositoryImpl());
+    this.notificationService = new NotificationService();
     this.login = this.login.bind(this);
     this.getMe = this.getMe.bind(this);
+    this.forgotPassword = this.forgotPassword.bind(this);
+    this.resetPassword = this.resetPassword.bind(this);
+    this._permissionService = null;
+  }
+
+  _getPermissionService() {
+    if (!this._permissionService) {
+      this._permissionService = new PermissionService({
+        roleRepository: new RoleRepositoryImpl(),
+      });
+    }
+    return this._permissionService;
   }
 
   async login(req, res, next) {
     try {
-      const { email, password, branchId } = req.body;
+      const identifier = req.body.identifier || req.body.email || req.body.phone;
+      const { password, branchId, force } = req.body;
 
-      // 1. Authenticate user first (tra ve { user } - chua co token)
-      const { user } = await this.authService.login(email, password, branchId);
+      const { user } = await this.authService.login(identifier, password, branchId, {
+        force: Boolean(force),
+      });
 
-      // 2. Track login with full user info to get deviceId
       const trackResult = await trackLogin(req, user);
       const deviceId = trackResult?.deviceId || null;
       const sessionId = trackResult?.sessionId || null;
       user.sessionId = sessionId;
 
-      // 3. Tao token voi deviceId/sessionId (chi tao 1 lan)
       const result = await this.authService.issueTokenWithDevice(user, deviceId);
-      return success(res, result, 'Đăng nhập thành công');
+      return success(
+        res,
+        {
+          token: result.token,
+          user: {
+            ...result.user,
+            permissions: result.effectivePermissions || result.user.permissions,
+          },
+          effectivePermissions: result.effectivePermissions || [],
+        },
+        'Đăng nhập thành công'
+      );
     } catch (err) {
-      // Chi ghi LOGIN_FAILED khi user ton tai (sai pass / tai khoan bi khoa).
-      // Neu user khong ton tai hoac loi validate -> KHONG ghi log de tranh
-      // spam DB voi cac email ao.
       const audit = err && err.audit;
       if (audit && audit.userExists && audit.user) {
         trackLoginFailed(req, {
@@ -36,15 +64,108 @@ class AuthController {
         }).catch((e) =>
           console.error('[AuthController] trackLoginFailed error:', e.message)
         );
+      } else if (!audit || !audit.skip) {
+        try {
+          const { auditLog, ACTION_TYPES } = require('../../utils/auditHelper');
+          const id = req.body?.identifier || req.body?.email || req.body?.phone || 'unknown';
+          await auditLog({
+            req,
+            action: ACTION_TYPES.FAILED_LOGIN,
+            tableName: 'login_sessions',
+            entityName: 'Đăng nhập thất bại',
+            entityCode: String(id).slice(0, 128),
+            description: `Đăng nhập thất bại: ${id}${audit?.reason ? ` — ${audit.reason}` : ''}`,
+            responseStatus: err.statusCode || 401,
+          });
+        } catch (auditErr) {
+          console.warn('[AuthController] failed-login audit (unknown user) failed:', auditErr.message);
+        }
       }
+      next(err);
+    }
+  }
+
+  async forgotPassword(req, res, next) {
+    try {
+      const email = req.body?.email;
+      const result = await this.passwordResetService.requestReset(email, {
+        ip: req.ip,
+      });
+
+      try {
+        const { auditLog: writeAudit } = require('../../utils/auditHelper');
+        await writeAudit({
+          req,
+          action: 'UPDATE',
+          tableName: 'password_reset_tokens',
+          description: `Yêu cầu quên mật khẩu: ${String(email || '').slice(0, 64)}`,
+          responseStatus: 200,
+        });
+      } catch (_) { /* non-blocking */ }
+
+      return success(res, {
+        sent: result.sent,
+        mode: result.mode || null,
+        ...(result.emailPreviewUrl ? { emailPreviewUrl: result.emailPreviewUrl } : {}),
+        ...(result.devResetUrl ? { devResetUrl: result.devResetUrl } : {}),
+        ...(result.mailError ? { mailError: result.mailError } : {}),
+      }, result.message);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resetPassword(req, res, next) {
+    try {
+      const { token, newPassword, password } = req.body || {};
+      const pwd = newPassword || password;
+      const result = await this.passwordResetService.resetPassword(token, pwd);
+
+      try {
+        await this.notificationService.notify('PASSWORD_CHANGED', {
+          userId: result.userId,
+        }, { skipSettings: true });
+      } catch (e) {
+        console.warn('[AuthController] notify PASSWORD_CHANGED failed:', e.message);
+      }
+
+      try {
+        await auditCrud.changePassword(req, {
+          targetUserName: `user#${result.userId}`,
+        });
+      } catch (_) { /* non-blocking */ }
+
+      return success(res, { userId: result.userId }, result.message);
+    } catch (err) {
       next(err);
     }
   }
 
   async getMe(req, res, next) {
     try {
-      // req.user da co permissions tu auth middleware
-      return success(res, req.user, 'Lấy thông tin thành công');
+      const userId = req.user?.userId || req.user?.id;
+      let effectivePermissions = Array.isArray(req.user?.permissions)
+        ? req.user.permissions
+        : [];
+      if (userId) {
+        try {
+          const full = await this._getPermissionService().getUserPermissions(userId, {
+            skipCache: true,
+          });
+          effectivePermissions = Array.from(full);
+        } catch (permErr) {
+          console.warn('[AuthController.getMe] load full permissions failed:', permErr.message);
+        }
+      }
+      return success(
+        res,
+        {
+          ...req.user,
+          permissions: effectivePermissions,
+          jwtPermissions: req.user?.permissions || [],
+        },
+        'Lấy thông tin thành công'
+      );
     } catch (err) {
       next(err);
     }

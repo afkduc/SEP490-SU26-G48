@@ -79,6 +79,16 @@ async function start() {
 
     syncMaintenanceReminders();
     setInterval(syncMaintenanceReminders, MAINTENANCE_REMINDER_SYNC_INTERVAL_MS);
+
+    // Auto-sync L1 (screen:X:Y:access) theo L2 (role_screen_permissions)
+    // cho tat ca role. Idempotent, chi thay doi neu data inconsistent.
+    // Dam bao moi thanh vien trong team khong can chay SQL thu cong.
+    try {
+      const { bootSync: bootPermissionMatrixSync } = require('./application/services/permissionMatrixSyncService');
+      bootPermissionMatrixSync();
+    } catch (syncErr) {
+      console.warn('[BE] Failed to start permission matrix sync:', syncErr.message);
+    }
   } catch (err) {
     console.error('Failed to start server:', err.message);
     process.exit(1);

@@ -67,27 +67,27 @@ const SERVICE_ADVISOR_NAV = [
 
 // ===== Manager =====
 const MANAGER_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard', permission: 'manager:dashboard:access' },
+  { label: 'Bảng điều khiển', path: '/dashboard', permission: 'screen:manager:dashboard:access' },
   { label: 'Kho', path: '/inventory', permission: 'screen:inventory:access' },
-  { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests', permission: 'manager:import_requests:read' },
-  { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests', permission: 'manager:export_requests:read' },
+  { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests', permission: 'screen:manager:import_requests:access' },
+  { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests', permission: 'screen:manager:export_requests:access' },
   {
     label: 'Nhân viên',
-    permission: 'manager:employees:read',
+    permission: 'screen:manager:employees:access',
     children: [
-      { label: 'Nhân viên', path: '/manager/employees', permission: 'manager:employees:read' },
-      { label: 'Thợ máy', path: '/manager/technicians', permission: 'manager:technicians:read' },
+      { label: 'Nhân viên', path: '/manager/employees', permission: 'screen:manager:employees:access' },
+      { label: 'Thợ máy', path: '/manager/technicians', permission: 'screen:manager:technicians:access' },
     ],
   },
-  { label: 'Quyết toán sửa chữa', path: '/manager/settlements', permission: 'manager:settlements:read' },
+  { label: 'Quyết toán sửa chữa', path: '/manager/settlements', permission: 'screen:manager:settlements:access' },
   { label: 'Chăm sóc khách hàng', path: '/customer-care', permission: 'screen:customer-care:access' },
   { label: 'Khách hàng', path: '/customers', permission: 'screen:customers:access' },
   {
     label: 'Dịch vụ',
-    permission: 'manager:services:read',
+    permission: 'screen:manager:services:access',
     children: [
-      { label: 'Dịch vụ lẻ', path: '/manager/services', permission: 'manager:services:read' },
-      { label: 'Gói dịch vụ', path: '/manager/service-packages', permission: 'manager:services:read' },
+      { label: 'Dịch vụ lẻ', path: '/manager/services', permission: 'screen:manager:services:access' },
+      { label: 'Gói dịch vụ', path: '/manager/service-packages', permission: 'screen:manager:services:access' },
     ],
   },
 ];
@@ -102,25 +102,15 @@ const WAREHOUSE_STAFF_NAV = [
   { label: 'Nhà cung cấp', path: '/inventory/suppliers', permission: 'inventory:suppliers:read' },
 ];
 
-// ===== Accountant (Kế toán) - chỉ xem kho, không dropdown =====
-const ACCOUNTANT_NAV = [
-  { label: 'Tổng quan kho', path: '/inventory', permission: 'screen:accountant:access' },
-  { label: 'Phụ tùng', path: '/inventory/parts', permission: 'screen:accountant:access' },
-  { label: 'Tồn kho', path: '/inventory/stock', permission: 'screen:accountant:access' },
-  { label: 'Phiếu nhập', path: '/inventory/import-requests', permission: 'screen:accountant:access' },
-  { label: 'Phiếu xuất', path: '/inventory/export-requests', permission: 'screen:accountant:access' },
-  { label: 'Nhà cung cấp', path: '/inventory/suppliers', permission: 'screen:accountant:access' },
-];
-
 // ===== General Director (Giám đốc) - xem báo cáo tổng quan, có dropdown =====
 const GENERAL_DIRECTOR_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard', permission: 'screen:general_director:dashboard:access' },
-  { label: 'Báo cáo doanh thu', path: '/general-director/reports', permission: 'screen:general_director:reports:access' },
-  { label: 'Báo cáo quyết toán', path: '/general-director/settlements', permission: 'screen:general_director:settlements:access' },
-  { label: 'Chi nhánh', path: '/general-director/branches', permission: 'screen:general_director:branches:access' },
-  { label: 'Nhân viên', path: '/general-director/employees', permission: 'screen:general_director:employees:access' },
-  { label: 'Quản lý chi nhánh', path: '/general-director/branch-managers', permission: 'screen:general_director:branch_managers:access' },
-  { label: 'Thợ máy', path: '/general-director/technicians', permission: 'screen:general_director:technicians:access' },
+  { label: 'Bảng điều khiển', path: '/dashboard', permission: 'screen:director:dashboard:access' },
+  { label: 'Báo cáo doanh thu', path: '/general-director/reports', permission: 'screen:director:reports:access' },
+  { label: 'Báo cáo quyết toán', path: '/general-director/settlements', permission: 'screen:director:settlements:access' },
+  { label: 'Chi nhánh', path: '/general-director/branches', permission: 'screen:director:branches:access' },
+  { label: 'Nhân viên', path: '/general-director/employees', permission: 'screen:director:employees:access' },
+  { label: 'Quản lý chi nhánh', path: '/general-director/branch-managers', permission: 'screen:director:branch_managers:access' },
+  { label: 'Thợ máy', path: '/general-director/technicians', permission: 'screen:director:technicians:access' },
 ];
 
 // ===== Team Leader (Tổ trưởng kỹ thuật) - chỉ xem công việc được giao =====
@@ -135,7 +125,6 @@ const NAV_ITEMS_BY_ROLE = {
   [ROLES.MANAGER]: MANAGER_NAV,
   [ROLES.SERVICE_ADVISOR]: SERVICE_ADVISOR_NAV,
   [ROLES.WAREHOUSE_STAFF]: WAREHOUSE_STAFF_NAV,
-  [ROLES.ACCOUNTANT]: ACCOUNTANT_NAV,
   [ROLES.TEAM_LEADER]: TEAM_LEADER_NAV,
 };
 
@@ -394,7 +383,17 @@ export default function Navbar() {
               <p className="navbar__dropdown-email">{user?.email}</p>
             </div>
             <hr />
-            <button className="navbar__dropdown-item" onClick={handleLogout}>
+            <button
+              className="navbar__dropdown-item"
+              type="button"
+              onClick={() => {
+                setDropdownOpen(false);
+                navigate(role === 'admin' ? '/admin/profile' : '/profile');
+              }}
+            >
+              Hồ sơ cá nhân
+            </button>
+            <button className="navbar__dropdown-item navbar__dropdown-item--danger" type="button" onClick={handleLogout}>
               Đăng xuất
             </button>
           </div>

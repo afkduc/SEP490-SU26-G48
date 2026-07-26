@@ -1,11 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { loginApi, logoutApi, getMeApi } from '../services/authApi';
+import { loginApi, logoutApi, getMeApi, getServerTime } from '../services/authApi';
 import { ROLES } from '../constants/roles';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
 import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
-import { resetSessionExpiredFlag, cancelAllPendingRequests, resetLoggedOutFlag } from '../services/httpClient';
+import {
+  resetSessionExpiredFlag,
+  cancelAllPendingRequests,
+  resetLoggedOutFlag,
+  SESSION_LOGGED_OUT_EVENT,
+} from '../services/httpClient';
 
 const AppContext = createContext(null);
 
@@ -96,7 +101,6 @@ export function getRoleHome(user) {
   if (roles.includes(ROLES.MANAGER)) return '/manager';
   if (roles.includes(ROLES.TEAM_LEADER)) return '/repair-orders';
   if (roles.includes(ROLES.WAREHOUSE_STAFF)) return '/inventory';
-  if (roles.includes(ROLES.ACCOUNTANT)) return '/accountant';
   return '/dashboard';
 }
 
@@ -180,21 +184,34 @@ export function AppProvider({ children }) {
       }
     };
 
+    // SESSION_LOGGED_OUT event: SessionExpiredModal hoac ForbiddenModal
+    // clear localStorage khi user click "Dang nhap lai" -> phai clear luon
+    // React state de LoginPage co the render form (khong bi redirect ve home).
+    const handleSessionLoggedOut = () => {
+      setToken(null);
+      setUser(null);
+      setPermissions([]);
+    };
+
     window.addEventListener('storage', handleStorageChange);
     if (SESSION_CHANNEL) {
       SESSION_CHANNEL.addEventListener('message', handleBroadcast);
     }
+    // SESSION_LOGGED_OUT: SessionExpiredModal hoac cac cho khac clear
+    // localStorage khi user click "Dang nhap lai" -> clear luon React state.
+    window.addEventListener(SESSION_LOGGED_OUT_EVENT, handleSessionLoggedOut);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       if (SESSION_CHANNEL) {
         SESSION_CHANNEL.removeEventListener('message', handleBroadcast);
       }
+      window.removeEventListener(SESSION_LOGGED_OUT_EVENT, handleSessionLoggedOut);
     };
   }, []); // Run once on mount
 
-  const login = useCallback(async (email, password, remember = false, branchId) => {
-    const result = await loginApi(email, password, branchId);
+  const login = useCallback(async (email, password, remember = false, branchId, options = {}) => {
+    const result = await loginApi(email, password, branchId, options);
 
     // QUAN TRONG: Phai save token vao storage TRUOC khi goi bat ky
     // authenticated API nao (nhu getMeApi). Vi httpClient luon doc token
@@ -221,19 +238,20 @@ export function AppProvider({ children }) {
       resetLoggedOutFlag();
     }
 
-    // Lay quyen moi nhat tu server (permissions trong JWT co the STALE neu
-    // admin vua thay doi ma tran quyen o mot tab khac). Fallback ve
-    // permissions tu JWT neu API fail (mang chap / 401).
-    let newPermissions = result.user?.permissions || [];
+    // Full permissions (L1 + L2 flatten) cho UI ẩn/hiện nút.
+    // JWT vẫn compact — không dùng JWT permissions làm nguồn chính cho FE.
+    let newPermissions =
+      (Array.isArray(result.effectivePermissions) && result.effectivePermissions) ||
+      result.user?.permissions ||
+      [];
     try {
       const me = await getMeApi();
       if (me && Array.isArray(me.permissions)) {
         newPermissions = me.permissions;
       }
     } catch (e) {
-      // Nuot loi — permissions tu JWT van OK cho lan render dau tien.
       if (typeof console !== 'undefined') {
-        console.warn('[AppContext] getMe after login failed, fallback to JWT perms:', e?.message);
+        console.warn('[AppContext] getMe after login failed, fallback to login perms:', e?.message);
       }
     }
 

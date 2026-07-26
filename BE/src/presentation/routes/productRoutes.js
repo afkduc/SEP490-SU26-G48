@@ -16,7 +16,9 @@ function buildProductRouter() {
   router.get('/:id', controller.getById);
   router.post('/', controller.create);
   router.put('/:id', controller.update);
+  // Soft-disable (không hard delete). Giữ DELETE path để FE cũ vẫn gọi được.
   router.delete('/:id', controller.remove);
+  router.patch('/:id/reactivate', controller.reactivate);
 
   return router;
 }

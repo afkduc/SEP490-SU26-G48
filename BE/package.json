@@ -4,8 +4,8 @@
   "description": "SEP490-G48 Backend API",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "start": "node --max-http-header-size=65536 src/index.js",
+    "dev": "nodemon -- --max-http-header-size=65536 src/index.js",
     "test": "node --test src/**/*.test.js"
   },
   "keywords": [],
@@ -22,7 +22,8 @@
     "mongoose": "^8.6.0",
     "mssql": "^12.6.0",
     "multer": "^2.2.0",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.10.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

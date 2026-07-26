@@ -138,7 +138,7 @@ function getInitials(firstName, lastName) {
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
-  inactive: 'Ngừng hoạt động',
+  inactive: 'Không hoạt động',
   locked: 'Bị khóa',
 };
 

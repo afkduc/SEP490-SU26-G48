@@ -293,16 +293,60 @@ function getAlertIcon(iconType) {
   }
 }
 
+function isAdminDarkTheme() {
+  try {
+    return localStorage.getItem('admin-theme') === 'dark'
+      || !!document.querySelector('.admin-shell--dark');
+  } catch {
+    return false;
+  }
+}
+
 function getAlertStyle(alert) {
   // Ưu tiên: severity (notification) > type (legacy) > action (audit)
-  const s = (alert.severity || alert.type || alert.action || '').toLowerCase();
-  if (s === 'success')   return { bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a', iconBg: '#dcfce7' };
-  if (s === 'danger')     return { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', iconBg: '#fee2e2' };
-  if (s === 'warning')   return { bg: '#fffbeb', border: '#fde68a', color: '#d97706', iconBg: '#fef3c7' };
-  if (s === 'info')      return { bg: '#eff6ff', border: '#bfdbfe', color: '#2563eb', iconBg: '#dbeafe' };
-  if (s === 'error')     return { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', iconBg: '#fee2e2' };
-  if (s === 'critical')  return { bg: '#fef2f2', border: '#fca5a5', color: '#991b1b', iconBg: '#fecaca' };
-  return { bg: '#f8fafc', border: '#e2e8f0', color: '#475569', iconBg: '#f1f5f9' };
+  // create/login = xanh; sửa/cập nhật = vàng; ngừng/khóa/xóa = đỏ
+  const raw = (alert.severity || alert.type || alert.action || alert.title || '').toLowerCase();
+  const dark = isAdminDarkTheme();
+  if (
+    raw === 'success'
+    || raw.includes('create')
+    || raw.includes('login')
+    || raw.includes('tạo')
+    || raw.includes('đăng nhập')
+  ) {
+    return dark
+      ? { bg: 'rgba(34,197,94,0.12)', border: '#166534', color: '#86efac', iconBg: 'rgba(34,197,94,0.22)' }
+      : { bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a', iconBg: '#dcfce7' };
+  }
+  if (
+    raw === 'danger'
+    || raw === 'error'
+    || raw === 'critical'
+    || raw.includes('disable')
+    || raw.includes('delete')
+    || raw.includes('reject')
+    || raw.includes('ngừng')
+    || raw.includes('khóa')
+    || raw.includes('vô hiệu')
+  ) {
+    return dark
+      ? { bg: 'rgba(239,68,68,0.12)', border: '#991b1b', color: '#fca5a5', iconBg: 'rgba(239,68,68,0.22)' }
+      : { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', iconBg: '#fee2e2' };
+  }
+  if (
+    raw === 'warning'
+    || raw === 'info'
+    || raw.includes('update')
+    || raw.includes('cập nhật')
+    || raw.includes('sửa')
+  ) {
+    return dark
+      ? { bg: 'rgba(245,158,11,0.12)', border: '#92400e', color: '#fcd34d', iconBg: 'rgba(245,158,11,0.22)' }
+      : { bg: '#fffbeb', border: '#fde68a', color: '#d97706', iconBg: '#fef3c7' };
+  }
+  return dark
+    ? { bg: '#162032', border: '#334155', color: '#cbd5e1', iconBg: '#1e293b' }
+    : { bg: '#f8fafc', border: '#e2e8f0', color: '#475569', iconBg: '#f1f5f9' };
 }
 
 // Severity: danh gia muc do nghiem trong cua canh bao

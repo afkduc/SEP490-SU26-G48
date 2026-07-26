@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { routeAfterLogin } from '../../utils/roleRedirect';
 import httpClient from '../../services/httpClient';
@@ -9,15 +9,16 @@ const WRONG_BRANCH_MESSAGE = 'Tài khoản của bạn không có quyền đăng
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
 
-  const [form, setForm] = useState({ email: '', password: '', branchId: '' });
+  const [form, setForm] = useState({ identifier: '', password: '', branchId: '' });
   const [branches, setBranches] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWrongBranchModal, setShowWrongBranchModal] = useState(false);
+  const [sessionConflict, setSessionConflict] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -35,31 +36,50 @@ export default function LoginPage() {
     };
   }, []);
 
+  // Neu user da authenticated (con token trong storage nhung dang o /login
+  // do F5 hoac navigate), redirect ve home cua role. Tranh truong hop form
+  // login render nhung bi che boi ErrorHandler/ForbiddenModal tu route cu.
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(routeAfterLogin(user), { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setError('');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.email || !form.password) {
-      setError('Vui lòng nhập đầy đủ email và mật khẩu');
-      return;
-    }
+  const doLogin = async (force = false) => {
     setLoading(true);
+    setError('');
     try {
-      const result = await login(form.email, form.password, rememberMe, form.branchId);
-      // Luôn chuyển thẳng về dashboard theo role — bỏ luồng ép đổi mật khẩu tạm.
+      const result = await login(form.identifier, form.password, rememberMe, form.branchId, { force });
+      setSessionConflict(null);
       navigate(routeAfterLogin(result?.user), { replace: true });
     } catch (err) {
       if (err.status === 403 && err.message === WRONG_BRANCH_MESSAGE) {
         setShowWrongBranchModal(true);
+      } else if (err.status === 409 || err.code === 'SESSION_CONFLICT') {
+        setSessionConflict({
+          message: err.message,
+          session: err.details?.session || null,
+        });
       } else {
         setError(err.message || 'Đăng nhập thất bại');
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.identifier || !form.password) {
+      setError('Vui lòng nhập đầy đủ email/số điện thoại và mật khẩu');
+      return;
+    }
+    await doLogin(false);
   };
 
   return (
@@ -73,21 +93,21 @@ export default function LoginPage() {
 
         <div className="login-panel-right">
           <h2 className="login-title">Đăng nhập</h2>
-          <p className="login-subtitle">Nhập thông tin tài khoản để truy cập hệ thống</p>
+          <p className="login-subtitle">Dùng email hoặc số điện thoại đã đăng ký</p>
 
           <form className="login-form" onSubmit={handleSubmit} noValidate>
             <div className="login-field">
-              <label htmlFor="email">
-                Email <span className="required">*</span>
+              <label htmlFor="identifier">
+                Email hoặc số điện thoại <span className="required">*</span>
               </label>
               <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                value={form.email}
+                id="identifier"
+                name="identifier"
+                type="text"
+                autoComplete="username"
+                value={form.identifier}
                 onChange={handleChange}
-                placeholder="email@autogara.vn"
+                placeholder="email@autogara.vn hoặc 09xxxxxxxx"
               />
             </div>
 
@@ -155,9 +175,9 @@ export default function LoginPage() {
                 />
                 <span>Ghi nhớ đăng nhập</span>
               </label>
-              <a href="/forgot-password" className="login-forgot">
+              <Link to="/forgot-password" className="login-forgot">
                 Quên mật khẩu?
-              </a>
+              </Link>
             </div>
 
             <button type="submit" className="login-btn" disabled={loading}>
@@ -182,6 +202,48 @@ export default function LoginPage() {
             <button className="login-modal-btn" onClick={() => setShowWrongBranchModal(false)}>
               Đã hiểu
             </button>
+          </div>
+        </div>
+      )}
+
+      {sessionConflict && (
+        <div className="login-modal-overlay" onClick={() => !loading && setSessionConflict(null)}>
+          <div className="login-modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="login-modal-icon" style={{ color: '#d97706' }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <h2 className="login-modal-title">Tài khoản đang được sử dụng</h2>
+            <p className="login-modal-message">
+              {sessionConflict.message}
+            </p>
+            {sessionConflict.session && (
+              <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px' }}>
+                Phiên hiện tại: {[sessionConflict.session.browser, sessionConflict.session.os].filter(Boolean).join(' · ') || 'Thiết bị khác'}
+                {sessionConflict.session.ip ? ` · IP ${sessionConflict.session.ip}` : ''}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="login-modal-btn"
+                style={{ background: '#fff', color: '#334155', border: '1px solid #cbd5e1' }}
+                disabled={loading}
+                onClick={() => setSessionConflict(null)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="login-modal-btn"
+                disabled={loading}
+                onClick={() => doLogin(true)}
+              >
+                {loading ? 'Đang đăng nhập...' : 'Đây là tôi — tiếp tục'}
+              </button>
+            </div>
           </div>
         </div>
       )}
