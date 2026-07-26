@@ -114,10 +114,10 @@ export default function PartDetailPage() {
           <div className="part-detail__actions">
             {!editing && (
               <>
-                <PermissionGate permission="inventory:products:update">
+                <PermissionGate permission="screen:inventory:products:update">
                   <button className="btn btn--secondary" onClick={startEdit}>Sửa</button>
                 </PermissionGate>
-                <PermissionGate permission="inventory:products:delete">
+                <PermissionGate permission="screen:inventory:products:delete">
                   <button
                     className="btn btn--ghost btn--danger"
                     onClick={handleToggleStatus}
@@ -146,7 +146,7 @@ export default function PartDetailPage() {
       {/* Info grid */}
       <div className="detail-grid">
         <div className="detail-card">
-          <h3 className="detail-card__title">Thong tin co ban</h3>
+          <h3 className="detail-card__title">Thông tin cơ bản</h3>
 
           {editing ? (
             <form onSubmit={handleSave} className="detail-form">
