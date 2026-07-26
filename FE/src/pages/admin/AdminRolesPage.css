@@ -1,12 +1,17 @@
-/* ── Page wrapper ──────────────────────────────────────────────────── */
-.admin-roles {
-  padding: 28px 32px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #1e293b;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+/* ── Embedded in Users page (tabs) ─────────────────────────────── */
+.admin-roles--embedded {
+  padding: 0;
 }
+
+.admin-roles--embedded .admin-roles__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
 
 /* ── Header ────────────────────────────────────────────────────────── */
 .admin-roles__header {
