@@ -25,13 +25,39 @@
 .navbar__logo {
   width: 34px;
   height: 34px;
-  background: var(--primary);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
+
+/* Nut hamburger - chi hien tren man hep (xem media query ben duoi), an tren
+   desktop vi nav van du cho nam ngang binh thuong. */
+.navbar__hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.navbar__hamburger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--gray-700);
+  border-radius: 2px;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.navbar__hamburger--active span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.navbar__hamburger--active span:nth-child(2) { opacity: 0; }
+.navbar__hamburger--active span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
 .navbar__name {
   font-size: 17px;
@@ -303,6 +329,74 @@
 .navbar__dropdown-item:hover {
   background: var(--red-light);
   color: var(--red);
+}
+
+/* Man hep (tablet tro xuong) - qua nhieu muc menu (vd Quan ly co 8 muc) se vo
+   dong tren 1 hang ngang, nen gap nut hamburger va gap menu chinh thanh 1
+   bang doc, tha xuong duoi header khi bam mo. Giu nguyen giao dien hang ngang
+   cho man rong (desktop/laptop) - khong doi gi ca tren do. */
+@media (max-width: 1024px) {
+  .navbar__hamburger {
+    display: flex;
+  }
+
+  .navbar__nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
+    height: auto;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-md);
+    padding: 6px 0;
+  }
+
+  .navbar__nav--open {
+    display: flex;
+  }
+
+  .navbar__link {
+    width: 100%;
+    height: auto;
+    padding: 12px 20px;
+    border-radius: 0;
+  }
+
+  .navbar__dropdown-wrapper {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .navbar__link-btn {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Dropdown con tha xuong TAI CHO (khong noi/float ra giua man hinh nua) de
+     xep vao dung mach doc cua menu mobile, thut le nhe de thay ro la con. */
+  .navbar__nav-dropdown {
+    position: static;
+    transform: none;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+    background: var(--gray-50);
+    min-width: 0;
+    padding: 0;
+  }
+
+  .navbar__nav-dropdown-item {
+    padding: 10px 20px 10px 34px;
+  }
 }
 
 /* Responsive: tránh vỡ trên màn nhỏ */

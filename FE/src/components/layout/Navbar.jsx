@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
@@ -38,13 +38,6 @@ const SERVICE_ADVISOR_NAV = [
     children: [
       { label: 'Danh sách quyết toán', path: '/repair-settlement' },
       { label: 'Tạo quyết toán', path: '/repair-settlement/create' },
-    ],
-  },
-  {
-    label: 'Lệnh sửa chữa',
-    children: [
-      { label: 'Danh sách lệnh sửa chữa', path: '/repair-orders' },
-      { label: 'Tạo lệnh sửa chữa', path: '/repair-orders/create' },
     ],
   },
   {
@@ -140,16 +133,36 @@ function getInitials(name = '') {
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function NavDropdownItem({ item, currentPath, badgeCount }) {
+// Phai trung voi breakpoint @media (max-width: 1024px) trong Navbar.css noi
+// menu chinh gap thanh hamburger. Duoi nguong nay, dropdown con dieu khien
+// bang CLICK (accordion) vi khong co su kien hover tren thiet bi cham; tu
+// nguong nay tro len, giu nguyen hanh vi hover nhu cu. Neu ca 2 cung bat
+// (vd may co man hinh cam ung + chuot/trackpad) se bi xung dot: hover mo ra
+// truoc, roi click lai dong ngay lai - nen chi bat 1 trong 2 tuy kich thuoc man hinh.
+const NAV_DROPDOWN_COMPACT_QUERY = '(max-width: 1024px)';
+
+function NavDropdownItem({ item, currentPath, badgeCount, onNavigate }) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef(null);
+  const [isCompact, setIsCompact] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(NAV_DROPDOWN_COMPACT_QUERY).matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(NAV_DROPDOWN_COMPACT_QUERY);
+    const handleChange = (e) => setIsCompact(e.matches);
+    mq.addEventListener('change', handleChange);
+    return () => mq.removeEventListener('change', handleChange);
+  }, []);
 
   const handleMouseEnter = () => {
+    if (isCompact) return;
     clearTimeout(timeoutRef.current);
     setOpen(true);
   };
 
   const handleMouseLeave = () => {
+    if (isCompact) return;
     timeoutRef.current = setTimeout(() => setOpen(false), 120);
   };
 
@@ -176,6 +189,7 @@ function NavDropdownItem({ item, currentPath, badgeCount }) {
         className={({ isActive }) =>
           'navbar__link' + ((isActive || isPathMatch(item.path)) ? ' navbar__link--active' : '')
         }
+        onClick={onNavigate}
       >
         {item.label}
         {item.path === '/service-requests' && badgeCount > 0 && (
@@ -195,6 +209,10 @@ function NavDropdownItem({ item, currentPath, badgeCount }) {
         className={
           'navbar__link navbar__link-btn' + (isParentActive ? ' navbar__link--active' : '')
         }
+        // Click de mo/dong - CHI ap dung o che do compact (man hep), vi hover
+        // van hoat dong binh thuong tren desktop nen khong can click o do
+        // (tranh xung dot: hover mo ra truoc, click lai dong ngay lai).
+        onClick={() => { if (isCompact) setOpen((v) => !v); }}
       >
         {item.label}
         <span className="navbar__link-caret">▾</span>
@@ -211,7 +229,7 @@ function NavDropdownItem({ item, currentPath, badgeCount }) {
                 className={
                   'navbar__nav-dropdown-item' + (childActive ? ' navbar__nav-dropdown-item--active' : '')
                 }
-                onClick={() => setOpen(false)}
+                onClick={() => { setOpen(false); onNavigate?.(); }}
               >
                 {child.label}
               </NavLink>
@@ -229,6 +247,9 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // Menu chinh tren man hep (tablet/dien thoai) - an mac dinh, mo qua nut
+  // hamburger, dong lai ngay khi bam vao 1 muc de khong che het man hinh.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const role = user?.primaryRole;
   const navItems = NAV_ITEMS_BY_ROLE[role] ?? [];
@@ -239,6 +260,8 @@ export default function Navbar() {
     navigate('/login');
   };
 
+  const closeMobileNav = () => setMobileNavOpen(false);
+
   const initials = getInitials(user?.name || '');
   const roleLabel = user?.primaryRoleLabel || user?.primaryRole || '';
   const displayName = user?.lastName || user?.name?.split(' ').pop() || '';
@@ -246,11 +269,21 @@ export default function Navbar() {
   return (
     <header className="navbar">
       <div className="navbar__brand">
-        <div className="navbar__logo">🚗</div>
+        <img className="navbar__logo" src="/AutoGaraLogo-Photoroom.png" alt="AutoGara" />
         <span className="navbar__name">AutoGara</span>
       </div>
 
-      <nav className="navbar__nav">
+      <button
+        type="button"
+        className={'navbar__hamburger' + (mobileNavOpen ? ' navbar__hamburger--active' : '')}
+        aria-label={mobileNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
+        aria-expanded={mobileNavOpen}
+        onClick={() => setMobileNavOpen((v) => !v)}
+      >
+        <span /><span /><span />
+      </button>
+
+      <nav className={'navbar__nav' + (mobileNavOpen ? ' navbar__nav--open' : '')}>
         {supportsDropdown
           ? navItems.map((item) => (
               <NavDropdownItem
@@ -258,6 +291,7 @@ export default function Navbar() {
                 item={item}
                 currentPath={location.pathname}
                 badgeCount={pendingCount}
+                onNavigate={closeMobileNav}
               />
             ))
           : navItems.map((item) => (
@@ -268,6 +302,7 @@ export default function Navbar() {
                 className={({ isActive }) =>
                   'navbar__link' + (isActive ? ' navbar__link--active' : '')
                 }
+                onClick={closeMobileNav}
               >
                 {item.label}
               </NavLink>
