@@ -31,6 +31,17 @@ export async function rejectPendingLoginApi(pendingId) {
   return httpClient.post(`/auth/login/pending/${pendingId}/reject`, {});
 }
 
+/** Phiên đang online: danh sách yêu cầu login chờ xác nhận. */
+export async function getMyLoginChallengesApi() {
+  return httpClient.get('/auth/login/challenges');
+}
+
+/** Mở modal cảnh báo lớn khi có LOGIN_CHALLENGE. */
+export function dispatchLoginChallenge(detail) {
+  if (typeof window === 'undefined' || !detail?.pendingId) return;
+  window.dispatchEvent(new CustomEvent('login-challenge', { detail }));
+}
+
 export async function forgotPasswordApi(email) {
   return httpClient.post(
     '/auth/forgot-password',

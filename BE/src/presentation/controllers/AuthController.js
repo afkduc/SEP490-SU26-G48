@@ -19,6 +19,7 @@ class AuthController {
     this.forgotPassword = this.forgotPassword.bind(this);
     this.resetPassword = this.resetPassword.bind(this);
     this.getPendingLogin = this.getPendingLogin.bind(this);
+    this.listMyLoginChallenges = this.listMyLoginChallenges.bind(this);
     this.approvePendingLogin = this.approvePendingLogin.bind(this);
     this.rejectPendingLogin = this.rejectPendingLogin.bind(this);
     this._permissionService = null;
@@ -143,11 +144,40 @@ class AuthController {
     }
   }
 
+  async listMyLoginChallenges(req, res, next) {
+    try {
+      const userId = req.user?.userId || req.user?.id;
+      const items = this.authService.listPendingChallengesForUser(userId);
+      return success(res, { items }, 'OK');
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async approvePendingLogin(req, res, next) {
     try {
       const userId = req.user?.userId || req.user?.id;
       const pendingId = req.params.pendingId || req.body?.pendingId;
       const row = await this.authService.approvePendingLogin(userId, pendingId);
+
+      try {
+        const { auditLog } = require('../../utils/auditHelper');
+        const { buildAuditDescription } = require('../../utils/auditLabels');
+        const meta = row?.clientMeta || {};
+        await auditLog({
+          req,
+          action: 'APPROVE_LOGIN_CHALLENGE',
+          tableName: 'login_sessions',
+          entityName: 'Xác nhận đăng nhập thiết bị khác',
+          entityCode: String(pendingId).slice(0, 64),
+          description: buildAuditDescription('APPROVE_LOGIN_CHALLENGE', meta),
+          newValue: { pendingId, status: 'approved', ...meta },
+          responseStatus: 200,
+        });
+      } catch (e) {
+        console.warn('[AuthController] audit APPROVE_LOGIN_CHALLENGE failed:', e.message);
+      }
+
       return success(res, { pendingId: row.id, status: row.status }, 'Đã đồng ý cho thiết bị mới đăng nhập');
     } catch (err) {
       next(err);
@@ -159,6 +189,25 @@ class AuthController {
       const userId = req.user?.userId || req.user?.id;
       const pendingId = req.params.pendingId || req.body?.pendingId;
       const row = await this.authService.rejectPendingLogin(userId, pendingId);
+
+      try {
+        const { auditLog } = require('../../utils/auditHelper');
+        const { buildAuditDescription } = require('../../utils/auditLabels');
+        const meta = row?.clientMeta || {};
+        await auditLog({
+          req,
+          action: 'REJECT_LOGIN_CHALLENGE',
+          tableName: 'login_sessions',
+          entityName: 'Từ chối đăng nhập thiết bị khác',
+          entityCode: String(pendingId).slice(0, 64),
+          description: buildAuditDescription('REJECT_LOGIN_CHALLENGE', meta),
+          newValue: { pendingId, status: 'rejected', ...meta },
+          responseStatus: 200,
+        });
+      } catch (e) {
+        console.warn('[AuthController] audit REJECT_LOGIN_CHALLENGE failed:', e.message);
+      }
+
       return success(res, { pendingId: row.id, status: row.status }, 'Đã từ chối đăng nhập từ thiết bị mới');
     } catch (err) {
       next(err);

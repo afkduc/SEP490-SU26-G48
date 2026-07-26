@@ -6,9 +6,42 @@ import {
   markAsRead,
   markAllAsRead,
 } from '../services/notificationApi';
+import { dispatchLoginChallenge } from '../services/authApi';
 
 const SSE_RECONNECT_DELAY_MS = 5000;
+const SSE_RECONNECT_MAX_MS = 60_000;
 const POLL_FALLBACK_MS = 60_000; // fallback polling 60s neu SSE fail
+
+function parseNotifMetadata(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) || {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+/** Nếu là LOGIN_CHALLENGE thì mở alert lớn xác nhận. */
+function maybeOpenLoginChallenge(data) {
+  if (!data || typeof window === 'undefined') return;
+  const metadata = parseNotifMetadata(data.metadata);
+  const type = data.type || data.eventType || metadata.eventType;
+  if (type !== 'LOGIN_CHALLENGE') return;
+  const pendingId = metadata.pendingId || data.pendingId;
+  if (!pendingId) return;
+  dispatchLoginChallenge({
+    pendingId,
+    metadata,
+    title: data.title,
+    message: data.message,
+    device: [metadata.browser, metadata.os].filter(Boolean).join(' · ') || undefined,
+    ip: metadata.ip,
+  });
+}
 
 /**
  * Hook realtime notifications.
@@ -126,12 +159,21 @@ export function useNotifications(token, options = {}) {
       return undefined;
     }
     stoppedRef.current = false;
+    let failCount = 0;
+
+    const scheduleReconnect = () => {
+      if (stoppedRef.current) return;
+      const delay = Math.min(
+        SSE_RECONNECT_MAX_MS,
+        SSE_RECONNECT_DELAY_MS * Math.max(1, 2 ** Math.min(failCount, 5))
+      );
+      reconnectTimerRef.current = setTimeout(connect, delay);
+    };
 
     const connect = () => {
       if (stoppedRef.current) return;
       if (!tokenRef.current) return;
 
-      // Cleanup
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -148,6 +190,7 @@ export function useNotifications(token, options = {}) {
         esRef.current = es;
 
         es.addEventListener('connected', () => {
+          failCount = 0;
           setConnected(true);
           setError(null);
         });
@@ -155,67 +198,43 @@ export function useNotifications(token, options = {}) {
         es.addEventListener('notification', (e) => {
           try {
             const data = JSON.parse(e.data);
-            // Push notification moi vao dau danh sach
             setNotifications((prev) => {
               const next = [data, ...prev.filter((n) => n.id !== data.id)];
               return next.slice(0, maxItems);
             });
-            // Tang unread count neu chua doc
             const wasRead = Boolean(data.isRead || data.readAt);
             if (!wasRead) {
               setUnreadCount((c) => c + 1);
             }
-            // Phiên đang online: hiện modal xác nhận đăng nhập trùng
-            const type = data.type || data.eventType || data.metadata?.eventType;
-            if (type === 'LOGIN_CHALLENGE' && typeof window !== 'undefined') {
-              window.dispatchEvent(
-                new CustomEvent('login-challenge', {
-                  detail: {
-                    pendingId: data.metadata?.pendingId || data.pendingId,
-                    metadata: data.metadata || {},
-                    title: data.title,
-                    message: data.message,
-                  },
-                })
-              );
-            }
+            maybeOpenLoginChallenge(data);
           } catch (parseErr) {
             console.warn('[useNotifications] parse SSE error:', parseErr);
           }
         });
 
-        // SSE error (network, auth, server close) -> disconnect
         const onError = () => {
           setConnected(false);
+          failCount += 1;
           try { es.close(); } catch { /* ignore */ }
           esRef.current = null;
-          if (!stoppedRef.current) {
-            // Reconnect sau delay
-            reconnectTimerRef.current = setTimeout(connect, SSE_RECONNECT_DELAY_MS);
-          }
+          scheduleReconnect();
         };
         es.addEventListener('error', onError);
-        // Native fallback
         es.onerror = onError;
       } catch (err) {
         console.warn('[useNotifications] EventSource construct error:', err);
         setConnected(false);
-        if (!stoppedRef.current) {
-          reconnectTimerRef.current = setTimeout(connect, SSE_RECONNECT_DELAY_MS);
-        }
+        failCount += 1;
+        scheduleReconnect();
       }
     };
 
-    // Initial: load danh sach + dem unread + connect SSE
     refresh();
     refreshUnreadCount();
     connect();
 
-    // Fallback polling unread-count moi 60s (neu SSE that bai, van dam bao
-    // badge update som nhat co the)
     pollTimerRef.current = setInterval(() => {
       if (!esRef.current || esRef.current.readyState !== 1) {
-        // OPEN = 1. Neu SSE khong open -> poll fallback
         refreshUnreadCount();
       }
     }, POLL_FALLBACK_MS);
