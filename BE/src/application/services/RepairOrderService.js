@@ -1,6 +1,7 @@
 const ApiError = require('../../utils/ApiError');
 const RepairOrderResponseDto = require('../dto/RepairOrderDto');
 const PublicRepairProgressDto = require('../dto/PublicRepairProgressDto');
+const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
 
 const UPDATABLE_STATUS_VALUES = ['completed', 'cancelled'];
 
@@ -22,14 +23,21 @@ class RepairOrderService {
 
   // Public - khong auth, dung cho landing page (khach nhap ma sua chua de
   // xem tien do). Tra ve DTO rut gon, khong lo thong tin khach hang.
+  //
+  // Ma khach hang thuc su cam tren tay la ma PHIEU QUYET TOAN (order_code,
+  // vd "RO-2026-068") - cap ngay luc tiep nhan xe, TRUOC KHI co lenh sua
+  // chua. Nen tim theo ma nay truoc tien (ho tro ca truong hop chua gan to
+  // truong). Ma lenh sua chua (repair_code, "LSC-...") chi la du phong cho
+  // truong hop hiem gap ai do nhap nham/duoc cho nham ma noi bo.
   async getPublicProgressByCode(code) {
     const trimmed = (code || '').trim();
     if (!trimmed) throw new ApiError(400, 'Vui lòng nhập mã sửa chữa');
 
-    const entity = await this.repairOrderRepository.findByCode(trimmed);
-    if (!entity) throw new ApiError(404, 'Không tìm thấy mã sửa chữa này');
+    const result = await this.repairOrderRepository.findByServiceOrderCode(trimmed)
+      || (await this.repairOrderRepository.findByCode(trimmed));
+    if (!result) throw new ApiError(404, 'Không tìm thấy mã sửa chữa này');
 
-    return PublicRepairProgressDto.fromEntity(entity);
+    return PublicRepairProgressDto.fromEntity(result);
   }
 
   async getTeamLeaders(branchId) {
@@ -67,6 +75,16 @@ class RepairOrderService {
       },
       { branchId, createdBy }
     );
+
+    // Realtime: day ngay cho to truong duoc gan - man "Cong viec cua toi"
+    // se thay lenh moi khong can cho vong lap 20s/F5 (xem sseRoutes.js).
+    emitRepairOrderEvent(branchId, 'assigned', {
+      teamLeaderId: entity.teamLeaderId,
+      orderId: entity.id,
+      settlementId: entity.serviceOrderId,
+      code: entity.code,
+    });
+
     return RepairOrderResponseDto.fromEntity(entity);
   }
 
@@ -92,6 +110,18 @@ class RepairOrderService {
     }
 
     const entity = await this.repairOrderRepository.updateStatus(id, status, cancelReason);
+
+    // Realtime: to truong vua hoan thanh toan bo lenh -> phieu quyet toan goc
+    // da tu chuyen "Cho thanh toan" (xem RepairOrderRepositoryImpl.updateStatus) -
+    // bao ngay cho man Phieu quyet toan cua CVDV, khong can cho poll/F5.
+    if (status === 'completed') {
+      emitRepairOrderEvent(branchId, 'order-completed', {
+        orderId: entity.id,
+        settlementId: entity.serviceOrderId,
+        code: entity.code,
+      });
+    }
+
     return RepairOrderResponseDto.fromEntity(entity);
   }
 
@@ -122,6 +152,15 @@ class RepairOrderService {
     }
 
     await this.repairOrderRepository.updateTaskStatus(taskId, isDone);
+
+    // Realtime: bao CVDV dang mo modal "Xem chi tiet" phieu quyet toan nay
+    // biet ngay tien do vua thay doi, khong can F5 (xem sseRoutes.js).
+    emitRepairOrderEvent(branchId, 'task-updated', {
+      orderId: Number(id),
+      settlementId: existing.serviceOrderId,
+      taskId: Number(taskId),
+    });
+
     return this.getById(id);
   }
 }
