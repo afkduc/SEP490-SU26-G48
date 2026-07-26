@@ -44,6 +44,14 @@ const NOTIFICATION_EVENTS = {
     },
     affectsSettings: [EMAIL_ON_FAILED_LOGIN, IN_APP_SYSTEM_ALERT],
   },
+  LOGIN_CHALLENGE: {
+    title: 'Yêu cầu đăng nhập mới',
+    severity: SEVERITY.WARNING,
+    messageTemplates: {
+      default: 'Có thiết bị khác đang cố đăng nhập tài khoản của bạn ({device}). Hãy xác nhận đó có phải là bạn không.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
   NEW_DEVICE: {
     title: 'Đăng nhập từ thiết bị mới',
     severity: SEVERITY.WARNING,
@@ -526,6 +534,7 @@ class NotificationService {
     if (data.page) metadata.page = data.page;
     if (data.reason) metadata.reason = data.reason;
     if (data.screenKey) metadata.screenKey = data.screenKey;
+    if (data.pendingId) metadata.pendingId = data.pendingId;
 
     // Create notification in DB
     const notification = await this.notificationRepo.create({

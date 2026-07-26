@@ -1,11 +1,13 @@
 const { success } = require('../../utils/response');
-const { trackLogin, trackLoginFailed } = require('../../middlewares/loginSessionMiddleware');
+const { trackLogin, trackLoginFailed, parseUserAgent, getRequestMeta } = require('../../middlewares/loginSessionMiddleware');
 const PermissionService = require('../../application/services/PermissionService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const PasswordResetService = require('../../application/services/PasswordResetService');
 const AuthRepositoryImpl = require('../../infrastructure/repositories/AuthRepositoryImpl');
 const NotificationService = require('../../application/services/NotificationService');
+const LoginAttemptGuard = require('../../application/services/LoginAttemptGuard');
 const { auditCrud } = require('../../utils/auditHelper');
+const ApiError = require('../../utils/ApiError');
 
 class AuthController {
   constructor(authService) {
@@ -16,6 +18,9 @@ class AuthController {
     this.getMe = this.getMe.bind(this);
     this.forgotPassword = this.forgotPassword.bind(this);
     this.resetPassword = this.resetPassword.bind(this);
+    this.getPendingLogin = this.getPendingLogin.bind(this);
+    this.approvePendingLogin = this.approvePendingLogin.bind(this);
+    this.rejectPendingLogin = this.rejectPendingLogin.bind(this);
     this._permissionService = null;
   }
 
@@ -28,14 +33,41 @@ class AuthController {
     return this._permissionService;
   }
 
+  _clientIp(req) {
+    try {
+      const meta = getRequestMeta(req);
+      return meta?.ipAddress || req.ip || '';
+    } catch {
+      return req.ip || '';
+    }
+  }
+
   async login(req, res, next) {
     try {
       const identifier = req.body.identifier || req.body.email || req.body.phone;
-      const { password, branchId, force } = req.body;
+      const { password, branchId, force, pendingId } = req.body;
+      const ip = this._clientIp(req);
+
+      try {
+        LoginAttemptGuard.assertNotLocked(identifier, ip);
+      } catch (lockErr) {
+        const e = new ApiError(lockErr.statusCode || 429, lockErr.message);
+        e.code = lockErr.code;
+        e.details = lockErr.details;
+        e.audit = { skip: true };
+        throw e;
+      }
+
+      const ua = req.headers['user-agent'] || '';
+      const { browser, os } = parseUserAgent(ua);
 
       const { user } = await this.authService.login(identifier, password, branchId, {
         force: Boolean(force),
+        pendingId: pendingId || null,
+        clientMeta: { ip, userAgent: ua, browser, os },
       });
+
+      LoginAttemptGuard.clearFailures(identifier, ip);
 
       const trackResult = await trackLogin(req, user);
       const deviceId = trackResult?.deviceId || null;
@@ -56,7 +88,24 @@ class AuthController {
         'Đăng nhập thành công'
       );
     } catch (err) {
+      const identifier = req.body?.identifier || req.body?.email || req.body?.phone;
+      const ip = this._clientIp(req);
       const audit = err && err.audit;
+
+      if (err?.statusCode === 401 && audit && !audit.skip) {
+        const lock = LoginAttemptGuard.recordFailure(identifier, ip);
+        if (lock.suggestChangePassword) {
+          err.message = `${err.message} Bạn đã sai ${lock.failCount} lần — nên đổi mật khẩu. Vui lòng đợi ${lock.waitSeconds}s rồi thử lại.`;
+          err.details = {
+            ...(err.details || {}),
+            failCount: lock.failCount,
+            waitSeconds: lock.waitSeconds,
+            remainingMs: lock.remainingMs,
+            suggestChangePassword: true,
+          };
+        }
+      }
+
       if (audit && audit.userExists && audit.user) {
         trackLoginFailed(req, {
           user: audit.user,
@@ -67,7 +116,7 @@ class AuthController {
       } else if (!audit || !audit.skip) {
         try {
           const { auditLog, ACTION_TYPES } = require('../../utils/auditHelper');
-          const id = req.body?.identifier || req.body?.email || req.body?.phone || 'unknown';
+          const id = identifier || 'unknown';
           await auditLog({
             req,
             action: ACTION_TYPES.FAILED_LOGIN,
@@ -85,12 +134,41 @@ class AuthController {
     }
   }
 
+  async getPendingLogin(req, res, next) {
+    try {
+      const status = this.authService.getPendingStatus(req.params.pendingId);
+      return success(res, status, 'OK');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async approvePendingLogin(req, res, next) {
+    try {
+      const userId = req.user?.userId || req.user?.id;
+      const pendingId = req.params.pendingId || req.body?.pendingId;
+      const row = await this.authService.approvePendingLogin(userId, pendingId);
+      return success(res, { pendingId: row.id, status: row.status }, 'Đã đồng ý cho thiết bị mới đăng nhập');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async rejectPendingLogin(req, res, next) {
+    try {
+      const userId = req.user?.userId || req.user?.id;
+      const pendingId = req.params.pendingId || req.body?.pendingId;
+      const row = await this.authService.rejectPendingLogin(userId, pendingId);
+      return success(res, { pendingId: row.id, status: row.status }, 'Đã từ chối đăng nhập từ thiết bị mới');
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async forgotPassword(req, res, next) {
     try {
       const email = req.body?.email;
-      const result = await this.passwordResetService.requestReset(email, {
-        ip: req.ip,
-      });
+      const result = await this.passwordResetService.requestReset(email, { ip: req.ip });
 
       try {
         const { auditLog: writeAudit } = require('../../utils/auditHelper');

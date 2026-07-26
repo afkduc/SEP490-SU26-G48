@@ -18,6 +18,9 @@ function buildAuthRouter() {
   const deviceService = new DeviceService();
 
   router.post('/login', controller.login);
+  router.get('/login/pending/:pendingId', controller.getPendingLogin);
+  router.post('/login/pending/:pendingId/approve', authenticate, controller.approvePendingLogin);
+  router.post('/login/pending/:pendingId/reject', authenticate, controller.rejectPendingLogin);
   router.get('/me', authenticate, controller.getMe);
 
   // Quên mật khẩu / đặt lại mật khẩu (public + rate limit)
