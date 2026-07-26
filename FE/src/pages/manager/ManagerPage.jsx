@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { usePermission } from '../../contexts/PermissionContext';
 import { formatCurrency, formatDate } from '../../utils';
 import managerApi from '../../services/managerApi';
 import { PermissionGate } from '../../components/PermissionGate';
@@ -307,12 +308,12 @@ function EmployeeListPage() {
           <div className="breadcrumb">Trang chủ / Nhân viên</div>
         </div>
         <div className="page-header-right">
-          <PermissionGate permission="manager:employees:read">
+          <PermissionGate permission="screen:manager:employees:view">
             <button type="button" className="btn btn-secondary" onClick={() => exportEmployeesCsv(employees)}>
               📊 Xuất Excel
             </button>
           </PermissionGate>
-          <PermissionGate permission="manager:employees:create">
+          <PermissionGate permission="screen:manager:employees:create">
             <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/employees/create')}>
               + Thêm nhân viên
             </button>
@@ -408,10 +409,10 @@ function EmployeeListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <PermissionGate permission="manager:employees:read">
+                      <PermissionGate permission="screen:manager:employees:view">
                         <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}>👁</button>
                       </PermissionGate>
-                      <PermissionGate permission="manager:employees:update">
+                      <PermissionGate permission="screen:manager:employees:update">
                         <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}>✏️</button>
                       </PermissionGate>
                     </div>
@@ -449,6 +450,10 @@ function EmployeeFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:employees:update')
+    : can('screen:manager:employees:create');
 
   const [branch, setBranch] = useState(null);
   const [roles, setRoles] = useState([]);
@@ -555,6 +560,10 @@ function EmployeeFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/employees" replace />;
+  }
 
   if (loading) {
     return (
@@ -815,7 +824,7 @@ function ServiceListPage() {
           <div className="breadcrumb">Trang chủ / Dịch vụ lẻ</div>
         </div>
         <div className="page-header-right">
-          <PermissionGate permission="manager:services:read">
+          <PermissionGate permission="screen:manager:services:view">
             <button
               type="button"
               className="btn btn-secondary"
@@ -828,7 +837,7 @@ function ServiceListPage() {
               📊 Xuất Excel
             </button>
           </PermissionGate>
-          <PermissionGate permission="manager:services:create">
+          <PermissionGate permission="screen:manager:services:create">
             <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/services/create')}>
               + Thêm dịch vụ
             </button>
@@ -916,10 +925,10 @@ function ServiceListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <PermissionGate permission="manager:services:read">
+                      <PermissionGate permission="screen:manager:services:view">
                         <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}>👁</button>
                       </PermissionGate>
-                      <PermissionGate permission="manager:services:update">
+                      <PermissionGate permission="screen:manager:services:update">
                         <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}>✏️</button>
                       </PermissionGate>
                     </div>
@@ -964,6 +973,10 @@ function ServiceFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:services:update')
+    : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -1079,6 +1092,10 @@ function ServiceFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/services" replace />;
+  }
 
   if (loading) {
     return (
@@ -1380,7 +1397,7 @@ function ServicePackageListPage() {
           <div className="breadcrumb">Trang chủ / Gói dịch vụ</div>
         </div>
         <div className="page-header-right">
-          <PermissionGate permission="manager:services:read">
+          <PermissionGate permission="screen:manager:services:view">
             <button
               type="button"
               className="btn btn-secondary"
@@ -1393,7 +1410,7 @@ function ServicePackageListPage() {
               📊 Xuất Excel
             </button>
           </PermissionGate>
-          <PermissionGate permission="manager:services:create">
+          <PermissionGate permission="screen:manager:services:create">
             <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/service-packages/create')}>
               + Thêm gói dịch vụ
             </button>
@@ -1474,10 +1491,10 @@ function ServicePackageListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <PermissionGate permission="manager:services:read">
+                      <PermissionGate permission="screen:manager:services:view">
                         <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
                       </PermissionGate>
-                      <PermissionGate permission="manager:services:update">
+                      <PermissionGate permission="screen:manager:services:update">
                         <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
                       </PermissionGate>
                     </div>
@@ -1509,6 +1526,10 @@ function ServicePackageFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:services:update')
+    : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -1610,6 +1631,10 @@ function ServicePackageFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/service-packages" replace />;
+  }
 
   if (loading) {
     return (
@@ -2197,7 +2222,7 @@ function TechnicianListPage() {
           <div className="breadcrumb">Trang chủ / Thợ máy</div>
         </div>
         <div className="page-header-right">
-          <PermissionGate permission="manager:technicians:read">
+          <PermissionGate permission="screen:manager:technicians:view">
             <button
               type="button"
               className="btn btn-secondary"
@@ -2214,7 +2239,7 @@ function TechnicianListPage() {
               📊 Xuất Excel
             </button>
           </PermissionGate>
-          <PermissionGate permission="manager:technicians:create">
+          <PermissionGate permission="screen:manager:technicians:create">
             <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/technicians/create')}>
               + Thêm thợ máy
             </button>
@@ -2320,10 +2345,10 @@ function TechnicianListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <PermissionGate permission="manager:technicians:read">
+                      <PermissionGate permission="screen:manager:technicians:view">
                         <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}>👁</button>
                       </PermissionGate>
-                      <PermissionGate permission="manager:technicians:update">
+                      <PermissionGate permission="screen:manager:technicians:update">
                         <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}>✏️</button>
                       </PermissionGate>
                     </div>
@@ -2355,6 +2380,10 @@ function TechnicianFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:technicians:update')
+    : can('screen:manager:technicians:create');
 
   const [branch, setBranch] = useState(null);
   const [teamLeaderOptions, setTeamLeaderOptions] = useState([]);
@@ -2457,6 +2486,10 @@ function TechnicianFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/technicians" replace />;
+  }
 
   if (loading) {
     return (

@@ -363,7 +363,7 @@ export default function ImportRequestFormPage() {
                         className="btn btn--ghost btn--sm"
                         onClick={() => removeItem(it.rowKey)}
                         disabled={items.length <= 1}
-                        title="Xoa dong"
+                        title="Xóa dòng"
                       >
                         X
                       </button>
@@ -372,7 +372,7 @@ export default function ImportRequestFormPage() {
                           type="button"
                           className="btn btn--ghost btn--sm"
                           onClick={() => clearProduct(it.rowKey)}
-                          title="Bo chon"
+                          title="Bỏ chọn"
                         >
                           ⟲
                         </button>
@@ -383,7 +383,7 @@ export default function ImportRequestFormPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={4} className="text-right"><strong>Tong so luong:</strong></td>
+                  <td colSpan={4} className="text-right"><strong>Tổng số lượng:</strong></td>
                   <td className="text-right"><strong>{totalQuantity}</strong></td>
                   <td></td>
                 </tr>

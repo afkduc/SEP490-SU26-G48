@@ -5,6 +5,28 @@ class UserRoleService {
     this.userRoleRepository = userRoleRepository;
     this.roleRepository = roleRepository;
     this.userRepository = userRepository;
+    this.authRepo = null;
+    try {
+      // Lazy require de tranh circular import.
+      const AuthRepositoryImpl = require('../../infrastructure/repositories/AuthRepositoryImpl');
+      this.authRepo = new AuthRepositoryImpl();
+    } catch (e) {
+      console.warn('[UserRoleService] AuthRepositoryImpl not available, token_version bump disabled:', e.message);
+    }
+  }
+
+  /**
+   * Bump token_version cho user (JWT cu vo hieu luc, user phai login lai).
+   * Skip actor (admin dang thuc hien) de khong tu logout minh.
+   */
+  async _bumpTokenVersion(userId, actorId) {
+    if (!this.authRepo) return;
+    if (Number(userId) === Number(actorId)) return;
+    try {
+      await this.authRepo.incrementTokenVersion(userId);
+    } catch (e) {
+      console.warn(`[UserRoleService] bump token_version cho user ${userId} failed:`, e.message);
+    }
   }
 
   /**
@@ -43,6 +65,9 @@ class UserRoleService {
     // Notify user about role change
     this._sendRoleChangedNotification(userId, 'ASSIGNED', assignedRoles.join(', '), changedBy);
 
+    // Bump token_version -> user bi 401 o request tiep theo (SessionExpiredModal hien)
+    await this._bumpTokenVersion(userId, changedBy);
+
     return result;
   }
 
@@ -71,6 +96,9 @@ class UserRoleService {
     // Notify user about role revocation
     this._sendRoleChangedNotification(userId, 'REVOKED', roleName, changedBy);
 
+    // Bump token_version
+    await this._bumpTokenVersion(userId, changedBy);
+
     return result;
   }
 
@@ -97,6 +125,9 @@ class UserRoleService {
     if (assignedRoles.length > 0) {
       this._sendRoleChangedNotification(userId, 'ASSIGNED', assignedRoles.join(', '), changedBy);
     }
+
+    // Bump token_version
+    await this._bumpTokenVersion(userId, changedBy);
 
     return result;
   }

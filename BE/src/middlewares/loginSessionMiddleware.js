@@ -182,6 +182,55 @@ function _sendLoginNotification(userId, browser, os, ipAddress, deviceId) {
   }
 }
 
+function _sendLoginFailedNotification(userId, reason, ipAddress, browser, os) {
+  if (!userId) return;
+  try {
+    const NotificationService = require('../application/services/NotificationService');
+    const ns = new NotificationService();
+    ns.notify('LOGIN_FAILED', {
+      userId,
+      reason: reason || 'Sai mật khẩu hoặc thông tin đăng nhập',
+      ip: ipAddress,
+      browser,
+      os,
+    }, { skipSettings: true }).catch((err) => {
+      console.error('[loginSessionMiddleware] Failed to send login-failed notification:', err.message);
+    });
+  } catch (err) {
+    console.error('[loginSessionMiddleware] Failed to send login-failed notification:', err.message);
+  }
+}
+
+async function _writeLoginAuditLog(req, { success, userId, userName, reason, ipAddress }) {
+  try {
+    const { auditLog, ACTION_TYPES } = require('../utils/auditHelper');
+    // Gan tam user vao req de auditLog lay dung actor (login chua co JWT)
+    const prevUser = req.user;
+    req.user = {
+      ...(prevUser || {}),
+      userId: userId || prevUser?.userId || null,
+      id: userId || prevUser?.id || null,
+      name: userName || prevUser?.name || userName,
+      email: userName || prevUser?.email,
+    };
+    await auditLog({
+      req,
+      action: success ? ACTION_TYPES.LOGIN : ACTION_TYPES.FAILED_LOGIN,
+      tableName: 'login_sessions',
+      entityName: success ? 'Đăng nhập thành công' : 'Đăng nhập thất bại',
+      entityCode: userName || null,
+      recordId: userId || null,
+      description: success
+        ? `Đăng nhập thành công${userName ? `: ${userName}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`
+        : `Đăng nhập thất bại${userName ? `: ${userName}` : ''}${reason ? ` — ${reason}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`,
+      responseStatus: success ? 200 : 401,
+    });
+    req.user = prevUser;
+  } catch (err) {
+    console.warn('[loginSessionMiddleware] audit_logs write failed (non-blocking):', err.message);
+  }
+}
+
 async function trackLogin(req, user) {
   try {
     const { ipAddress, userAgent } = getRequestMeta(req);
@@ -324,6 +373,12 @@ async function trackLogin(req, user) {
         deviceId,
       });
       _sendLoginNotification(userId, browser, os, ipAddress, deviceId);
+      await _writeLoginAuditLog(req, {
+        success: true,
+        userId,
+        userName,
+        ipAddress,
+      });
     }
 
     return { deviceId, sessionId };
@@ -472,6 +527,22 @@ async function trackLogout(req) {
       ipAddress,
       deviceId,
     });
+
+    try {
+      const { auditLog, ACTION_TYPES } = require('../utils/auditHelper');
+      await auditLog({
+        req,
+        action: ACTION_TYPES.LOGOUT,
+        tableName: 'login_sessions',
+        entityName: 'Đăng xuất',
+        entityCode: userName || null,
+        recordId: sessionUserId || endedSessionId,
+        description: `Đăng xuất${userName ? `: ${userName}` : ''}`,
+        responseStatus: 200,
+      });
+    } catch (auditErr) {
+      console.warn('[loginSessionMiddleware] logout audit failed:', auditErr.message);
+    }
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLogout ERROR:', err && err.message ? err.message : err);
   }
@@ -547,6 +618,15 @@ async function trackLoginFailed(req, payload) {
           failureReason,
         });
       }
+
+      _sendLoginFailedNotification(userId, failureReason, ipAddress, browser, os);
+      await _writeLoginAuditLog(req, {
+        success: false,
+        userId,
+        userName,
+        reason: failureReason,
+        ipAddress,
+      });
     }
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLoginFailed failed:', err && err.message ? err.message : err);

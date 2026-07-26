@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { usePermission } from '../../contexts/PermissionContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
@@ -73,7 +74,6 @@ const EMPLOYEE_ROLE_OPTIONS = [
   { value: 'service_advisor', label: 'Cố vấn dịch vụ' },
   { value: 'team_leader', label: 'Tổ trưởng kỹ thuật' },
   { value: 'warehouse_staff', label: 'Nhân viên kho' },
-  { value: 'accountant', label: 'Kế toán' },
 ];
 
 const TECHNICIAN_SKILL_OPTIONS = [
@@ -1491,7 +1491,13 @@ function TechnicianListPage() {
 
 function BranchManagerListPage() {
   const { user } = useAuth();
+  const { canScreenAction } = usePermission();
   const navigate = useNavigate();
+  const canViewManagers = canScreenAction('director:branch_managers', 'view');
+  const canCreateManager = canScreenAction('director:branch_managers', 'create');
+  const canUpdateManager = canScreenAction('director:branch_managers', 'update');
+  const canLockBranch = canScreenAction('director:branches', 'delete');
+  const canUnlockBranch = canScreenAction('director:branches', 'update');
   const [branchManagers, setBranchManagers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [search, setSearch] = useState('');
@@ -1611,9 +1617,11 @@ function BranchManagerListPage() {
           <div className="breadcrumb">General Director / Danh sách giám đốc chi nhánh</div>
         </div>
         <div className="page-header-right">
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/general-director/branch-managers/create')}>
-            + Thêm Giám đốc chi nhánh
-          </button>
+          {canCreateManager && (
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/general-director/branch-managers/create')}>
+              + Thêm Giám đốc chi nhánh
+            </button>
+          )}
         </div>
       </div>
 
@@ -1757,24 +1765,30 @@ function BranchManagerListPage() {
                     </span>
                   </td>
                   <td style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button type="button" className="btn btn-info btn-sm" onClick={() => navigate(`/general-director/branch-managers/${row.id}`)}>
-                      Xem
-                    </button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(`/general-director/branch-managers/${row.id}/edit`)}>
-                      Sửa
-                    </button>
-                    <button
-                      type="button"
-                      className={isBranchActive ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm'}
-                      onClick={() => handleBranchActivation(row, !isBranchActive)}
-                      disabled={!row.branch?.id || actionLoadingId === row.branch?.id}
-                    >
-                      {actionLoadingId === row.branch?.id
-                        ? 'Đang xử lý...'
-                        : isBranchActive
-                          ? 'Khóa chi nhánh'
-                          : 'Mở chi nhánh'}
-                    </button>
+                    {canViewManagers && (
+                      <button type="button" className="btn btn-info btn-sm" onClick={() => navigate(`/general-director/branch-managers/${row.id}`)}>
+                        Xem
+                      </button>
+                    )}
+                    {canUpdateManager && (
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(`/general-director/branch-managers/${row.id}/edit`)}>
+                        Sửa
+                      </button>
+                    )}
+                    {((isBranchActive && canLockBranch) || (!isBranchActive && canUnlockBranch)) && (
+                      <button
+                        type="button"
+                        className={isBranchActive ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm'}
+                        onClick={() => handleBranchActivation(row, !isBranchActive)}
+                        disabled={!row.branch?.id || actionLoadingId === row.branch?.id}
+                      >
+                        {actionLoadingId === row.branch?.id
+                          ? 'Đang xử lý...'
+                          : isBranchActive
+                            ? 'Khóa chi nhánh'
+                            : 'Mở chi nhánh'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
@@ -1802,6 +1816,8 @@ function BranchManagerListPage() {
 function BranchManagerDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { canScreenAction } = usePermission();
+  const canUpdateManager = canScreenAction('director:branch_managers', 'update');
   const [manager, setManager] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1842,9 +1858,11 @@ function BranchManagerDetailPage() {
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/general-director/branch-managers')}>
             Quay về danh sách
           </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate(`/general-director/branch-managers/${id}/edit`)}>
-            Chỉnh sửa
-          </button>
+          {canUpdateManager && (
+            <button type="button" className="btn btn-primary" onClick={() => navigate(`/general-director/branch-managers/${id}/edit`)}>
+              Chỉnh sửa
+            </button>
+          )}
         </div>
       </div>
 
@@ -1894,6 +1912,8 @@ function BranchManagerDetailPage() {
 
 function BranchManagerCreatePage() {
   const navigate = useNavigate();
+  const { canScreenAction } = usePermission();
+  const canCreateManager = canScreenAction('director:branch_managers', 'create');
   const [branches, setBranches] = useState([]);
   const [form, setForm] = useState({
     fullName: '',
@@ -1950,6 +1970,10 @@ function BranchManagerCreatePage() {
       setSaving(false);
     }
   };
+
+  if (!canCreateManager) {
+    return <Navigate to="/general-director/branch-managers" replace />;
+  }
 
   return (
     <div>
@@ -2029,6 +2053,8 @@ function BranchManagerCreatePage() {
 function BranchManagerEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { canScreenAction } = usePermission();
+  const canUpdateManager = canScreenAction('director:branch_managers', 'update');
   const [branches, setBranches] = useState([]);
   const [form, setForm] = useState({
     fullName: '',
@@ -2092,6 +2118,10 @@ function BranchManagerEditPage() {
       setSaving(false);
     }
   };
+
+  if (!canUpdateManager) {
+    return <Navigate to={`/general-director/branch-managers/${id}`} replace />;
+  }
 
   return (
     <div>
@@ -2517,10 +2547,13 @@ export default function GeneralDirectorPage() {
   return (
     <Routes>
       <Route index element={<Navigate to="reports/settlements" replace />} />
+      <Route path="reports" element={<Navigate to="reports/revenue" replace />} />
+      <Route path="settlements" element={<Navigate to="reports/settlements" replace />} />
+      <Route path="branches" element={<Navigate to="branch-managers" replace />} />
       <Route
         path="reports/settlements"
         element={
-          <ProtectedRoute permission="screen:general_director:settlements:access">
+          <ProtectedRoute permission="screen:director:settlements:access">
             <SettlementReportsPage />
           </ProtectedRoute>
         }
@@ -2528,7 +2561,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="reports/revenue"
         element={
-          <ProtectedRoute permission="screen:general_director:reports:access">
+          <ProtectedRoute permission="screen:director:reports:access">
             <RevenueOverviewPage />
           </ProtectedRoute>
         }
@@ -2536,7 +2569,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="employees"
         element={
-          <ProtectedRoute permission="screen:general_director:employees:access">
+          <ProtectedRoute permission="screen:director:employees:access">
             <EmployeeListPage />
           </ProtectedRoute>
         }
@@ -2544,7 +2577,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="technicians"
         element={
-          <ProtectedRoute permission="screen:general_director:technicians:access">
+          <ProtectedRoute permission="screen:director:technicians:access">
             <TechnicianListPage />
           </ProtectedRoute>
         }
@@ -2552,7 +2585,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="branch-managers"
         element={
-          <ProtectedRoute permission="screen:general_director:branch_managers:access">
+          <ProtectedRoute permission="screen:director:branch_managers:access">
             <BranchManagerListPage />
           </ProtectedRoute>
         }
@@ -2560,7 +2593,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="branch-managers/create"
         element={
-          <ProtectedRoute permission="screen:general_director:branch_managers:access">
+          <ProtectedRoute permission="screen:director:branch_managers:access">
             <BranchManagerCreatePage />
           </ProtectedRoute>
         }
@@ -2568,7 +2601,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="branch-managers/:id"
         element={
-          <ProtectedRoute permission="screen:general_director:branch_managers:access">
+          <ProtectedRoute permission="screen:director:branch_managers:access">
             <BranchManagerDetailPage />
           </ProtectedRoute>
         }
@@ -2576,7 +2609,7 @@ export default function GeneralDirectorPage() {
       <Route
         path="branch-managers/:id/edit"
         element={
-          <ProtectedRoute permission="screen:general_director:branch_managers:access">
+          <ProtectedRoute permission="screen:director:branch_managers:access">
             <BranchManagerEditPage />
           </ProtectedRoute>
         }
