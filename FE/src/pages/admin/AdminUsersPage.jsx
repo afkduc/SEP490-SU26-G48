@@ -19,17 +19,17 @@ import './AdminUsersPage.css';
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
   { value: 'active', label: 'Hoạt động' },
-  { value: 'inactive', label: 'Ngừng hoạt động' },
+  { value: 'inactive', label: 'Không hoạt động' },
 ];
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
-  inactive: 'Ngừng hoạt động',
+  inactive: 'Không hoạt động',
 };
 
 const STATUS_CLASS = {
   active: 'badge--success',
-  inactive: 'badge--secondary',
+  inactive: 'badge--danger',
 };
 
 function formatDate(value) {
@@ -109,13 +109,6 @@ function UserActionMenu({ user, onView, onEdit }) {
 export default function AdminUsersPage() {
   const { can } = usePermission();
   const { set403Error } = useGlobalError();
-
-  // Check permission: neu khong co quyen doc user -> hien trang 403
-  if (!can('admin:users:read')) {
-    set403Error('admin:users:read', 'Bạn không có quyền truy cập trang quản lý người dùng.');
-    return null;
-  }
-
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -151,6 +144,15 @@ export default function AdminUsersPage() {
   const [togglingId, setTogglingId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
+
+  const hasReadPermission = can('admin:users:read');
+
+  // Không gọi setState trong render — chuyển sang effect (tránh vỡ hooks / action buttons)
+  useEffect(() => {
+    if (!hasReadPermission) {
+      set403Error('admin:users:read', 'Bạn không có quyền truy cập trang quản lý người dùng.');
+    }
+  }, [hasReadPermission, set403Error]);
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -207,17 +209,21 @@ export default function AdminUsersPage() {
     updateParam('page', page);
   }
 
+  if (!hasReadPermission) {
+    return null;
+  }
+
   async function handleToggleStatus(userId, newStatus) {
     const isDeactivate = newStatus === 'inactive';
     const confirmMsg = isDeactivate
-      ? 'Ngừng hoạt động tài khoản này? User sẽ không thể đăng nhập.'
+      ? 'Khóa tài khoản này? User sẽ không thể đăng nhập.'
       : 'Kích hoạt lại tài khoản này?';
     if (!window.confirm(confirmMsg)) return;
 
     setTogglingId(userId);
     try {
       await adminUsersApi.update({ userId, status: newStatus });
-      toast.success(isDeactivate ? 'Đã ngừng hoạt động tài khoản' : 'Đã kích hoạt tài khoản');
+      toast.success(isDeactivate ? 'Đã khóa tài khoản' : 'Đã kích hoạt tài khoản');
       refresh();
     } catch (err) {
       toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
@@ -457,11 +463,11 @@ export default function AdminUsersPage() {
                             </span>
                             <button
                               className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
-                              title={u.status === 'active' ? 'Ngừng hoạt động tài khoản' : 'Kích hoạt lại tài khoản'}
+                              title={u.status === 'active' ? 'Khóa tài khoản' : 'Kích hoạt lại tài khoản'}
                               onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
                               disabled={togglingId === u.id}
                             >
-                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Ngừng' : 'Kích hoạt')}
+                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khóa' : 'Kích hoạt')}
                             </button>
                           </div>
                         </td>

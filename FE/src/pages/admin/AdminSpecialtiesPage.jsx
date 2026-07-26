@@ -143,7 +143,8 @@ export default function AdminSpecialtiesPage() {
   async function handleToggleStatus(specialty) {
     try {
       await adminSpecialtiesApi.toggleStatus(specialty.id);
-      toast.success(specialty.isActive ? 'Đã tắt chuyên môn' : 'Đã kích hoạt chuyên môn');
+      if (specialty.isActive) toast.warning('Đã tắt chuyên môn');
+      else toast.success('Đã kích hoạt chuyên môn');
       loadData();
     } catch (err) {
       toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
@@ -223,7 +224,7 @@ export default function AdminSpecialtiesPage() {
                       <td className="specialty-name-cell"><span className="specialty-name">{s.specialtyName}</span></td>
                       <td className="specialty-status-cell">
                         <span className={`specialty-status-badge ${s.isActive ? 'specialty-status-badge--active' : 'specialty-status-badge--inactive'}`}>
-                          {s.isActive ? 'Hoạt động' : 'Tắt'}
+                          {s.isActive ? 'Hoạt động' : 'Không hoạt động'}
                         </span>
                       </td>
                       <td className="specialty-actions-cell">
@@ -265,7 +266,8 @@ export default function AdminSpecialtiesPage() {
           specialty={editSpecialty}
           onClose={() => { setShowForm(false); setEditSpecialty(null); }}
           onSuccess={() => {
-            toast.success(editSpecialty ? 'Cập nhật chuyên môn thành công' : 'Tạo chuyên môn mới thành công');
+            if (editSpecialty) toast.warning('Đã cập nhật chuyên môn');
+            else toast.success('Đã tạo chuyên môn mới');
             setShowForm(false);
             setEditSpecialty(null);
             loadData();

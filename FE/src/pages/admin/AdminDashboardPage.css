@@ -1,4 +1,4 @@
-﻿/* ─────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────
    Admin Dashboard – Professional Modern Design
    Font: Inter, Gradient accents, Glassmorphism
 ───────────────────────────────────────────────────────── */
@@ -1269,4 +1269,121 @@
     max-height: 580px;
   }
 }
+
+/* ── Dark mode: Tổng quan — nền xám + chữ trắng ──────── */
+.admin-shell--dark .admin-dashboard {
+  background: #0a0a0a !important;
+  color: #ffffff !important;
+}
+
+.admin-shell--dark .stat-card {
+  background: #2f2f2f !important;
+  border: 1px solid #4b5563 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.admin-shell--dark .stat-card__value,
+.admin-shell--dark .stat-card__label,
+.admin-shell--dark .stat-card__sub {
+  color: #ffffff !important;
+}
+
+.admin-shell--dark .stat-card__label {
+  color: #e5e7eb !important;
+}
+
+.admin-shell--dark .stat-card__sub {
+  color: #d1d5db !important;
+}
+
+.admin-shell--dark .stat-card__icon-wrap {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+  box-shadow: none;
+}
+
+.admin-shell--dark .stat-chip-row span,
+.admin-shell--dark .stat-chip,
+.admin-shell--dark .stat-card [class*='chip'],
+.admin-shell--dark .stat-card [class*='badge'] {
+  background: #3f3f3f !important;
+  color: #ffffff !important;
+  border-color: #6b7280 !important;
+}
+
+.admin-shell--dark .stat-chip--green {
+  background: rgba(34, 197, 94, 0.28) !important;
+  color: #86efac !important;
+}
+
+.admin-shell--dark .stat-chip--gray {
+  background: #4b5563 !important;
+  color: #ffffff !important;
+}
+
+.admin-shell--dark .stat-chip--red {
+  background: rgba(239, 68, 68, 0.28) !important;
+  color: #fca5a5 !important;
+}
+
+.admin-shell--dark .trend--up {
+  background: rgba(34, 197, 94, 0.25) !important;
+  color: #86efac !important;
+}
+
+.admin-shell--dark .trend--down {
+  background: rgba(239, 68, 68, 0.25) !important;
+  color: #fca5a5 !important;
+}
+
+.admin-shell--dark .dash-widget {
+  background: #2a2a2a !important;
+  border: 1px solid #4b5563 !important;
+  color: #ffffff !important;
+}
+
+.admin-shell--dark .dash-widget__topbar,
+.admin-shell--dark .dash-widget__body {
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+  border-color: #4b5563 !important;
+}
+
+.admin-shell--dark .dash-widget__heading,
+.admin-shell--dark .dash-widget__title,
+.admin-shell--dark .section-header__title {
+  color: #ffffff !important;
+}
+
+.admin-shell--dark .section-header__link {
+  color: #a5b4fc !important;
+}
+
+.admin-shell--dark .section-header__badge {
+  background: #3f3f3f !important;
+  color: #ffffff !important;
+}
+
+.admin-shell--dark .alert-item,
+.admin-shell--dark .activity-item,
+.admin-shell--dark .login-item {
+  background: #1f1f1f !important;
+  border-color: #4b5563 !important;
+  color: #ffffff !important;
+}
+
+.admin-shell--dark .alert-item__title,
+.admin-shell--dark .activity-item__actor,
+.admin-shell--dark .login-item__user {
+  color: #ffffff !important;
+}
+
+.admin-shell--dark .alert-item__message,
+.admin-shell--dark .activity-item__details,
+.admin-shell--dark .alert-item__meta,
+.admin-shell--dark .activity-item__meta {
+  color: #e5e7eb !important;
+}
+
 

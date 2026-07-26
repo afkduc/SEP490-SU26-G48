@@ -1,20 +1,21 @@
-/* ─────────────────────────────────────────────────────────
-   Admin Shell – sidebar + topbar layout
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Admin Shell â€“ sidebar + topbar layout
    Font: Inter, Primary: #4f46e5 (indigo)
-───────────────────────────────────────────────────────── */
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* ── Shell ─────────────────────────────────────────────── */
+/* â”€â”€ Shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .admin-shell {
   display: flex;
   min-height: 100vh;
-  background: #f1f5f9;
+  background: var(--ag-bg, #f1f5f9);
+  color: var(--ag-text-primary, #0f172a);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   position: relative;
 }
 
-/* ── Sidebar ───────────────────────────────────────────── */
+/* â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .admin-sidebar {
   width: 256px;
   min-height: 100vh;
@@ -178,7 +179,7 @@
   letter-spacing: 0.5px;
 }
 
-/* ── Collapse toggle button (floating, for desktop) ── */
+/* â”€â”€ Collapse toggle button (floating, for desktop) â”€â”€ */
 .admin-shell__collapse-toggle {
   display: none; /* Hien tren desktop */
   position: absolute;
@@ -207,7 +208,7 @@
   color: #1e293b;
 }
 
-/* ── Overlay (mobile drawer) ── */
+/* â”€â”€ Overlay (mobile drawer) â”€â”€ */
 .admin-sidebar__overlay {
   position: fixed;
   inset: 0;
@@ -222,7 +223,7 @@
   to { opacity: 1; }
 }
 
-/* ── Main area ─────────────────────────────────────────── */
+/* â”€â”€ Main area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .admin-main {
   flex: 1;
   display: flex;
@@ -231,7 +232,7 @@
   overflow-x: hidden;
 }
 
-/* ── Top bar ─────────────────────────────────────────────── */
+/* â”€â”€ Top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .admin-topbar {
   height: 64px;
   background: #fff;
@@ -304,6 +305,26 @@
   align-items: center;
   gap: 16px;
   flex-shrink: 0;
+}
+
+.admin-topbar__theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.admin-topbar__theme-btn:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
 }
 
 .admin-topbar__online-indicator {
@@ -469,7 +490,7 @@
   background: #fef2f2;
 }
 
-/* ── Content ────────────────────────────────────────────── */
+/* â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .admin-content {
   flex: 1;
   padding: 0;
@@ -477,7 +498,7 @@
   overflow-y: auto;
 }
 
-/* ── Responsive ─────────────────────────────────────────── */
+/* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Tablet */
 @media (max-width: 1024px) {

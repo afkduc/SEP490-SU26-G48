@@ -3,6 +3,13 @@ import { API_BASE_URL } from '../config';
 export const SESSION_EXPIRED_KEY = 'SESSION_EXPIRED';
 export const FORBIDDEN_KEY = 'FORBIDDEN_DENIED';
 export const LOGOUT_KEY = 'app:logout';
+// Event danh dau: "Da clear localStorage, AppContext phai clear React state".
+// Khi user click "Dang nhap lai" tu SessionExpiredModal hoac ForbiddenModal,
+// localStorage + sessionStorage bi clear. AppContext lang nghe event nay de
+// clear token/user/permissions trong React state. Neu khong clear state,
+// isAuthenticated van true -> LoginPage useEffect redirect ve home ngay
+// khi vua navigate xong -> user khong the dang nhap lai.
+export const SESSION_LOGGED_OUT_EVENT = 'SESSION_LOGGED_OUT';
 
 // Flag toan cuc de chong spam SessionExpiredModal.
 // Set true khi modal hien, reset khi user login thanh cong (login flow se
@@ -21,6 +28,46 @@ const pendingControllers = new Map();
  * happens when in-flight requests from before logout complete without a token.
  */
 let loggedOutFlag = false;
+
+/**
+ * Module-level flag to skip the next incoming SSE permission-changed event
+ * from triggering an automatic refresh-permissions call.
+ *
+ * Use case: when admin saves the permission matrix themselves, the BE
+ * broadcasts `permission-changed`. The admin's own React state already
+ * reflects the new permissions (just-and-saved), so auto-refreshing the JWT
+ * would be redundant and could trigger a 403 storm on the next in-flight
+ * request using the now-stale JWT (race condition between SSE save event
+ * and the next request that already captured the old token).
+ *
+ * Set this flag from the page that just saved the matrix. The SSE hook
+ * checks it once and resets the flag.
+ */
+let skipNextPermissionChangeRef = false;
+
+/**
+ * Mark the next 'permission-changed' SSE event as self-initiated, so the
+ * SSE hook will NOT trigger an automatic refresh-permissions call.
+ *
+ * Should be called by the page that just saved the permission matrix,
+ * BEFORE the BE has time to broadcast the SSE event (typically right after
+ * the save API returns 200).
+ */
+export function markNextPermissionChangeAsSelf() {
+  skipNextPermissionChangeRef = true;
+}
+
+/**
+ * Internal: check & consume the skip flag. Returns true if the next event
+ * should be skipped.
+ */
+export function consumeSkipNextPermissionChange() {
+  if (skipNextPermissionChangeRef) {
+    skipNextPermissionChangeRef = false;
+    return true;
+  }
+  return false;
+}
 
 /**
  * Reset the "logged out" flag. Call this on successful login so subsequent
@@ -179,8 +226,14 @@ class HttpClient {
       // Anti-spam: chi dispatch khi thuoc session hien tai (tranh stale request
       // cua user da logout).
       if (response.status === 403 && belongsToCurrentSession) {
+        const required = Array.isArray(payload?.required) ? payload.required : [];
+        const permissionKey =
+          payload?.metadata?.permissionKey
+          || payload?.permissionKey
+          || required[0]
+          || null;
         showForbidden({
-          permissionKey: payload?.metadata?.permissionKey || null,
+          permissionKey,
           message: (payload && payload.message) || 'Bạn không có quyền thực hiện thao tác này',
           path,
         });
@@ -193,9 +246,16 @@ class HttpClient {
       const error = new Error(message);
       error.status = response.status;
       error.payload = payload;
+      error.code = payload?.code || null;
+      error.details = payload?.details || null;
       // Attach permissionKey from response metadata if present
-      if (response.status === 403 && payload?.metadata?.permissionKey) {
-        error.permissionKey = payload.metadata.permissionKey;
+      if (response.status === 403) {
+        const required = Array.isArray(payload?.required) ? payload.required : [];
+        error.permissionKey =
+          payload?.metadata?.permissionKey
+          || payload?.permissionKey
+          || required[0]
+          || null;
       }
       throw error;
     }
