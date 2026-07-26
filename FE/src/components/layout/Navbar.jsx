@@ -269,7 +269,6 @@ export default function Navbar() {
     <header className="navbar">
       <div className="navbar__brand">
         <img className="navbar__logo" src="/AutoGaraLogo-Photoroom.png" alt="AutoGara" />
-        <span className="navbar__name">AutoGara</span>
       </div>
 
       <button
