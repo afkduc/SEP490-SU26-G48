@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { ROLES } from '../../constants/roles';
 import { formatCurrency } from '../../utils';
 import { searchVehiclesApi } from '../../services/vehicleApi';
@@ -15,7 +16,9 @@ import {
   updateRepairSettlementApi,
   updateRepairSettlementStatusApi,
 } from '../../services/repairSettlementApi';
+import { updateRepairOrderStatusApi } from '../../services/repairOrderApi';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
+import './RepairSettlementPage.css';
 
 // item.lhsc ('DV'/'PT') la LOAI HANG MUC (dong nay la cong tho hay vat tu) -
 // khong con chon tay qua dropdown nua (tu dong theo nut "Thêm dịch vụ"/"Thêm
@@ -139,6 +142,27 @@ function assignGroupIds(items, nextGroupId) {
   });
 }
 
+// Mau nen nhat (pastel) rieng cho tung nhom (gói/dịch vụ + phụ tùng phụ thuộc
+// đi kèm) trên bảng "Hạng mục công việc / phụ tùng" của MÀN TẠO/SỬA QUYẾT
+// TOÁN - CHỈ để cố vấn dễ phân biệt nhóm nào với nhóm nào trên màn hình, cyclic
+// theo groupId. KHÔNG áp dụng khi in phiếu (printSettlement/SettlementPreviewModal
+// không dùng hàm này). Dòng không thuộc nhóm nào (gói đơn/phụ tùng thêm gõ tay,
+// không groupId) dùng 1 mau trung tinh rieng, khac voi mau cua bat ky nhom nao.
+const GROUP_ROW_COLORS = [
+  '#EEF4FF', // xanh duong nhat
+  '#F1FBEA', // xanh la nhat
+  '#FFF7E6', // vang nhat
+  '#FDEEF6', // hong nhat
+  '#F1EEFE', // tim nhat
+  '#E9FBF7', // xanh ngoc nhat
+];
+const UNGROUPED_ROW_COLOR = '#FAFAFA';
+
+function rowColorForGroup(groupId) {
+  if (!groupId) return UNGROUPED_ROW_COLOR;
+  return GROUP_ROW_COLORS[groupId % GROUP_ROW_COLORS.length];
+}
+
 // Che dữ liệu nhạy cảm (điện thoại, email, CCCD) khi hiển thị dữ liệu đã tra cứu
 // từ DB — chỉ hiện 4 ký tự cuối, phần còn lại thay bằng dấu *.
 function maskLast4(value) {
@@ -166,10 +190,17 @@ function buildVietQrUrl(amount, addInfo) {
   return `https://img.vietqr.io/image/${VIETQR_BANK_BIN}-${VIETQR_ACCOUNT_NO}-compact2.png?${params.toString()}`;
 }
 
+// "total" = so tien THUC SU thu cua khach hang cho dong nay - dong mien phi
+// (isFree) hoac mien thu khach (bao hanh/bao hiem/noi bo chiu phi) deu la 0,
+// du don gia/so luong that su la bao nhieu (van giu nguyen unitPrice/qty/
+// discount rieng de con doi lai duoc neu sau nay doi HTTT). Nho vay cot
+// "Thanh tien" hien dung so tien khach phai tra cho tung dong, khong can doc
+// them dong tong ket rieng moi biet dong nao duoc mien.
 function recalcItem(item) {
   const base = (item.qty || 0) * (item.unitPrice || 0);
   const disc = base * ((item.discount || 0) / 100);
-  return { ...item, total: item.isFree ? 0 : Math.round(base - disc) };
+  const rawTotal = Math.round(base - disc);
+  return { ...item, total: (item.isFree || isExemptFromCustomerBilling(item)) ? 0 : rawTotal };
 }
 
 // Hạng mục có HTTT = Bảo hành hãng xe / Bảo hiểm chi trả / Nội bộ chịu phí ->
@@ -177,6 +208,14 @@ function recalcItem(item) {
 // loại khỏi số tiền thu khách.
 function isExemptFromCustomerBilling(item) {
   return item.httt === 'BHH' || item.httt === 'BH' || item.httt === 'NB';
+}
+
+// Nhan ngan gon hien ben canh so 0 o cot "Thanh tien" cho dong duoc mien thu
+// khach (vd "0 (Bảo hành)") - de co van biet ngay VI SAO dong nay la 0 ma
+// khong can doi chieu qua cot HTTT.
+const EXEMPTION_SHORT_LABEL = { BHH: 'Bảo hành', BH: 'Bảo hiểm', NB: 'Nội bộ' };
+function exemptionShortLabel(item) {
+  return EXEMPTION_SHORT_LABEL[item.httt] || null;
 }
 
 function calcTotals(items) {
@@ -249,9 +288,6 @@ export function printWorkList(order) {
 
 // ─── In phiếu quyết toán sửa chữa ────────────────────────────────────
 function printSettlement(order) {
-  const exemptedAmount = (order.items || [])
-    .filter((i) => !i.isFree && isExemptFromCustomerBilling(i))
-    .reduce((s, i) => s + (i.total || 0), 0);
   // Tach 2 nhom "Cong viec can thuc hien" / "Phu tung, vat tu" khi in - giong
   // cach hien thi ben form tao/sua phieu va modal Xem chi tiet (giu nguyen so
   // thu tu goc trong mang items, khong danh lai tu 1 cho tung nhom).
@@ -273,7 +309,7 @@ function printSettlement(order) {
       <td style="text-align:right">${(item.unitPrice || 0).toLocaleString('vi-VN')}</td>
       <td style="text-align:center">${item.discount || 0}%</td>
       <td style="text-align:center">${item.isFree ? 'Có' : ''}</td>
-      <td style="text-align:right"><b>${(item.total || 0).toLocaleString('vi-VN')}</b></td>
+      <td style="text-align:right"><b>${(item.total || 0).toLocaleString('vi-VN')}${exemptionShortLabel(item) ? ` (${exemptionShortLabel(item)})` : ''}</b></td>
     </tr>`;
 
   const groupHeaderRow = (label) => `
@@ -374,7 +410,6 @@ function printSettlement(order) {
     <tr><td class="lbl">Tổng cộng sau giảm giá:</td><td class="val">${(order.afterDiscount || 0).toLocaleString('vi-VN')}</td></tr>
     <tr><td class="lbl">Tiền thuế GTGT (8%):</td><td class="val">${(order.vat || 0).toLocaleString('vi-VN')}</td></tr>
     <tr><td class="lbl">Miễn phí:</td><td class="val">${(order.freeAmount || 0).toLocaleString('vi-VN')}</td></tr>
-    ${exemptedAmount > 0 ? `<tr><td class="lbl">Miễn thu khách hàng (Bảo hành/Bảo hiểm/Nội bộ):</td><td class="val">${exemptedAmount.toLocaleString('vi-VN')}</td></tr>` : ''}
     <tr style="font-size:13px"><td class="lbl"><b>Tổng giá trị thanh toán:</b></td><td class="val" style="color:#C62828"><b>${(order.total || 0).toLocaleString('vi-VN')}</b></td></tr>
     <tr><td colspan="2" style="font-size:10px; font-style:italic; text-align:right">Bằng chữ: ${numberToVietnamese(order.total)}</td></tr>
   </table>
@@ -395,12 +430,114 @@ function printSettlement(order) {
   w.onload = () => w.print();
 }
 
+// ─── In phiếu xe ra ("Giấy xe khách ra cổng") ─────────────────────────
+// Mau in khi giao xe lai cho khach o phieu DA XUAT HOA DON - thay cho nut
+// "Xem/In lại" (von chi mo lai phieu quyet toan, khong lien quan den buoc
+// giao xe). Bo cuc tham khao mau giay ra cong thuc te cua dai ly xe hoi, dung
+// logo/ten AutoGara thay logo hang xe, va "Cố vấn dịch vụ" thay "Tư vấn dịch
+// vụ" cho dung thuat ngu he thong nay dang dung.
+function printVehicleOutSlip(order) {
+  const today = new Date();
+  const todayStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+
+  const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
+<title>Giấy xe ra cổng ${order.code}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 12px; margin: 10mm 15mm; color:#000; }
+  .center { text-align:center; } .bold { font-weight:bold; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:8px; margin-bottom:10px; }
+  .header-left { display:flex; gap:10px; align-items:center; }
+  .header-left img { width:52px; height:52px; object-fit:contain; }
+  .header-left .company { font-size:11px; line-height:1.5; }
+  .header-right { text-align:right; font-size:11px; line-height:1.8; }
+  .title { font-size:18px; font-weight:800; letter-spacing:1px; margin:10px 0 2px; }
+  .subtitle { font-size:12px; color:#333; margin-bottom:14px; }
+  .field-row { display:flex; gap:30px; margin-bottom:14px; font-size:13px; }
+  .field-row span.lbl { font-weight:bold; }
+  .field-row span.val { border-bottom:1px solid #000; padding:0 6px; min-width:160px; display:inline-block; }
+  .checklist { border:1px solid #333; border-radius:4px; padding:12px 16px; margin-bottom:14px; }
+  .checklist-row { display:flex; align-items:center; gap:8px; padding:4px 0; font-size:12.5px; }
+  .checkbox { width:14px; height:14px; border:1.5px solid #000; flex-shrink:0; display:inline-block; }
+  .total-row { display:flex; justify-content:space-between; align-items:center; border:1px solid #333; border-radius:4px; padding:10px 16px; margin-bottom:16px; font-size:14px; }
+  .total-row b { color:#C62828; font-size:16px; }
+  .confirm-note { font-size:11.5px; font-style:italic; border-top:1px solid #ccc; padding-top:6px; margin-bottom:26px; }
+  .sign-row { display:flex; justify-content:space-between; }
+  .sign-box { text-align:center; width:19%; }
+  .sign-line { margin-top:44px; border-top:1px solid #000; padding-top:3px; font-size:10px; }
+  @media print { body { margin:8mm 12mm; } }
+</style></head><body>
+
+<div class="header">
+  <div class="header-left">
+    <img src="/AutoGaraLogo-Photoroom.png" alt="AutoGara" />
+    <div class="company">
+      <b>CÔNG TY TNHH AUTOGARA</b><br>
+      Chi nhánh: ${order.branch || MOCK_BRANCH}<br>
+      Cố vấn dịch vụ: ${order.advisor || ''}
+    </div>
+  </div>
+  <div class="header-right">
+    <div><b>RO:</b> ${order.code}</div>
+    <div><b>Ngày vào xưởng:</b> ${order.date || ''}</div>
+    <div><b>Ngày xe ra:</b> ${order.paidDate || todayStr}</div>
+  </div>
+</div>
+
+<div class="center title">GIẤY XE KHÁCH RA CỔNG</div>
+<div class="center subtitle">Bộ phận dịch vụ sau bán hàng</div>
+
+<div class="field-row">
+  <div><span class="lbl">Biển số xe:</span> <span class="val">${order.vehicle?.licensePlate || ''}</span></div>
+  <div><span class="lbl">Loại xe:</span> <span class="val">${order.vehicle?.vehicleModel || ''}</span></div>
+</div>
+
+<div class="checklist">
+  <div class="checklist-row"><span class="checkbox"></span>(1) Kiểm tra sửa chữa miễn phí</div>
+  <div class="checklist-row"><span class="checkbox"></span>(2) Sửa chữa bảo hành</div>
+  <div class="checklist-row"><span class="checkbox"></span>(3) Bán lẻ phụ tùng</div>
+  <div class="checklist-row"><span class="checkbox"></span>(4) Tạm xuất xưởng, vận tải</div>
+  <div class="checklist-row"><span class="checkbox"></span>(5) Giao xe Showroom, vận tải</div>
+  <div class="checklist-row"><span class="checkbox"></span>(6) Khách hàng thanh toán</div>
+  <div class="checklist-row"><span class="checkbox"></span>(7) Bảo hiểm thanh toán</div>
+  <div class="checklist-row"><span class="checkbox"></span>(8) Mục đích khác, ghi rõ lý do: …………………………………………</div>
+</div>
+
+<div class="total-row">
+  <span>Tổng giá trị thanh toán:</span>
+  <b>${(order.total || 0).toLocaleString('vi-VN')} VNĐ</b>
+</div>
+
+<div class="confirm-note">
+  Xe đã hoàn tất thủ tục và được giao lại đúng cho khách hàng hoặc đại diện khách hàng.<br>
+  Ghi chú: .....................................................................................................................
+</div>
+
+<div class="sign-row">
+  <div class="sign-box"><div class="bold">Khách hàng</div><div class="sign-line">${order.customer?.fullName || ''}</div></div>
+  <div class="sign-box"><div class="bold">Cố vấn dịch vụ</div><div class="sign-line">${order.advisor || ''}</div></div>
+  <div class="sign-box"><div class="bold">Kế toán</div><div class="sign-line"></div></div>
+  <div class="sign-box"><div class="bold">GĐ/TP Dịch vụ</div><div class="sign-line"></div></div>
+  <div class="sign-box"><div class="bold">Bảo vệ</div><div class="sign-line"></div></div>
+</div>
+</body></html>`;
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => w.print();
+}
+
 // ─── Modal xem trước & xuất phiếu quyết toán ────────────────────────
 function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
   const canConfirm = canManage && order.status === 'waiting_payment';
-  const exemptedAmount = (order.items || [])
-    .filter((i) => !i.isFree && isExemptFromCustomerBilling(i))
-    .reduce((s, i) => s + (i.total || 0), 0);
+  // Bat buoc phai In phieu quyet toan (xem lai giay to) TRUOC khi duoc phep
+  // Xac nhan xuat hoa don - nut xac nhan chi xuat hien SAU lan in dau tien,
+  // tranh xac nhan xuat hoa don ma chua thuc su in/kiem tra lai phieu giay.
+  const [hasPrinted, setHasPrinted] = useState(false);
+
+  const handlePrint = () => {
+    printSettlement(order);
+    setHasPrinted(true);
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -472,7 +609,10 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
                     <td className="td-cell" style={{ textAlign: 'center' }}>{s.unit}</td>
                     <td className="td-cell" style={{ textAlign: 'center' }}>{s.qty}</td>
                     <td className="td-cell" style={{ textAlign: 'right' }}>{(s.unitPrice || 0).toLocaleString('vi-VN')}</td>
-                    <td className="td-cell" style={{ textAlign: 'right', fontWeight: 700 }}>{(s.total || 0).toLocaleString('vi-VN')}</td>
+                    <td className="td-cell" style={{ textAlign: 'right', fontWeight: 700 }}>
+                      {(s.total || 0).toLocaleString('vi-VN')}
+                      {exemptionShortLabel(s) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(s)})</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -496,7 +636,6 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
                   ['Tổng cộng giảm giá:', order.discountAmount],
                   ['Tiền thuế GTGT (8%):', order.vat],
                   ['Miễn phí:', order.freeAmount],
-                  ...(exemptedAmount > 0 ? [['Miễn thu khách hàng (Bảo hành/Bảo hiểm/Nội bộ):', exemptedAmount]] : []),
                 ].map(([l, v]) => (
                   <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0', borderBottom: '1px solid #EEE' }}>
                     <span>{l}</span><b>{(v || 0).toLocaleString('vi-VN')}</b>
@@ -513,8 +652,10 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
 
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
-          <button className="btn btn-secondary" onClick={() => printSettlement(order)}>In phiếu quyết toán</button>
-          {canConfirm && (
+          <button className="btn btn-secondary" onClick={handlePrint}>
+            {hasPrinted ? 'In lại phiếu quyết toán' : 'In phiếu quyết toán'}
+          </button>
+          {canConfirm && hasPrinted && (
             <button className="btn btn-primary" onClick={() => { onConfirm(order.id); onClose(); }}>
               Xác nhận xuất hóa đơn
             </button>
@@ -528,9 +669,6 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
 // ─── Modal xem chi tiết phiếu ────────────────────────────────────────
 function DetailModal({ order, onClose, onPreview }) {
   const st = STATUS_LABELS[order.status];
-  const exemptedAmount = (order.items || [])
-    .filter((i) => !i.isFree && isExemptFromCustomerBilling(i))
-    .reduce((s, i) => s + (i.total || 0), 0);
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-xl" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900 }}>
@@ -542,7 +680,7 @@ function DetailModal({ order, onClose, onPreview }) {
           </div>
         </div>
         <div className="modal-body">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div className="responsive-2col" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 16 }}>
             <div>
               <div className="form-section-title">Thông tin khách hàng</div>
               {[
@@ -609,7 +747,10 @@ function DetailModal({ order, onClose, onPreview }) {
                       <td style={{ textAlign: 'center' }}>{item.qty}</td>
                       <td style={{ textAlign: 'right' }}>{(item.unitPrice || 0).toLocaleString('vi-VN')}</td>
                       <td style={{ textAlign: 'center' }}>{item.discount || 0}%</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{(item.total || 0).toLocaleString('vi-VN')}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                        {(item.total || 0).toLocaleString('vi-VN')}
+                        {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
+                      </td>
                     </tr>
                   );
 
@@ -681,7 +822,6 @@ function DetailModal({ order, onClose, onPreview }) {
                 ['Tổng giảm giá', order.discountAmount],
                 ['Thuế GTGT (8%)', order.vat],
                 ['Miễn phí', order.freeAmount],
-                ...(exemptedAmount > 0 ? [['Miễn thu khách hàng (Bảo hành/Bảo hiểm/Nội bộ)', exemptedAmount]] : []),
               ].map(([l, v]) => (
                 <div key={l} className="summary-row"><span>{l}:</span><span>{(v || 0).toLocaleString('vi-VN')} đ</span></div>
               ))}
@@ -710,16 +850,22 @@ function DetailModal({ order, onClose, onPreview }) {
 function RepairSettlementList() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const canManage = user?.primaryRole !== ROLES.ADMIN;
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [tab, setTab] = useState('waiting_repair');
+  // Sau khi phan cong to truong xong (RepairOrderCreate) hoac tu cac luong
+  // dieu huong khac muon mo san 1 tab cu the, co the truyen state: { tab }
+  // khi navigate() toi day - vd chuyen thang sang "Dang sua chua" sau khi
+  // gan xong, khong can nguoi dung tu bam lai tab.
+  const [tab, setTab] = useState(location.state?.tab || 'waiting_repair');
   const [search, setSearch] = useState('');
   const [view, setView] = useState(null);
   const [previewOrder, setPreviewOrder] = useState(null);
   const [page, setPage] = useState(1);
   const [cancelTarget, setCancelTarget] = useState(null);
+  const [completedPopupOrder, setCompletedPopupOrder] = useState(null);
   const PAGE_SIZE = 10;
 
   // silent=true dung cho auto-refresh nen (poll/focus lai tab) - khong bat
@@ -738,6 +884,9 @@ function RepairSettlementList() {
 
   useEffect(() => {
     loadAll();
+    // Poll 20s + refresh khi quay lai tab van giu lam luoi an toan (phong khi
+    // SSE mat ket noi tam thoi) - duong chinh de biet to truong vua tich
+    // xong/hoan thanh la SSE ben duoi (realtime, khong can cho poll).
     const intervalId = setInterval(() => loadAll({ silent: true }), 20000);
     const onFocus = () => loadAll({ silent: true });
     const onVisibility = () => { if (document.visibilityState === 'visible') loadAll({ silent: true }); };
@@ -749,6 +898,34 @@ function RepairSettlementList() {
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
+
+  // Realtime: to truong vua tich xong 1 dau muc / hoan thanh toan bo lenh sua
+  // chua -> cap nhat ngay ca danh sach lan modal "Xem chi tiet" dang mo, khong
+  // can F5 tay:
+  //   - 'task-updated': nap lai dung phieu dang xem de tien do hien thi ngay.
+  //   - 'order-completed': phieu goc da tu chuyen "Cho thanh toan" (xem
+  //     RepairOrderRepositoryImpl.updateStatus) -> nap lai danh sach; neu
+  //     dang mo dung modal chi tiet phieu do thi hien popup thong bao, doi
+  //     CVDV bam X moi chuyen sang tab "Cho thanh toan" (khong tu dong nhay
+  //     ngang khi ho dang doc do).
+  const handleRepairOrderEvent = (event) => {
+    if (event.type === 'task-updated' && view && String(view.id) === String(event.settlementId)) {
+      getRepairSettlementApi(view.id).then(setView).catch(() => {});
+    }
+    if (event.type === 'order-completed') {
+      loadAll({ silent: true });
+      if (view && String(view.id) === String(event.settlementId)) {
+        setCompletedPopupOrder(view);
+      }
+    }
+  };
+  useRepairOrderEventsSSE(handleRepairOrderEvent, true);
+
+  const handleCloseCompletedPopup = () => {
+    setCompletedPopupOrder(null);
+    setView(null);
+    setTab('waiting_payment');
+  };
 
   const counts = {
     waiting_repair: orders.filter((o) => o.status === 'waiting_repair').length,
@@ -796,6 +973,13 @@ function RepairSettlementList() {
     setPreviewOrder(await fetchFullOrder(o));
   };
 
+  // Phieu xe ra chi can thong tin dau phieu (khach hang, xe, ngay, tong tien)
+  // - da co san ngay trong dong tom tat cua danh sach, khong can goi lai
+  // fetchFullOrder (von chi de bo sung "items" day du).
+  const handlePrintVehicleOut = (o) => {
+    printVehicleOutSlip(o);
+  };
+
   const handleInvoice = async (id) => {
     const updated = await updateRepairSettlementStatusApi(id, 'invoiced');
     setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
@@ -803,8 +987,16 @@ function RepairSettlementList() {
   };
 
   const handleConfirmCancel = async (reason) => {
-    const updated = await updateRepairSettlementStatusApi(cancelTarget.id, 'cancelled', reason);
-    setOrders((prev) => prev.filter((o) => o.id !== updated.id));
+    if (cancelTarget.kind === 'repair_order') {
+      await updateRepairOrderStatusApi(cancelTarget.repairOrderId, 'cancelled', reason);
+      // Huy lenh sua chua se tu dong lam phieu quyet toan goc quay ve "Cho
+      // sua chua" (xem RepairOrderRepositoryImpl.updateStatus) - nap lai ca
+      // danh sach cho chinh xac thay vi tu suy doan trang thai moi.
+      await loadAll();
+    } else {
+      const updated = await updateRepairSettlementStatusApi(cancelTarget.id, 'cancelled', reason);
+      setOrders((prev) => prev.filter((o) => o.id !== updated.id));
+    }
     setCancelTarget(null);
   };
 
@@ -864,7 +1056,7 @@ function RepairSettlementList() {
 
       {tab === 'waiting_payment' && counts.waiting_payment > 0 && (
         <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#2E7D32' }}>
-          Nhấn <b>Xuất hóa đơn</b> để xem/in phiếu quyết toán và hoàn tất dịch vụ.
+          Nhấn <b>In phiếu và xuất hóa đơn</b> để xem/in phiếu quyết toán và hoàn tất dịch vụ.
         </div>
       )}
 
@@ -917,22 +1109,25 @@ function RepairSettlementList() {
 
                       {o.status === 'waiting_repair' && (<>
                         <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => handleAssign(o.id)}>Phân công</button>
-                        <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget(o)}>Hủy</button>
+                        <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'settlement', id: o.id, code: o.code })}>Hủy</button>
                       </>)}
 
-                      {o.status === 'inprogress' && (
+                      {o.status === 'inprogress' && (<>
                         <button className="btn btn-sm" style={{ fontSize: 11, background: '#00897B', color: '#fff' }} onClick={() => handlePrintWorkList(o)}>In danh sách CV</button>
-                      )}
+                        {o.repairOrderId && (
+                          <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'repair_order', repairOrderId: o.repairOrderId, code: o.code })}>Hủy</button>
+                        )}
+                      </>)}
 
                       {o.status === 'waiting_payment' && (
                         <button className="btn btn-primary btn-sm" style={{ fontSize: 11, background: '#2E7D32', borderColor: '#2E7D32' }}
                           onClick={() => handlePreview(o)}>
-                          Xuất hóa đơn
+                          In phiếu và xuất hóa đơn
                         </button>
                       )}
 
                       {o.status === 'invoiced' && (
-                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => handlePreview(o)}>Xem / In lại</button>
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => handlePrintVehicleOut(o)}>In phiếu xe ra</button>
                       )}
 
                       {canManage && o.status !== 'invoiced' && o.status !== 'waiting_payment' && (
@@ -962,12 +1157,29 @@ function RepairSettlementList() {
         </div>
       )}
 
-      {view && (
+      {view && !completedPopupOrder && (
         <DetailModal
           order={view}
           onClose={() => setView(null)}
           onPreview={setPreviewOrder}
         />
+      )}
+
+      {completedPopupOrder && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal modal-sm" style={{ textAlign: 'center' }}>
+            <div className="modal-header" style={{ justifyContent: 'flex-end', border: 'none', paddingBottom: 0 }}>
+              <button className="modal-close" onClick={handleCloseCompletedPopup}>✕</button>
+            </div>
+            <div className="modal-body" style={{ paddingTop: 0 }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
+              <h3 style={{ margin: '0 0 6px', fontSize: 16 }}>Phiếu sửa chữa này đã hoàn thành</h3>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--gray-600)' }}>
+                {completedPopupOrder.code} — tổ trưởng đã hoàn thành toàn bộ công việc. Phiếu đã chuyển sang <b>Chờ thanh toán</b>.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {previewOrder && (
@@ -981,7 +1193,9 @@ function RepairSettlementList() {
 
       {cancelTarget && (
         <CancelReasonModal
-          title={`Hủy phiếu quyết toán ${cancelTarget.code}`}
+          title={cancelTarget.kind === 'repair_order'
+            ? `Hủy lệnh sửa chữa ${cancelTarget.code}`
+            : `Hủy phiếu quyết toán ${cancelTarget.code}`}
           onConfirm={handleConfirmCancel}
           onClose={() => setCancelTarget(null)}
         />
@@ -1270,11 +1484,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     setItems((prev) => {
       const next = [...prev];
       const groupId = next[idx]?.groupId;
-      next[idx] = { ...next[idx], httt: value };
+      // Phai goi lai recalcItem (khong chi merge httt) vi "total" phu thuoc
+      // vao httt (dong duoc mien thu khach - bao hanh/bao hiem/noi bo - luon
+      // tra ve 0) - neu khong Thanh tien se giu nguyen gia tri CU, sai voi
+      // HTTT vua doi.
+      next[idx] = recalcItem({ ...next[idx], httt: value });
       if (next[idx].isGroupParent && groupId) {
         for (let j = 0; j < next.length; j += 1) {
           if (j !== idx && next[j].groupId === groupId) {
-            next[j] = { ...next[j], httt: value };
+            next[j] = recalcItem({ ...next[j], httt: value });
           }
         }
       }
@@ -1435,12 +1653,30 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       // Dong nay truoc do da la dau nhom (vd doi sang dich vu khac) -> bo het
       // phu tung cu di kem truoc khi chen bo phu tung moi, tranh de sot orphan.
       const oldGroupId = prev[idx]?.groupId;
-      const base = oldGroupId ? prev.filter((it, i) => i === idx || it.groupId !== oldGroupId) : prev;
-      let next = [...base];
+      const withoutCurrent = prev.filter((it, i) => {
+        if (i === idx) return false;
+        if (oldGroupId && it.groupId === oldGroupId) return false;
+        return true;
+      });
+
+      // Dich vu vua chon da TRUNG voi 1 dong co san o noi khac (vd dich vu con
+      // duoc goi lon tu dong chen kem truoc do) -> cong don +1 so luong vao
+      // dong do, mo khoa cho sua so luong tay, KHONG tao them dong/nhom moi
+      // (tranh liet ke trung lap cung 1 hang muc 2 lan).
+      const dupIdx = withoutCurrent.findIndex((it) => it.serviceId === svc.id);
+      if (dupIdx !== -1) {
+        const next = [...withoutCurrent];
+        const target = next[dupIdx];
+        const newQty = (target.qtyBasis || target.qty || 1) + 1;
+        next[dupIdx] = recalcItem({ ...target, qty: newQty, qtyBasis: newQty, manualQtyUnlock: true });
+        return next;
+      }
+
       const groupId = nextGroupId();
-      next[idx] = recalcItem({ ...next[idx], code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', httt: 'KHT', discount: 0, repairCategory, groupId, isGroupParent: true });
+      const newHead = recalcItem({ ...emptyItem(), code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', httt: 'KHT', discount: 0, repairCategory, groupId, isGroupParent: true });
       const partRows = buildPartRows(svc.parts, repairCategory).map((r) => ({ ...r, groupId }));
-      next.splice(idx + 1, 0, ...partRows);
+      const next = [...withoutCurrent];
+      next.splice(idx, 0, newHead, ...partRows);
       return next;
     });
     closeCatalogSuggestions(idx);
@@ -1504,6 +1740,20 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // lấy theo đúng thông tin đã khai báo trong kho (products), không giảm giá.
   const selectProduct = (idx, product) => {
     setItems((prev) => {
+      // Phu tung vua chon da TRUNG voi 1 dong co san o noi khac (vd phu tung
+      // phu thuoc cua 1 goi/dich vu da chon truoc do) -> cong don +1 so luong
+      // vao dong do, mo khoa cho sua so luong tay, bo dong dang go di (khong
+      // can them dong rieng nua) - tranh liet ke trung lap cung 1 phu tung.
+      const dupIdx = prev.findIndex((it, i) => i !== idx && it.productId === product.id);
+      if (dupIdx !== -1) {
+        const next = prev.filter((_, i) => i !== idx);
+        const adjDupIdx = dupIdx > idx ? dupIdx - 1 : dupIdx;
+        const target = next[adjDupIdx];
+        const newQty = (target.qtyBasis || target.qty || 1) + 1;
+        next[adjDupIdx] = recalcItem({ ...target, qty: newQty, qtyBasis: newQty, manualQtyUnlock: true });
+        return next;
+      }
+
       const next = [...prev];
       next[idx] = recalcItem({
         ...next[idx],
@@ -1854,12 +2104,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         : (suggestion.packages?.length > 0 || suggestion.services?.length > 0)
                     );
                     return (
-                    <tr key={idx}>
+                    <tr key={idx} style={{ background: rowColorForGroup(item.groupId) }}>
                       <td>
-                        <input className="form-input" style={{ fontSize: 11, fontFamily: 'monospace' }} value={item.code || ''} readOnly />
+                        <input className="form-input" style={{ fontSize: 11, fontFamily: 'monospace', background: 'transparent' }} value={item.code || ''} readOnly />
                       </td>
                       <td style={{ position: 'relative' }}>
-                        <input className="form-input" style={{ fontSize: 12 }} value={item.description} disabled={!canSave} readOnly={isChild}
+                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.description} disabled={!canSave} readOnly={isChild}
                           onChange={(e) => handleItemDescription(idx, e.target.value)}
                           onFocus={(e) => !isChild && openCatalogDropdown(idx, e.target)}
                           onBlur={() => setTimeout(() => closeCatalogSuggestions(idx), 180)}
@@ -1909,15 +2159,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         )}
                       </td>
                       <td>
-                        <input className="form-input" style={{ fontSize: 12 }}
+                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }}
                           value={REPAIR_CATEGORY_LABEL_BY_VALUE[item.repairCategory] || ''} readOnly
                           title="Loại hình sửa chữa lấy tự động theo dịch vụ/gói đã chọn, không chỉnh sửa trực tiếp trên form" />
                       </td>
                       <td>
                         {isChild ? (
-                          <input className="form-input" style={{ fontSize: 12 }} value={HTTT_LABEL_BY_VALUE[item.httt] || ''} readOnly />
+                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={HTTT_LABEL_BY_VALUE[item.httt] || ''} readOnly />
                         ) : (
-                          <select className="form-select" style={{ fontSize: 12 }} value={item.httt} onChange={(e) => handleHtttChange(idx, e.target.value)}>
+                          <select className="form-select" style={{ fontSize: 12, background: 'transparent' }} value={item.httt} onChange={(e) => handleHtttChange(idx, e.target.value)}>
                             <option value=""></option>
                             {HTTT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                           </select>
@@ -1925,27 +2175,30 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       </td>
                       <td>
                         {item.lhsc === 'DV' ? (
-                          <input className="form-input" style={{ fontSize: 12 }} value="Công" readOnly />
+                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value="Công" readOnly />
                         ) : isChild ? (
-                          <input className="form-input" style={{ fontSize: 12 }} value={item.unit} readOnly />
+                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.unit} readOnly />
                         ) : (
-                          <select className="form-select" style={{ fontSize: 12 }} value={item.unit} onChange={(e) => setItem(idx, 'unit', e.target.value)}>
+                          <select className="form-select" style={{ fontSize: 12, background: 'transparent' }} value={item.unit} onChange={(e) => setItem(idx, 'unit', e.target.value)}>
                             {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
                           </select>
                         )}
                       </td>
                       <td>
-                        <input className="form-input" style={{ fontSize: 12 }} type="number" min={1} value={item.qty} readOnly={isChild} onChange={(e) => handleGroupQtyChange(idx, e.target.value)} />
+                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} type="number" min={1} value={item.qty} readOnly={isChild && !item.manualQtyUnlock} onChange={(e) => handleGroupQtyChange(idx, e.target.value)} />
                       </td>
                       <td>
-                        <input className="form-input" style={{ fontSize: 12 }}
+                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }}
                           value={(item.unitPrice || 0).toLocaleString('vi-VN')} readOnly
                           title="Đơn giá lấy theo catalog/kho phụ tùng, không chỉnh sửa trực tiếp trên form" />
                       </td>
                       <td>
-                        <input className="form-input" style={{ fontSize: 12 }} type="number" min={0} max={100} value={item.discount} readOnly={isChild} onChange={(e) => setItem(idx, 'discount', Number(e.target.value))} />
+                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} type="number" min={0} max={100} value={item.discount} readOnly={isChild} onChange={(e) => setItem(idx, 'discount', Number(e.target.value))} />
                       </td>
-                      <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{(item.total || 0).toLocaleString('vi-VN')}</td>
+                      <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {(item.total || 0).toLocaleString('vi-VN')}
+                        {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
+                      </td>
                       <td>
                         {!isChild && (
                           <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => removeItem(idx)}>Xóa</button>
@@ -1991,7 +2244,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
+      <div className="settlement-summary-grid">
         {/* Lịch bảo dưỡng kế tiếp */}
         <div className="card">
           <div className="card-header"><span className="card-title">Lịch bảo dưỡng kế tiếp</span></div>
@@ -2019,11 +2272,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               <div className="summary-row"><span>Thuế giá trị gia tăng (8%):</span><span>{totals.vat.toLocaleString('vi-VN')} đ</span></div>
               {totals.freeAmount > 0 && (
                 <div className="summary-row"><span>Miễn phí:</span><span>{totals.freeAmount.toLocaleString('vi-VN')} đ</span></div>
-              )}
-              {totals.exemptedAmount > 0 && (
-                <div className="summary-row" title="Hạng mục có hình thức thanh toán Bảo hành hãng xe / Bảo hiểm chi trả / Nội bộ chịu phí - không tính vào tiền khách phải trả">
-                  <span>Miễn thu khách hàng (Bảo hành/Bảo hiểm/Nội bộ):</span><span>{totals.exemptedAmount.toLocaleString('vi-VN')} đ</span>
-                </div>
               )}
               <div className="summary-row total"><span>Tổng thanh toán:</span><span>{formatCurrency(totals.total)}</span></div>
             </div>

@@ -44,7 +44,7 @@ export default function CustomerRequestForm() {
       .then((body) => {
         if (body?.success) setVehicleBrands(body.data);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   function handleChange(e) {
@@ -188,7 +188,7 @@ export default function CustomerRequestForm() {
                   <span>Hãng xe</span>
                   <select name="vehicleBrandId" value={form.vehicleBrandId} onChange={handleChange}>
                     <option value="" disabled>
-                      Xe của bạn là Kia hay Mazda?
+                      Chọn hãng xe của bạn?
                     </option>
                     {vehicleBrands.map((b) => (
                       <option key={b.id} value={b.id}>
@@ -196,9 +196,6 @@ export default function CustomerRequestForm() {
                       </option>
                     ))}
                   </select>
-                  <span className={styles.hint}>
-                    AutoGara hiện chỉ nhận bảo dưỡng, sửa chữa xe Kia và Mazda.
-                  </span>
                 </label>
 
                 <label className={styles.field}>
