@@ -9,6 +9,7 @@ const PermissionService = require('../../application/services/PermissionService'
 const { emitPermissionChanged } = require('../../application/events/PermissionEvents');
 const { generatePermissionKeys } = require('../../../scripts/auto-discover-permissions');
 
+
 /**
  * PermissionMatrixController — admin-only endpoints de quan ly ma tran quyen
  * (Role x Screen).

@@ -21,7 +21,7 @@ function buildAuditRouter() {
   const repository = AuditRepository;
   const auditService = new AuditService(repository);
 
-  router.use(authenticate, requireAdmin, requireScreen('audit_logs'), trackActivity);
+  router.use(authenticate, requireAdmin, requireScreen('audit_logs', 'access'), trackActivity);
 
   /**
    * GET /api/audit

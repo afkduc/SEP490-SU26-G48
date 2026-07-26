@@ -1,5 +1,7 @@
 .sup-detail {
   padding: 8px 4px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .sup-detail__loading,
@@ -61,6 +63,13 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .sup-detail__body { grid-template-columns: 1fr; }
+  .sup-detail__header { flex-direction: column; }
+  .detail-form .form-row,
+  .form-row { grid-template-columns: 1fr; }
 }
 
 .sup-detail__section {

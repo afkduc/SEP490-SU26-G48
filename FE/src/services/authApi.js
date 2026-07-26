@@ -1,9 +1,9 @@
 import httpClient from './httpClient';
 
-export async function loginApi(email, password) {
+export async function loginApi(email, password, branchId) {
   const data = await httpClient.post(
     '/auth/login',
-    { email, password },
+    { email, password, branchId },
     { omitAuth: true, skipSessionExpired: true }
   );
   return data; // { token, user }
