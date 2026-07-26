@@ -31,6 +31,45 @@ class AuditService {
     if (!normalized.user_id && normalized.actorId) {
       normalized.user_id = normalized.actorId;
     }
+    // Map common request aliases used by controllers
+    if (!normalized.ip_address && (normalized.ip || normalized.ipAddress)) {
+      normalized.ip_address = normalized.ip || normalized.ipAddress;
+    }
+    if (!normalized.record_id && normalized.resourceId != null) {
+      normalized.record_id = String(normalized.resourceId);
+    }
+    if (!normalized.request_url && normalized.userAgent) {
+      // keep userAgent available in description if no dedicated column write
+      if (!normalized.description) {
+        normalized.description = `UA: ${String(normalized.userAgent).slice(0, 120)}`;
+      }
+    }
+    // Map details -> new_value / description để FE hiển thị được
+    if (normalized.details && !normalized.new_value) {
+      normalized.new_value = typeof normalized.details === 'string'
+        ? normalized.details
+        : JSON.stringify(normalized.details);
+    }
+    if (!normalized.description && normalized.details) {
+      const d = normalized.details;
+      if (typeof d === 'object') {
+        const bits = [];
+        if (d.roleName) bits.push(`vai trò ${d.roleName}`);
+        if (d.permissionKey) bits.push(`quyền ${d.permissionKey}`);
+        if (d.itemCount != null) bits.push(`${d.itemCount} mục`);
+        if (d.screenKey) bits.push(`màn ${d.screenKey}`);
+        if (d.granted === true) bits.push('cấp quyền');
+        if (d.granted === false) bits.push('thu hồi');
+        if (bits.length) {
+          normalized.description = `${normalized.action || 'Cập nhật'}: ${bits.join(', ')}`;
+        }
+      }
+    }
+
+    // Truncate action for safety (some DBs historically used short action columns)
+    if (normalized.action && String(normalized.action).length > 50) {
+      normalized.action = String(normalized.action).slice(0, 50);
+    }
 
     return this.insertAuditLog(normalized);
   }

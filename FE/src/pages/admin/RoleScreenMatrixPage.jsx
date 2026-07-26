@@ -54,7 +54,15 @@ function ActionCell({ granted, disabled, onToggle, label }) {
       className={`sm-cell ${granted ? 'sm-cell--on' : 'sm-cell--off'} ${disabled ? 'sm-cell--disabled' : ''}`}
       onClick={onToggle}
       disabled={disabled}
-      title={granted ? `Đã bật ${label}` : `Chưa bật ${label}`}
+      title={
+        disabled
+          ? 'Cần bật View trước khi cấp quyền này'
+          : label === 'V' && granted
+            ? 'Tắt View sẽ tắt toàn bộ Create/Edit/Disable/Export'
+            : granted
+              ? `Đã bật ${label}`
+              : `Chưa bật ${label}`
+      }
     >
       {granted ? <IconCheck /> : <IconX />}
     </button>
@@ -92,9 +100,11 @@ export default function RoleScreenMatrixPage() {
     setError('');
     try {
       const rolesResp = await adminRolesApi.list();
-      const roleList = rolesResp?.items || rolesResp || [];
+      const roleList = (rolesResp?.items || rolesResp || []).filter(
+        (r) => r.roleName !== 'admin' && r.role_name !== 'admin'
+      );
       setRoles(roleList);
-      // Default: chọn tất cả roles để hiện ở mode 'perRole'
+      // Default: chọn tất cả roles business (không gồm admin)
       setSelectedRoleIds((prev) => prev.length > 0 ? prev : roleList.map((r) => r.id));
 
       // Lay matrix cho tung role song song
@@ -155,12 +165,26 @@ export default function RoleScreenMatrixPage() {
     loadMatrix();
   }, [loadMatrix]);
 
-  // Toggle cell
+  // Toggle cell — View-first: View bat truoc; tat View → tat het
   async function handleToggle(roleId, screenKey, actionKey) {
     const current = matrix[roleId]?.[screenKey] || {
       canView: false, canCreate: false, canUpdate: false, canDelete: false, canExport: false,
     };
-    const updated = { ...current, [actionKey]: !current[actionKey] };
+    const nextVal = !current[actionKey];
+    let updated = { ...current, [actionKey]: nextVal };
+
+    if (actionKey === 'canView' && !nextVal) {
+      updated = {
+        ...updated,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+        canExport: false,
+      };
+    } else if (actionKey !== 'canView' && nextVal && !current.canView) {
+      toast.info('Cần bật View trước khi cấp quyền này');
+      return;
+    }
 
     // Optimistic update
     setMatrix((prev) => ({
@@ -198,21 +222,22 @@ export default function RoleScreenMatrixPage() {
     );
   }, [screens, search]);
 
-  // Lấy danh sách screens CÓ quyền (>= 1 action enabled) cho 1 role
-  // Trả về cả screens chưa có trong matrix (auto-discover có route nhưng chưa tick)
-  // để admin có thể bật thêm. Ẩn những screen auto-discover không tồn tại route.
+  // Lấy danh sách screens cho 1 role - HIỂN THỊ TẤT CẢ screens auto-discovered,
+  // kể cả khi role chưa có row trong role_screen_permissions (chưa tick).
+  // Mac dinh canView/Create/Update/Delete/Export = false cho screen chua co row.
+  // Logic nay dam bao admin co the BAT quyen cho bat ky screen nao, khong bi gioi
+  // han boi data cu.
   const getGrantedScreensForRole = useCallback((roleId) => {
-    if (!matrix[roleId]) return [];
     const result = [];
-    const screensMap = new Map();
-    filteredScreens.forEach((s) => screensMap.set(s.screenKey, s));
+    const emptyMatrix = {
+      canView: false, canCreate: false, canUpdate: false, canDelete: false, canExport: false,
+    };
     for (const s of filteredScreens) {
-      const m = matrix[roleId][s.screenKey];
-      if (!m) continue;
+      const m = matrix[roleId]?.[s.screenKey] ?? emptyMatrix;
       const hasAny = m.canView || m.canCreate || m.canUpdate || m.canDelete || m.canExport;
       result.push({ screen: s, matrix: m, hasAny });
     }
-    // Sắp xếp: có quyền trước, sau đó theo screenKey
+    // Sap xep: co quyen truoc, sau do theo screenKey
     return result.sort((a, b) => {
       if (a.hasAny !== b.hasAny) return a.hasAny ? -1 : 1;
       return a.screen.screenKey.localeCompare(b.screen.screenKey);
@@ -249,11 +274,12 @@ export default function RoleScreenMatrixPage() {
             <IconShield />
           </div>
           <div className="admin-page__title-group">
-            <h1>Phân quyền theo màn × Hành động (Multi-role)</h1>
+            <h1>Phân quyền theo màn × Hành động</h1>
             <p className="admin-page__subtitle">
+              Chỉ các vai trò nghiệp vụ (không gồm Admin — Admin dùng quyền <code>*</code>).
               {viewMode === 'perRole'
-                ? 'Chế độ "Theo vai trò": mỗi vai trò là 1 bảng riêng, chỉ liệt kê các màn hình thuộc phạm vi của vai trò đó. Click ô V/C/U/D/E để bật/tắt quyền. Thay đổi tự động lưu.'
-                : 'Chế độ "Ma trận tổng": mỗi màn hình × tất cả vai trò × 5 hành động (View/Create/Update/Delete/Export). Click ô để bật/tắt quyền.'}
+                ? ' Chế độ theo vai trò: mỗi role một bảng. View bắt buộc trước các quyền khác. Thay đổi tự lưu.'
+                : ' Chế độ ma trận tổng: màn × role × View/Create/Update/Disable/Export. View bắt buộc trước.'}
             </p>
           </div>
         </div>
@@ -373,10 +399,10 @@ export default function RoleScreenMatrixPage() {
                       <td key={r.id} className="sm-multi-table__action-cell">
                         <div className="sm-multi-table__action-row">
                           <ActionCell granted={m.canView} onToggle={() => handleToggle(r.id, s.screenKey, 'canView')} label="V" />
-                          <ActionCell granted={m.canCreate} onToggle={() => handleToggle(r.id, s.screenKey, 'canCreate')} label="C" />
-                          <ActionCell granted={m.canUpdate} onToggle={() => handleToggle(r.id, s.screenKey, 'canUpdate')} label="U" />
-                          <ActionCell granted={m.canDelete} onToggle={() => handleToggle(r.id, s.screenKey, 'canDelete')} label="D" />
-                          <ActionCell granted={m.canExport} onToggle={() => handleToggle(r.id, s.screenKey, 'canExport')} label="E" />
+                          <ActionCell granted={m.canCreate} disabled={!m.canView} onToggle={() => handleToggle(r.id, s.screenKey, 'canCreate')} label="C" />
+                          <ActionCell granted={m.canUpdate} disabled={!m.canView} onToggle={() => handleToggle(r.id, s.screenKey, 'canUpdate')} label="U" />
+                          <ActionCell granted={m.canDelete} disabled={!m.canView} onToggle={() => handleToggle(r.id, s.screenKey, 'canDelete')} label="D" />
+                          <ActionCell granted={m.canExport} disabled={!m.canView} onToggle={() => handleToggle(r.id, s.screenKey, 'canExport')} label="E" />
                         </div>
                       </td>
                     );
@@ -422,7 +448,7 @@ export default function RoleScreenMatrixPage() {
                           <th className="sm-multi-table__action-col">View</th>
                           <th className="sm-multi-table__action-col">Create</th>
                           <th className="sm-multi-table__action-col">Update</th>
-                          <th className="sm-multi-table__action-col">Delete</th>
+                          <th className="sm-multi-table__action-col">Disable</th>
                           <th className="sm-multi-table__action-col">Export</th>
                         </tr>
                       </thead>
@@ -437,16 +463,16 @@ export default function RoleScreenMatrixPage() {
                               <ActionCell granted={m.canView} onToggle={() => handleToggle(role.id, s.screenKey, 'canView')} label="V" />
                             </td>
                             <td className="sm-multi-table__action-cell">
-                              <ActionCell granted={m.canCreate} onToggle={() => handleToggle(role.id, s.screenKey, 'canCreate')} label="C" />
+                              <ActionCell granted={m.canCreate} disabled={!m.canView} onToggle={() => handleToggle(role.id, s.screenKey, 'canCreate')} label="C" />
                             </td>
                             <td className="sm-multi-table__action-cell">
-                              <ActionCell granted={m.canUpdate} onToggle={() => handleToggle(role.id, s.screenKey, 'canUpdate')} label="U" />
+                              <ActionCell granted={m.canUpdate} disabled={!m.canView} onToggle={() => handleToggle(role.id, s.screenKey, 'canUpdate')} label="U" />
                             </td>
                             <td className="sm-multi-table__action-cell">
-                              <ActionCell granted={m.canDelete} onToggle={() => handleToggle(role.id, s.screenKey, 'canDelete')} label="D" />
+                              <ActionCell granted={m.canDelete} disabled={!m.canView} onToggle={() => handleToggle(role.id, s.screenKey, 'canDelete')} label="D" />
                             </td>
                             <td className="sm-multi-table__action-cell">
-                              <ActionCell granted={m.canExport} onToggle={() => handleToggle(role.id, s.screenKey, 'canExport')} label="E" />
+                              <ActionCell granted={m.canExport} disabled={!m.canView} onToggle={() => handleToggle(role.id, s.screenKey, 'canExport')} label="E" />
                             </td>
                           </tr>
                         ))}

@@ -39,14 +39,14 @@ export default function PartListPage() {
     parts, total, loading, error, categories,
     params,
     setSearch, setStatus, setCategory, setLowStockOnly, setPage,
-    create, update, remove,
+    create, update, deactivate, reactivate,
   } = useParts({ branchId });
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm());
   const [formError, setFormError] = useState('');
-  const [deletingId, setDeletingId] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
   const [units, setUnits] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
 
@@ -114,13 +114,18 @@ export default function PartListPage() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('Xác nhận xóa phụ tùng này?')) return;
-    setDeletingId(id);
+  async function handleToggleStatus(p) {
+    const isActive = p.status === 'active';
+    const msg = isActive
+      ? 'Xác nhận tạm ngừng phụ tùng này?'
+      : 'Xác nhận kích hoạt lại phụ tùng này?';
+    if (!window.confirm(msg)) return;
+    setTogglingId(p.id);
     try {
-      await remove(id);
+      if (isActive) await deactivate(p.id);
+      else await reactivate(p.id);
     } finally {
-      setDeletingId(null);
+      setTogglingId(null);
     }
   }
 
@@ -255,10 +260,10 @@ export default function PartListPage() {
                           <PermissionGate permission="inventory:products:delete">
                             <button
                               className="btn btn--ghost btn--sm btn--danger"
-                              onClick={() => handleDelete(p.id)}
-                              disabled={deletingId === p.id}
+                              onClick={() => handleToggleStatus(p)}
+                              disabled={togglingId === p.id}
                             >
-                              Xóa
+                              {p.status === 'active' ? 'Ngừng' : 'Kích hoạt'}
                             </button>
                           </PermissionGate>
                         </td>

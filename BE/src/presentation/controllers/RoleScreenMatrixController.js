@@ -1,11 +1,12 @@
 const ApiError = require('../../utils/ApiError');
 const RoleScreenMatrixRepository = require('../../infrastructure/repositories/RoleScreenMatrixRepository');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+const AuthRepositoryImpl = require('../../infrastructure/repositories/AuthRepositoryImpl');
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
 const PermissionService = require('../../application/services/PermissionService');
 const { emitPermissionChanged } = require('../../application/events/PermissionEvents');
-const { generatePermissionKeys } = require('../../../scripts/auto-discover-permissions');
+const { generatePermissionKeys } = require('../../infrastructure/utils/autoDiscoverPermissions');
 
 const PROTECTED_ROLES = new Set(['admin']);
 
@@ -14,12 +15,11 @@ const PROTECTED_ROLES = new Set(['admin']);
  *
  * GET  /api/admin/role-screen-matrix?roleId=1
  *   -> { role, screenKeys, grants, generatedAt }
- *   Tra ve danh sach cac screen_key (auto-discovered tu routes) + cac quyen
- *   hien tai cua role.
  *
  * PUT  /api/admin/role-screen-matrix?roleId=1
  *   body: { items: [{ screenKey, canView, canCreate, canUpdate, canDelete, canExport }] }
- *   -> Bulk upsert trong 1 transaction, invalidate cache, emit SSE.
+ *   -> Bulk upsert trong 1 transaction, invalidate cache, emit SSE,
+ *      auto-sync L1 (screen:module:resource:access) theo L2.
  *
  * GET  /api/admin/role-screen-matrix/screens
  *   -> { screens: [...] } - danh sach screen_key (auto-discovered)
@@ -31,6 +31,7 @@ class RoleScreenMatrixController {
   constructor() {
     this.repo = new RoleScreenMatrixRepository();
     this.roleRepo = new RoleRepositoryImpl();
+    this.authRepo = new AuthRepositoryImpl();
     this.auditService = new AuditService(AuditRepository);
     this.permissionService = new PermissionService({
       roleRepository: this.roleRepo,
@@ -116,11 +117,12 @@ class RoleScreenMatrixController {
           screensMap.set(screenKey, {
             screenKey,
             module: parts[0] || 'custom',
-            resource: parts[1] || 'custom',
-            availableView: false,
-            availableCreate: false,
-            availableUpdate: false,
-            availableDelete: false,
+            resource: parts.slice(1).join(':') || 'custom',
+            // Business screens trong DB: cho cấu hình đủ 5 bit L2
+            availableView: true,
+            availableCreate: true,
+            availableUpdate: true,
+            availableDelete: true,
           });
         }
       }
@@ -154,6 +156,13 @@ class RoleScreenMatrixController {
 
   /**
    * Bulk upsert matrix cho 1 role.
+   *
+   * Sau khi save L2, tu dong sync L1 (screen:module:resource:access):
+   *   - it nhat 1 action true  -> L1 = grant
+   *   - tat ca action false    -> L1 = revoke
+   *
+   * Dam bao FE ProtectedRoute (L1) luon khop voi action that su (L2).
+   * Neu L1 revoke, user se bi 403 ngay o FE khi vao page.
    */
   saveMatrix = async (req, res, next) => {
     try {
@@ -175,24 +184,56 @@ class RoleScreenMatrixController {
         }
       }
 
-      // Normalize items
-      const normalized = items.map((i) => ({
-        roleId,
-        screenKey: String(i.screenKey),
-        canView: Boolean(i.canView),
-        canCreate: Boolean(i.canCreate),
-        canUpdate: Boolean(i.canUpdate),
-        canDelete: Boolean(i.canDelete),
-        canExport: Boolean(i.canExport),
-      }));
+      // Normalize + View-first:
+      //  - Có C/U/D/E → bắt buộc canView=true
+      //  - canView=false → tắt hết C/U/D/E
+      const normalized = items.map((i) => {
+        let canCreate = Boolean(i.canCreate);
+        let canUpdate = Boolean(i.canUpdate);
+        let canDelete = Boolean(i.canDelete);
+        let canExport = Boolean(i.canExport);
+        let canView = Boolean(i.canView) || canCreate || canUpdate || canDelete || canExport;
+        if (!canView) {
+          canCreate = false;
+          canUpdate = false;
+          canDelete = false;
+          canExport = false;
+        }
+        return {
+          roleId,
+          screenKey: String(i.screenKey),
+          canView,
+          canCreate,
+          canUpdate,
+          canDelete,
+          canExport,
+        };
+      });
 
       const result = await this.repo.bulkUpsert(normalized);
+
+      // === AUTO-SYNC L1 (screen:module:resource:access) theo L2 ===
+      // Neu L1 grant/revoke thay doi -> user phai login lai de nhan quyen moi.
+      let l1SyncResult = { changedKeys: [], grantedKeys: [], revokedKeys: [] };
+      try {
+        l1SyncResult = await this._autoSyncL1Access(roleId, normalized);
+        if (l1SyncResult.changedKeys.length > 0) {
+          console.log(
+            `[RoleScreenMatrixController] auto-sync L1 cho role ${role.roleName} (id=${roleId}):`,
+            `granted=${l1SyncResult.grantedKeys.length},`,
+            `revoked=${l1SyncResult.revokedKeys.length}`
+          );
+        }
+      } catch (syncErr) {
+        console.warn('[RoleScreenMatrixController] auto-sync L1 failed (non-blocking):', syncErr.message);
+      }
 
       // Invalidate cache + emit SSE
       this.permissionService.invalidateAllCache();
       let affectedUserCount = 0;
+      let userIds = [];
       try {
-        const userIds = await this.repo.getUsersByRole(roleId);
+        userIds = await this.repo.getUsersByRole(roleId);
         affectedUserCount = userIds.length;
         if (userIds.length > 0) {
           emitPermissionChanged({
@@ -200,15 +241,24 @@ class RoleScreenMatrixController {
             userIds,
             roleIds: [roleId],
             actorUserId: req.user?.userId || null,
-            details: { count: normalized.length },
+            details: {
+              count: normalized.length,
+              l1Synced: l1SyncResult.changedKeys.length,
+            },
           });
+
+          // Bump token_version neu co L1 revoke (user that permission page access)
+          if (l1SyncResult.revokedKeys.length > 0) {
+            await this._bumpTokenVersions(userIds, req);
+          }
         }
       } catch (eventErr) {
         console.warn('[RoleScreenMatrixController] SSE emit failed:', eventErr.message);
       }
 
-      // Audit log (best-effort)
+      // Audit log + notification
       try {
+        const actorName = req.user?.name || req.user?.email || 'Quản trị viên';
         await this.auditService.log({
           actorId: req.user?.userId,
           actorEmail: req.user?.email,
@@ -221,18 +271,52 @@ class RoleScreenMatrixController {
             activeItems: normalized.filter(
               (i) => i.canView || i.canCreate || i.canUpdate || i.canDelete || i.canExport
             ).length,
+            l1Granted: l1SyncResult.grantedKeys.length,
+            l1Revoked: l1SyncResult.revokedKeys.length,
           },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
+
+        const NotificationService = require('../../application/services/NotificationService');
+        const ns = new NotificationService();
+        await ns.notifyAdmins('PERMISSION_MATRIX_UPDATED', {
+          actorName,
+          roleScreen: true,
+          targetName: role.roleLabel || role.roleName,
+          count: normalized.length,
+          permissionKey: role.roleName,
+          actorId: req.user?.userId,
+        }, { excludeUserId: req.user?.userId }).catch((err) =>
+          console.warn('[RoleScreenMatrix] notifyAdmins failed:', err.message),
+        );
+
+        for (const userId of userIds) {
+          await ns.notify('ROLE_CHANGED', {
+            userId,
+            roles: `Ma trận màn hình vai trò ${role.roleLabel || role.roleName}`,
+            actorName,
+            actorId: req.user?.userId,
+          }, { skipSettings: true }).catch((err) =>
+            console.warn('[RoleScreenMatrix] notify user failed:', err.message),
+          );
+        }
       } catch (auditErr) {
         console.warn('[RoleScreenMatrixController] audit log failed:', auditErr.message);
       }
 
       return res.json({
         success: true,
-        data: { updated: result.updated, affectedUserCount, affectedRoleCount: 1 },
-        message: 'Da luu ma tran screen x action',
+        data: {
+          updated: result.updated,
+          affectedUserCount,
+          affectedRoleCount: 1,
+          l1Synced: {
+            granted: l1SyncResult.grantedKeys,
+            revoked: l1SyncResult.revokedKeys,
+          },
+        },
+        message: 'Da luu ma tran screen x action (L2 + auto-sync L1)',
       });
     } catch (err) {
       next(err);
@@ -271,6 +355,115 @@ class RoleScreenMatrixController {
       });
     } catch (err) {
       next(err);
+    }
+  };
+
+  /**
+   * Auto-sync L1 (screen:module:resource:access) theo L2 (role_screen_permissions).
+   *
+   * Quy tac:
+   *   - screen co IT NHAT 1 action (V/C/U/D/E) = true -> L1 = GRANTED.
+   *   - TAT CA 5 actions = false -> L1 = REVOKED.
+   *
+   * Ly do: FE ProtectedRoute check L1 de render page, BE middleware check L2 cho
+   * action. Neu chi sua L2 ma L1 van = true, user van vao duoc page nhung action
+   * ben trong fail. Auto-sync dam bao 2 lop luon consistent.
+   *
+   * @returns {Promise<{changedKeys: string[], grantedKeys: string[], revokedKeys: string[]}>}
+   */
+  _autoSyncL1Access = async (roleId, items) => {
+    if (!roleId || !Array.isArray(items) || items.length === 0) {
+      return { changedKeys: [], grantedKeys: [], revokedKeys: [] };
+    }
+
+    const PermissionMatrixRepository = require('../../infrastructure/repositories/PermissionMatrixRepository');
+    const permRepo = new PermissionMatrixRepository();
+
+    // 1. Build desired L1 state tu L2 items
+    //    L1 key format: 'screen:<module>:<resource>:access'
+    const desiredL1 = new Map();
+    for (const item of items) {
+      if (!item.screenKey || typeof item.screenKey !== 'string') continue;
+      const l1Key = `screen:${item.screenKey}:access`;
+      const hasAnyAction =
+        Boolean(item.canView) ||
+        Boolean(item.canCreate) ||
+        Boolean(item.canUpdate) ||
+        Boolean(item.canDelete) ||
+        Boolean(item.canExport);
+      desiredL1.set(l1Key, hasAnyAction);
+    }
+
+    // 2. Load TAT CA L1 permission keys co trong permissions table (FK list).
+    //    Day la danh sach cac L1 key hop le (admin co the grant/revoke).
+    //    Neu l1Key khong co trong day -> khong the grant (FK violation).
+    const allL1KeysInDb = await permRepo.getAllL1AccessKeys();
+
+    // 3. Lay current L1 grants cho role.
+    //    getGrants() chi tra ve grants dang active (co row trong role_permissions).
+    //    Sau khi revoke, row bi DELETE -> key khong con xuat hien.
+    //    Can biet ca 2 trang thai: granted (co row) vs revoked (FK exists, nhung row deleted).
+    const allGrants = await permRepo.getGrants();
+    const currentL1 = new Map();
+    for (const g of allGrants) {
+      if (Number(g.roleId) !== Number(roleId)) continue;
+      if (Number(g.layer) !== 1) continue;
+      if (!g.permissionKey || !g.permissionKey.startsWith('screen:') || !g.permissionKey.endsWith(':access')) continue;
+      currentL1.set(g.permissionKey, true);
+    }
+
+    // 4. Compute diff
+    //    - granted: FK exists in permissions table, L1 currently NOT granted (no row in role_permissions),
+    //      nhung L2 desired = true -> can grant.
+    //    - revoked: L1 currently granted (row exists), nhung L2 desired = false -> can revoke.
+    //    - skip:   FK khong ton tai (khong the grant, FK violation).
+    const grantedKeys = [];
+    const revokedKeys = [];
+    for (const [l1Key, desired] of desiredL1.entries()) {
+      const isKnownKey = allL1KeysInDb.has(l1Key);
+      if (!isKnownKey) continue; // L1 key chua co trong permissions table -> skip
+      const current = currentL1.get(l1Key); // true = granted, undefined = revoked/not-granted
+      if (desired && current !== true) grantedKeys.push(l1Key);
+      if (!desired && current === true) revokedKeys.push(l1Key);
+    }
+
+    // 4. Apply grant/revoke
+    for (const key of grantedKeys) {
+      try {
+        await permRepo.toggleGrantByKey(roleId, key, true);
+      } catch (e) {
+        console.warn(`[RoleScreenMatrixController] auto-sync L1 grant ${key} failed:`, e.message);
+      }
+    }
+    for (const key of revokedKeys) {
+      try {
+        await permRepo.toggleGrantByKey(roleId, key, false);
+      } catch (e) {
+        console.warn(`[RoleScreenMatrixController] auto-sync L1 revoke ${key} failed:`, e.message);
+      }
+    }
+
+    return {
+      changedKeys: [...grantedKeys, ...revokedKeys],
+      grantedKeys,
+      revokedKeys,
+    };
+  };
+
+  /**
+   * Bump token_version cho users trong role (tru actor).
+   * Dam bao user phai login lai de JWT cu (co permission cu) vo hieu luc.
+   */
+  _bumpTokenVersions = async (userIds, req) => {
+    if (!Array.isArray(userIds) || userIds.length === 0) return;
+    const actorId = req.user?.userId;
+    for (const userId of userIds) {
+      try {
+        if (Number(userId) === Number(actorId)) continue;
+        await this.authRepo.incrementTokenVersion(userId);
+      } catch (err) {
+        console.warn(`[RoleScreenMatrixController] bump token_version user ${userId} failed:`, err.message);
+      }
     }
   };
 }

@@ -39,6 +39,17 @@ function buildSSERouter() {
    *   data: {"type":"login","timestamp":"...","userName":"...","..."}
    */
   router.get('/login-sessions', (req, res) => {
+    // AUTH: verify JWT (FE truyen qua query vi EventSource khong gui header)
+    let decoded;
+    try {
+      decoded = jwt.verify(req.query.token, config.jwtSecret);
+    } catch {
+      return res.status(401).end();
+    }
+    if (!decoded.userId) {
+      return res.status(403).end();
+    }
+
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');

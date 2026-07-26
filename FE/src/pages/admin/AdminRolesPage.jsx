@@ -154,7 +154,7 @@ function RoleUsersModal({ role, users, onClose }) {
                     background: u.status === 'active' ? '#dcfce7' : '#fee2e2',
                     padding: '2px 8px', borderRadius: '4px',
                   }}>
-                    {u.status === 'active' ? 'Hoạt động' : 'Khóa'}
+                    {u.status === 'active' ? 'Hoạt động' : 'Dừng hoạt động'}
                 </span>
               </div>
               ))}
@@ -174,34 +174,31 @@ function RoleUsersModal({ role, users, onClose }) {
 function RoleCard({ role, onEdit, onToggleStatus, onUsers }) {
   return (
     <div className={`role-card ${role.isActive ? '' : 'role-card--inactive'}`}>
-      <div className="role-card__header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <span className={`role-card__badge ${role.isActive ? '' : 'role-card__badge--inactive'}`}>
-              {role.roleName}
-            </span>
-            <span className={`role-card__status-chip ${role.isActive ? 'role-card__status-chip--active' : 'role-card__status-chip--inactive'}`}>
-              {role.isActive ? 'Hoạt động' : 'Tắt'}
-            </span>
-          </div>
-          <div className="role-card__name">{role.roleLabel}</div>
-        </div>
-      </div>
-      <div className="role-card__meta">
-        <span className="role-card__meta-item">
-          <IconUsers />
-          {role.userCount ?? 0} người dùng
+      <div className="role-card__top">
+        <span className="role-card__code">{role.roleName}</span>
+        <span className={`role-card__status ${role.isActive ? 'role-card__status--active' : 'role-card__status--inactive'}`}>
+          <span className="role-card__status-dot" aria-hidden="true" />
+          {role.isActive ? 'Hoạt động' : 'Dừng hoạt động'}
         </span>
       </div>
+
+      <h3 className="role-card__title">{role.roleLabel}</h3>
+
+      <div className="role-card__meta">
+        <IconUsers />
+        <span>{role.userCount ?? 0} người dùng</span>
+      </div>
+
       <div className="role-card__actions">
-        <button className="btn btn--sm btn--secondary" onClick={() => onUsers(role)} title="Xem người dùng">
+        <button type="button" className="role-card__btn role-card__btn--users" onClick={() => onUsers(role)} title="Xem người dùng">
           <IconUsers /> Người dùng
         </button>
-        <button className="btn btn--sm btn--secondary" onClick={() => onEdit(role)} title="Chỉnh sửa">
+        <button type="button" className="role-card__btn role-card__btn--edit" onClick={() => onEdit(role)} title="Chỉnh sửa">
           <IconEdit /> Sửa
         </button>
         <button
-          className={`btn btn--sm ${role.isActive ? 'btn--warning' : 'btn--success-outline'}`}
+          type="button"
+          className={`role-card__btn ${role.isActive ? 'role-card__btn--off' : 'role-card__btn--on'}`}
           onClick={() => onToggleStatus(role)}
           title={role.isActive ? 'Tắt vai trò' : 'Kích hoạt vai trò'}
         >
@@ -244,9 +241,21 @@ export default function AdminRolesPage() {
   useEffect(() => { loadRoles(); }, []);
 
   async function handleToggleStatus(role) {
+    if (role.roleName === 'admin') {
+      toast.error('Không thể tắt vai trò Admin');
+      return;
+    }
+    const nextActive = !role.isActive;
+    const ok = window.confirm(
+      nextActive
+        ? `Kích hoạt lại vai trò "${role.roleLabel || role.roleName}"?`
+        : `Tắt vai trò "${role.roleLabel || role.roleName}"? Người dùng thuộc vai trò này có thể mất quyền tương ứng.`
+    );
+    if (!ok) return;
     try {
       await adminRolesApi.toggleStatus(role.id);
-      toast.success('Cập nhật trạng thái thành công');
+      if (nextActive) toast.success('Đã kích hoạt vai trò');
+      else toast.warning('Đã tắt vai trò');
       loadRoles();
     } catch (err) {
       toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
@@ -257,7 +266,8 @@ export default function AdminRolesPage() {
     try {
       const data = await adminRolesApi.getRoleUsers(role.id);
       setUsersModal({ role, users: data?.items || [] });
-    } catch {
+    } catch (err) {
+      toast.error(err.message || 'Không tải được danh sách người dùng');
       setUsersModal({ role, users: [] });
     }
   }

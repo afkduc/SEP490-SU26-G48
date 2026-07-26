@@ -46,9 +46,14 @@ function requirePerm(...requiredPerms) {
       return res.status(401).json({ success: false, message: 'Không xác định được user' });
     }
 
+    // PLAN A: Check DB mỗi request (skipCache=true) để đảm bảo permission mới nhất.
+    // Lý do: JWT chỉ chứa compact permissions (Layer 1 + 2a). Nếu admin vừa
+    // revoke qua Role Screen Matrix (Layer 2b), JWT vẫn còn permission cũ →
+    // user pass giả. PermissionService có cache 60s sẵn; sau khi admin đổi →
+    // controller gọi invalidateCache → request protected tiếp theo sẽ query lại.
     try {
       const ps = getPermissionService();
-      const hasAll = await ps.canAll(userId, requiredPerms);
+      const hasAll = await ps.canAll(userId, requiredPerms, { skipCache: true });
 
       if (!hasAll) {
         return res.status(403).json({
@@ -85,9 +90,10 @@ function requireAnyPerm(...permKeys) {
       return res.status(401).json({ success: false, message: 'Không xác định được user' });
     }
 
+    // PLAN A: Check DB mỗi request (skipCache=true) - xem lý do ở requirePerm bên trên.
     try {
       const ps = getPermissionService();
-      const hasAny = await ps.canAny(userId, permKeys);
+      const hasAny = await ps.canAny(userId, permKeys, { skipCache: true });
 
       if (!hasAny) {
         return res.status(403).json({
@@ -136,26 +142,25 @@ function requireScreen(module, resource) {
       return res.status(401).json({ success: false, message: 'Không xác định được user' });
     }
 
-    // Kiem tra nhanh bang JWT permissions (tranh goi DB neu JWT da co)
-    // JWT permissions duoc refresh qua /api/auth/refresh-permissions sau khi admin thay doi.
-    const jwtPerms = req.user.permissions || [];
-    if (jwtPerms.length > 0) {
-      const isAdmin = (req.user.roles || []).some((r) => r === 'admin' || r === 'super_admin');
-      if (isAdmin || jwtPerms.includes('*') || jwtPerms.includes(screenKey)) {
-        return next();
-      }
-      // JWT co permissions nhung khong co key can thiet -> chan ngay
-      return res.status(403).json({
-        success: false,
-        message: `Không có quyền truy cập màn hình "${module}${resource ? '/' + resource : ''}". Liên hệ admin để được cấp quyền.`,
-        required: [screenKey],
-      });
-    }
-
-    // Fallback: JWT cu khong co permissions, dung PermissionService (co cache)
+    // PLAN A: Luôn check DB (skipCache=true) để đảm bảo permission mới nhất.
+    //
+    // Lý do KHÔNG check JWT trước:
+    //   - JWT có thể chứa permission cũ (admin vừa revoke qua Permission Matrix
+    //     hoặc Role Screen Matrix).
+    //   - Layer 1 (screen:<x>:access) và Layer 2b (screen:<x>:<action>) là 2 bảng
+    //     RIÊNG BIỆT - JWT compact chỉ chứa Layer 1 + 2a.
+    //   - Nếu dựa JWT → admin gỡ Layer 2b nhưng JWT cũ vẫn có Layer 1 → user
+    //     vẫn pass vào trang.
+    //   - Cache TTL 60s + JWT TTL 24h tạo "stale window" → user vào được trang
+    //     đã bị revoke trong khoảng thời gian này.
+    //
+    // Trade-off: Mỗi request protected sẽ hit DB 1 lần. Tuy nhiên PermissionService
+    // có cache 60s sẵn (vẫn dùng cache cho User X trong khoảng 60s để tránh
+    // spam DB). Sau khi admin đổi permission → controller gọi invalidateCache
+    // → request protected tiếp theo sẽ query lại.
     try {
       const ps = getPermissionService();
-      const ok = await ps.can(userId, screenKey);
+      const ok = await ps.can(userId, screenKey, { skipCache: true });
 
       if (!ok) {
         return res.status(403).json({
@@ -217,9 +222,10 @@ function requireScreenAction(screenKey, action) {
       return res.status(401).json({ success: false, message: 'Không xác định được user' });
     }
 
+    // PLAN A: Check DB mỗi request (skipCache=true) - xem lý do ở requirePerm.
     try {
       const ps = getPermissionService();
-      const ok = await ps.can(userId, permKey);
+      const ok = await ps.can(userId, permKey, { skipCache: true });
 
       if (!ok) {
         return res.status(403).json({

@@ -1,11 +1,20 @@
 const express = require('express');
 const { authenticate, authorize } = require('../../middlewares/auth');
-const { requireScreen } = require('../../middlewares/permission');
+const { requireScreen, requireScreenAction } = require('../../middlewares/permission');
 const { trackActivity } = require('../../middlewares');
 const GeneralDirectorController = require('../controllers/GeneralDirectorController');
 const GeneralDirectorService = require('../../application/services/GeneralDirectorService');
 const GeneralDirectorRepositoryImpl = require('../../infrastructure/repositories/GeneralDirectorRepositoryImpl');
 
+/**
+ * General Director routes — L1 (screen access) + L2 (feature bits).
+ *
+ * L1: requireScreen('director', resource) → screen:director:<resource>:access
+ * L2: requireScreenAction('director:<resource>', action)
+ *     → screen:director:<resource>:view|create|update|delete|export
+ *
+ * Vào được trang (L1) không đồng nghĩa có mọi nút — từng API nút check L2 riêng.
+ */
 function buildGeneralDirectorRouter() {
   const router = express.Router();
   const repository = new GeneralDirectorRepositoryImpl();
@@ -16,75 +25,89 @@ function buildGeneralDirectorRouter() {
 
   router.get(
     '/reports/revenue',
-    requireScreen('general_director', 'reports'),
+    requireScreen('director', 'reports'),
+    requireScreenAction('director:reports', 'view'),
     controller.getRevenueReports
   );
   router.get(
     '/reports/settlements',
-    requireScreen('general_director', 'settlements'),
+    requireScreen('director', 'settlements'),
+    requireScreenAction('director:settlements', 'view'),
     controller.getSettlementReports
   );
   router.get(
     '/reports/settlements/:id',
-    requireScreen('general_director', 'settlements'),
+    requireScreen('director', 'settlements'),
+    requireScreenAction('director:settlements', 'view'),
     controller.getSettlementReportById
   );
 
-  // Reference data + personnel modules
-  router.get('/branches', controller.getBranches);
+  router.get(
+    '/branches',
+    requireScreen('director', 'branches'),
+    requireScreenAction('director:branches', 'view'),
+    controller.getBranches
+  );
   router.get(
     '/employees',
-    requireScreen('general_director', 'employees'),
+    requireScreen('director', 'employees'),
+    requireScreenAction('director:employees', 'view'),
     controller.getEmployees
   );
   router.get(
     '/employees/:id',
-    requireScreen('general_director', 'employees'),
+    requireScreen('director', 'employees'),
+    requireScreenAction('director:employees', 'view'),
     controller.getEmployeeById
   );
 
-  // UC51 - technician coordination
-  // Permission rieng cho technicians (khong chia se voi employees)
   router.get(
     '/technicians',
-    requireScreen('general_director', 'technicians'),
+    requireScreen('director', 'technicians'),
+    requireScreenAction('director:technicians', 'view'),
     controller.getTechnicians
   );
   router.get(
     '/technicians/:id',
-    requireScreen('general_director', 'technicians'),
+    requireScreen('director', 'technicians'),
+    requireScreenAction('director:technicians', 'view'),
     controller.getTechnicianById
   );
 
-  // UC52-55 - branch manager management
   router.get(
     '/branch-managers',
-    requireScreen('general_director', 'branch_managers'),
+    requireScreen('director', 'branch_managers'),
+    requireScreenAction('director:branch_managers', 'view'),
     controller.getBranchManagers
   );
   router.get(
     '/branch-managers/:id',
-    requireScreen('general_director', 'branch_managers'),
+    requireScreen('director', 'branch_managers'),
+    requireScreenAction('director:branch_managers', 'view'),
     controller.getBranchManagerById
   );
   router.post(
     '/branch-managers',
-    requireScreen('general_director', 'branch_managers'),
+    requireScreen('director', 'branch_managers'),
+    requireScreenAction('director:branch_managers', 'create'),
     controller.createBranchManager
   );
   router.put(
     '/branch-managers/:id',
-    requireScreen('general_director', 'branch_managers'),
+    requireScreen('director', 'branch_managers'),
+    requireScreenAction('director:branch_managers', 'update'),
     controller.updateBranchManager
   );
   router.patch(
     '/branches/:id/deactivate',
-    requireScreen('general_director', 'branches'),
+    requireScreen('director', 'branches'),
+    requireScreenAction('director:branches', 'delete'),
     controller.deactivateBranch
   );
   router.patch(
     '/branches/:id/reactivate',
-    requireScreen('general_director', 'branches'),
+    requireScreen('director', 'branches'),
+    requireScreenAction('director:branches', 'update'),
     controller.reactivateBranch
   );
 
