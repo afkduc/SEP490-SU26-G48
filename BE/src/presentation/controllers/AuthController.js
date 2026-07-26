@@ -10,10 +10,10 @@ class AuthController {
 
   async login(req, res, next) {
     try {
-      const { email, password } = req.body;
+      const { email, password, branchId } = req.body;
 
       // 1. Authenticate user first (tra ve { user } - chua co token)
-      const { user } = await this.authService.login(email, password);
+      const { user } = await this.authService.login(email, password, branchId);
 
       // 2. Track login with full user info to get deviceId
       const trackResult = await trackLogin(req, user);

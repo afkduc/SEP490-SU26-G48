@@ -7,6 +7,9 @@
  *   form Lien he cua landing page, scope theo branchId cua CVDV.
  * /api/sse/permissions: server push khi admin thay doi permission matrix.
  *   Push toi DUNG user dang bi anh huong (filter theo userId trong JWT).
+ * /api/sse/repair-orders: server push khi co lenh sua chua moi duoc giao,
+ *   dau muc cong viec duoc tich hoan thanh, hoac lenh hoan thanh toan bo -
+ *   scope theo branchId cua CVDV/to truong dang ket noi.
  */
 
 const express = require('express');
@@ -15,6 +18,7 @@ const config = require('../../config');
 const { onLoginSession } = require('../../application/events/LoginSessionEvents');
 const { onServiceRequestEvent } = require('../../application/events/ServiceRequestEvents');
 const { onPermissionChanged } = require('../../application/events/PermissionEvents');
+const { onRepairOrderEvent } = require('../../application/events/RepairOrderEvents');
 
 function buildSSERouter() {
   const router = express.Router();
@@ -154,6 +158,47 @@ function buildSSERouter() {
       } catch (writeErr) {
         console.warn('[sse/permissions] write failed:', writeErr.message);
       }
+    });
+
+    const heartbeat = setInterval(() => {
+      res.write(`: heartbeat\n\n`);
+    }, 30_000);
+
+    req.on('close', () => {
+      unsubscribe();
+      clearInterval(heartbeat);
+    });
+  });
+
+  /**
+   * GET /api/sse/repair-orders?token=...
+   *
+   * SSE stream cho realtime "Lenh sua chua" - scope theo branchId (server tu
+   * doc tu token, giong /service-requests). Ca CVDV va to truong cung chi
+   * nhanh deu ket noi endpoint nay, tu loc o FE theo type + id lien quan
+   * (vd to truong chi quan tam event 'assigned' co teamLeaderId = chinh minh).
+   */
+  router.get('/repair-orders', (req, res) => {
+    let decoded;
+    try {
+      decoded = jwt.verify(req.query.token, config.jwtSecret);
+    } catch {
+      return res.status(401).end();
+    }
+    if (!decoded.branchId) {
+      return res.status(403).end();
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected' })}\n\n`);
+
+    const unsubscribe = onRepairOrderEvent(decoded.branchId, (eventData) => {
+      res.write(`event: repair-order\ndata: ${JSON.stringify(eventData)}\n\n`);
     });
 
     const heartbeat = setInterval(() => {
