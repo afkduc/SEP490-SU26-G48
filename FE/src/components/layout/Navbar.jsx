@@ -95,11 +95,11 @@ const MANAGER_NAV = [
 // ===== Warehouse Staff (Nhân viên kho) - menu phẳng, không dropdown =====
 const WAREHOUSE_STAFF_NAV = [
   { label: 'Tổng quan kho', path: '/inventory', end: true, permission: 'screen:inventory:access' },
-  { label: 'Phụ tùng', path: '/inventory/parts', permission: 'inventory:products:read' },
+  { label: 'Phụ tùng', path: '/inventory/parts', permission: 'screen:inventory:access' },
   { label: 'Tồn kho', path: '/inventory/stock', permission: 'screen:inventory:access' },
   { label: 'Phiếu nhập', path: '/inventory/import-requests', permission: 'import_requests:read' },
   { label: 'Phiếu xuất', path: '/inventory/export-requests', permission: 'export_requests:read' },
-  { label: 'Nhà cung cấp', path: '/inventory/suppliers', permission: 'inventory:suppliers:read' },
+  { label: 'Nhà cung cấp', path: '/inventory/suppliers', permission: 'screen:inventory:access' },
 ];
 
 // ===== General Director (Giám đốc) - xem báo cáo tổng quan, có dropdown =====
