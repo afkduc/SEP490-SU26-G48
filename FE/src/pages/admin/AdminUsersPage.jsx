@@ -14,7 +14,9 @@ import UserFormModal from './users/UserFormModal';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import TableSkeleton from './components/TableSkeleton';
+import AdminRolesPage from './AdminRolesPage';
 import './AdminUsersPage.css';
+import './AdminRolesPage.css';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -137,7 +139,7 @@ export default function AdminUsersPage() {
     if (roles && roles.length > 0) setLocalRoles(roles);
   }, [roles]);
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [detailUserId, setDetailUserId] = useState(null);
@@ -146,6 +148,42 @@ export default function AdminUsersPage() {
   const [exportError, setExportError] = useState(null);
 
   const hasReadPermission = can('admin:users:read');
+  const canManageRoles = can('screen:roles:access');
+  const activeTab = searchParams.get('tab') === 'roles' && canManageRoles ? 'roles' : 'users';
+
+  const setActiveTab = useCallback((tab) => {
+    setSearchParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      if (tab === 'roles') {
+        sp.set('tab', 'roles');
+        // Clear user list query noise when switching to roles catalog
+        sp.delete('search');
+        sp.delete('branchId');
+        sp.delete('status');
+        sp.delete('page');
+        sp.delete('create');
+      } else {
+        sp.delete('tab');
+      }
+      return sp;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleFilterUsersByRole = useCallback((roleId) => {
+    setSearchParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      sp.delete('tab');
+      if (roleId != null) sp.set('roleId', String(roleId));
+      else sp.delete('roleId');
+      sp.delete('page');
+      return sp;
+    }, { replace: true });
+    setParams((p) => ({
+      ...p,
+      roleId: roleId != null ? Number(roleId) : undefined,
+      page: 1,
+    }));
+  }, [setSearchParams, setParams]);
 
   // Không gọi setState trong render — chuyển sang effect (tránh vỡ hooks / action buttons)
   useEffect(() => {
@@ -170,16 +208,21 @@ export default function AdminUsersPage() {
       return;
     }
 
-    const sp = new URLSearchParams();
-    if (params.search) sp.set('search', params.search);
-    if (params.branchId) sp.set('branchId', params.branchId);
-    if (params.roleId) sp.set('roleId', params.roleId);
-    if (params.status) sp.set('status', params.status);
-    if (params.page > 1) sp.set('page', params.page);
-    const qs = sp.toString();
+    if (activeTab !== 'users') return;
+
+    const sp = new URLSearchParams(window.location.search);
+    const tab = sp.get('tab');
+    const next = new URLSearchParams();
+    if (tab) next.set('tab', tab);
+    if (params.search) next.set('search', params.search);
+    if (params.branchId) next.set('branchId', params.branchId);
+    if (params.roleId) next.set('roleId', params.roleId);
+    if (params.status) next.set('status', params.status);
+    if (params.page > 1) next.set('page', params.page);
+    const qs = next.toString();
     const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
     window.history.replaceState(null, '', newUrl);
-  }, [params.search, params.branchId, params.roleId, params.status, params.page]);
+  }, [params.search, params.branchId, params.roleId, params.status, params.page, activeTab, location.pathname]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -262,49 +305,74 @@ export default function AdminUsersPage() {
             </svg>
           </div>
           <div className="admin-page__title-group">
-            <h1>Quản lý người dùng</h1>
+            <h1>Người dùng &amp; Vai trò</h1>
             <p className="admin-page__subtitle">
-              Danh sách tài khoản hệ thống
+              Quản lý tài khoản và danh mục vai trò hệ thống
             </p>
           </div>
         </div>
-        <div className="admin-page__actions">
-          <span className="admin-page__total-badge" title="Tổng số người dùng">
-            {loading ? '...' : data.total} tài khoản
-          </span>
-          <button
-            className="btn btn--secondary admin-page__btn-icon-text"
-            onClick={handleExportExcel}
-            disabled={exporting || loading}
-            title="Xuất danh sách người dùng"
-            aria-label="Xuất Excel"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <span className="admin-page__btn-label">{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
-          </button>
-          <PermissionGate permission="admin:users:create">
+        {activeTab === 'users' && (
+          <div className="admin-page__actions">
+            <span className="admin-page__total-badge" title="Tổng số người dùng">
+              {loading ? '...' : data.total} tài khoản
+            </span>
             <button
-              className="btn btn--primary admin-page__btn-icon-text"
-              onClick={() => { setEditUser(null); setShowModal(true); }}
+              className="btn btn--secondary admin-page__btn-icon-text"
+              onClick={handleExportExcel}
+              disabled={exporting || loading}
+              title="Xuất danh sách người dùng"
+              aria-label="Xuất Excel"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              <span className="admin-page__btn-label">Tạo người dùng</span>
+              <span className="admin-page__btn-label">{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
             </button>
-          </PermissionGate>
-        </div>
-        {exportError && (
+            <PermissionGate permission="admin:users:create">
+              <button
+                className="btn btn--primary admin-page__btn-icon-text"
+                onClick={() => { setEditUser(null); setShowModal(true); }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span className="admin-page__btn-label">Tạo người dùng</span>
+              </button>
+            </PermissionGate>
+          </div>
+        )}
+        {exportError && activeTab === 'users' && (
           <div className="admin-users__error" style={{ marginTop: 12, width: '100%' }}>
             <strong>Xuất Excel thất bại:</strong> {exportError}
           </div>
         )}
       </div>
 
+      {canManageRoles && (
+        <nav className="admin-users__tabs" aria-label="Người dùng và vai trò">
+          <button
+            type="button"
+            className={`admin-users__tab ${activeTab === 'users' ? 'admin-users__tab--active' : ''}`}
+            onClick={() => setActiveTab('users')}
+          >
+            Người dùng
+          </button>
+          <button
+            type="button"
+            className={`admin-users__tab ${activeTab === 'roles' ? 'admin-users__tab--active' : ''}`}
+            onClick={() => setActiveTab('roles')}
+          >
+            Vai trò
+          </button>
+        </nav>
+      )}
+
+      {activeTab === 'roles' ? (
+        <AdminRolesPage embedded onFilterUsersByRole={handleFilterUsersByRole} />
+      ) : (
+        <>
       {/* Filters */}
       <div className="filter-card">
         <div className="filter-row">
@@ -525,6 +593,8 @@ export default function AdminUsersPage() {
           </>
         )}
       </div>
+        </>
+      )}
 
       {showModal && (
         <UserFormModal
