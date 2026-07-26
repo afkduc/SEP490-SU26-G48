@@ -2,3 +2,6 @@
 @import './theme-admin.css';
 @import './global.css';
 @import '../pages/admin/AdminShared.css';
+/* Page CSS sau theme/shared — tránh bị ghi đè màu nút/badge */
+@import '../pages/admin/AdminBranchesPage.css';
+@import '../pages/admin/AdminRolesPage.css';
