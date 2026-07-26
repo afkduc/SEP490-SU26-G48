@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { routeAfterLogin } from '../../utils/roleRedirect';
 import httpClient from '../../services/httpClient';
+import { getPendingLoginApi } from '../../services/authApi';
 import './LoginPage.css';
 
 const WRONG_BRANCH_MESSAGE = 'Tài khoản của bạn không có quyền đăng nhập vào chi nhánh này';
@@ -18,7 +19,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWrongBranchModal, setShowWrongBranchModal] = useState(false);
-  const [sessionConflict, setSessionConflict] = useState(null);
+  const [pendingLogin, setPendingLogin] = useState(null); // { pendingId, message, session }
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+  const pollRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -27,45 +30,101 @@ export default function LoginPage() {
       .then((data) => {
         if (alive) setBranches(data || []);
       })
-      .catch(() => {
-        // Im lang neu loi - dropdown chi nhanh se rong, khach van thay thong
-        // bao "vui long chon chi nhanh" nhu binh thuong khi bam dang nhap.
-      });
+      .catch(() => {});
     return () => {
       alive = false;
     };
   }, []);
 
-  // Neu user da authenticated (con token trong storage nhung dang o /login
-  // do F5 hoac navigate), redirect ve home cua role. Tranh truong hop form
-  // login render nhung bi che boi ErrorHandler/ForbiddenModal tu route cu.
   useEffect(() => {
     if (isAuthenticated && user) {
       navigate(routeAfterLogin(user), { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
 
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return undefined;
+    const t = setInterval(() => {
+      setLockoutSeconds((s) => Math.max(0, s - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [lockoutSeconds]);
+
+  useEffect(() => () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+  }, []);
+
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setError('');
   };
 
-  const doLogin = async (force = false) => {
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const startPendingPoll = (pendingId) => {
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      try {
+        const status = await getPendingLoginApi(pendingId);
+        if (status?.status === 'approved') {
+          stopPolling();
+          setLoading(true);
+          try {
+            const result = await login(form.identifier, form.password, rememberMe, form.branchId, {
+              pendingId,
+            });
+            setPendingLogin(null);
+            navigate(routeAfterLogin(result?.user), { replace: true });
+          } catch (err) {
+            setPendingLogin(null);
+            setError(err.message || 'Không thể hoàn tất đăng nhập');
+          } finally {
+            setLoading(false);
+          }
+        } else if (status?.status === 'rejected') {
+          stopPolling();
+          setPendingLogin(null);
+          setError('Phiên đang đăng nhập đã từ chối yêu cầu của bạn.');
+        } else if (status?.status === 'expired') {
+          stopPolling();
+          setPendingLogin(null);
+          setError('Yêu cầu đăng nhập đã hết hạn. Vui lòng thử lại.');
+        }
+      } catch {
+        // ignore transient poll errors
+      }
+    }, 2000);
+  };
+
+  const doLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await login(form.identifier, form.password, rememberMe, form.branchId, { force });
-      setSessionConflict(null);
+      const result = await login(form.identifier, form.password, rememberMe, form.branchId);
+      setPendingLogin(null);
       navigate(routeAfterLogin(result?.user), { replace: true });
     } catch (err) {
       if (err.status === 403 && err.message === WRONG_BRANCH_MESSAGE) {
         setShowWrongBranchModal(true);
-      } else if (err.status === 409 || err.code === 'SESSION_CONFLICT') {
-        setSessionConflict({
+      } else if (err.status === 409 || err.code === 'LOGIN_PENDING') {
+        const pendingId = err.details?.pendingId;
+        setPendingLogin({
+          pendingId,
           message: err.message,
           session: err.details?.session || null,
         });
+        if (pendingId) startPendingPoll(pendingId);
+      } else if (err.status === 429 || err.code === 'LOGIN_LOCKED' || err.details?.suggestChangePassword) {
+        const wait = err.details?.waitSeconds || Math.ceil((err.details?.remainingMs || 0) / 1000) || 10;
+        setLockoutSeconds(wait);
+        setError(err.message || 'Vui lòng đợi rồi thử lại. Nên đổi mật khẩu nếu không phải bạn.');
       } else {
+        if (err.details?.waitSeconds) setLockoutSeconds(err.details.waitSeconds);
         setError(err.message || 'Đăng nhập thất bại');
       }
     } finally {
@@ -79,7 +138,11 @@ export default function LoginPage() {
       setError('Vui lòng nhập đầy đủ email/số điện thoại và mật khẩu');
       return;
     }
-    await doLogin(false);
+    if (lockoutSeconds > 0) {
+      setError(`Vui lòng đợi ${lockoutSeconds}s trước khi thử lại.`);
+      return;
+    }
+    await doLogin();
   };
 
   return (
@@ -165,6 +228,11 @@ export default function LoginPage() {
             </div>
 
             {error && <p className="login-error">{error}</p>}
+            {lockoutSeconds > 0 && (
+              <p className="login-error" style={{ color: '#b45309' }}>
+                Thử lại sau <strong>{lockoutSeconds}s</strong>. Nếu không phải bạn, hãy đổi mật khẩu.
+              </p>
+            )}
 
             <div className="login-row">
               <label className="login-checkbox">
@@ -180,8 +248,8 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <button type="submit" className="login-btn" disabled={loading}>
-              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+            <button type="submit" className="login-btn" disabled={loading || lockoutSeconds > 0}>
+              {loading ? 'Đang đăng nhập...' : lockoutSeconds > 0 ? `Chờ ${lockoutSeconds}s` : 'Đăng nhập'}
             </button>
           </form>
         </div>
@@ -206,44 +274,36 @@ export default function LoginPage() {
         </div>
       )}
 
-      {sessionConflict && (
-        <div className="login-modal-overlay" onClick={() => !loading && setSessionConflict(null)}>
+      {pendingLogin && (
+        <div className="login-modal-overlay">
           <div className="login-modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="login-modal-icon" style={{ color: '#d97706' }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            <div className="login-modal-icon" style={{ color: '#4f46e5' }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
               </svg>
             </div>
-            <h2 className="login-modal-title">Tài khoản đang được sử dụng</h2>
+            <h2 className="login-modal-title">Đang chờ xác nhận</h2>
             <p className="login-modal-message">
-              {sessionConflict.message}
+              {pendingLogin.message || 'Đã gửi yêu cầu tới phiên đang đăng nhập. Vui lòng chờ họ đồng ý.'}
             </p>
-            {sessionConflict.session && (
+            {pendingLogin.session && (
               <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px' }}>
-                Phiên hiện tại: {[sessionConflict.session.browser, sessionConflict.session.os].filter(Boolean).join(' · ') || 'Thiết bị khác'}
-                {sessionConflict.session.ip ? ` · IP ${sessionConflict.session.ip}` : ''}
+                Phiên hiện tại: {[pendingLogin.session.browser, pendingLogin.session.os].filter(Boolean).join(' · ') || 'Thiết bị khác'}
+                {pendingLogin.session.ip ? ` · IP ${pendingLogin.session.ip}` : ''}
               </p>
             )}
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button
-                type="button"
-                className="login-modal-btn"
-                style={{ background: '#fff', color: '#334155', border: '1px solid #cbd5e1' }}
-                disabled={loading}
-                onClick={() => setSessionConflict(null)}
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                className="login-modal-btn"
-                disabled={loading}
-                onClick={() => doLogin(true)}
-              >
-                {loading ? 'Đang đăng nhập...' : 'Đây là tôi — tiếp tục'}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="login-modal-btn"
+              style={{ background: '#fff', color: '#334155', border: '1px solid #cbd5e1' }}
+              onClick={() => {
+                stopPolling();
+                setPendingLogin(null);
+              }}
+            >
+              Hủy chờ
+            </button>
           </div>
         </div>
       )}

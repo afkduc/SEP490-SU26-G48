@@ -1,0 +1,79 @@
+.login-challenge-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-challenge-modal {
+  width: min(440px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 24px 22px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+  text-align: center;
+}
+
+.login-challenge-modal__icon {
+  color: #d97706;
+  margin-bottom: 12px;
+}
+
+.login-challenge-modal__title {
+  margin: 0 0 10px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.login-challenge-modal__message {
+  margin: 0 0 16px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.login-challenge-modal__error {
+  margin: 0 0 12px;
+  color: #b91c1c;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.login-challenge-modal__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.login-challenge-btn {
+  min-width: 140px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid transparent;
+  font-weight: 650;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 8px 14px;
+}
+
+.login-challenge-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-challenge-btn--reject {
+  background: #fff;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.login-challenge-btn--approve {
+  background: #4f46e5;
+  color: #fff;
+}

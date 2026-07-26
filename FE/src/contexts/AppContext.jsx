@@ -3,8 +3,10 @@ import { loginApi, logoutApi, getMeApi, getServerTime } from '../services/authAp
 import { ROLES } from '../constants/roles';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
+import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
+import LoginChallengeModal from '../components/LoginChallengeModal';
 import {
   resetSessionExpiredFlag,
   cancelAllPendingRequests,
@@ -397,9 +399,8 @@ export function AppProvider({ children }) {
       {/* HeartbeatRunner: goi POST /api/auth/heartbeat moi 60s.
           Tu tat khi user logout. Tu backoff khi nhan 401 de tranh spam. */}
       {isAuthenticated ? <HeartbeatRunner /> : null}
-      {/* PermissionEventsRunner: SSE listener de refresh quyen realtime khi admin
-          thay doi ma tran quyen / gan role / revoke role. Tu tat khi logout. */}
       {isAuthenticated ? <PermissionEventsRunner /> : null}
+      {isAuthenticated ? <LoginChallengeRunner /> : null}
       {children}
     </AppContext.Provider>
   );
@@ -450,6 +451,31 @@ function PermissionEventsRunner() {
   });
 
   return null;
+}
+
+function LoginChallengeRunner() {
+  const { token } = useAuth();
+  // Đảm bảo SSE notifications luôn chạy (kể cả trang không có NotificationBell)
+  useNotifications(token);
+  const [challenge, setChallenge] = useState(null);
+
+  useEffect(() => {
+    const onChallenge = (e) => {
+      const detail = e?.detail;
+      if (!detail?.pendingId) return;
+      setChallenge(detail);
+    };
+    window.addEventListener('login-challenge', onChallenge);
+    return () => window.removeEventListener('login-challenge', onChallenge);
+  }, []);
+
+  if (!challenge) return null;
+  return (
+    <LoginChallengeModal
+      challenge={challenge}
+      onClose={() => setChallenge(null)}
+    />
+  );
 }
 
 export function useAuth() {

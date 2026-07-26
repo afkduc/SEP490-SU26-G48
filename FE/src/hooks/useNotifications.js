@@ -165,6 +165,20 @@ export function useNotifications(token, options = {}) {
             if (!wasRead) {
               setUnreadCount((c) => c + 1);
             }
+            // Phiên đang online: hiện modal xác nhận đăng nhập trùng
+            const type = data.type || data.eventType || data.metadata?.eventType;
+            if (type === 'LOGIN_CHALLENGE' && typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent('login-challenge', {
+                  detail: {
+                    pendingId: data.metadata?.pendingId || data.pendingId,
+                    metadata: data.metadata || {},
+                    title: data.title,
+                    message: data.message,
+                  },
+                })
+              );
+            }
           } catch (parseErr) {
             console.warn('[useNotifications] parse SSE error:', parseErr);
           }
