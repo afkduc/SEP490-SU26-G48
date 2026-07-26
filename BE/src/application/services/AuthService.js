@@ -21,7 +21,7 @@ class AuthService {
     return this._permissionService;
   }
 
-  async login(email, password) {
+  async login(email, password, branchId) {
     if (!email || !password) {
       const e = new ApiError(400, 'Email và mật khẩu không được để trống');
       e.audit = { skip: true };
@@ -54,6 +54,24 @@ class AuthService {
     if (user.branch_id && user.branch_is_active !== undefined && !Boolean(user.branch_is_active)) {
       const e = new ApiError(403, 'Chi nhánh của tài khoản này đang bị ngưng hoạt động');
       e.audit = { userExists: true, user, reason: 'BRANCH_DISABLED' };
+      throw e;
+    }
+
+    // Tai khoan gan voi 1 chi nhanh cu the thi bat buoc phai chon dung chi
+    // nhanh do o man dang nhap moi cho vao - tranh nhan vien chi nhanh nay
+    // dang nhap nham "voi tu cach" chi nhanh khac. Rieng admin/giam doc
+    // (general_director) quan ly toan he thong nen duoc mien kiem tra nay du
+    // trong DB ho van co the dang gan voi 1 branch_id cu the (VD: chi nhanh
+    // chinh de thong ke) - khong dung branch_id == null de xac dinh vi du
+    // lieu thuc te khong dam bao dieu do.
+    const roles = await this.authRepository.findUserRoles(user.id);
+    const isBranchExempt = roles.some(
+      (r) => r.role_name === 'admin' || r.role_name === 'general_director'
+    );
+
+    if (user.branch_id && !isBranchExempt && String(user.branch_id) !== String(branchId)) {
+      const e = new ApiError(403, 'Tài khoản của bạn không có quyền đăng nhập vào chi nhánh này');
+      e.audit = { userExists: true, user, reason: 'WRONG_BRANCH' };
       throw e;
     }
 

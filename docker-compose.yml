@@ -38,8 +38,19 @@ services:
       context: ./Landing
     # Khong publish port ra ngoai - chi "fe" (nginx) goi vao qua network noi
     # bo cua Docker Compose bang ten service "landing" (xem FE/nginx.conf,
-    # location "/gioi-thieu"). Landing/.env.production tu duoc doc luc
-    # "npm run build" (xem Landing/Dockerfile), giong cach FE lam voi Vite.
+    # location "/gioi-thieu").
+    #
+    # KHAC VOI "fe": Landing la Next.js chay bang "node server.js" (SSR that,
+    # khong phai file tinh qua nginx nhu FE), nen cac trang Server Component
+    # (vd app/goi-dich-vu/[code]/page.js goi API luc render tren server) doc
+    # process.env.NEXT_PUBLIC_API_BASE_URL TRUC TIEP LUC CHAY, khong chi qua
+    # buoc "nuong" bien vao bundle luc "npm run build" nhu code phia client.
+    # Neu thieu env_file nay, cac trang server-side se doc phai fallback '/api'
+    # (duong dan tuong doi) - fetch() trong Node khong tu suy ra duoc domain
+    # nen bi loi ngay, dan den "Landing khong goi duoc BE" (dung ca 2 noi:
+    # buoc build cho code client, va o day cho code chay tren server).
+    env_file:
+      - ./Landing/.env.production
     depends_on:
       - be
     restart: unless-stopped
