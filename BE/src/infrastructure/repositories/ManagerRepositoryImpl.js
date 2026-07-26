@@ -2,9 +2,8 @@ const { query } = require('../database/sqlServer');
 
 // Tổ trưởng đã gộp vào module Nhân viên (dùng chung listEmployees/createEmployee/...),
 // nên phải nằm trong EMPLOYEE_ROLES để hiện ra trong danh sách/tìm kiếm nhân viên.
-const EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'accountant', 'team_leader'];
-// Vai trò được PHÉP GÁN khi tạo/sửa nhân viên (khác EMPLOYEE_ROLES ở chỗ không cho
-// tạo mới Kế toán qua màn này nữa).
+const EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'team_leader'];
+// Vai trò được PHÉP GÁN khi tạo/sửa nhân viên.
 const ASSIGNABLE_EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'team_leader'];
 const TECHNICIAN_ROLE = 'technician';
 const TEAM_LEADER_ROLE = 'team_leader';

@@ -11,11 +11,15 @@ const ADMIN_USER_COLUMNS = `
   b.branch_name,
   u.status,
   u.created_at,
-  (SELECT COUNT(*) FROM user_branches ub WHERE ub.user_id = u.id) AS assigned_branch_count
+  (SELECT COUNT(*) FROM user_branches ub WHERE ub.user_id = u.id) AS assigned_branch_count,
+  (SELECT MAX(ud.last_login_at) FROM user_devices ud WHERE ud.user_id = u.id) AS last_login_at
 `;
 
 function toAdminUserRow(row) {
   if (!row) return null;
+  const assignedCount = Number(row.assigned_branch_count) || 0;
+  // "Tất cả chi nhánh" = không gắn branch_id chính (Admin / GD kiểu all-scope)
+  const scopeAllBranches = row.branch_id === null || row.branch_id === undefined;
   return {
     id: row.id,
     name: row.user_name,
@@ -25,14 +29,11 @@ function toAdminUserRow(row) {
     phone: row.phone,
     branchId: row.branch_id,
     branchName: row.branch_name,
-    // scopeAllBranches = true neu user co >= 1 row trong user_branches
-    // (junction table luu ds branch user duoc phep truy cap).
-    // Vd: Admin cap cao chon "Tat ca chi nhanh" -> them row cho moi branch active.
-    scopeAllBranches: Number(row.assigned_branch_count) > 0
-      || row.branch_id === null
-      || row.branch_id === undefined,
+    scopeAllBranches,
+    assignedBranchCount: assignedCount,
     status: row.status,
     createdAt: row.created_at,
+    lastLoginAt: row.last_login_at || null,
     roles: [],
   };
 }

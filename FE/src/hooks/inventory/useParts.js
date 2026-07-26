@@ -3,13 +3,13 @@ import {
   getProductsApi,
   createProductApi,
   updateProductApi,
-  deleteProductApi,
+  deactivateProductApi,
+  reactivateProductApi,
   getCategoriesApi,
 } from '../../services/productApi';
 
 /**
- * Quan ly trang thai danh sach phu tung: tai, loc, tao, sua, xoa.
- * BranchId duoc truyen tu ben ngoai (vi moi user chi thao tac trong chi nhanh cua minh).
+ * Quan ly danh sach phu tung: tai, loc, tao, sua, ngung/kich hoat (khong hard delete).
  */
 export function useParts({ branchId } = {}) {
   const [parts, setParts] = useState([]);
@@ -68,11 +68,32 @@ export function useParts({ branchId } = {}) {
     return res;
   }, []);
 
-  const remove = useCallback(async (id) => {
-    await deleteProductApi(id);
-    setParts((prev) => prev.filter((p) => p.id !== id));
-    setTotal((t) => Math.max(0, t - 1));
-  }, []);
+  const deactivate = useCallback(async (id) => {
+    const res = await deactivateProductApi(id);
+    setParts((prev) => {
+      if (params.status === 'active') {
+        setTotal((t) => Math.max(0, t - 1));
+        return prev.filter((p) => p.id !== id);
+      }
+      return prev.map((p) => (p.id === id ? res : p));
+    });
+    return res;
+  }, [params.status]);
+
+  const reactivate = useCallback(async (id) => {
+    const res = await reactivateProductApi(id);
+    setParts((prev) => {
+      if (params.status === 'inactive') {
+        setTotal((t) => Math.max(0, t - 1));
+        return prev.filter((p) => p.id !== id);
+      }
+      return prev.map((p) => (p.id === id ? res : p));
+    });
+    return res;
+  }, [params.status]);
+
+  /** Alias: soft-disable (không hard delete) */
+  const remove = deactivate;
 
   const setSearch = useCallback((v) => {
     setParams((p) => ({ ...p, search: v, page: 1 }));
@@ -110,6 +131,8 @@ export function useParts({ branchId } = {}) {
     fetch: fetchData,
     create,
     update,
+    deactivate,
+    reactivate,
     remove,
   };
 }

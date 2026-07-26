@@ -1,12 +1,28 @@
 import httpClient from './httpClient';
 
-export async function loginApi(email, password, branchId) {
+export async function loginApi(identifier, password, branchId, { force = false } = {}) {
   const data = await httpClient.post(
     '/auth/login',
-    { email, password, branchId },
+    { identifier, email: identifier, password, branchId, force: Boolean(force) },
     { omitAuth: true, skipSessionExpired: true }
   );
   return data; // { token, user }
+}
+
+export async function forgotPasswordApi(email) {
+  return httpClient.post(
+    '/auth/forgot-password',
+    { email },
+    { omitAuth: true, skipSessionExpired: true }
+  );
+}
+
+export async function resetPasswordApi(token, newPassword) {
+  return httpClient.post(
+    '/auth/reset-password',
+    { token, newPassword },
+    { omitAuth: true, skipSessionExpired: true }
+  );
 }
 
 export async function logoutApi() {
@@ -65,3 +81,32 @@ export async function heartbeatApi() {
     return null;
   }
 }
+
+/**
+ * Refresh permissions: lay token moi + permissions moi tu DB (bo qua cache BE).
+ *
+ * Dung khi:
+ *   - SSE nhan 'permission-changed' (admin vua doi matrix).
+ *   - User navigate/F5 vao 1 trang co permission check (ProtectedRoute) - dam
+ *     bao JWT trong storage dong bo voi DB.
+ *   - Heartbeat dinh ky (toi da 1 lan / 60s) de bat ke thay doi permission
+ *     ngoai SSE (VD: admin sua tu tab khac, user offline luc admin luu).
+ *
+ * Tra ve:
+ *   { token, user } neu thanh cong
+ */
+export async function refreshPermissionsApi() {
+  const data = await httpClient.post('/auth/refresh-permissions', {});
+  return data;
+}
+
+export default {
+  loginApi,
+  logoutApi,
+  getMeApi,
+  getServerTime,
+  heartbeatApi,
+  refreshPermissionsApi,
+  forgotPasswordApi,
+  resetPasswordApi,
+};

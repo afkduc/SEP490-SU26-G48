@@ -45,8 +45,40 @@ class UserScreenPermissionsRepository {
   }
 
   /**
+   * Upsert 1 override (không xóa các override khác của user).
+   */
+  async upsertGrant(userId, item, grantedBy) {
+    if (!userId || !item?.screenKey) return { updated: 0 };
+    await query(
+      `IF EXISTS (SELECT 1 FROM user_screen_permissions WHERE user_id = @p1 AND screen_key = @p2)
+         UPDATE user_screen_permissions
+         SET can_view = @p3, can_create = @p4, can_update = @p5, can_delete = @p6, can_export = @p7,
+             override_type = @p8, granted_by = @p9, note = @p10, updated_at = SYSUTCDATETIME()
+         WHERE user_id = @p1 AND screen_key = @p2
+       ELSE
+         INSERT INTO user_screen_permissions
+           (user_id, screen_key, can_view, can_create, can_update, can_delete, can_export,
+            override_type, granted_by, note)
+         VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10)`,
+      {
+        p1: userId,
+        p2: String(item.screenKey),
+        p3: item.canView ? 1 : 0,
+        p4: item.canCreate ? 1 : 0,
+        p5: item.canUpdate ? 1 : 0,
+        p6: item.canDelete ? 1 : 0,
+        p7: item.canExport ? 1 : 0,
+        p8: String(item.overrideType || 'grant'),
+        p9: grantedBy || null,
+        p10: item.note || null,
+      }
+    );
+    return { updated: 1 };
+  }
+
+  /**
    * Bulk upsert (delete all rows cu -> insert fresh set).
-   * items: [{ userId, screenKey, canView, canCreate, canUpdate, canDelete, canExport, overrideType, note, grantedBy }]
+   * Chi dung khi admin thay the TOAN BO override cua user.
    */
   async bulkReplace(userId, items, grantedBy) {
     if (!userId) return { updated: 0 };

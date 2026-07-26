@@ -21,31 +21,28 @@ class AuthService {
     return this._permissionService;
   }
 
-  async login(email, password, branchId) {
-    if (!email || !password) {
-      const e = new ApiError(400, 'Email và mật khẩu không được để trống');
+  async login(identifier, password, branchId, { force = false } = {}) {
+    if (!identifier || !password) {
+      const e = new ApiError(400, 'Email/số điện thoại và mật khẩu không được để trống');
       e.audit = { skip: true };
       throw e;
     }
 
-    const user = await this.authRepository.findUserByEmail(email);
+    const user = await this.authRepository.findUserByEmailOrPhone(identifier);
     if (!user) {
-      const e = new ApiError(401, 'Email hoặc mật khẩu không đúng');
+      const e = new ApiError(401, 'Email/số điện thoại hoặc mật khẩu không đúng');
       e.audit = { userExists: false };
       throw e;
     }
 
     const isMatch = await this._verifyPassword(password, user.user_password);
     if (!isMatch) {
-      const e = new ApiError(401, 'Email hoặc mật khẩu không đúng');
+      const e = new ApiError(401, 'Email/số điện thoại hoặc mật khẩu không đúng');
       e.audit = { userExists: true, user, reason: 'WRONG_PASSWORD' };
       throw e;
     }
 
     if (user.status && user.status !== 'active') {
-      // status la 'inactive' (ngung hoat dong) hoac bat ky gia tri khac active
-      // -> chan login. Migrating tu 'locked' -> 'inactive' (gop 2 status vi
-      // logic giong nhau, chi khac UI badge).
       const e = new ApiError(403, 'Tài khoản đã ngừng hoạt động');
       e.audit = { userExists: true, user, reason: 'ACCOUNT_DISABLED' };
       throw e;
@@ -57,13 +54,6 @@ class AuthService {
       throw e;
     }
 
-    // Tai khoan gan voi 1 chi nhanh cu the thi bat buoc phai chon dung chi
-    // nhanh do o man dang nhap moi cho vao - tranh nhan vien chi nhanh nay
-    // dang nhap nham "voi tu cach" chi nhanh khac. Rieng admin/giam doc
-    // (general_director) quan ly toan he thong nen duoc mien kiem tra nay du
-    // trong DB ho van co the dang gan voi 1 branch_id cu the (VD: chi nhanh
-    // chinh de thong ke) - khong dung branch_id == null de xac dinh vi du
-    // lieu thuc te khong dam bao dieu do.
     const roles = await this.authRepository.findUserRoles(user.id);
     const isBranchExempt = roles.some(
       (r) => r.role_name === 'admin' || r.role_name === 'general_director'
@@ -75,11 +65,41 @@ class AuthService {
       throw e;
     }
 
-    // Increment token version de revoke token cu
+    // 1 tài khoản = 1 phiên: nếu đang có session active và chưa xác nhận force
+    // -> trả 409 để FE hiện modal "Đây là tôi / Hủy"
+    if (!force) {
+      const { query } = require('../../infrastructure/database/sqlServer');
+      const active = await query(
+        `SELECT TOP 1 id, browser, os, ip_address, login_time
+         FROM login_sessions
+         WHERE user_id = @p1 AND status = 'active' AND action_type = 'LOGIN'
+         ORDER BY login_time DESC`,
+        { p1: user.id }
+      );
+      if (active.recordset[0]) {
+        const s = active.recordset[0];
+        const e = new ApiError(
+          409,
+          'Tài khoản đang được đăng nhập ở thiết bị khác. Xác nhận "Đây là tôi" để tiếp tục (phiên cũ sẽ bị đăng xuất).'
+        );
+        e.code = 'SESSION_CONFLICT';
+        e.details = {
+          code: 'SESSION_CONFLICT',
+          session: {
+            browser: s.browser,
+            os: s.os,
+            ip: s.ip_address,
+            startedAt: s.login_time,
+          },
+        };
+        e.audit = { skip: true };
+        throw e;
+      }
+    }
+
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
     user.token_version = newTokenVersion;
 
-    // Tra ve user object (CHUA CO TOKEN) - controller se tao token sau khi co deviceId
     return { user };
   }
 
@@ -108,19 +128,21 @@ class AuthService {
   async _signToken(user, deviceId, options = {}) {
     const roles = await this.authRepository.findUserRoles(user.id);
     const permissionService = this._getPermissionService();
-    // Dung compact set cho JWT (chi Layer 1 + screen:*:access), khong flatten
-    // Layer 2b vi se lam JWT qua lon (status 431).
+    // JWT: compact (L1 + screen:*:access + feature keys) — tránh 431.
+    // FE UI: effectivePermissions (full flatten L2 view/create/...) lưu localStorage.
     // options.skipCache = true: dung khi refresh permissions (admin vua thay doi).
-    const permissionKeys = await permissionService.getUserPermissionsCompact(user.id, options);
+    const compactKeys = await permissionService.getUserPermissionsCompact(user.id, options);
+    const fullPermSet = await permissionService.getUserPermissions(user.id, options);
+    const effectivePermissions = Array.from(fullPermSet);
 
-    const userDto = toUserDto({ ...user, token_version: user.token_version }, roles, permissionKeys);
+    const userDto = toUserDto({ ...user, token_version: user.token_version }, roles, compactKeys);
 
     const tokenPayload = {
       userId: userDto.id,
       email: userDto.email,
       name: userDto.name,
       roles: userDto.roles,
-      permissions: userDto.permissions,
+      permissions: compactKeys,
       branchId: userDto.branchId,
       tokenVersion: userDto.tokenVersion,
     };
@@ -134,7 +156,7 @@ class AuthService {
 
     const token = jwt.sign(tokenPayload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
 
-    return { token, user: userDto };
+    return { token, user: userDto, effectivePermissions };
   }
 }
 

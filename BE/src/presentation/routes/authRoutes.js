@@ -20,6 +20,25 @@ function buildAuthRouter() {
   router.post('/login', controller.login);
   router.get('/me', authenticate, controller.getMe);
 
+  // Quên mật khẩu / đặt lại mật khẩu (public + rate limit)
+  const rateLimit = require('express-rate-limit');
+  const forgotLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 8,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.' },
+  });
+  const resetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' },
+  });
+  router.post('/forgot-password', forgotLimiter, controller.forgotPassword);
+  router.post('/reset-password', resetLimiter, controller.resetPassword);
+
   /**
    * POST /api/auth/refresh-permissions
    *
@@ -81,7 +100,20 @@ function buildAuthRouter() {
         return next(new ApiError(503, 'Khong the tao token moi'));
       }
 
-      return success(res, refreshed, 'Refresh permissions thanh cong');
+      // FE ưu tiên effectivePermissions (full L2) để UI; JWT/user.permissions vẫn compact.
+      return success(
+        res,
+        {
+          token: refreshed.token,
+          user: {
+            ...refreshed.user,
+            // Gắn full set vào user.permissions cho FE storage (JWT đã compact riêng).
+            permissions: refreshed.effectivePermissions || refreshed.user.permissions,
+          },
+          effectivePermissions: refreshed.effectivePermissions || [],
+        },
+        'Refresh permissions thanh cong'
+      );
     } catch (err) {
       console.error('[auth.refresh-permissions] unexpected:', err?.message || err);
       return next(new ApiError(500, 'Loi may chu noi bo'));

@@ -11,6 +11,7 @@ export default function UnauthorizedPage({ permissionKey, customMessage }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [reason, setReason] = useState('');
+  const [sendError, setSendError] = useState('');
 
   const handleGoHome = () => {
     navigate(getRoleHome(user), { replace: true });
@@ -25,8 +26,9 @@ export default function UnauthorizedPage({ permissionKey, customMessage }) {
   };
 
   const handleRequestPermission = async () => {
-    if (!permissionKey || sent) return;
+    if (!permissionKey || sent || sending) return;
     setSending(true);
+    setSendError('');
     try {
       await requestPermission(
         permissionKey,
@@ -35,8 +37,7 @@ export default function UnauthorizedPage({ permissionKey, customMessage }) {
       );
       setSent(true);
     } catch (e) {
-      // Vẫn hiện đã gửi, backend sẽ xử lý
-      setSent(true);
+      setSendError(e?.message || 'Không gửi được yêu cầu. Thử lại sau.');
     } finally {
       setSending(false);
     }
@@ -126,6 +127,10 @@ export default function UnauthorizedPage({ permissionKey, customMessage }) {
                   onChange={(e) => setReason(e.target.value)}
                   rows={2}
                 />
+
+                {sendError && (
+                  <p style={{ color: '#dc2626', fontSize: 13, margin: '0 0 8px' }}>{sendError}</p>
+                )}
 
                 <button
                   className="error-card__btn error-card__btn--request"

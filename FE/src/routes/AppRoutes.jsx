@@ -12,6 +12,8 @@ import { SharedDataProvider } from '../contexts/SharedDataContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
+const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
@@ -30,6 +32,7 @@ const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
 const AdminPermissionMatrixPage = lazy(() => import('../pages/admin/AdminPermissionMatrixPage'));
 const RoleScreenMatrixPage = lazy(() => import('../pages/admin/RoleScreenMatrixPage'));
+const PermissionRequestsPage = lazy(() => import('../pages/admin/PermissionRequestsPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -47,7 +50,6 @@ const ImportRequestDetailPage = lazy(() => import('../pages/inventory/ImportRequ
 const ExportRequestListPage = lazy(() => import('../pages/inventory/ExportRequestListPage'));
 const ExportRequestFormPage = lazy(() => import('../pages/inventory/ExportRequestFormPage'));
 const ExportRequestDetailPage = lazy(() => import('../pages/inventory/ExportRequestDetailPage'));
-const AccountantDashboardPage = lazy(() => import('../pages/accountant/AccountantDashboardPage'));
 
 /**
  * ErrorHandler — bắt lỗi 403 toàn cục từ error event.
@@ -68,6 +70,19 @@ function ErrorHandler() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, [globalError, clearError]);
+
+  // Auto-clear globalError khi user dang o trang /login.
+  // Ly do: khi token stale va user click "Dang nhap lai" tu SessionExpiredModal,
+  // navigate('/login') se fire. AppContext clear token, nhung globalError van
+  // con giu set403Error tu ProtectedRoute truoc do -> ErrorHandler van show
+  // UnauthorizedPage full-screen, che form login. Clear o day de form login
+  // render binh thuong.
+  useEffect(() => {
+    if (!globalError) return;
+    if (window.location.pathname === '/login') {
+      clearError();
+    }
   }, [globalError, clearError]);
 
   if (!globalError) return null;
@@ -107,13 +122,15 @@ function AppRoutes() {
           <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         {/* Protected – wrapped in AppLayout (Navbar) */}
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute permission="screen:dashboard:access">
               <AppLayout>
                 <DashboardPage />
               </AppLayout>
@@ -164,6 +181,11 @@ function AppRoutes() {
               <AdminPermissionMatrixPage />
             </ProtectedRoute>
           } />
+          <Route path="permission-requests" element={
+            <ProtectedRoute roles={[ROLES.ADMIN]}>
+              <PermissionRequestsPage />
+            </ProtectedRoute>
+          } />
           <Route path="role-screen-matrix" element={
             <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:role_screen_matrix:access">
               <RoleScreenMatrixPage />
@@ -182,12 +204,24 @@ function AppRoutes() {
           <Route path="profile" element={<AdminProfilePage />} />
           <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
         </Route>
-        {/* General Director settlement reports */}
+        {/* General Director – any submodule access key grants entry */}
                 <Route
                   path="/general-director/*"
                   element={
-                    <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
-                      <AppLayout>
+                    <ProtectedRoute
+                      roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}
+                      permissions={[
+                        'screen:director:dashboard:access',
+                        'screen:director:reports:access',
+                        'screen:director:settlements:access',
+                        'screen:director:employees:access',
+                        'screen:director:technicians:access',
+                        'screen:director:branches:access',
+                        'screen:director:branch_managers:access',
+                      ]}
+                      match="any"
+                    >
+                      <AppLayout showNavbar={false}>
                         <GeneralDirectorPage />
                       </AppLayout>
                     </ProtectedRoute>
@@ -206,11 +240,23 @@ function AppRoutes() {
           }
         />
 
+        {/* Hồ sơ cá nhân — mọi role đã đăng nhập */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <AdminProfilePage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Phiếu quyết toán sửa chữa */}
         <Route
           path="/repair-settlement/*"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute permission="screen:repair-settlement:access">
               <AppLayout>
                 <RepairSettlementPage />
               </AppLayout>
@@ -222,7 +268,7 @@ function AppRoutes() {
         <Route
           path="/repair-orders/*"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute permission="screen:repair-orders:access">
               <AppLayout>
                 <RepairOrderPage />
               </AppLayout>
@@ -270,7 +316,7 @@ function AppRoutes() {
         <Route
           path={ROUTES.INVENTORY}
           element={
-            <ProtectedRoute roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ACCOUNTANT, ROLES.ADMIN]}>
+            <ProtectedRoute roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]} permission="screen:inventory:access">
               <AppLayout>
                 <InventoryLayout />
               </AppLayout>
@@ -307,18 +353,6 @@ function AppRoutes() {
             }
           />
         ))}
-
-        {/* Accountant dashboard - chỉ xem báo cáo */}
-        <Route
-          path={ROUTES.ACCOUNTANT}
-          element={
-            <ProtectedRoute roles={[ROLES.ACCOUNTANT, ROLES.ADMIN]} permission="screen:accountant:access">
-              <AppLayout>
-                <AccountantDashboardPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
 
         {/* Redirects */}
         <Route path="/" element={<RoleAwareRedirect />} />

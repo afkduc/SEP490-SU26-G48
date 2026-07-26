@@ -5,11 +5,12 @@ const RoleScreenMatrixRepository = require('../../infrastructure/repositories/Ro
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const UserRepositoryImpl = require('../../infrastructure/repositories/UserRepositoryImpl');
 const UserRoleRepositoryImpl = require('../../infrastructure/repositories/UserRoleRepositoryImpl');
+const AuthRepositoryImpl = require('../../infrastructure/repositories/AuthRepositoryImpl');
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
 const PermissionService = require('../../application/services/PermissionService');
 const { emitPermissionChanged } = require('../../application/events/PermissionEvents');
-const { generatePermissionKeys } = require('../../../scripts/auto-discover-permissions');
+const { generatePermissionKeys } = require('../../infrastructure/utils/autoDiscoverPermissions');
 
 /**
  * UserScreenPermissionsController - quan ly quyen truy cap rieng cho user (override).
@@ -35,6 +36,7 @@ class UserScreenPermissionsController {
     this.roleRepo = new RoleRepositoryImpl();
     this.userRepo = new UserRepositoryImpl();
     this.userRoleRepo = new UserRoleRepositoryImpl();
+    this.authRepo = new AuthRepositoryImpl();
     this.auditService = new AuditService(AuditRepository);
     this.permissionService = new PermissionService({ roleRepository: this.roleRepo });
   }
@@ -198,8 +200,20 @@ class UserScreenPermissionsController {
         console.warn('[UserScreenPermissionsController] SSE emit failed:', eventErr.message);
       }
 
-      // Audit
+      // Bump token_version -> user bi 401 o request tiep theo (tranh giu quyen
+      // cu qua JWT khi admin vua doi override).
       try {
+        if (Number(userId) !== Number(req.user?.userId)) {
+          await this.authRepo.incrementTokenVersion(userId);
+        }
+      } catch (e) {
+        console.warn('[UserScreenPermissionsController] bump token_version failed:', e.message);
+      }
+
+      // Audit + notify
+      try {
+        const actorName = req.user?.name || req.user?.email || 'Quản trị viên';
+        const targetName = user.user_name || user.email || `user#${userId}`;
         await this.auditService.log({
           actorId: req.user?.userId,
           actorEmail: req.user?.email,
@@ -213,6 +227,28 @@ class UserScreenPermissionsController {
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
+
+        const NotificationService = require('../../application/services/NotificationService');
+        const ns = new NotificationService();
+        await ns.notifyAdmins('PERMISSION_MATRIX_UPDATED', {
+          actorName,
+          userOverride: true,
+          targetName,
+          permissionKey: `${normalized.length} màn hình`,
+          actorId: req.user?.userId,
+        }, { excludeUserId: req.user?.userId }).catch((err) =>
+          console.warn('[UserScreenPerm] notifyAdmins failed:', err.message),
+        );
+
+        await ns.notify('PERMISSION_GRANTED', {
+          userId,
+          permissionKey: `Quyền riêng (${normalized.length} màn)`,
+          fromMatrix: true,
+          actorName,
+          actorId: req.user?.userId,
+        }, { skipSettings: true }).catch((err) =>
+          console.warn('[UserScreenPerm] notify user failed:', err.message),
+        );
       } catch (auditErr) {
         console.warn('[UserScreenPermissionsController] audit log failed:', auditErr.message);
       }
@@ -248,6 +284,51 @@ class UserScreenPermissionsController {
         });
       } catch (e) {
         console.warn('[UserScreenPermissionsController] SSE emit failed:', e.message);
+      }
+
+      // Bump token_version
+      try {
+        if (Number(userId) !== Number(req.user?.userId)) {
+          await this.authRepo.incrementTokenVersion(userId);
+        }
+      } catch (e) {
+        console.warn('[UserScreenPermissionsController] bump token_version (clear) failed:', e.message);
+      }
+
+      // Audit + notify
+      try {
+        const actorName = req.user?.name || req.user?.email || 'Quản trị viên';
+        const targetName = user.user_name || user.email || `user#${userId}`;
+        await this.auditService.log({
+          actorId: req.user?.userId,
+          actorEmail: req.user?.email,
+          action: 'CLEAR_USER_SCREEN_PERMISSIONS',
+          resource: 'user_screen_permissions',
+          resourceId: String(userId),
+          details: { targetEmail: user.email, deleted },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+
+        const NotificationService = require('../../application/services/NotificationService');
+        const ns = new NotificationService();
+        await ns.notifyAdmins('PERMISSION_MATRIX_UPDATED', {
+          actorName,
+          userOverride: true,
+          targetName,
+          permissionKey: 'Xóa toàn bộ quyền riêng',
+          actorId: req.user?.userId,
+        }, { excludeUserId: req.user?.userId }).catch(() => {});
+
+        await ns.notify('ROLE_CHANGED', {
+          userId,
+          roles: 'Quyền riêng đã bị xóa, quay về quyền theo vai trò',
+          action: 'REVOKED',
+          actorName,
+          actorId: req.user?.userId,
+        }, { skipSettings: true }).catch(() => {});
+      } catch (auditErr) {
+        console.warn('[UserScreenPermissionsController] clear audit failed:', auditErr.message);
       }
 
       return res.json({

@@ -14,12 +14,20 @@ const ACTION_OPTIONS = [
   { value: 'DELETE', label: 'Xóa (DELETE)', color: 'danger' },
   { value: 'READ', label: 'Xem dữ liệu (READ)', color: 'slate' },
   { value: 'LOGIN', label: 'Đăng nhập (LOGIN)', color: 'purple' },
+  { value: 'FAILED_LOGIN', label: 'Đăng nhập thất bại (FAILED_LOGIN)', color: 'danger' },
   { value: 'LOGOUT', label: 'Đăng xuất (LOGOUT)', color: 'gray' },
   { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất (FORCE_LOGOUT)', color: 'orange' },
   { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu (CHANGE_PASSWORD)', color: 'teal' },
   { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu (RESET_PASSWORD)', color: 'cyan' },
   { value: 'ASSIGN_ROLE', label: 'Gán vai trò (ASSIGN_ROLE)', color: 'indigo' },
   { value: 'REMOVE_ROLE', label: 'Xóa vai trò (REMOVE_ROLE)', color: 'rose' },
+  { value: 'GRANT_SCREEN', label: 'Cấp quyền màn hình (GRANT_SCREEN)', color: 'success' },
+  { value: 'REVOKE_SCREEN', label: 'Thu hồi quyền màn hình (REVOKE_SCREEN)', color: 'danger' },
+  { value: 'BULK_TOGGLE', label: 'Cập nhật hàng loạt ma trận (BULK_TOGGLE)', color: 'info' },
+  { value: 'SAVE_SCREEN_MATRIX', label: 'Lưu ma trận màn hình (SAVE_SCREEN_MATRIX)', color: 'indigo' },
+  { value: 'SAVE_USER_SCREEN_PERMISSIONS', label: 'Lưu quyền riêng user', color: 'teal' },
+  { value: 'APPROVE_PERMISSION_REQUEST', label: 'Duyệt yêu cầu cấp quyền', color: 'success' },
+  { value: 'REJECT_PERMISSION_REQUEST', label: 'Từ chối yêu cầu cấp quyền', color: 'danger' },
   { value: 'EXPORT', label: 'Xuất dữ liệu (EXPORT)', color: 'green' },
   { value: 'IMPORT', label: 'Nhập dữ liệu (IMPORT)', color: 'amber' },
 ];
@@ -27,17 +35,29 @@ const ACTION_OPTIONS = [
 const ACTION_LABELS = {
   CREATE: 'Tạo mới',
   UPDATE: 'Cập nhật',
-  DELETE: 'Xóa',
+  DELETE: 'Xóa / Vô hiệu hóa',
+  DISABLE: 'Ngừng hoạt động',
+  REACTIVATE: 'Kích hoạt lại',
   READ: 'Xem dữ liệu',
   LOGIN: 'Đăng nhập',
+  FAILED_LOGIN: 'Đăng nhập thất bại',
   LOGOUT: 'Đăng xuất',
   FORCE_LOGOUT: 'Buộc đăng xuất',
   CHANGE_PASSWORD: 'Đổi mật khẩu',
   RESET_PASSWORD: 'Đặt lại mật khẩu',
   ASSIGN_ROLE: 'Gán vai trò',
-  REMOVE_ROLE: 'Xóa vai trò',
+  REMOVE_ROLE: 'Thu hồi vai trò',
   EXPORT: 'Xuất dữ liệu',
   IMPORT: 'Nhập dữ liệu',
+  GRANT_SCREEN: 'Cấp quyền màn hình',
+  REVOKE_SCREEN: 'Thu hồi quyền màn hình',
+  BULK_TOGGLE: 'Cập nhật hàng loạt ma trận',
+  SAVE_SCREEN_MATRIX: 'Lưu ma trận quyền màn hình',
+  SAVE_USER_SCREEN_PERMISSIONS: 'Lưu quyền riêng user',
+  CLEAR_USER_SCREEN_PERMISSIONS: 'Xóa quyền riêng user',
+  APPROVE_PERMISSION_REQUEST: 'Duyệt yêu cầu cấp quyền',
+  REJECT_PERMISSION_REQUEST: 'Từ chối yêu cầu cấp quyền',
+  PERMISSION_MATRIX_BULK: 'Cập nhật ma trận phân quyền',
 };
 
 const ACTION_CLASS = {
@@ -46,6 +66,7 @@ const ACTION_CLASS = {
   DELETE: 'badge--danger',
   READ: 'badge--slate',
   LOGIN: 'badge--purple',
+  FAILED_LOGIN: 'badge--danger',
   LOGOUT: 'badge--secondary',
   FORCE_LOGOUT: 'badge--orange',
   CHANGE_PASSWORD: 'badge--teal',
@@ -54,6 +75,14 @@ const ACTION_CLASS = {
   REMOVE_ROLE: 'badge--rose',
   EXPORT: 'badge--green',
   IMPORT: 'badge--amber',
+  GRANT_SCREEN: 'badge--success',
+  REVOKE_SCREEN: 'badge--danger',
+  BULK_TOGGLE: 'badge--info',
+  SAVE_SCREEN_MATRIX: 'badge--indigo',
+  SAVE_USER_SCREEN_PERMISSIONS: 'badge--teal',
+  CLEAR_USER_SCREEN_PERMISSIONS: 'badge--rose',
+  APPROVE_PERMISSION_REQUEST: 'badge--success',
+  REJECT_PERMISSION_REQUEST: 'badge--danger',
 };
 
 const STATUS_OPTIONS = [
@@ -80,6 +109,9 @@ const TABLE_NAME_VI = {
   user_notification_settings: 'Cài đặt thông báo',
   roles: 'Vai trò',
   role_permissions: 'Phân quyền theo vai trò',
+  role_screen_permissions: 'Quyền màn hình theo vai trò',
+  role_screen_matrix: 'Ma trận quyền màn hình',
+  permission_request: 'Yêu cầu cấp quyền',
   role_security_mapping: 'Ánh xạ vai trò - bảo mật',
   permissions: 'Phân quyền chi tiết',
   service_categories: 'Danh mục dịch vụ',
@@ -89,7 +121,6 @@ const TABLE_NAME_VI = {
   suppliers: 'Nhà cung cấp',
   products: 'Phụ tùng / Sản phẩm',
   inventory_transactions: 'Giao dịch kho',
-  contracts: 'Hợp đồng',
   appointments: 'Lịch hẹn',
   work_orders: 'Phiếu sửa chữa',
   work_order_items: 'Hạng mục phiếu sửa',
@@ -101,8 +132,6 @@ const TABLE_NAME_VI = {
   payments: 'Thanh toán',
   specialties: 'Chuyên môn',
   warranty_records: 'Lịch sử bảo hành',
-  after_service_care: 'Chăm sóc sau dịch vụ',
-  customer_feedback: 'Phản hồi khách hàng',
   maintenance_reminders: 'Lịch nhắc bảo dưỡng',
   vehicle_owners: 'Chủ phương tiện',
   import_requests: 'Yêu cầu nhập kho',
@@ -803,6 +832,10 @@ function AuditLogDetailModal({ log, onClose }) {
   if (!log) return null;
   const t = formatLocal(log.logged_at);
   const userName = log.user_name || 'Hệ thống';
+  const actionLabel = ACTION_LABELS[log.action] || log.action || 'Thao tác';
+  const objectLabel = TABLE_NAME_VI[log.table_name] || log.entity_name || log.table_name || 'hệ thống';
+  const summary = log.description
+    || `${userName} đã ${String(actionLabel).toLowerCase()} trên ${String(objectLabel).toLowerCase()}${log.entity_code ? ` (${log.entity_code})` : ''}.`;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -812,6 +845,19 @@ function AuditLogDetailModal({ log, onClose }) {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
+          <div style={{
+            padding: '14px 16px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 12,
+            marginBottom: 16,
+            fontSize: 14,
+            lineHeight: 1.55,
+            color: '#334155',
+          }}>
+            {summary}
+          </div>
+
           {/* Row 1: User + Action */}
           <div className="audit-detail__row">
             <div className="audit-detail__field">
@@ -828,14 +874,14 @@ function AuditLogDetailModal({ log, onClose }) {
               <label>Hành động</label>
               <div className="audit-detail__value">
                 <span className={`badge ${ACTION_CLASS[log.action] || 'badge--secondary'}`}>
-                  {ACTION_LABELS[log.action] || log.action || '—'}
+                  {actionLabel}
                 </span>
               </div>
             </div>
             <div className="audit-detail__field">
               <label>Đối tượng</label>
               <div className="audit-detail__value">
-                <strong>{TABLE_NAME_VI[log.table_name] || log.table_name || log.entity_name || '—'}</strong>
+                <strong>{objectLabel}</strong>
                 {log.entity_code && <code className="audit-detail__code">{log.entity_code}</code>}
               </div>
             </div>
