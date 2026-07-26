@@ -250,6 +250,17 @@ class AuthService {
     };
   }
 
+  /** Phiên đang online poll để hiện alert lớn khi có thiết bị khác xin vào. */
+  listPendingChallengesForUser(userId) {
+    return PendingLoginStore.listPendingForUser(userId).map((p) => ({
+      pendingId: p.id,
+      status: p.status,
+      expiresAt: new Date(p.expiresAt).toISOString(),
+      clientMeta: p.clientMeta || null,
+      activeSession: p.activeSession || null,
+    }));
+  }
+
   async _notifyLoginChallenge(userId, pending) {
     try {
       const NotificationService = require('./NotificationService');

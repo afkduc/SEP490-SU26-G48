@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { loginApi, logoutApi, getMeApi, getServerTime } from '../services/authApi';
+import { loginApi, logoutApi, getMeApi, getServerTime, getMyLoginChallengesApi } from '../services/authApi';
 import { ROLES } from '../constants/roles';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
@@ -455,7 +455,7 @@ function PermissionEventsRunner() {
 
 function LoginChallengeRunner() {
   const { token } = useAuth();
-  // Đảm bảo SSE notifications luôn chạy (kể cả trang không có NotificationBell)
+  // SSE notifications (bell + challenge event). Poll challenges làm backup nếu SSE trễ.
   useNotifications(token);
   const [challenge, setChallenge] = useState(null);
 
@@ -463,11 +463,46 @@ function LoginChallengeRunner() {
     const onChallenge = (e) => {
       const detail = e?.detail;
       if (!detail?.pendingId) return;
-      setChallenge(detail);
+      setChallenge((prev) => (prev?.pendingId === detail.pendingId ? prev : detail));
     };
     window.addEventListener('login-challenge', onChallenge);
     return () => window.removeEventListener('login-challenge', onChallenge);
   }, []);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const data = await getMyLoginChallengesApi();
+        const items = data?.items || data || [];
+        const first = Array.isArray(items) ? items[0] : null;
+        if (cancelled || !first?.pendingId) return;
+        const meta = first.clientMeta || {};
+        setChallenge((prev) => {
+          if (prev?.pendingId === first.pendingId) return prev;
+          return {
+            pendingId: first.pendingId,
+            metadata: meta,
+            device: [meta.browser, meta.os].filter(Boolean).join(' · ') || 'Thiết bị khác',
+            ip: meta.ip,
+            title: 'Yêu cầu đăng nhập mới',
+            message: 'Có thiết bị khác đang cố đăng nhập tài khoản của bạn.',
+          };
+        });
+      } catch {
+        // ignore poll errors
+      }
+    };
+
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [token]);
 
   if (!challenge) return null;
   return (
