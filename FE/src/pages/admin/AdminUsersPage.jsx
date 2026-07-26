@@ -465,7 +465,7 @@ export default function AdminUsersPage() {
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
                     <th>Ngày tạo</th>
-                    <th className="table__actions-col" style={{ textAlign: 'right' }}>Hành động</th>
+                    <th className="table__actions-col">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>

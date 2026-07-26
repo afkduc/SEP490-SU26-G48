@@ -105,10 +105,14 @@
 }
 
 /* ── Action buttons ── */
+.admin-page .table thead th.table__actions-col,
 .admin-users__actions-cell {
-  white-space: nowrap;
   text-align: center;
   vertical-align: middle;
+}
+
+.admin-users__actions-cell {
+  white-space: nowrap;
 }
 
 .action-btns {
