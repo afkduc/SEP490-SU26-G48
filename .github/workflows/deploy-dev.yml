@@ -1,0 +1,25 @@
+name: Deploy to server (dev)
+
+# Chi chay khi co push (bao gom merge PR) vao nhanh dev - deploy ban dev
+# hien tai len server thuc te.
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH vao server, pull code moi nhat, rebuild va restart
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USERNAME }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          script_stop: true
+          script: |
+            cd ~/SEP490-SU26-G48
+            git pull origin dev
+            docker compose up -d --build
+            sudo systemctl reload nginx

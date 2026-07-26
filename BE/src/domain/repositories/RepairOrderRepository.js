@@ -11,6 +11,10 @@ class RepairOrderRepository {
     throw new Error('Method findByCode() must be implemented');
   }
 
+  async findByServiceOrderCode(code) {
+    throw new Error('Method findByServiceOrderCode() must be implemented');
+  }
+
   async findTeamLeadersByBranch(branchId) {
     throw new Error('Method findTeamLeadersByBranch() must be implemented');
   }

@@ -1,5 +1,7 @@
 .part-detail {
   padding: 8px 4px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .part-detail__header {
@@ -56,6 +58,11 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .detail-grid { grid-template-columns: 1fr; }
+  .part-detail__title-row { flex-direction: column; }
 }
 
 .detail-card {
