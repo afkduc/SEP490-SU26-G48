@@ -47,6 +47,14 @@
 }
 
 /* ── Status cell ── */
+.user-status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
 .user-status-cell .badge--success {
   background: #dcfce7;
   color: #15803d;
@@ -66,10 +74,29 @@
   white-space: nowrap;
 }
 
+/* Branch pills — cùng kiểu cho “Tất cả chi nhánh” và chi nhánh cụ thể */
+.badge.badge--branch {
+  display: inline-flex;
+  align-items: center;
+  max-width: 11.5rem;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
 /* Desktop: 2 nut (Chi tiet + Sua) - AN MENU 3 CHAM tren desktop */
 @media (min-width: 641px) {
   .action-btns {
-    display: flex !important;
+    display: inline-flex !important;
   }
 
   .user-action-menu {
@@ -80,19 +107,36 @@
 /* ── Action buttons ── */
 .admin-users__actions-cell {
   white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .action-btns {
-  display: flex;
-  gap: 6px;
-  justify-content: flex-end;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
   align-items: center;
   flex-wrap: nowrap;
+  width: 100%;
 }
 
 .action-btns .btn--sm {
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-width: 92px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  gap: 6px;
   white-space: nowrap;
+}
+
+.admin-users__roles-fallback {
+  padding: 28px 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 /* User action menu - MAC DINH LA AN (chi hien tren mobile) */
@@ -174,23 +218,27 @@
 }
 
 /* ── Buttons color ── */
-.btn--view {
+.admin-page .btn--view,
+.action-btns .btn--view {
   background: #eff6ff;
   color: #2563eb;
-  border-color: #bfdbfe;
+  border: 1.5px solid #bfdbfe;
 }
 
-.btn--view:hover:not(:disabled) {
+.admin-page .btn--view:hover:not(:disabled),
+.action-btns .btn--view:hover:not(:disabled) {
   background: #dbeafe;
 }
 
-.btn--edit {
+.admin-page .btn--edit,
+.action-btns .btn--edit {
   background: #f0fdf4;
   color: #16a34a;
-  border-color: #bbf7d0;
+  border: 1.5px solid #bbf7d0;
 }
 
-.btn--edit:hover:not(:disabled) {
+.admin-page .btn--edit:hover:not(:disabled),
+.action-btns .btn--edit:hover:not(:disabled) {
   background: #dcfce7;
 }
 
@@ -363,8 +411,8 @@
   .table-card .table tbody td:last-child {
     padding-top: 10px;
     border-top: 1px solid #f1f5f9;
-    justify-content: flex-end;
-    flex-wrap: wrap;
+    justify-content: center;
+    flex-wrap: nowrap;
     gap: 8px;
   }
 

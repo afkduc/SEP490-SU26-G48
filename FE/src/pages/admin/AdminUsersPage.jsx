@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
@@ -14,9 +14,9 @@ import UserFormModal from './users/UserFormModal';
 import UserDetailDrawer from './users/UserDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import TableSkeleton from './components/TableSkeleton';
-import AdminRolesPage from './AdminRolesPage';
 import './AdminUsersPage.css';
-import './AdminRolesPage.css';
+
+const AdminRolesPage = lazy(() => import('./AdminRolesPage'));
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -370,7 +370,15 @@ export default function AdminUsersPage() {
       )}
 
       {activeTab === 'roles' ? (
-        <AdminRolesPage embedded onFilterUsersByRole={handleFilterUsersByRole} />
+        <Suspense
+          fallback={
+            <div className="admin-users__roles-fallback" role="status">
+              Đang tải quản lý vai trò...
+            </div>
+          }
+        >
+          <AdminRolesPage embedded onFilterUsersByRole={handleFilterUsersByRole} />
+        </Suspense>
       ) : (
         <>
       {/* Filters */}
@@ -489,24 +497,20 @@ export default function AdminUsersPage() {
                           </div>
                         </td>
                         <td data-label="Email" className="user-table__email">{u.email || '—'}</td>
-                        <td data-label="Chi nhánh" className="user-table__muted">
+                        <td data-label="Chi nhánh">
                           {u.scopeAllBranches ? (
                             <span
-                              className="badge badge--all-branches"
-                              style={{
-                                background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                                color: '#fff',
-                                fontSize: 11,
-                                fontWeight: 600,
-                                padding: '3px 10px',
-                                borderRadius: 10,
-                              }}
+                              className="badge badge--branch"
                               title="Người dùng quản lý tất cả chi nhánh"
                             >
                               Tất cả chi nhánh
                             </span>
+                          ) : u.branchName ? (
+                            <span className="badge badge--branch" title={u.branchName}>
+                              {u.branchName}
+                            </span>
                           ) : (
-                            u.branchName || '—'
+                            <span className="user-table__empty">—</span>
                           )}
                         </td>
                         <td data-label="Vai trò">
@@ -541,9 +545,9 @@ export default function AdminUsersPage() {
                         </td>
                         <td data-label="Ngày tạo" className="admin-users__date">{formatDate(u.createdAt)}</td>
                         <td className="admin-users__actions-cell" data-label="Hành động">
-                          {/* Desktop: 2 nut (Chi tiet + Sua) - Phan quyen chuyen vao Edit modal */}
                           <div className="action-btns">
                             <button
+                              type="button"
                               className="btn btn--sm btn--view"
                               onClick={() => setDetailUserId(u.id)}
                             >
@@ -555,6 +559,7 @@ export default function AdminUsersPage() {
                             </button>
                             <PermissionGate permission="admin:users:update">
                               <button
+                                type="button"
                                 className="btn btn--sm btn--edit"
                                 onClick={() => { setEditUser(u); setShowModal(true); }}
                               >
@@ -566,7 +571,6 @@ export default function AdminUsersPage() {
                               </button>
                             </PermissionGate>
                           </div>
-                          {/* Mobile: menu 3 cham (Chi tiet + Sua) - Phan quyen trong modal Sua */}
                           <UserActionMenu
                             user={u}
                             onView={() => setDetailUserId(u.id)}
