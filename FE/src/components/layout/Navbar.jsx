@@ -97,12 +97,11 @@ const ACCOUNTANT_NAV = [
 
 // ===== General Director (Giám đốc) - xem báo cáo tổng quan, có dropdown =====
 const GENERAL_DIRECTOR_NAV = [
-  { label: 'Tổng quan kho', path: '/inventory', end: true },
-  { label: 'Phụ tùng', path: '/inventory/parts' },
-  { label: 'Tồn kho', path: '/inventory/stock' },
-  { label: 'Phiếu nhập', path: '/inventory/import-requests' },
-  { label: 'Phiếu xuất', path: '/inventory/export-requests' },
-  { label: 'Nhà cung cấp', path: '/inventory/suppliers' },
+  { label: 'Phiếu quyết toán', path: '/general-director/reports/settlements' },
+  { label: 'Doanh thu', path: '/general-director/reports/revenue' },
+  { label: 'Nhân sự vận hành', path: '/general-director/employees' },
+  { label: 'Kỹ thuật viên', path: '/general-director/technicians' },
+  { label: 'Giám đốc chi nhánh', path: '/general-director/branch-managers' },
 ];
 
 // ===== Team Leader (Tổ trưởng kỹ thuật) - chỉ xem công việc được giao =====
@@ -112,12 +111,12 @@ const TEAM_LEADER_NAV = [
 
 const NAV_ITEMS_BY_ROLE = {
   [ROLES.ADMIN]: ADMIN_NAV,
-  general_director: GENERAL_DIRECTOR_NAV,
-  manager: MANAGER_NAV,
-  service_advisor: SERVICE_ADVISOR_NAV,
-  warehouse_staff: WAREHOUSE_STAFF_NAV,
-  accountant: ACCOUNTANT_NAV,
-  team_leader: TEAM_LEADER_NAV,
+  [ROLES.GENERAL_DIRECTOR]: GENERAL_DIRECTOR_NAV,
+  [ROLES.MANAGER]: MANAGER_NAV,
+  [ROLES.SERVICE_ADVISOR]: SERVICE_ADVISOR_NAV,
+  [ROLES.WAREHOUSE_STAFF]: WAREHOUSE_STAFF_NAV,
+  [ROLES.ACCOUNTANT]: ACCOUNTANT_NAV,
+  [ROLES.TEAM_LEADER]: TEAM_LEADER_NAV,
 };
 
 // Cac role co dropdown (vi cac role khac chi co 1-2 muc khong can dropdown).
