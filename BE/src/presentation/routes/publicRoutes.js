@@ -49,6 +49,8 @@ function buildPublicRouter() {
   router.get('/lookup/:code', lookupRateLimiter, controller.lookupPublicProgress);
   router.get('/branches', serviceRequestController.getPublicBranches);
   router.get('/vehicle-brands', serviceRequestController.getPublicVehicleBrands);
+  router.get('/service-packages', serviceRequestController.getPublicServicePackages);
+  router.get('/service-packages/:code', serviceRequestController.getPublicServicePackageByCode);
   router.post('/service-requests', serviceRequestRateLimiter, serviceRequestController.createPublic);
 
   return router;

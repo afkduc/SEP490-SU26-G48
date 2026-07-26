@@ -75,7 +75,7 @@ function buildAuthRouter() {
       try {
         const deviceId = req.user.deviceId || null;
         freshUser.sessionId = req.user.sessionId || null;
-        refreshed = await service.issueTokenWithDevice(freshUser, deviceId, { skipCache: true });
+        refreshed = await service.issueTokenWithDevice(freshUser, deviceId);
       } catch (signErr) {
         console.error('[auth.refresh-permissions] issueToken failed:', signErr?.message || signErr);
         return next(new ApiError(503, 'Khong the tao token moi'));

@@ -43,6 +43,7 @@ async function cleanupStaleSessions() {
     // la "lan hoat dong cuoi cung" (heartbeat). Neu user login 1h truoc, van
     // dang dung (heartbeat vua chay) → KHONG close. Neu user dong tab 6 phut
     // truoc → close ngay lap tuc.
+<<<<<<< HEAD
     //
     // TRANSACTION: close session + close device cung luc de dam bao rang
     // 2 màn login-history va devices luon dong bo (cu: 2 query rieng le,

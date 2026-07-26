@@ -14,6 +14,9 @@ class RepairSettlement {
     this.advisorId = data.advisorId ?? null;
     this.teamLeaderId = data.teamLeaderId ?? null;
     this.teamLeaderName = data.teamLeaderName ?? null;
+    // Lenh sua chua dang hien hanh cua phieu nay (null neu chua gan to
+    // truong) - dung de CVDV huy truc tiep tu man Phieu quyet toan.
+    this.repairOrderId = data.repairOrderId ?? null;
     this.customerRequest = data.customerRequest ?? null;
     this.currentKm = data.currentKm ?? null;
     this.status = data.status ?? 'waiting_repair';
@@ -53,6 +56,7 @@ class RepairSettlement {
       advisorId: headerRow.advisor_id,
       teamLeaderId: headerRow.team_leader_id,
       teamLeaderName: headerRow.team_leader_name,
+      repairOrderId: headerRow.repair_order_id,
       customerRequest: headerRow.customer_request,
       currentKm: headerRow.current_km,
       status: headerRow.status,
