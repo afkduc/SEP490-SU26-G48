@@ -27,7 +27,6 @@ const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
-const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
 const AdminPermissionMatrixPage = lazy(() => import('../pages/admin/AdminPermissionMatrixPage'));
@@ -161,11 +160,7 @@ function AppRoutes() {
               <AdminBranchesPage />
             </ProtectedRoute>
           } />
-          <Route path="roles" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:roles:access">
-              <AdminRolesPage />
-            </ProtectedRoute>
-          } />
+          <Route path="roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
           <Route path="devices" element={
             <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:devices:access">
               <AdminDevicesPage />
