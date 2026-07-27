@@ -4,8 +4,6 @@ const { authenticate, requireAdmin } = require('../../middlewares/auth');
 const { requirePerm, requireScreen } = require('../../middlewares/permission');
 const { trackActivity } = require('../../middlewares');
 const { validateListUsersQuery } = require('../validators/adminUserValidator');
-const buildPermissionMatrixRouter = require('./permissionMatrixRoutes');
-
 /**
  * Admin routes - chi danh cho user co role admin
  *
@@ -34,13 +32,8 @@ function buildAdminRouter() {
   // Debug: xem permissions hien tai cua user (tu JWT, KHONG query DB moi)
   router.get('/debug-permissions', authenticate, controller.debugPermissions);
 
-  // Refresh permissions sau khi admin sua ma tran quyen
+  // Refresh permissions sau khi admin gan/thu hoi role hoac cap quyen
   router.post('/refresh-permissions', authenticate, trackActivity, controller.refreshPermissions);
-
-  // Permission matrix (Role x Screen) - admin-only.
-  // Mount sub-router voi requireAdmin rieng de tranh conflict voi /reissue-token.
-  // L1: requireScreen('X') → screen:X:access (KHÔNG truyền 'access' làm resource)
-  router.use('/permission-matrix', authenticate, requireAdmin, requireScreen('permission_matrix'), trackActivity, buildPermissionMatrixRouter());
 
   router.use(authenticate, requireAdmin, requireScreen('dashboard'), trackActivity);
 
@@ -74,8 +67,6 @@ function buildAdminRouter() {
   router.get('/roles/full', requirePerm('admin:roles:read'), controller.listRolesWithPermissions);
   router.get('/roles/:id', requirePerm('admin:roles:read'), controller.getRoleDetail);
   router.post('/roles', requirePerm('admin:roles:create'), controller.createRole);
-  // Matrix route phai dat TRUOC /roles/:id de tranh Express match 'matrix' lam :id
-  router.put('/roles/matrix/permissions', requirePerm('admin:roles:manage'), controller.saveRolePermissionsMatrix);
   router.put('/roles/:id', requirePerm('admin:roles:update'), controller.updateRole);
   // Soft delete: chi co toggle active/inactive, KHONG co DELETE cung.
   router.patch('/roles/:id/toggle-status', requirePerm('admin:roles:manage'), controller.toggleRoleStatus);
