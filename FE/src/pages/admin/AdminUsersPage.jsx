@@ -34,19 +34,6 @@ const STATUS_CLASS = {
   inactive: 'badge--danger',
 };
 
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  } catch {
-    return value;
-  }
-}
-
 function getInitials(firstName, lastName) {
   if (firstName || lastName) {
     return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
@@ -448,7 +435,7 @@ export default function AdminUsersPage() {
         </div>
 
         {loading && data.total === 0 ? (
-          <TableSkeleton columns={['Người dùng', 'Email', 'Chi nhánh', 'Vai trò', 'Trạng thái', 'Ngày tạo', 'Hành động']} />
+          <TableSkeleton columns={['Người dùng', 'Chi nhánh', 'Vai trò', 'Trạng thái', 'Hành động']} />
         ) : error ? (
           <div className="admin-users__error">
             <strong>Lỗi:</strong> {error.message || 'Không thể tải danh sách'}
@@ -456,22 +443,20 @@ export default function AdminUsersPage() {
         ) : (
           <>
             <div className="table-scroll">
-              <table className="table">
+              <table className="table admin-users__table">
                 <thead>
                   <tr>
                     <th>Người dùng</th>
-                    <th>Email</th>
                     <th>Chi nhánh</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
-                    <th>Ngày tạo</th>
                     <th className="table__actions-col">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(!data.items || data.items.length === 0) ? (
                     <tr>
-                      <td colSpan={7} className="table__empty">
+                      <td colSpan={5} className="table__empty">
                         Không có người dùng nào phù hợp với bộ lọc
                       </td>
                     </tr>
@@ -493,10 +478,14 @@ export default function AdminUsersPage() {
                                 <span className="font-mono">@{u.name}</span>
                                 {u.phone ? ` · ${u.phone}` : ''}
                               </span>
+                              {u.email ? (
+                                <span className="user-name-cell__email" title={u.email}>
+                                  {u.email}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                         </td>
-                        <td data-label="Email" className="user-table__email">{u.email || '—'}</td>
                         <td data-label="Chi nhánh">
                           {u.scopeAllBranches ? (
                             <span
@@ -506,7 +495,7 @@ export default function AdminUsersPage() {
                               Tất cả chi nhánh
                             </span>
                           ) : u.branchName ? (
-                            <span className="badge badge--branch" title={u.branchName}>
+                            <span className="badge badge--branch">
                               {u.branchName}
                             </span>
                           ) : (
@@ -520,7 +509,9 @@ export default function AdminUsersPage() {
                                 const name = typeof r === 'object' && r !== null ? r.roleName : r;
                                 const key = typeof r === 'object' && r !== null ? r.roleId : r;
                                 return (
-                                  <span key={key} className="badge badge--info">{name}</span>
+                                  <span key={key} className="badge badge--info" title={name}>
+                                    {name}
+                                  </span>
                                 );
                               })}
                             </div>
@@ -534,7 +525,10 @@ export default function AdminUsersPage() {
                               {STATUS_LABELS[u.status] || u.status}
                             </span>
                             <button
-                              className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
+                              type="button"
+                              className={`badge admin-users__toggle-badge ${
+                                u.status === 'active' ? 'badge--danger' : 'badge--success'
+                              }`}
                               title={u.status === 'active' ? 'Khóa tài khoản' : 'Kích hoạt lại tài khoản'}
                               onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
                               disabled={togglingId === u.id}
@@ -543,7 +537,6 @@ export default function AdminUsersPage() {
                             </button>
                           </div>
                         </td>
-                        <td data-label="Ngày tạo" className="admin-users__date">{formatDate(u.createdAt)}</td>
                         <td className="admin-users__actions-cell" data-label="Hành động">
                           <div className="action-btns">
                             <button

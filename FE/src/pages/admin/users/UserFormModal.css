@@ -132,6 +132,22 @@
   background: #f1f5f9;
 }
 
+.form__section--security {
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.form__security-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form__security-actions .btn {
+  font-size: 0.8125rem;
+  padding: 8px 12px;
+}
+
 .form__row {
   display: flex;
   gap: 14px;

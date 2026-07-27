@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { adminUsersApi } from '../../../services/adminApi';
-import PermissionGate from '../../../components/PermissionGate';
-import ResetPasswordModal from './ResetPasswordModal';
+import { Link } from 'react-router-dom';
+import { adminUsersApi, adminSpecialtiesApi } from '../../../services/adminApi';
+import { useToast } from '../../../components/common/ToastContext';
 import '../components/AdminDrawer.css';
 
 const STATUS_LABELS = {
@@ -31,19 +31,6 @@ function formatDateTime(value) {
   }
 }
 
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  } catch {
-    return value;
-  }
-}
-
 function getInitials(firstName, lastName) {
   if (firstName || lastName) {
     return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
@@ -51,15 +38,10 @@ function getInitials(firstName, lastName) {
   return '?';
 }
 
-function DetailRow({ icon, label, value, badge }) {
+function DetailRow({ label, value, badge }) {
   return (
     <div className="detail-list__item">
-      <dt>
-        {icon && (
-          <span style={{ opacity: 0.6 }}>{icon}</span>
-        )}
-        {label}
-      </dt>
+      <dt>{label}</dt>
       <dd>
         {badge ? (
           <span className={`badge ${badge}`}>{value}</span>
@@ -72,10 +54,13 @@ function DetailRow({ icon, label, value, badge }) {
 }
 
 export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
+  const toast = useToast();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showReset, setShowReset] = useState(false);
+  const [allSpecialties, setAllSpecialties] = useState([]);
+  const [userSpecialtyIds, setUserSpecialtyIds] = useState([]);
+  const [savingSpecs, setSavingSpecs] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -85,8 +70,16 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
 
     (async () => {
       try {
-        const res = await adminUsersApi.getDetail(userId);
-        if (!cancelled) setUser(res);
+        const [res, specs, userSpecs] = await Promise.all([
+          adminUsersApi.getDetail(userId),
+          adminSpecialtiesApi.list().catch(() => ({ items: [] })),
+          adminSpecialtiesApi.getUserSpecialties(userId).catch(() => ({ items: [] })),
+        ]);
+        if (!cancelled) {
+          setUser(res);
+          setAllSpecialties((specs?.items || []).filter((s) => s.isActive !== false));
+          setUserSpecialtyIds((userSpecs?.items || []).map((s) => s.id || s.specialtyId).filter(Boolean));
+        }
       } catch (err) {
         if (!cancelled) setError(err.message || 'Không tải được chi tiết người dùng');
       } finally {
@@ -100,6 +93,25 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
   const fullName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || '—'
     : '—';
+
+  function toggleSpecialty(id) {
+    setUserSpecialtyIds((prev) => (
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    ));
+  }
+
+  async function handleSaveSpecialties() {
+    setSavingSpecs(true);
+    try {
+      await adminSpecialtiesApi.setUserSpecialties(userId, userSpecialtyIds);
+      toast.success('Đã cập nhật chuyên môn');
+      onRolesChanged?.();
+    } catch (err) {
+      toast.error(err?.message || 'Không lưu được chuyên môn');
+    } finally {
+      setSavingSpecs(false);
+    }
+  }
 
   return (
     <div className="drawer-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
@@ -128,7 +140,6 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
             <div className="drawer__error">{error}</div>
           ) : user ? (
             <>
-              {/* User card */}
               <div className="user-info-card">
                 <div className="user-info-card__avatar">
                   {getInitials(user.firstName, user.lastName)}
@@ -138,6 +149,9 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                   @{user.name}
                   {user.phone ? ` · ${user.phone}` : ''}
                 </p>
+                {user.mustChangePassword && (
+                  <span className="badge badge--danger" style={{ marginTop: 8 }}>Phải đổi mật khẩu</span>
+                )}
                 {user.roles?.length > 0 && (
                   <div className="user-info-card__roles">
                     {user.roles.map((r) => {
@@ -151,24 +165,22 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                 )}
               </div>
 
-              {/* Detail list */}
               <dl className="detail-list">
                 <div className="detail-list__group">
                   <div className="detail-list__group-title">Thông tin tài khoản</div>
                 </div>
                 <div className="detail-list__group">
-                  <DetailRow
-                    label="ID"
-                    value={<span className="font-mono">#{user.id}</span>}
-                  />
-                  <DetailRow
-                    label="Email"
-                    value={user.email}
-                  />
+                  <DetailRow label="ID" value={<span className="font-mono">#{user.id}</span>} />
+                  <DetailRow label="Email" value={user.email} />
                   <DetailRow
                     label="Trạng thái"
                     value={STATUS_LABELS[user.status] || user.status}
                     badge={STATUS_CLASS[user.status] || ''}
+                  />
+                  <DetailRow
+                    label="Đổi MK bắt buộc"
+                    value={user.mustChangePassword ? 'Có' : 'Không'}
+                    badge={user.mustChangePassword ? 'badge--danger' : 'badge--success'}
                   />
                 </div>
 
@@ -176,18 +188,9 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                   <div className="detail-list__group-title">Thông tin cá nhân</div>
                 </div>
                 <div className="detail-list__group">
-                  <DetailRow
-                    label="Họ"
-                    value={user.firstName || '—'}
-                  />
-                  <DetailRow
-                    label="Tên"
-                    value={user.lastName || '—'}
-                  />
-                  <DetailRow
-                    label="Số điện thoại"
-                    value={user.phone || '—'}
-                  />
+                  <DetailRow label="Họ" value={user.firstName || '—'} />
+                  <DetailRow label="Tên" value={user.lastName || '—'} />
+                  <DetailRow label="Số điện thoại" value={user.phone || '—'} />
                 </div>
 
                 <div className="detail-list__group">
@@ -205,13 +208,60 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                 </div>
 
                 <div className="detail-list__group">
+                  <div className="detail-list__group-title">Chuyên môn</div>
+                </div>
+                <div className="detail-list__group" style={{ padding: '8px 0 12px' }}>
+                  {allSpecialties.length === 0 ? (
+                    <span style={{ color: '#94a3b8', fontSize: 13 }}>Chưa có chuyên môn trong hệ thống</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {allSpecialties.map((s) => {
+                        const id = s.id;
+                        const checked = userSpecialtyIds.includes(id);
+                        return (
+                          <label
+                            key={id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '4px 10px',
+                              borderRadius: 999,
+                              border: `1px solid ${checked ? '#4f46e5' : '#e2e8f0'}`,
+                              background: checked ? '#eef2ff' : '#fff',
+                              fontSize: 12,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleSpecialty(id)}
+                            />
+                            {s.specialtyName || s.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {allSpecialties.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn--secondary btn--sm"
+                      style={{ marginTop: 10 }}
+                      disabled={savingSpecs}
+                      onClick={handleSaveSpecialties}
+                    >
+                      {savingSpecs ? 'Đang lưu...' : 'Lưu chuyên môn'}
+                    </button>
+                  )}
+                </div>
+
+                <div className="detail-list__group">
                   <div className="detail-list__group-title">Lịch sử</div>
                 </div>
                 <div className="detail-list__group">
-                  <DetailRow
-                    label="Ngày tạo"
-                    value={formatDateTime(user.createdAt)}
-                  />
+                  <DetailRow label="Ngày tạo" value={formatDateTime(user.createdAt)} />
                   <DetailRow
                     label="Đăng nhập cuối"
                     value={user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Chưa có dữ liệu'}
@@ -222,31 +272,19 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
           ) : null}
         </div>
 
-        <div className="drawer__footer">
-          <PermissionGate permission="admin:users:update">
-            <button
+        <div className="drawer__footer" style={{ flexWrap: 'wrap', gap: 8 }}>
+          {user?.name && (
+            <Link
               className="drawer__btn-secondary"
-              onClick={() => setShowReset(true)}
-              type="button"
-              disabled={!user?.id}
-              title="Tạo mật khẩu mới ngẫu nhiên cho người dùng này"
+              to={`/admin/logs?userName=${encodeURIComponent(user.name)}`}
+              onClick={() => onClose?.()}
+              title="Mở nhật ký hoạt động đã lọc theo user này"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
-              Đặt lại mật khẩu
-            </button>
-          </PermissionGate>
+              Xem nhật ký
+            </Link>
+          )}
         </div>
       </div>
-
-      {showReset && user && (
-        <ResetPasswordModal
-          user={{ id: user.id, name: fullName, email: user.email }}
-          onClose={() => setShowReset(false)}
-        />
-      )}
     </div>
   );
 }
