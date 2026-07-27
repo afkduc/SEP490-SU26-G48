@@ -7,6 +7,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
 import LoginChallengeModal from '../components/LoginChallengeModal';
+import SessionTakenOverModal from '../components/SessionTakenOverModal';
 import {
   resetSessionExpiredFlag,
   cancelAllPendingRequests,
@@ -401,7 +402,7 @@ export function AppProvider({ children }) {
           Tu tat khi user logout. Tu backoff khi nhan 401 de tranh spam. */}
       {isAuthenticated ? <HeartbeatRunner /> : null}
       {isAuthenticated ? <PermissionEventsRunner /> : null}
-      {/* Login challenge (chờ Approve) đang tắt — bật lại cùng LOGIN_CHALLENGE_ENABLED trên BE */}
+      {isAuthenticated ? <SessionTakenOverRunner /> : null}
       {children}
     </AppContext.Provider>
   );
@@ -510,6 +511,30 @@ function LoginChallengeRunner() {
     <LoginChallengeModal
       challenge={challenge}
       onClose={() => setChallenge(null)}
+    />
+  );
+}
+
+/** Nghe SSE SESSION_TAKEN_OVER + giữ SSE notifications sống khi đã login. */
+function SessionTakenOverRunner() {
+  const { token } = useAuth();
+  useNotifications(token);
+  const [takenOver, setTakenOver] = useState(null);
+
+  useEffect(() => {
+    const onTakenOver = (e) => {
+      const detail = e?.detail || {};
+      setTakenOver((prev) => prev || detail);
+    };
+    window.addEventListener('session-taken-over', onTakenOver);
+    return () => window.removeEventListener('session-taken-over', onTakenOver);
+  }, []);
+
+  if (!takenOver) return null;
+  return (
+    <SessionTakenOverModal
+      detail={takenOver}
+      onClose={() => setTakenOver(null)}
     />
   );
 }
