@@ -7,10 +7,14 @@ import {
 } from '../../contexts/AppContext';
 import { getMyProfile, updateMyProfile, changePassword, uploadMyAvatar } from '../../services/profileApi';
 import {
-  loadSessionUser,
-  mergeProfileIntoSessionUser,
-  saveSessionUser,
+  syncProfileSession,
 } from '../../utils/profileSession';
+import {
+  isRoleProfilePath,
+  isProfileNotificationsPath,
+  isProfileEditPath,
+} from '../../utils/profilePaths';
+import { useAuthenticatedAvatarUrl } from '../../hooks/useAuthenticatedAvatarUrl';
 import './AdminProfilePage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -217,6 +221,25 @@ export default function AdminProfilePage() {
 
   const forcedChange = searchParams.get('reason') === 'forced';
 
+  // Redirect ve dung URL profile/edit theo role (khong de /dashboard/profile cho admin...)
+  useEffect(() => {
+    if (!user) return;
+    const path = location.pathname;
+    if (isProfileNotificationsPath(path)) return;
+    if (!isRoleProfilePath(path)) return;
+
+    const viewPath = getRoleProfilePath(user);
+    const editPath = getRoleProfileEditPath(user);
+
+    if (isProfileEditPath(path)) {
+      if (path !== editPath) navigate(editPath, { replace: true });
+      return;
+    }
+    if (path !== viewPath) {
+      navigate(viewPath, { replace: true });
+    }
+  }, [user, location.pathname, navigate]);
+
   useEffect(() => {
     if (searchParams.get('tab') !== 'edit') return;
     if (isEditMode) {
@@ -253,9 +276,9 @@ export default function AdminProfilePage() {
   const avatarInputRef = useRef(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState(null);
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null); // preview of selected file
-  const [avatarDisplayUrl, setAvatarDisplayUrl] = useState(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null);
   const [avatarCacheBuster, setAvatarCacheBuster] = useState(0);
+  const avatarDisplayUrl = useAuthenticatedAvatarUrl(profile?.avatar, avatarCacheBuster);
 
   // Load profile on mount
   useEffect(() => {
@@ -323,17 +346,15 @@ export default function AdminProfilePage() {
       setProfile(updated);
       setEditSuccess('Cập nhật thông tin thành công!');
 
-      // Update localStorage user va AppContext user + permissions de Navbar,
-      // permission gate va role badge dong bo ngay (khong can F5).
-      try {
-        const existing = loadSessionUser();
-        const updatedUser = mergeProfileIntoSessionUser(existing, updated);
-        saveSessionUser(updatedUser);
-        setUser(updatedUser);
-        if (typeof reloadPermissions === 'function') {
-          reloadPermissions();
-        }
-      } catch (_) {}
+      syncProfileSession(user, updated, setUser);
+      if (typeof reloadPermissions === 'function') {
+        reloadPermissions();
+      }
+
+      // Giu dung trang edit cua role sau khi luu
+      if (isEditMode && location.pathname !== profileEditPath) {
+        navigate(profileEditPath, { replace: true });
+      }
 
       setTimeout(() => setEditSuccess(null), 3000);
     } catch (err) {
@@ -344,54 +365,18 @@ export default function AdminProfilePage() {
   }
 
   useEffect(() => {
-    // Revoke local object URL when it changes/unmount to avoid memory leaks.
     if (!avatarPreviewUrl) return undefined;
     return () => {
       try { URL.revokeObjectURL(avatarPreviewUrl); } catch (_) {}
     };
   }, [avatarPreviewUrl]);
 
+  // Giu preview local cho den khi anh tu server load xong
   useEffect(() => {
-    let cancelled = false;
-    let objectUrl = null;
-
-    async function loadAvatar() {
-      if (!profile?.avatar) {
-        setAvatarDisplayUrl(null);
-        return;
-      }
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setAvatarDisplayUrl(null);
-        return;
-      }
-
-      try {
-        const res = await fetch(`/api/profile/me/avatar?ts=${avatarCacheBuster}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          setAvatarDisplayUrl(null);
-          return;
-        }
-        const blob = await res.blob();
-        objectUrl = URL.createObjectURL(blob);
-        if (!cancelled) {
-          setAvatarDisplayUrl(objectUrl);
-        }
-      } catch (_) {
-        if (!cancelled) setAvatarDisplayUrl(null);
-      }
+    if (avatarDisplayUrl && avatarPreviewUrl) {
+      setAvatarPreviewUrl(null);
     }
-
-    loadAvatar();
-    return () => {
-      cancelled = true;
-      if (objectUrl) {
-        try { URL.revokeObjectURL(objectUrl); } catch (_) {}
-      }
-    };
-  }, [profile?.avatar, avatarCacheBuster]);
+  }, [avatarDisplayUrl, avatarPreviewUrl]);
 
   function openAvatarPicker() {
     avatarInputRef.current?.click?.();
@@ -405,25 +390,15 @@ export default function AdminProfilePage() {
     setAvatarPreviewUrl(() => URL.createObjectURL(file));
     setAvatarUploading(true);
     try {
-      await uploadMyAvatar(file);
+      const updated = await uploadMyAvatar(file);
       setAvatarCacheBuster((v) => v + 1);
-
-      const data = await getMyProfile();
-      setProfile(data);
-
-      // Sync AppContext + localStorage so Navbar (và các component khác) cập nhật ngay.
-      try {
-        const existing = loadSessionUser();
-        const updatedUser = mergeProfileIntoSessionUser(existing, data);
-        saveSessionUser(updatedUser);
-        setUser(updatedUser);
-      } catch (_) {}
+      setProfile(updated);
+      syncProfileSession(user, updated, setUser);
     } catch (err) {
       setAvatarError(err?.message || 'Không thể cập nhật avatar');
+      setAvatarPreviewUrl(null);
     } finally {
       setAvatarUploading(false);
-      setAvatarPreviewUrl(null);
-      // Reset input để chọn lại cùng 1 file cũng trigger onChange.
       e.target.value = '';
     }
   }
@@ -524,6 +499,8 @@ export default function AdminProfilePage() {
 
               <input
                 ref={avatarInputRef}
+                id="profile-avatar-input"
+                name="avatar"
                 type="file"
                 accept="image/*"
                 style={{ display: 'none' }}
