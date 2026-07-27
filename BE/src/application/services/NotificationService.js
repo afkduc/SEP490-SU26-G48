@@ -52,6 +52,14 @@ const NOTIFICATION_EVENTS = {
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
+  SESSION_TAKEN_OVER: {
+    title: 'Đã có người đăng nhập tài khoản của bạn',
+    severity: SEVERITY.CRITICAL,
+    messageTemplates: {
+      default: 'Đã có người đăng nhập tài khoản của bạn từ thiết bị khác ({device}). Phiên hiện tại sẽ bị đăng xuất.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
   NEW_DEVICE: {
     title: 'Đăng nhập từ thiết bị mới',
     severity: SEVERITY.WARNING,
