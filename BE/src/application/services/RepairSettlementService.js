@@ -31,15 +31,6 @@ const ACTIVE_STATUS_LABELS = {
   waiting_payment: 'chờ thanh toán',
 };
 
-// FE gui "Ngay ke tiep" dang dd/mm/yyyy (o nhap tu do, khong phai <input type="date">).
-function parseDDMMYYYY(value) {
-  if (!value) return null;
-  const m = String(value).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  const [, dd, mm, yyyy] = m;
-  return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-}
-
 class RepairSettlementService {
   constructor({ repairSettlementRepository }) {
     this.repairSettlementRepository = repairSettlementRepository;
@@ -237,8 +228,6 @@ class RepairSettlementService {
       vat: payload.vat,
       freeAmount: payload.freeAmount,
       total: payload.total,
-      nextMaintenanceKm: payload.nextMaintenanceKm ? Number(payload.nextMaintenanceKm) : null,
-      nextMaintenanceDate: parseDDMMYYYY(payload.nextMaintenanceDate),
       items,
     };
   }
