@@ -184,6 +184,20 @@ class ProfileController {
         requesterId: req.user.userId,
       }, { excludeUserId: req.user.userId });
 
+      // Ghi audit log yêu cầu cấp quyền
+      try {
+        await auditCrud.create(req, {
+          tableName: 'notifications',
+          entityName: 'Yêu cầu cấp quyền',
+          entityCode: permissionKey,
+          recordId: req.user.userId,
+          newData: { permissionKey, reason: reason || null, page: page || null },
+          description: `${userName} yêu cầu cấp quyền ${permissionKey}`,
+        });
+      } catch (auditErr) {
+        console.warn('[ProfileController] requestPermission audit failed:', auditErr.message);
+      }
+
       return success(res, null, 'Đã gửi yêu cầu cấp quyền tới quản trị viên');
     } catch (err) {
       next(err);

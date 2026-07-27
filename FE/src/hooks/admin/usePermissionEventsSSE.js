@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../../config';
+import { LOGOUT_KEY, consumeSkipNextPermissionChange } from '../../services/httpClient';
 
 const SSE_RECONNECT_DELAY_MS = 5000;
 const REFRESH_API_TIMEOUT_MS = 10000;
+// Cooldown giua 2 lan refresh permission de tranh loop khi BE broadcast
+// lien tuc nhieu event (VD: cac tab khac dang sua nhieu role cung luc).
+const REFRESH_COOLDOWN_MS = 1500;
 
 /**
  * Hook SSE lang nghe permission-changed events tu server.
@@ -37,6 +41,10 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
   const enabledRef = useRef(enabled);
   // Dem so lan SSE fail lien tiep - neu >= 2 lan -> refresh token truoc
   const authFailCountRef = useRef(0);
+  // Timestamp cua lan refresh gan nhat -> dung cooldown de tranh loop.
+  const lastRefreshAtRef = useRef(0);
+  // Set neu co 1 refresh dang chay (de tranh 2 refresh song song).
+  const refreshInFlightRef = useRef(false);
 
   // Sync refs khi props thay doi (tranh stale closure nhung khong reconnect)
   useEffect(() => {
@@ -63,6 +71,20 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
       console.warn('[usePermissionEventsSSE] refresh skipped: no token');
       return;
     }
+
+    // Chong loop: neu co refresh khac dang chay, hoac refresh gan day
+    // (trong REFRESH_COOLDOWN_MS), bo qua. Day fix tinh trang BE broadcast
+    // lien tuc nhieu event (VD: admin luu matrix -> trigger 1 refresh ->
+    // refresh xong set state -> ProtectedRoute re-mount -> ...).
+    if (refreshInFlightRef.current) {
+      return;
+    }
+    const now = Date.now();
+    if (now - lastRefreshAtRef.current < REFRESH_COOLDOWN_MS) {
+      return;
+    }
+    lastRefreshAtRef.current = now;
+    refreshInFlightRef.current = true;
 
     setRefreshing(true);
     try {
@@ -105,8 +127,10 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
         return;
       }
 
-      // Lay permissions tu user.permissions (BE da embed vao JWT payload)
-      const newPermissions = Array.isArray(newUser.permissions) ? newUser.permissions : [];
+      // Ưu tiên effectivePermissions (full L2); fallback user.permissions (BE đã gắn full khi refresh).
+      const newPermissions = Array.isArray(payload?.effectivePermissions)
+        ? payload.effectivePermissions
+        : (Array.isArray(newUser.permissions) ? newUser.permissions : []);
 
       // Xac dinh storage (local hay session) dua vao token hien tai
       const inLocal = localStorage.getItem('token');
@@ -156,6 +180,7 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
       setError(err && err.message);
     } finally {
       setRefreshing(false);
+      refreshInFlightRef.current = false;
     }
   };
 
@@ -166,6 +191,24 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
     }
 
     let isCancelled = false;
+
+    // Lang nghe logout: dong SSE va huy refresh dang chay de khong gay
+    // them 401 sau khi user da clear session.
+    const onLogout = () => {
+      isCancelled = true;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (eventSourceRef.current) {
+        try { eventSourceRef.current.close(); } catch { /* ignore */ }
+        eventSourceRef.current = null;
+      }
+      setConnected(false);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener(LOGOUT_KEY, onLogout);
+    }
 
     const connect = () => {
       if (isCancelled) return;
@@ -199,13 +242,21 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
           if (isCancelled) return;
           try {
             const data = JSON.parse(e.data);
-            // Callback cho UI (VD: hien toast)
+            // Callback cho UI (VD: hien toast). Van goi callback de UI
+            // hien "da cap nhat" toast (admin muon biet BE da nhan save).
             try {
               onEventRef.current && onEventRef.current(data);
             } catch (cbErr) {
               console.warn('[usePermissionEventsSSE] onPermissionChanged threw:', cbErr);
             }
-            // Refresh permission ngay
+            // Neu chinh admin vua SELF_LU matrix (co skip flag), KHONG
+            // refresh permissions: admin da biet permission moi va state
+            // FE da duoc cap nhat qua response API. Refresh chi gay them
+            // 1 round-trip + co the 403 neu token cu dang in-flight.
+            if (consumeSkipNextPermissionChange()) {
+              return;
+            }
+            // Refresh permission ngay (co cooldown/in-flight check ben trong).
             refreshPermissions();
           } catch (parseErr) {
             console.warn('[usePermissionEventsSSE] parse event failed:', parseErr);
@@ -268,6 +319,9 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(LOGOUT_KEY, onLogout);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -333,6 +333,15 @@
   font-size: 0.82rem;
   font-weight: 600;
   color: #374151;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-label__icon {
+  display: inline-flex;
+  color: #64748b;
+  flex-shrink: 0;
 }
 
 .required {
@@ -697,8 +706,8 @@
 }
 
 .status-badge--inactive {
-  background: #f1f5f9;
-  color: #64748b;
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .status-badge--locked {

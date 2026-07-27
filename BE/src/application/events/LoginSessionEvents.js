@@ -29,9 +29,13 @@ function getEmitter() {
  * @param {object} data - { userId, userName, ipAddress, browser, os, sessionId, ... }
  */
 function emitLoginSessionEvent(eventType, data) {
+  // serverTime: them vao event de FE tinh clockOffset (dong bo thoi gian
+  // giua server & client, tranh sai lech timezone hien thi tren man login
+  // history va devices).
   getEmitter().emit('login-session', eventType, {
     type: eventType,
     timestamp: new Date().toISOString(),
+    serverTime: new Date().toISOString(),
     ...data,
   });
 }
