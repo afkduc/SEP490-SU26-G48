@@ -42,13 +42,6 @@ const SERVICE_ADVISOR_NAV = [
       { label: 'Tạo quyết toán', path: '/repair-settlement/create' },
     ],
   },
-  {
-    label: 'Lệnh sửa chữa',
-    children: [
-      { label: 'Danh sách lệnh sửa chữa', path: '/repair-orders' },
-      { label: 'Tạo lệnh sửa chữa', path: '/repair-orders/create' },
-    ],
-  },
   { label: 'Chăm sóc khách hàng', path: '/customer-care' },
   { label: 'Khách hàng', path: '/customers' },
 ];

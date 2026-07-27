@@ -26,6 +26,18 @@ class RepairSettlementRepository {
   async updateStatus(id, status, { issuedBy } = {}) {
     throw new Error('Method updateStatus() must be implemented');
   }
+
+  async createPayosTransaction(serviceOrderId, { orderCode, paymentLinkId, qrCode, checkoutUrl, amount, expiredAt }) {
+    throw new Error('Method createPayosTransaction() must be implemented');
+  }
+
+  async findPayosTransactionByOrderCode(orderCode) {
+    throw new Error('Method findPayosTransactionByOrderCode() must be implemented');
+  }
+
+  async markPayosTransactionPaid(orderCode, { reference, paidAt }) {
+    throw new Error('Method markPayosTransactionPaid() must be implemented');
+  }
 }
 
 module.exports = RepairSettlementRepository;
