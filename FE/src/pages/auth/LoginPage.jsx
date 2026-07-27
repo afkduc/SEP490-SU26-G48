@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { routeAfterLogin } from '../../utils/roleRedirect';
@@ -18,11 +18,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWrongBranchModal, setShowWrongBranchModal] = useState(false);
-  /** { message, session, waitSeconds, remaining } — chờ takeover rồi force login */
-  const [loginWait, setLoginWait] = useState(null);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
-  const waitTimerRef = useRef(null);
-  const cancelledWaitRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -51,71 +47,16 @@ export default function LoginPage() {
     return () => clearInterval(t);
   }, [lockoutSeconds]);
 
-  useEffect(() => () => {
-    if (waitTimerRef.current) clearInterval(waitTimerRef.current);
-    cancelledWaitRef.current = true;
-  }, []);
-
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setError('');
   };
 
-  const stopLoginWait = () => {
-    cancelledWaitRef.current = true;
-    if (waitTimerRef.current) {
-      clearInterval(waitTimerRef.current);
-      waitTimerRef.current = null;
-    }
-    setLoginWait(null);
-  };
-
-  const completeForceLogin = async () => {
-    setLoading(true);
-    try {
-      const result = await login(form.identifier, form.password, rememberMe, form.branchId, {
-        force: true,
-      });
-      if (cancelledWaitRef.current) return;
-      setLoginWait(null);
-      navigate(routeAfterLogin(result?.user), { replace: true });
-    } catch (err) {
-      if (cancelledWaitRef.current) return;
-      setLoginWait(null);
-      setError(err.message || 'Không thể hoàn tất đăng nhập');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startLoginWait = ({ message, session, waitSeconds }) => {
-    cancelledWaitRef.current = false;
-    if (waitTimerRef.current) clearInterval(waitTimerRef.current);
-    let remaining = Math.max(1, Number(waitSeconds) || 5);
-    setLoginWait({ message, session, waitSeconds: remaining, remaining });
-    waitTimerRef.current = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(waitTimerRef.current);
-        waitTimerRef.current = null;
-        setLoginWait((prev) => (prev ? { ...prev, remaining: 0 } : null));
-        if (!cancelledWaitRef.current) {
-          completeForceLogin();
-        }
-        return;
-      }
-      setLoginWait((prev) => (prev ? { ...prev, remaining } : null));
-    }, 1000);
-  };
-
   const doLogin = async () => {
     setLoading(true);
     setError('');
-    stopLoginWait();
-    cancelledWaitRef.current = false;
     try {
       const result = await login(form.identifier, form.password, rememberMe, form.branchId);
-      setLoginWait(null);
       navigate(routeAfterLogin(result?.user), { replace: true });
     } catch (err) {
       if (err.status === 403 && err.message === WRONG_BRANCH_MESSAGE) {
@@ -125,13 +66,15 @@ export default function LoginPage() {
         && (err.code === 'LOGIN_WAIT' || err.details?.code === 'LOGIN_WAIT'
           || err.code === 'LOGIN_PENDING' || err.details?.code === 'LOGIN_PENDING')
       ) {
-        // LOGIN_WAIT: countdown rồi force. LOGIN_PENDING legacy: cũng countdown force (không poll approve).
-        const waitSeconds = err.details?.waitSeconds || 5;
-        startLoginWait({
-          message: err.message,
-          session: err.details?.session || null,
-          waitSeconds,
-        });
+        // Backward compatibility: nếu BE cũ vẫn trả 409 thì force-login ngay.
+        try {
+          const result = await login(form.identifier, form.password, rememberMe, form.branchId, {
+            force: true,
+          });
+          navigate(routeAfterLogin(result?.user), { replace: true });
+        } catch (forceErr) {
+          setError(forceErr?.message || 'Không thể đăng nhập ngay lúc này');
+        }
       } else if (err.status === 429 || err.code === 'LOGIN_LOCKED' || err.details?.suggestChangePassword) {
         const wait = err.details?.waitSeconds || Math.ceil((err.details?.remainingMs || 0) / 1000) || 10;
         setLockoutSeconds(wait);
@@ -288,43 +231,6 @@ export default function LoginPage() {
             <p className="login-modal-message">{WRONG_BRANCH_MESSAGE}</p>
             <button className="login-modal-btn" onClick={() => setShowWrongBranchModal(false)}>
               Đã hiểu
-            </button>
-          </div>
-        </div>
-      )}
-
-      {loginWait && (
-        <div className="login-modal-overlay">
-          <div className="login-modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="login-modal-icon" style={{ color: '#4f46e5' }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-            </div>
-            <h2 className="login-modal-title">
-              {loginWait.remaining > 0
-                ? `Đăng nhập sau ${loginWait.remaining}s`
-                : 'Đang đăng nhập...'}
-            </h2>
-            <p className="login-modal-message">
-              {loginWait.message
-                || 'Tài khoản đang được sử dụng trên thiết bị khác. Bạn sẽ được đăng nhập tự động.'}
-            </p>
-            {loginWait.session && (
-              <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px' }}>
-                Phiên hiện tại: {[loginWait.session.browser, loginWait.session.os].filter(Boolean).join(' · ') || 'Thiết bị khác'}
-                {loginWait.session.ip ? ` · IP ${loginWait.session.ip}` : ''}
-              </p>
-            )}
-            <button
-              type="button"
-              className="login-modal-btn"
-              style={{ background: '#fff', color: '#334155', border: '1px solid #cbd5e1' }}
-              onClick={stopLoginWait}
-              disabled={loading || loginWait.remaining <= 0}
-            >
-              Hủy
             </button>
           </div>
         </div>
