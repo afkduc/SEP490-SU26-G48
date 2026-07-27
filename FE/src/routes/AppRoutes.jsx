@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
+import ProfileRedirect from '../components/ProfileRedirect';
 import SessionExpiredModal from '../components/SessionExpiredModal';
 import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
@@ -107,6 +108,30 @@ function Loading() {
   );
 }
 
+function ProfilePageLayout() {
+  return (
+    <AppLayout>
+      <Outlet />
+    </AppLayout>
+  );
+}
+
+function RoleProfileRoutes({ path, roles }) {
+  return (
+    <Route
+      path={path}
+      element={
+        <ProtectedRoute roles={roles}>
+          <ProfilePageLayout />
+        </ProtectedRoute>
+      }
+    >
+      <Route index element={<AdminProfilePage />} />
+      <Route path="edit" element={<AdminProfilePage />} />
+    </Route>
+  );
+}
+
 function AppRoutes() {
   return (
     <>
@@ -163,8 +188,34 @@ function AppRoutes() {
           <Route path="logs" element={<AuditLogsPage />} />
           <Route path="login-sessions" element={<LoginSessionsPage />} />
           <Route path="profile" element={<AdminProfilePage />} />
+          <Route path="profile/edit" element={<AdminProfilePage />} />
           <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
         </Route>
+
+        {/* Hồ sơ cá nhân — URL riêng theo từng role (view + edit) */}
+        <RoleProfileRoutes path={ROUTES.DASHBOARD_PROFILE} roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]} />
+        <RoleProfileRoutes path={ROUTES.MANAGER_PROFILE} roles={[ROLES.MANAGER, ROLES.ADMIN]} />
+        <RoleProfileRoutes path={ROUTES.DIRECTOR_PROFILE} roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]} />
+        <RoleProfileRoutes path={ROUTES.REPAIR_ORDERS_PROFILE} roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]} />
+        <RoleProfileRoutes path={ROUTES.INVENTORY_PROFILE} roles={[ROLES.WAREHOUSE_STAFF, ROLES.ADMIN]} />
+
+        {/* Legacy /profile, /profile/edit → redirect theo role */}
+        <Route
+          path="/profile/edit"
+          element={
+            <ProtectedRoute>
+              <ProfileRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfileRedirect />
+            </ProtectedRoute>
+          }
+        />
 
         {/* General Director */}
         <Route
@@ -185,18 +236,6 @@ function AppRoutes() {
             <ProtectedRoute roles={[ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <ManagerPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Hồ sơ cá nhân — mọi role đã đăng nhập */}
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <AdminProfilePage />
               </AppLayout>
             </ProtectedRoute>
           }

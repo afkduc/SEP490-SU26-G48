@@ -1,7 +1,16 @@
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import {
+  useAuth,
+  getRoleProfilePath,
+  getRoleProfileEditPath,
+} from '../../contexts/AppContext';
 import { getMyProfile, updateMyProfile, changePassword, uploadMyAvatar } from '../../services/profileApi';
+import {
+  loadSessionUser,
+  mergeProfileIntoSessionUser,
+  saveSessionUser,
+} from '../../utils/profileSession';
 import './AdminProfilePage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -194,21 +203,30 @@ function PasswordInput({ label, id, value, onChange, placeholder, error }) {
 export default function AdminProfilePage() {
   const { user, setUser, reloadPermissions } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const profileBasePath = getRoleProfilePath(user);
+  const profileEditPath = getRoleProfileEditPath(user);
+  const isEditMode = location.pathname.endsWith('/edit');
+  const activeTab = isEditMode ? 'edit' : 'view';
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
-  // Hien thi banner neu bi redirect tu login vi mustChangePassword=true
   const forcedChange = searchParams.get('reason') === 'forced';
 
-  // Tab: 'view' | 'edit' | 'password'
-  // Doc tu query param ?tab=edit de auto switch khi can.
-  // Tab 'password' da bi an (se lam luong rieng qua email) -> fallback 'view'.
-  const initialTab = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState(
-    initialTab === 'edit' ? 'edit' : 'view'
-  );
+  useEffect(() => {
+    if (searchParams.get('tab') !== 'edit') return;
+    if (isEditMode) {
+      if (searchParams.get('tab')) {
+        setSearchParams({}, { replace: true });
+      }
+      return;
+    }
+    navigate(profileEditPath, { replace: true });
+  }, [searchParams, isEditMode, navigate, profileEditPath, setSearchParams]);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -265,17 +283,19 @@ export default function AdminProfilePage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Switch tab resets messages
-  // Tab 'password' bi an nen neu co ai do goi handleTabChange('password') qua
-  // query param cu, fallback ve 'view' de tranh render content bi an.
   function handleTabChange(tab) {
     const safeTab = tab === 'password' ? 'view' : tab;
-    setActiveTab(safeTab);
     setEditError(null);
     setEditSuccess(null);
     setPwSuccess(null);
     setPwErrors({});
-    // Clear query param ?tab= khi user tu chuyen tab (giu URL sach)
+
+    if (safeTab === 'edit') {
+      if (!isEditMode) navigate(profileEditPath);
+    } else if (isEditMode) {
+      navigate(profileBasePath);
+    }
+
     if (searchParams.get('tab') || searchParams.get('reason')) {
       setSearchParams({}, { replace: true });
     }
@@ -305,37 +325,11 @@ export default function AdminProfilePage() {
 
       // Update localStorage user va AppContext user + permissions de Navbar,
       // permission gate va role badge dong bo ngay (khong can F5).
-      // Bug cu: chi setProfile local + luu 1 phan vao localStorage. Neu BE
-      // tra updated.roles hoac updated.permissions (khi admin thay doi role
-      // cua chinh minh), Navbar va PermissionGate van hien thi role cu.
       try {
-        const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
-        const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
-
-        const updatedUser = {
-          ...(raw ? JSON.parse(raw) : {}),
-          ...updated,
-          // Dam bao cac field chinh xac nhat quan he giua FE va BE
-          id: updated.id ?? updated.userId,
-          email: updated.email,
-          userName: updated.userName || updated.name,
-          name:
-            `${updated.firstName || ''} ${updated.lastName || ''}`.trim() ||
-            updated.name,
-          firstName: updated.firstName,
-          lastName: updated.lastName,
-          phone: updated.phone,
-          roles: updated.roles,
-          permissions: updated.permissions,
-          branchId: updated.branchId,
-          branchName: updated.branchName,
-        };
-        storage.setItem('user', JSON.stringify(updatedUser));
-
-        // Cap nhat AppContext state de component khac (Navbar, AdminLayout)
-        // re-render voi thong tin moi ngay lap tuc.
+        const existing = loadSessionUser();
+        const updatedUser = mergeProfileIntoSessionUser(existing, updated);
+        saveSessionUser(updatedUser);
         setUser(updatedUser);
-        // Re-load permissions tu storage (BE co the da tra permissions moi).
         if (typeof reloadPermissions === 'function') {
           reloadPermissions();
         }
@@ -419,25 +413,9 @@ export default function AdminProfilePage() {
 
       // Sync AppContext + localStorage so Navbar (và các component khác) cập nhật ngay.
       try {
-        const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
-        const existing = raw ? JSON.parse(raw) : {};
-        const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
-
-        const updatedUser = {
-          ...existing,
-          id: data.id ?? data.userId,
-          email: data.email,
-          userName: data.userName || existing.userName || data.email,
-          name: `${data.firstName || ''} ${data.lastName || ''}`.trim() || existing.name,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
-          roles: data.roles,
-          avatar: data.avatar,
-          branchId: data.branchId,
-          branchName: data.branchName,
-        };
-        storage.setItem('user', JSON.stringify(updatedUser));
+        const existing = loadSessionUser();
+        const updatedUser = mergeProfileIntoSessionUser(existing, data);
+        saveSessionUser(updatedUser);
         setUser(updatedUser);
       } catch (_) {}
     } catch (err) {
