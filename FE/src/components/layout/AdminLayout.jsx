@@ -269,16 +269,6 @@ export default function AdminLayout({ children }) {
     setContentKey((k) => k + 1);
   };
 
-  // Clear leftover dark-theme preference (admin luôn dùng light)
-  useEffect(() => {
-    try { localStorage.removeItem('admin-theme'); } catch { /* ignore */ }
-    document.documentElement.removeAttribute('data-theme');
-  }, []);
-
-  const refreshContent = () => {
-    setContentKey((k) => k + 1);
-  };
-
   const isItemVisible = (item) => !item.permission || can(item.permission);
   const visibleGroups = ADMIN_SIDEBAR
     .map((g) => ({ ...g, items: g.items.filter(isItemVisible) }))
