@@ -25,18 +25,55 @@ const DB_MISSING_RE = /Invalid object name 'security_alerts'|'security_alerts' n
 let lastMissingLogTs = 0;
 
 /**
- * Deduplication: chi insert alert moi neu chua co alert cung rule_key + user_id
- * trong vong 25h (tranh spam 5 phut/lan x 300 lan = 1 ngay).
+ * Deduplication: tránh spam mỗi 5 phút.
+ * - Có userId: cùng user + rule_key trong 25h
+ * - Không userId (vd. failed_login_burst): cùng rule_key + fingerprint (IP) trong 25h
+ * - Fingerprint tùy chọn khi có userId (vd. new_device_ip theo từng IP)
  */
-async function insertAlert({ severity, title, message, userId, branchId, ruleKey, metadata }) {
+async function insertAlert({ severity, title, message, userId, branchId, ruleKey, metadata, fingerprint }) {
   try {
+    const fp = fingerprint
+      || (metadata && (metadata.ipAddress || metadata.ip))
+      || null;
+
     if (userId && ruleKey) {
-      const existing = await query(`
-        SELECT 1 FROM security_alerts
-        WHERE user_id = @uid
-          AND rule_key = @rk
-          AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
-      `, { uid: userId, rk: ruleKey });
+      let existing;
+      if (fp) {
+        existing = await query(`
+          SELECT TOP 1 1 AS ok FROM security_alerts
+          WHERE user_id = @uid
+            AND rule_key = @rk
+            AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
+            AND metadata LIKE @fpLike
+        `, { uid: userId, rk: ruleKey, fpLike: `%${fp}%` });
+      } else {
+        existing = await query(`
+          SELECT TOP 1 1 AS ok FROM security_alerts
+          WHERE user_id = @uid
+            AND rule_key = @rk
+            AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
+        `, { uid: userId, rk: ruleKey });
+      }
+      if (existing.recordset && existing.recordset.length > 0) return;
+    } else if (ruleKey) {
+      // Alerts không gắn user (burst theo IP): dedupe theo rule + fingerprint/IP
+      let existing;
+      if (fp) {
+        existing = await query(`
+          SELECT TOP 1 1 AS ok FROM security_alerts
+          WHERE rule_key = @rk
+            AND user_id IS NULL
+            AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
+            AND metadata LIKE @fpLike
+        `, { rk: ruleKey, fpLike: `%${fp}%` });
+      } else {
+        existing = await query(`
+          SELECT TOP 1 1 AS ok FROM security_alerts
+          WHERE rule_key = @rk
+            AND user_id IS NULL
+            AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
+        `, { rk: ruleKey });
+      }
       if (existing.recordset && existing.recordset.length > 0) return;
     }
 
@@ -91,6 +128,7 @@ async function checkFailedLoginBurst() {
         userId: null,
         branchId: null,
         ruleKey: RULE_KEYS.FAILED_LOGIN_BURST,
+        fingerprint: String(row.ip_address || ''),
         metadata: { ipAddress: row.ip_address, count: row.cnt },
       });
     }
@@ -231,7 +269,7 @@ async function checkInactiveAdmin() {
         userId: row.id,
         branchId: null,
         ruleKey: RULE_KEYS.INACTIVE_ADMIN,
-        metadata: { lastActionAt: row.last_action_at },
+        metadata: { lastActionAt: row.last_action_at, userName: row.user_name, email: row.email },
       });
     }
   } catch (err) {
@@ -274,7 +312,13 @@ async function checkNewDeviceIp() {
         userId: row.user_id,
         branchId: null,
         ruleKey: RULE_KEYS.NEW_DEVICE_IP,
-        metadata: { ipAddress: row.ip_address, userName: row.user_name, loginTime: row.login_time },
+        fingerprint: String(row.ip_address || ''),
+        metadata: {
+          ipAddress: row.ip_address,
+          userName: row.user_name,
+          loginTime: row.login_time,
+          sessionId: row.id,
+        },
       });
     }
   } catch (err) {
