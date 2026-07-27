@@ -1,0 +1,71 @@
+/* ── Table Skeleton Loading ─────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e8eef5 50%, #f1f5f9 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.table-skeleton-wrap {
+  padding: 0;
+}
+
+.table-skeleton {
+  width: 100%;
+}
+
+.table--skeleton thead th {
+  background: #f8fafc;
+}
+
+.table-skeleton__row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  gap: 12px;
+}
+
+.table-skeleton__row:last-child {
+  border-bottom: none;
+}
+
+/* Avatar skeleton */
+.table-skeleton__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Text lines */
+.table-skeleton__text {
+  height: 12px;
+  border-radius: 6px;
+}
+
+.table-skeleton__text--sm { height: 10px; width: 60%; }
+.table-skeleton__text--md { height: 12px; width: 80%; }
+.table-skeleton__text--lg { height: 14px; width: 90%; }
+
+/* Badge skeleton */
+.table-skeleton__badge {
+  height: 20px;
+  width: 70px;
+  border-radius: 20px;
+}
+
+/* Button skeleton */
+.table-skeleton__btn {
+  height: 28px;
+  width: 70px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}

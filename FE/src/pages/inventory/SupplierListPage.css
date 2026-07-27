@@ -1,0 +1,230 @@
+/* ============================================================
+   SupplierListPage — Material Design 3
+   Scope trong .sup-list để không ảnh hưởng trang khác.
+============================================================ */
+.sup-list {
+  --md-primary: #4f46e5;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #e0e7ff;
+  --md-on-primary-container: #1e1b4b;
+  --md-surface: #ffffff;
+  --md-surface-variant: #f4f4fb;
+  --md-surface-container: #f7f7fd;
+  --md-on-surface: #1c1b1f;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #cac4d0;
+  --md-outline-variant: #e7e0ec;
+  --md-error: #ba1a1a;
+  --md-error-container: #ffdad6;
+  --md-on-error-container: #410002;
+  --md-success: #146c2e;
+  --md-success-container: #c6f0cd;
+  --md-on-success-container: #002106;
+  --md-warning-container: #ffdea8;
+  --md-on-warning-container: #2a1800;
+
+  --md-elevation-1: 0 1px 2px rgba(0,0,0,0.30), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-elevation-2: 0 1px 2px rgba(0,0,0,0.30), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-full: 9999px;
+
+  padding: 8px 4px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: var(--md-on-surface);
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.sup-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sup-list__title {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 400;
+  margin: 0 0 4px;
+  color: var(--md-on-surface);
+}
+
+.sup-list__subtitle {
+  font-size: 14px;
+  color: var(--md-on-surface-variant);
+  margin: 0;
+  max-width: 60ch;
+}
+
+.sup-list__filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--md-surface-container);
+  border-radius: var(--md-shape-md);
+}
+
+.sup-list__filters .input--search {
+  flex: 1;
+  min-width: 220px;
+}
+
+.sup-list__loading,
+.sup-list__error {
+  padding: 32px;
+  text-align: center;
+  border-radius: var(--md-shape-md);
+  font-size: 14px;
+}
+
+.sup-list__loading {
+  background: var(--md-surface-variant);
+  color: var(--md-on-surface-variant);
+}
+
+.sup-list__error {
+  background: var(--md-error-container);
+  color: var(--md-on-error-container);
+}
+
+@media (max-width: 640px) {
+  .sup-list__title { font-size: 22px; line-height: 28px; }
+  .sup-list__filters { padding: 12px; }
+  .sup-list__filters .input--search { min-width: 100%; }
+}
+
+/* ── MD3 inputs ── */
+.sup-list .input,
+.sup-list .input--search,
+.sup-list .input--select {
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-sm);
+  background: var(--md-surface);
+  font-size: 14px;
+  color: var(--md-on-surface);
+  outline: none;
+  box-sizing: border-box;
+}
+.sup-list .input:focus,
+.sup-list .input--select:focus {
+  border-color: var(--md-primary);
+  box-shadow: inset 0 0 0 1px var(--md-primary);
+}
+.sup-list .input--select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2349454f' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+/* ── MD3 buttons ── */
+.sup-list .btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--md-shape-full);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.sup-list .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.sup-list .btn--secondary {
+  background: var(--md-surface);
+  color: var(--md-primary);
+  border: 1px solid var(--md-outline);
+}
+.sup-list .btn--secondary:hover:not(:disabled) { background: var(--md-surface-variant); }
+.sup-list .btn--ghost { background: transparent; color: var(--md-primary); padding: 0 12px; }
+.sup-list .btn--ghost:hover:not(:disabled) { background-color: rgba(79, 70, 229, 0.08); }
+.sup-list .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
+/* ── MD3 table ── */
+.sup-list .table-responsive {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-lg);
+  overflow: auto;
+  box-shadow: var(--md-elevation-1);
+}
+.sup-list .table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.sup-list .table thead tr { background: var(--md-surface-variant); }
+.sup-list .table th {
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+.sup-list .table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface);
+  text-align: left;
+  vertical-align: middle;
+}
+.sup-list .table tbody tr:last-child td { border-bottom: none; }
+.sup-list .table tbody tr:hover { background-color: var(--md-surface-container); }
+
+.sup-list .table__empty {
+  text-align: center;
+  color: var(--md-on-surface-variant);
+  padding: 40px 12px !important;
+}
+
+.sup-list .table__actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.sup-list .font-mono {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--md-primary);
+}
+
+/* ── Chips ── */
+.sup-list .badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--md-shape-sm);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.sup-list .badge--success { background: var(--md-success-container); color: var(--md-on-success-container); }
+.sup-list .badge--danger { background: var(--md-error-container); color: var(--md-on-error-container); }
+.sup-list .badge--warning { background: var(--md-warning-container); color: var(--md-on-warning-container); }
+
+.sup-list .text-right { text-align: right; }
+.sup-list .text-success { color: var(--md-success); font-weight: 600; }
+.sup-list .text-danger { color: var(--md-error); font-weight: 600; }

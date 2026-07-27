@@ -1,0 +1,189 @@
+/* ============================================================
+   ExportRequestDetailPage — Material Design 3
+   Scope trong .er-detail để không ảnh hưởng trang khác.
+============================================================ */
+.er-detail {
+  --md-primary: #4f46e5;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #e0e7ff;
+  --md-on-primary-container: #1e1b4b;
+  --md-surface: #ffffff;
+  --md-surface-variant: #f4f4fb;
+  --md-surface-container: #f7f7fd;
+  --md-on-surface: #1c1b1f;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #cac4d0;
+  --md-outline-variant: #e7e0ec;
+  --md-error: #ba1a1a;
+  --md-error-container: #ffdad6;
+  --md-on-error-container: #410002;
+  --md-success: #146c2e;
+  --md-success-container: #c6f0cd;
+  --md-on-success-container: #002106;
+  --md-warning-container: #ffdea8;
+  --md-on-warning-container: #2a1800;
+
+  --md-elevation-1: 0 1px 2px rgba(0,0,0,0.30), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-elevation-2: 0 1px 2px rgba(0,0,0,0.30), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-full: 9999px;
+
+  padding: 8px 4px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: var(--md-on-surface);
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.er-detail__loading,
+.er-detail__error {
+  padding: 32px;
+  text-align: center;
+  border-radius: var(--md-shape-md);
+  font-size: 14px;
+}
+.er-detail__loading { background: var(--md-surface-variant); color: var(--md-on-surface-variant); }
+.er-detail__error { background: var(--md-error-container); color: var(--md-on-error-container); }
+
+.er-detail__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--md-primary);
+  text-decoration: none;
+  font-size: 14px;
+}
+.back-link:hover { text-decoration: underline; }
+
+.er-detail__title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.er-detail__title {
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 400;
+  margin: 0;
+  color: var(--md-on-surface);
+}
+
+@media (max-width: 768px) {
+  .er-detail__title { font-size: 22px; line-height: 28px; }
+}
+
+.er-detail__body {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-lg);
+  padding: 24px;
+  box-shadow: var(--md-elevation-1);
+}
+
+.er-detail__section {
+  margin-bottom: 24px;
+}
+.er-detail__section:last-child { margin-bottom: 0; }
+
+.er-detail__section-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  margin: 0 0 12px;
+}
+
+.er-detail__empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--md-on-surface-variant);
+  background: var(--md-surface-variant);
+  border-radius: var(--md-shape-md);
+  margin: 0;
+}
+
+.er-detail__notice {
+  padding: 14px 16px;
+  border-radius: var(--md-shape-sm);
+  font-size: 13px;
+  margin-top: 16px;
+}
+.er-detail__notice--success { background: var(--md-success-container); color: var(--md-on-success-container); }
+.er-detail__notice--danger { background: var(--md-error-container); color: var(--md-on-error-container); }
+
+/* ── Info list ── */
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+.info-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+.info-row__label { font-size: 13px; color: var(--md-on-surface-variant); margin: 0; }
+.info-row__value { font-size: 14px; color: var(--md-on-surface); margin: 0; word-break: break-word; }
+
+/* ── MD3 table ── */
+.er-detail .table-responsive {
+  background: var(--md-surface);
+  border-radius: var(--md-shape-md);
+  overflow: auto;
+}
+.er-detail .table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.er-detail .table thead tr { background: var(--md-surface-variant); }
+.er-detail .table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+.er-detail .table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface);
+  text-align: left;
+}
+.er-detail .table tbody tr:last-child td { border-bottom: none; }
+.er-detail .table tbody tr:hover { background-color: var(--md-surface-container); }
+.er-detail .table tfoot td { border-top: 1px solid var(--md-outline-variant); border-bottom: none; }
+
+.er-detail .font-mono { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--md-primary); }
+.er-detail .text-right { text-align: right; }
+
+/* ── Chips ── */
+.er-detail .badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--md-shape-sm);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.er-detail .badge--success { background: var(--md-success-container); color: var(--md-on-success-container); }
+.er-detail .badge--danger { background: var(--md-error-container); color: var(--md-on-error-container); }

@@ -1,0 +1,811 @@
+import { useEffect, useState } from 'react';
+import { adminBranchesApi, adminRolesApi, adminUsersApi, userScreenPermissionsApi } from '../../../services/adminApi';
+import './UserFormModal.css';
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Hoạt động' },
+  { value: 'inactive', label: 'Ngừng hoạt động' },
+];
+
+/**
+ * Sentinel value gui tu FE -> BE de yeu cau set branch_id = NULL (quan ly tat ca chi nhanh).
+ * BE AdminUserService.updateUser se nhan gia tri nay va chuyen thanh NULL.
+ */
+const ALL_BRANCHES_SENTINEL = '__ALL__';
+
+/**
+ * Role Admin id (hardcoded theo DB seed hien tai).
+ * Chi user co role Admin moi duoc chon "Tat ca chi nhanh".
+ * TODO: thay bang role check qua permission service khi san sang.
+ */
+const ADMIN_ROLE_ID = 7;
+
+/**
+ * Kiem tra role set co chua Admin hay khong.
+ */
+function hasAdminRole(userRoles) {
+  if (!Array.isArray(userRoles)) return false;
+  return userRoles.some((r) => {
+    const id = typeof r === 'object' && r !== null ? r.roleId : r;
+    return Number(id) === ADMIN_ROLE_ID;
+  });
+}
+
+/**
+ * Lay roleId tu user.roles (da hoac chua fetch roles list).
+ *
+ * Tra ve:
+ *   - roleId neu user chi co 1 role (normal case)
+ *   - '' neu user co nhieu role (FE phai canh bao admin -> dung modal rieng AssignRoleModal)
+ *   - '' neu user khong co role nao
+ *
+ * @param {Array} userRoles - roles array tu user object [{roleId, roleName}, ...]
+ * @param {Array} allRoles  - roles tu API dropdown
+ * @returns {string} roleId hoac ''
+ */
+function resolveRoleId(userRoles, allRoles) {
+  if (!Array.isArray(userRoles) || userRoles.length === 0) return '';
+  const first = userRoles[0];
+
+  // Backend moi: { roleId, roleName }
+  let resolvedId = '';
+  if (typeof first === 'object' && first !== null) {
+    resolvedId = first.roleId !== undefined && first.roleId !== null
+      ? String(first.roleId)
+      : '';
+  } else if (typeof first === 'string') {
+    // Backend cu: ['Admin', ...] -> map ten -> id
+    const match = allRoles.find((r) => r.roleName === first || String(r.id) === first);
+    resolvedId = match ? String(match.id) : '';
+  }
+
+  // Neu user co >= 2 role -> tra ve '' de form.roleId bi empty.
+  // Caller se hien thi canh bao: "User nay co N vai tro, hay dung modal Phan quyen rieng".
+  // Ly do: backend updateUser voi roleId != undefined se DELETE toan bo roles cu va
+  // INSERT 1 role moi -> MAT TOAN BO vai tro khac (data loss nghiem trong).
+  return resolvedId;
+}
+
+/**
+ * Kiem tra user co nhieu role khong (de canh bao trong UI).
+ */
+function hasMultipleRoles(userRoles) {
+  return Array.isArray(userRoles) && userRoles.length >= 2;
+}
+
+export default function UserFormModal({ user, onClose, onSuccess }) {
+  const isEdit = Boolean(user);
+
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    phone: '',
+    branchId: '',
+    roleId: '',
+    status: 'active',
+    scopeAllBranches: false,
+  });
+
+  const [branches, setBranches] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
+
+  // Tab state (Permissions tab chi hien thi khi edit)
+  const [activeTab, setActiveTab] = useState('info');
+
+  // Permission override state (edit mode only)
+  const [permData, setPermData] = useState(null);  // { screens, roleMatrix, overrides, userRoles }
+  const [permLoading, setPermLoading] = useState(false);
+  const [permSaving, setPermSaving] = useState(false);
+  const [permError, setPermError] = useState('');
+  const [permFilter, setPermFilter] = useState('');
+
+  // Load branches + roles dropdown
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [bRes, rRes] = await Promise.all([
+          adminBranchesApi.list(),
+          adminRolesApi.list(),
+        ]);
+        if (!cancelled) {
+          setBranches(bRes?.items || []);
+          setRoles(rRes?.items || []);
+        }
+      } catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Load permissions khi user mo tab Permissions (edit mode only)
+  useEffect(() => {
+    if (!isEdit || !user?.id) return;
+    if (activeTab !== 'permissions') return;
+    let cancelled = false;
+    setPermLoading(true);
+    setPermError('');
+    (async () => {
+      try {
+        const res = await userScreenPermissionsApi.getPermissions(user.id);
+        if (!cancelled) {
+          const data = res?.data?.data || res?.data || {};
+          setPermData(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPermError(err?.response?.data?.message || err.message || 'Lỗi tải permissions');
+        }
+      } finally {
+        if (!cancelled) setPermLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, isEdit, user?.id]);
+
+  // Khi user object hoac roles list thay doi -> cap nhat form
+  useEffect(() => {
+    if (!user) return;
+
+    // Neu roles chua load xong, bo qua (effect tiep theo se trigger)
+    const resolvedRoleId = resolveRoleId(user.roles, roles);
+
+    // Phan biet user "all branches" (co row trong user_branches) vs user 1 branch
+    // - assignedBranchIds tu BE co nhieu hon 1 row, hoac user.branchId null -> ALL
+    // - assignedBranchIds co 1 row -> set dropdown theo row do
+    const isAllBranches = user.scopeAllBranches === true
+      || user.branchId === null
+      || user.branchId === undefined;
+    let branchIdValue = '';
+    if (isAllBranches) {
+      branchIdValue = ALL_BRANCHES_SENTINEL;
+    } else if (user.branchId !== undefined && user.branchId !== null) {
+      branchIdValue = String(user.branchId);
+    }
+
+    setForm({
+      name: user.name || '',
+      email: user.email || '',
+      password: '',
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      phone: user.phone || '',
+      branchId: branchIdValue,
+      roleId: resolvedRoleId,
+      status: user.status || 'active',
+      scopeAllBranches: isAllBranches,
+    });
+  }, [user, JSON.stringify(roles)]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function validate() {
+    const errs = {};
+    if (!isEdit && !form.name.trim()) errs.name = 'Tên đăng nhập là bắt buộc';
+    if (!isEdit && !form.email.trim()) errs.email = 'Email là bắt buộc';
+    if (!isEdit && !form.password) errs.password = 'Mật khẩu là bắt buộc';
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      errs.email = 'Email không đúng định dạng';
+    }
+    if (form.phone && !/^0[0-9]{9,10}$/.test(form.phone)) {
+      errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
+    }
+    if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc (hoặc chọn "Tất cả chi nhánh")';
+    // Bug #10: Khi user co nhieu vai tro va admin KHONG thay doi dropdown
+    // -> form.roleId se empty (resolveRoleId returns '' for first multi-role).
+    // Tranh block submit neu admin khong thay vai tro.
+    if (!form.roleId && !(isEdit && hasMultipleRoles(user?.roles))) {
+      errs.roleId = 'Vai trò là bắt buộc';
+    }
+    return errs;
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
+
+    setLoading(true);
+    setApiError('');
+
+    try {
+      if (isEdit) {
+        // Bug #10 (data loss): neu user co nhieu vai tro va admin KHONG doi
+        // dropdown role -> KHONG gui roleId (undefined) de BE khong DELETE + INSERT.
+        // Neu admin doi dropdown -> gui roleId moi (BE se DELETE all + INSERT moi
+        // -> mat vai tro phu, nhan roi qua warning).
+        const shouldSendRoleId =
+          form.roleId && form.roleId !== '';
+        const payload = {
+          userId: user.id,
+          firstName: form.firstName?.trim() || user.firstName || '',
+          lastName: form.lastName?.trim() || user.lastName || '',
+          email: form.email?.trim() || user.email,
+          phone: form.phone?.trim() || undefined,
+          status: form.status,
+        };
+        if (form.scopeAllBranches) {
+          payload.scopeAllBranches = true;
+          payload.branchId = null;
+        } else {
+          payload.branchId = form.branchId ? Number(form.branchId) : null;
+        }
+        if (shouldSendRoleId) {
+          payload.roleId = Number(form.roleId);
+        }
+        await adminUsersApi.update(payload);
+      } else {
+        const payload = {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          password: form.password,
+          firstName: form.firstName.trim() || form.name.trim(),
+          lastName: form.lastName.trim(),
+          phone: form.phone.trim() || undefined,
+          roleId: Number(form.roleId),
+        };
+        if (form.scopeAllBranches) {
+          payload.scopeAllBranches = true;
+          payload.branchId = null;
+        } else {
+          payload.branchId = Number(form.branchId);
+        }
+        await adminUsersApi.create(payload);
+      }
+      onSuccess?.();
+      onClose?.();
+    } catch (err) {
+      setApiError(err?.response?.data?.message || err.message || 'Lỗi hệ thống');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleChange(field, value) {
+    setForm((f) => {
+      const next = { ...f, [field]: value };
+      // Khi chon chi nhanh -> tu dong set scopeAllBranches
+      if (field === 'branchId') {
+        next.scopeAllBranches = value === ALL_BRANCHES_SENTINEL;
+      }
+      return next;
+    });
+    setErrors((e) => ({ ...e, [field]: undefined }));
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
+      <div className={`modal ${activeTab === 'permissions' ? 'modal--wide' : ''}`}>
+        <div className="modal__header">
+          <div className="modal__title-block">
+            <div className="modal__title-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <h2 className="modal__title">{isEdit ? 'Chỉnh sửa người dùng' : 'Tạo người dùng mới'}</h2>
+          </div>
+          <button className="modal__close" onClick={onClose} type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Tab bar (chi hien thi o edit mode) */}
+        {isEdit && (
+          <div className="modal__tabs">
+            <button
+              type="button"
+              className={`modal__tab ${activeTab === 'info' ? 'modal__tab--active' : ''}`}
+              onClick={() => setActiveTab('info')}
+            >
+              Thông tin
+            </button>
+            <button
+              type="button"
+              className={`modal__tab ${activeTab === 'permissions' ? 'modal__tab--active' : ''}`}
+              onClick={() => setActiveTab('permissions')}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4, verticalAlign: '-2px' }}>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              Quyền truy cập
+            </button>
+          </div>
+        )}
+
+        <div className="modal__body">
+          {apiError && <div className="form-error">{apiError}</div>}
+
+          {activeTab === 'info' && (
+            <form onSubmit={handleSubmit} autoComplete="off">
+            {/* Section: Thông tin đăng nhập */}
+            <div className="form__section">
+              <div className="form__section-title">Thông tin đăng nhập</div>
+              <div className="form__row">
+                <div className="form__field">
+                  <label className="form__label">Tên đăng nhập <span className="required">*</span></label>
+                  <input
+                    className={`input ${errors.name ? 'input--error' : ''}`}
+                    value={form.name}
+                    onChange={(e) => handleChange('name', e.target.value)}
+                    disabled={isEdit}
+                    placeholder="nguyen_van_a"
+                    autoComplete="off"
+                  />
+                  {errors.name && <span className="form__err">{errors.name}</span>}
+                </div>
+                <div className="form__field">
+                  <label className="form__label">Email <span className="required">*</span></label>
+                  <input
+                    className={`input ${errors.email ? 'input--error' : ''}`}
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => handleChange('email', e.target.value)}
+                    disabled={isEdit}
+                    placeholder="user@autogara.vn"
+                    autoComplete="off"
+                  />
+                  {errors.email && <span className="form__err">{errors.email}</span>}
+                </div>
+              </div>
+
+              {!isEdit && (
+                <div className="form__field">
+                  <label className="form__label">Mật khẩu <span className="required">*</span></label>
+                  <input
+                    className={`input ${errors.password ? 'input--error' : ''}`}
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => handleChange('password', e.target.value)}
+                    placeholder="Nhập mật khẩu mạnh"
+                    autoComplete="new-password"
+                  />
+                  {errors.password && <span className="form__err">{errors.password}</span>}
+                </div>
+              )}
+            </div>
+
+            {/* Section: Thông tin cá nhân */}
+            <div className="form__section">
+              <div className="form__section-title">Thông tin cá nhân</div>
+              <div className="form__row">
+                <div className="form__field">
+                  <label className="form__label">Họ</label>
+                  <input
+                    className="input"
+                    value={form.firstName}
+                    onChange={(e) => handleChange('firstName', e.target.value)}
+                    placeholder="Nguyễn"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="form__field">
+                  <label className="form__label">Tên <span className="required">*</span></label>
+                  <input
+                    className="input"
+                    value={form.lastName}
+                    onChange={(e) => handleChange('lastName', e.target.value)}
+                    placeholder="Văn A"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+
+              <div className="form__field">
+                <label className="form__label">Số điện thoại</label>
+                <input
+                  className={`input ${errors.phone ? 'input--error' : ''}`}
+                  value={form.phone}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  placeholder="0912345678"
+                  autoComplete="tel"
+                />
+                {errors.phone && <span className="form__err">{errors.phone}</span>}
+              </div>
+            </div>
+
+            {/* Section: Phân công */}
+            <div className="form__section">
+              <div className="form__section-title">Phân công & trạng thái</div>
+
+              {/* Canh bao khi user co >=2 vai tro (de tranh data loss).
+                  Bug cu: resolveRoleId chi lay role[0], FE gui 1 role duy nhat ->
+                  BE AdminUserRepositoryImpl.updateUser DELETE all + INSERT 1 ->
+                  mat toan bo vai tro khac.
+
+                  Fix hien tai:
+                  - Neu admin KHONG doi dropdown vai tro -> FE bo qua field roleId
+                    trong payload -> BE giữ nguyên toàn bộ vai tro.
+                  - Neu admin DOI dropdown -> BE sẽ DELETE các vai trò khác.
+                    Admin phải dùng modal Phân quyền riêng để quản lý nhiều vai trò. */}
+              {isEdit && hasMultipleRoles(user?.roles) && (
+                <div
+                  className="form__warning"
+                  style={{
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    color: '#92400e',
+                    padding: '10px 12px',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    marginBottom: 12,
+                    lineHeight: 1.5,
+                  }}
+                  role="alert"
+                >
+                  ⚠️ User này đang có <b>{user.roles.length} vai trò</b>:{' '}
+                  {user.roles.map((r) => r.roleName).join(', ')}.
+                  <br />
+                  Nếu bạn <b>không thay đổi</b> dropdown Vai trò bên dưới thì các
+                  vai trò hiện tại được giữ nguyên.
+                  <br />
+                  Nếu bạn <b>chọn vai trò khác</b>, các vai trò còn lại sẽ bị
+                  xóa — hãy dùng modal <b>Phân quyền</b> riêng để quản lý.
+                </div>
+              )}
+
+              <div className="form__row">
+                <div className="form__field">
+                  <label className="form__label">Chi nhánh <span className="required">*</span></label>
+                  <select
+                    className={`input input--select ${errors.branchId ? 'input--error' : ''}`}
+                    value={form.branchId}
+                    onChange={(e) => handleChange('branchId', e.target.value)}
+                  >
+                    <option value="">-- Chọn chi nhánh --</option>
+                    {/* Option "Tat ca chi nhanh" chi hien thi khi user co role Admin
+                        (edit mode: user dang co role Admin) hoac role dang chon la Admin
+                        (create mode: admin form chon role Admin). */}
+                    {((isEdit && hasAdminRole(user?.roles)) ||
+                      (!isEdit && Number(form.roleId) === ADMIN_ROLE_ID)) && (
+                      <option value={ALL_BRANCHES_SENTINEL}>Tất cả chi nhánh (Admin)</option>
+                    )}
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.branchName}</option>
+                    ))}
+                  </select>
+                  {errors.branchId && <span className="form__err">{errors.branchId}</span>}
+                </div>
+                <div className="form__field">
+                  <label className="form__label">Vai trò <span className="required">*</span></label>
+                  <select
+                    className={`input input--select ${errors.roleId ? 'input--error' : ''}`}
+                    value={form.roleId}
+                    onChange={(e) => handleChange('roleId', e.target.value)}
+                  >
+                    <option value="">-- Chọn vai trò --</option>
+                    {roles.map((r) => (
+                      <option key={r.id} value={r.id}>{r.roleName}</option>
+                    ))}
+                  </select>
+                  {errors.roleId && <span className="form__err">{errors.roleId}</span>}
+                </div>
+              </div>
+
+              {isEdit && (
+                <div className="form__field">
+                  <label className="form__label">Trạng thái tài khoản</label>
+                  <select
+                    className="input input--select"
+                    value={form.status}
+                    onChange={(e) => handleChange('status', e.target.value)}
+                  >
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </form>
+          )}
+
+          {activeTab === 'permissions' && isEdit && (
+            <UserPermissionsTab
+              user={user}
+              permData={permData}
+              loading={permLoading}
+              saving={permSaving}
+              error={permError}
+              filter={permFilter}
+              onFilterChange={setPermFilter}
+              onSave={async () => {
+                if (!permData) return;
+                setPermSaving(true);
+                setPermError('');
+                try {
+                  await userScreenPermissionsApi.savePermissions(user.id, permData.overrides);
+                  onSuccess?.();
+                } catch (err) {
+                  setPermError(err?.response?.data?.message || err.message || 'Lỗi lưu');
+                } finally {
+                  setPermSaving(false);
+                }
+              }}
+              onClear={async () => {
+                if (!window.confirm('Xóa toàn bộ override và quay về quyền từ role?')) return;
+                setPermSaving(true);
+                setPermError('');
+                try {
+                  await userScreenPermissionsApi.clearPermissions(user.id);
+                  // Reload
+                  const res = await userScreenPermissionsApi.getPermissions(user.id);
+                  const data = res?.data?.data || res?.data || {};
+                  setPermData(data);
+                } catch (err) {
+                  setPermError(err?.response?.data?.message || err.message || 'Lỗi xóa');
+                } finally {
+                  setPermSaving(false);
+                }
+              }}
+              onChangeOverride={(item) => {
+                setPermData((prev) => {
+                  if (!prev) return prev;
+                  const existing = prev.overrides.findIndex((o) => o.screenKey === item.screenKey);
+                  const newOverrides = [...prev.overrides];
+                  if (existing >= 0) newOverrides[existing] = item;
+                  else newOverrides.push(item);
+                  return { ...prev, overrides: newOverrides };
+                });
+              }}
+            />
+          )}
+        </div>
+
+        {activeTab === 'info' && (
+          <div className="modal__footer">
+            <button type="button" className="btn btn--ghost" onClick={onClose} disabled={loading}>
+              Hủy
+            </button>
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={loading}
+              onClick={handleSubmit}
+            >
+              {loading ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 0.7s linear infinite' }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  </svg>
+                  Đang xử lý...
+                </>
+              ) : (isEdit ? 'Lưu thay đổi' : 'Tạo người dùng')}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * UserPermissionsTab - tab Quan ly quyen truy cap rieng cho user.
+ * Hien thi full grid 119 screens x 5 actions (V/C/U/D/E) cho admin override.
+ */
+function UserPermissionsTab({
+  user, permData, loading, saving, error, filter, onFilterChange,
+  onSave, onClear, onChangeOverride,
+}) {
+  if (loading) {
+    return (
+      <div className="uperm">
+        <div className="uperm__loading">
+          <span className="uperm__spinner" />
+          Đang tải cấu hình quyền...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="uperm__error">{error}</div>;
+  }
+
+  if (!permData) {
+    return <div className="uperm__empty">Chưa có dữ liệu quyền.</div>;
+  }
+
+  const { screens = [], roleMatrix = [], overrides = [], userRoles = [], user: uhead } = permData;
+
+  // Filter screens
+  const filteredScreens = screens.filter((s) => {
+    if (!filter) return true;
+    const q = filter.toLowerCase();
+    return (s.screenKey || '').toLowerCase().includes(q)
+      || (s.module || '').toLowerCase().includes(q)
+      || (s.resource || '').toLowerCase().includes(q);
+  });
+
+  // Build lookup: roleMatrixMap[screenKey] = { canView, ... }
+  const roleMatrixMap = {};
+  for (const r of roleMatrix) {
+    roleMatrixMap[r.screenKey] = r;
+  }
+
+  // Build lookup: overrideMap[screenKey] = { ... }
+  const overrideMap = {};
+  for (const o of overrides) {
+    overrideMap[o.screenKey] = o;
+  }
+
+  // Get item for a screen (override or empty)
+  const getItem = (screenKey) => {
+    const ov = overrideMap[screenKey];
+    if (ov) return ov;
+    return {
+      screenKey,
+      canView: false,
+      canCreate: false,
+      canUpdate: false,
+      canDelete: false,
+      canExport: false,
+      overrideType: 'full',
+      note: '',
+    };
+  };
+
+  const updateBit = (screenKey, bit, value) => {
+    const current = getItem(screenKey);
+    const next = { ...current, [bit]: value };
+    onChangeOverride(next);
+  };
+
+  const setOverrideType = (screenKey, overrideType) => {
+    const current = getItem(screenKey);
+    onChangeOverride({ ...current, overrideType });
+  };
+
+  // Stats
+  const totalOverridden = overrides.length;
+  const totalFullOverride = overrides.filter((o) => o.overrideType === 'full').length;
+
+  return (
+    <div className="uperm">
+      <div className="uperm__header">
+        <div className="uperm__user-info">
+          <strong>{uhead?.fullName || uhead?.email || user?.email || 'User'}</strong>
+          <span className="uperm__user-email">{uhead?.email}</span>
+          {userRoles.length > 0 && (
+            <span className="uperm__user-roles">
+              Vai trò: {userRoles.map((r) => r.roleName).join(', ')}
+            </span>
+          )}
+        </div>
+        <div className="uperm__stats">
+          <span className="uperm__stat-pill">
+            {totalOverridden} screen đã override
+          </span>
+          {totalFullOverride > 0 && (
+            <span className="uperm__stat-pill uperm__stat-pill--warn">
+              {totalFullOverride} full override (bỏ qua role)
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="uperm__info">
+        <strong>Hướng dẫn:</strong> Mỗi dòng là 1 màn hình. Tick V/C/U/D/E để cấp quyền cho user này.{' '}
+        <strong>Full override</strong> = thay thế hoàn toàn quyền từ role (dùng khi cần loại bỏ 1 số quyền role cấp).{' '}
+        <strong>Grant</strong> = cộng thêm vào quyền từ role.{' '}
+        <strong>Deny</strong> = thu hồi quyền từ role.
+      </div>
+
+      <div className="uperm__toolbar">
+        <input
+          type="search"
+          className="uperm__search"
+          placeholder="Tìm theo tên màn hình, module hoặc resource..."
+          value={filter}
+          onChange={(e) => onFilterChange(e.target.value)}
+        />
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={onClear}
+          disabled={saving || totalOverridden === 0}
+        >
+          Gỡ hết override
+        </button>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={onSave}
+          disabled={saving}
+        >
+          {saving ? 'Đang lưu...' : 'Lưu quyền'}
+        </button>
+      </div>
+
+      <div className="uperm__table-wrap">
+        <table className="uperm__table">
+          <thead>
+            <tr>
+              <th className="uperm__col-screen">Màn hình</th>
+              <th className="uperm__col-role">Quyền từ role</th>
+              <th className="uperm__col-type">Loại override</th>
+              <th className="uperm__col-action">V</th>
+              <th className="uperm__col-action">C</th>
+              <th className="uperm__col-action">U</th>
+              <th className="uperm__col-action">D</th>
+              <th className="uperm__col-action">E</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredScreens.map((s) => {
+              const rM = roleMatrixMap[s.screenKey] || {};
+              const item = getItem(s.screenKey);
+              const hasRolePerm = rM.canView || rM.canCreate || rM.canUpdate || rM.canDelete || rM.canExport;
+              const isOverridden = !!overrideMap[s.screenKey];
+              return (
+                <tr key={s.screenKey} className={isOverridden ? 'uperm__row--overridden' : ''}>
+                  <td className="uperm__col-screen">
+                    {s.screenLabel ? (
+                      <div className="uperm__screen-label">{s.screenLabel}</div>
+                    ) : null}
+                    <div className="uperm__screen-key">{s.screenKey}</div>
+                    <div className="uperm__screen-meta">
+                      {s.groupLabel && <span className="uperm__chip uperm__chip--group">{s.groupLabel}</span>}
+                      {s.resource && <span className="uperm__chip uperm__chip--resource">{s.resource}</span>}
+                    </div>
+                  </td>
+                  <td className="uperm__col-role">
+                    {hasRolePerm ? (
+                      <div className="uperm__role-perms">
+                        {rM.canView && <span className="uperm__role-bit">V</span>}
+                        {rM.canCreate && <span className="uperm__role-bit">C</span>}
+                        {rM.canUpdate && <span className="uperm__role-bit">U</span>}
+                        {rM.canDelete && <span className="uperm__role-bit">D</span>}
+                        {rM.canExport && <span className="uperm__role-bit">E</span>}
+                      </div>
+                    ) : (
+                      <span className="uperm__role-none">—</span>
+                    )}
+                  </td>
+                  <td className="uperm__col-type">
+                    <select
+                      className="input input--select uperm__type-select"
+                      value={item.overrideType}
+                      onChange={(e) => setOverrideType(s.screenKey, e.target.value)}
+                      disabled={!isOverridden}
+                    >
+                      <option value="full">Full</option>
+                      <option value="grant">Grant</option>
+                      <option value="deny">Deny</option>
+                    </select>
+                  </td>
+                  {['canView', 'canCreate', 'canUpdate', 'canDelete', 'canExport'].map((bit) => (
+                    <td key={bit} className="uperm__col-action">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(item[bit])}
+                        onChange={(e) => updateBit(s.screenKey, bit, e.target.checked)}
+                        aria-label={`${bit} for ${s.screenKey}`}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+            {filteredScreens.length === 0 && (
+              <tr>
+                <td colSpan={8} className="uperm__empty">
+                  Không có màn hình nào khớp với bộ lọc.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

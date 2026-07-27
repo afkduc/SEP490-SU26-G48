@@ -1,84 +1,128 @@
 .navbar {
   display: flex;
   align-items: center;
-  gap: 0;
-  padding: 0 24px;
-  height: 52px;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 32px;
+  height: 60px;
+  /* Nen tim nhat (theo tong mau primary indigo cua he thong) de logo (co san
+     chu "AutoGara" trong anh) noi bat len - khong con hien chu "AutoGara"
+     rieng ben canh nua vi anh logo da du thuong hieu. */
+  background: #e0e7ff;
+  border-bottom: 1px solid #c7d2fe;
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 
 /* Brand */
 .navbar__brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   text-decoration: none;
   flex-shrink: 0;
-  margin-right: 24px;
+  min-width: 180px;
 }
 
 .navbar__logo {
-  width: 32px;
-  height: 32px;
-  background: #22c55e;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
+  height: 56px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* Nut hamburger - chi hien tren man hep (xem media query ben duoi), an tren
+   desktop vi nav van du cho nam ngang binh thuong. */
+.navbar__hamburger {
+  display: none;
+  flex-direction: column;
   justify-content: center;
-  font-size: 16px;
+  align-items: center;
+  gap: 4px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.navbar__name {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1a1a1a;
+.navbar__hamburger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--gray-700);
+  border-radius: 2px;
+  transition: transform 0.15s, opacity 0.15s;
 }
 
-/* Nav links */
+.navbar__hamburger--active span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.navbar__hamburger--active span:nth-child(2) { opacity: 0; }
+.navbar__hamburger--active span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+/* Nav links - center area */
 .navbar__nav {
   display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 4px;
   flex: 1;
+  height: 100%;
 }
 
 .navbar__link {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
   font-weight: 500;
-  color: #374151;
+  color: var(--gray-700);
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s;
 }
 
+/* Chi doi mau chu khi hover/active - KHONG tao khung/nen boc quanh chu (chi
+   la chu bam duoc, khong phai 1 nut/pill rieng). */
 .navbar__link:hover {
-  background: #f0fdf4;
-  color: #16a34a;
+  color: var(--primary-dark);
 }
 
 .navbar__link--active {
-  background: #dcfce7;
-  color: #15803d;
+  color: var(--primary-dark);
+  font-weight: 600;
 }
 
-/* Nav link icon */
-.navbar__link-icon {
-  font-size: 13px;
-  margin-right: 5px;
+.navbar__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
   line-height: 1;
 }
 
+/* Caret for dropdown triggers */
 .navbar__link-caret {
-  font-size: 9px;
-  margin-left: 5px;
-  color: #6b7280;
+  font-size: 10px;
+  margin-left: 6px;
+  color: var(--gray-400);
+  transition: transform 0.15s;
+}
+
+.navbar__dropdown-wrapper:hover .navbar__link-caret {
+  transform: rotate(180deg);
 }
 
 /* Nav item with children (button styled as link) */
@@ -86,66 +130,104 @@
   background: none;
   border: none;
   cursor: pointer;
-  display: flex;
-  align-items: center;
   font-family: inherit;
 }
 
 /* Nav-level dropdown wrapper */
 .navbar__dropdown-wrapper {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
 }
 
 .navbar__nav-dropdown {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  min-width: 200px;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  min-width: 220px;
   overflow: hidden;
   z-index: 300;
-  padding: 4px 0;
+  padding: 6px 0;
 }
 
 .navbar__nav-dropdown-item {
   display: block;
-  padding: 9px 16px;
-  font-size: 13px;
+  padding: 10px 18px;
+  font-size: 13.5px;
   font-weight: 500;
-  color: #374151;
+  color: var(--gray-700);
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.1s, color 0.1s;
 }
 
 .navbar__nav-dropdown-item:hover {
-  background: #f0fdf4;
-  color: #16a34a;
+  background: var(--primary-very-light);
+  color: var(--primary-dark);
 }
 
 .navbar__nav-dropdown-item--active {
-  background: #dcfce7;
-  color: #15803d;
+  background: var(--primary-very-light);
+  color: var(--primary-dark);
+  font-weight: 600;
 }
 
 /* Right side */
 .navbar__right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex-shrink: 0;
+  min-width: 180px;
+  justify-content: flex-end;
   position: relative;
 }
 
-.navbar__role-badge {
-  background: #dcfce7;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
+/* Online indicator */
+.navbar__online-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
   border-radius: 20px;
-  padding: 3px 12px;
+}
+
+.online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse-online 2s ease-in-out infinite;
+}
+
+.online-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #16a34a;
+  letter-spacing: 0.02em;
+}
+
+@keyframes pulse-online {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+/* Nen trang (khac voi nen tim nhat cua ca thanh navbar) de badge vai tro noi
+   ro thanh 1 khoi rieng, khong bi lan vao nen xung quanh. */
+.navbar__role-badge {
+  background: var(--white);
+  color: var(--primary-dark);
+  border: 1px solid var(--primary-light);
+  border-radius: var(--radius-full);
+  padding: 4px 12px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -154,87 +236,87 @@
 .navbar__user {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 5px 10px;
+  border-radius: var(--radius);
   transition: background 0.12s;
   user-select: none;
 }
 
 .navbar__user:hover {
-  background: #f3f4f6;
+  background: rgba(79, 70, 229, 0.08);
 }
 
 .navbar__avatar {
-  width: 30px;
-  height: 30px;
-  background: #22c55e;
+  width: 32px;
+  height: 32px;
+  background: var(--primary);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  color: #fff;
+  color: var(--white);
   flex-shrink: 0;
 }
 
 .navbar__display-name {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
-  color: #374151;
+  color: var(--gray-700);
 }
 
 .navbar__caret {
   font-size: 10px;
-  color: #6b7280;
+  color: var(--gray-400);
 }
 
-/* Dropdown */
+/* User dropdown (right) */
 .navbar__dropdown {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  min-width: 200px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  min-width: 220px;
   overflow: hidden;
   z-index: 200;
 }
 
 .navbar__dropdown-header {
   padding: 12px 16px;
-  background: #f9fafb;
+  background: var(--gray-50);
 }
 
 .navbar__dropdown-name {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--gray-900);
   margin: 0;
 }
 
 .navbar__dropdown-email {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--gray-500);
   margin: 2px 0 0;
 }
 
 .navbar__dropdown hr {
   margin: 0;
   border: none;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--gray-200);
 }
 
 .navbar__dropdown-item {
   display: block;
   width: 100%;
   padding: 10px 16px;
-  font-size: 13px;
-  color: #374151;
+  font-size: 13.5px;
+  color: var(--gray-700);
   background: none;
   border: none;
   text-align: left;
@@ -243,6 +325,110 @@
 }
 
 .navbar__dropdown-item:hover {
-  background: #fef2f2;
-  color: #ef4444;
+  background: var(--red-light);
+  color: var(--red);
+}
+
+/* Man hep (tablet tro xuong) - qua nhieu muc menu (vd Quan ly co 8 muc) se vo
+   dong tren 1 hang ngang, nen gap nut hamburger va gap menu chinh thanh 1
+   bang doc, tha xuong duoi header khi bam mo. Giu nguyen giao dien hang ngang
+   cho man rong (desktop/laptop) - khong doi gi ca tren do. */
+@media (max-width: 1024px) {
+  .navbar__hamburger {
+    display: flex;
+  }
+
+  .navbar__nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
+    height: auto;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-md);
+    padding: 6px 0;
+  }
+
+  .navbar__nav--open {
+    display: flex;
+  }
+
+  .navbar__link {
+    width: 100%;
+    height: auto;
+    padding: 12px 20px;
+    border-radius: 0;
+  }
+
+  .navbar__dropdown-wrapper {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .navbar__link-btn {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Dropdown con tha xuong TAI CHO (khong noi/float ra giua man hinh nua) de
+     xep vao dung mach doc cua menu mobile, thut le nhe de thay ro la con. */
+  .navbar__nav-dropdown {
+    position: static;
+    transform: none;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+    background: var(--gray-50);
+    min-width: 0;
+    padding: 0;
+  }
+
+  .navbar__nav-dropdown-item {
+    padding: 10px 20px 10px 34px;
+  }
+}
+
+/* Responsive: tránh vỡ trên màn nhỏ */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0 16px;
+    gap: 12px;
+  }
+  .navbar__brand { min-width: auto; }
+  .navbar__right { min-width: auto; }
+  .navbar__display-name,
+  .navbar__role-badge { display: none; }
+}
+
+/* Man dien thoai rat nho - bo bot chu "Truc tuyen", chi giu cham xanh, tranh
+   xo lech voi muc menu + avatar tren cung 1 hang. */
+@media (max-width: 420px) {
+  .navbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .navbar__online-indicator {
+    padding: 4px 8px;
+  }
+  .online-label { display: none; }
+  .navbar__link {
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
+}
+
+/* Container cho inline children (khi parent dropdown bi an, chi render children). */
+.navbar__inline-children {
+  display: flex;
+  align-items: center;
+  gap: 0;
 }

@@ -1,3 +1,19 @@
 node_modules/
-dist/
 .env
+dist/
+.DS_Store
+*.log
+.claude/settings.local.json
+
+# Database files - tự sinh, không đẩy lên git
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
+FE/.env.production
+Landing/.env.production
+
+*.md
+docs/

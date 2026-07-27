@@ -1,0 +1,302 @@
+/* ── Layout ─────────────────────────────────────────────── */
+.error-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated background shapes */
+.error-page__bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.error-page__shape {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.08;
+}
+
+.error-page__shape--1 {
+  width: 400px;
+  height: 400px;
+  background: #3b82f6;
+  top: -100px;
+  right: -100px;
+  animation: float 8s ease-in-out infinite;
+}
+
+.error-page__shape--2 {
+  width: 300px;
+  height: 300px;
+  background: #10b981;
+  bottom: -80px;
+  left: -80px;
+  animation: float 10s ease-in-out infinite reverse;
+}
+
+.error-page__shape--3 {
+  width: 200px;
+  height: 200px;
+  background: #8b5cf6;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: pulse 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(20px, -20px) scale(1.05); }
+  66% { transform: translate(-10px, 15px) scale(0.95); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.05; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.12; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+/* ── Card ──────────────────────────────────────────────── */
+.error-card {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 20px;
+  padding: 48px 40px;
+  text-align: center;
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.02),
+    0 12px 40px rgba(59, 130, 246, 0.08),
+    0 0 0 1px rgba(59, 130, 246, 0.05);
+}
+
+/* ── Icon ──────────────────────────────────────────────── */
+.error-card__icon-wrapper {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 24px;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+}
+
+.error-card__status {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #ef4444;
+  background: #fef2f2;
+  padding: 4px 16px;
+  border-radius: 100px;
+  margin-bottom: 16px;
+  border: 1px solid #fecaca;
+}
+
+/* ── Text ──────────────────────────────────────────────── */
+.error-card__title {
+  margin: 0 0 12px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.3px;
+}
+
+.error-card__desc {
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: #6b7280;
+}
+
+/* ── Actions ───────────────────────────────────────────── */
+.error-card__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.error-card__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  outline: none;
+}
+
+.error-card__btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.error-card__btn--primary {
+  background: #1e40af;
+  color: #ffffff;
+}
+
+.error-card__btn--primary:hover {
+  background: #1e3a8a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+}
+
+.error-card__btn--secondary {
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.error-card__btn--secondary:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Request Permission Section ─────────────────────────── */
+.error-card__request-section {
+  margin-top: 8px;
+}
+
+.error-card__divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.error-card__divider::before,
+.error-card__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.error-card__request-label {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.error-card__textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.error-card__textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.error-card__btn--request {
+  width: 100%;
+  margin-top: 12px;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+  justify-content: center;
+}
+
+.error-card__btn--request:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+  border-color: #93c5fd;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.error-card__btn--request:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.error-card__request-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.error-card__request-hint code {
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #4b5563;
+}
+
+/* ── Success State ─────────────────────────────────────── */
+.error-card__success {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  color: #059669;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── Spinner ───────────────────────────────────────────── */
+.error-card__spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .error-card {
+    padding: 32px 20px;
+  }
+
+  .error-card__title {
+    font-size: 22px;
+  }
+
+  .error-card__actions {
+    flex-direction: column;
+  }
+
+  .error-card__btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

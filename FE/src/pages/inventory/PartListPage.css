@@ -1,0 +1,293 @@
+/* ============================================================
+   PartListPage — Material Design 3 (POC)
+   Toàn bộ style scope trong .part-list để không ảnh hưởng
+   các trang khác. Token MD3 ánh xạ từ hệ màu indigo sẵn có.
+============================================================ */
+.part-list {
+  /* MD3 color roles (map từ indigo hệ thống) */
+  --md-primary: #4f46e5;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #e0e7ff;
+  --md-on-primary-container: #1e1b4b;
+  --md-surface: #ffffff;
+  --md-surface-variant: #f4f4fb;
+  --md-surface-container: #f7f7fd;
+  --md-on-surface: #1c1b1f;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #cac4d0;
+  --md-outline-variant: #e7e0ec;
+  --md-error: #ba1a1a;
+  --md-error-container: #ffdad6;
+  --md-on-error-container: #410002;
+  --md-success: #146c2e;
+  --md-success-container: #c6f0cd;
+  --md-on-success-container: #002106;
+  --md-warning-container: #ffdea8;
+  --md-on-warning-container: #2a1800;
+
+  /* MD3 elevation */
+  --md-elevation-1: 0 1px 2px rgba(0,0,0,0.30), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-elevation-2: 0 1px 2px rgba(0,0,0,0.30), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.30);
+
+  /* MD3 shape scale */
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-xl: 28px;
+  --md-shape-full: 9999px;
+
+  padding: 8px 4px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: var(--md-on-surface);
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ── Header ── */
+.part-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.part-list__title {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 400;
+  letter-spacing: 0;
+  margin: 0 0 4px;
+  color: var(--md-on-surface);
+}
+
+.part-list__subtitle {
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0.25px;
+  color: var(--md-on-surface-variant);
+  margin: 0;
+  max-width: 60ch;
+}
+
+/* ── MD3 Buttons (scope trong .part-list) ── */
+.part-list .btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--md-shape-full);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, background-color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* State layer overlay (MD3) */
+.part-list .btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.part-list .btn:hover::after { opacity: 0.08; }
+.part-list .btn:active::after { opacity: 0.12; }
+.part-list .btn:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+.part-list .btn:disabled { opacity: 0.38; cursor: not-allowed; box-shadow: none; }
+.part-list .btn:disabled::after { opacity: 0; }
+
+/* Filled button */
+.part-list .btn--primary {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+.part-list .btn--primary:hover { box-shadow: var(--md-elevation-1); }
+
+/* Tonal/secondary button */
+.part-list .btn--secondary {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+/* Text/ghost button */
+.part-list .btn--ghost {
+  background: transparent;
+  color: var(--md-primary);
+  padding: 0 12px;
+}
+
+.part-list .btn--danger { color: var(--md-error); }
+.part-list .btn--primary.btn--danger { background: var(--md-error); color: #fff; }
+
+.part-list .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
+/* ── Filters bar (MD3 surface container) ── */
+.part-list__filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 16px;
+  background: var(--md-surface-container);
+  border-radius: var(--md-shape-lg);
+}
+
+/* MD3 outlined text field look */
+.part-list__filters .input,
+.part-list__filters .input--search,
+.part-list__filters .input--select {
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-sm);
+  background: var(--md-surface);
+  font-size: 14px;
+  color: var(--md-on-surface);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.part-list__filters .input--search { flex: 1; min-width: 220px; }
+
+.part-list__filters .input:focus,
+.part-list__filters .input--search:focus,
+.part-list__filters .input--select:focus {
+  border-color: var(--md-primary);
+  box-shadow: inset 0 0 0 1px var(--md-primary);
+}
+
+.filter-low-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0 8px;
+  height: 44px;
+}
+
+.filter-low-stock input { width: 18px; height: 18px; accent-color: var(--md-primary); cursor: pointer; }
+
+/* ── Loading / error states ── */
+.part-list__loading,
+.part-list__error {
+  padding: 32px;
+  text-align: center;
+  border-radius: var(--md-shape-md);
+  font-size: 14px;
+}
+
+.part-list__loading { background: var(--md-surface-variant); color: var(--md-on-surface-variant); }
+.part-list__error { background: var(--md-error-container); color: var(--md-on-error-container); }
+
+/* ── MD3 Data table inside an elevated surface card ── */
+.part-list .table-responsive {
+  background: var(--md-surface);
+  border-radius: var(--md-shape-lg);
+  box-shadow: var(--md-elevation-1);
+  overflow: auto;
+  border: 1px solid var(--md-outline-variant);
+}
+
+.part-list .table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.part-list .table thead tr { background: var(--md-surface-variant); }
+
+.part-list .table th {
+  padding: 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.part-list .table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface);
+  vertical-align: middle;
+}
+
+.part-list .table tbody tr:last-child td { border-bottom: none; }
+.part-list .table tbody tr { transition: background-color 0.12s ease; }
+.part-list .table tbody tr:hover { background-color: var(--md-surface-container); }
+
+.part-list .row--low-stock { background: var(--md-warning-container); }
+.part-list .row--low-stock:hover { background: #ffd591 !important; }
+
+.part-list .table a {
+  color: var(--md-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.part-list .table a:hover { text-decoration: underline; }
+
+.part-list .font-mono {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--md-primary);
+}
+
+/* ── MD3 chips (badge) ── */
+.part-list .badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--md-shape-sm);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+.part-list .badge--success { background: var(--md-success-container); color: var(--md-on-success-container); }
+.part-list .badge--danger { background: var(--md-error-container); color: var(--md-on-error-container); }
+
+.part-list .table__actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.part-list .table__empty { text-align: center; color: var(--md-on-surface-variant); padding: 48px 16px !important; }
+
+/* ── Pagination ── */
+.part-list__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.part-list__page-info { font-size: 14px; color: var(--md-on-surface-variant); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .part-list__title { font-size: 24px; line-height: 32px; }
+  .part-list__filters { padding: 12px; }
+  .part-list__filters .input--search { min-width: 100%; }
+  .part-list .table-responsive {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%);
+  }
+}

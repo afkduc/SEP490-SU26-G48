@@ -1,0 +1,1200 @@
+/* ── Page wrapper ──────────────────────────────────────────────────── */
+.admin-roles {
+  padding: 28px 32px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #1e293b;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Embedded in Users page (tabs) ─────────────────────────────── */
+.admin-roles--embedded {
+  padding: 0;
+}
+
+.admin-roles--embedded .admin-roles__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+
+/* ── Header ────────────────────────────────────────────────────────── */
+.admin-roles__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.admin-roles__title-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-roles__title-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--ag-primary, #4f46e5), #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+}
+
+.admin-roles__title-group h1 {
+  margin: 0 0 2px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.3px;
+}
+
+.admin-roles__subtitle {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.admin-roles__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-roles__total-badge {
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* ── Buttons (scoped — tránh leak sang trang Người dùng khi gộp tab) ─ */
+.admin-roles .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s, border-color 0.15s, color 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.admin-roles .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.admin-shell .admin-content .admin-roles .btn--primary,
+.admin-shell .admin-content .admin-roles .btn.btn--primary {
+  background: #4f46e5 !important;
+  background-image: none !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.28) !important;
+}
+.admin-shell .admin-content .admin-roles .btn--primary:hover:not(:disabled),
+.admin-shell .admin-content .admin-roles .btn.btn--primary:hover:not(:disabled) {
+  background: #4338ca !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35) !important;
+}
+
+.admin-shell .admin-content .admin-roles .admin-roles__title-icon {
+  background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35) !important;
+}
+
+.admin-roles .btn--secondary {
+  background: #fff;
+  color: #374151;
+  border-color: #d1d5db;
+}
+.admin-roles .btn--secondary:hover:not(:disabled) { background: #f9fafb; border-color: #9ca3af; }
+
+.admin-roles .btn--danger {
+  background: #fff;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+.admin-roles .btn--danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
+
+.admin-roles .btn--warning {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+.admin-roles .btn--warning:hover:not(:disabled) { background: #fef3c7; border-color: #f59e0b; }
+
+.admin-roles .btn--success-outline {
+  background: #fff;
+  color: #16a34a;
+  border-color: #bbf7d0;
+}
+.admin-roles .btn--success-outline:hover:not(:disabled) { background: #f0fdf4; border-color: #16a34a; }
+
+.admin-roles .btn--sm { padding: 6px 12px; font-size: 0.8rem; }
+
+.admin-roles .btn--ghost {
+  background: transparent;
+  color: #64748b;
+  border-color: transparent;
+}
+.admin-roles .btn--ghost:hover { background: #f1f5f9; color: #1e293b; }
+
+/* ── Tabs ─────────────────────────────────────────────────────────── */
+.admin-roles__tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0;
+}
+
+.admin-roles__tab {
+  padding: 8px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+  border-radius: 6px 6px 0 0;
+  font-family: inherit;
+}
+
+.admin-roles__tab:hover { color: #4f46e5; }
+
+.admin-roles__tab--active {
+  color: #4f46e5;
+  border-bottom-color: #4f46e5;
+  background: #eef2ff;
+}
+
+/* ── Cards ─────────────────────────────────────────────────────────── */
+.admin-roles__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+.role-card {
+  background: var(--ag-card, #fff);
+  border: 1px solid var(--ag-border, #e2e8f0);
+  border-radius: var(--ag-radius-lg, 14px);
+  padding: 22px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.role-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--ag-primary, #4f46e5), #6366f1);
+  opacity: 1;
+}
+
+.role-card:hover {
+  box-shadow: var(--ag-shadow-md, 0 10px 28px rgba(15, 23, 42, 0.1));
+  border-color: #c7d2fe;
+  transform: translateY(-2px);
+}
+
+.role-card--inactive {
+  opacity: 1;
+  background: #fcfcfd;
+}
+
+.role-card--inactive::before {
+  background: #cbd5e1;
+}
+
+.role-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.role-card__code {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: #64748b;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.admin-shell .admin-content .admin-roles .role-card__status {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px !important;
+  border-radius: 999px !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.admin-shell .admin-content .admin-roles .role-card__status--active {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #86efac !important;
+}
+
+.admin-shell .admin-content .admin-roles .role-card__status--active .role-card__status-dot {
+  background: #16a34a !important;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+}
+
+.admin-shell .admin-content .admin-roles .role-card__status--inactive {
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
+  border-color: #fecaca !important;
+}
+
+.admin-shell .admin-content .admin-roles .role-card__status--inactive .role-card__status-dot {
+  background: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+}
+
+.admin-shell .admin-content .admin-roles .role-card__btn {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px !important;
+  border-radius: 8px !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+.admin-shell .admin-content .admin-roles .role-card__btn--users {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  border-color: #93c5fd !important;
+}
+.admin-shell .admin-content .admin-roles .role-card__btn--users:hover {
+  background: #bfdbfe !important;
+  color: #1e40af !important;
+}
+
+.admin-shell .admin-content .admin-roles .role-card__btn--edit {
+  background: #eef2ff !important;
+  color: #4f46e5 !important;
+  border-color: #c7d2fe !important;
+}
+.admin-shell .admin-content .admin-roles .role-card__btn--edit:hover {
+  background: #e0e7ff !important;
+  color: #3730a3 !important;
+}
+
+.admin-shell .admin-content .admin-roles .role-card__btn--off {
+  background: #fef3c7 !important;
+  color: #a16207 !important;
+  border-color: #fde68a !important;
+}
+.admin-shell .admin-content .admin-roles .role-card__btn--off:hover {
+  background: #fde68a !important;
+  color: #92400e !important;
+}
+
+.admin-shell .admin-content .admin-roles .role-card__btn--on {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #86efac !important;
+}
+.admin-shell .admin-content .admin-roles .role-card__btn--on:hover {
+  background: #bbf7d0 !important;
+  color: #166534 !important;
+}
+
+.role-card__title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.role-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: #64748b;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.role-card__meta svg {
+  width: 15px;
+  height: 15px;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.role-card__actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 2px;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+/* legacy */
+.role-card__btn--warn {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+.role-card__btn--warn:hover {
+  background: #ffedd5;
+  border-color: #fdba74;
+}
+.role-card__btn--ok {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+.role-card__btn--ok:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+/* legacy aliases (nếu còn chỗ khác dùng) */
+.role-card__header { display: contents; }
+.role-card__badge,
+.role-card__badge--inactive,
+.role-card__status-chip,
+.role-card__status-chip--active,
+.role-card__status-chip--inactive,
+.role-card__name,
+.role-card__label,
+.role-card__meta-item {
+  /* giữ tương thích nhẹ — style mới dùng class bên trên */
+}
+
+/* ── Matrix ────────────────────────────────────────────────────────── */
+.matrix-container {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.matrix-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  gap: 12px;
+}
+
+.matrix-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.matrix-scroll {
+  overflow-x: auto;
+  /* Su dung custom property de tinh toan width cua cac cot role */
+  --matrix-role-width: clamp(72px, 8vw, 110px);
+}
+
+.matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 0;
+}
+
+.matrix-table th {
+  padding: 10px 8px;
+  background: #f8fafc;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  text-align: center;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  z-index: 2;
+}
+
+.matrix-th--module {
+  text-align: left !important;
+  width: clamp(140px, 22vw, 200px);
+  min-width: 140px;
+  background: #f1f5f9 !important;
+  font-size: 0.72rem;
+  border-right: 1px solid #e2e8f0;
+}
+
+.matrix-th--role {
+  width: var(--matrix-role-width);
+  min-width: 72px;
+  padding: 8px 4px !important;
+  background: #f8fafc !important;
+  white-space: normal;
+  vertical-align: bottom;
+  line-height: 1.15;
+}
+
+.matrix-role-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1e293b;
+  text-transform: none;
+  letter-spacing: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  hyphens: auto;
+  writing-mode: horizontal-tb;
+  transform: none;
+}
+
+.matrix-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f5f0;
+  border-right: 1px solid #f1f5f0;
+  vertical-align: middle;
+  font-size: 0.85rem;
+}
+
+.matrix-table tr:last-child td { border-bottom: none; }
+.matrix-table tr:hover td { background: #f8fafc; }
+
+.matrix-table td:first-child {
+  font-weight: 700;
+  color: #1e293b;
+  background: #fafbfc;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: clamp(140px, 22vw, 200px);
+  min-width: 140px;
+  max-width: 200px;
+}
+
+.matrix-table td:not(:first-child) {
+  text-align: center;
+  width: var(--matrix-role-width);
+  min-width: 72px;
+  padding: 8px 4px;
+}
+
+.matrix-module-row td {
+  background: #f1f5f9 !important;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.matrix-module-cell {
+  text-align: left;
+}
+
+.matrix-perm-row:hover td {
+  background: #f8fafc;
+}
+
+.matrix-perm-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 10px !important;
+}
+
+.matrix-perm-action {
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matrix-perm-key {
+  font-size: 0.64rem;
+  color: #94a3b8;
+  font-weight: 400;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matrix-check-cell {
+  text-align: center;
+  padding: 6px 2px !important;
+}
+
+.matrix-checkbox {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: #4f46e5;
+  margin: 0;
+  vertical-align: middle;
+}
+
+/* ── Modal ────────────────────────────────────────────────────────── */
+.role-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: overlayIn 0.18s ease-out;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.role-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.94) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.role-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.role-modal__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.role-modal__close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.role-modal__close:hover { background: #e2e8f0; color: #1e293b; }
+
+.role-modal__body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.role-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* ── Role Users Modal ──────────────────────────────────────────────── */
+.role-users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.role-user-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.role-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.role-user-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  flex: 1;
+}
+
+.role-user-branch {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+/* ── Forms ────────────────────────────────────────────────────────── */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-group label span { color: #ef4444; }
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.form-group .form-hint {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* ── Empty / Loading / Error ─────────────────────────────────────── */
+.admin-roles__loading,
+.admin-roles__error,
+.admin-roles__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  text-align: center;
+  color: #64748b;
+}
+
+.admin-roles__loading svg { animation: spin 1s linear infinite; }
+.admin-roles__error { color: #dc2626; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Confirm Delete ──────────────────────────────────────────────── */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  animation: overlayIn 0.18s ease-out;
+}
+
+.confirm-modal {
+  background: #fff;
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.confirm-modal__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fef2f2;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+}
+
+.confirm-modal__icon--warning {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.confirm-modal__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  text-align: center;
+}
+
+.confirm-modal__body {
+  font-size: 0.875rem;
+  color: #475569;
+  text-align: center;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.confirm-modal__footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* ── Matrix Save Bar ──────────────────────────────────────────────── */
+.matrix-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #fffbeb;
+  border-top: 1px solid #fde68a;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.matrix-save-bar__info {
+  font-size: 0.85rem;
+  color: #92400e;
+}
+
+.matrix-save-bar__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Permission badge ────────────────────────────────────────────── */
+.permission-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+/* ── Matrix compact: dam bao khong can cuon ngang o >=1024px ─────── */
+/* Tinh tong width: cot module (200) + N cot role (110) phai < viewport */
+/* 200 + N*110 < viewport => N < (viewport-200)/110 */
+/* 1024px: N < 7.5 (toi da 7 cot role) */
+/* 1280px: N < 9.8 (toi da 9 cot role) */
+/* 768px:  luon cuon ngang - dung scroll */
+
+@media (max-width: 1023px) {
+  .matrix-scroll {
+    --matrix-role-width: 90px;
+  }
+}
+
+@media (max-width: 767px) {
+  .matrix-scroll {
+    --matrix-role-width: 72px;
+  }
+  .admin-roles {
+    padding: 16px 12px;
+  }
+  .matrix-th--module,
+  .matrix-table td:first-child {
+    width: 110px;
+    min-width: 110px;
+    max-width: 130px;
+  }
+  .matrix-perm-label {
+    padding: 6px 8px !important;
+  }
+  .matrix-perm-action { font-size: 0.72rem; }
+  .matrix-perm-key { font-size: 0.6rem; }
+  .matrix-checkbox { width: 14px; height: 14px; }
+}
+
+/* ── Matrix scroll behaviors ─────────────────────────────────────── */
+/* Dam bao header module row luon sticky-top khi cuon doc */
+.matrix-module-row td {
+  position: sticky;
+  top: 0;
+}
+
+/* Dam bao thead (cot role header) cung sticky-top, stack voi module row */
+.matrix-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.matrix-table thead th.matrix-th--module {
+  /* Fix xung dot: cot module khong can sticky-top rieng, no nam trong thead */
+  top: 0;
+}
+
+/* Khi cuon ngang, cot dau tien giu nguyen */
+.matrix-th--module,
+.matrix-table td:first-child {
+  position: sticky;
+  left: 0;
+}
+
+/* ============================================================
+ * GROUPS MATRIX (Phase 3) - moi role = 1 card voi cac nhom checkbox
+ * ============================================================ */
+
+.groups-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.groups-matrix__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+}
+
+.groups-matrix__header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.groups-matrix__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 16px;
+}
+
+.groups-matrix__card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.groups-matrix__card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  border-color: #cbd5e1;
+}
+
+.groups-matrix__card--inactive {
+  opacity: 0.55;
+  background: #f8fafc;
+}
+
+.groups-matrix__card-header {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+}
+
+.groups-matrix__role-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.groups-matrix__role-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.groups-matrix__role-code {
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #475569;
+  font-size: 0.72rem;
+}
+
+.groups-matrix__status {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+.groups-matrix__status.is-active {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.groups-matrix__status.is-inactive {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.groups-matrix__role-count {
+  color: #6366f1;
+  font-weight: 600;
+  background: #e0e7ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.groups-matrix__modules {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.groups-matrix__warning {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.groups-matrix__warning code {
+  background: #fde68a;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: #78350f;
+}
+
+.groups-matrix__module {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.groups-matrix__module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.groups-matrix__module-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.88rem;
+}
+
+.groups-matrix__module-toggle input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+.groups-matrix__module-name {
+  user-select: none;
+}
+
+.groups-matrix__module-count {
+  font-size: 0.72rem;
+  color: #64748b;
+  background: #ffffff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.groups-matrix__group-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px;
+}
+
+.groups-matrix__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.82rem;
+}
+
+.groups-matrix__group:hover {
+  border-color: #6366f1;
+  background: #f5f3ff;
+}
+
+.groups-matrix__group.is-checked {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+
+.groups-matrix__group input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: #6366f1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.groups-matrix__group-name {
+  flex: 1;
+  min-width: 0;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groups-matrix__group-perms {
+  font-size: 0.7rem;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.groups-matrix__group.is-checked .groups-matrix__group-perms {
+  background: #c7d2fe;
+  color: #4338ca;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .groups-matrix__cards {
+    grid-template-columns: 1fr;
+  }
+  .groups-matrix__group-list {
+    grid-template-columns: 1fr;
+  }
+  .groups-matrix__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
