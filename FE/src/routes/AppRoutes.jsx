@@ -180,21 +180,13 @@ function AppRoutes() {
               <AdminSpecialtiesPage />
             </ProtectedRoute>
           } />
-          <Route path="permission-matrix" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:permission_matrix:access">
-              <AdminPermissionMatrixPage />
-            </ProtectedRoute>
-          } />
+          <Route path="permission-matrix" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="permission-requests" element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
               <PermissionRequestsPage />
             </ProtectedRoute>
           } />
-          <Route path="role-screen-matrix" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:role_screen_matrix:access">
-              <RoleScreenMatrixPage />
-            </ProtectedRoute>
-          } />
+          <Route path="role-screen-matrix" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="logs" element={
             <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:audit_logs:access">
               <AuditLogsPage />

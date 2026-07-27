@@ -401,7 +401,7 @@ export function AppProvider({ children }) {
           Tu tat khi user logout. Tu backoff khi nhan 401 de tranh spam. */}
       {isAuthenticated ? <HeartbeatRunner /> : null}
       {isAuthenticated ? <PermissionEventsRunner /> : null}
-      {isAuthenticated ? <LoginChallengeRunner /> : null}
+      {/* Login challenge (chờ Approve) đang tắt — bật lại cùng LOGIN_CHALLENGE_ENABLED trên BE */}
       {children}
     </AppContext.Provider>
   );
