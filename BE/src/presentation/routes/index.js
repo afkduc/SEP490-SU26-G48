@@ -25,6 +25,7 @@ const buildServiceRequestRouter = require('./serviceRequestRoutes');
 const buildRoleScreenMatrixRouter = require('./roleScreenMatrixRoutes');
 const buildUserScreenPermissionsRouter = require('./userScreenPermissionsRoutes');
 const buildPermissionRequestRouter = require('./permissionRequestRoutes');
+const buildPayosWebhookRouter = require('./payosWebhookRoutes');
 
 const router = express.Router();
 
@@ -74,5 +75,7 @@ router.use('/sse', buildSSERouter());
 // sua chua bang ma, khong can dang nhap). Mount rieng, KHONG dat trong
 // repairOrderRoutes.js vi file do gan authenticate cho ca router.
 router.use('/public', buildPublicRouter());
+// PayOS webhook - khong qua authenticate (xem ghi chu trong payosWebhookRoutes.js).
+router.use('/payos', buildPayosWebhookRouter());
 
 module.exports = router;
