@@ -129,7 +129,16 @@ function AppRoutes() {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute permission="screen:dashboard:access">
+            <ProtectedRoute
+              permissions={[
+                'screen:dashboard:access',
+                'screen:advisor:dashboard:access',
+                'screen:manager:dashboard:access',
+                'screen:director:dashboard:access',
+                'screen:leader:dashboard:access',
+              ]}
+              match="any"
+            >
               <AppLayout>
                 <DashboardPage />
               </AppLayout>
@@ -247,11 +256,17 @@ function AppRoutes() {
           }
         />
 
-        {/* Phiếu quyết toán sửa chữa */}
+        {/* Phiếu quyết toán sửa chữa — shared + advisor matrix keys */}
         <Route
           path="/repair-settlement/*"
           element={
-            <ProtectedRoute permission="screen:repair-settlement:access">
+            <ProtectedRoute
+              permissions={[
+                'screen:repair-settlement:access',
+                'screen:advisor:orders:access',
+              ]}
+              match="any"
+            >
               <AppLayout>
                 <RepairSettlementPage />
               </AppLayout>
@@ -259,11 +274,19 @@ function AppRoutes() {
           }
         />
 
-        {/* Lệnh sửa chữa */}
+        {/* Lệnh sửa chữa — shared + advisor/leader matrix keys */}
         <Route
           path="/repair-orders/*"
           element={
-            <ProtectedRoute permission="screen:repair-orders:access">
+            <ProtectedRoute
+              permissions={[
+                'screen:repair-orders:access',
+                'screen:advisor:orders:access',
+                'screen:leader:orders:access',
+                'screen:leader:tasks:access',
+              ]}
+              match="any"
+            >
               <AppLayout>
                 <RepairOrderPage />
               </AppLayout>
@@ -275,7 +298,7 @@ function AppRoutes() {
         <Route
           path="/customers"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <CustomerHistoryPage />
               </AppLayout>
@@ -299,7 +322,7 @@ function AppRoutes() {
         <Route
           path="/customer-care"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <CustomerCarePage />
               </AppLayout>
@@ -307,11 +330,26 @@ function AppRoutes() {
           }
         />
 
-        {/* Inventory module */}
+        {/* Inventory module — top-level inventory + submodule / manager keys */}
         <Route
           path={ROUTES.INVENTORY}
           element={
-            <ProtectedRoute roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]} permission="screen:inventory:access">
+            <ProtectedRoute
+              roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}
+              permissions={[
+                'screen:inventory:access',
+                'screen:manager:inventory:access',
+                'screen:inventory:products:access',
+                'screen:inventory:stock:access',
+                'screen:inventory:suppliers:access',
+                'screen:inventory:import-requests:access',
+                'screen:inventory:export-requests:access',
+                'screen:inventory:low-stock:access',
+                'screen:warehouse:products:access',
+                'screen:warehouse:stock:access',
+              ]}
+              match="any"
+            >
               <AppLayout>
                 <InventoryLayout />
               </AppLayout>

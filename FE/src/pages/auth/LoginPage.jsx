@@ -138,6 +138,10 @@ export default function LoginPage() {
       setError('Vui lòng nhập đầy đủ email/số điện thoại và mật khẩu');
       return;
     }
+    if (!form.branchId) {
+      setError('Vui lòng chọn chi nhánh trước khi đăng nhập');
+      return;
+    }
     if (lockoutSeconds > 0) {
       setError(`Vui lòng đợi ${lockoutSeconds}s trước khi thử lại.`);
       return;
@@ -216,8 +220,10 @@ export default function LoginPage() {
             </div>
 
             <div className="login-field">
-              <label htmlFor="branchId">Chi nhánh</label>
-              <select id="branchId" name="branchId" value={form.branchId} onChange={handleChange}>
+              <label htmlFor="branchId">
+                Chi nhánh <span className="required">*</span>
+              </label>
+              <select id="branchId" name="branchId" value={form.branchId} onChange={handleChange} required>
                 <option value="">Chọn chi nhánh</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
