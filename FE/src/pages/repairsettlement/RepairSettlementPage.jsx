@@ -15,6 +15,7 @@ import {
   createRepairSettlementApi,
   updateRepairSettlementApi,
   updateRepairSettlementStatusApi,
+  createPayosPaymentLinkApi,
 } from '../../services/repairSettlementApi';
 import { updateRepairOrderStatusApi } from '../../services/repairOrderApi';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
@@ -532,7 +533,46 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
   // Bat buoc phai In phieu quyet toan (xem lai giay to) TRUOC khi duoc phep
   // Xac nhan xuat hoa don - nut xac nhan chi xuat hien SAU lan in dau tien,
   // tranh xac nhan xuat hoa don ma chua thuc su in/kiem tra lai phieu giay.
+  // (Van giu cho khach tra tien mat: xac nhan tay, khong qua PayOS.)
   const [hasPrinted, setHasPrinted] = useState(false);
+
+  // PayOS: QR dong that, tu tao ngay khi mo modal cho phieu dang cho thanh
+  // toan (khong doi CVDV bam them nut nao) - het han sau 60s, khach quet la
+  // ra dung so tien can chuyen. Khi PayOS bao da nhan tien (webhook), phieu
+  // tu dong chuyen "Da xuat hoa don" qua SSE 'invoiced' (xem handleRepairOrderEvent
+  // ben duoi) - khong lien quan gi den hasPrinted/xac nhan tay o tren.
+  const [payos, setPayos] = useState(null); // { qrCode, checkoutUrl, orderCode, expiredAt }
+  const [payosLoading, setPayosLoading] = useState(false);
+  const [payosError, setPayosError] = useState('');
+  const [secondsLeft, setSecondsLeft] = useState(0);
+
+  const requestPayosQr = async () => {
+    setPayosLoading(true);
+    setPayosError('');
+    try {
+      const result = await createPayosPaymentLinkApi(order.id);
+      setPayos(result);
+    } catch (err) {
+      setPayosError(err.message || 'Không tạo được mã QR thanh toán');
+    } finally {
+      setPayosLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (order.status === 'waiting_payment') {
+      requestPayosQr();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id]);
+
+  useEffect(() => {
+    if (!payos) return undefined;
+    const tick = () => setSecondsLeft(Math.max(0, payos.expiredAt - Math.floor(Date.now() / 1000)));
+    tick();
+    const intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
+  }, [payos]);
 
   const handlePrint = () => {
     printSettlement(order);
@@ -627,8 +667,38 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                <img src={buildVietQrUrl(order.total, order.code)} alt="QR thanh toán" style={{ width: 90, height: 90, border: '1px solid #DDD' }} />
-                <div style={{ fontSize: 9, color: '#888' }}>Quét để thanh toán</div>
+                {order.status === 'waiting_payment' ? (
+                  <>
+                    {payos && secondsLeft > 0 ? (
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(payos.qrCode)}`}
+                        alt="QR thanh toán PayOS"
+                        style={{ width: 130, height: 130, border: '1px solid #DDD' }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: 130, height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '1px dashed #ccc', textAlign: 'center', fontSize: 11, color: '#888', padding: 6,
+                      }}>
+                        {payosLoading ? 'Đang tạo mã QR…' : payos ? 'Mã QR đã hết hạn' : (payosError || 'Chưa có mã QR')}
+                      </div>
+                    )}
+                    {payos && secondsLeft > 0 ? (
+                      <div style={{ fontSize: 9, color: '#888' }}>Quét app ngân hàng — hết hạn sau {secondsLeft}s</div>
+                    ) : (
+                      !payosLoading && (
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, padding: '4px 8px' }} onClick={requestPayosQr}>
+                          Tạo lại mã QR
+                        </button>
+                      )
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <img src={buildVietQrUrl(order.total, order.code)} alt="QR thanh toán" style={{ width: 90, height: 90, border: '1px solid #DDD' }} />
+                    <div style={{ fontSize: 9, color: '#888' }}>Quét để thanh toán</div>
+                  </>
+                )}
               </div>
               <div style={{ minWidth: 260, flexShrink: 0 }}>
                 {[
@@ -908,6 +978,11 @@ function RepairSettlementList() {
   //     dang mo dung modal chi tiet phieu do thi hien popup thong bao, doi
   //     CVDV bam X moi chuyen sang tab "Cho thanh toan" (khong tu dong nhay
   //     ngang khi ho dang doc do).
+  //   - 'invoiced': PayOS webhook bao da nhan tien -> phieu tu dong xuat hoa
+  //     don (RepairSettlementService.handlePayosWebhook) - nap lai danh sach;
+  //     neu dang mo dung modal xem/in phieu nay thi nap lai de modal tu
+  //     chuyen sang trang thai "da xuat hoa don" ngay (an QR PayOS/nut xac
+  //     nhan tay), khong can CVDV thao tac gi them.
   const handleRepairOrderEvent = (event) => {
     if (event.type === 'task-updated' && view && String(view.id) === String(event.settlementId)) {
       getRepairSettlementApi(view.id).then(setView).catch(() => {});
@@ -916,6 +991,12 @@ function RepairSettlementList() {
       loadAll({ silent: true });
       if (view && String(view.id) === String(event.settlementId)) {
         setCompletedPopupOrder(view);
+      }
+    }
+    if (event.type === 'invoiced') {
+      loadAll({ silent: true });
+      if (previewOrder && String(previewOrder.id) === String(event.settlementId)) {
+        getRepairSettlementApi(previewOrder.id).then(setPreviewOrder).catch(() => {});
       }
     }
   };
@@ -981,8 +1062,15 @@ function RepairSettlementList() {
   };
 
   const handleInvoice = async (id) => {
-    const updated = await updateRepairSettlementStatusApi(id, 'invoiced');
-    setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
+    try {
+      const updated = await updateRepairSettlementStatusApi(id, 'invoiced');
+      setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
+    } catch (err) {
+      // 409: PayOS da tu dong xuat hoa don truoc do (webhook toi truoc luc
+      // CVDV bam nut nay) - khong phai loi thuc su, chi can nap lai danh sach.
+      if (err.status !== 409) throw err;
+      await loadAll({ silent: true });
+    }
     setTab('invoiced');
   };
 
