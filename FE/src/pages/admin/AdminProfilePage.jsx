@@ -575,7 +575,7 @@ export default function AdminProfilePage() {
                     <span className="profile-info-item__value">{formatDateTime(profile.updatedAt || profile.createdAt)}</span>
                   </div>
                   <div className="profile-info-item profile-info-item--full">
-                    <span className="profile-info-item__label">Vai tro</span>
+                    <span className="profile-info-item__label">Vai trò</span>
                     <span className="profile-info-item__value">
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {profile.roles?.map((r) => (
