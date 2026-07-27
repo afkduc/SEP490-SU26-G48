@@ -18,6 +18,7 @@ export const ROUTES = Object.freeze({
   DASHBOARD_PROFILE: '/dashboard/profile',
   REPAIR_ORDERS_PROFILE: '/repair-orders/profile',
   INVENTORY_PROFILE: '/inventory/profile',
+  TECHNICIAN_PROFILE: '/technician/profile',
 
   INVENTORY: '/inventory',
 
