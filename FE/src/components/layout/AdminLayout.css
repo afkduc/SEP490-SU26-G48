@@ -19,7 +19,7 @@
 .admin-sidebar {
   width: 256px;
   min-height: 100vh;
-  background: #1e1b4b;
+  background: var(--ag-sidebar-bg, #12163a);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -30,6 +30,7 @@
   overflow-x: hidden;
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 100;
+  box-shadow: 4px 0 24px rgba(18, 22, 58, 0.18);
 }
 
 .admin-shell--collapsed .admin-sidebar {
@@ -51,14 +52,14 @@
 .admin-sidebar__logo {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, #4338ca, #6366f1 50%, #0891b2);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 6px 16px rgba(67, 56, 202, 0.45);
 }
 
 .admin-sidebar__brand-text {
@@ -112,7 +113,7 @@
 .admin-sidebar__group-label {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #6366f1;
+  color: #818cf8;
   text-transform: uppercase;
   letter-spacing: 1px;
   padding: 8px 10px 4px;
@@ -127,7 +128,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   text-decoration: none;
-  color: #a5b4fc;
+  color: var(--ag-sidebar-text, #c7d2fe);
   font-size: 0.875rem;
   font-weight: 500;
   transition: all 0.15s;
@@ -138,19 +139,19 @@
 }
 
 .admin-sidebar__item:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--ag-sidebar-hover, rgba(255, 255, 255, 0.1));
   color: #fff;
 }
 
 .admin-sidebar__item--active {
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.35), rgba(124, 58, 237, 0.2));
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.48), rgba(8, 145, 178, 0.22));
   color: #fff;
   font-weight: 600;
-  box-shadow: inset 3px 0 0 #4f46e5;
+  box-shadow: inset 3px 0 0 #818cf8;
 }
 
 .admin-sidebar__item--active:hover {
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.45), rgba(124, 58, 237, 0.3));
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.58), rgba(8, 145, 178, 0.3));
 }
 
 .admin-sidebar__item-icon {
@@ -177,6 +178,21 @@
   color: #a5b4fc;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.admin-sidebar__item-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 /* â”€â”€ Collapse toggle button (floating, for desktop) â”€â”€ */

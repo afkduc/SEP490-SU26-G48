@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { notificationApi } from '../../services';
 import './AdminProfileNotificationsPage.css';
 
-export default function AdminProfileNotificationsPage() {
+export default function AdminProfileNotificationsPage({ embedded = false } = {}) {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -95,15 +95,41 @@ export default function AdminProfileNotificationsPage() {
     }
   };
 
+  const titleBlock = (
+    <div>
+      <h1>Cài đặt thông báo</h1>
+      <p className="admin-notifications__subtitle">Quản lý các kênh thông báo của tài khoản</p>
+    </div>
+  );
+
+  const actionButtons = (
+    <div className="admin-notifications__header-actions" style={{ display: 'flex', gap: 8 }}>
+      <button
+        type="button"
+        className="btn btn--ghost"
+        onClick={handleResetDefaults}
+        disabled={saving || !settings}
+      >
+        Đặt lại mặc định
+      </button>
+      <button
+        className="btn btn--primary"
+        onClick={handleSave}
+        disabled={saving || !settings}
+      >
+        {saving ? 'Đang lưu...' : 'Lưu cài đặt'}
+      </button>
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className="admin-notifications">
-        <div className="admin-notifications__header">
-          <div>
-            <h1>Cài đặt thông báo</h1>
-            <p className="admin-notifications__subtitle">Quản lý các kênh thông báo của tài khoản</p>
+      <div className={`admin-notifications${embedded ? ' admin-notifications--embedded' : ''}`}>
+        {!embedded && (
+          <div className="admin-notifications__header">
+            {titleBlock}
           </div>
-        </div>
+        )}
         <div className="loading-state">
           <div className="loading-spinner"></div>
           <p>Đang tải cài đặt...</p>
@@ -114,13 +140,12 @@ export default function AdminProfileNotificationsPage() {
 
   if (error && !settings) {
     return (
-      <div className="admin-notifications">
-        <div className="admin-notifications__header">
-          <div>
-            <h1>Cài đặt thông báo</h1>
-            <p className="admin-notifications__subtitle">Quản lý các kênh thông báo của tài khoản</p>
+      <div className={`admin-notifications${embedded ? ' admin-notifications--embedded' : ''}`}>
+        {!embedded && (
+          <div className="admin-notifications__header">
+            {titleBlock}
           </div>
-        </div>
+        )}
         <div className="error-state">
           <p>{error}</p>
           <button className="btn btn--secondary" onClick={loadSettings}>
@@ -132,30 +157,19 @@ export default function AdminProfileNotificationsPage() {
   }
 
   return (
-    <div className="admin-notifications">
-      <div className="admin-notifications__header">
-        <div>
-          <h1>Cài đặt thông báo</h1>
-          <p className="admin-notifications__subtitle">Quản lý các kênh thông báo của tài khoản</p>
+    <div className={`admin-notifications${embedded ? ' admin-notifications--embedded' : ''}`}>
+      {!embedded && (
+        <div className="admin-notifications__header">
+          {titleBlock}
+          {actionButtons}
         </div>
-        <div className="admin-notifications__header-actions" style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={handleResetDefaults}
-            disabled={saving || !settings}
-          >
-            Đặt lại mặc định
-          </button>
-          <button
-            className="btn btn--primary"
-            onClick={handleSave}
-            disabled={saving || !settings}
-          >
-            {saving ? 'Đang lưu...' : 'Lưu cài đặt'}
-          </button>
+      )}
+
+      {embedded && (
+        <div className="admin-hub__toolbar">
+          {actionButtons}
         </div>
-      </div>
+      )}
 
       {error && (
         <div className="alert-banner alert-banner--error">
