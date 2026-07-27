@@ -2,12 +2,14 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
+import ProfileRedirect from '../components/ProfileRedirect';
 import SessionExpiredModal from '../components/SessionExpiredModal';
 import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
+import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
 import { SharedDataProvider } from '../contexts/SharedDataContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
 
@@ -29,7 +31,6 @@ const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'))
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
-const PermissionRequestsPage = lazy(() => import('../pages/admin/PermissionRequestsPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -108,6 +109,14 @@ function Loading() {
   );
 }
 
+function ProfilePageLayout() {
+  return (
+    <AppLayout>
+      <Outlet />
+    </AppLayout>
+  );
+}
+
 function AppRoutes() {
   return (
     <>
@@ -133,6 +142,7 @@ function AppRoutes() {
                 ROLES.MANAGER,
                 ROLES.GENERAL_DIRECTOR,
                 ROLES.TEAM_LEADER,
+                ROLES.TECHNICIAN,
                 ROLES.ADMIN,
               ]}
             >
@@ -161,19 +171,53 @@ function AppRoutes() {
           <Route path="roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
           <Route path="devices" element={<AdminDevicesPage />} />
           <Route path="specialties" element={<AdminSpecialtiesPage />} />
-          <Route path="permission-requests" element={<PermissionRequestsPage />} />
           <Route path="logs" element={<AuditLogsPage />} />
           <Route path="login-sessions" element={<LoginSessionsPage />} />
           <Route path="profile" element={<AdminProfilePage />} />
+          <Route path="profile/edit" element={<AdminProfilePage />} />
           <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
         </Route>
+
+        {/* Hồ sơ cá nhân — URL view/edit riêng cho từng role (AppLayout) */}
+        {APP_PROFILE_ROUTE_CONFIGS.map(({ profilePath, allowedRoles }) => (
+          <Route
+            key={profilePath}
+            path={profilePath}
+            element={
+              <ProtectedRoute roles={allowedRoles}>
+                <ProfilePageLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminProfilePage />} />
+            <Route path="edit" element={<AdminProfilePage />} />
+          </Route>
+        ))}
+
+        {/* Legacy /profile, /profile/edit → redirect theo role */}
+        <Route
+          path="/profile/edit"
+          element={
+            <ProtectedRoute>
+              <ProfileRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfileRedirect />
+            </ProtectedRoute>
+          }
+        />
 
         {/* General Director */}
         <Route
           path="/general-director/*"
           element={
             <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
-              <AppLayout showNavbar={false}>
+              <AppLayout>
                 <GeneralDirectorPage />
               </AppLayout>
             </ProtectedRoute>
@@ -187,18 +231,6 @@ function AppRoutes() {
             <ProtectedRoute roles={[ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <ManagerPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Hồ sơ cá nhân — mọi role đã đăng nhập */}
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <AdminProfilePage />
               </AppLayout>
             </ProtectedRoute>
           }
@@ -220,7 +252,7 @@ function AppRoutes() {
         <Route
           path="/repair-orders/*"
           element={
-            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.TEAM_LEADER, ROLES.MANAGER, ROLES.ADMIN]}>
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.TEAM_LEADER, ROLES.TECHNICIAN, ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <RepairOrderPage />
               </AppLayout>

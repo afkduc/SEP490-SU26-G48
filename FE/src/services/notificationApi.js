@@ -34,17 +34,3 @@ export async function markAllAsRead() {
 export async function getUnreadCount() {
   return httpClient.get('/profile/me/notifications/unread-count');
 }
-
-/**
- * Gửi yêu cầu cấp quyền tới admin.
- * @param {string} permissionKey - VD: 'admin:branches:create'
- * @param {string} reason - Lý do (optional)
- * @param {string} page - Trang user đang ở (optional)
- */
-export async function requestPermission(permissionKey, reason = '', page = '') {
-  return httpClient.post('/profile/me/request-permission', {
-    permissionKey,
-    reason,
-    page,
-  });
-}

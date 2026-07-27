@@ -1,7 +1,20 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
-import { getMyProfile, updateMyProfile, changePassword } from '../../services/profileApi';
+import { useEffect, useState, useRef } from 'react';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import {
+  useAuth,
+  getRoleProfilePath,
+  getRoleProfileEditPath,
+} from '../../contexts/AppContext';
+import { getMyProfile, updateMyProfile, changePassword, uploadMyAvatar } from '../../services/profileApi';
+import {
+  syncProfileSession,
+} from '../../utils/profileSession';
+import {
+  isRoleProfilePath,
+  isProfileNotificationsPath,
+  isProfileEditPath,
+} from '../../utils/profilePaths';
+import { useAuthenticatedAvatarUrl } from '../../hooks/useAuthenticatedAvatarUrl';
 import './AdminProfilePage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -194,21 +207,49 @@ function PasswordInput({ label, id, value, onChange, placeholder, error }) {
 export default function AdminProfilePage() {
   const { user, setUser, reloadPermissions } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const profileBasePath = getRoleProfilePath(user);
+  const profileEditPath = getRoleProfileEditPath(user);
+  const isEditMode = location.pathname.endsWith('/edit');
+  const activeTab = isEditMode ? 'edit' : 'view';
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
-  // Hien thi banner neu bi redirect tu login vi mustChangePassword=true
   const forcedChange = searchParams.get('reason') === 'forced';
 
-  // Tab: 'view' | 'edit' | 'password'
-  // Doc tu query param ?tab=edit de auto switch khi can.
-  // Tab 'password' da bi an (se lam luong rieng qua email) -> fallback 'view'.
-  const initialTab = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState(
-    initialTab === 'edit' ? 'edit' : 'view'
-  );
+  // Redirect ve dung URL profile/edit theo role (khong de /dashboard/profile cho admin...)
+  useEffect(() => {
+    if (!user) return;
+    const path = location.pathname;
+    if (isProfileNotificationsPath(path)) return;
+    if (!isRoleProfilePath(path)) return;
+
+    const viewPath = getRoleProfilePath(user);
+    const editPath = getRoleProfileEditPath(user);
+
+    if (isProfileEditPath(path)) {
+      if (path !== editPath) navigate(editPath, { replace: true });
+      return;
+    }
+    if (path !== viewPath) {
+      navigate(viewPath, { replace: true });
+    }
+  }, [user, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (searchParams.get('tab') !== 'edit') return;
+    if (isEditMode) {
+      if (searchParams.get('tab')) {
+        setSearchParams({}, { replace: true });
+      }
+      return;
+    }
+    navigate(profileEditPath, { replace: true });
+  }, [searchParams, isEditMode, navigate, profileEditPath, setSearchParams]);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -230,6 +271,14 @@ export default function AdminProfilePage() {
   const [pwErrors, setPwErrors] = useState({});
   const [pwLoading, setPwLoading] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(null);
+
+  // ─── Avatar upload state ────────────────────────────────────────────────
+  const avatarInputRef = useRef(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null);
+  const [avatarCacheBuster, setAvatarCacheBuster] = useState(0);
+  const avatarDisplayUrl = useAuthenticatedAvatarUrl(profile?.avatar, avatarCacheBuster);
 
   // Load profile on mount
   useEffect(() => {
@@ -257,17 +306,19 @@ export default function AdminProfilePage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Switch tab resets messages
-  // Tab 'password' bi an nen neu co ai do goi handleTabChange('password') qua
-  // query param cu, fallback ve 'view' de tranh render content bi an.
   function handleTabChange(tab) {
     const safeTab = tab === 'password' ? 'view' : tab;
-    setActiveTab(safeTab);
     setEditError(null);
     setEditSuccess(null);
     setPwSuccess(null);
     setPwErrors({});
-    // Clear query param ?tab= khi user tu chuyen tab (giu URL sach)
+
+    if (safeTab === 'edit') {
+      if (!isEditMode) navigate(profileEditPath);
+    } else if (isEditMode) {
+      navigate(profileBasePath);
+    }
+
     if (searchParams.get('tab') || searchParams.get('reason')) {
       setSearchParams({}, { replace: true });
     }
@@ -295,49 +346,60 @@ export default function AdminProfilePage() {
       setProfile(updated);
       setEditSuccess('Cập nhật thông tin thành công!');
 
-      // Update localStorage user va AppContext user + permissions de Navbar,
-      // permission gate va role badge dong bo ngay (khong can F5).
-      // Bug cu: chi setProfile local + luu 1 phan vao localStorage. Neu BE
-      // tra updated.roles hoac updated.permissions (khi admin thay doi role
-      // cua chinh minh), Navbar va PermissionGate van hien thi role cu.
-      try {
-        const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
-        const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
+      syncProfileSession(user, updated, setUser);
+      if (typeof reloadPermissions === 'function') {
+        reloadPermissions();
+      }
 
-        const updatedUser = {
-          ...(raw ? JSON.parse(raw) : {}),
-          ...updated,
-          // Dam bao cac field chinh xac nhat quan he giua FE va BE
-          id: updated.id ?? updated.userId,
-          email: updated.email,
-          userName: updated.userName || updated.name,
-          name:
-            `${updated.firstName || ''} ${updated.lastName || ''}`.trim() ||
-            updated.name,
-          firstName: updated.firstName,
-          lastName: updated.lastName,
-          phone: updated.phone,
-          roles: updated.roles,
-          permissions: updated.permissions,
-          branchId: updated.branchId,
-          branchName: updated.branchName,
-        };
-        storage.setItem('user', JSON.stringify(updatedUser));
-
-        // Cap nhat AppContext state de component khac (Navbar, AdminLayout)
-        // re-render voi thong tin moi ngay lap tuc.
-        setUser(updatedUser);
-        // Re-load permissions tu storage (BE co the da tra permissions moi).
-        if (typeof reloadPermissions === 'function') {
-          reloadPermissions();
-        }
-      } catch (_) {}
+      // Giu dung trang edit cua role sau khi luu
+      if (isEditMode && location.pathname !== profileEditPath) {
+        navigate(profileEditPath, { replace: true });
+      }
 
       setTimeout(() => setEditSuccess(null), 3000);
     } catch (err) {
       setEditError(err.message || 'Không thể cập nhật thông tin');
     } finally {
       setEditLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!avatarPreviewUrl) return undefined;
+    return () => {
+      try { URL.revokeObjectURL(avatarPreviewUrl); } catch (_) {}
+    };
+  }, [avatarPreviewUrl]);
+
+  // Giu preview local cho den khi anh tu server load xong
+  useEffect(() => {
+    if (avatarDisplayUrl && avatarPreviewUrl) {
+      setAvatarPreviewUrl(null);
+    }
+  }, [avatarDisplayUrl, avatarPreviewUrl]);
+
+  function openAvatarPicker() {
+    avatarInputRef.current?.click?.();
+  }
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+    if (!file) return;
+
+    setAvatarError(null);
+    setAvatarPreviewUrl(() => URL.createObjectURL(file));
+    setAvatarUploading(true);
+    try {
+      const updated = await uploadMyAvatar(file);
+      setAvatarCacheBuster((v) => v + 1);
+      setProfile(updated);
+      syncProfileSession(user, updated, setUser);
+    } catch (err) {
+      setAvatarError(err?.message || 'Không thể cập nhật avatar');
+      setAvatarPreviewUrl(null);
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = '';
     }
   }
 
@@ -422,10 +484,40 @@ export default function AdminProfilePage() {
           {/* ── Left: avatar card ──────────────────────────────── */}
           <div className="profile-card profile-card--left">
             <div className="profile-avatar-wrap">
-              <div className="profile-avatar">{initials}</div>
+              {avatarPreviewUrl || avatarDisplayUrl ? (
+                <img
+                  className="profile-avatar profile-avatar--img"
+                  src={avatarPreviewUrl || avatarDisplayUrl}
+                  alt="Avatar"
+                />
+              ) : (
+                <div className="profile-avatar">{initials}</div>
+              )}
               <div className="profile-avatar__badge">
                 <IconShield />
               </div>
+
+              <input
+                ref={avatarInputRef}
+                id="profile-avatar-input"
+                name="avatar"
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleAvatarChange}
+              />
+            </div>
+
+            <div style={{ width: '100%', marginBottom: 10, textAlign: 'center' }}>
+              <button
+                type="button"
+                className="btn profile-card__avatar-btn"
+                onClick={openAvatarPicker}
+                disabled={avatarUploading}
+              >
+                {avatarUploading ? 'Đang cập nhật...' : 'Đổi avatar'}
+              </button>
+              {avatarError && <div className="form-error" style={{ marginTop: 6 }}>{avatarError}</div>}
             </div>
 
             <div className="profile-card__name">{displayName}</div>

@@ -7,14 +7,9 @@ import './LoginChallengeModal.css';
  */
 export default function SessionTakenOverModal({ detail, onClose }) {
   const navigate = useNavigate();
-  const device =
-    detail?.device
-    || [detail?.metadata?.browser, detail?.metadata?.os].filter(Boolean).join(' · ')
-    || 'Thiết bị khác';
-  const ip = detail?.ip || detail?.metadata?.ip;
   const message =
     detail?.message
-    || 'Đã có người đăng nhập tài khoản của bạn. Phiên này sẽ bị đăng xuất.';
+    || 'Đã có người khác đăng nhập tài khoản của bạn.';
 
   function goLogin() {
     localStorage.removeItem('token');
@@ -44,9 +39,6 @@ export default function SessionTakenOverModal({ detail, onClose }) {
         </h2>
         <p className="login-challenge-modal__message">
           {message}
-          <br />
-          Thiết bị: <strong>{device}</strong>
-          {ip ? <> · IP <strong>{ip}</strong></> : null}
         </p>
         <div className="login-challenge-modal__actions">
           <button

@@ -10,12 +10,6 @@ const PendingLoginStore = require('./PendingLoginStore');
 const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '5', 10);
 /** Giữ flag cũ: chỉ bật Approve/Reject nếu LOGIN_CHALLENGE_ENABLED=true (mặc định tắt). */
 const LOGIN_CHALLENGE_ENABLED = process.env.LOGIN_CHALLENGE_ENABLED === 'true';
-/** Người 2 chờ N giây rồi force vào — không cần người 1 xác nhận. */
-const LOGIN_TAKEOVER_WAIT_SECONDS = Math.max(
-  1,
-  parseInt(process.env.LOGIN_TAKEOVER_WAIT_SECONDS || '5', 10) || 5
-);
-
 class AuthService {
   constructor(authRepository) {
     this.authRepository = authRepository;
@@ -140,69 +134,9 @@ class AuthService {
     await this._closeStaleSessionsForUser(user.id);
     const live = await this._findLiveSession(user.id);
 
-    if (live && LOGIN_CHALLENGE_ENABLED && !force) {
-      // Legacy Approve/Reject — chỉ khi bật env.
-      const pending = PendingLoginStore.createPending({
-        userId: user.id,
-        identifier: String(identifier).trim(),
-        branchId: branchId || null,
-        passwordFingerprint: await bcrypt.hash(password, 4),
-        clientMeta: {
-          ip: clientMeta.ip || null,
-          userAgent: clientMeta.userAgent || null,
-          browser: clientMeta.browser || null,
-          os: clientMeta.os || null,
-        },
-        activeSession: {
-          id: live.id,
-          browser: live.browser,
-          os: live.os,
-          ip: live.ip_address,
-          startedAt: live.login_time,
-        },
-      });
-
-      this._notifyLoginChallenge(user.id, pending).catch(() => {});
-
-      const e = new ApiError(
-        409,
-        'Tài khoản đang được sử dụng trên thiết bị khác. Đã gửi yêu cầu xác nhận tới phiên đang đăng nhập. Vui lòng chờ họ đồng ý.'
-      );
-      e.code = 'LOGIN_PENDING';
-      e.details = {
-        code: 'LOGIN_PENDING',
-        pendingId: pending.id,
-        expiresAt: new Date(pending.expiresAt).toISOString(),
-        session: pending.activeSession,
-      };
-      e.audit = { skip: true };
-      throw e;
-    }
-
-    // Mặc định: có phiên sống + chưa force → FE đếm ngược rồi gọi lại force=true
-    if (live && !force) {
-      const session = {
-        id: live.id,
-        browser: live.browser,
-        os: live.os,
-        ip: live.ip_address,
-        startedAt: live.login_time,
-      };
-      const e = new ApiError(
-        409,
-        `Tài khoản đang được sử dụng trên thiết bị khác. Bạn sẽ được đăng nhập sau ${LOGIN_TAKEOVER_WAIT_SECONDS} giây.`
-      );
-      e.code = 'LOGIN_WAIT';
-      e.details = {
-        code: 'LOGIN_WAIT',
-        waitSeconds: LOGIN_TAKEOVER_WAIT_SECONDS,
-        session,
-      };
-      e.audit = { skip: true };
-      throw e;
-    }
-
-    const replacedLive = Boolean(live) && Boolean(force);
+    // Chính sách mới: có phiên sống thì thay thế ngay, không chờ countdown.
+    // Giữ biến `force` chỉ để backward-compat với FE cũ.
+    const replacedLive = Boolean(live);
     if (live) {
       await this._closeActiveSessionsForUser(user.id, 'FORCE_NEW_LOGIN');
     }
@@ -342,15 +276,10 @@ class AuthService {
     try {
       const NotificationService = require('./NotificationService');
       const ns = new NotificationService();
-      const deviceLabel = [clientMeta.browser, clientMeta.os].filter(Boolean).join(' · ') || 'Thiết bị khác';
       await ns.notify(
         'SESSION_TAKEN_OVER',
         {
           userId,
-          device: deviceLabel,
-          ip: clientMeta.ip || null,
-          browser: clientMeta.browser || null,
-          os: clientMeta.os || null,
         },
         { skipSettings: true }
       );
