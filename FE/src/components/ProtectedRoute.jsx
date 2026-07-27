@@ -4,6 +4,7 @@ import { usePermission } from '../contexts';
 import { getRoleHome, normalizeRoles } from '../contexts/AppContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
 import { useEffect, useRef, useState } from 'react';
+import { mergeAuthRefreshUser } from '../utils/profileSession';
 import { refreshPermissionsApi } from '../services/authApi';
 import { getPermissionScreenLabel } from '../utils/screenLabels';
 
@@ -48,14 +49,26 @@ export default function ProtectedRoute({
       .then((res) => {
         if (res && res.token && res.user) {
           const inLocal = localStorage.getItem('token');
-          const storage = res.token === inLocal ? localStorage : sessionStorage;
+          const inSession = sessionStorage.getItem('token');
+          const storage = res.token === inLocal ? localStorage : (res.token === inSession ? sessionStorage : null);
+          if (!storage) return;
+
+          let existing = {};
+          try {
+            const raw = storage.getItem('user');
+            existing = raw ? JSON.parse(raw) : {};
+          } catch {
+            existing = {};
+          }
+
+          const mergedUser = mergeAuthRefreshUser(existing, res.user);
           storage.setItem('token', res.token);
-          storage.setItem('user', JSON.stringify(res.user));
-          const newPerms = Array.isArray(res.user?.permissions) ? res.user.permissions : [];
+          storage.setItem('user', JSON.stringify(mergedUser));
+          const newPerms = Array.isArray(mergedUser.permissions) ? mergedUser.permissions : [];
           storage.setItem('permissions', JSON.stringify(newPerms));
           window.dispatchEvent(new StorageEvent('storage', {
-            key: 'token',
-            newValue: res.token,
+            key: 'user',
+            newValue: JSON.stringify(mergedUser),
             storageArea: storage,
           }));
         }

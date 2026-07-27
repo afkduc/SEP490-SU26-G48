@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useAuth, getPrimaryRole } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { ROLES } from '../../constants/roles';
 import ScrollToggleButton from '../common/ScrollToggleButton';
+import UserProfileMenu from './UserProfileMenu';
 import './Navbar.css';
 
 // ===== Admin =====
@@ -97,6 +98,11 @@ const TEAM_LEADER_NAV = [
   { label: 'Công việc của tôi', path: '/repair-orders', end: true },
 ];
 
+// ===== Technician (Kỹ thuật viên) =====
+const TECHNICIAN_NAV = [
+  { label: 'Công việc của tôi', path: '/repair-orders', end: true },
+];
+
 const NAV_ITEMS_BY_ROLE = {
   [ROLES.ADMIN]: ADMIN_NAV,
   [ROLES.GENERAL_DIRECTOR]: GENERAL_DIRECTOR_NAV,
@@ -104,6 +110,7 @@ const NAV_ITEMS_BY_ROLE = {
   [ROLES.SERVICE_ADVISOR]: SERVICE_ADVISOR_NAV,
   [ROLES.WAREHOUSE_STAFF]: WAREHOUSE_STAFF_NAV,
   [ROLES.TEAM_LEADER]: TEAM_LEADER_NAV,
+  [ROLES.TECHNICIAN]: TECHNICIAN_NAV,
 };
 
 // Cac role co dropdown (vi cac role khac chi co 1-2 muc khong can dropdown).
@@ -112,12 +119,6 @@ const ROLES_WITH_DROPDOWN = new Set([
   'service_advisor',
   'manager',
 ]);
-
-function getInitials(name = '') {
-  const parts = name.trim().split(' ');
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 // Phai trung voi breakpoint @media (max-width: 1024px) trong Navbar.css noi
 // menu chinh gap thanh hamburger. Duoi nguong nay, dropdown con dieu khien
@@ -247,30 +248,16 @@ function NavDropdownItem({ item, currentPath, badgeCount, onNavigate }) {
 }
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
   const { pendingCount } = useServiceRequests();
-  const navigate = useNavigate();
   const location = useLocation();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  // Menu chinh tren man hep (tablet/dien thoai) - an mac dinh, mo qua nut
-  // hamburger, dong lai ngay khi bam vao 1 muc de khong che het man hinh.
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const role = user?.primaryRole;
-  // Sau khi gỡ ma trận quyền: menu theo role, không filter theo permission key.
+  const { user } = useAuth();
+  const role = getPrimaryRole(user);
   const navItems = NAV_ITEMS_BY_ROLE[role] ?? [];
   const supportsDropdown = ROLES_WITH_DROPDOWN.has(role);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   const closeMobileNav = () => setMobileNavOpen(false);
-
-  const initials = getInitials(user?.name || '');
-  const roleLabel = user?.primaryRoleLabel || user?.primaryRole || '';
-  const displayName = user?.lastName || user?.name?.split(' ').pop() || '';
 
   return (
     <header className="navbar">
@@ -315,41 +302,7 @@ export default function Navbar() {
       </nav>
 
       <div className="navbar__right">
-        {/* Online indicator */}
-        <div className="navbar__online-indicator" title="Tai khoan dang hoat dong">
-          <span className="online-dot" />
-          <span className="online-label">Trực tuyến</span>
-        </div>
-        {roleLabel && <span className="navbar__role-badge">{roleLabel}</span>}
-
-        <div className="navbar__user" onClick={() => setDropdownOpen((v) => !v)}>
-          <div className="navbar__avatar">{initials}</div>
-          <span className="navbar__display-name">{displayName}</span>
-          <span className="navbar__caret">▾</span>
-        </div>
-
-        {dropdownOpen && (
-          <div className="navbar__dropdown">
-            <div className="navbar__dropdown-header">
-              <p className="navbar__dropdown-name">{user?.name}</p>
-              <p className="navbar__dropdown-email">{user?.email}</p>
-            </div>
-            <hr />
-            <button
-              className="navbar__dropdown-item"
-              type="button"
-              onClick={() => {
-                setDropdownOpen(false);
-                navigate(role === 'admin' ? '/admin/profile' : '/profile');
-              }}
-            >
-              Hồ sơ cá nhân
-            </button>
-            <button className="navbar__dropdown-item navbar__dropdown-item--danger" type="button" onClick={handleLogout}>
-              Đăng xuất
-            </button>
-          </div>
-        )}
+        <UserProfileMenu />
       </div>
     </header>
   );
