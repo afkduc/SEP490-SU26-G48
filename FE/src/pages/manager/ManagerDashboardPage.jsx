@@ -6,14 +6,21 @@ import { STATUS_LABELS } from '../repairsettlement/mockData';
 import {
   STATUS_ORDER, REPAIR_CATEGORY_HUES,
   StatTile, RevenueLineChart, StatusStackedBarChart, StatusDonutChart, RepairCategoryStackedBarChart,
-} from './DashboardCharts';
-import './DashboardPage.css';
+} from '../dashboard/DashboardCharts';
+import '../dashboard/DashboardPage.css';
 
+const CURRENT_YEAR = new Date().getFullYear();
+// Ngoai cac khoang co san (giong trang Co van), them rieng lua chon "Theo
+// nam" - quan ly can xem doanh thu ca nam de doi chieu voi ke hoach/bao cao
+// theo nam, khong chi xem theo khoang gan day.
 const DATE_PRESETS = [
   { key: 'all', label: 'Tất cả thời gian' },
   { key: 'month', label: 'Tháng này' },
   { key: '3m', label: '3 tháng gần đây' },
   { key: '6m', label: '6 tháng gần đây' },
+  { key: `year:${CURRENT_YEAR}`, label: `Năm ${CURRENT_YEAR}` },
+  { key: `year:${CURRENT_YEAR - 1}`, label: `Năm ${CURRENT_YEAR - 1}` },
+  { key: `year:${CURRENT_YEAR - 2}`, label: `Năm ${CURRENT_YEAR - 2}` },
 ];
 
 function toISODate(d) {
@@ -21,6 +28,10 @@ function toISODate(d) {
 }
 
 function computeDateRange(presetKey) {
+  if (presetKey.startsWith('year:')) {
+    const year = Number(presetKey.split(':')[1]);
+    return { fromDate: `${year}-01-01`, toDate: `${year}-12-31` };
+  }
   const now = new Date();
   if (presetKey === 'month') {
     return { fromDate: toISODate(new Date(now.getFullYear(), now.getMonth(), 1)), toDate: toISODate(now) };
@@ -34,10 +45,15 @@ function computeDateRange(presetKey) {
   return { fromDate: '', toDate: '' };
 }
 
-// ─── Trang Dashboard chính (Cố vấn dịch vụ) ───────────────────────────
-export default function DashboardPage() {
+// ─── Trang Dashboard riêng cho Quản lý chi nhánh ──────────────────────
+// Cung 1 nguon du lieu voi trang Co van (GET /dashboard/overview - BE da loc
+// theo branch_id cua nguoi dang nhap nen luon la so lieu CA CHI NHANH, khong
+// phai rieng cua 1 co van), nhung tach thanh trang/route rieng de sau nay
+// tuy chinh cho quan ly ma khong anh huong man cua Co van, va them bo loc
+// "Theo nam" ma trang Co van khong co.
+export default function ManagerDashboardPage() {
   const { user } = useAuth();
-  const [preset, setPreset] = useState('all');
+  const [preset, setPreset] = useState(`year:${CURRENT_YEAR}`);
   const [status, setStatus] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [overview, setOverview] = useState(null);
@@ -68,7 +84,7 @@ export default function DashboardPage() {
   return (
     <div className="dashboard">
       <div className="dashboard__welcome">
-        <h1>Xin chào, {user?.name}</h1>
+        <h1>Dashboard chi nhánh</h1>
         <p>
           Vai trò: <strong>{user?.roleLabels?.join(', ') || user?.roles?.join(', ')}</strong>
           {user?.branchId && <span> · Chi nhánh #{user.branchId}</span>}

@@ -14,3 +14,18 @@
     gap: 12px;
   }
 }
+
+/* Cac the trong grid tren cao bang nhau (khong phinh to theo so luong dau
+   muc/phu tung) - the nao nhieu noi dung hon thi phan checklist ben trong
+   tu cuon (xem .team-leader-tasklist) thay vi day chieu cao ca the. */
+.team-leader-order-card {
+  display: flex;
+  flex-direction: column;
+  height: 480px;
+}
+
+.team-leader-tasklist {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}

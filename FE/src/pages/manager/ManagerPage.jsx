@@ -9,6 +9,7 @@ import ManagerImportRequestListPage from './ManagerImportRequestListPage';
 import ManagerImportRequestDetailPage from './ManagerImportRequestDetailPage';
 import ManagerExportRequestListPage from './ManagerExportRequestListPage';
 import ManagerExportRequestDetailPage from './ManagerExportRequestDetailPage';
+import ManagerDashboardPage from './ManagerDashboardPage';
 
 const SERVICE_STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -465,6 +466,10 @@ function EmployeeFormPage({ mode }) {
   const [loading, setLoading] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // Chi hien o che do sua: mac dinh khong doi mat khau, tich vao moi hien o
+  // nhap mat khau moi - tranh bat buoc phai nhap lai moi lan chinh sua thong
+  // tin khac cua nhan vien.
+  const [changePassword, setChangePassword] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -522,8 +527,8 @@ function EmployeeFormPage({ mode }) {
     if (!form.phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại';
     else if (!PHONE_REGEX.test(form.phone.trim())) errors.phone = 'Số điện thoại không hợp lệ';
     if (!form.roleId) errors.roleId = 'Vui lòng chọn vai trò';
-    if (!isEdit) {
-      if (!form.password) errors.password = 'Vui lòng nhập mật khẩu tạm thời';
+    if (!isEdit || changePassword) {
+      if (!form.password) errors.password = 'Vui lòng nhập mật khẩu';
       else if (form.password.length < 8) errors.password = 'Mật khẩu tối thiểu 8 ký tự';
       if (form.confirmPassword !== form.password) errors.confirmPassword = 'Xác nhận mật khẩu không khớp';
     }
@@ -548,6 +553,10 @@ function EmployeeFormPage({ mode }) {
       };
 
       if (isEdit) {
+        if (changePassword) {
+          payload.password = form.password;
+          payload.confirmPassword = form.confirmPassword;
+        }
         await managerApi.updateEmployee(id, payload);
         navigate('/manager/employees');
       } else {
@@ -678,6 +687,41 @@ function EmployeeFormPage({ mode }) {
                 </div>
               </div>
               <p className="form-hint" style={{ marginTop: 8 }}>Nhân viên sẽ đổi mật khẩu lần đầu đăng nhập.</p>
+            </>
+          )}
+
+          {isEdit && (
+            <>
+              <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Mật khẩu</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={changePassword}
+                  onChange={(e) => {
+                    setChangePassword(e.target.checked);
+                    if (!e.target.checked) {
+                      setField('password', '');
+                      setField('confirmPassword', '');
+                    }
+                  }}
+                />
+                <span>Đặt lại mật khẩu mới cho nhân viên này</span>
+              </label>
+
+              {changePassword && (
+                <div className="form-grid form-grid-2" style={{ marginTop: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label required">Mật khẩu mới</label>
+                    <input type="password" className="form-input" value={form.password} onChange={(e) => setField('password', e.target.value)} placeholder="Tối thiểu 8 ký tự" autoFocus />
+                    {fieldErrors.password && <span className="form-error">{fieldErrors.password}</span>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label required">Xác nhận mật khẩu mới</label>
+                    <input type="password" className="form-input" value={form.confirmPassword} onChange={(e) => setField('confirmPassword', e.target.value)} placeholder="Nhập lại mật khẩu mới" />
+                    {fieldErrors.confirmPassword && <span className="form-error">{fieldErrors.confirmPassword}</span>}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -2645,6 +2689,7 @@ export default function ManagerPage() {
   return (
     <Routes>
       <Route index element={<Navigate to="employees" replace />} />
+      <Route path="dashboard" element={<ManagerDashboardPage />} />
       <Route path="employees" element={<EmployeeListPage />} />
       <Route path="employees/create" element={<EmployeeFormPage mode="create" />} />
       <Route path="employees/:id/edit" element={<EmployeeFormPage mode="edit" />} />
