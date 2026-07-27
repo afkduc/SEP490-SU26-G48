@@ -4,7 +4,7 @@ const ROWS = 6;
 
 export default function TableSkeleton({ rows = ROWS, columns }) {
   const cols = Array.isArray(columns) && columns.length > 0 ? columns : [
-    'Người dùng', 'Email', 'Chi nhánh', 'Vai trò', 'Trạng thái', 'Ngày tạo', 'Hành động'
+    'Người dùng', 'Chi nhánh', 'Vai trò', 'Trạng thái', 'Hành động'
   ];
   return (
     <div className="table-skeleton-wrap">

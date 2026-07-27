@@ -369,6 +369,7 @@ export { AdminSpecialtiesApi, adminSpecialtiesApi };
  *   - list(params):   GET /api/admin/security-alerts
  *   - getCounts():    GET /api/admin/security-alerts/counts
  *   - ack(id):        PATCH /api/admin/security-alerts/:id/ack
+ *   - ackAll():       PATCH /api/admin/security-alerts/ack-all
  */
 class AdminSecurityAlertsApi {
   list(params = {}) {
@@ -382,8 +383,37 @@ class AdminSecurityAlertsApi {
   ack(alertId) {
     return httpClient.patch(`/admin/security-alerts/${alertId}/ack`);
   }
+
+  ackAll() {
+    return httpClient.patch('/admin/security-alerts/ack-all');
+  }
 }
 
 const adminSecurityAlertsApi = new AdminSecurityAlertsApi();
 
 export { AdminSecurityAlertsApi, adminSecurityAlertsApi };
+
+class AdminVehicleBrandsApi {
+  list() {
+    return httpClient.get('/admin/vehicle-brands');
+  }
+
+  create(payload) {
+    return httpClient.post('/admin/vehicle-brands', payload);
+  }
+
+  update(id, payload) {
+    return httpClient.put(`/admin/vehicle-brands/${id}`, payload);
+  }
+
+  toggleStatus(id) {
+    return httpClient.patch(`/admin/vehicle-brands/${id}/toggle-status`);
+  }
+}
+
+const adminVehicleBrandsApi = new AdminVehicleBrandsApi();
+export { AdminVehicleBrandsApi, adminVehicleBrandsApi };
+
+export async function setUserMustChangePassword(userId, mustChangePassword) {
+  return httpClient.patch(`/admin/users/${userId}/must-change-password`, { mustChangePassword });
+}
