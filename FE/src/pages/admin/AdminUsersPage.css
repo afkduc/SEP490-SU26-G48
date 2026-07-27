@@ -4,7 +4,7 @@
 .user-name-cell {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -13,22 +13,34 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .user-name-cell__main {
-  font-weight: 500;
+  font-weight: 600;
   color: #0f172a;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
 }
 
 .user-name-cell__sub {
   font-size: 0.78rem;
   color: #94a3b8;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.user-name-cell__email {
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.35;
   white-space: nowrap;
+  overflow: visible;
 }
 
 /* ── Avatar in table ── */
@@ -48,11 +60,12 @@
 
 /* ── Status cell ── */
 .user-status-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 112px;
+  margin: 0 auto;
 }
 
 .user-status-cell .badge--success {
@@ -71,14 +84,13 @@
 .admin-users__date {
   font-size: 0.8rem;
   color: #64748b;
-  white-space: nowrap;
 }
 
 /* Branch pills — cùng kiểu cho “Tất cả chi nhánh” và chi nhánh cụ thể */
 .badge.badge--branch {
   display: inline-flex;
   align-items: center;
-  max-width: 11.5rem;
+  max-width: 100%;
   background: linear-gradient(135deg, #3b82f6, #6366f1);
   color: #fff;
   font-size: 0.7rem;
@@ -96,7 +108,9 @@
 /* Desktop: 2 nut (Chi tiet + Sua) - AN MENU 3 CHAM tren desktop */
 @media (min-width: 641px) {
   .action-btns {
-    display: inline-flex !important;
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .user-action-menu {
@@ -104,44 +118,7 @@
   }
 }
 
-/* ── Action buttons ── */
-.admin-page .table thead th.table__actions-col,
-.admin-users__actions-cell {
-  text-align: center;
-  vertical-align: middle;
-}
-
-.admin-users__actions-cell {
-  white-space: nowrap;
-}
-
-.action-btns {
-  display: inline-flex;
-  gap: 8px;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: nowrap;
-  width: 100%;
-}
-
-.action-btns .btn--sm {
-  flex: 0 0 auto;
-  box-sizing: border-box;
-  min-width: 92px;
-  min-height: 32px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.admin-users__roles-fallback {
-  padding: 28px 16px;
-  text-align: center;
-  color: #64748b;
-  font-size: 0.9rem;
-  font-weight: 500;
-}
+/* Action / table fit overrides — xem khối .table-scroll bên dưới */
 
 /* User action menu - MAC DINH LA AN (chi hien tren mobile) */
 .user-action-menu {
@@ -211,14 +188,202 @@
   color: #64748b;
 }
 
-/* ── Table scroll wrapper (cho phep overflow-x:auto nhung khong anh huong layout) ── */
+/* ── Table: 5 cột, khoảng cách đều ── */
 .table-scroll {
   overflow-x: auto;
+  width: 100%;
+  max-width: 100%;
   -webkit-overflow-scrolling: touch;
 }
 
-.table-scroll > .table {
-  min-width: 720px;
+.table-scroll > .table.admin-users__table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  min-width: 0;
+}
+
+.table-scroll > .table.admin-users__table thead th {
+  padding: 12px 16px;
+  white-space: nowrap;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.table-scroll > .table.admin-users__table thead th.table__actions-col {
+  text-align: center;
+}
+
+.table-scroll > .table.admin-users__table tbody td {
+  padding: 14px 16px;
+  vertical-align: middle;
+  text-align: center;
+}
+
+/* Người dùng: khối cố định căn giữa cột → avatar thẳng hàng giữa các dòng */
+.table-scroll > .table.admin-users__table td:nth-child(1) .user-name-row {
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+}
+
+.table-scroll > .table.admin-users__table td:nth-child(2) .badge--branch,
+.table-scroll > .table.admin-users__table td:nth-child(3) .user-table__roles,
+.table-scroll > .table.admin-users__table td:nth-child(4) .user-status-cell,
+.table-scroll > .table.admin-users__table td:nth-child(5) .action-btns {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Chia đều khoảng cách cột (Người dùng hơi rộng vì nhiều dòng info) */
+.table-scroll > .table.admin-users__table th:nth-child(1),
+.table-scroll > .table.admin-users__table td:nth-child(1) { width: 28%; }
+.table-scroll > .table.admin-users__table th:nth-child(2),
+.table-scroll > .table.admin-users__table td:nth-child(2) { width: 18%; }
+.table-scroll > .table.admin-users__table th:nth-child(3),
+.table-scroll > .table.admin-users__table td:nth-child(3) { width: 18%; }
+.table-scroll > .table.admin-users__table th:nth-child(4),
+.table-scroll > .table.admin-users__table td:nth-child(4) { width: 18%; }
+.table-scroll > .table.admin-users__table th:nth-child(5),
+.table-scroll > .table.admin-users__table td:nth-child(5) { width: 18%; }
+
+.user-table__empty {
+  color: #cbd5e1;
+  font-size: 0.8rem;
+}
+
+.user-table__roles {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  max-width: 148px;
+  margin: 0 auto;
+}
+
+.user-table__roles .badge {
+  box-sizing: border-box;
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Action buttons ── */
+.admin-page .table thead th.table__actions-col,
+.admin-users__actions-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.admin-users__actions-cell {
+  white-space: normal;
+}
+
+.action-btns {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  width: 112px;
+  margin: 0 auto;
+}
+
+.action-btns > * {
+  display: block;
+  width: 100%;
+}
+
+.action-btns .btn--sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.action-btns .btn--sm svg {
+  flex-shrink: 0;
+}
+
+/* Trạng thái: Hoạt động + Khóa cùng bề ngang */
+.user-status-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 112px;
+  margin: 0 auto;
+}
+
+.user-status-cell > .badge,
+.user-status-cell > .admin-users__toggle-badge {
+  box-sizing: border-box;
+  width: 100% !important;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+button.badge.admin-users__toggle-badge {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
+}
+
+button.badge.admin-users__toggle-badge:hover:not(:disabled) {
+  filter: brightness(0.96);
+  transform: translateY(-0.5px);
+}
+
+button.badge.admin-users__toggle-badge:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+button.badge.admin-users__toggle-badge.badge--danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+button.badge.admin-users__toggle-badge.badge--success {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+.admin-users__roles-fallback {
+  padding: 28px 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 /* ── Buttons color ── */
@@ -272,37 +437,15 @@
   color: #64748b;
 }
 
-.user-table__email {
-  color: #64748b;
-  font-size: 0.85rem;
-}
-
-.user-table__muted {
-  color: #64748b;
-  font-size: 0.85rem;
-}
-
-.user-table__empty {
-  color: #cbd5e1;
-  font-size: 0.8rem;
-}
-
-.user-table__roles {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-/* ── Reset filter button responsive ── */
 .filter-row__reset {
   width: auto;
 }
 
 @media (max-width: 900px) {
-  .filter-row {
+  .admin-page .filter-row {
     grid-template-columns: repeat(2, 1fr);
   }
-  .filter-row__reset {
+  .admin-page .filter-row__reset {
     grid-column: 1 / -1;
     width: 100%;
   }
@@ -363,12 +506,12 @@
     padding: 14px;
   }
 
-  .filter-row {
+  .admin-page .filter-row {
     grid-template-columns: 1fr;
     gap: 10px;
   }
 
-  .filter-row__reset {
+  .admin-page .filter-row__reset {
     grid-column: auto;
   }
 
