@@ -188,13 +188,13 @@
   align-items: end;
 }
 
-.filter-field {
+.admin-logs .filter-field {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
 
-.filter-field__label {
+.admin-logs .filter-field__label {
   font-size: 0.72rem;
   font-weight: 600;
   color: #64748b;
@@ -203,8 +203,8 @@
   padding-left: 2px;
 }
 
-.filter-field__input,
-.filter-field__select {
+.admin-logs .filter-field__input,
+.admin-logs .filter-field__select {
   height: 38px;
   padding: 0 12px;
   border: 1.5px solid #e2e8f0;
@@ -219,13 +219,13 @@
   font-family: inherit;
 }
 
-.filter-field__input:focus,
-.filter-field__select:focus {
+.admin-logs .filter-field__input:focus,
+.admin-logs .filter-field__select:focus {
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
-.filter-field__select {
+.admin-logs .filter-field__select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -234,20 +234,20 @@
   cursor: pointer;
 }
 
-.filter-field__date-group {
+.admin-logs .filter-field__date-group {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.filter-field__date-sep {
+.admin-logs .filter-field__date-sep {
   font-size: 0.75rem;
   color: #94a3b8;
   font-weight: 500;
   flex-shrink: 0;
 }
 
-.filter-field__input--date {
+.admin-logs .filter-field__input--date {
   height: 38px;
   padding: 0 10px;
   width: 140px;
@@ -280,8 +280,8 @@
   gap: 8px;
 }
 
-/* ── Buttons ──────────────────────────────────────────────── */
-.btn {
+/* ── Buttons (scoped dưới .admin-logs — Vite giữ CSS lazy route sau khi rời trang) ── */
+.admin-logs .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -298,54 +298,54 @@
   text-decoration: none;
 }
 
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.admin-logs .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn--primary {
+.admin-logs .btn--primary {
   background: linear-gradient(135deg, #4f46e5, #6366f1);
   color: #fff;
   box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
   border-color: transparent;
 }
 
-.btn--primary:hover:not(:disabled) {
+.admin-logs .btn--primary:hover:not(:disabled) {
   background: linear-gradient(135deg, #4338ca, #4f46e5);
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
   transform: translateY(-1px);
 }
 
-.btn--secondary {
+.admin-logs .btn--secondary {
   background: #f1f5f9;
   color: #475569;
   border-color: #e2e8f0;
 }
 
-.btn--secondary:hover:not(:disabled) {
+.admin-logs .btn--secondary:hover:not(:disabled) {
   background: #e2e8f0;
   color: #1e293b;
 }
 
-.btn--ghost {
+.admin-logs .btn--ghost {
   background: transparent;
   color: #64748b;
   border-color: #e2e8f0;
 }
 
-.btn--ghost:hover:not(:disabled) {
+.admin-logs .btn--ghost:hover:not(:disabled) {
   background: #f1f5f9;
   color: #1e293b;
 }
 
-.btn--danger-ghost {
+.admin-logs .btn--danger-ghost {
   background: #fff;
   color: #dc2626;
   border-color: #fecaca;
 }
 
-.btn--danger-ghost:hover:not(:disabled) {
+.admin-logs .btn--danger-ghost:hover:not(:disabled) {
   background: #fef2f2;
 }
 
-.btn--sm {
+.admin-logs .btn--sm {
   padding: 5px 12px;
   font-size: 0.78rem;
 }
@@ -385,7 +385,9 @@
   width: 100%;
 }
 
-.table {
+/* Scope dưới .admin-logs__table-wrapper — KHÔNG pollute global .table
+   (tránh làm lệch bảng phiên đăng nhập / users / … sau khi vào trang nhật ký). */
+.admin-logs__table-wrapper .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.82rem;
@@ -395,18 +397,18 @@
 
 /* Phân bổ độ rộng cột theo tỉ lệ % (tổng = 100%) — đều nhau ở mọi viewport ≥1100px.
    Ưu tiên cột Mô tả (description) vì chứa text dài nhất. */
-.table colgroup col:nth-child(1)  { width: 17%;  }  /* Người dùng */
-.table colgroup col:nth-child(2)  { width: 12%;  }  /* Hành động */
-.table colgroup col:nth-child(3)  { width: 38%;  }  /* Mô tả — chiếm phần lớn nhất */
-.table colgroup col:nth-child(4)  { width: 14%;  }  /* Chi nhánh */
-.table colgroup col:nth-child(5)  { width: 19%;  }  /* Thời gian */
+.admin-logs__table-wrapper .table colgroup col:nth-child(1)  { width: 17%;  }  /* Người dùng */
+.admin-logs__table-wrapper .table colgroup col:nth-child(2)  { width: 12%;  }  /* Hành động */
+.admin-logs__table-wrapper .table colgroup col:nth-child(3)  { width: 38%;  }  /* Mô tả — chiếm phần lớn nhất */
+.admin-logs__table-wrapper .table colgroup col:nth-child(4)  { width: 14%;  }  /* Chi nhánh */
+.admin-logs__table-wrapper .table colgroup col:nth-child(5)  { width: 19%;  }  /* Thời gian */
 
-.table thead tr {
+.admin-logs__table-wrapper .table thead tr {
   background: #f8fafc;
   border-bottom: 2px solid #e2e8f0;
 }
 
-.table thead th {
+.admin-logs__table-wrapper .table thead th {
   padding: 10px 12px;
   text-align: left;
   font-size: 0.72rem;
@@ -420,7 +422,7 @@
   text-overflow: ellipsis;
 }
 
-.table tbody td {
+.admin-logs__table-wrapper .table tbody td {
   padding: 12px 14px;
   color: #334155;
   vertical-align: middle;
@@ -428,10 +430,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-height: 60px;
 }
 
 /* Các span nội dung trong cell cũng phải truncate theo */
-.table tbody td > * {
+.admin-logs__table-wrapper .table tbody td > * {
   display: block;
   max-width: 100%;
   overflow: hidden;
@@ -441,7 +444,7 @@
 
 /* Description: cho phép xuống tối đa 2 dòng để không bị mất thông tin,
    giữ các row cao đều nhau (line-height 1.4 → ~2 dòng = 2.8em). */
-.table tbody td > .audit-logs__description {
+.admin-logs__table-wrapper .table tbody td > .audit-logs__description {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -455,32 +458,28 @@
 
 /* Đặt chiều cao tối thiểu cho mỗi row để tất cả row cao đều nhau
    (đủ chứa 2 dòng description + padding). */
-.table tbody tr {
+.admin-logs__table-wrapper .table tbody tr {
   border-bottom: 1px solid #f1f5f9;
   transition: background 0.12s;
   min-height: 60px;
 }
 
-.table tbody tr:nth-child(even) {
+.admin-logs__table-wrapper .table tbody tr:nth-child(even) {
   background: #fafbff;
 }
 
-.table tbody tr:hover {
+.admin-logs__table-wrapper .table tbody tr:hover {
   background: #ede9fe;
 }
 
-.table tbody tr:last-child {
+.admin-logs__table-wrapper .table tbody tr:last-child {
   border-bottom: none;
-}
-
-.table tbody td {
-  min-height: 60px;
 }
 
 /* Time-cell là container flex-column chứa 3 dòng (main / ago / utc).
    Phải loại trừ khỏi override display:block ở trên, nếu không các span sẽ
    chảy ngang thành 1 dòng. */
-.table tbody td.audit-logs__cell--time > .audit-logs__time-cell {
+.admin-logs__table-wrapper .table tbody td.audit-logs__cell--time > .audit-logs__time-cell {
   display: flex !important;
   flex-direction: column;
   align-items: flex-start;
@@ -491,7 +490,7 @@
 
 /* User-cell (avatar + tên) cũng phải flex để avatar + tên nằm cùng 1 dòng.
    Tương tự time-cell, phải loại trừ khỏi override display:block ở trên. */
-.table tbody td > .audit-logs__user-cell {
+.admin-logs__table-wrapper .table tbody td > .audit-logs__user-cell {
   display: flex !important;
   align-items: center;
   gap: 10px;
@@ -501,21 +500,21 @@
   white-space: nowrap;
 }
 
-.table tbody td > .audit-logs__user-cell > .audit-logs__user-avatar {
+.admin-logs__table-wrapper .table tbody td > .audit-logs__user-cell > .audit-logs__user-avatar {
   display: inline-flex !important;
   flex: 0 0 32px;
   width: 32px;
   height: 32px;
 }
 
-.table tbody td > .audit-logs__user-cell > .audit-logs__user-text {
+.admin-logs__table-wrapper .table tbody td > .audit-logs__user-cell > .audit-logs__user-text {
   display: block !important;
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
 }
 
-.table tbody td.audit-logs__cell--time > .audit-logs__time-cell > span {
+.admin-logs__table-wrapper .table tbody td.audit-logs__cell--time > .audit-logs__time-cell > span {
   display: block;
   max-width: 100%;
   overflow: hidden;
@@ -523,14 +522,14 @@
 }
 
 /* Action cell (nút Chi tiết): không truncate */
-.table tbody td.audit-logs__cell--actions,
-.table tbody td.audit-logs__cell--actions > * {
+.admin-logs__table-wrapper .table tbody td.audit-logs__cell--actions,
+.admin-logs__table-wrapper .table tbody td.audit-logs__cell--actions > * {
   white-space: nowrap;
   overflow: visible;
   text-overflow: clip;
 }
 
-.table__empty {
+.admin-logs__table-wrapper .table__empty {
   text-align: center;
   padding: 56px 16px;
   color: #94a3b8;
@@ -829,11 +828,11 @@
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 1100px) {
   /* Màn trung bình: giữ tỉ lệ % nhưng ưu tiên thu gọn cột Người dùng + Thời gian */
-  .table colgroup col:nth-child(1) { width: 15%;  }  /* Người dùng */
-  .table colgroup col:nth-child(2) { width: 11%;  }  /* Hành động */
-  .table colgroup col:nth-child(3) { width: 40%;  }  /* Mô tả */
-  .table colgroup col:nth-child(4) { width: 14%;  }  /* Chi nhánh */
-  .table colgroup col:nth-child(5) { width: 20%;  }  /* Thời gian */
+  .admin-logs__table-wrapper .table colgroup col:nth-child(1) { width: 15%;  }  /* Người dùng */
+  .admin-logs__table-wrapper .table colgroup col:nth-child(2) { width: 11%;  }  /* Hành động */
+  .admin-logs__table-wrapper .table colgroup col:nth-child(3) { width: 40%;  }  /* Mô tả */
+  .admin-logs__table-wrapper .table colgroup col:nth-child(4) { width: 14%;  }  /* Chi nhánh */
+  .admin-logs__table-wrapper .table colgroup col:nth-child(5) { width: 20%;  }  /* Thời gian */
 }
 
 @media (max-width: 900px) {
