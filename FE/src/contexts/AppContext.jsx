@@ -443,7 +443,8 @@ function PermissionEventsRunner() {
       // Toast thong bao cho user biet quyen vua duoc cap nhat.
       // action: 'matrix_updated' | 'role_assigned' | 'role_revoked'
       const actionLabels = {
-        matrix_updated: 'Ma trận quyền đã được cập nhật',
+        matrix_updated: 'Quyền truy cập đã được cập nhật',
+        role_screen_matrix_updated: 'Quyền truy cập đã được cập nhật',
         role_assigned: 'Bạn vừa được gán vai trò mới',
         role_revoked: 'Một vai trò của bạn đã bị thu hồi',
       };
