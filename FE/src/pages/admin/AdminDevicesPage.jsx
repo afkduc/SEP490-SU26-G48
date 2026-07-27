@@ -107,9 +107,9 @@ const OS_OPTIONS = [
 
 function SelectFilter({ value, options, onChange, placeholder }) {
   return (
-    <div className="select-filter-wrapper">
+    <div className="admin-devices__select-wrap">
       <select
-        className="select-filter"
+        className="admin-devices__select"
         value={value}
         onChange={onChange}
       >
@@ -117,7 +117,7 @@ function SelectFilter({ value, options, onChange, placeholder }) {
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-      <span className="select-filter-arrow"><IconChevronDown /></span>
+      <span className="admin-devices__select-arrow"><IconChevronDown /></span>
     </div>
   );
 }
@@ -194,7 +194,13 @@ function Pagination({ page, pageSize, total, onPageChange }) {
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export default function AdminDevicesPage() {
+export default function AdminDevicesPage({
+  embedded = false,
+  seedSearch = '',
+  seedUserId = null,
+  seedIsCurrent = '',
+  seedKey = 0,
+} = {}) {
   const toast = useToast();
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -208,6 +214,7 @@ export default function AdminDevicesPage() {
   const searchTimerRef = useRef(null);
 
   const [statusFilter, setStatusFilter] = useState('');
+  const [userIdFilter, setUserIdFilter] = useState(null);
   const [browserFilter, setBrowserFilter] = useState('');
   const [osFilter, setOsFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -226,13 +233,21 @@ export default function AdminDevicesPage() {
         page: pageNum,
         pageSize: PAGE_SIZE,
         search: search || undefined,
-        ...extraParams,
       };
+      if (userIdFilter) params.userId = userIdFilter;
       if (statusFilter) params.isCurrent = statusFilter;
       if (browserFilter) params.browser = browserFilter;
       if (osFilter) params.os = osFilter;
       if (dateFrom) params.dateFrom = dateFrom;
       if (dateTo) params.dateTo = dateTo;
+      // Seed từ cảnh bảo: extraParams thắng state (tránh race setState)
+      Object.assign(params, extraParams);
+      // Chuẩn hóa: chuỗi rỗng / null = bỏ filter
+      Object.keys(params).forEach((k) => {
+        if (params[k] === '' || params[k] === null || params[k] === undefined) {
+          delete params[k];
+        }
+      });
 
       const data = await adminDevicesApi.list(params);
       setDevices(data?.items || []);
@@ -243,15 +258,40 @@ export default function AdminDevicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, browserFilter, osFilter, dateFrom, dateTo]);
+  }, [search, userIdFilter, statusFilter, browserFilter, osFilter, dateFrom, dateTo]);
 
   useEffect(() => { loadData(1); }, []);
+
+  // Seed từ panel cảnh báo ("Xem thiết bị")
+  useEffect(() => {
+    if (!seedKey) return;
+    const nextSearch = seedSearch || '';
+    const nextUserId = seedUserId || null;
+    const nextStatus = seedIsCurrent ?? '';
+    setSearch(nextSearch);
+    setUserIdFilter(nextUserId);
+    setStatusFilter(nextStatus);
+    setBrowserFilter('');
+    setOsFilter('');
+    setDateFrom('');
+    setDateTo('');
+    loadData(1, {
+      search: nextSearch || undefined,
+      userId: nextUserId || undefined,
+      isCurrent: nextStatus || undefined,
+      browser: undefined,
+      os: undefined,
+      dateFrom: undefined,
+      dateTo: undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey]);
 
   // Reload khi đổi filter (status/browser/os/date) — không phụ thuộc blur
   useEffect(() => {
     loadData(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, browserFilter, osFilter, dateFrom, dateTo]);
+  }, [statusFilter, browserFilter, osFilter, dateFrom, dateTo, userIdFilter]);
 
   // SSE listener - chi cap nhat row bi anh huong (login/logout/force),
   // tranh loadData() gay giat man hinh khi user dang cuon/xem.
@@ -355,12 +395,21 @@ export default function AdminDevicesPage() {
 
   function handleClearFilters() {
     setSearch('');
+    setUserIdFilter(null);
     setStatusFilter('');
     setBrowserFilter('');
     setOsFilter('');
     setDateFrom('');
     setDateTo('');
-    loadData(1);
+    loadData(1, {
+      search: undefined,
+      userId: undefined,
+      isCurrent: undefined,
+      browser: undefined,
+      os: undefined,
+      dateFrom: undefined,
+      dateTo: undefined,
+    });
   }
 
   function handlePageChange(newPage) {
@@ -391,43 +440,51 @@ export default function AdminDevicesPage() {
     }
   }
 
-  const hasActiveFilters = statusFilter || browserFilter || osFilter || dateFrom || dateTo || search;
+  const hasActiveFilters = statusFilter || browserFilter || osFilter || dateFrom || dateTo || search || userIdFilter;
 
   return (
-    <div className="admin-devices">
-      {/* Header */}
-      <div className="admin-devices__header">
-        <div className="admin-devices__title-block">
-          <div className="admin-devices__title-icon">
-            <IconDevice />
-          </div>
-          <div className="admin-devices__title-group">
-            <h1>Thiết bị đăng nhập</h1>
-            <p className="admin-devices__subtitle">Quản lý thiết bị đang đăng nhập &amp; Force Logout</p>
+    <div className={`admin-devices${embedded ? ' admin-devices--embedded' : ''}`}>
+      {!embedded && (
+        <div className="admin-devices__header">
+          <div className="admin-devices__title-block">
+            <div className="admin-devices__title-icon">
+              <IconDevice />
+            </div>
+            <div className="admin-devices__title-group">
+              <h1>Thiết bị đăng nhập</h1>
+              <p className="admin-devices__subtitle">Quản lý thiết bị đang đăng nhập &amp; Force Logout</p>
+            </div>
           </div>
         </div>
-        <div className="admin-devices__actions">
-          <button className="btn btn--ghost btn--sm" onClick={() => loadData(page)} title="Làm mới">
+      )}
+
+      {/* Toolbar: tìm kiếm + lọc + làm mới trên 1 khối */}
+      <div className="admin-devices__toolbar">
+        <div className="admin-devices__toolbar-top">
+          <div className="admin-devices__search-wrap">
+            <span className="admin-devices__search-icon" aria-hidden="true">
+              <IconSearch />
+            </span>
+            <input
+              type="text"
+              className="admin-devices__search"
+              placeholder="Tìm theo tên, SĐT, IP, trình duyệt..."
+              value={search}
+              onChange={handleSearchChange}
+            />
+          </div>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm admin-devices__refresh"
+            onClick={() => loadData(page)}
+            title="Làm mới"
+          >
             <IconRefresh /> Làm mới
           </button>
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="admin-devices__filters">
-        <div className="search-input-wrapper">
-          <IconSearch />
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Tìm theo tên, SĐT, IP, trình duyệt..."
-            value={search}
-            onChange={handleSearchChange}
-          />
-        </div>
-
-        <div className="filter-row">
-          <div className="filter-group">
+        <div className="admin-devices__toolbar-filters">
+          <div className="admin-devices__filter-group">
             <IconFilter />
             <SelectFilter
               value={statusFilter}
@@ -435,43 +492,39 @@ export default function AdminDevicesPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
             />
           </div>
-
-          <div className="filter-group">
-            <SelectFilter
-              value={browserFilter}
-              options={BROWSER_OPTIONS}
-              onChange={(e) => setBrowserFilter(e.target.value)}
-            />
-          </div>
-
-          <div className="filter-group">
-            <SelectFilter
-              value={osFilter}
-              options={OS_OPTIONS}
-              onChange={(e) => setOsFilter(e.target.value)}
-            />
-          </div>
-
-          <div className="filter-group filter-group--date">
+          <SelectFilter
+            value={browserFilter}
+            options={BROWSER_OPTIONS}
+            onChange={(e) => setBrowserFilter(e.target.value)}
+          />
+          <SelectFilter
+            value={osFilter}
+            options={OS_OPTIONS}
+            onChange={(e) => setOsFilter(e.target.value)}
+          />
+          <div className="admin-devices__filter-group admin-devices__filter-group--date">
             <input
               type="date"
-              className="date-input"
+              className="admin-devices__date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
               title="Từ ngày"
             />
-            <span className="date-separator">—</span>
+            <span className="admin-devices__date-sep">—</span>
             <input
               type="date"
-              className="date-input"
+              className="admin-devices__date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
               title="Đến ngày"
             />
           </div>
-
           {hasActiveFilters && (
-            <button className="btn btn--ghost btn--sm btn--clear-filters" onClick={handleClearFilters}>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm admin-devices__clear-filters"
+              onClick={handleClearFilters}
+            >
               ✕ Xóa lọc
             </button>
           )}
@@ -504,8 +557,16 @@ export default function AdminDevicesPage() {
       )}
 
       {!loading && !error && devices.length > 0 && (
-        <div className="devices-table-wrapper">
-          <table className="devices-table">
+        <div className="admin-devices__table-wrap">
+          <table className="admin-devices__table">
+            <colgroup>
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '14%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>Thiết bị</th>
@@ -520,36 +581,38 @@ export default function AdminDevicesPage() {
               {sortedDevices.map((device) => (
                 <tr key={device.id}>
                   <td>
-                    <div className="device-info">
-                      <span className="device-name">
+                    <div className="admin-devices__cell-stack">
+                      <span className="admin-devices__cell-title">
                         {getBrowserIcon(device.browser)} {device.deviceName || 'Unknown Device'}
                       </span>
-                      <span className="device-meta">{device.browser} · {device.os}</span>
+                      <span className="admin-devices__cell-sub">{device.browser} · {device.os}</span>
                     </div>
                   </td>
                   <td>
-                    <div className="user-info">
-                      <span className="user-name-cell">{device.displayName || device.userName || '—'}</span>
-                      {device.branchName && <span className="user-branch-cell">{device.branchName}</span>}
+                    <div className="admin-devices__cell-stack">
+                      <span className="admin-devices__cell-title">{device.displayName || device.userName || '—'}</span>
+                      {device.branchName && <span className="admin-devices__cell-sub">{device.branchName}</span>}
                     </div>
                   </td>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{device.ipAddress || '—'}</td>
-                  <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>{formatDate(device.lastLoginAt)}</td>
                   <td>
-                    <span className={`current-badge ${device.isCurrent ? 'current-badge--yes' : 'current-badge--no'}`}>
+                    <span className="admin-devices__mono">{device.ipAddress || '—'}</span>
+                  </td>
+                  <td>
+                    <span className="admin-devices__mono">{formatDate(device.lastLoginAt)}</span>
+                  </td>
+                  <td>
+                    <span className={`admin-devices__badge ${device.isCurrent ? 'admin-devices__badge--on' : 'admin-devices__badge--off'}`}>
                       {device.isCurrent ? '● Hiện tại' : '○ Không hoạt động'}
                     </span>
                   </td>
                   <td>
-                    {/* Button Force Logout CHI enable khi isCurrent=true.
-                        Khi isCurrent=false: hien thi text "Da dang xuat" (readonly).
-                        Day la logic da dung tu truoc - giu nguyen. */}
                     {!device.isCurrent ? (
                       <span className="btn btn--secondary btn--sm btn--disabled">
                         Đã đăng xuất
                       </span>
                     ) : (
                       <button
+                        type="button"
                         className="btn btn--danger btn--sm"
                         onClick={() => setLogoutTarget(device)}
                         title="Đăng xuất khỏi thiết bị này"
