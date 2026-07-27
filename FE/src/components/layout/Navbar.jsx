@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useAuth, getRoleProfilePath } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { ROLES } from '../../constants/roles';
 import ScrollToggleButton from '../common/ScrollToggleButton';
@@ -347,7 +347,7 @@ export default function Navbar() {
               type="button"
               onClick={() => {
                 setDropdownOpen(false);
-                navigate(role === 'admin' ? '/admin/profile' : '/profile');
+                navigate(getRoleProfilePath(user));
               }}
             >
               Hồ sơ cá nhân
