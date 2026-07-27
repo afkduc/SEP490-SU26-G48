@@ -69,6 +69,12 @@ export const AUDIT_FIELD_LABELS = {
   screenLabel: 'Tên màn hình',
   granted: 'Trạng thái quyền',
   itemCount: 'Số mục thay đổi',
+  activeItems: 'Số mục đang có quyền',
+  l1Granted: 'Số quyền truy cập mới được cấp',
+  l1Revoked: 'Số quyền truy cập bị thu hồi',
+  count: 'Số lượng',
+  entityCode: 'Mã đối tượng',
+  recordId: 'Mã bản ghi',
   targetUserId: 'Người nhận (ID)',
   targetUserName: 'Người nhận',
   targetEmail: 'Email người nhận',
@@ -159,12 +165,20 @@ export function humanizeAuditDescription(description, action, newValue) {
           target ? `của ${target}` : null,
           details.reason ? `(lý do: ${details.reason})` : null,
         ].filter(Boolean).join(' ');
-      case 'SAVE_SCREEN_MATRIX':
-        return [
+      case 'SAVE_SCREEN_MATRIX': {
+        const parts = [
           'Đã lưu ma trận quyền màn hình',
           roleLabel !== '—' ? `cho vai trò ${roleLabel}` : null,
           itemCount != null ? `(${itemCount} mục)` : null,
-        ].filter(Boolean).join(' ');
+        ];
+        const activeItems = details.activeItems != null ? Number(details.activeItems) : null;
+        const l1Granted = details.l1Granted != null ? Number(details.l1Granted) : null;
+        const l1Revoked = details.l1Revoked != null ? Number(details.l1Revoked) : null;
+        if (activeItems != null) parts.push(`— ${activeItems} mục đang có quyền`);
+        if (l1Granted > 0) parts.push(`— cấp thêm ${l1Granted} quyền truy cập`);
+        if (l1Revoked > 0) parts.push(`— thu hồi ${l1Revoked} quyền truy cập`);
+        return parts.filter(Boolean).join(' ');
+      }
       case 'GRANT_SCREEN':
         return [
           'Đã cấp quyền truy cập màn hình',
@@ -271,6 +285,9 @@ export function summarizeAuditNewValue(newValue, action) {
     'targetUserId',
     'granted',
     'itemCount',
+    'activeItems',
+    'l1Granted',
+    'l1Revoked',
     'reason',
     'browser',
     'os',
@@ -291,6 +308,7 @@ export function summarizeAuditNewValue(newValue, action) {
 
   preferredKeys.forEach((key) => {
     if (obj[key] === undefined || obj[key] === null || obj[key] === '') return;
+    if ((key === 'l1Granted' || key === 'l1Revoked') && Number(obj[key]) === 0) return;
     used.add(key);
     rows.push({
       label: AUDIT_FIELD_LABELS[key] || key,

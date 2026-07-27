@@ -156,7 +156,6 @@ const adminBranchesApi = new AdminBranchesApi();
  *   - listPermissions():         GET /api/admin/permissions
  *   - getRolePermissions(id):    GET /api/admin/roles/:id/permissions
  *   - setRolePermissions(id, permIds[]): PUT /api/admin/roles/:id/permissions
- *   - saveMatrix(changes[]):            PUT /api/admin/roles/matrix/permissions
  *   - getRoleUsers(id):         GET /api/admin/roles/:id/users
  *
  * Permission Groups (Phase 3):
@@ -203,14 +202,6 @@ class AdminRolesApi {
 
   setRolePermissions(id, permissionIds) {
     return httpClient.put(`/admin/roles/${id}/permissions`, { permissionIds });
-  }
-
-  /**
-   * Bulk save permissions cho nhieu role trong 1 call (atomic).
-   * changes: [{roleId, permissionIds}, ...]
-   */
-  saveMatrix(changes) {
-    return httpClient.put('/admin/roles/matrix/permissions', { changes });
   }
 
   getRoleUsers(id) {
@@ -446,63 +437,6 @@ class AdminSecurityAlertsApi {
 const adminSecurityAlertsApi = new AdminSecurityAlertsApi();
 
 export { AdminSecurityAlertsApi, adminSecurityAlertsApi };
-
-/**
- * Permission Matrix API (admin-only)
- *   - getMatrix():      GET   /api/admin/permission-matrix
- *                       tra ve: { roles: [...], screens: [...], grants: [{roleId,permissionId}], generatedAt }
- *   - toggleCell(payload): PATCH /api/admin/permission-matrix
- *                       payload: { roleId, permissionId, granted: boolean }
- *   - bulkToggle(payload): POST  /api/admin/permission-matrix/bulk
- *                       payload: { cells: [{roleId, permissionId, granted}, ...] }
- */
-class PermissionMatrixApi {
-  getMatrix() {
-    return httpClient.get('/admin/permission-matrix');
-  }
-
-  toggleCell({ roleId, permissionId, granted }) {
-    return httpClient.patch('/admin/permission-matrix', { roleId, permissionId, granted });
-  }
-
-  bulkToggle(cells) {
-    return httpClient.post('/admin/permission-matrix/bulk', { cells });
-  }
-}
-
-const permissionMatrixApi = new PermissionMatrixApi();
-
-export { PermissionMatrixApi, permissionMatrixApi };
-
-/**
- * Role Screen Matrix API (admin-only) - granular action-per-screen.
- *   - getAvailableScreens(): GET   /api/admin/role-screen-matrix/screens
- *   - getMatrix(roleId):     GET   /api/admin/role-screen-matrix?roleId=1
- *   - saveMatrix(roleId, items): PUT /api/admin/role-screen-matrix?roleId=1
- *       items: [{ screenKey, canView, canCreate, canUpdate, canDelete, canExport }]
- *   - compareMatrix(roleIds): GET  /api/admin/role-screen-matrix/compare?roleIds=1,2,3
- */
-class RoleScreenMatrixApi {
-  getAvailableScreens() {
-    return httpClient.get('/admin/role-screen-matrix/screens');
-  }
-
-  getMatrix(roleId) {
-    return httpClient.get(`/admin/role-screen-matrix?roleId=${roleId}`);
-  }
-
-  saveMatrix(roleId, items) {
-    return httpClient.put(`/admin/role-screen-matrix?roleId=${roleId}`, { items });
-  }
-
-  compareMatrix(roleIds) {
-    return httpClient.get(`/admin/role-screen-matrix/compare?roleIds=${roleIds.join(',')}`);
-  }
-}
-
-const roleScreenMatrixApi = new RoleScreenMatrixApi();
-
-export { RoleScreenMatrixApi, roleScreenMatrixApi };
 
 /**
  * User Screen Permissions API (admin-only) - override quyen cho 1 user cu the.
