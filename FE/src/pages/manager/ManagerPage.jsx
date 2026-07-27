@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { usePermission } from '../../contexts/PermissionContext';
 import { formatCurrency, formatDate } from '../../utils';
 import managerApi from '../../services/managerApi';
+import { PermissionGate } from '../../components/PermissionGate';
 import ManagerImportRequestListPage from './ManagerImportRequestListPage';
 import ManagerImportRequestDetailPage from './ManagerImportRequestDetailPage';
 import ManagerExportRequestListPage from './ManagerExportRequestListPage';
@@ -306,12 +308,16 @@ function EmployeeListPage() {
           <div className="breadcrumb">Trang chủ / Nhân viên</div>
         </div>
         <div className="page-header-right">
-          <button type="button" className="btn btn-secondary" onClick={() => exportEmployeesCsv(employees)}>
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/employees/create')}>
-            + Thêm nhân viên
-          </button>
+          <PermissionGate permission="screen:manager:employees:view">
+            <button type="button" className="btn btn-secondary" onClick={() => exportEmployeesCsv(employees)}>
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="screen:manager:employees:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/employees/create')}>
+              + Thêm nhân viên
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -403,8 +409,12 @@ function EmployeeListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="screen:manager:employees:view">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="screen:manager:employees:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -440,6 +450,10 @@ function EmployeeFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:employees:update')
+    : can('screen:manager:employees:create');
 
   const [branch, setBranch] = useState(null);
   const [roles, setRoles] = useState([]);
@@ -546,6 +560,10 @@ function EmployeeFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/employees" replace />;
+  }
 
   if (loading) {
     return (
@@ -806,20 +824,24 @@ function ServiceListPage() {
           <div className="breadcrumb">Trang chủ / Dịch vụ lẻ</div>
         </div>
         <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-dich-vu.csv',
-              ['Mã DV', 'Tên dịch vụ', 'Danh mục', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
-              services.map((s) => [s.code, s.name, s.categoryName, s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/services/create')}>
-            + Thêm dịch vụ
-          </button>
+          <PermissionGate permission="screen:manager:services:view">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCsv(
+                'danh-sach-dich-vu.csv',
+                ['Mã DV', 'Tên dịch vụ', 'Danh mục', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
+                services.map((s) => [s.code, s.name, s.categoryName, s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
+              )}
+            >
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="screen:manager:services:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/services/create')}>
+              + Thêm dịch vụ
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -903,8 +925,12 @@ function ServiceListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="screen:manager:services:view">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="screen:manager:services:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -947,6 +973,10 @@ function ServiceFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:services:update')
+    : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -1062,6 +1092,10 @@ function ServiceFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/services" replace />;
+  }
 
   if (loading) {
     return (
@@ -1263,9 +1297,9 @@ function ServicePackageDetailModal({ pkg, onClose }) {
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 16 }}>
             <div className="detail-row"><div className="detail-label">Mã gói</div><div className="detail-value">{pkg.code}</div></div>
             <div className="detail-row"><div className="detail-label">Danh mục</div><div className="detail-value">{pkg.categoryName || '—'}</div></div>
-            <div className="detail-row"><div className="detail-label">Mốc km áp dụng</div><div className="detail-value">{pkg.applicableKm ? `${pkg.applicableKm} km` : '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Giá gói</div><div className="detail-value">{formatCurrency(pkg.totalPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{pkg.description || '—'}</div></div>
+            <div className="detail-row"><div className="detail-label">Giải thích chi tiết</div><div className="detail-value">{pkg.purpose || '—'}</div></div>
           </div>
           <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13, color: 'var(--gray-700)' }}>
             Dịch vụ trong gói ({(pkg.services || []).length})
@@ -1363,20 +1397,24 @@ function ServicePackageListPage() {
           <div className="breadcrumb">Trang chủ / Gói dịch vụ</div>
         </div>
         <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-goi-dich-vu.csv',
-              ['Mã gói', 'Tên gói', 'Danh mục', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
-              packages.map((p) => [p.code, p.name, p.categoryName, p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/service-packages/create')}>
-            + Thêm gói dịch vụ
-          </button>
+          <PermissionGate permission="screen:manager:services:view">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCsv(
+                'danh-sach-goi-dich-vu.csv',
+                ['Mã gói', 'Tên gói', 'Danh mục', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
+                packages.map((p) => [p.code, p.name, p.categoryName, p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
+              )}
+            >
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="screen:manager:services:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/service-packages/create')}>
+              + Thêm gói dịch vụ
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -1453,8 +1491,12 @@ function ServicePackageListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="screen:manager:services:view">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="screen:manager:services:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -1484,13 +1526,17 @@ function ServicePackageFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:services:update')
+    : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
   const [categories, setCategories] = useState([]);
   const [availableServices, setAvailableServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [form, setForm] = useState({
-    packageName: '', categoryId: '', applicableKm: '', totalPrice: '', description: '', isActive: true, repairCategory: '', serviceIds: [],
+    packageName: '', categoryId: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [],
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1511,9 +1557,9 @@ function ServicePackageFormPage({ mode }) {
           setForm({
             packageName: data.name || '',
             categoryId: data.categoryId ? String(data.categoryId) : '',
-            applicableKm: data.applicableKm ?? '',
             totalPrice: data.totalPrice ?? '',
             description: data.description || '',
+            purpose: data.purpose || '',
             isActive: data.isActive,
             repairCategory: data.repairCategory || '',
             serviceIds: (data.services || []).map((s) => s.id),
@@ -1565,9 +1611,9 @@ function ServicePackageFormPage({ mode }) {
       const payload = {
         packageName: form.packageName.trim(),
         categoryId: Number(form.categoryId),
-        applicableKm: form.applicableKm === '' ? null : Number(form.applicableKm),
         totalPrice: Number(form.totalPrice),
         description: form.description.trim(),
+        purpose: form.purpose.trim(),
         isActive: form.isActive,
         repairCategory: form.repairCategory || null,
         serviceIds: form.serviceIds,
@@ -1585,6 +1631,10 @@ function ServicePackageFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/service-packages" replace />;
+  }
 
   if (loading) {
     return (
@@ -1683,6 +1733,17 @@ function ServicePackageFormPage({ mode }) {
           <div className="form-group" style={{ marginTop: 14 }}>
             <label className="form-label">Mô tả</label>
             <textarea className="form-textarea" value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Mô tả ngắn về gói dịch vụ" />
+          </div>
+
+          <div className="form-group" style={{ marginTop: 14 }}>
+            <label className="form-label">Giải thích chi tiết (hiển thị ở trang chi tiết gói trên landing page)</label>
+            <textarea
+              className="form-textarea"
+              rows={5}
+              value={form.purpose}
+              onChange={(e) => setField('purpose', e.target.value)}
+              placeholder="Gói này dùng để làm gì, khi nào nên thực hiện, vì sao cần thiết..."
+            />
           </div>
 
           <div className="form-group" style={{ marginTop: 14 }}>
@@ -2161,24 +2222,28 @@ function TechnicianListPage() {
           <div className="breadcrumb">Trang chủ / Thợ máy</div>
         </div>
         <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-tho-may.csv',
-              ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Chuyên môn', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
-              technicians.map((t) => [
-                t.employeeId, t.fullName, t.email, t.teamLeaderName,
-                (t.specialties || []).map((s) => s.name).join('; '),
-                t.phone, formatDate(t.createdAt), statusBadge(t.status).label,
-              ])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/technicians/create')}>
-            + Thêm thợ máy
-          </button>
+          <PermissionGate permission="screen:manager:technicians:view">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCsv(
+                'danh-sach-tho-may.csv',
+                ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Chuyên môn', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
+                technicians.map((t) => [
+                  t.employeeId, t.fullName, t.email, t.teamLeaderName,
+                  (t.specialties || []).map((s) => s.name).join('; '),
+                  t.phone, formatDate(t.createdAt), statusBadge(t.status).label,
+                ])
+              )}
+            >
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="screen:manager:technicians:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/technicians/create')}>
+              + Thêm thợ máy
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -2280,8 +2345,12 @@ function TechnicianListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="screen:manager:technicians:view">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="screen:manager:technicians:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -2311,6 +2380,10 @@ function TechnicianFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:technicians:update')
+    : can('screen:manager:technicians:create');
 
   const [branch, setBranch] = useState(null);
   const [teamLeaderOptions, setTeamLeaderOptions] = useState([]);
@@ -2413,6 +2486,10 @@ function TechnicianFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/technicians" replace />;
+  }
 
   if (loading) {
     return (

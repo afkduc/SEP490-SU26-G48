@@ -17,8 +17,11 @@ class UserApi {
     return httpClient.put(`/users/${id}`, payload);
   }
 
-  remove(id) {
-    return httpClient.delete(`/users/${id}`);
+  /** Hard delete đã bỏ — dùng adminUsersApi.update({ status: 'inactive' }). */
+  remove() {
+    return Promise.reject(
+      new Error('Hard delete user khong duoc ho tro. Su dung Disable/Ngung (cap nhat status).')
+    );
   }
 }
 

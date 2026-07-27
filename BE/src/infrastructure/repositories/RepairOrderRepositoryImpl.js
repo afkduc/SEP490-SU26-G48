@@ -1,6 +1,6 @@
 const RepairOrderRepository = require('../../domain/repositories/RepairOrderRepository');
 const RepairOrder = require('../../domain/entities/RepairOrder');
-const { query, sql } = require('../database/sqlServer');
+const { query, sql, getPool } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
 const { buildDesiredTasks } = require('./repairOrderTaskBuilder');
 
@@ -101,6 +101,78 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
       { id: header.id }
     );
     return RepairOrder.fromPersistence(header, tasksResult.recordset);
+  }
+
+  // Public - dung cho Landing "Tra cuu tien do sua chua". Ma khach hang thuc
+  // su duoc cap khi tiep nhan xe la ma PHIEU QUYET TOAN (service_orders.order_code,
+  // vd "RO-2026-068") - ma lenh sua chua (repair_orders.repair_code, "LSC-...")
+  // chi sinh ra SAU khi co van gan to truong, khach hang khong biet ma nay.
+  // Vi vay tra cuu phai tim theo order_code truoc tien, roi moi noi sang
+  // repair_orders (neu da co) de lay checklist chi tiet.
+  async findByServiceOrderCode(code) {
+    const settlementResult = await query(
+      `SELECT so.id, so.order_code, so.status, so.intake_date, b.branch_name
+       FROM   service_orders so
+       JOIN   branches b ON b.id = so.branch_id
+       WHERE  so.order_code = @code`,
+      { code }
+    );
+    const settlement = settlementResult.recordset[0];
+    if (!settlement) return null;
+
+    if (settlement.status === 'cancelled') {
+      return {
+        code: settlement.order_code,
+        status: 'cancelled',
+        branchName: settlement.branch_name,
+        createdAt: settlement.intake_date,
+        completedAt: null,
+        tasks: [],
+      };
+    }
+
+    // Loai tru lenh sua chua da HUY: khach huy giua chung se lam phieu quyet
+    // toan goc tu tra ve "waiting_repair" (xem updateStatus ben duoi) de co
+    // van gan lai to truong khac, nhung dong repair_orders da huy do van con
+    // luu lai (lich su) - khong duoc coi no la lenh "dang hien hanh" cua
+    // phieu nay nua, keo lai bi bao nham trang thai "cancelled".
+    const roResult = await query(
+      `SELECT TOP 1 id, status, completed_at FROM repair_orders
+       WHERE service_order_id = @id AND status <> 'cancelled'
+       ORDER BY id DESC`,
+      { id: settlement.id }
+    );
+    const repairOrder = roResult.recordset[0];
+
+    if (repairOrder) {
+      const tasksResult = await query(
+        `SELECT task_name, task_type, is_done FROM repair_order_tasks WHERE repair_order_id = @id ORDER BY id`,
+        { id: repairOrder.id }
+      );
+      return {
+        code: settlement.order_code,
+        status: repairOrder.status,
+        branchName: settlement.branch_name,
+        createdAt: settlement.intake_date,
+        completedAt: repairOrder.completed_at,
+        tasks: tasksResult.recordset.map((t) => ({ taskName: t.task_name, taskType: t.task_type, isDone: Boolean(t.is_done) })),
+      };
+    }
+
+    // Chua gan to truong (chua co lenh sua chua) - dung lai chinh logic suy ra
+    // checklist tu hang muc phieu quyet toan (buildDesiredTasks, giong het luc
+    // tao lenh sua chua that su) de lam danh sach "sap toi" tam thoi, tat ca
+    // deu chua lam.
+    const pool = await getPool();
+    const desiredTasks = await buildDesiredTasks(pool, settlement.id);
+    return {
+      code: settlement.order_code,
+      status: 'pending_assignment',
+      branchName: settlement.branch_name,
+      createdAt: settlement.intake_date,
+      completedAt: null,
+      tasks: desiredTasks.map((t) => ({ taskName: t.taskName, taskType: t.taskType, isDone: false })),
+    };
   }
 
   async findTeamLeadersByBranch(branchId) {

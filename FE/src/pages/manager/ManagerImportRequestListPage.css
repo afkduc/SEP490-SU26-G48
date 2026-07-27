@@ -1,6 +1,40 @@
-/* Reuse BEM-style cua Inventory page, doi prefix sang 'mir-'. */
+/* ============================================================
+   ManagerImportRequestListPage — Material Design 3
+   Scope trong .mir-list, cùng pattern với ImportRequestListPage (kho).
+============================================================ */
 .mir-list {
-  padding: 24px 32px;
+  --md-primary: #4f46e5;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #e0e7ff;
+  --md-on-primary-container: #1e1b4b;
+  --md-surface: #ffffff;
+  --md-surface-variant: #f4f4fb;
+  --md-surface-container: #f7f7fd;
+  --md-on-surface: #1c1b1f;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #cac4d0;
+  --md-outline-variant: #e7e0ec;
+  --md-error: #ba1a1a;
+  --md-error-container: #ffdad6;
+  --md-on-error-container: #410002;
+  --md-success: #146c2e;
+  --md-success-container: #c6f0cd;
+  --md-on-success-container: #002106;
+  --md-warning-container: #ffdea8;
+  --md-on-warning-container: #2a1800;
+
+  --md-elevation-1: 0 1px 2px rgba(0,0,0,0.30), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-elevation-2: 0 1px 2px rgba(0,0,0,0.30), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-full: 9999px;
+
+  padding: 8px 4px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: var(--md-on-surface);
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .mir-list__header {
@@ -9,69 +43,65 @@
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .mir-list__title {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 400;
   margin: 0 0 4px;
-  color: #1f2937;
+  color: var(--md-on-surface);
 }
 
 .mir-list__subtitle {
-  font-size: 13px;
-  color: #6b7280;
+  font-size: 14px;
+  color: var(--md-on-surface-variant);
   margin: 0;
-  max-width: 720px;
+  max-width: 60ch;
 }
 
 .mir-list__tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   margin-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 8px;
+  border-bottom: 1px solid var(--md-outline-variant);
 }
 
 .mir-list__tab {
   background: transparent;
-  border: 1px solid transparent;
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #4b5563;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .mir-list__tab:hover {
-  background: #f3f4f6;
+  color: var(--md-on-surface);
 }
 
 .mir-list__tab--active {
-  background: #1f6feb;
-  color: #fff;
-  border-color: #1f6feb;
+  color: var(--md-primary);
+  border-bottom-color: var(--md-primary);
 }
 
 .mir-list__filters {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
   margin-bottom: 16px;
   flex-wrap: wrap;
-}
-
-.mir-list__filters .input {
-  height: 36px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 0 10px;
-  font-size: 13px;
+  padding: 16px;
+  background: var(--md-surface-container);
+  border-radius: var(--md-shape-md);
 }
 
 .mir-list__filters .input--search {
-  min-width: 260px;
+  min-width: 240px;
   flex: 1;
 }
 
@@ -79,20 +109,21 @@
 .mir-list__error {
   padding: 32px;
   text-align: center;
-  color: #6b7280;
+  border-radius: var(--md-shape-md);
+  font-size: 14px;
 }
-
-.mir-list__error {
-  color: #dc2626;
-}
+.mir-list__loading { background: var(--md-surface-variant); color: var(--md-on-surface-variant); }
+.mir-list__error { background: var(--md-error-container); color: var(--md-on-error-container); }
 
 .mir-list__pagination {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-top: 16px;
-  font-size: 13px;
-  color: #4b5563;
+  padding-top: 16px;
+  border-top: 1px solid var(--md-outline-variant);
+  font-size: 14px;
+  color: var(--md-on-surface-variant);
 }
 
 .mir-list__pagination-controls {
@@ -104,8 +135,120 @@
 .mir-list__pagination-current {
   min-width: 100px;
   text-align: center;
+  color: var(--md-on-surface);
 }
 
-.text-right {
-  text-align: right;
+@media (max-width: 768px) {
+  .mir-list__title { font-size: 22px; line-height: 28px; }
+  .mir-list__filters { padding: 12px; }
+  .mir-list__filters .input--search { min-width: 100%; }
 }
+
+/* ── MD3 inputs ── */
+.mir-list .input,
+.mir-list .input--search {
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-sm);
+  background: var(--md-surface);
+  font-size: 14px;
+  color: var(--md-on-surface);
+  outline: none;
+  box-sizing: border-box;
+}
+.mir-list .input:focus { border-color: var(--md-primary); box-shadow: inset 0 0 0 1px var(--md-primary); }
+.mir-list .input[type="date"] { min-width: 150px; }
+
+/* ── MD3 buttons ── */
+.mir-list .btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--md-shape-full);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.mir-list .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.mir-list .btn--primary { background: var(--md-primary); color: var(--md-on-primary); box-shadow: var(--md-elevation-1); }
+.mir-list .btn--primary:hover:not(:disabled) { box-shadow: var(--md-elevation-2); }
+.mir-list .btn--secondary {
+  background: var(--md-surface);
+  color: var(--md-primary);
+  border: 1px solid var(--md-outline);
+}
+.mir-list .btn--secondary:hover:not(:disabled) { background: var(--md-surface-variant); }
+.mir-list .btn--ghost { background: transparent; color: var(--md-primary); padding: 0 12px; }
+.mir-list .btn--ghost:hover:not(:disabled) { background-color: rgba(79, 70, 229, 0.08); }
+.mir-list .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
+/* ── MD3 table ── */
+.mir-list .table-responsive {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-lg);
+  overflow: auto;
+  box-shadow: var(--md-elevation-1);
+}
+.mir-list .table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.mir-list .table thead tr { background: var(--md-surface-variant); }
+.mir-list .table th {
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+.mir-list .table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface);
+  text-align: left;
+}
+.mir-list .table tbody tr:last-child td { border-bottom: none; }
+.mir-list .table tbody tr:hover { background-color: var(--md-surface-container); }
+
+.mir-list .table__empty {
+  text-align: center;
+  color: var(--md-on-surface-variant);
+  padding: 40px 12px !important;
+}
+
+.mir-list .table__actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.mir-list .font-mono { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--md-primary); }
+.mir-list .text-right { text-align: right; }
+
+/* ── Chips ── */
+.mir-list .badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--md-shape-sm);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.mir-list .badge--success { background: var(--md-success-container); color: var(--md-on-success-container); }
+.mir-list .badge--warning { background: var(--md-warning-container); color: var(--md-on-warning-container); }
+.mir-list .badge--danger { background: var(--md-error-container); color: var(--md-on-error-container); }

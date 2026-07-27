@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { formatCurrency } from '../../utils';
-import { listRepairSettlementsApi, getRepairSettlementApi, updateRepairSettlementStatusApi } from '../../services/repairSettlementApi';
+import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
 import {
   listTeamLeadersApi,
   listRepairOrdersApi,
   createRepairOrderApi,
-  getRepairOrderApi,
   updateRepairOrderStatusApi,
   updateRepairOrderTaskApi,
 } from '../../services/repairOrderApi';
 import { ROLES } from '../../constants/roles';
-import { printWorkList } from '../repairsettlement/RepairSettlementPage';
 import './RepairOrderPage.css';
 
 const LHSC_LABELS = { DV: 'Dịch vụ', PT: 'Phụ tùng', BH: 'Bảo hành', HD: 'Hợp đồng' };
@@ -33,290 +32,6 @@ const TEAM_LEADER_TABS = [
   { key: 'completed', label: 'Hoàn thành' },
 ];
 const TEAM_LEADER_ACTIVE_TAB_COLOR = '#E65100';
-
-// Ngay o day luon o dang chuoi dd/mm/yyyy (BE format san qua toDDMMYYYY, ca
-// cho phieu quyet toan lan lenh sua chua) - parse ve Date de loc/sap xep.
-function parseDDMMYYYY(value) {
-  if (!value) return null;
-  const m = String(value).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  const [, dd, mm, yyyy] = m;
-  return new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-}
-// Cùng 1 chiều cao/kiểu cho mọi nút trong cột Thao tác để hàng lối thẳng
-// hàng, không bị lệch cao thấp giữa các nút.
-const ACTION_BTN_STYLE = { height: 28, padding: '0 10px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' };
-
-// ─── Modal xem chi tiết phiếu quyết toán (dòng đang chờ phân công) ───
-function PendingSettlementDetailModal({ settlementId, onClose }) {
-  const [detail, setDetail] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    getRepairSettlementApi(settlementId)
-      .then((result) => { if (alive) setDetail(result); })
-      .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được chi tiết phiếu'); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [settlementId]);
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">Phiếu quyết toán {detail?.code || ''}</h3>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span className="badge badge-pending">Đang chờ phân công</span>
-            <button className="modal-close" onClick={onClose}>✕</button>
-          </div>
-        </div>
-        <div className="modal-body">
-          {loading && <p>Đang tải…</p>}
-          {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
-          {detail && (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-                <div>
-                  <div className="form-section-title">Khách hàng & xe</div>
-                  {[
-                    ['Khách hàng', detail.customer?.fullName],
-                    ['Điện thoại', detail.customer?.phone],
-                    ['Biển số xe', detail.vehicle?.licensePlate],
-                    ['Loại xe', detail.vehicle?.vehicleModel],
-                  ].map(([l, v]) => (
-                    <div key={l} className="detail-row">
-                      <div className="detail-label" style={{ width: 130, fontSize: 11 }}>{l}</div>
-                      <div className="detail-value" style={{ fontSize: 12 }}>{v || '—'}</div>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <div className="form-section-title">Thông tin phiếu</div>
-                  {[
-                    ['Cố vấn dịch vụ', detail.advisor],
-                    ['Ngày tiếp nhận', detail.date],
-                    ['Tổng cộng', formatCurrency(detail.total)],
-                  ].map(([l, v]) => (
-                    <div key={l} className="detail-row">
-                      <div className="detail-label" style={{ width: 130, fontSize: 11 }}>{l}</div>
-                      <div className="detail-value" style={{ fontSize: 12 }}>{v || '—'}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-section-title">Yêu cầu khách hàng</div>
-              <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
-                {detail.customerRequest || '—'}
-              </div>
-
-              {detail.cancelReason && (
-                <>
-                  <div className="form-section-title">Lý do hủy</div>
-                  <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#C62828' }}>
-                    {detail.cancelReason}
-                  </div>
-                </>
-              )}
-
-              <div className="form-section-title">Hạng mục công việc / phụ tùng</div>
-              <div className="table-wrapper" style={{ marginBottom: 0 }}>
-                <table className="data-table" style={{ fontSize: 12 }}>
-                  <thead>
-                    <tr><th>#</th><th>Nội dung</th><th>Loại</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th></tr>
-                  </thead>
-                  <tbody>
-                    {(detail.items || []).map((item, i) => (
-                      <tr key={i}>
-                        <td style={{ textAlign: 'center' }}>{i + 1}</td>
-                        <td>{item.description}</td>
-                        <td><span className="tag">{LHSC_LABELS[item.lhsc] || item.lhsc}</span></td>
-                        <td style={{ textAlign: 'center' }}>{item.qty}</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(item.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Modal xem chi tiết lệnh sửa chữa ────────────────────────────────
-function RepairOrderDetailModal({ orderId, onClose }) {
-  const [detail, setDetail] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    getRepairOrderApi(orderId)
-      .then((result) => { if (alive) setDetail(result); })
-      .catch((err) => { if (alive) setLoadError(err.message || 'Không tải được chi tiết lệnh sửa chữa'); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [orderId]);
-
-  const st = detail && (STATUS_LABELS[detail.status] || { label: detail.status, badge: 'badge-inactive' });
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">Lệnh sửa chữa {detail?.code || ''}</h3>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {st && <span className={`badge ${st.badge}`}>{st.label}</span>}
-            <button className="modal-close" onClick={onClose}>✕</button>
-          </div>
-        </div>
-        <div className="modal-body">
-          {loading && <p>Đang tải…</p>}
-          {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
-          {detail && (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-                <div>
-                  <div className="form-section-title">Khách hàng & xe</div>
-                  {[
-                    ['Khách hàng', detail.customer?.fullName],
-                    ['Biển số xe', detail.vehicle?.licensePlate],
-                    ['Loại xe', detail.vehicle?.vehicleModel],
-                  ].map(([l, v]) => (
-                    <div key={l} className="detail-row">
-                      <div className="detail-label" style={{ width: 130, fontSize: 11 }}>{l}</div>
-                      <div className="detail-value" style={{ fontSize: 12 }}>{v || '—'}</div>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <div className="form-section-title">Phụ trách</div>
-                  {[
-                    ['Tổ trưởng', detail.teamLeader?.fullName],
-                    ['Chuyên môn', detail.teamLeader?.specialty],
-                    ['Người tạo lệnh', detail.createdByName],
-                    ['Ngày tạo', detail.createdAt],
-                    ['Ngày hoàn thành', detail.completedAt || '—'],
-                  ].map(([l, v]) => (
-                    <div key={l} className="detail-row">
-                      <div className="detail-label" style={{ width: 130, fontSize: 11 }}>{l}</div>
-                      <div className="detail-value" style={{ fontSize: 12 }}>{v || '—'}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {detail.notes && (
-                <>
-                  <div className="form-section-title">Ghi chú cho tổ trưởng</div>
-                  <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
-                    {detail.notes}
-                  </div>
-                </>
-              )}
-
-              {detail.cancelReason && (
-                <>
-                  <div className="form-section-title">Lý do hủy</div>
-                  <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#C62828' }}>
-                    {detail.cancelReason}
-                  </div>
-                </>
-              )}
-
-              <div className="form-section-title">Hạng mục công việc</div>
-              <div className="table-wrapper" style={{ marginBottom: 0 }}>
-                <table className="data-table" style={{ fontSize: 12 }}>
-                  <thead>
-                    <tr><th>#</th><th>Nội dung</th><th>Loại</th><th>SL</th><th>Đơn giá</th><th>Xong</th></tr>
-                  </thead>
-                  <tbody>
-                    {(detail.tasks || []).map((t, i) => (
-                      <tr key={t.id}>
-                        <td style={{ textAlign: 'center' }}>{i + 1}</td>
-                        <td>{t.taskName}</td>
-                        <td><span className="tag">{t.taskTypeLabel}</span></td>
-                        <td style={{ textAlign: 'center' }}>{t.quantity}</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(t.unitPrice)}</td>
-                        <td style={{ textAlign: 'center' }}>{t.isDone ? 'Đã xong' : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Modal nhập lý do hủy (thay cho window.confirm) ──────────────────
-function CancelReasonModal({ title, onConfirm, onClose }) {
-  const [reason, setReason] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleConfirm = async () => {
-    if (!reason.trim()) {
-      setError('Vui lòng nhập lý do hủy');
-      return;
-    }
-    setSubmitting(true);
-    setError('');
-    try {
-      await onConfirm(reason.trim());
-    } catch (err) {
-      setError(err.message || 'Hủy thất bại');
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">{title}</h3>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <div className="form-group">
-            <label className="form-label required">Lý do hủy</label>
-            <textarea
-              className="form-textarea"
-              placeholder="Nhập lý do khách hủy…"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              autoFocus
-            />
-          </div>
-          {error && <div className="form-error" style={{ marginTop: 6 }}>{error}</div>}
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Trở lại</button>
-          <button className="btn btn-danger" onClick={handleConfirm} disabled={submitting}>
-            {submitting ? 'Đang xử lý…' : 'Xác nhận hủy'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Modal xác nhận hoàn thành 1 đầu mục công việc (To truong) - thay cho
 // window.confirm cua trinh duyet de dong bo giao dien voi phan con lai cua app ──
@@ -357,338 +72,6 @@ function ConfirmDoneModal({ taskName, onConfirm, onClose }) {
   );
 }
 
-// ─── Danh sách lệnh sửa chữa ──────────────────────────────────────────
-// Gộp 2 nguồn dữ liệu vào 1 danh sách duy nhất: (1) phiếu quyết toán đang
-// "Chờ sửa chữa" nhưng CHƯA có lệnh sửa chữa/tổ trưởng -> hiển thị trạng thái
-// ảo "Đang chờ phân công"; (2) các lệnh sửa chữa thật đã tạo (Đang sửa chữa /
-// Hoàn thành / Hủy). Nhờ vậy cố vấn dịch vụ thấy toàn bộ luồng và thao tác
-// được ngay trên 1 màn hình, không cần nút "Tạo lệnh sửa chữa" riêng nữa.
-function RepairOrderList() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [pendingSettlements, setPendingSettlements] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-  const [actionError, setActionError] = useState('');
-  const [busyId, setBusyId] = useState(null);
-  const [viewOrderId, setViewOrderId] = useState(null);
-  const [viewSettlementId, setViewSettlementId] = useState(null);
-  const [cancelTarget, setCancelTarget] = useState(null); // { kind: 'order' | 'pending', id }
-
-  // Bo loc: mac dinh sap xep ngay som nhat truoc (asc) khi vua mo man hinh,
-  // cho phep loc them theo trang thai / to truong / khoang ngay, ket hop
-  // duoc nhieu dieu kien cung luc, ap dung ngay khi chon (khong can nut loc).
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterTeamLeader, setFilterTeamLeader] = useState('');
-  const [filterFromDate, setFilterFromDate] = useState('');
-  const [filterToDate, setFilterToDate] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 10;
-
-  const loadAll = () => {
-    setLoading(true);
-    return Promise.all([
-      listRepairSettlementsApi({ status: 'waiting_repair', limit: 100, scope: 'branch' }),
-      listRepairSettlementsApi({ status: 'cancelled', limit: 100, scope: 'branch' }),
-      listRepairOrdersApi(),
-    ])
-      .then(([waitingResult, cancelledResult, orderResult]) => {
-        setPendingSettlements([...(waitingResult.items || []), ...(cancelledResult.items || [])]);
-        setOrders(orderResult || []);
-      })
-      .catch((err) => setLoadError(err.message || 'Không tải được danh sách lệnh sửa chữa'))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    let alive = true;
-    loadAll().then(() => {}).catch(() => {});
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const rows = useMemo(() => {
-    const pendingRows = pendingSettlements.map((s) => ({
-      kind: 'pending',
-      id: s.id,
-      code: s.code,
-      customer: s.customer,
-      vehicle: s.vehicle,
-      teamLeader: null,
-      status: s.status === 'cancelled' ? 'cancelled' : 'pending_assignment',
-      date: s.date,
-    }));
-    const orderRows = orders.map((o) => ({
-      kind: 'order',
-      id: o.id,
-      code: o.code,
-      customer: o.customer,
-      vehicle: o.vehicle,
-      teamLeader: o.teamLeader,
-      status: o.status,
-      date: o.createdAt,
-    }));
-    return [...pendingRows, ...orderRows];
-  }, [pendingSettlements, orders]);
-
-  // Danh sach to truong de hien trong dropdown loc - lay tu chinh du lieu dang
-  // co (khong goi API rieng), vi chi can loc trong pham vi to truong da tung
-  // duoc phan cong o day.
-  const teamLeaderOptions = useMemo(() => {
-    const map = new Map();
-    rows.forEach((r) => {
-      if (r.teamLeader) map.set(String(r.teamLeader.id), r.teamLeader.fullName);
-    });
-    return Array.from(map.entries()).map(([id, fullName]) => ({ id, fullName }));
-  }, [rows]);
-
-  const hasFilters = Boolean(filterStatus || filterTeamLeader || filterFromDate || filterToDate);
-  const clearFilters = () => {
-    setFilterStatus('');
-    setFilterTeamLeader('');
-    setFilterFromDate('');
-    setFilterToDate('');
-  };
-
-  const filteredRows = useMemo(() => {
-    const fromDate = filterFromDate ? parseDDMMYYYY(filterFromDate.split('-').reverse().join('/')) : null;
-    const toDate = filterToDate ? parseDDMMYYYY(filterToDate.split('-').reverse().join('/')) : null;
-
-    let result = rows.filter((r) => {
-      if (filterStatus && r.status !== filterStatus) return false;
-      if (filterTeamLeader) {
-        if (filterTeamLeader === 'unassigned') {
-          if (r.teamLeader) return false;
-        } else if (String(r.teamLeader?.id) !== filterTeamLeader) {
-          return false;
-        }
-      }
-      const rowDate = parseDDMMYYYY(r.date);
-      if (fromDate && (!rowDate || rowDate < fromDate)) return false;
-      if (toDate && (!rowDate || rowDate > toDate)) return false;
-      return true;
-    });
-
-    // Phieu "Dang cho phan cong" luon noi len dau, khong phu thuoc ngay tao cu/moi -
-    // day la viec can xu ly gap nhat, khong the de bi chon vui xuong trang sau chi
-    // vi tao tu lau (sap xep theo ngay chi ap dung TRONG TUNG nhom, khong gop chung).
-    result = [...result].sort((a, b) => {
-      const pendingA = a.status === 'pending_assignment' ? 0 : 1;
-      const pendingB = b.status === 'pending_assignment' ? 0 : 1;
-      if (pendingA !== pendingB) return pendingA - pendingB;
-      const da = parseDDMMYYYY(a.date);
-      const db = parseDDMMYYYY(b.date);
-      if (!da && !db) return 0;
-      if (!da) return 1;
-      if (!db) return -1;
-      return sortOrder === 'asc' ? da - db : db - da;
-    });
-
-    return result;
-  }, [rows, filterStatus, filterTeamLeader, filterFromDate, filterToDate, sortOrder]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const pageSafe = Math.min(page, totalPages);
-  const paginatedRows = filteredRows.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
-
-  useEffect(() => { setPage(1); }, [filterStatus, filterTeamLeader, filterFromDate, filterToDate, sortOrder]);
-
-  const handleAssign = (settlementId) => {
-    navigate('/repair-orders/create', { state: { settlementId } });
-  };
-
-  const handleMarkComplete = async (id) => {
-    setBusyId(id);
-    setActionError('');
-    try {
-      await updateRepairOrderStatusApi(id, 'completed');
-      await loadAll();
-    } catch (err) {
-      setActionError(err.message || 'Không đánh dấu hoàn thành được');
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleConfirmCancel = async (reason) => {
-    const { kind, id } = cancelTarget;
-    setBusyId(id);
-    setActionError('');
-    try {
-      if (kind === 'pending') {
-        await updateRepairSettlementStatusApi(id, 'cancelled', reason);
-      } else {
-        await updateRepairOrderStatusApi(id, 'cancelled', reason);
-      }
-      setCancelTarget(null);
-      await loadAll();
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  return (
-    <div>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>Lệnh sửa chữa</h1>
-          <div className="breadcrumb">Trang chủ / Lệnh sửa chữa</div>
-        </div>
-        <div className="page-header-right">
-          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
-            {user?.branchName || user?.branch}
-          </span>
-        </div>
-      </div>
-
-      {(loadError || actionError) && (
-        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
-          {loadError || actionError}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
-        <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
-          <label className="form-label">Trạng thái</label>
-          <select className="form-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="">Tất cả trạng thái</option>
-            {Object.entries(STATUS_LABELS).map(([key, v]) => (
-              <option key={key} value={key}>{v.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group" style={{ marginBottom: 0, minWidth: 190 }}>
-          <label className="form-label">Tổ trưởng phụ trách</label>
-          <select className="form-select" value={filterTeamLeader} onChange={(e) => setFilterTeamLeader(e.target.value)}>
-            <option value="">Tất cả tổ trưởng</option>
-            <option value="unassigned">Chưa phân công</option>
-            {teamLeaderOptions.map((t) => (
-              <option key={t.id} value={t.id}>{t.fullName}</option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Từ ngày</label>
-          <input className="form-input" type="date" value={filterFromDate} onChange={(e) => setFilterFromDate(e.target.value)} />
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Đến ngày</label>
-          <input className="form-input" type="date" value={filterToDate} onChange={(e) => setFilterToDate(e.target.value)} />
-        </div>
-        <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
-          <label className="form-label">Sắp xếp theo ngày</label>
-          <select className="form-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-            <option value="asc">Cũ nhất</option>
-            <option value="desc">Mới nhất</option>
-          </select>
-        </div>
-        {hasFilters && (
-          <button className="btn btn-secondary btn-sm" onClick={clearFilters}>Xóa lọc</button>
-        )}
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)', alignSelf: 'center' }}>
-          {filteredRows.length} / {rows.length} lệnh
-        </div>
-      </div>
-
-      <div className="table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Số lệnh / phiếu</th><th>Khách hàng</th><th>Xe</th>
-              <th>Tổ trưởng phụ trách</th><th>Trạng thái</th><th>Ngày</th><th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7}>
-                <div className="empty-state"><p>Đang tải danh sách lệnh sửa chữa…</p></div>
-              </td></tr>
-            )}
-            {!loading && filteredRows.length === 0 && (
-              <tr><td colSpan={7}>
-                <div className="empty-state">
-                  <h3>Chưa có lệnh sửa chữa nào</h3>
-                  <p>{hasFilters ? 'Không có lệnh nào khớp bộ lọc đang chọn.' : 'Chưa có phiếu quyết toán nào đang chờ sửa chữa, và chưa có lệnh sửa chữa nào được tạo.'}</p>
-                </div>
-              </td></tr>
-            )}
-            {paginatedRows.map((r) => {
-              const st = STATUS_LABELS[r.status] || { label: r.status, badge: 'badge-inactive' };
-              const isBusy = busyId === r.id;
-              return (
-                <tr key={`${r.kind}-${r.id}`}>
-                  <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{r.code}</span></td>
-                  <td>{r.customer?.fullName}</td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{r.vehicle?.licensePlate}</div>
-                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{r.vehicle?.vehicleModel}</div>
-                  </td>
-                  <td style={{ fontSize: 12 }}>
-                    {r.teamLeader ? <span>{r.teamLeader.fullName}</span> : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa phân công</span>}
-                  </td>
-                  <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
-                  <td style={{ fontSize: 12 }}>{r.date}</td>
-                  <td>
-                    <div className="table-actions" style={{ flexWrap: 'nowrap' }}>
-                      {r.kind === 'pending' && r.status === 'pending_assignment' && (
-                        <>
-                          <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} onClick={() => handleAssign(r.id)}>Phân công</button>
-                          <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'pending', id: r.id })}>Hủy</button>
-                          <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewSettlementId(r.id)}>Xem chi tiết</button>
-                        </>
-                      )}
-                      {r.kind === 'pending' && r.status === 'cancelled' && (
-                        <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewSettlementId(r.id)}>Xem chi tiết</button>
-                      )}
-                      {r.kind === 'order' && r.status === 'inprogress' && (
-                        <>
-                          <button className="btn btn-primary btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => handleMarkComplete(r.id)}>Hoàn thành</button>
-                          <button className="btn btn-danger btn-sm" style={ACTION_BTN_STYLE} disabled={isBusy} onClick={() => setCancelTarget({ kind: 'order', id: r.id })}>Hủy</button>
-                          <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewOrderId(r.id)}>Xem chi tiết</button>
-                        </>
-                      )}
-                      {r.kind === 'order' && r.status !== 'inprogress' && (
-                        <button className="btn btn-secondary btn-sm" style={ACTION_BTN_STYLE} onClick={() => setViewOrderId(r.id)}>Xem chi tiết</button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredRows.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 12, color: 'var(--gray-500)' }}>
-          <div>Tổng {filteredRows.length} lệnh</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button className="btn btn-secondary btn-sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => p - 1)}>Trước</button>
-            <span>Trang {pageSafe}/{totalPages}</span>
-            <button className="btn btn-secondary btn-sm" disabled={pageSafe >= totalPages} onClick={() => setPage((p) => p + 1)}>Sau</button>
-          </div>
-        </div>
-      )}
-
-      {viewOrderId && (
-        <RepairOrderDetailModal orderId={viewOrderId} onClose={() => setViewOrderId(null)} />
-      )}
-      {viewSettlementId && (
-        <PendingSettlementDetailModal settlementId={viewSettlementId} onClose={() => setViewSettlementId(null)} />
-      )}
-      {cancelTarget && (
-        <CancelReasonModal
-          title={cancelTarget.kind === 'pending' ? 'Hủy phiếu quyết toán' : 'Hủy lệnh sửa chữa'}
-          onConfirm={handleConfirmCancel}
-          onClose={() => setCancelTarget(null)}
-        />
-      )}
-    </div>
-  );
-}
-
 // ─── Tạo lệnh sửa chữa: gán tổ trưởng phụ trách ──────────────────────
 function RepairOrderCreate() {
   const navigate = useNavigate();
@@ -707,7 +90,6 @@ function RepairOrderCreate() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [confirmedOrder, setConfirmedOrder] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -746,6 +128,11 @@ function RepairOrderCreate() {
 
   const canConfirm = Boolean(selectedSettlementId) && Boolean(selectedTeamLeaderId);
 
+  // Sau khi phan cong xong, chuyen thang sang tab "Dang sua chua" cua man
+  // Phieu quyet toan luon (khong can man xac nhan trung gian nua) - phieu vua
+  // tao lenh da tu chuyen sang "inprogress" nen se thay ngay o do. Muon in
+  // danh sach cong viec cho to truong thi bam "In danh sach CV" ngay tai dong
+  // do (RepairSettlementList), khong can lam o man nay nua.
   const handleConfirm = async () => {
     if (!canConfirm) return;
     setSaving(true);
@@ -756,7 +143,7 @@ function RepairOrderCreate() {
         teamLeaderId: selectedTeamLeaderId,
         notes,
       });
-      setConfirmedOrder({ ...selectedSettlementDetail, teamLeader: selectedTeamLeader.fullName });
+      navigate('/repair-settlement', { state: { tab: 'inprogress' } });
     } catch (err) {
       setSaveError(err.message || 'Tạo lệnh sửa chữa thất bại');
     } finally {
@@ -772,7 +159,7 @@ function RepairOrderCreate() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Tạo lệnh sửa chữa</h1>
-          <div className="breadcrumb">Trang chủ / Lệnh sửa chữa / Tạo lệnh sửa chữa</div>
+          <div className="breadcrumb"><Link to="/repair-settlement">Phiếu quyết toán sửa chữa</Link> / Tạo lệnh sửa chữa</div>
         </div>
       </div>
 
@@ -795,12 +182,12 @@ function RepairOrderCreate() {
               Mã phiếu: <b>{selectedSettlementDetail.code}</b> &nbsp;|&nbsp; Tổng cộng: <b>{formatCurrency(selectedSettlementDetail.total)}</b>
             </div>
           </div>
-          <button className="btn btn-secondary" disabled={Boolean(confirmedOrder)} onClick={() => setShowSettlementPicker(true)}>Đổi phiếu quyết toán</button>
+          <button className="btn btn-secondary" onClick={() => setShowSettlementPicker(true)}>Đổi phiếu quyết toán</button>
         </div>
       )}
 
       {selectedSettlementDetail && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, alignItems: 'start' }}>
+        <div className="responsive-2col" style={{ gridTemplateColumns: '2fr 1fr', gap: 20, alignItems: 'start' }}>
           <div>
             <div className="form-section-title">Chi tiết dịch vụ cần thực hiện</div>
             <div className="table-wrapper" style={{ marginBottom: 20 }}>
@@ -833,7 +220,7 @@ function RepairOrderCreate() {
             {teamLeaders.length === 0 && (
               <div style={{ fontSize: 13, color: 'var(--gray-500)', fontStyle: 'italic' }}>Chi nhánh chưa có tổ trưởng nào đang hoạt động.</div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: confirmedOrder ? 0.6 : 1, pointerEvents: confirmedOrder ? 'none' : 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {teamLeaders.map((t) => {
                 const isSelected = selectedTeamLeaderId === t.id;
                 return (
@@ -885,7 +272,6 @@ function RepairOrderCreate() {
                 placeholder="Chú ý kỹ thuật, lưu ý đặc biệt…"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                disabled={Boolean(confirmedOrder)}
               />
             </div>
 
@@ -902,40 +288,20 @@ function RepairOrderCreate() {
               )}
             </div>
 
-            {confirmedOrder ? (
-              <>
-                <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 13, color: '#2E7D32', fontWeight: 700, textAlign: 'center' }}>
-                  Xác nhận thành công
-                </div>
-                <button
-                  className="btn btn-primary"
-                  style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
-                  onClick={() => printWorkList(confirmedOrder)}
-                >
-                  Xuất file công việc
-                </button>
-                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate('/repair-orders')}>
-                  Quay lại
-                </button>
-              </>
-            ) : (
-              <>
-                {saveError && (
-                  <div style={{ fontSize: 12, color: '#C62828', marginBottom: 10 }}>{saveError}</div>
-                )}
-                <button
-                  className="btn btn-primary"
-                  style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
-                  disabled={!canConfirm || saving}
-                  onClick={handleConfirm}
-                >
-                  {saving ? 'Đang xác nhận…' : 'Xác nhận lệnh sửa chữa'}
-                </button>
-                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate('/repair-orders')}>
-                  Quay lại
-                </button>
-              </>
+            {saveError && (
+              <div style={{ fontSize: 12, color: '#C62828', marginBottom: 10 }}>{saveError}</div>
             )}
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
+              disabled={!canConfirm || saving}
+              onClick={handleConfirm}
+            >
+              {saving ? 'Đang xác nhận…' : 'Xác nhận lệnh sửa chữa'}
+            </button>
+            <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate('/repair-settlement')}>
+              Quay lại
+            </button>
           </div>
         </div>
       )}
@@ -983,6 +349,7 @@ function RepairOrderCreate() {
 // BE đã tự lọc GET /repair-orders theo team_leader_id = user hiện tại nên
 // không cần truyền tham số gì thêm - danh sách trả về luôn là của chính mình.
 function TeamLeaderTaskCards() {
+  const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -1005,9 +372,9 @@ function TeamLeaderTaskCards() {
 
   useEffect(() => {
     loadAll().then(() => {}).catch(() => {});
-    // Chua co websocket/push nen tu dong lam moi: cu vong lap 1 lan/20s va
-    // moi khi quay lai tab, de tho truong thay ngay phieu vua duoc co van
-    // phan cong ma khong phai F5 tay.
+    // Poll 20s + refresh khi quay lai tab van giu lam luoi an toan (phong khi
+    // SSE ben duoi bi mat ket noi tam thoi) - nhung duong chinh de thay lenh
+    // moi la SSE 'assigned' (realtime, khong can cho toi vong poll).
     const intervalId = setInterval(() => loadAll({ silent: true }), 20000);
     const onFocus = () => loadAll({ silent: true });
     const onVisibility = () => { if (document.visibilityState === 'visible') loadAll({ silent: true }); };
@@ -1019,6 +386,15 @@ function TeamLeaderTaskCards() {
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
+
+  // Realtime: CVDV vua tao lenh sua chua va gan cho DUNG minh -> nap lai
+  // danh sach ngay, khong can cho poll 20s hay F5 tay.
+  const handleRepairOrderEvent = (event) => {
+    if (event.type === 'assigned' && String(event.teamLeaderId) === String(user?.id)) {
+      loadAll({ silent: true });
+    }
+  };
+  useRepairOrderEventsSSE(handleRepairOrderEvent, Boolean(user));
 
   const filteredOrders = orders.filter((o) => o.status === filterStatus);
   const tabCounts = orders.reduce((acc, o) => {
@@ -1237,7 +613,10 @@ export default function RepairOrderPage() {
   }
   return (
     <Routes>
-      <Route index element={<RepairOrderList />} />
+      {/* Da bo man "Danh sach lenh sua chua" rieng - CVDV theo doi trang thai
+          qua cac tab cua man Phieu quyet toan sua chua roi, /repair-orders
+          (index) gio chi con dung de vao "create" (luc bam Phan cong). */}
+      <Route index element={<Navigate to="/repair-settlement" replace />} />
       <Route path="create" element={<RepairOrderCreate />} />
     </Routes>
   );

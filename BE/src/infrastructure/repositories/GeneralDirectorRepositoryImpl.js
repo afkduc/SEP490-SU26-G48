@@ -763,7 +763,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN user_role ur ON ur.user_id = u.id
        LEFT JOIN roles r ON r.id = ur.role_id
        ${USER_SPECIALTY_APPLY}
-       WHERE r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'accountant', 'team_leader')
+       WHERE r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'team_leader')
          AND (@branchId IS NULL OR u.branch_id = @branchId)
          AND (@status IS NULL OR u.status = @status)
          AND (@role IS NULL OR r.role_name = @role)
@@ -813,14 +813,13 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN roles r ON r.id = ur.role_id
        ${USER_SPECIALTY_APPLY}
        WHERE u.id = @id
-         AND r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'accountant', 'team_leader')
+         AND r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'team_leader')
        ORDER BY
          CASE r.role_name
            WHEN 'manager' THEN 1
            WHEN 'service_advisor' THEN 2
            WHEN 'team_leader' THEN 3
            WHEN 'warehouse_staff' THEN 4
-           WHEN 'accountant' THEN 5
            ELSE 99
          END`,
       { id: Number(id) }

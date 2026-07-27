@@ -1,32 +1,49 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SESSION_EXPIRED_KEY } from '../services/httpClient';
+import { SESSION_EXPIRED_KEY, SESSION_LOGGED_OUT_EVENT } from '../services/httpClient';
+
+// Module-level flag da chong spam DUNG ROI giua cac instance StrictMode/HMR.
+// Su dung module-level (khong phai useRef) de:
+//   1. StrictMode dev: useEffect chay 2 lan nhung cung 1 module flag -> 1 modal.
+//   2. HMR: neu component remount, flag van giu nguyen -> tranh re-show.
+//   3. Neu 2 instance khac nhau cung import file nay, van chi 1 modal.
+let modalShownAt = 0;
+const MIN_REDISPLAY_INTERVAL_MS = 60_000; // 60s: phai doi 60s truoc khi hien lai
 
 export default function SessionExpiredModal() {
   const [visible, setVisible] = useState(false);
   const navigate = useNavigate();
-  const visibleRef = useRef(false);
 
   useEffect(() => {
     const handler = (event) => {
       // Bo qua neu user dang o trang login (tranh modal nhap nhay).
       if (window.location.pathname === '/login') return;
-      // Tranh spam: neu modal dang hien thi -> khong dispatch nua.
-      if (visibleRef.current) return;
-      // Cho phep caller bo qua bang cach truyen detail.skipIfVisible
-      const detail = event?.detail || {};
-      if (detail.skipIfVisible && visibleRef.current) return;
-
-      visibleRef.current = true;
+      // Anti-spam: kiem tra module-level flag. Khoa 60s giua cac lan hien.
+      const now = Date.now();
+      if (now - modalShownAt < MIN_REDISPLAY_INTERVAL_MS) {
+        return;
+      }
+      modalShownAt = now;
       setVisible(true);
     };
     window.addEventListener(SESSION_EXPIRED_KEY, handler);
     return () => window.removeEventListener(SESSION_EXPIRED_KEY, handler);
   }, []);
 
-  // Reset flag khi modal dong va user bam "Dang nhap lai"
+  // Reset flag khi user dang nhap lai (token moi -> session moi).
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === 'token' && e.newValue) {
+        // Login moi -> reset de lan sau gap 401 se hien modal.
+        modalShownAt = 0;
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   function handleLogin() {
-    visibleRef.current = false;
+    modalShownAt = 0;
     setVisible(false);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -34,6 +51,10 @@ export default function SessionExpiredModal() {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('permissions');
+    // Dispatch event de AppContext clear React state (token/user/permissions).
+    // Neu khong co buoc nay, isAuthenticated van true -> LoginPage useEffect
+    // redirect ve home ngay khi vua navigate xong -> user khong the login.
+    window.dispatchEvent(new CustomEvent(SESSION_LOGGED_OUT_EVENT));
     navigate('/login', { replace: true });
   }
 

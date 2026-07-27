@@ -1,0 +1,123 @@
+.login-challenge-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: login-challenge-fade 0.2s ease-out;
+}
+
+@keyframes login-challenge-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.login-challenge-modal {
+  width: min(560px, 100%);
+  background: #fff;
+  border-radius: 20px;
+  padding: 0 28px 28px;
+  box-shadow:
+    0 0 0 1px rgba(245, 158, 11, 0.35),
+    0 28px 64px rgba(15, 23, 42, 0.4);
+  text-align: center;
+  animation: login-challenge-pop 0.25s ease-out;
+  overflow: hidden;
+}
+
+@keyframes login-challenge-pop {
+  from { transform: translateY(12px) scale(0.96); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.login-challenge-modal__banner {
+  margin: 0 -28px 18px;
+  padding: 12px 20px;
+  background: linear-gradient(90deg, #b45309, #d97706);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-challenge-modal__icon {
+  color: #d97706;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.login-challenge-modal__title {
+  margin: 0 0 14px;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.login-challenge-modal__message {
+  margin: 0 0 20px;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.login-challenge-modal__error {
+  margin: 0 0 14px;
+  color: #b91c1c;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.login-challenge-modal__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.login-challenge-btn {
+  min-width: 180px;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  font-weight: 750;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 12px 18px;
+}
+
+.login-challenge-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-challenge-btn--reject {
+  background: #fff;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.login-challenge-btn--reject:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.login-challenge-btn--approve {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.login-challenge-btn--approve:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.login-challenge-modal__hint {
+  margin: 16px 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}

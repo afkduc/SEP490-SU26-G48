@@ -7,7 +7,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr;
+  grid-template-columns: 1fr 1.3fr 0.9fr 0.9fr;
   gap: 32px;
 }
 
@@ -28,7 +28,29 @@
 }
 
 .logo span {
-  color: #2f9e52;
+  color: var(--accent);
+}
+
+.about {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.branch {
+  margin-bottom: 16px;
+}
+
+.branch:last-child {
+  margin-bottom: 0;
+}
+
+.branchName {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 6px;
 }
 
 .item {
