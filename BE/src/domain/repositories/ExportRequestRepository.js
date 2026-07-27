@@ -63,8 +63,9 @@ class ExportRequestRepository {
   }
 
   /**
-   * Lay cac Repair Order co the xuat kho (status IN ('pending','inprogress')
-   * va chua tung duoc xuat cho RO do). Tra ve kem tasks (PART) de FE hien thi.
+   * Lay cac Repair Order co the xuat kho (status <> 'cancelled', bao gom ca
+   * 'inprogress' va 'completed') va chua tung duoc xuat cho RO do. Tra ve kem
+   * tasks (product) de FE hien thi.
    * @param {Object} filters - { branchId, search, page, limit }
    * @returns {Promise<Array<{ id, repairOrderCode, serviceOrderCode, customerName, vehiclePlate, status, items: Array }>>}
    */
