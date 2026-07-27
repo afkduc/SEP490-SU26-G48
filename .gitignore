@@ -14,3 +14,6 @@ dist/
 *.bak
 FE/.env.production
 Landing/.env.production
+
+*.md
+docs/
