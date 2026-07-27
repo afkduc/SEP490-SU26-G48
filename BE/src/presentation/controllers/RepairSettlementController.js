@@ -125,6 +125,15 @@ class RepairSettlementController {
       next(err);
     }
   };
+
+  createPaymentLink = async (req, res, next) => {
+    try {
+      const result = await this.repairSettlementService.createPayosPaymentLink(req.params.id);
+      return success(res, result, 'PayOS payment link created');
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 module.exports = RepairSettlementController;

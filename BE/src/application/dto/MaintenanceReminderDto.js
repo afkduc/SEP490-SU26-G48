@@ -14,7 +14,6 @@ class MaintenanceReminderResponseDto {
       id: entity.id,
       reminderType: entity.reminderType,
       dueDate: toDDMMYYYY(entity.dueDate),
-      dueKm: entity.dueKm,
       isSent: entity.isSent,
       sentAt: toDDMMYYYY(entity.sentAt),
       isConfirmed: entity.isConfirmed,

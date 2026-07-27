@@ -2,12 +2,14 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
+import ProfileRedirect from '../components/ProfileRedirect';
 import SessionExpiredModal from '../components/SessionExpiredModal';
 import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
+import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
 import { SharedDataProvider } from '../contexts/SharedDataContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
 
@@ -29,9 +31,6 @@ const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'))
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
-const AdminPermissionMatrixPage = lazy(() => import('../pages/admin/AdminPermissionMatrixPage'));
-const RoleScreenMatrixPage = lazy(() => import('../pages/admin/RoleScreenMatrixPage'));
-const PermissionRequestsPage = lazy(() => import('../pages/admin/PermissionRequestsPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -110,6 +109,14 @@ function Loading() {
   );
 }
 
+function ProfilePageLayout() {
+  return (
+    <AppLayout>
+      <Outlet />
+    </AppLayout>
+  );
+}
+
 function AppRoutes() {
   return (
     <>
@@ -130,14 +137,14 @@ function AppRoutes() {
           path="/dashboard"
           element={
             <ProtectedRoute
-              permissions={[
-                'screen:dashboard:access',
-                'screen:advisor:dashboard:access',
-                'screen:manager:dashboard:access',
-                'screen:director:dashboard:access',
-                'screen:leader:dashboard:access',
+              roles={[
+                ROLES.SERVICE_ADVISOR,
+                ROLES.MANAGER,
+                ROLES.GENERAL_DIRECTOR,
+                ROLES.TEAM_LEADER,
+                ROLES.TECHNICIAN,
+                ROLES.ADMIN,
               ]}
-              match="any"
             >
               <AppLayout>
                 <DashboardPage />
@@ -159,72 +166,65 @@ function AppRoutes() {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="users" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="admin:users:read">
-              <AdminUsersPage />
-            </ProtectedRoute>
-          } />
-          <Route path="branches" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:branches:access">
-              <AdminBranchesPage />
-            </ProtectedRoute>
-          } />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="branches" element={<AdminBranchesPage />} />
           <Route path="roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
-          <Route path="devices" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:devices:access">
-              <AdminDevicesPage />
-            </ProtectedRoute>
-          } />
-          <Route path="specialties" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:specialties:access">
-              <AdminSpecialtiesPage />
-            </ProtectedRoute>
-          } />
-          <Route path="permission-matrix" element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="permission-requests" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <PermissionRequestsPage />
-            </ProtectedRoute>
-          } />
-          <Route path="role-screen-matrix" element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="logs" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:audit_logs:access">
-              <AuditLogsPage />
-            </ProtectedRoute>
-          } />
-          <Route path="login-sessions" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:login_sessions:access">
-              <LoginSessionsPage />
-            </ProtectedRoute>
-          } />
+          <Route path="devices" element={<AdminDevicesPage />} />
+          <Route path="specialties" element={<AdminSpecialtiesPage />} />
+          <Route path="logs" element={<AuditLogsPage />} />
+          <Route path="login-sessions" element={<LoginSessionsPage />} />
           <Route path="profile" element={<AdminProfilePage />} />
+          <Route path="profile/edit" element={<AdminProfilePage />} />
           <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
         </Route>
-        {/* General Director – any submodule access key grants entry */}
-                <Route
-                  path="/general-director/*"
-                  element={
-                    <ProtectedRoute
-                      roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}
-                      permissions={[
-                        'screen:director:dashboard:access',
-                        'screen:director:reports:access',
-                        'screen:director:settlements:access',
-                        'screen:director:employees:access',
-                        'screen:director:technicians:access',
-                        'screen:director:branches:access',
-                        'screen:director:branch_managers:access',
-                      ]}
-                      match="any"
-                    >
-                      <AppLayout showNavbar={false}>
-                        <GeneralDirectorPage />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
 
-        {/* Quản lý chi nhánh - Nhân viên / Thợ máy / Tổ trưởng */}
+        {/* Hồ sơ cá nhân — URL view/edit riêng cho từng role (AppLayout) */}
+        {APP_PROFILE_ROUTE_CONFIGS.map(({ profilePath, allowedRoles }) => (
+          <Route
+            key={profilePath}
+            path={profilePath}
+            element={
+              <ProtectedRoute roles={allowedRoles}>
+                <ProfilePageLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminProfilePage />} />
+            <Route path="edit" element={<AdminProfilePage />} />
+          </Route>
+        ))}
+
+        {/* Legacy /profile, /profile/edit → redirect theo role */}
+        <Route
+          path="/profile/edit"
+          element={
+            <ProtectedRoute>
+              <ProfileRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfileRedirect />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* General Director */}
+        <Route
+          path="/general-director/*"
+          element={
+            <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
+              <AppLayout>
+                <GeneralDirectorPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý chi nhánh */}
         <Route
           path="/manager/*"
           element={
@@ -236,29 +236,11 @@ function AppRoutes() {
           }
         />
 
-        {/* Hồ sơ cá nhân — mọi role đã đăng nhập */}
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <AdminProfilePage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Phiếu quyết toán sửa chữa — shared + advisor matrix keys */}
+        {/* Phiếu quyết toán sửa chữa */}
         <Route
           path="/repair-settlement/*"
           element={
-            <ProtectedRoute
-              permissions={[
-                'screen:repair-settlement:access',
-                'screen:advisor:orders:access',
-              ]}
-              match="any"
-            >
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <RepairSettlementPage />
               </AppLayout>
@@ -266,19 +248,11 @@ function AppRoutes() {
           }
         />
 
-        {/* Lệnh sửa chữa — shared + advisor/leader matrix keys */}
+        {/* Lệnh sửa chữa */}
         <Route
           path="/repair-orders/*"
           element={
-            <ProtectedRoute
-              permissions={[
-                'screen:repair-orders:access',
-                'screen:advisor:orders:access',
-                'screen:leader:orders:access',
-                'screen:leader:tasks:access',
-              ]}
-              match="any"
-            >
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.TEAM_LEADER, ROLES.TECHNICIAN, ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <RepairOrderPage />
               </AppLayout>
@@ -322,25 +296,12 @@ function AppRoutes() {
           }
         />
 
-        {/* Inventory module — top-level inventory + submodule / manager keys */}
+        {/* Inventory module */}
         <Route
           path={ROUTES.INVENTORY}
           element={
             <ProtectedRoute
               roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}
-              permissions={[
-                'screen:inventory:access',
-                'screen:manager:inventory:access',
-                'screen:inventory:products:access',
-                'screen:inventory:stock:access',
-                'screen:inventory:suppliers:access',
-                'screen:inventory:import-requests:access',
-                'screen:inventory:export-requests:access',
-                'screen:inventory:low-stock:access',
-                'screen:warehouse:products:access',
-                'screen:warehouse:stock:access',
-              ]}
-              match="any"
             >
               <AppLayout>
                 <InventoryLayout />

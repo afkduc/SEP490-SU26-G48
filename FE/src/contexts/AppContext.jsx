@@ -1,12 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { loginApi, logoutApi, getMeApi, getServerTime, getMyLoginChallengesApi } from '../services/authApi';
 import { ROLES } from '../constants/roles';
+import {
+  ROLE_PROFILE_CONFIG,
+  getProfileConfigByRole,
+} from '../config/roleProfileConfig';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
 import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
 import LoginChallengeModal from '../components/LoginChallengeModal';
+import SessionTakenOverModal from '../components/SessionTakenOverModal';
 import {
   resetSessionExpiredFlag,
   cancelAllPendingRequests,
@@ -88,23 +93,64 @@ function clearSession() {
 export function normalizeRoles(roles) {
   if (!Array.isArray(roles)) return [];
   return roles
-    .map((r) => (typeof r === 'string' ? r : r?.roleName))
+    .map((r) => {
+      if (typeof r === 'string') return r;
+      return r?.roleName || r?.name || null;
+    })
     .filter((name) => typeof name === 'string' && name.trim().length > 0);
+}
+
+const ROLE_PRIORITY = [
+  ROLES.ADMIN,
+  ROLES.GENERAL_DIRECTOR,
+  ROLES.MANAGER,
+  ROLES.SERVICE_ADVISOR,
+  ROLES.TEAM_LEADER,
+  ROLES.TECHNICIAN,
+  ROLES.WAREHOUSE_STAFF,
+];
+
+export function getPrimaryRole(user) {
+  const roles = normalizeRoles(user?.roles);
+  if (!roles.length) return user?.primaryRole || null;
+  // Uu tien role cao nhat (admin > GD > manager > ...) de route/profile khong bi lech
+  const prioritized = ROLE_PRIORITY.find((role) => roles.includes(role));
+  if (prioritized) return prioritized;
+  if (user?.primaryRole && roles.includes(user.primaryRole)) {
+    return user.primaryRole;
+  }
+  return roles[0] || null;
 }
 
 /**
  * Tra ve path home phu hop nhat theo thu tu role (admin uu tien cao nhat)
  */
 export function getRoleHome(user) {
-  const roles = normalizeRoles(user?.roles);
-  if (!roles.length) return '/dashboard';
-  if (roles.includes(ROLES.ADMIN)) return '/admin/dashboard';
-  if (roles.includes(ROLES.GENERAL_DIRECTOR)) return '/general-director';
-  if (roles.includes(ROLES.MANAGER)) return '/manager';
-  if (roles.includes(ROLES.SERVICE_ADVISOR)) return '/dashboard';
-  if (roles.includes(ROLES.TEAM_LEADER)) return '/repair-orders';
-  if (roles.includes(ROLES.WAREHOUSE_STAFF)) return '/inventory';
+  const role = getPrimaryRole(user);
+  if (!role) return '/dashboard';
+  if (role === ROLES.ADMIN) return '/admin/dashboard';
+  if (role === ROLES.GENERAL_DIRECTOR) return '/general-director';
+  if (role === ROLES.MANAGER) return '/manager';
+  if (role === ROLES.SERVICE_ADVISOR) return '/dashboard';
+  if (role === ROLES.TEAM_LEADER) return '/repair-orders';
+  if (role === ROLES.TECHNICIAN) return '/repair-orders';
+  if (role === ROLES.WAREHOUSE_STAFF) return '/inventory';
   return '/dashboard';
+}
+
+/**
+ * Tra ve path ho so ca nhan theo role (moi role co URL rieng, khong dung /profile chung).
+ */
+export function getRoleProfilePath(user) {
+  const role = getPrimaryRole(user);
+  const cfg = getProfileConfigByRole(role);
+  return cfg?.profilePath || ROLE_PROFILE_CONFIG[ROLES.SERVICE_ADVISOR].profilePath;
+}
+
+export function getRoleProfileEditPath(user) {
+  const role = getPrimaryRole(user);
+  const cfg = getProfileConfigByRole(role);
+  return cfg?.profileEditPath || `${getRoleProfilePath(user)}/edit`;
 }
 
 export function AppProvider({ children }) {
@@ -401,7 +447,7 @@ export function AppProvider({ children }) {
           Tu tat khi user logout. Tu backoff khi nhan 401 de tranh spam. */}
       {isAuthenticated ? <HeartbeatRunner /> : null}
       {isAuthenticated ? <PermissionEventsRunner /> : null}
-      {/* Login challenge (chờ Approve) đang tắt — bật lại cùng LOGIN_CHALLENGE_ENABLED trên BE */}
+      {isAuthenticated ? <SessionTakenOverRunner /> : null}
       {children}
     </AppContext.Provider>
   );
@@ -442,7 +488,8 @@ function PermissionEventsRunner() {
       // Toast thong bao cho user biet quyen vua duoc cap nhat.
       // action: 'matrix_updated' | 'role_assigned' | 'role_revoked'
       const actionLabels = {
-        matrix_updated: 'Ma trận quyền đã được cập nhật',
+        matrix_updated: 'Quyền truy cập đã được cập nhật',
+        role_screen_matrix_updated: 'Quyền truy cập đã được cập nhật',
         role_assigned: 'Bạn vừa được gán vai trò mới',
         role_revoked: 'Một vai trò của bạn đã bị thu hồi',
       };
@@ -510,6 +557,30 @@ function LoginChallengeRunner() {
     <LoginChallengeModal
       challenge={challenge}
       onClose={() => setChallenge(null)}
+    />
+  );
+}
+
+/** Nghe SSE SESSION_TAKEN_OVER + giữ SSE notifications sống khi đã login. */
+function SessionTakenOverRunner() {
+  const { token } = useAuth();
+  useNotifications(token);
+  const [takenOver, setTakenOver] = useState(null);
+
+  useEffect(() => {
+    const onTakenOver = (e) => {
+      const detail = e?.detail || {};
+      setTakenOver((prev) => prev || detail);
+    };
+    window.addEventListener('session-taken-over', onTakenOver);
+    return () => window.removeEventListener('session-taken-over', onTakenOver);
+  }, []);
+
+  if (!takenOver) return null;
+  return (
+    <SessionTakenOverModal
+      detail={takenOver}
+      onClose={() => setTakenOver(null)}
     />
   );
 }

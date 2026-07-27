@@ -34,6 +34,9 @@ function parseDDMMYYYY(value) {
   return new Date(Number(yyyy), Number(mm) - 1, Number(dd));
 }
 
+// Chi bao truoc dem nguoc 2 ngay/1 ngay (khong con canh bao som theo 1
+// khoang rong 30 ngay nhu truoc) - dung y muon CVDV: nhac dung luc gan den
+// han thay vi hien "Sap den han" qua som roi lu mo dan trong danh sach.
 function dueDateMeta(dueDate) {
   const d = parseDDMMYYYY(dueDate);
   if (!d) return {};
@@ -41,14 +44,9 @@ function dueDateMeta(dueDate) {
   today.setHours(0, 0, 0, 0);
   const diffDays = Math.round((d - today) / (1000 * 60 * 60 * 24));
   if (diffDays < 0) return { color: '#C62828', label: 'Quá hạn' };
-  if (diffDays <= 30) return { color: '#E65100', label: 'Sắp đến hạn' };
-  return {};
-}
-
-function dueKmMeta(dueKm, currentKm) {
-  if (!dueKm) return {};
-  if ((currentKm || 0) >= dueKm) return { color: '#C62828', label: 'Đã vượt' };
-  if (dueKm - (currentKm || 0) <= 1000) return { color: '#E65100', label: 'Sắp đến hạn' };
+  if (diffDays === 0) return { color: '#C62828', label: 'Hôm nay' };
+  if (diffDays === 1) return { color: '#E65100', label: 'Còn 1 ngày' };
+  if (diffDays === 2) return { color: '#E65100', label: 'Còn 2 ngày' };
   return {};
 }
 
@@ -192,25 +190,24 @@ export default function CustomerCarePage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Xe</th><th>Khách hàng</th><th>Hạn bảo dưỡng</th><th>Trạng thái</th><th>Ghi chú</th><th>Thao tác</th>
+              <th>Xe</th><th>Khách hàng</th><th>Loại nhắc nhở</th><th>Hạn nhắc</th><th>Trạng thái</th><th>Ghi chú</th><th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={6}><div className="empty-state"><p>Đang tải danh sách nhắc nhở…</p></div></td></tr>
+              <tr><td colSpan={7}><div className="empty-state"><p>Đang tải danh sách nhắc nhở…</p></div></td></tr>
             )}
             {!loading && items.length === 0 && (
-              <tr><td colSpan={6}>
+              <tr><td colSpan={7}>
                 <div className="empty-state">
                   <h3>Chưa có nhắc nhở nào</h3>
-                  <p>Hệ thống sẽ tự động tạo nhắc nhở khi phiếu quyết toán có ghi ngày/km bảo dưỡng kế tiếp.</p>
+                  <p>Hệ thống tự động tạo 3 mốc nhắc nhở (1 tuần, 1 tháng, 2 tháng sau ngày tạo phiếu) cho mỗi phiếu quyết toán.</p>
                 </div>
               </td></tr>
             )}
             {paginatedItems.map((r) => {
               const st = STATUS_BADGE[reminderStatusOf(r)];
               const dueMeta = dueDateMeta(r.dueDate);
-              const kmMeta = dueKmMeta(r.dueKm, r.vehicle?.currentKm);
               const isBusy = busyId === r.id;
               return (
                 <tr key={r.id}>
@@ -222,18 +219,13 @@ export default function CustomerCarePage() {
                     <div style={{ fontWeight: 600 }}>{r.customer?.fullName}</div>
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{r.customer?.phone}</div>
                   </td>
+                  <td style={{ fontSize: 12 }}>{r.reminderType || '—'}</td>
                   <td style={{ fontSize: 12 }}>
-                    {r.dueDate && (
+                    {r.dueDate ? (
                       <div style={{ color: dueMeta.color, fontWeight: dueMeta.color ? 700 : 400 }}>
                         {r.dueDate}{dueMeta.label ? ` (${dueMeta.label})` : ''}
                       </div>
-                    )}
-                    {r.dueKm != null && (
-                      <div style={{ color: kmMeta.color, fontWeight: kmMeta.color ? 700 : 400 }}>
-                        {r.dueKm.toLocaleString('vi-VN')} km{kmMeta.label ? ` (${kmMeta.label})` : ''}
-                      </div>
-                    )}
-                    {!r.dueDate && r.dueKm == null && <span style={{ color: 'var(--gray-400)' }}>—</span>}
+                    ) : <span style={{ color: 'var(--gray-400)' }}>—</span>}
                   </td>
                   <td><span className={`badge ${st.className}`}>{st.label}</span></td>
                   <td style={{ fontSize: 12, color: 'var(--gray-600)', maxWidth: 200 }}>{r.notes || '—'}</td>
