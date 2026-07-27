@@ -8,6 +8,8 @@ const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleReposi
 const PendingLoginStore = require('./PendingLoginStore');
 
 const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '5', 10);
+/** Tắt mặc định: không bắt thiết bị 2 chờ thiết bị 1 Approve/Reject. Bật lại bằng LOGIN_CHALLENGE_ENABLED=true */
+const LOGIN_CHALLENGE_ENABLED = process.env.LOGIN_CHALLENGE_ENABLED === 'true';
 
 class AuthService {
   constructor(authRepository) {
@@ -56,6 +58,22 @@ class AuthService {
       { p1: userId, p2: STALE_MINUTES }
     );
     return active.recordset[0] || null;
+  }
+
+  /** Đóng mọi phiên LOGIN đang active của user (login mới thay phiên cũ). */
+  async _closeActiveSessionsForUser(userId, reason = 'FORCE_NEW_LOGIN') {
+    const { query } = require('../../infrastructure/database/sqlServer');
+    await query(
+      `UPDATE login_sessions
+       SET    logout_time              = SYSUTCDATETIME(),
+              logout_reason            = @p2,
+              session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+              status                   = 'ended'
+       WHERE  user_id     = @p1
+         AND  status      = 'active'
+         AND  action_type = 'LOGIN'`,
+      { p1: userId, p2: String(reason).slice(0, 64) }
+    );
   }
 
   /**
@@ -117,8 +135,8 @@ class AuthService {
     await this._closeStaleSessionsForUser(user.id);
     const live = await this._findLiveSession(user.id);
 
-    if (live) {
-      // Không cho thiết bị mới tự force. Tạo pending → phiên cũ xác nhận.
+    if (live && LOGIN_CHALLENGE_ENABLED) {
+      // Bật LOGIN_CHALLENGE_ENABLED=true mới dùng luồng chờ Approve/Reject.
       const pending = PendingLoginStore.createPending({
         userId: user.id,
         identifier: String(identifier).trim(),
@@ -156,8 +174,11 @@ class AuthService {
       throw e;
     }
 
-    // force flag cũ: bỏ qua (không còn override). Giữ tham số để FE cũ không crash.
+    // Mặc định: login mới đóng phiên cũ (không chờ xác nhận). force giữ tương thích FE cũ.
     void force;
+    if (live) {
+      await this._closeActiveSessionsForUser(user.id, 'FORCE_NEW_LOGIN');
+    }
 
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
     user.token_version = newTokenVersion;
