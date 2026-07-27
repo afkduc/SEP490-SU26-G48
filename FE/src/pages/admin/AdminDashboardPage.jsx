@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { getAdminDashboardStats } from '../../services/adminApi';
 import { getNotifications } from '../../services/notificationApi';
+import { humanizeNotificationMessage } from '../../utils/notificationDisplay';
+import { humanizeAuditDescription, getAuditActionLabel } from '../../utils/auditDisplay';
 import './AdminDashboardPage.css';
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
@@ -121,12 +123,12 @@ function formatRelativeTime(dateStr) {
   const now = new Date();
   const diffMs = now - date;
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'Vua xong';
-  if (diffMin < 60) return `${diffMin} phut truoc`;
+  if (diffMin < 1) return 'Vừa xong';
+  if (diffMin < 60) return `${diffMin} phút trước`;
   const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} gio truoc`;
+  if (diffHour < 24) return `${diffHour} giờ trước`;
   const diffDay = Math.floor(diffHour / 24);
-  return `${diffDay} ngay truoc`;
+  return `${diffDay} ngày trước`;
 }
 
 function formatDuration(seconds) {
@@ -175,26 +177,26 @@ function formatActionLabel(action) {
 }
 
 function getActionBadge(action) {
-  const fallbackLabel = formatActionLabel(action) || 'UNKNOWN';
-  if (!action) return { label: 'UNKNOWN', bg: '#f1f5f9', color: '#64748b' };
+  const fallbackLabel = getAuditActionLabel(action) || 'Thao tác';
+  if (!action) return { label: 'Thao tác', bg: '#f1f5f9', color: '#64748b' };
 
   const upper = String(action).toUpperCase();
 
   // Tao moi / Insert
   if (upper.includes('CREATE') || upper.includes('INSERT') || upper.includes('ADD')) {
-    return { label: 'TAO MOI', bg: '#dcfce7', color: '#15803d' };
+    return { label: 'Tạo mới', bg: '#dcfce7', color: '#15803d' };
   }
   // Cap nhat / Edit
   if (upper.includes('UPDATE') || upper.includes('EDIT') || upper.includes('MODIFY') || upper.includes('PATCH')) {
-    return { label: 'CAP NHAT', bg: '#eef2ff', color: '#4338ca' };
+    return { label: 'Cập nhật', bg: '#eef2ff', color: '#4338ca' };
   }
   // Xoa
   if (upper.includes('DELETE') || upper.includes('REMOVE')) {
-    return { label: 'XOA', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'Xóa', bg: '#fee2e2', color: '#dc2626' };
   }
   // Dang nhap that bai
   if (upper.includes('LOGIN_FAILED') || upper.includes('LOGINFAIL') || upper.includes('LOGIN FAIL')) {
-    return { label: 'DANG NHAP THAT BAI', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'Đăng nhập thất bại', bg: '#fee2e2', color: '#dc2626' };
   }
   // Dang nhap / Dang xuat
   if (upper.includes('LOGOUT') || upper.includes('SIGNOUT')) {
@@ -357,14 +359,14 @@ const SEVERITY_LABELS = {
   low: 'Thấp',
 };
 const SEVERITY_STYLES = {
-  critical: { label: 'CRITICAL', bg: '#991b1b', color: '#ffffff' },
-  high:     { label: 'HIGH',     bg: '#dc2626', color: '#ffffff' },
-  medium:   { label: 'MEDIUM',   bg: '#eab308', color: '#1f2937' },
-  low:      { label: 'LOW',      bg: '#10b981', color: '#ffffff' },
-  success:  { label: 'THANH CONG', bg: '#16a34a', color: '#ffffff' },
-  info:     { label: 'INFO',      bg: '#2563eb', color: '#ffffff' },
-  warning:  { label: 'CANH BAO', bg: '#d97706', color: '#ffffff' },
-  error:    { label: 'LOI',      bg: '#dc2626', color: '#ffffff' },
+  critical: { label: 'Nghiêm trọng', bg: '#991b1b', color: '#ffffff' },
+  high:     { label: 'Cao',         bg: '#dc2626', color: '#ffffff' },
+  medium:   { label: 'Trung bình',  bg: '#eab308', color: '#1f2937' },
+  low:      { label: 'Thấp',        bg: '#10b981', color: '#ffffff' },
+  success:  { label: 'Thành công',  bg: '#16a34a', color: '#ffffff' },
+  info:     { label: 'Thông tin',   bg: '#2563eb', color: '#ffffff' },
+  warning:  { label: 'Cảnh báo',    bg: '#d97706', color: '#ffffff' },
+  error:    { label: 'Lỗi',         bg: '#dc2626', color: '#ffffff' },
 };
 
 // Category: phan loai canh bao
@@ -461,10 +463,16 @@ function AlertItem({ alert }) {
 
   // Fallback noi dung chinh: uu tien alert.message, neu trong thi dung title + affectedEntity
   const title = alert.title || 'Cảnh báo hệ thống';
-  const message =
+  const message = humanizeNotificationMessage(
     alert.message ||
     alert.description ||
-    (alert.affectedEntity ? `Liên quan đến ${alert.affectedEntity}` : null);
+    (alert.affectedEntity ? `Liên quan đến ${alert.affectedEntity}` : null),
+    alert.metadata || {
+      targetCode: alert.affectedEntity,
+      targetName: alert.targetName,
+      actorName: alert.actorName,
+    },
+  );
 
   const actor = resolveAlertActor(alert);
 
@@ -701,14 +709,16 @@ function ActivityItem({ log }) {
 
   // Lay ten actor voi fallback an toan
   const actor =
-    log.actorName || log.user_name || log.userName || log.actor || 'He thong';
+    log.actorName || log.user_name || log.userName || log.actor || 'Hệ thống';
 
-  // Lay details: uu tien log.details / log.description, fallback tu data khac
   const details =
-    log.details ||
-    log.description ||
+    humanizeAuditDescription(
+      log.details || log.description,
+      log.action,
+      log.new_value || log.newValue,
+    ) ||
     buildActivityDetails(log) ||
-    (log.ipAddress ? `Tu ${log.ipAddress}` : null);
+    (log.ipAddress || log.ip_address ? `Từ IP ${log.ipAddress || log.ip_address}` : null);
 
   return (
     <div className="activity-item">
@@ -907,13 +917,14 @@ export default function AdminDashboardPage() {
     const notifItems = notifications.map((n) => ({
       id: `notif-${n.id}`,
       title: n.title,
-      message: n.message,
+      message: humanizeNotificationMessage(n.message, n.metadata),
       severity: n.severity || null,
       type: n.severity || 'info',
       time: n.createdAt || n.timestamp || n.created_at,
       actorName: n.metadata?.actorName || null,
       targetName: n.metadata?.targetName || null,
       affectedEntity: n.metadata?.targetCode || null,
+      metadata: n.metadata,
       _source: 'notification',
     }));
 

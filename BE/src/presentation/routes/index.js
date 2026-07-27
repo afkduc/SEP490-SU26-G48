@@ -22,9 +22,7 @@ const buildMaintenanceReminderRouter = require('./maintenanceReminderRoutes');
 const buildSSERouter = require('./sseRoutes');
 const buildPublicRouter = require('./publicRoutes');
 const buildServiceRequestRouter = require('./serviceRequestRoutes');
-const buildRoleScreenMatrixRouter = require('./roleScreenMatrixRoutes');
-const buildUserScreenPermissionsRouter = require('./userScreenPermissionsRoutes');
-const buildPermissionRequestRouter = require('./permissionRequestRoutes');
+const buildPayosWebhookRouter = require('./payosWebhookRoutes');
 
 const router = express.Router();
 
@@ -49,9 +47,6 @@ router.get('/_debug/whoami', (req, res) => {
 router.use('/auth', buildAuthRouter());
 router.use('/users', buildUserRouter());
 router.use('/vehicles', buildVehicleRouter());
-router.use('/admin/role-screen-matrix', buildRoleScreenMatrixRouter());
-router.use('/admin/users/:userId/screen-permissions', buildUserScreenPermissionsRouter());
-router.use('/admin/permission-requests', buildPermissionRequestRouter());
 router.use('/admin', buildAdminRouter());
 router.use('/products', buildProductRouter());
 router.use('/inventory', buildInventoryRouter());
@@ -74,5 +69,7 @@ router.use('/sse', buildSSERouter());
 // sua chua bang ma, khong can dang nhap). Mount rieng, KHONG dat trong
 // repairOrderRoutes.js vi file do gan authenticate cho ca router.
 router.use('/public', buildPublicRouter());
+// PayOS webhook - khong qua authenticate (xem ghi chu trong payosWebhookRoutes.js).
+router.use('/payos', buildPayosWebhookRouter());
 
 module.exports = router;

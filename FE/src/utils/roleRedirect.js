@@ -7,6 +7,7 @@ const ROLE_TO_DEFAULT_ROUTE = Object.freeze({
   [ROLES.MANAGER]: '/manager',
   [ROLES.SERVICE_ADVISOR]: ROUTES.DASHBOARD,
   [ROLES.TEAM_LEADER]: '/repair-orders',
+  [ROLES.TECHNICIAN]: '/repair-orders',
   [ROLES.WAREHOUSE_STAFF]: ROUTES.INVENTORY,
 });
 

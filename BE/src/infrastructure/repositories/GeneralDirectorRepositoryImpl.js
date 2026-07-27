@@ -24,8 +24,6 @@ function mapSettlementRow(row) {
     afterDiscount: Number(row.after_discount || 0),
     vat: Number(row.vat || 0),
     freeAmount: Number(row.free_amount || 0),
-    nextMaintenanceKm: row.next_maintenance_km,
-    nextMaintenanceDate: row.next_maintenance_date ? normalizeDate(row.next_maintenance_date) : null,
     customerRequest: row.customer_request,
     currentKm: row.current_km,
     branch: {
@@ -538,8 +536,6 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           so.vat,
           so.free_amount,
           so.total,
-          so.next_maintenance_km,
-          so.next_maintenance_date,
           so.intake_date,
           so.completed_date
        FROM service_orders so
@@ -626,8 +622,6 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           so.vat,
           so.free_amount,
           so.total,
-          so.next_maintenance_km,
-          so.next_maintenance_date,
           so.intake_date,
           so.completed_date
        FROM service_orders so

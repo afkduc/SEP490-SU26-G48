@@ -8,9 +8,8 @@ const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleReposi
 const PendingLoginStore = require('./PendingLoginStore');
 
 const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '5', 10);
-/** Tắt mặc định: không bắt thiết bị 2 chờ thiết bị 1 Approve/Reject. Bật lại bằng LOGIN_CHALLENGE_ENABLED=true */
+/** Giữ flag cũ: chỉ bật Approve/Reject nếu LOGIN_CHALLENGE_ENABLED=true (mặc định tắt). */
 const LOGIN_CHALLENGE_ENABLED = process.env.LOGIN_CHALLENGE_ENABLED === 'true';
-
 class AuthService {
   constructor(authRepository) {
     this.authRepository = authRepository;
@@ -78,8 +77,8 @@ class AuthService {
 
   /**
    * @param {object} opts
-   * @param {boolean} [opts.force] - DEPRECATED: chỉ giữ tương thích, không còn override phiên cũ
-   * @param {string} [opts.pendingId] - hoàn tất sau khi phiên cũ approve
+   * @param {boolean} [opts.force] - true = đóng phiên cũ và đăng nhập ngay (sau countdown FE)
+   * @param {string} [opts.pendingId] - hoàn tất sau khi phiên cũ approve (legacy)
    * @param {object} [opts.clientMeta] - { ip, userAgent, browser, os }
    */
   async login(identifier, password, branchId, { force = false, pendingId = null, clientMeta = {} } = {}) {
@@ -89,7 +88,7 @@ class AuthService {
       throw e;
     }
 
-    // Hoàn tất sau khi phiên cũ đã approve
+    // Hoàn tất sau khi phiên cũ đã approve (legacy, chỉ khi LOGIN_CHALLENGE_ENABLED)
     if (pendingId) {
       return this._completePendingLogin(pendingId, identifier, password);
     }
@@ -135,53 +134,19 @@ class AuthService {
     await this._closeStaleSessionsForUser(user.id);
     const live = await this._findLiveSession(user.id);
 
-    if (live && LOGIN_CHALLENGE_ENABLED) {
-      // Bật LOGIN_CHALLENGE_ENABLED=true mới dùng luồng chờ Approve/Reject.
-      const pending = PendingLoginStore.createPending({
-        userId: user.id,
-        identifier: String(identifier).trim(),
-        branchId: branchId || null,
-        passwordFingerprint: await bcrypt.hash(password, 4), // nhẹ, chỉ để verify lại lúc complete
-        clientMeta: {
-          ip: clientMeta.ip || null,
-          userAgent: clientMeta.userAgent || null,
-          browser: clientMeta.browser || null,
-          os: clientMeta.os || null,
-        },
-        activeSession: {
-          id: live.id,
-          browser: live.browser,
-          os: live.os,
-          ip: live.ip_address,
-          startedAt: live.login_time,
-        },
-      });
-
-      this._notifyLoginChallenge(user.id, pending).catch(() => {});
-
-      const e = new ApiError(
-        409,
-        'Tài khoản đang được sử dụng trên thiết bị khác. Đã gửi yêu cầu xác nhận tới phiên đang đăng nhập. Vui lòng chờ họ đồng ý.'
-      );
-      e.code = 'LOGIN_PENDING';
-      e.details = {
-        code: 'LOGIN_PENDING',
-        pendingId: pending.id,
-        expiresAt: new Date(pending.expiresAt).toISOString(),
-        session: pending.activeSession,
-      };
-      e.audit = { skip: true };
-      throw e;
-    }
-
-    // Mặc định: login mới đóng phiên cũ (không chờ xác nhận). force giữ tương thích FE cũ.
-    void force;
+    // Chính sách mới: có phiên sống thì thay thế ngay, không chờ countdown.
+    // Giữ biến `force` chỉ để backward-compat với FE cũ.
+    const replacedLive = Boolean(live);
     if (live) {
       await this._closeActiveSessionsForUser(user.id, 'FORCE_NEW_LOGIN');
     }
 
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
     user.token_version = newTokenVersion;
+
+    if (replacedLive) {
+      this._notifySessionTakenOver(user.id, clientMeta).catch(() => {});
+    }
 
     return { user, pendingComplete: false };
   }
@@ -303,6 +268,23 @@ class AuthService {
       );
     } catch (err) {
       console.warn('[AuthService] LOGIN_CHALLENGE notify failed:', err.message);
+    }
+  }
+
+  /** Báo phiên cũ: đã có thiết bị khác đăng nhập (sau force takeover). */
+  async _notifySessionTakenOver(userId, clientMeta = {}) {
+    try {
+      const NotificationService = require('./NotificationService');
+      const ns = new NotificationService();
+      await ns.notify(
+        'SESSION_TAKEN_OVER',
+        {
+          userId,
+        },
+        { skipSettings: true }
+      );
+    } catch (err) {
+      console.warn('[AuthService] SESSION_TAKEN_OVER notify failed:', err.message);
     }
   }
 

@@ -6,7 +6,7 @@ import {
   markAsRead,
   markAllAsRead,
 } from '../services/notificationApi';
-import { dispatchLoginChallenge } from '../services/authApi';
+import { dispatchLoginChallenge, dispatchSessionTakenOver } from '../services/authApi';
 
 const SSE_RECONNECT_DELAY_MS = 5000;
 const SSE_RECONNECT_MAX_MS = 60_000;
@@ -37,6 +37,21 @@ function maybeOpenLoginChallenge(data) {
     pendingId,
     metadata,
     title: data.title,
+    message: data.message,
+    device: [metadata.browser, metadata.os].filter(Boolean).join(' · ') || undefined,
+    ip: metadata.ip,
+  });
+}
+
+/** Phiên bị thay bởi login mới — popup báo người trước. */
+function maybeOpenSessionTakenOver(data) {
+  if (!data || typeof window === 'undefined') return;
+  const metadata = parseNotifMetadata(data.metadata);
+  const type = data.type || data.eventType || metadata.eventType;
+  if (type !== 'SESSION_TAKEN_OVER') return;
+  dispatchSessionTakenOver({
+    metadata,
+    title: data.title || 'Đã có người đăng nhập tài khoản của bạn',
     message: data.message,
     device: [metadata.browser, metadata.os].filter(Boolean).join(' · ') || undefined,
     ip: metadata.ip,
@@ -207,6 +222,7 @@ export function useNotifications(token, options = {}) {
               setUnreadCount((c) => c + 1);
             }
             maybeOpenLoginChallenge(data);
+            maybeOpenSessionTakenOver(data);
           } catch (parseErr) {
             console.warn('[useNotifications] parse SSE error:', parseErr);
           }

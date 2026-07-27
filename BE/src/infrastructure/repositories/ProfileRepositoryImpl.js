@@ -11,6 +11,7 @@ const PROFILE_COLUMNS = `
   u.phone,
   u.branch_id,
   u.status,
+  u.avatar,
   u.created_at,
   u.updated_at
 `;
@@ -28,6 +29,7 @@ function toProfileRow(row, branchName, assignedBranches = []) {
     branchId: row.branch_id,
     branchName: branchName || null,
     status: row.status,
+    avatar: row.avatar || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     roles: [],
@@ -128,6 +130,17 @@ class ProfileRepositoryImpl {
       params
     );
 
+    return this.findById(userId);
+  }
+
+  async updateAvatar(userId, avatarFileName) {
+    await query(
+      `UPDATE users
+       SET    avatar      = @p1,
+              updated_at  = SYSUTCDATETIME()
+       WHERE  id = @p2`,
+      { p1: avatarFileName || null, p2: userId }
+    );
     return this.findById(userId);
   }
 
