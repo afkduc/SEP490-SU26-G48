@@ -1,165 +1,107 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
-import { usePermission } from '../../contexts/PermissionContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { ROLES } from '../../constants/roles';
+import ScrollToggleButton from '../common/ScrollToggleButton';
 import './Navbar.css';
 
 // ===== Admin =====
 const ADMIN_NAV = [
-  { label: 'Bảng điều khiển', path: '/admin/dashboard', permission: 'screen:dashboard:access' },
+  { label: 'Bảng điều khiển', path: '/admin/dashboard' },
   {
     label: 'Người dùng',
-    permission: 'screen:users:access',
     children: [
-      { label: 'Danh sách người dùng', path: '/admin/users', permission: 'admin:users:read' },
-      { label: 'Thêm người dùng', path: '/admin/users?create=true', permission: 'admin:users:create' },
+      { label: 'Danh sách người dùng', path: '/admin/users' },
+      { label: 'Thêm người dùng', path: '/admin/users?create=true' },
     ],
   },
   {
     label: 'Vai trò',
-    permission: 'screen:roles:access',
     children: [
-      { label: 'Phân quyền người dùng', path: '/admin/users', permission: 'screen:users:access' },
+      { label: 'Phân quyền người dùng', path: '/admin/users' },
     ],
   },
   {
     label: 'Nhật ký',
-    permission: 'screen:audit_logs:access',
     children: [
-      { label: 'Nhật ký hoạt động', path: '/admin/logs', permission: 'screen:audit_logs:access' },
+      { label: 'Nhật ký hoạt động', path: '/admin/logs' },
     ],
   },
 ];
 
 // ===== Service Advisor =====
 const SERVICE_ADVISOR_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard', permission: 'screen:advisor:dashboard:access' },
-  { label: 'Yêu cầu', path: '/service-requests', permission: 'screen:advisor:requests:access' },
+  { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Yêu cầu', path: '/service-requests' },
   {
     label: 'Quyết toán sửa chữa',
-    permission: 'screen:advisor:orders:access',
     children: [
-      { label: 'Danh sách quyết toán', path: '/repair-settlement', permission: 'screen:advisor:orders:access' },
-      { label: 'Tạo quyết toán', path: '/repair-settlement/create', permission: 'screen:advisor:orders:create' },
+      { label: 'Danh sách quyết toán', path: '/repair-settlement' },
+      { label: 'Tạo quyết toán', path: '/repair-settlement/create' },
     ],
   },
   {
     label: 'Lệnh sửa chữa',
-    permission: 'screen:advisor:orders:access',
     children: [
-      { label: 'Danh sách lệnh sửa chữa', path: '/repair-orders', permission: 'screen:advisor:orders:access' },
-      { label: 'Tạo lệnh sửa chữa', path: '/repair-orders/create', permission: 'screen:advisor:orders:create' },
+      { label: 'Danh sách lệnh sửa chữa', path: '/repair-orders' },
+      { label: 'Tạo lệnh sửa chữa', path: '/repair-orders/create' },
     ],
   },
-  {
-    label: 'Chăm sóc khách hàng',
-    path: '/customer-care',
-    permissions: [
-      'screen:advisor:customers:access',
-      'screen:customer-care:access',
-    ],
-  },
-  {
-    label: 'Khách hàng',
-    path: '/customers',
-    permissions: [
-      'screen:advisor:customers:access',
-      'screen:customers:access',
-    ],
-  },
+  { label: 'Chăm sóc khách hàng', path: '/customer-care' },
+  { label: 'Khách hàng', path: '/customers' },
 ];
 
 // ===== Manager =====
 const MANAGER_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard', permission: 'screen:manager:dashboard:access' },
-  { label: 'Kho', path: '/inventory', permissions: [
-    'screen:manager:inventory:access',
-    'screen:inventory:access',
-    'screen:inventory:products:access',
-  ] },
-  { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests', permission: 'screen:manager:import_requests:access' },
-  { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests', permission: 'screen:manager:export_requests:access' },
+  { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Kho', path: '/inventory' },
+  { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests' },
+  { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests' },
   {
     label: 'Nhân viên',
-    permission: 'screen:manager:employees:access',
     children: [
-      { label: 'Nhân viên', path: '/manager/employees', permission: 'screen:manager:employees:access' },
-      { label: 'Thợ máy', path: '/manager/technicians', permission: 'screen:manager:technicians:access' },
+      { label: 'Nhân viên', path: '/manager/employees' },
+      { label: 'Thợ máy', path: '/manager/technicians' },
     ],
   },
-  { label: 'Quyết toán sửa chữa', path: '/manager/settlements', permission: 'screen:manager:settlements:access' },
-  { label: 'Chăm sóc khách hàng', path: '/customer-care', permissions: [
-    'screen:customer-care:access',
-    'screen:customers:access',
-  ] },
-  { label: 'Khách hàng', path: '/customers', permissions: [
-    'screen:customers:access',
-  ] },
+  { label: 'Quyết toán sửa chữa', path: '/manager/settlements' },
+  { label: 'Chăm sóc khách hàng', path: '/customer-care' },
+  { label: 'Khách hàng', path: '/customers' },
   {
     label: 'Dịch vụ',
-    permission: 'screen:manager:services:access',
     children: [
-      { label: 'Dịch vụ lẻ', path: '/manager/services', permission: 'screen:manager:services:access' },
-      { label: 'Gói dịch vụ', path: '/manager/service-packages', permissions: [
-        'screen:manager:service-packages:access',
-        'screen:manager:services:access',
-      ] },
+      { label: 'Dịch vụ lẻ', path: '/manager/services' },
+      { label: 'Gói dịch vụ', path: '/manager/service-packages' },
     ],
   },
 ];
 
-// ===== Warehouse Staff (Nhân viên kho) - menu phẳng, không dropdown =====
+// ===== Warehouse Staff (Nhân viên kho) =====
 const WAREHOUSE_STAFF_NAV = [
-  { label: 'Tổng quan kho', path: '/inventory', end: true, permissions: [
-    'screen:inventory:access',
-    'screen:inventory:products:access',
-    'screen:inventory:stock:access',
-  ] },
-  { label: 'Phụ tùng', path: '/inventory/parts', permissions: [
-    'screen:inventory:products:access',
-    'screen:warehouse:products:access',
-    'screen:inventory:access',
-  ] },
-  { label: 'Tồn kho', path: '/inventory/stock', permissions: [
-    'screen:inventory:stock:access',
-    'screen:warehouse:stock:access',
-    'screen:inventory:access',
-  ] },
-  { label: 'Phiếu nhập', path: '/inventory/import-requests', permissions: [
-    'screen:inventory:import-requests:access',
-    'screen:inventory:access',
-  ] },
-  { label: 'Phiếu xuất', path: '/inventory/export-requests', permissions: [
-    'screen:inventory:export-requests:access',
-    'screen:inventory:access',
-  ] },
-  { label: 'Nhà cung cấp', path: '/inventory/suppliers', permissions: [
-    'screen:inventory:suppliers:access',
-    'screen:inventory:access',
-  ] },
+  { label: 'Tổng quan kho', path: '/inventory', end: true },
+  { label: 'Phụ tùng', path: '/inventory/parts' },
+  { label: 'Tồn kho', path: '/inventory/stock' },
+  { label: 'Phiếu nhập', path: '/inventory/import-requests' },
+  { label: 'Phiếu xuất', path: '/inventory/export-requests' },
+  { label: 'Nhà cung cấp', path: '/inventory/suppliers' },
 ];
 
-// ===== General Director (Giám đốc) - xem báo cáo tổng quan, có dropdown =====
+// ===== General Director =====
 const GENERAL_DIRECTOR_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard', permission: 'screen:director:dashboard:access' },
-  { label: 'Báo cáo doanh thu', path: '/general-director/reports/revenue', permission: 'screen:director:reports:access' },
-  { label: 'Báo cáo quyết toán', path: '/general-director/reports/settlements', permission: 'screen:director:settlements:access' },
-  { label: 'Chi nhánh', path: '/general-director/branch-managers', permission: 'screen:director:branches:access' },
-  { label: 'Nhân viên', path: '/general-director/employees', permission: 'screen:director:employees:access' },
-  { label: 'Quản lý chi nhánh', path: '/general-director/branch-managers', permission: 'screen:director:branch_managers:access' },
-  { label: 'Thợ máy', path: '/general-director/technicians', permission: 'screen:director:technicians:access' },
+  { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Báo cáo doanh thu', path: '/general-director/reports/revenue' },
+  { label: 'Báo cáo quyết toán', path: '/general-director/reports/settlements' },
+  { label: 'Chi nhánh', path: '/general-director/branch-managers' },
+  { label: 'Nhân viên', path: '/general-director/employees' },
+  { label: 'Quản lý chi nhánh', path: '/general-director/branch-managers' },
+  { label: 'Thợ máy', path: '/general-director/technicians' },
 ];
 
-// ===== Team Leader (Tổ trưởng kỹ thuật) - chỉ xem công việc được giao =====
+// ===== Team Leader =====
 const TEAM_LEADER_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard', permission: 'screen:leader:dashboard:access' },
-  { label: 'Công việc của tôi', path: '/repair-orders', end: true, permissions: [
-    'screen:leader:orders:access',
-    'screen:leader:tasks:access',
-    'screen:repair-orders:access',
-  ] },
+  { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Công việc của tôi', path: '/repair-orders', end: true },
 ];
 
 const NAV_ITEMS_BY_ROLE = {
@@ -313,7 +255,6 @@ function NavDropdownItem({ item, currentPath, badgeCount, onNavigate }) {
 
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const { can, canAny } = usePermission();
   const { pendingCount } = useServiceRequests();
   const navigate = useNavigate();
   const location = useLocation();
@@ -323,40 +264,9 @@ export default function Navbar() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const role = user?.primaryRole;
-  const rawNavItems = NAV_ITEMS_BY_ROLE[role] ?? [];
+  // Sau khi gỡ ma trận quyền: menu theo role, không filter theo permission key.
+  const navItems = NAV_ITEMS_BY_ROLE[role] ?? [];
   const supportsDropdown = ROLES_WITH_DROPDOWN.has(role);
-
-  const hasNavPermission = (item) => {
-    if (Array.isArray(item?.permissions) && item.permissions.length > 0) {
-      return canAny(...item.permissions);
-    }
-    if (item?.permission) return can(item.permission);
-    return true;
-  };
-
-  // Filter items theo permission. Voi item co children, chi hien thi neu it nhat
-  // 1 child duoc phep. Parent permission la optional de tranh an dropdown cha
-  // khi user van co the vao 1 trong cac child.
-  const navItems = rawNavItems
-    .map((item) => {
-      if (!item.children) {
-        return hasNavPermission(item) ? item : null;
-      }
-      const allowedChildren = item.children.filter((c) => hasNavPermission(c));
-      if (allowedChildren.length === 0) return null;
-      // Neu parent co permission rieng ma user khong co, van cho phep neu co child duoc phep
-      // (uu tien child). Nguoc lai, neu parent co permission va user co thi show.
-      if (item.permission || item.permissions) {
-        if (hasNavPermission(item)) {
-          return { ...item, children: allowedChildren };
-        }
-        // Parent khong co quyen nhung co 1 child duoc phep -> chi show cac child do
-        return { ...item, label: null, children: allowedChildren, _hideParent: true };
-      }
-      return { ...item, children: allowedChildren };
-    })
-    .filter(Boolean)
-    .filter((item) => !item._hideParent || (item.children && item.children.length > 0));
 
   const handleLogout = () => {
     logout();
