@@ -257,6 +257,7 @@ export default function AdminLayout({ children }) {
   const [navLoading, setNavLoading] = useState(false);
   const [contentKey, setContentKey] = useState(0);
   const userMenuRef = useRef(null);
+  const prevPathRef = useRef(location.pathname);
 
   // Clear leftover dark-theme preference (admin luôn dùng light)
   useEffect(() => {
@@ -276,6 +277,20 @@ export default function AdminLayout({ children }) {
   // Close mobile drawer when route changes
   useEffect(() => {
     setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Khi vừa login và điều hướng từ trang public (/login) vào admin,
+  // ép remount nội dung để tránh render sai frame (cần F5 mới đúng).
+  useEffect(() => {
+    const prev = prevPathRef.current;
+    const now = location.pathname;
+    prevPathRef.current = now;
+
+    const nowAdmin = String(now).startsWith('/admin');
+    const prevAdmin = String(prev).startsWith('/admin');
+    if (nowAdmin && !prevAdmin) {
+      refreshContent();
+    }
   }, [location.pathname]);
 
   // Lock body scroll khi mobile drawer mo

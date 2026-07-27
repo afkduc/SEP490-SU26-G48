@@ -5,60 +5,45 @@ import { downloadBlob } from '../../utils/downloadBlob';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
 import AdminPagination from './components/AdminPagination';
+import {
+  AUDIT_ACTION_LABELS,
+  AUDIT_FIELD_LABELS,
+  humanizeAuditDescription,
+  formatAuditFieldValue,
+  summarizeAuditNewValue,
+  formatAuditTime,
+  parseAuditJson,
+} from '../../utils/auditDisplay';
 import './AuditLogsPage.css';
 
 const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
-  { value: 'CREATE', label: 'Tạo mới (CREATE)', color: 'success' },
-  { value: 'UPDATE', label: 'Cập nhật (UPDATE)', color: 'info' },
-  { value: 'DELETE', label: 'Xóa (DELETE)', color: 'danger' },
-  { value: 'READ', label: 'Xem dữ liệu (READ)', color: 'slate' },
-  { value: 'LOGIN', label: 'Đăng nhập (LOGIN)', color: 'purple' },
-  { value: 'FAILED_LOGIN', label: 'Đăng nhập thất bại (FAILED_LOGIN)', color: 'danger' },
-  { value: 'LOGOUT', label: 'Đăng xuất (LOGOUT)', color: 'gray' },
-  { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất (FORCE_LOGOUT)', color: 'orange' },
-  { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu (CHANGE_PASSWORD)', color: 'teal' },
-  { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu (RESET_PASSWORD)', color: 'cyan' },
-  { value: 'ASSIGN_ROLE', label: 'Gán vai trò (ASSIGN_ROLE)', color: 'indigo' },
-  { value: 'REMOVE_ROLE', label: 'Xóa vai trò (REMOVE_ROLE)', color: 'rose' },
-  { value: 'GRANT_SCREEN', label: 'Cấp quyền màn hình (GRANT_SCREEN)', color: 'success' },
-  { value: 'REVOKE_SCREEN', label: 'Thu hồi quyền màn hình (REVOKE_SCREEN)', color: 'danger' },
-  { value: 'BULK_TOGGLE', label: 'Cập nhật hàng loạt ma trận (BULK_TOGGLE)', color: 'info' },
-  { value: 'SAVE_SCREEN_MATRIX', label: 'Lưu ma trận màn hình (SAVE_SCREEN_MATRIX)', color: 'indigo' },
+  { value: 'CREATE', label: 'Tạo mới', color: 'success' },
+  { value: 'UPDATE', label: 'Cập nhật', color: 'info' },
+  { value: 'DELETE', label: 'Xóa', color: 'danger' },
+  { value: 'READ', label: 'Xem dữ liệu', color: 'slate' },
+  { value: 'LOGIN', label: 'Đăng nhập', color: 'purple' },
+  { value: 'FAILED_LOGIN', label: 'Đăng nhập thất bại', color: 'danger' },
+  { value: 'LOGOUT', label: 'Đăng xuất', color: 'gray' },
+  { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất', color: 'orange' },
+  { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu', color: 'teal' },
+  { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu', color: 'cyan' },
+  { value: 'ASSIGN_ROLE', label: 'Gán vai trò', color: 'indigo' },
+  { value: 'REMOVE_ROLE', label: 'Xóa vai trò', color: 'rose' },
+  { value: 'GRANT_SCREEN', label: 'Cấp quyền màn hình', color: 'success' },
+  { value: 'REVOKE_SCREEN', label: 'Thu hồi quyền màn hình', color: 'danger' },
+  { value: 'BULK_TOGGLE', label: 'Cập nhật hàng loạt ma trận', color: 'info' },
+  { value: 'SAVE_SCREEN_MATRIX', label: 'Lưu ma trận màn hình', color: 'indigo' },
   { value: 'SAVE_USER_SCREEN_PERMISSIONS', label: 'Lưu quyền riêng user', color: 'teal' },
   { value: 'APPROVE_PERMISSION_REQUEST', label: 'Duyệt yêu cầu cấp quyền', color: 'success' },
   { value: 'REJECT_PERMISSION_REQUEST', label: 'Từ chối yêu cầu cấp quyền', color: 'danger' },
-  { value: 'EXPORT', label: 'Xuất dữ liệu (EXPORT)', color: 'green' },
-  { value: 'IMPORT', label: 'Nhập dữ liệu (IMPORT)', color: 'amber' },
+  { value: 'APPROVE_LOGIN_CHALLENGE', label: 'Đồng ý đăng nhập thiết bị khác', color: 'success' },
+  { value: 'REJECT_LOGIN_CHALLENGE', label: 'Từ chối đăng nhập thiết bị khác', color: 'danger' },
+  { value: 'EXPORT', label: 'Xuất dữ liệu', color: 'green' },
+  { value: 'IMPORT', label: 'Nhập dữ liệu', color: 'amber' },
 ];
 
-const ACTION_LABELS = {
-  CREATE: 'Tạo mới',
-  UPDATE: 'Cập nhật',
-  DELETE: 'Xóa / Vô hiệu hóa',
-  DISABLE: 'Ngừng hoạt động',
-  REACTIVATE: 'Kích hoạt lại',
-  READ: 'Xem dữ liệu',
-  LOGIN: 'Đăng nhập',
-  FAILED_LOGIN: 'Đăng nhập thất bại',
-  LOGOUT: 'Đăng xuất',
-  FORCE_LOGOUT: 'Buộc đăng xuất',
-  CHANGE_PASSWORD: 'Đổi mật khẩu',
-  RESET_PASSWORD: 'Đặt lại mật khẩu',
-  ASSIGN_ROLE: 'Gán vai trò',
-  REMOVE_ROLE: 'Thu hồi vai trò',
-  EXPORT: 'Xuất dữ liệu',
-  IMPORT: 'Nhập dữ liệu',
-  GRANT_SCREEN: 'Cấp quyền màn hình',
-  REVOKE_SCREEN: 'Thu hồi quyền màn hình',
-  BULK_TOGGLE: 'Cập nhật hàng loạt ma trận',
-  SAVE_SCREEN_MATRIX: 'Lưu ma trận quyền màn hình',
-  SAVE_USER_SCREEN_PERMISSIONS: 'Lưu quyền riêng user',
-  CLEAR_USER_SCREEN_PERMISSIONS: 'Xóa quyền riêng user',
-  APPROVE_PERMISSION_REQUEST: 'Duyệt yêu cầu cấp quyền',
-  REJECT_PERMISSION_REQUEST: 'Từ chối yêu cầu cấp quyền',
-  PERMISSION_MATRIX_BULK: 'Cập nhật ma trận phân quyền',
-};
+const ACTION_LABELS = AUDIT_ACTION_LABELS;
 
 const ACTION_CLASS = {
   CREATE: 'badge--success',
@@ -83,6 +68,8 @@ const ACTION_CLASS = {
   CLEAR_USER_SCREEN_PERMISSIONS: 'badge--rose',
   APPROVE_PERMISSION_REQUEST: 'badge--success',
   REJECT_PERMISSION_REQUEST: 'badge--danger',
+  APPROVE_LOGIN_CHALLENGE: 'badge--success',
+  REJECT_LOGIN_CHALLENGE: 'badge--danger',
 };
 
 const STATUS_OPTIONS = [
@@ -146,42 +133,7 @@ const TABLE_NAME_VI = {
 };
 
 function formatLocal(value) {
-  if (!value) return { main: '—', sub: '', ago: '' };
-  let d;
-  if (value instanceof Date) {
-    d = value;
-  } else {
-    const s = typeof value === 'string' ? value : String(value);
-    const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(s);
-    d = new Date(hasTz ? s : `${s}Z`);
-  }
-  if (Number.isNaN(d.getTime())) return { main: String(value), sub: '', ago: '' };
-
-  const main = d.toLocaleString('vi-VN', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false,
-  });
-  const sub = d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-  const diffMs = Date.now() - d.getTime();
-  const ago = humanizeAgo(diffMs);
-  return { main, sub, ago };
-}
-
-function humanizeAgo(diffMs) {
-  if (diffMs < 0) return 'vừa xong';
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 5) return 'vừa xong';
-  if (sec < 60) return `${sec} giây trước`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} phút trước`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} giờ trước`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day} ngày trước`;
-  const mo = Math.floor(day / 30);
-  if (mo < 12) return `${mo} tháng trước`;
-  return `${Math.floor(mo / 12)} năm trước`;
+  return formatAuditTime(value);
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -322,9 +274,18 @@ export default function AuditLogsPage() {
   const [selectedLog, setSelectedLog] = useState(null);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30_000);
+    const t = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(t);
   }, []);
+
+  // Làm mới danh sách định kỳ để thời gian / log mới gần realtime
+  useEffect(() => {
+    const refreshFn = audit.refresh || audit.refetch;
+    if (typeof refreshFn !== 'function') return undefined;
+    const t = setInterval(() => refreshFn(), 20_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ gắn theo hàm refresh ổn định
+  }, [audit.refresh, audit.refetch]);
 
   async function handleExportExcel() {
     setExporting(true);
@@ -556,7 +517,7 @@ export default function AuditLogsPage() {
         ) : (
           <>
             <div className="admin-logs__table-wrapper">
-              <AuditTable items={audit.data.items} onRowClick={setSelectedLog} />
+              <AuditTable items={audit.data.items} onRowClick={setSelectedLog} now={now} />
             </div>
             <Pagination
               currentPage={audit.data.page || 1}
@@ -610,7 +571,7 @@ function TableSkeleton({ rows }) {
   );
 }
 
-function AuditTable({ items, onRowClick }) {
+function AuditTable({ items, onRowClick, now }) {
   if (!items || items.length === 0) {
     return (
       <table className="table">
@@ -653,10 +614,16 @@ function AuditTable({ items, onRowClick }) {
       </thead>
       <tbody>
         {items.map((item) => {
+          void now; // tick để cập nhật "vừa xong" realtime
           const t = formatLocal(item.logged_at);
           const userName = item.user_name || 'Hệ thống';
           const initials = userName.split(' ').filter(Boolean).slice(-2)
             .map((p) => p[0]).join('').toUpperCase() || '?';
+          const description = humanizeAuditDescription(
+            item.description,
+            item.action,
+            item.new_value
+          );
           return (
             <tr key={item.id} onClick={() => onRowClick && onRowClick(item)} style={{ cursor: 'pointer' }} title="Nhấp để xem chi tiết">
               <td>
@@ -675,8 +642,8 @@ function AuditTable({ items, onRowClick }) {
                 ) : '—'}
               </td>
               <td>
-                <span className="audit-logs__description" title={item.description || ''}>
-                  {item.description || '—'}
+                <span className="audit-logs__description" title={description}>
+                  {description || '—'}
                 </span>
               </td>
               <td className="audit-logs__cell--branch">
@@ -712,55 +679,55 @@ function JsonView({ data }) {
 
 /**
  * Format old/new value thành dạng human-readable
- * VD: { status: 'active', branchId: 1 } → "Trạng thái: Hoạt động, Chi nhánh: CN-001"
  */
-const FIELD_LABELS = {
-  status: 'Trạng thái',
-  branchId: 'Chi nhánh',
-  roleId: 'Vai trò',
-  phone: 'SĐT',
-  firstName: 'Họ',
-  lastName: 'Tên',
-  fullName: 'Tên đầy đủ',
-  email: 'Email',
-  userName: 'Tên đăng nhập',
-  specialtyId: 'Chuyên môn',
-  name: 'Tên',
-  branchName: 'Chi nhánh',
-  roleName: 'Vai trò',
-};
-
-const STATUS_LABELS = {
-  active: 'Hoạt động',
-  inactive: 'Ngừng hoạt động',
-  locked: 'Bị khóa',
-};
-
-function formatValue(key, value) {
-  if (value === null || value === undefined) return '—';
-  if (key === 'status') return STATUS_LABELS[value] || value;
-  if (typeof value === 'boolean') return value ? 'Có' : 'Không';
-  if (typeof value === 'string' && value.length > 50) return value.slice(0, 50) + '...';
-  return String(value);
-}
-
-function DiffView({ oldValue, newValue }) {
-  const oldObj = oldValue ? (typeof oldValue === 'string' ? JSON.parse(oldValue) : oldValue) : null;
-  const newObj = newValue ? (typeof newValue === 'string' ? JSON.parse(newValue) : newValue) : null;
+function DiffView({ oldValue, newValue, action }) {
+  const oldObj = parseAuditJson(oldValue);
+  const newObj = parseAuditJson(newValue);
+  const summary = summarizeAuditNewValue(newValue, action);
 
   if (!oldObj && !newObj) return <span className="audit-detail__json-empty">—</span>;
 
-  // Nếu là object đơn giản, hiển thị dạng bảng thay đổi
+  // Ưu tiên bảng tóm tắt dễ đọc cho giá trị mới
+  if (summary?.rows?.length) {
+    return (
+      <div className="audit-detail__diff-table">
+        {summary.summary && (
+          <p className="audit-detail__diff-summary" style={{ margin: '0 0 12px', color: '#334155', fontSize: 14 }}>
+            {summary.summary}
+          </p>
+        )}
+        <table>
+          <thead>
+            <tr>
+              <th>Thông tin</th>
+              <th>Giá trị</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.rows.map((row) => (
+              <tr key={row.label}>
+                <td className="diff-label">{row.label}</td>
+                <td className="diff-new">{row.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {oldObj && (
+          <details style={{ marginTop: 12 }}>
+            <summary style={{ cursor: 'pointer', color: '#64748b', fontSize: 13 }}>Xem giá trị cũ (chi tiết kỹ thuật)</summary>
+            <JsonView data={oldValue} />
+          </details>
+        )}
+      </div>
+    );
+  }
+
   const isSimpleObject = (obj) => obj && typeof obj === 'object' && !Array.isArray(obj) &&
     Object.keys(obj).length <= 10;
 
   if (isSimpleObject(oldObj) && isSimpleObject(newObj)) {
     const allKeys = [...new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})])];
-    const changes = allKeys.filter(k => {
-      const oldVal = oldObj?.[k];
-      const newVal = newObj?.[k];
-      return oldVal !== newVal;
-    });
+    const changes = allKeys.filter((k) => oldObj?.[k] !== newObj?.[k]);
 
     if (changes.length > 0) {
       return (
@@ -774,13 +741,13 @@ function DiffView({ oldValue, newValue }) {
               </tr>
             </thead>
             <tbody>
-              {changes.map(key => {
-                const label = FIELD_LABELS[key] || key;
+              {changes.map((key) => {
+                const label = AUDIT_FIELD_LABELS[key] || key;
                 return (
                   <tr key={key}>
                     <td className="diff-label">{label}</td>
-                    <td className="diff-old">{formatValue(key, oldObj?.[key])}</td>
-                    <td className="diff-new">{formatValue(key, newObj?.[key])}</td>
+                    <td className="diff-old">{formatAuditFieldValue(key, oldObj?.[key])}</td>
+                    <td className="diff-new">{formatAuditFieldValue(key, newObj?.[key])}</td>
                   </tr>
                 );
               })}
@@ -790,7 +757,6 @@ function DiffView({ oldValue, newValue }) {
       );
     }
 
-    // Không có thay đổi
     if (Object.keys(newObj || {}).length > 0) {
       return (
         <div className="audit-detail__diff-table">
@@ -798,8 +764,8 @@ function DiffView({ oldValue, newValue }) {
             <tbody>
               {Object.entries(newObj).map(([key, value]) => (
                 <tr key={key}>
-                  <td className="diff-label">{FIELD_LABELS[key] || key}</td>
-                  <td colSpan={2}>{formatValue(key, value)}</td>
+                  <td className="diff-label">{AUDIT_FIELD_LABELS[key] || key}</td>
+                  <td colSpan={2}>{formatAuditFieldValue(key, value)}</td>
                 </tr>
               ))}
             </tbody>
@@ -809,7 +775,6 @@ function DiffView({ oldValue, newValue }) {
     }
   }
 
-  // Fallback: hiển thị JSON nếu không parse được
   return (
     <div className="audit-detail__diff-raw">
       {oldObj && (
@@ -834,7 +799,7 @@ function AuditLogDetailModal({ log, onClose }) {
   const userName = log.user_name || 'Hệ thống';
   const actionLabel = ACTION_LABELS[log.action] || log.action || 'Thao tác';
   const objectLabel = TABLE_NAME_VI[log.table_name] || log.entity_name || log.table_name || 'hệ thống';
-  const summary = log.description
+  const summary = humanizeAuditDescription(log.description, log.action, log.new_value)
     || `${userName} đã ${String(actionLabel).toLowerCase()} trên ${String(objectLabel).toLowerCase()}${log.entity_code ? ` (${log.entity_code})` : ''}.`;
 
   return (
@@ -935,14 +900,19 @@ function AuditLogDetailModal({ log, onClose }) {
           {log.description && (
             <div className="audit-detail__section">
               <label>Mô tả</label>
-              <p className="audit-detail__description">{log.description}</p>
+              <p className="audit-detail__description">
+                {humanizeAuditDescription(log.description, log.action, log.new_value)}
+              </p>
             </div>
           )}
 
           {/* Old / New value */}
           {(log.old_value || log.new_value) && (
             <div className="audit-detail__diff">
-              <DiffView oldValue={log.old_value} newValue={log.new_value} />
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#475569' }}>
+                Chi tiết thay đổi / Giá trị mới
+              </label>
+              <DiffView oldValue={log.old_value} newValue={log.new_value} action={log.action} />
             </div>
           )}
 
