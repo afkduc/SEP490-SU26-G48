@@ -77,6 +77,7 @@ const ADMIN_SIDEBAR = [
           </svg>
         ),
         permission: 'screen:permission_matrix:access',
+        hidden: true, // tạm tắt chức năng ma trận
       },
       {
         label: 'Nhật ký hoạt động',
@@ -156,7 +157,7 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isItemVisible = (item) => !item.permission || can(item.permission);
+  const isItemVisible = (item) => !item.hidden && (!item.permission || can(item.permission));
 
   const visibleGroups = ADMIN_SIDEBAR
     .map((g) => ({ ...g, items: g.items.filter(isItemVisible) }))
@@ -269,7 +270,7 @@ export default function AdminLayout({ children }) {
     setContentKey((k) => k + 1);
   };
 
-  const isItemVisible = (item) => !item.permission || can(item.permission);
+  const isItemVisible = (item) => !item.hidden && (!item.permission || can(item.permission));
   const visibleGroups = ADMIN_SIDEBAR
     .map((g) => ({ ...g, items: g.items.filter(isItemVisible) }))
     .filter((g) => g.items.length > 0);
