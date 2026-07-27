@@ -5,6 +5,9 @@ const { toUserDto } = require('../dto/AuthDto');
 const config = require('../../config');
 const PermissionService = require('./PermissionService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
+const PendingLoginStore = require('./PendingLoginStore');
+
+const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '5', 10);
 
 class AuthService {
   constructor(authRepository) {
@@ -21,11 +24,56 @@ class AuthService {
     return this._permissionService;
   }
 
-  async login(identifier, password, branchId, { force = false } = {}) {
+  /**
+   * Đóng session "ma" (không heartbeat trong STALE_MINUTES) trước khi check conflict.
+   */
+  async _closeStaleSessionsForUser(userId) {
+    const { query } = require('../../infrastructure/database/sqlServer');
+    await query(
+      `UPDATE login_sessions
+       SET    logout_time              = SYSUTCDATETIME(),
+              logout_reason            = 'TIMEOUT',
+              session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+              status                   = 'ended'
+       WHERE  user_id     = @p1
+         AND  status      = 'active'
+         AND  action_type = 'LOGIN'
+         AND  COALESCE(last_activity_at, login_time) < DATEADD(MINUTE, -@p2, SYSUTCDATETIME())`,
+      { p1: userId, p2: STALE_MINUTES }
+    );
+  }
+
+  async _findLiveSession(userId) {
+    const { query } = require('../../infrastructure/database/sqlServer');
+    const active = await query(
+      `SELECT TOP 1 id, browser, os, ip_address, login_time, last_activity_at
+       FROM login_sessions
+       WHERE user_id = @p1
+         AND status = 'active'
+         AND action_type = 'LOGIN'
+         AND COALESCE(last_activity_at, login_time) >= DATEADD(MINUTE, -@p2, SYSUTCDATETIME())
+       ORDER BY COALESCE(last_activity_at, login_time) DESC`,
+      { p1: userId, p2: STALE_MINUTES }
+    );
+    return active.recordset[0] || null;
+  }
+
+  /**
+   * @param {object} opts
+   * @param {boolean} [opts.force] - DEPRECATED: chỉ giữ tương thích, không còn override phiên cũ
+   * @param {string} [opts.pendingId] - hoàn tất sau khi phiên cũ approve
+   * @param {object} [opts.clientMeta] - { ip, userAgent, browser, os }
+   */
+  async login(identifier, password, branchId, { force = false, pendingId = null, clientMeta = {} } = {}) {
     if (!identifier || !password) {
       const e = new ApiError(400, 'Email/số điện thoại và mật khẩu không được để trống');
       e.audit = { skip: true };
       throw e;
+    }
+
+    // Hoàn tất sau khi phiên cũ đã approve
+    if (pendingId) {
+      return this._completePendingLogin(pendingId, identifier, password);
     }
 
     const user = await this.authRepository.findUserByEmailOrPhone(identifier);
@@ -65,42 +113,176 @@ class AuthService {
       throw e;
     }
 
-    // 1 tài khoản = 1 phiên: nếu đang có session active và chưa xác nhận force
-    // -> trả 409 để FE hiện modal "Đây là tôi / Hủy"
-    if (!force) {
-      const { query } = require('../../infrastructure/database/sqlServer');
-      const active = await query(
-        `SELECT TOP 1 id, browser, os, ip_address, login_time
-         FROM login_sessions
-         WHERE user_id = @p1 AND status = 'active' AND action_type = 'LOGIN'
-         ORDER BY login_time DESC`,
-        { p1: user.id }
+    // Dọn session stale rồi mới xét conflict thật (heartbeat còn sống)
+    await this._closeStaleSessionsForUser(user.id);
+    const live = await this._findLiveSession(user.id);
+
+    if (live) {
+      // Không cho thiết bị mới tự force. Tạo pending → phiên cũ xác nhận.
+      const pending = PendingLoginStore.createPending({
+        userId: user.id,
+        identifier: String(identifier).trim(),
+        branchId: branchId || null,
+        passwordFingerprint: await bcrypt.hash(password, 4), // nhẹ, chỉ để verify lại lúc complete
+        clientMeta: {
+          ip: clientMeta.ip || null,
+          userAgent: clientMeta.userAgent || null,
+          browser: clientMeta.browser || null,
+          os: clientMeta.os || null,
+        },
+        activeSession: {
+          id: live.id,
+          browser: live.browser,
+          os: live.os,
+          ip: live.ip_address,
+          startedAt: live.login_time,
+        },
+      });
+
+      this._notifyLoginChallenge(user.id, pending).catch(() => {});
+
+      const e = new ApiError(
+        409,
+        'Tài khoản đang được sử dụng trên thiết bị khác. Đã gửi yêu cầu xác nhận tới phiên đang đăng nhập. Vui lòng chờ họ đồng ý.'
       );
-      if (active.recordset[0]) {
-        const s = active.recordset[0];
-        const e = new ApiError(
-          409,
-          'Tài khoản đang được đăng nhập ở thiết bị khác. Xác nhận "Đây là tôi" để tiếp tục (phiên cũ sẽ bị đăng xuất).'
-        );
-        e.code = 'SESSION_CONFLICT';
-        e.details = {
-          code: 'SESSION_CONFLICT',
-          session: {
-            browser: s.browser,
-            os: s.os,
-            ip: s.ip_address,
-            startedAt: s.login_time,
-          },
-        };
-        e.audit = { skip: true };
-        throw e;
-      }
+      e.code = 'LOGIN_PENDING';
+      e.details = {
+        code: 'LOGIN_PENDING',
+        pendingId: pending.id,
+        expiresAt: new Date(pending.expiresAt).toISOString(),
+        session: pending.activeSession,
+      };
+      e.audit = { skip: true };
+      throw e;
+    }
+
+    // force flag cũ: bỏ qua (không còn override). Giữ tham số để FE cũ không crash.
+    void force;
+
+    const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
+    user.token_version = newTokenVersion;
+
+    return { user, pendingComplete: false };
+  }
+
+  async _completePendingLogin(pendingId, identifier, password) {
+    const pending = PendingLoginStore.getPending(pendingId);
+    if (!pending) {
+      throw new ApiError(404, 'Yêu cầu đăng nhập không tồn tại hoặc đã hết hạn');
+    }
+    if (pending.status === 'rejected') {
+      const e = new ApiError(403, 'Yêu cầu đăng nhập đã bị từ chối bởi phiên đang đăng nhập.');
+      e.code = 'LOGIN_REJECTED';
+      throw e;
+    }
+    if (pending.status === 'expired' || pending.expiresAt <= Date.now()) {
+      PendingLoginStore.updatePending(pendingId, { status: 'expired' });
+      throw new ApiError(410, 'Yêu cầu đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+    if (pending.status !== 'approved') {
+      const e = new ApiError(409, 'Đang chờ phiên hiện tại xác nhận đăng nhập...');
+      e.code = 'LOGIN_PENDING';
+      e.details = { code: 'LOGIN_PENDING', pendingId, status: pending.status };
+      throw e;
+    }
+
+    if (String(identifier).trim().toLowerCase() !== String(pending.identifier).trim().toLowerCase()) {
+      throw new ApiError(400, 'Thông tin đăng nhập không khớp yêu cầu đang chờ');
+    }
+
+    const ok = await bcrypt.compare(password, pending.passwordFingerprint);
+    if (!ok) {
+      throw new ApiError(401, 'Email/số điện thoại hoặc mật khẩu không đúng');
+    }
+
+    const user = await this.authRepository.findUserByEmailOrPhone(identifier);
+    if (!user || String(user.id) !== String(pending.userId)) {
+      throw new ApiError(401, 'Không thể hoàn tất đăng nhập');
     }
 
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
     user.token_version = newTokenVersion;
 
-    return { user };
+    PendingLoginStore.updatePending(pendingId, { status: 'completed' });
+    return { user, pendingComplete: true, pending };
+  }
+
+  async approvePendingLogin(userId, pendingId) {
+    const pending = PendingLoginStore.getPending(pendingId);
+    if (!pending || String(pending.userId) !== String(userId)) {
+      throw new ApiError(404, 'Không tìm thấy yêu cầu đăng nhập');
+    }
+    if (pending.status !== 'pending') {
+      throw new ApiError(409, `Yêu cầu đã ở trạng thái: ${pending.status}`);
+    }
+    if (pending.expiresAt <= Date.now()) {
+      PendingLoginStore.updatePending(pendingId, { status: 'expired' });
+      throw new ApiError(410, 'Yêu cầu đã hết hạn');
+    }
+    return PendingLoginStore.updatePending(pendingId, { status: 'approved', decidedAt: Date.now() });
+  }
+
+  async rejectPendingLogin(userId, pendingId) {
+    const pending = PendingLoginStore.getPending(pendingId);
+    if (!pending || String(pending.userId) !== String(userId)) {
+      throw new ApiError(404, 'Không tìm thấy yêu cầu đăng nhập');
+    }
+    if (pending.status !== 'pending') {
+      throw new ApiError(409, `Yêu cầu đã ở trạng thái: ${pending.status}`);
+    }
+    return PendingLoginStore.updatePending(pendingId, { status: 'rejected', decidedAt: Date.now() });
+  }
+
+  getPendingStatus(pendingId) {
+    const pending = PendingLoginStore.getPending(pendingId);
+    if (!pending) {
+      return { status: 'expired', pendingId };
+    }
+    if (pending.status === 'pending' && pending.expiresAt <= Date.now()) {
+      PendingLoginStore.updatePending(pendingId, { status: 'expired' });
+      return { status: 'expired', pendingId };
+    }
+    return {
+      status: pending.status,
+      pendingId,
+      expiresAt: new Date(pending.expiresAt).toISOString(),
+      session: pending.activeSession || null,
+    };
+  }
+
+  /** Phiên đang online poll để hiện alert lớn khi có thiết bị khác xin vào. */
+  listPendingChallengesForUser(userId) {
+    return PendingLoginStore.listPendingForUser(userId).map((p) => ({
+      pendingId: p.id,
+      status: p.status,
+      expiresAt: new Date(p.expiresAt).toISOString(),
+      clientMeta: p.clientMeta || null,
+      activeSession: p.activeSession || null,
+    }));
+  }
+
+  async _notifyLoginChallenge(userId, pending) {
+    try {
+      const NotificationService = require('./NotificationService');
+      const ns = new NotificationService();
+      const deviceLabel = [pending.clientMeta?.browser, pending.clientMeta?.os]
+        .filter(Boolean)
+        .join(' · ') || 'Thiết bị khác';
+      await ns.notify(
+        'LOGIN_CHALLENGE',
+        {
+          userId,
+          device: deviceLabel,
+          ip: pending.clientMeta?.ip,
+          browser: pending.clientMeta?.browser,
+          os: pending.clientMeta?.os,
+          pendingId: pending.id,
+        },
+        { skipSettings: true }
+      );
+    } catch (err) {
+      console.warn('[AuthService] LOGIN_CHALLENGE notify failed:', err.message);
+    }
   }
 
   async _verifyPassword(input, stored) {

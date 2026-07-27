@@ -7,9 +7,9 @@ import { useImportRequestApproval } from '../../hooks/inventory/useImportRequest
 import './ImportRequestDetailPage.css';
 
 const STATUS_META = {
-  pending: { label: 'Cho duyet', className: 'badge--warning' },
-  approved: { label: 'Da duyet', className: 'badge--success' },
-  rejected: { label: 'Tu choi', className: 'badge--danger' },
+  pending: { label: 'Chờ duyệt', className: 'badge--warning' },
+  approved: { label: 'Đã duyệt', className: 'badge--success' },
+  rejected: { label: 'Từ chối', className: 'badge--danger' },
 };
 
 function formatDate(d) {
@@ -54,7 +54,7 @@ export default function ImportRequestDetailPage() {
     try {
       await approve(id);
     } catch (err) {
-      setApproveError(err.message || 'Duyet that bai');
+      setApproveError(err.message || 'Duyệt thất bại');
     }
   }
 
@@ -62,7 +62,7 @@ export default function ImportRequestDetailPage() {
     e.preventDefault();
     setRejectSubmitError('');
     if (!rejectReason.trim()) {
-      setRejectSubmitError('Vui long nhap ly do tu choi');
+      setRejectSubmitError('Vui lòng nhập lý do từ chối');
       return;
     }
     try {
@@ -70,12 +70,12 @@ export default function ImportRequestDetailPage() {
       setShowRejectModal(false);
       setRejectReason('');
     } catch (err) {
-      setRejectSubmitError(err.message || 'Tu choi that bai');
+      setRejectSubmitError(err.message || 'Từ chối thất bại');
     }
   }
 
-  if (loading) return <div className="ir-detail__loading">Dang tai...</div>;
-  if (error) return <div className="ir-detail__error">Loi: {error}</div>;
+  if (loading) return <div className="ir-detail__loading">Đang tải...</div>;
+  if (error) return <div className="ir-detail__error">Lỗi: {error}</div>;
   if (!data) return null;
 
   const meta = STATUS_META[data.status] || { label: data.status, className: '' };
@@ -88,11 +88,11 @@ export default function ImportRequestDetailPage() {
       <div className="ir-detail__header">
         <div>
           <Link to="/inventory/import-requests" className="back-link">
-            ← Danh sach phieu nhap
+            ← Danh sách phiếu nhập
           </Link>
           <div className="ir-detail__title-row">
             <h1 className="ir-detail__title">
-              Phieu nhap: <span className="font-mono">{data.requestCode}</span>
+              Phiếu nhập: <span className="font-mono">{data.requestCode}</span>
             </h1>
             <span className={`badge ${meta.className}`}>{meta.label}</span>
           </div>
@@ -106,7 +106,7 @@ export default function ImportRequestDetailPage() {
               onClick={() => setShowRejectModal(true)}
               disabled={approving || rejecting}
             >
-              Tu choi
+              Từ chối
             </button>
             <button
               type="button"
@@ -114,7 +114,7 @@ export default function ImportRequestDetailPage() {
               onClick={handleApprove}
               disabled={approving || rejecting}
             >
-              {approving ? 'Dang duyet...' : 'Duyet phieu'}
+              {approving ? 'Đang duyệt...' : 'Duyệt phiếu'}
             </button>
           </div>
         )}
@@ -125,37 +125,37 @@ export default function ImportRequestDetailPage() {
 
       <div className="ir-detail__body">
         <div className="ir-detail__section">
-          <h2 className="ir-detail__section-title">Thong tin chung</h2>
+          <h2 className="ir-detail__section-title">Thông tin chung</h2>
           <dl className="info-list">
-            <InfoRow label="Ma phieu" value={data.requestCode} />
-            <InfoRow label="Nha cung cap" value={data.supplierName} />
-            <InfoRow label="So hoa don NCC" value={data.supplierInvoiceNo} />
-            <InfoRow label="Ngay nhap" value={formatDate(data.importDate)} />
-            <InfoRow label="Ngay tao" value={formatDateTime(data.createdAt)} />
-            <InfoRow label="Nguoi tao" value={data.requestedByName} />
-            <InfoRow label="Nguoi duyet" value={data.approvedByName} />
-            <InfoRow label="Ngay duyet" value={formatDateTime(data.approvedBy ? data.importDate : null)} />
-            <InfoRow label="Ly do tu choi" value={data.rejectReason} />
-            <InfoRow label="Ghi chu" value={data.notes} />
+            <InfoRow label="Mã phiếu" value={data.requestCode} />
+            <InfoRow label="Nhà cung cấp" value={data.supplierName} />
+            <InfoRow label="Số hóa đơn NCC" value={data.supplierInvoiceNo} />
+            <InfoRow label="Ngày nhập" value={formatDate(data.importDate)} />
+            <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
+            <InfoRow label="Người tạo" value={data.requestedByName} />
+            <InfoRow label="Người duyệt" value={data.approvedByName} />
+            <InfoRow label="Ngày duyệt" value={formatDateTime(data.approvedBy ? data.importDate : null)} />
+            <InfoRow label="Lý do từ chối" value={data.rejectReason} />
+            <InfoRow label="Ghi chú" value={data.notes} />
           </dl>
         </div>
 
         <div className="ir-detail__section">
           <h2 className="ir-detail__section-title">
-            Danh sach phu tung ({items.length} dong, tong SL: {totalQty})
+            Danh sách phụ tùng ({items.length} dòng, tổng SL: {totalQty})
           </h2>
           {items.length === 0 ? (
-            <p className="ir-detail__empty">Phieu khong co dong phu tung nao.</p>
+            <p className="ir-detail__empty">Phiếu không có dòng phụ tùng nào.</p>
           ) : (
             <div className="table-responsive">
               <table className="table">
                 <thead>
                   <tr>
                     <th style={{ width: 40 }}>#</th>
-                    <th>Ma phu tung</th>
-                    <th>Ten phu tung</th>
-                    <th>Don vi</th>
-                    <th className="text-right" style={{ width: 120 }}>So luong</th>
+                    <th>Mã phụ tùng</th>
+                    <th>Tên phụ tùng</th>
+                    <th>Đơn vị</th>
+                    <th className="text-right" style={{ width: 120 }}>Số lượng</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -171,7 +171,7 @@ export default function ImportRequestDetailPage() {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={5} className="text-right"><strong>Tong cong</strong></td>
+                    <td colSpan={4} className="text-right"><strong>Tổng cộng</strong></td>
                     <td className="text-right"><strong>{totalQty}</strong></td>
                   </tr>
                 </tfoot>
@@ -182,25 +182,25 @@ export default function ImportRequestDetailPage() {
 
         {data.status === 'approved' && (
           <div className="ir-detail__notice ir-detail__notice--success">
-            Phieu da duoc duyet. Ton kho cho cac phu tung tren da duoc cong va he thong
-            da ghi log vao <code>inventory_transactions</code>.
+            Phiếu đã được duyệt. Tồn kho cho các phụ tùng trên đã được cộng và hệ thống
+            đã ghi log vào <code>inventory_transactions</code>.
           </div>
         )}
         {data.status === 'rejected' && (
           <div className="ir-detail__notice ir-detail__notice--danger">
-            Phieu da bi tu choi va khong cong ton kho.
+            Phiếu đã bị từ chối và không cộng tồn kho.
           </div>
         )}
       </div>
 
-      {/* Modal tu choi */}
+      {/* Modal từ chối */}
       {showRejectModal && (
         <div className="ir-detail__modal-backdrop" onClick={() => setShowRejectModal(false)}>
           <div className="ir-detail__modal" onClick={(e) => e.stopPropagation()}>
-            <h3 className="ir-detail__modal-title">Tu choi phieu nhap</h3>
+            <h3 className="ir-detail__modal-title">Từ chối phiếu nhập</h3>
             <p className="ir-detail__modal-desc">
-              Vui long nhap ly do tu choi. Phieu se chuyen sang trang thai
-              &quot;Tu choi&quot; va khong cong ton kho.
+              Vui lòng nhập lý do từ chối. Phiếu sẽ chuyển sang trạng thái
+              &quot;Từ chối&quot; và không cộng tồn kho.
             </p>
             <form onSubmit={handleRejectSubmit}>
               <textarea
@@ -208,7 +208,7 @@ export default function ImportRequestDetailPage() {
                 rows={4}
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="VD: So luong khong khop voi hoa don..."
+                placeholder="VD: Số lượng không khớp với hóa đơn..."
                 maxLength={500}
                 required
               />
@@ -222,14 +222,14 @@ export default function ImportRequestDetailPage() {
                   onClick={() => setShowRejectModal(false)}
                   disabled={rejecting}
                 >
-                  Huy
+                  Hủy
                 </button>
                 <button
                   type="submit"
                   className="btn btn--danger"
                   disabled={rejecting}
                 >
-                  {rejecting ? 'Dang gui...' : 'Xac nhan tu choi'}
+                  {rejecting ? 'Đang gửi...' : 'Xác nhận từ chối'}
                 </button>
               </div>
             </form>

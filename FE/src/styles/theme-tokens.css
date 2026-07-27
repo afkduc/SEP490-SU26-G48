@@ -7,10 +7,10 @@
 :root,
 [data-theme='light'],
 .admin-shell:not(.admin-shell--dark) {
-  /* Surfaces */
-  --ag-bg: #f1f5f9;
+  /* Surfaces — bớt xám phẳng, nền hơi indigo-cool */
+  --ag-bg: #eef2ff;
   --ag-surface: #ffffff;
-  --ag-surface-2: #f8fafc;
+  --ag-surface-2: #f5f7ff;
   --ag-card: #ffffff;
   --ag-card-hover: #f8fafc;
 
@@ -56,7 +56,7 @@
   --ag-cancelled-bg: #e2e8f0;
 
   /* Chrome */
-  --ag-border: #e2e8f0;
+  --ag-border: #e0e7ff;
   --ag-divider: #e2e8f0;
   --ag-focus-ring: rgba(79, 70, 229, 0.35);
   --ag-overlay: rgba(15, 23, 42, 0.45);
@@ -73,10 +73,10 @@
   /* Topbar / content */
   --ag-topbar-bg: #ffffff;
   --ag-input-bg: #ffffff;
-  --ag-input-border: #cbd5e1;
+  --ag-input-border: #c7d2fe;
   --ag-input-placeholder: #94a3b8;
-  --ag-table-header-bg: #f8fafc;
-  --ag-table-row-hover: #f1f5f9;
+  --ag-table-header-bg: #eef2ff;
+  --ag-table-row-hover: #e0e7ff;
   --ag-table-row-alt: #f8fafc;
   --ag-table-border: #e2e8f0;
 

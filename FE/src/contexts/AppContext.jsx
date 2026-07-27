@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { loginApi, logoutApi, getMeApi, getServerTime } from '../services/authApi';
+import { loginApi, logoutApi, getMeApi, getServerTime, getMyLoginChallengesApi } from '../services/authApi';
 import { ROLES } from '../constants/roles';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
+import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
+import LoginChallengeModal from '../components/LoginChallengeModal';
 import {
   resetSessionExpiredFlag,
   cancelAllPendingRequests,
@@ -99,6 +101,7 @@ export function getRoleHome(user) {
   if (roles.includes(ROLES.ADMIN)) return '/admin/dashboard';
   if (roles.includes(ROLES.GENERAL_DIRECTOR)) return '/general-director';
   if (roles.includes(ROLES.MANAGER)) return '/manager';
+  if (roles.includes(ROLES.SERVICE_ADVISOR)) return '/dashboard';
   if (roles.includes(ROLES.TEAM_LEADER)) return '/repair-orders';
   if (roles.includes(ROLES.WAREHOUSE_STAFF)) return '/inventory';
   return '/dashboard';
@@ -397,9 +400,8 @@ export function AppProvider({ children }) {
       {/* HeartbeatRunner: goi POST /api/auth/heartbeat moi 60s.
           Tu tat khi user logout. Tu backoff khi nhan 401 de tranh spam. */}
       {isAuthenticated ? <HeartbeatRunner /> : null}
-      {/* PermissionEventsRunner: SSE listener de refresh quyen realtime khi admin
-          thay doi ma tran quyen / gan role / revoke role. Tu tat khi logout. */}
       {isAuthenticated ? <PermissionEventsRunner /> : null}
+      {isAuthenticated ? <LoginChallengeRunner /> : null}
       {children}
     </AppContext.Provider>
   );
@@ -450,6 +452,66 @@ function PermissionEventsRunner() {
   });
 
   return null;
+}
+
+function LoginChallengeRunner() {
+  const { token } = useAuth();
+  // SSE notifications (bell + challenge event). Poll challenges làm backup nếu SSE trễ.
+  useNotifications(token);
+  const [challenge, setChallenge] = useState(null);
+
+  useEffect(() => {
+    const onChallenge = (e) => {
+      const detail = e?.detail;
+      if (!detail?.pendingId) return;
+      setChallenge((prev) => (prev?.pendingId === detail.pendingId ? prev : detail));
+    };
+    window.addEventListener('login-challenge', onChallenge);
+    return () => window.removeEventListener('login-challenge', onChallenge);
+  }, []);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const data = await getMyLoginChallengesApi();
+        const items = data?.items || data || [];
+        const first = Array.isArray(items) ? items[0] : null;
+        if (cancelled || !first?.pendingId) return;
+        const meta = first.clientMeta || {};
+        setChallenge((prev) => {
+          if (prev?.pendingId === first.pendingId) return prev;
+          return {
+            pendingId: first.pendingId,
+            metadata: meta,
+            device: [meta.browser, meta.os].filter(Boolean).join(' · ') || 'Thiết bị khác',
+            ip: meta.ip,
+            title: 'Yêu cầu đăng nhập mới',
+            message: 'Có thiết bị khác đang cố đăng nhập tài khoản của bạn.',
+          };
+        });
+      } catch {
+        // ignore poll errors
+      }
+    };
+
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [token]);
+
+  if (!challenge) return null;
+  return (
+    <LoginChallengeModal
+      challenge={challenge}
+      onClose={() => setChallenge(null)}
+    />
+  );
 }
 
 export function useAuth() {
