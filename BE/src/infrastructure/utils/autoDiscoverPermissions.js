@@ -14,7 +14,8 @@
  * Phuong phap static scan (khong execute router) de tranh circular dependency
  * giua controllers va routes/index.js.
  *
- * Controllers PermissionMatrixController / RoleScreenMatrixController /
+ * Controllers user-screen / permission-request /
+
  * UserScreenPermissionsController dung generatePermissionKeys() de build
  * ma tran screens cho role/user.
  */

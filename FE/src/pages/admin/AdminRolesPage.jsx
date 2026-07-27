@@ -218,8 +218,7 @@ function RoleCard({ role, onEdit, onToggleStatus, onUsers, usersActionLabel = 'N
  */
 export default function AdminRolesPage({ embedded = false, onFilterUsersByRole } = {}) {
   const toast = useToast();
-  // Trang nay chi quan ly danh sach vai tro + CRUD.
-  // Ma tran quyen (Role x Screen) da chuyen sang trang rieng: /admin/permission-matrix.
+  // Trang nay chi quan ly danh sach vai tro + CRUD (khong con ma tran quyen).
 
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -239,12 +239,20 @@ function buildAuditDescription(action, details = {}) {
         targetUser ? `của ${targetUser}` : null,
       ].filter(Boolean).join(' ');
 
-    case 'SAVE_SCREEN_MATRIX':
-      return [
+    case 'SAVE_SCREEN_MATRIX': {
+      const parts = [
         'Đã lưu ma trận quyền màn hình',
         roleLabel ? `cho vai trò ${roleLabel}` : null,
         itemCount != null ? `(${itemCount} mục)` : null,
-      ].filter(Boolean).join(' ');
+      ];
+      const activeItems = d.activeItems != null ? Number(d.activeItems) : null;
+      const l1Granted = d.l1Granted != null ? Number(d.l1Granted) : null;
+      const l1Revoked = d.l1Revoked != null ? Number(d.l1Revoked) : null;
+      if (activeItems != null) parts.push(`— ${activeItems} mục đang có quyền`);
+      if (l1Granted > 0) parts.push(`— cấp thêm ${l1Granted} quyền truy cập`);
+      if (l1Revoked > 0) parts.push(`— thu hồi ${l1Revoked} quyền truy cập`);
+      return parts.filter(Boolean).join(' ');
+    }
 
     case 'BULK_TOGGLE':
     case 'PERMISSION_MATRIX_BULK':

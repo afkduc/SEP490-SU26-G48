@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
 import permissionRequestApi from '../../services/permissionRequestApi';
 import { useToast } from '../../components/common/ToastContext';
 import { getPermissionScreenLabel } from '../../utils/screenLabels';
@@ -33,10 +32,10 @@ function countPending(items) {
 }
 
 /**
- * Panel duyệt yêu cầu cấp quyền — dùng trong Ma trận quyền (tab).
- * @param {{ onFocusInMatrix?: (req: object) => void, onCountChange?: (n: number) => void }} props
+ * Panel duyệt yêu cầu cấp quyền.
+ * @param {{ onCountChange?: (n: number) => void }} props
  */
-export function PermissionRequestsPanel({ onFocusInMatrix, onCountChange }) {
+export function PermissionRequestsPanel({ onCountChange }) {
   const toast = useToast();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -225,16 +224,6 @@ export function PermissionRequestsPanel({ onFocusInMatrix, onCountChange }) {
                     <td className="perm-req-time">{formatDateTime(req.createdAt)}</td>
                     <td>
                       <div className="perm-req-actions">
-                        {typeof onFocusInMatrix === 'function' && !isApproved && !isRejected && (
-                          <button
-                            type="button"
-                            className="btn btn--secondary btn--sm"
-                            title="Mở tab Ma trận và tìm quyền này"
-                            onClick={() => onFocusInMatrix(req)}
-                          >
-                            Mở ma trận
-                          </button>
-                        )}
                         {isApproved ? (
                           <button
                             type="button"
@@ -319,7 +308,17 @@ export function PermissionRequestsPanel({ onFocusInMatrix, onCountChange }) {
   );
 }
 
-/** Route cũ → chuyển vào Ma trận quyền (tab yêu cầu). */
+/** Trang admin duyệt yêu cầu cấp quyền (độc lập, không còn ma trận). */
 export default function PermissionRequestsPage() {
-  return <Navigate to="/admin/permission-matrix?tab=requests" replace />;
+  return (
+    <div className="permission-requests-page">
+      <div className="permission-requests-page__header" style={{ marginBottom: 16 }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0f172a' }}>Yêu cầu cấp quyền</h1>
+        <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
+          Duyệt hoặc từ chối các yêu cầu truy cập màn hình từ người dùng.
+        </p>
+      </div>
+      <PermissionRequestsPanel />
+    </div>
+  );
 }
