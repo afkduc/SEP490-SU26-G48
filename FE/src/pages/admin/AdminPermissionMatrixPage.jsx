@@ -77,10 +77,17 @@ function normalizeScreenSearchTerm(raw = '') {
 /** Map role_name DB -> CHỈ các module màn hình thuộc role đó */
 const ROLE_MODULE_ALIASES = {
   general_director: ['director'],
-  service_advisor: ['advisor'],
-  team_leader: ['leader'],
+  service_advisor: [
+    'advisor',
+    'repair-orders',
+    'repair-settlement',
+    'customers',
+    'customer-care',
+    'service-requests',
+  ],
+  team_leader: ['leader', 'repair-orders'],
   warehouse_staff: ['inventory', 'warehouse'],
-  manager: ['manager'],
+  manager: ['manager', 'inventory', 'customers', 'customer-care'],
   technician: ['technician'],
 };
 
@@ -249,7 +256,7 @@ function RoleTable({ role, screenPermissions, isAdmin, actionMap, onToggleAction
               <input
                 type="checkbox"
                 checked={stats.granted === stats.total}
-                onChange={() => onToggleAllForRole(role, screenPermissions, stats.granted !== stats.total)}
+                onChange={() => onToggleAllForRole(role, matrix, stats.granted !== stats.total)}
               />
               <span className="role-table__toggle-all-label">Toàn quyền</span>
             </label>
@@ -607,12 +614,14 @@ export default function AdminPermissionMatrixPage() {
   /**
    * Toggle tat ca actions cua TAT CA screen cua 1 role.
    */
-  const handleToggleAllForRole = useCallback((role, screenPermissions, granted) => {
+  const handleToggleAllForRole = useCallback((role, ownedScreens, granted) => {
     setPendingChanges((prev) => {
       const next = new Map(prev);
       const ACTIONS = ['view', ...L2_OTHER_ACTIONS];
-      for (const screen of screenPermissions) {
+      for (const screen of ownedScreens) {
         const screenKey = screen.screenKey;
+        if (!screenKey) continue;
+        if (!isScreenOwnedByRole(screenKey, screen.module, role.roleName)) continue;
         const available = screen.availableActions || {};
         for (const action of ACTIONS) {
           if (available[action] === false) continue;

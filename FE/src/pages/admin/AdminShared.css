@@ -77,22 +77,23 @@
   border: 1px solid var(--ag-border);
   border-radius: var(--ag-radius-lg);
   padding: 18px 20px;
-  box-shadow: none;
+  box-shadow: var(--ag-shadow-sm);
   color: var(--ag-text-primary);
 }
 
 .filter-card {
-  background: transparent;
-  border: none;
-  padding: 0;
-  box-shadow: none;
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-border);
+  padding: 16px 18px;
+  box-shadow: var(--ag-shadow-sm);
 }
 
 .admin-table-card,
 .table-card {
   padding: 0;
   overflow: hidden;
-  box-shadow: var(--ag-shadow-sm);
+  box-shadow: var(--ag-shadow-md);
+  border-color: var(--ag-border);
 }
 
 .filter-row {

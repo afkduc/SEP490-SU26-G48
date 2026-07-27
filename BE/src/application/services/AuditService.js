@@ -1,4 +1,5 @@
 const ApiError = require('../../utils/ApiError');
+const { buildAuditDescription } = require('../../utils/auditLabels');
 
 class AuditService {
   constructor(auditRepository) {
@@ -51,19 +52,15 @@ class AuditService {
         : JSON.stringify(normalized.details);
     }
     if (!normalized.description && normalized.details) {
-      const d = normalized.details;
-      if (typeof d === 'object') {
-        const bits = [];
-        if (d.roleName) bits.push(`vai trò ${d.roleName}`);
-        if (d.permissionKey) bits.push(`quyền ${d.permissionKey}`);
-        if (d.itemCount != null) bits.push(`${d.itemCount} mục`);
-        if (d.screenKey) bits.push(`màn ${d.screenKey}`);
-        if (d.granted === true) bits.push('cấp quyền');
-        if (d.granted === false) bits.push('thu hồi');
-        if (bits.length) {
-          normalized.description = `${normalized.action || 'Cập nhật'}: ${bits.join(', ')}`;
-        }
+      const d = typeof normalized.details === 'string'
+        ? (() => { try { return JSON.parse(normalized.details); } catch { return null; } })()
+        : normalized.details;
+      if (d && typeof d === 'object') {
+        const built = buildAuditDescription(normalized.action, d);
+        if (built) normalized.description = built;
       }
+    } else if (!normalized.description && normalized.action) {
+      normalized.description = buildAuditDescription(normalized.action, {});
     }
 
     // Truncate action for safety (some DBs historically used short action columns)

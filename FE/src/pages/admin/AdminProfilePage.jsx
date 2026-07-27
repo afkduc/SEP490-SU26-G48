@@ -575,7 +575,7 @@ export default function AdminProfilePage() {
                     <span className="profile-info-item__value">{formatDateTime(profile.updatedAt || profile.createdAt)}</span>
                   </div>
                   <div className="profile-info-item profile-info-item--full">
-                    <span className="profile-info-item__label">Vai tro</span>
+                    <span className="profile-info-item__label">Vai trò</span>
                     <span className="profile-info-item__value">
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {profile.roles?.map((r) => (
@@ -670,36 +670,36 @@ export default function AdminProfilePage() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label" htmlFor="email">Email <span className="required">*</span></label>
-                    <div className="input-wrapper">
-                      <span className="input-icon"><IconMail /></span>
-                      <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        className="form-input form-input--icon"
-                        value={editForm.email}
-                        onChange={handleEditChange}
-                        placeholder="email@example.com"
-                        required
-                      />
-                    </div>
+                    <label className="form-label" htmlFor="email">
+                      <span className="form-label__icon" aria-hidden="true"><IconMail /></span>
+                      Email <span className="required">*</span>
+                    </label>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      className="form-input"
+                      value={editForm.email}
+                      onChange={handleEditChange}
+                      placeholder="email@example.com"
+                      required
+                    />
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label" htmlFor="phone">Số điện thoại</label>
-                    <div className="input-wrapper">
-                      <span className="input-icon"><IconPhone /></span>
-                      <input
-                        id="phone"
-                        name="phone"
-                        type="tel"
-                        className="form-input form-input--icon"
-                        value={editForm.phone}
-                        onChange={handleEditChange}
-                        placeholder="0xxxxxxxxx"
-                      />
-                    </div>
+                    <label className="form-label" htmlFor="phone">
+                      <span className="form-label__icon" aria-hidden="true"><IconPhone /></span>
+                      Số điện thoại
+                    </label>
+                    <input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      className="form-input"
+                      value={editForm.phone}
+                      onChange={handleEditChange}
+                      placeholder="0xxxxxxxxx"
+                    />
                   </div>
 
                   <div className="profile-form__readonly">
