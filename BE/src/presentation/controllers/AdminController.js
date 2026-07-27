@@ -50,6 +50,7 @@ class AdminController {
     this.specialtyService = new SpecialtyService();
     this.securityAlertService = new SecurityAlertService();
     this.notificationService = new NotificationService();
+    this.vehicleBrandRepository = new (require('../../infrastructure/repositories/VehicleBrandRepository'))();
 
     this.getDashboardStats = this.getDashboardStats.bind(this);
     this.listUsers = this.listUsers.bind(this);
@@ -90,6 +91,7 @@ class AdminController {
     this.setUserSpecialties = this.setUserSpecialties.bind(this);
     this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
     this.acknowledgeAlert = this.acknowledgeAlert.bind(this);
+    this.acknowledgeAllAlerts = this.acknowledgeAllAlerts.bind(this);
     this.acknowledgeAlertCounts = this.acknowledgeAlertCounts.bind(this);
     this.getRecentLoginSessions = this.getRecentLoginSessions.bind(this);
     this.getUserRoles = this.getUserRoles.bind(this);
@@ -644,6 +646,15 @@ class AdminController {
     }
   };
 
+  acknowledgeAllAlerts = async (req, res, next) => {
+    try {
+      const result = await this.securityAlertService.acknowledgeAll(req.user?.userId);
+      return success(res, result, `Da xu ly ${result?.acknowledgedCount || 0} canh bao`);
+    } catch (err) {
+      next(err);
+    }
+  };
+
   acknowledgeAlertCounts = async (req, res, next) => {
     try {
       const counts = await this.securityAlertService.getCounts();
@@ -1146,6 +1157,110 @@ class AdminController {
         description: `Cap nhat ma tran nhom quyen (${result.updatedRoles} vai tro, ${result.affectedUserCount} user bi anh huong)`,
       });
       return success(res, result, 'Cap nhat ma tran nhom quyen thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // ── Vehicle brands ───────────────────────────────────────────────
+  listVehicleBrands = async (req, res, next) => {
+    try {
+      const items = await this.vehicleBrandRepository.list({ includeInactive: true });
+      return success(res, { items, total: items.length }, 'Danh sach hang xe');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createVehicleBrand = async (req, res, next) => {
+    try {
+      const brandName = String(req.body?.brandName || '').trim();
+      if (!brandName) {
+        const ApiError = require('../../utils/ApiError');
+        throw new ApiError(400, 'Ten hang xe la bat buoc');
+      }
+      const brandCode = req.body?.brandCode != null
+        ? String(req.body.brandCode).trim()
+        : undefined;
+      const brand = await this.vehicleBrandRepository.create({
+        brandName,
+        brandCode: brandCode || undefined,
+        sortOrder: req.body?.sortOrder,
+        warrantyYears: req.body?.warrantyYears,
+        warrantyKm: req.body?.warrantyKm,
+      });
+      await auditCrud.create(req, {
+        tableName: 'brands',
+        entityCode: brand.brandCode || brand.brandName,
+        recordId: brand.id,
+        entityName: 'Hãng xe',
+        data: brand,
+      });
+      return success(res, brand, 'Tao hang xe thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateVehicleBrand = async (req, res, next) => {
+    try {
+      const brand = await this.vehicleBrandRepository.update(req.params.id, {
+        brandName: req.body?.brandName != null ? String(req.body.brandName).trim() : undefined,
+        brandCode: req.body?.brandCode != null ? String(req.body.brandCode).trim() : undefined,
+        sortOrder: req.body?.sortOrder,
+        warrantyYears: req.body?.warrantyYears,
+        warrantyKm: req.body?.warrantyKm,
+      });
+      await auditCrud.update(req, {
+        tableName: 'brands',
+        entityCode: brand?.brandCode || brand?.brandName,
+        recordId: req.params.id,
+        entityName: 'Hãng xe',
+        newData: req.body,
+      });
+      return success(res, brand, 'Cap nhat hang xe thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  toggleVehicleBrandStatus = async (req, res, next) => {
+    try {
+      const brand = await this.vehicleBrandRepository.toggleStatus(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'brands',
+        entityCode: brand?.brandName,
+        recordId: req.params.id,
+        entityName: 'Hãng xe',
+        newData: { isActive: brand?.isActive },
+      });
+      return success(res, brand, 'Cap nhat trang thai hang xe thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setMustChangePassword = async (req, res, next) => {
+    try {
+      const ApiError = require('../../utils/ApiError');
+      const userId = Number(req.params.id);
+      if (!userId) throw new ApiError(400, 'userId khong hop le');
+      const flag = req.body?.mustChangePassword !== false && req.body?.mustChangePassword !== 'false';
+      const { query } = require('../../infrastructure/database/sqlServer');
+      await query(
+        `UPDATE users SET must_change_password = @p1, updated_at = SYSUTCDATETIME() WHERE id = @p2`,
+        { p1: flag ? 1 : 0, p2: userId }
+      );
+      await auditCrud.update(req, {
+        tableName: 'users',
+        entityCode: `ID-${userId}`,
+        recordId: userId,
+        entityName: 'Người dùng',
+        newData: { mustChangePassword: flag },
+        description: flag ? 'Bật bắt buộc đổi mật khẩu' : 'Tắt bắt buộc đổi mật khẩu',
+      });
+      const user = await this.adminUserService.getUserDetail(userId);
+      return success(res, user, 'Cap nhat bat buoc doi mat khau thanh cong');
     } catch (err) {
       next(err);
     }
