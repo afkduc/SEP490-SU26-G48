@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
-import { getMyProfile, updateMyProfile, changePassword } from '../../services/profileApi';
+import { getMyProfile, updateMyProfile, changePassword, uploadMyAvatar } from '../../services/profileApi';
 import './AdminProfilePage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -231,6 +231,14 @@ export default function AdminProfilePage() {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(null);
 
+  // ─── Avatar upload state ────────────────────────────────────────────────
+  const avatarInputRef = useRef(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null); // preview of selected file
+  const [avatarDisplayUrl, setAvatarDisplayUrl] = useState(null);
+  const [avatarCacheBuster, setAvatarCacheBuster] = useState(0);
+
   // Load profile on mount
   useEffect(() => {
     let cancelled = false;
@@ -341,6 +349,107 @@ export default function AdminProfilePage() {
     }
   }
 
+  useEffect(() => {
+    // Revoke local object URL when it changes/unmount to avoid memory leaks.
+    if (!avatarPreviewUrl) return undefined;
+    return () => {
+      try { URL.revokeObjectURL(avatarPreviewUrl); } catch (_) {}
+    };
+  }, [avatarPreviewUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = null;
+
+    async function loadAvatar() {
+      if (!profile?.avatar) {
+        setAvatarDisplayUrl(null);
+        return;
+      }
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setAvatarDisplayUrl(null);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/profile/me/avatar?ts=${avatarCacheBuster}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          setAvatarDisplayUrl(null);
+          return;
+        }
+        const blob = await res.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setAvatarDisplayUrl(objectUrl);
+        }
+      } catch (_) {
+        if (!cancelled) setAvatarDisplayUrl(null);
+      }
+    }
+
+    loadAvatar();
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      }
+    };
+  }, [profile?.avatar, avatarCacheBuster]);
+
+  function openAvatarPicker() {
+    avatarInputRef.current?.click?.();
+  }
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+    if (!file) return;
+
+    setAvatarError(null);
+    setAvatarPreviewUrl(() => URL.createObjectURL(file));
+    setAvatarUploading(true);
+    try {
+      await uploadMyAvatar(file);
+      setAvatarCacheBuster((v) => v + 1);
+
+      const data = await getMyProfile();
+      setProfile(data);
+
+      // Sync AppContext + localStorage so Navbar (và các component khác) cập nhật ngay.
+      try {
+        const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
+        const existing = raw ? JSON.parse(raw) : {};
+        const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
+
+        const updatedUser = {
+          ...existing,
+          id: data.id ?? data.userId,
+          email: data.email,
+          userName: data.userName || existing.userName || data.email,
+          name: `${data.firstName || ''} ${data.lastName || ''}`.trim() || existing.name,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+          roles: data.roles,
+          avatar: data.avatar,
+          branchId: data.branchId,
+          branchName: data.branchName,
+        };
+        storage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+      } catch (_) {}
+    } catch (err) {
+      setAvatarError(err?.message || 'Không thể cập nhật avatar');
+    } finally {
+      setAvatarUploading(false);
+      setAvatarPreviewUrl(null);
+      // Reset input để chọn lại cùng 1 file cũng trigger onChange.
+      e.target.value = '';
+    }
+  }
+
   // Password form handlers
   function handlePwChange(e) {
     setPwForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -422,10 +531,38 @@ export default function AdminProfilePage() {
           {/* ── Left: avatar card ──────────────────────────────── */}
           <div className="profile-card profile-card--left">
             <div className="profile-avatar-wrap">
-              <div className="profile-avatar">{initials}</div>
+              {avatarPreviewUrl || avatarDisplayUrl ? (
+                <img
+                  className="profile-avatar profile-avatar--img"
+                  src={avatarPreviewUrl || avatarDisplayUrl}
+                  alt="Avatar"
+                />
+              ) : (
+                <div className="profile-avatar">{initials}</div>
+              )}
               <div className="profile-avatar__badge">
                 <IconShield />
               </div>
+
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleAvatarChange}
+              />
+            </div>
+
+            <div style={{ width: '100%', marginBottom: 10, textAlign: 'center' }}>
+              <button
+                type="button"
+                className="btn profile-card__avatar-btn"
+                onClick={openAvatarPicker}
+                disabled={avatarUploading}
+              >
+                {avatarUploading ? 'Đang cập nhật...' : 'Đổi avatar'}
+              </button>
+              {avatarError && <div className="form-error" style={{ marginTop: 6 }}>{avatarError}</div>}
             </div>
 
             <div className="profile-card__name">{displayName}</div>
