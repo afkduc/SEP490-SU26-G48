@@ -136,6 +136,44 @@
 .specialties-table tr:last-child td { border-bottom: none; }
 .specialties-table tbody tr:hover td { background: #fafbfc; }
 
+/* ── Brands table: header + data cùng alignment ───────────────────── */
+.brands-table {
+  min-width: 860px;
+}
+
+.brands-table th.brands-col,
+.brands-table td.brands-col {
+  text-align: left;
+  vertical-align: middle;
+}
+
+.brands-table th.brands-col--stt,
+.brands-table td.brands-col--stt,
+.brands-table th.brands-col--num,
+.brands-table td.brands-col--num {
+  text-align: center;
+}
+
+.brands-table th.brands-col--status,
+.brands-table td.brands-col--status,
+.brands-table th.brands-col--actions,
+.brands-table td.brands-col--actions {
+  text-align: center;
+}
+
+.brands-table td.brands-col--actions .specialty-actions {
+  justify-content: center;
+  width: 100%;
+}
+
+.brands-code {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+  letter-spacing: 0.3px;
+  color: #0f172a;
+}
+
 .specialty-code {
   display: inline-flex;
   align-items: center;
@@ -245,8 +283,8 @@
   }
 }
 
-/* ── Buttons ─────────────────────────────────────────────────────── */
-.btn {
+/* ── Buttons (scoped — Vite giữ CSS lazy route) ──────────────────── */
+.admin-specialties .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -262,33 +300,33 @@
   text-decoration: none;
 }
 
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.admin-specialties .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-.btn--primary {
+.admin-specialties .btn--primary {
   background: linear-gradient(135deg, #d97706, #f59e0b);
   color: #fff;
   box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
 }
-.btn--primary:hover:not(:disabled) {
+.admin-specialties .btn--primary:hover:not(:disabled) {
   background: linear-gradient(135deg, #b45309, #d97706);
   box-shadow: 0 4px 12px rgba(217, 119, 6, 0.35);
 }
 
-.btn--secondary {
+.admin-specialties .btn--secondary {
   background: #fff;
   color: #374151;
   border: 1.5px solid #d1d5db;
 }
-.btn--secondary:hover:not(:disabled) { background: #f9fafb; border-color: #9ca3af; }
+.admin-specialties .btn--secondary:hover:not(:disabled) { background: #f9fafb; border-color: #9ca3af; }
 
-.btn--danger {
+.admin-specialties .btn--danger {
   background: #fff;
   color: #dc2626;
   border: 1.5px solid #fecaca;
 }
-.btn--danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
+.admin-specialties .btn--danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
 
-.btn--sm { padding: 6px 12px; font-size: 0.8rem; }
+.admin-specialties .btn--sm { padding: 6px 12px; font-size: 0.8rem; }
 
 /* ── Modal ────────────────────────────────────────────────────────── */
 .specialty-modal-overlay {
