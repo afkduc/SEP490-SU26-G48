@@ -2,22 +2,18 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FORBIDDEN_KEY } from '../services/httpClient';
 import { useAuth, getRoleHome } from '../contexts/AppContext';
-import { requestPermission } from '../services/notificationApi';
+import { getPermissionScreenLabel } from '../utils/screenLabels';
 
 let modalShownAt = 0;
 const MIN_REDISPLAY_INTERVAL_MS = 2000;
 
 /**
- * Modal 403 — UI chuyên nghiệp + form gửi yêu cầu cấp quyền (kèm lý do).
+ * Modal 403 — thông báo không có quyền truy cập.
  */
 export default function ForbiddenModal() {
   const [visible, setVisible] = useState(false);
   const [permissionKey, setPermissionKey] = useState(null);
   const [message, setMessage] = useState('');
-  const [reason, setReason] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [sendError, setSendError] = useState('');
   const visibleRef = useRef(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -25,9 +21,6 @@ export default function ForbiddenModal() {
   const handleClose = useCallback(() => {
     visibleRef.current = false;
     setVisible(false);
-    setReason('');
-    setSent(false);
-    setSendError('');
   }, []);
 
   useEffect(() => {
@@ -42,9 +35,6 @@ export default function ForbiddenModal() {
       visibleRef.current = true;
       setPermissionKey(detail.permissionKey || null);
       setMessage(detail.message || 'Bạn không có quyền thực hiện thao tác này');
-      setReason('');
-      setSent(false);
-      setSendError('');
       setVisible(true);
     };
 
@@ -63,26 +53,16 @@ export default function ForbiddenModal() {
     navigate(getRoleHome(user) || '/dashboard', { replace: true });
   }
 
-  async function handleRequestPermission() {
-    if (sending || sent || !permissionKey) return;
-    setSending(true);
-    setSendError('');
-    try {
-      await requestPermission(permissionKey, reason.trim(), window.location.pathname);
-      setSent(true);
-    } catch (e) {
-      setSendError(e?.message || 'Không gửi được yêu cầu. Thử lại sau.');
-    } finally {
-      setSending(false);
-    }
-  }
-
   if (!visible) return null;
 
-  const friendlyMsg = permissionKey
-    ? (message.includes(permissionKey)
-      ? message
-      : `Bạn không có quyền "${permissionKey}" để truy cập trang này.`)
+  const friendlyLabel = permissionKey
+    ? (getPermissionScreenLabel(permissionKey) !== '—'
+      ? getPermissionScreenLabel(permissionKey)
+      : null)
+    : null;
+
+  const friendlyMsg = friendlyLabel
+    ? `Bạn không có quyền truy cập «${friendlyLabel}».`
     : message;
 
   return (
@@ -113,81 +93,6 @@ export default function ForbiddenModal() {
           <button className="btn btn--secondary" type="button" onClick={handleBack}>← Quay lại</button>
           <button className="btn btn--secondary" type="button" onClick={handleHome}>Về trang chủ</button>
         </div>
-
-        {permissionKey && (
-          <>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0 14px', color: '#94a3b8', fontSize: 12,
-            }}>
-              <span style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-              hoặc
-              <span style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-            </div>
-
-            <p style={{ margin: '0 0 10px', fontSize: 13, color: '#475569', textAlign: 'center' }}>
-              Cần quyền này? Gửi yêu cầu tới quản trị viên
-            </p>
-
-            {!sent ? (
-              <>
-                <textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Lý do cần quyền (không bắt buộc)..."
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '10px 12px',
-                    borderRadius: 10,
-                    border: '1px solid #e2e8f0',
-                    fontSize: 13,
-                    resize: 'vertical',
-                    marginBottom: 10,
-                    fontFamily: 'inherit',
-                  }}
-                />
-                {sendError && (
-                  <p style={{ color: '#dc2626', fontSize: 12, margin: '0 0 8px' }}>{sendError}</p>
-                )}
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={handleRequestPermission}
-                  disabled={sending}
-                  style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                >
-                  {sending ? 'Đang gửi...' : 'Yêu cầu cấp quyền'}
-                </button>
-              </>
-            ) : (
-              <div style={{
-                padding: '12px 14px',
-                borderRadius: 10,
-                background: '#ecfdf5',
-                color: '#047857',
-                fontSize: 13,
-                textAlign: 'center',
-                fontWeight: 600,
-              }}>
-                Đã gửi yêu cầu. Admin sẽ xử lý sớm.
-              </div>
-            )}
-
-            <p style={{
-              margin: '12px 0 0',
-              padding: '8px 10px',
-              background: '#f8fafc',
-              borderRadius: 8,
-              fontSize: 11,
-              fontFamily: 'ui-monospace, Consolas, monospace',
-              color: '#64748b',
-              wordBreak: 'break-all',
-            }}>
-              Quyền yêu cầu: {permissionKey}
-            </p>
-          </>
-        )}
       </div>
       <style>{`
         .modal-overlay {
@@ -210,8 +115,6 @@ export default function ForbiddenModal() {
           padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 600;
           border: 1px solid transparent; cursor: pointer;
         }
-        .btn--primary { background: #2563eb; color: #fff; }
-        .btn--primary:disabled { opacity: 0.65; cursor: not-allowed; }
         .btn--secondary { background: #fff; color: #334155; border-color: #e2e8f0; }
       `}</style>
     </div>
