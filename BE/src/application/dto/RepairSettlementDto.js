@@ -1,4 +1,4 @@
-// Format 1 Date/string ve dd/mm/yyyy (khop voi o "Ngay ke tiep" cua FE, dang la input text tu do).
+// Format 1 Date/string ve dd/mm/yyyy (khop voi cac o ngay dang input text tu do o FE).
 // Dung cac getter UTC (khong dung .getDate()/.getHours() local) vi mssql
 // (tedious, useUTC mac dinh true) doc/ghi cot date/datetime cua SQL Server
 // theo truc UTC cua JS Date - dung getter local se bi lech theo mui gio he
@@ -51,8 +51,6 @@ class RepairSettlementResponseDto {
       vat: entity.vat,
       freeAmount: entity.freeAmount,
       total: entity.total,
-      nextMaintenanceKm: entity.nextMaintenanceKm,
-      nextMaintenanceDate: toDDMMYYYY(entity.nextMaintenanceDate),
       isWarranty: entity.isWarranty,
       teamLeader: entity.teamLeaderName,
       repairOrderId: entity.repairOrderId,
