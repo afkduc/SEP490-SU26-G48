@@ -299,7 +299,69 @@ async function exportAuditLogsToExcel(rows, filters = {}) {
   return workbook.xlsx.writeBuffer();
 }
 
+const LOGIN_SESSION_COLUMNS = [
+  { header: 'Thời gian', key: 'loginTime', width: 20 },
+  { header: 'Người dùng', key: 'userName', width: 18 },
+  { header: 'SĐT', key: 'phone', width: 14 },
+  { header: 'Hành động', key: 'actionType', width: 16 },
+  { header: 'Trạng thái', key: 'status', width: 14 },
+  { header: 'IP', key: 'ipAddress', width: 16 },
+  { header: 'Trình duyệt', key: 'browser', width: 16 },
+  { header: 'Hệ điều hành', key: 'os', width: 16 },
+  { header: 'Thời lượng (giây)', key: 'duration', width: 16 },
+];
+
+function mapLoginSessionRow(row) {
+  return [
+    formatDateValue(row.loginTime || row.login_time),
+    row.userName || row.user_name || '',
+    row.phoneNumber || row.phone_number || row.phone || '',
+    row.actionType || row.action_type || '',
+    row.status || '',
+    row.ipAddress || row.ip_address || '',
+    row.browser || '',
+    row.os || '',
+    row.sessionDuration ?? row.session_duration_seconds ?? '',
+  ];
+}
+
+async function exportLoginSessionsToExcel(rows, filters = {}) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'AutoGara';
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet('Lịch sử đăng nhập', {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 4 }],
+  });
+
+  const filterDescs = [];
+  if (filters.userName) filterDescs.push(`Người dùng: "${filters.userName}"`);
+  if (filters.phone) filterDescs.push(`SĐT: "${filters.phone}"`);
+  if (filters.actionType) filterDescs.push(`Hành động: ${filters.actionType}`);
+  if (filters.status) filterDescs.push(`Trạng thái: ${filters.status}`);
+  if (filters.startDate) filterDescs.push(`Từ: ${filters.startDate}`);
+  if (filters.endDate) filterDescs.push(`Đến: ${filters.endDate}`);
+
+  const subtitleParts = [`Ngày xuất: ${new Date().toLocaleString('vi-VN')}`];
+  if (filterDescs.length) subtitleParts.push(`Bộ lọc: ${filterDescs.join(' | ')}`);
+  subtitleParts.push(`Tổng: ${rows.length} bản ghi`);
+
+  setTitleRow(worksheet, columnLetter(LOGIN_SESSION_COLUMNS.length), 'BÁO CÁO LỊCH SỬ ĐĂNG NHẬP', subtitleParts.join(' - '));
+  const headerRow = worksheet.getRow(4);
+  LOGIN_SESSION_COLUMNS.forEach((col, idx) => { headerRow.getCell(idx + 1).value = col.header; });
+  styleHeaderRow(worksheet, 4, LOGIN_SESSION_COLUMNS.length);
+  autoWidth(worksheet, LOGIN_SESSION_COLUMNS);
+
+  const lastDataRow = writeRows(worksheet, 5, LOGIN_SESSION_COLUMNS, rows, mapLoginSessionRow);
+  if (lastDataRow > 5) {
+    styleDataRows(worksheet, 5, lastDataRow - 1, LOGIN_SESSION_COLUMNS.length);
+  }
+
+  return workbook.xlsx.writeBuffer();
+}
+
 module.exports = {
   exportUsersToExcel,
   exportAuditLogsToExcel,
+  exportLoginSessionsToExcel,
 };

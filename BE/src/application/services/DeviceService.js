@@ -313,21 +313,66 @@ class DeviceService {
   async heartbeat(deviceId) {
     const { query } = require('../../infrastructure/database/sqlServer');
     const devId = Number(deviceId);
-    // 1. Update user_devices.last_activity_at (existing logic)
+    // 1. Update user_devices.last_activity_at
     const updatedDevice = await this.deviceRepository.updateLastActivityIfNeeded(devId);
-    // 2. Update login_sessions.last_activity_at (BUG FIX: was missing)
-    //    This ensures the cleanup job can correctly identify stale sessions.
-    //    Use throttle: only update if >= 60s since last update to avoid DB spam.
+
+    // 2. Neu session vua bi TIMEOUT nham (user van heartbeat) → mo lai
+    //    Chi revive session TIMEOUT gan day cua dung device, va chi khi
+    //    user khong con session active nao khac.
     await query(
-      `UPDATE TOP (1) login_sessions
-       SET    last_activity_at = SYSUTCDATETIME()
-       WHERE  device_id = @p1
-         AND  status    = 'active'
-         AND  action_type = 'LOGIN'
-         AND  (last_activity_at IS NULL
-               OR last_activity_at < DATEADD(SECOND, -60, SYSUTCDATETIME()))`,
+      `UPDATE ls
+       SET    ls.status = 'active',
+              ls.logout_time = NULL,
+              ls.logout_reason = NULL,
+              ls.session_duration_seconds = NULL,
+              ls.last_activity_at = SYSUTCDATETIME()
+       FROM   login_sessions ls
+       INNER JOIN user_devices ud ON ud.id = @p1 AND ud.user_id = ls.user_id
+       WHERE  ls.device_id = @p1
+         AND  ls.status = 'ended'
+         AND  ls.logout_reason = 'TIMEOUT'
+         AND  ls.action_type = 'LOGIN'
+         AND  ls.logout_time >= DATEADD(HOUR, -2, SYSUTCDATETIME())
+         AND  NOT EXISTS (
+           SELECT 1 FROM login_sessions a
+           WHERE  a.user_id = ls.user_id
+             AND  a.status = 'active'
+             AND  a.action_type = 'LOGIN'
+         )`,
       { p1: devId }
     );
+
+    // 3. Update last_activity_at cho moi session active cua user so huu device
+    await query(
+      `UPDATE ls
+       SET    ls.last_activity_at = SYSUTCDATETIME()
+       FROM   login_sessions ls
+       INNER JOIN user_devices ud
+               ON ud.user_id = ls.user_id
+              AND ud.id = @p1
+       WHERE  ls.status = 'active'
+         AND  ls.action_type = 'LOGIN'
+         AND  (ls.last_activity_at IS NULL
+               OR ls.last_activity_at < DATEADD(SECOND, -60, SYSUTCDATETIME()))`,
+      { p1: devId }
+    );
+
+    // 4. Heal device is_current neu van con session active
+    await query(
+      `UPDATE ud
+       SET    ud.is_current = 1
+       FROM   user_devices ud
+       WHERE  ud.id = @p1
+         AND  ud.is_current = 0
+         AND  EXISTS (
+           SELECT 1 FROM login_sessions ls
+           WHERE  ls.user_id = ud.user_id
+             AND  ls.status = 'active'
+             AND  ls.action_type = 'LOGIN'
+         )`,
+      { p1: devId }
+    );
+
     return {
       updated: updatedDevice,
       deviceId: devId,
