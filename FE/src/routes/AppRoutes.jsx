@@ -29,8 +29,6 @@ const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'))
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
-const AdminPermissionMatrixPage = lazy(() => import('../pages/admin/AdminPermissionMatrixPage'));
-const RoleScreenMatrixPage = lazy(() => import('../pages/admin/RoleScreenMatrixPage'));
 const PermissionRequestsPage = lazy(() => import('../pages/admin/PermissionRequestsPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
@@ -180,13 +178,13 @@ function AppRoutes() {
               <AdminSpecialtiesPage />
             </ProtectedRoute>
           } />
-          <Route path="permission-matrix" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="permission-matrix" element={<Navigate to="/admin/permission-requests" replace />} />
+          <Route path="role-screen-matrix" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="permission-requests" element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
               <PermissionRequestsPage />
             </ProtectedRoute>
           } />
-          <Route path="role-screen-matrix" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="logs" element={
             <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:audit_logs:access">
               <AuditLogsPage />

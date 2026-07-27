@@ -862,7 +862,7 @@ function AuditLogDetailModal({ log, onClose }) {
             )}
             {log.request_method && (
               <div className="audit-detail__field">
-                <label>Method</label>
+                <label>Phương thức</label>
                 <span className={`badge badge--${log.request_method === 'POST' ? 'success' : log.request_method === 'PUT' || log.request_method === 'PATCH' ? 'info' : log.request_method === 'DELETE' ? 'danger' : 'secondary'}`}>
                   {log.request_method}
                 </span>
@@ -870,13 +870,13 @@ function AuditLogDetailModal({ log, onClose }) {
             )}
             {log.request_url && (
               <div className="audit-detail__field audit-detail__field--full">
-                <label>URL</label>
+                <label>Đường dẫn yêu cầu</label>
                 <code className="audit-detail__url">{log.request_url}</code>
               </div>
             )}
             {log.response_status && (
               <div className="audit-detail__field">
-                <label>HTTP Status</label>
+                <label>Mã phản hồi</label>
                 <span className={`badge badge--${String(log.response_status).startsWith('2') ? 'success' : String(log.response_status).startsWith('4') || String(log.response_status).startsWith('5') ? 'danger' : 'secondary'}`}>
                   {log.response_status}
                 </span>
@@ -919,7 +919,7 @@ function AuditLogDetailModal({ log, onClose }) {
           {/* Request body */}
           {log.request_body && (
             <div className="audit-detail__section">
-              <label>Request Body</label>
+              <label>Nội dung yêu cầu</label>
               <JsonView data={log.request_body} />
             </div>
           )}
@@ -927,7 +927,7 @@ function AuditLogDetailModal({ log, onClose }) {
           {/* Timestamp */}
           <div className="audit-detail__timestamp">
             <span title={t.sub}>{t.main}</span>
-            {log.record_id && <span className="audit-detail__record-id">Record ID: {log.record_id}</span>}
+            {log.record_id && <span className="audit-detail__record-id">Mã bản ghi: {log.record_id}</span>}
           </div>
         </div>
       </div>
