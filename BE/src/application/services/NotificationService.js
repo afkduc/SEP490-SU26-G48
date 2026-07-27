@@ -79,6 +79,15 @@ const NOTIFICATION_EVENTS = {
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
+  SYSTEM_BROADCAST: {
+    title: 'Thông báo hệ thống',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{message}',
+      withTitle: '{title}: {message}',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
   PASSWORD_CHANGED: {
     title: 'Mật khẩu đã thay đổi',
     severity: SEVERITY.INFO,
@@ -473,10 +482,18 @@ class NotificationService {
     }
 
     // Tạo title và message
-    const title = event.title;
+    let title = event.title;
     let message = event.messageTemplates.default || Object.values(event.messageTemplates)[0] || event.title;
 
     // Handle different message templates based on data (trước replace placeholder)
+    if (eventType === 'SYSTEM_BROADCAST') {
+      if (data.title) title = String(data.title);
+      if (data.templateKey === 'withTitle' && event.messageTemplates.withTitle) {
+        message = event.messageTemplates.withTitle;
+      } else if (data.message) {
+        message = '{message}';
+      }
+    }
     if (eventType === 'PASSWORD_CHANGED' && data.resetByAdmin) {
       message = event.messageTemplates.byAdmin;
     }
@@ -541,11 +558,11 @@ class NotificationService {
     // Create notification in DB
     const notification = await this.notificationRepo.create({
       userId,
-      title: event.title,
+      title,
       message,
       type: eventType,
-      severity: event.severity || null,
-      metadata,
+      severity: (data.severity || event.severity) || null,
+      metadata: { ...metadata, ...(data.metadata || {}) },
     });
 
     // Emit SSE event for real-time update
@@ -586,6 +603,22 @@ class NotificationService {
         results.push({ adminId, notification: result });
       } catch (err) {
         console.warn(`[NotificationService] Failed to notify admin ${adminId}:`, err.message);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Broadcast thong bao toi danh sach userId (dung cho Admin broadcast).
+   */
+  async notifyUsers(userIds = [], eventType, data = {}) {
+    const results = [];
+    for (const userId of userIds) {
+      try {
+        const result = await this.notify(eventType, { ...data, userId }, { skipSettings: true });
+        results.push({ userId, notification: result });
+      } catch (err) {
+        console.warn(`[NotificationService] Failed to notify user ${userId}:`, err.message);
       }
     }
     return results;

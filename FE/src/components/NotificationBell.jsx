@@ -165,7 +165,7 @@ export default function NotificationBell() {
         </svg>
         {unreadCount > 0 && (
           <span className="notif-bell__badge" aria-hidden>
-            {unreadCount > 99 ? '99+' : unreadCount}
+            {unreadCount > 100 ? '99+' : unreadCount}
           </span>
         )}
         {/* Dot nho the hien SSE connect status */}
