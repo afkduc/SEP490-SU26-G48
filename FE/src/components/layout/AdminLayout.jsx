@@ -50,15 +50,20 @@ const ADMIN_SIDEBAR = [
         permission: 'screen:branches:access',
       },
       {
-        label: 'Vai trò',
-        path: '/admin/roles',
+        label: 'Chuyên môn',
+        path: '/admin/specialties',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
           </svg>
         ),
-        permission: 'screen:roles:access',
+        permission: 'screen:specialties:access',
       },
+    ],
+  },
+  {
+    group: 'Giám sát',
+    items: [
       {
         label: 'Ma trận quyền',
         path: '/admin/permission-matrix',
@@ -72,12 +77,8 @@ const ADMIN_SIDEBAR = [
           </svg>
         ),
         permission: 'screen:permission_matrix:access',
+        hidden: true, // tạm tắt chức năng ma trận
       },
-    ],
-  },
-  {
-    group: 'Giám sát',
-    items: [
       {
         label: 'Nhật ký hoạt động',
         path: '/admin/logs',
@@ -115,16 +116,6 @@ const ADMIN_SIDEBAR = [
         ),
         permission: 'screen:devices:access',
       },
-      {
-        label: 'Chuyên môn',
-        path: '/admin/specialties',
-        icon: (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-          </svg>
-        ),
-        permission: 'screen:specialties:access',
-      },
     ],
   },
   {
@@ -160,13 +151,13 @@ function getInitials(name = '') {
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
+function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd, onContentRefresh }) {
   const { user } = useAuth();
   const { can } = usePermission();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isItemVisible = (item) => !item.permission || can(item.permission);
+  const isItemVisible = (item) => !item.hidden && (!item.permission || can(item.permission));
 
   const visibleGroups = ADMIN_SIDEBAR
     .map((g) => ({ ...g, items: g.items.filter(isItemVisible) }))
@@ -181,15 +172,19 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick }) {
     .sort((a, b) => b.length - a.length);
   const longestMatch = matchedPaths[0];
 
-  // Click sidebar item -> hard reload neu chuyen sang path khac.
-  // Quy tac cua du an: moi lan doi route admin phai F5 1 luot de tranh
-  // stale state (filter, modal, permission gate, layout leak).
+  // SPA navigate nhanh — không full reload (tránh trắng màn hình lâu)
   const handleItemClick = (targetPath) => {
     if (onItemClick) onItemClick();
-    if (!targetPath || targetPath === location.pathname) return;
-    // Dung full reload (window.location.assign) de tat ca React state
-    // (useEffect deps, refs, context cache) duoc reset tu dau.
-    window.location.assign(targetPath);
+    if (!targetPath) return;
+    onNavStart?.();
+    // Cùng trang hoặc đổi trang: luôn remount content (soft F5) để state sạch
+    if (targetPath !== location.pathname) {
+      navigate(targetPath);
+    }
+    onContentRefresh?.();
+    requestAnimationFrame(() => {
+      setTimeout(() => onNavEnd?.(), 180);
+    });
   };
 
   return (
@@ -260,9 +255,22 @@ export default function AdminLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [navLoading, setNavLoading] = useState(false);
+  const [contentKey, setContentKey] = useState(0);
   const userMenuRef = useRef(null);
+  const prevPathRef = useRef(location.pathname);
 
-  const isItemVisible = (item) => !item.permission || can(item.permission);
+  // Clear leftover dark-theme preference (admin luôn dùng light)
+  useEffect(() => {
+    try { localStorage.removeItem('admin-theme'); } catch { /* ignore */ }
+    document.documentElement.removeAttribute('data-theme');
+  }, []);
+
+  const refreshContent = () => {
+    setContentKey((k) => k + 1);
+  };
+
+  const isItemVisible = (item) => !item.hidden && (!item.permission || can(item.permission));
   const visibleGroups = ADMIN_SIDEBAR
     .map((g) => ({ ...g, items: g.items.filter(isItemVisible) }))
     .filter((g) => g.items.length > 0);
@@ -270,6 +278,20 @@ export default function AdminLayout({ children }) {
   // Close mobile drawer when route changes
   useEffect(() => {
     setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Khi vừa login và điều hướng từ trang public (/login) vào admin,
+  // ép remount nội dung để tránh render sai frame (cần F5 mới đúng).
+  useEffect(() => {
+    const prev = prevPathRef.current;
+    const now = location.pathname;
+    prevPathRef.current = now;
+
+    const nowAdmin = String(now).startsWith('/admin');
+    const prevAdmin = String(prev).startsWith('/admin');
+    if (nowAdmin && !prevAdmin) {
+      refreshContent();
+    }
   }, [location.pathname]);
 
   // Lock body scroll khi mobile drawer mo
@@ -318,7 +340,9 @@ export default function AdminLayout({ children }) {
   const currentPage = allItems.find((i) => i.path === longestMatch);
 
   return (
-    <div className={`admin-shell ${collapsed ? 'admin-shell--collapsed' : ''}`}>
+    <div
+      className={`admin-shell ${collapsed ? 'admin-shell--collapsed' : ''}`}
+    >
 
       {/* Mobile drawer overlay */}
       {mobileOpen && (
@@ -334,7 +358,38 @@ export default function AdminLayout({ children }) {
         isMobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         onItemClick={() => setMobileOpen(false)}
+        onNavStart={() => setNavLoading(true)}
+        onNavEnd={() => setNavLoading(false)}
+        onContentRefresh={refreshContent}
       />
+
+      {navLoading && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 5000,
+            background: 'rgba(248, 250, 252, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+          aria-hidden="true"
+        >
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              border: '3px solid #c7d2fe',
+              borderTopColor: '#4f46e5',
+              animation: 'admin-nav-spin 0.7s linear infinite',
+            }}
+          />
+          <style>{`@keyframes admin-nav-spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
 
       {/* Desktop collapse button (desktop only) */}
       <button
@@ -416,7 +471,7 @@ export default function AdminLayout({ children }) {
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                       <circle cx="12" cy="7" r="4"/>
                     </svg>
-                    Ho sơ cá nhân
+                    Hồ sơ cá nhân
                   </button>
                   <button className="admin-topbar__dropdown-item admin-topbar__dropdown-item--danger" onClick={handleLogout}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -433,7 +488,9 @@ export default function AdminLayout({ children }) {
         </header>
 
         <main className="admin-content">
-          {children}
+          <div key={`${location.pathname}::${contentKey}`} className="admin-content__remount">
+            {children}
+          </div>
         </main>
 
         <ScrollToggleButton />

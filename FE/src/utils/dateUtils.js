@@ -118,3 +118,38 @@ export function computeClockOffsetMs(serverIso, clientMsAtCall = Date.now()) {
   if (!d) return 0;
   return d.getTime() - clientMsAtCall;
 }
+
+/**
+ * Lay clock offset tu storage (set boi AppContext sau login).
+ * Tra ve 0 neu chua co (lan dau load page, chua login).
+ */
+export function getClockOffsetMs() {
+  try {
+    const raw = sessionStorage.getItem('clockOffset') || localStorage.getItem('clockOffset');
+    if (!raw) return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Tuong tu formatDateSafe nhung AP DUNG clock offset (server - client).
+ * Muc dich: dam bao cac timestamp tu server duoc hien thi dung theo
+ * may client, ke ca khi may client set sai gio he thong.
+ *
+ * Vi du: BE tra login_time = '2026-07-19T11:25:14.613Z'. May client
+ * co system clock cham 5 phut. Binh thuong hien thi 11:20 (sai).
+ * Voi formatDateSafeWithOffset, se hien thi 11:25 (dung theo server).
+ */
+export function formatDateSafeWithOffset(value, options = {}) {
+  const offset = getClockOffsetMs();
+  if (offset === 0) return formatDateSafe(value, options);
+
+  const d = parseDateSafe(value);
+  if (!d) return '—';
+  // Cong offset vao Date de "dich" thoi gian theo server
+  const adjusted = new Date(d.getTime() + offset);
+  return formatDateSafe(adjusted, options);
+}

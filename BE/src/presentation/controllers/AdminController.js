@@ -936,11 +936,13 @@ class AdminController {
       const roles = await this.userRoleService.getUserRoles(userId);
       const roleNames = roles.map((r) => r.roleName).filter(Boolean);
 
-      // Lay permissions tu DB
+      // Lay permissions tu DB (bo qua cache de lay gia tri moi nhat -
+      // tranh truong hop admin vua thay doi ma tran quyen nhung cache 60s
+      // van con permission cu)
       const PermissionService = require('../../application/services/PermissionService');
       const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
       const ps = new PermissionService({ roleRepository: new RoleRepositoryImpl() });
-      const permissions = await ps.getUserPermissions(userId);
+      const permissions = await ps.getUserPermissions(userId, { skipCache: true });
       const permissionKeys = Array.from(permissions);
 
       const newToken = jwt.sign(
@@ -980,12 +982,12 @@ class AdminController {
       const roles = await this.userRoleService.getUserRoles(userId);
       const roleNames = roles.map((r) => r.roleName).filter(Boolean);
 
-      // Lay permissions tu DB (bypass cache de lay gia tri moi nhat)
+      // JWT: compact (tránh 431). Response permissions: full L2 cho FE UI.
       const PermissionService = require('../../application/services/PermissionService');
       const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
       const ps = new PermissionService({ roleRepository: new RoleRepositoryImpl() });
-      const permissions = await ps.getUserPermissions(userId);
-      const permissionKeys = Array.from(permissions);
+      const compactKeys = await ps.getUserPermissionsCompact(userId, { skipCache: true });
+      const fullKeys = Array.from(await ps.getUserPermissions(userId, { skipCache: true }));
 
       const newToken = jwt.sign(
         {
@@ -993,7 +995,7 @@ class AdminController {
           email: req.user.email,
           name: req.user.name,
           roles: roleNames,
-          permissions: permissionKeys,
+          permissions: compactKeys,
           branchId: req.user.branchId,
           tokenVersion: req.user.tokenVersion,
           ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
@@ -1002,7 +1004,11 @@ class AdminController {
         { expiresIn: config.jwtExpiresIn }
       );
 
-      return success(res, { token: newToken, permissions: permissionKeys }, 'Cap nhat quyen thanh cong');
+      return success(
+        res,
+        { token: newToken, permissions: fullKeys, effectivePermissions: fullKeys },
+        'Cap nhat quyen thanh cong'
+      );
     } catch (err) {
       next(err);
     }

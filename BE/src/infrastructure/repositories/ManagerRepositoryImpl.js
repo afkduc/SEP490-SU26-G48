@@ -2,9 +2,8 @@ const { query } = require('../database/sqlServer');
 
 // Tổ trưởng đã gộp vào module Nhân viên (dùng chung listEmployees/createEmployee/...),
 // nên phải nằm trong EMPLOYEE_ROLES để hiện ra trong danh sách/tìm kiếm nhân viên.
-const EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'accountant', 'team_leader'];
-// Vai trò được PHÉP GÁN khi tạo/sửa nhân viên (khác EMPLOYEE_ROLES ở chỗ không cho
-// tạo mới Kế toán qua màn này nữa).
+const EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'team_leader'];
+// Vai trò được PHÉP GÁN khi tạo/sửa nhân viên.
 const ASSIGNABLE_EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'team_leader'];
 const TECHNICIAN_ROLE = 'technician';
 const TEAM_LEADER_ROLE = 'team_leader';
@@ -165,9 +164,9 @@ function mapPackageRow(row) {
     name: row.package_name,
     categoryId: row.category_id,
     categoryName: row.category_name,
-    applicableKm: row.applicable_km,
     totalPrice: Number(row.total_price || 0),
     description: row.description,
+    purpose: row.purpose,
     isActive: !!row.is_active,
     repairCategory: row.repair_category,
   };
@@ -557,7 +556,7 @@ class ManagerRepositoryImpl {
 
     const result = await query(
       `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
-              sp.applicable_km, sp.total_price, sp.description, sp.is_active, sp.repair_category,
+              sp.total_price, sp.description, sp.purpose, sp.is_active, sp.repair_category,
               (SELECT COUNT(*) FROM service_package_items spi WHERE spi.package_id = sp.id) AS item_count
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
@@ -578,7 +577,7 @@ class ManagerRepositoryImpl {
   async getServicePackageById(branchId, id) {
     const result = await query(
       `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
-              sp.applicable_km, sp.total_price, sp.description, sp.is_active, sp.repair_category
+              sp.total_price, sp.description, sp.purpose, sp.is_active, sp.repair_category
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
        WHERE sp.id = @id AND sp.branch_id = @branchId`,
@@ -629,18 +628,18 @@ class ManagerRepositoryImpl {
     }
   }
 
-  async createServicePackage({ branchId, packageCode, packageName, categoryId, applicableKm, totalPrice, description, repairCategory, serviceIds }) {
+  async createServicePackage({ branchId, packageCode, packageName, categoryId, totalPrice, description, purpose, repairCategory, serviceIds }) {
     const result = await query(
-      `INSERT INTO service_packages (package_code, package_name, category_id, applicable_km, total_price, description, is_active, branch_id, repair_category)
+      `INSERT INTO service_packages (package_code, package_name, category_id, total_price, description, purpose, is_active, branch_id, repair_category)
        OUTPUT INSERTED.id
-       VALUES (@packageCode, @packageName, @categoryId, @applicableKm, @totalPrice, @description, 1, @branchId, @repairCategory)`,
+       VALUES (@packageCode, @packageName, @categoryId, @totalPrice, @description, @purpose, 1, @branchId, @repairCategory)`,
       {
         packageCode,
         packageName,
         categoryId,
-        applicableKm,
         totalPrice,
         description,
+        purpose: purpose || null,
         branchId: Number(branchId),
         repairCategory: repairCategory || null,
       }
@@ -650,23 +649,23 @@ class ManagerRepositoryImpl {
     return this.getServicePackageById(branchId, packageId);
   }
 
-  async updateServicePackage(branchId, id, { packageName, categoryId, applicableKm, totalPrice, description, isActive, repairCategory, serviceIds }) {
+  async updateServicePackage(branchId, id, { packageName, categoryId, totalPrice, description, purpose, isActive, repairCategory, serviceIds }) {
     await query(
       `UPDATE service_packages
        SET package_name = @packageName,
            category_id = @categoryId,
-           applicable_km = @applicableKm,
            total_price = @totalPrice,
            description = @description,
+           purpose = @purpose,
            is_active = @isActive,
            repair_category = @repairCategory
        WHERE id = @id AND branch_id = @branchId`,
       {
         packageName,
         categoryId,
-        applicableKm,
         totalPrice,
         description,
+        purpose: purpose || null,
         isActive: isActive ? 1 : 0,
         repairCategory: repairCategory || null,
         id: Number(id),

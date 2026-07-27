@@ -39,9 +39,18 @@ const NOTIFICATION_EVENTS = {
     title: 'Cảnh báo đăng nhập',
     severity: SEVERITY.ERROR,
     messageTemplates: {
-      default: 'Có {count} lần đăng nhập thất bại cho tài khoản của bạn.',
+      default: 'Phát hiện đăng nhập thất bại vào tài khoản của bạn{reason}.',
+      withCount: 'Có {count} lần đăng nhập thất bại cho tài khoản của bạn.',
     },
     affectsSettings: [EMAIL_ON_FAILED_LOGIN, IN_APP_SYSTEM_ALERT],
+  },
+  LOGIN_CHALLENGE: {
+    title: 'Yêu cầu đăng nhập mới',
+    severity: SEVERITY.WARNING,
+    messageTemplates: {
+      default: 'Có thiết bị khác đang cố đăng nhập tài khoản của bạn ({device}). Hãy xác nhận đó có phải là bạn không.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
   NEW_DEVICE: {
     title: 'Đăng nhập từ thiết bị mới',
@@ -73,6 +82,7 @@ const NOTIFICATION_EVENTS = {
     title: 'Phân quyền đã thay đổi',
     severity: SEVERITY.WARNING,
     messageTemplates: {
+      default: 'Phân quyền của bạn đã được cập nhật: {roles}.',
       assigned: 'Bạn đã được gán quyền mới: {roles}.',
       revoked: 'Quyền sau đã bị thu hồi: {roles}.',
     },
@@ -91,7 +101,7 @@ const NOTIFICATION_EVENTS = {
   },
   USER_UPDATED: {
     title: 'Người dùng được cập nhật',
-    severity: SEVERITY.INFO,
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} đã cập nhật thông tin người dùng: {targetName} ({targetCode}).',
     },
@@ -133,7 +143,7 @@ const NOTIFICATION_EVENTS = {
   },
   REPAIR_ORDER_UPDATED: {
     title: 'Phiếu sửa chữa được cập nhật',
-    severity: SEVERITY.INFO,
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} đã cập nhật phiếu sửa chữa: {targetName}.',
     },
@@ -151,19 +161,47 @@ const NOTIFICATION_EVENTS = {
   },
   SETTLEMENT_UPDATED: {
     title: 'Phiếu quyết toán được cập nhật',
-    severity: SEVERITY.INFO,
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} đã cập nhật phiếu quyết toán: {targetName}.',
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
 
-  // Inventory
+  // Inventory / permission workflow
   PERMISSION_REQUEST: {
     title: 'Yêu cầu cấp quyền mới',
     severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} ({targetCode}) yêu cầu cấp quyền: {permissionKey}{reason}.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  PERMISSION_GRANTED: {
+    title: 'Đã được cấp quyền',
+    severity: SEVERITY.SUCCESS,
+    messageTemplates: {
+      default: '{actorName} đã cấp quyền "{permissionKey}" cho bạn.',
+      matrix: '{actorName} đã cập nhật quyền trên ma trận: {permissionKey}.',
+    },
+    affectsSettings: [EMAIL_ON_ROLE_CHANGE, IN_APP_SYSTEM_ALERT],
+  },
+  PERMISSION_REJECTED: {
+    title: 'Yêu cầu cấp quyền bị từ chối',
+    severity: SEVERITY.ERROR,
+    messageTemplates: {
+      default: '{actorName} đã từ chối yêu cầu quyền "{permissionKey}"{reason}.',
+    },
+    affectsSettings: [EMAIL_ON_ROLE_CHANGE, IN_APP_SYSTEM_ALERT],
+  },
+  PERMISSION_MATRIX_UPDATED: {
+    title: 'Ma trận quyền đã cập nhật',
+    severity: SEVERITY.WARNING,
+    messageTemplates: {
+      default: '{actorName} đã cập nhật ma trận quyền: {permissionKey}.',
+      bulk: '{actorName} đã cập nhật hàng loạt ma trận quyền ({count} ô).',
+      roleScreen: '{actorName} đã lưu ma trận màn hình cho vai trò {targetName} ({count} mục).',
+      userOverride: '{actorName} đã cập nhật quyền riêng cho {targetName}.',
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
@@ -195,7 +233,7 @@ const NOTIFICATION_EVENTS = {
   },
   BRANCH_UPDATED: {
     title: 'Chi nhánh được cập nhật',
-    severity: SEVERITY.INFO,
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} đã cập nhật chi nhánh: {targetName}.',
     },
@@ -229,7 +267,7 @@ const NOTIFICATION_EVENTS = {
   },
   ROLE_UPDATED: {
     title: 'Vai trò được cập nhật',
-    severity: SEVERITY.INFO,
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} đã cập nhật vai trò: {targetName}.',
     },
@@ -264,7 +302,7 @@ const NOTIFICATION_EVENTS = {
   },
   PRODUCT_UPDATED: {
     title: 'Sản phẩm được cập nhật',
-    severity: SEVERITY.INFO,
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} đã cập nhật sản phẩm: {targetName} ({targetCode}).',
     },
@@ -307,7 +345,7 @@ const NOTIFICATION_EVENTS = {
 
   CUSTOMER_UPDATED: {
     title: 'Khách hàng được cập nhật',
-    severity: SEVERITY.INFO,
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} đã cập nhật khách hàng: {targetName} ({targetCode}).',
     },
@@ -324,7 +362,7 @@ const NOTIFICATION_EVENTS = {
   },
   BRANCH_MANAGER_UPDATED: {
     title: 'Giám đốc chi nhánh được cập nhật',
-    severity: SEVERITY.INFO,
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} đã cập nhật giám đốc chi nhánh: {targetName}.',
     },
@@ -351,7 +389,7 @@ const NOTIFICATION_EVENTS = {
   },
   SPECIALTY_UPDATED: {
     title: 'Chuyên môn được cập nhật',
-    severity: SEVERITY.INFO,
+    severity: SEVERITY.WARNING,
     messageTemplates: {
       default: '{actorName} đã cập nhật chuyên môn: {targetName}.',
     },
@@ -426,21 +464,9 @@ class NotificationService {
 
     // Tạo title và message
     const title = event.title;
-    let message = event.messageTemplates.default;
+    let message = event.messageTemplates.default || Object.values(event.messageTemplates)[0] || event.title;
 
-    // Replace placeholders in message
-    if (data.device) message = message.replace('{device}', data.device);
-    if (data.location) message = message.replace('{location}', data.location);
-    if (data.count) message = message.replace('{count}', data.count);
-    if (data.roles) message = message.replace('{roles}', data.roles);
-    // CRUD placeholders
-    if (data.actorName) message = message.replace('{actorName}', data.actorName);
-    if (data.targetName) message = message.replace('{targetName}', data.targetName);
-    if (data.targetCode) message = message.replace('{targetCode}', data.targetCode);
-    if (data.permissionKey) message = message.replace('{permissionKey}', data.permissionKey);
-    if (data.reason) message = message.replace('{reason}', data.reason);
-
-    // Handle different message templates based on data
+    // Handle different message templates based on data (trước replace placeholder)
     if (eventType === 'PASSWORD_CHANGED' && data.resetByAdmin) {
       message = event.messageTemplates.byAdmin;
     }
@@ -454,7 +480,34 @@ class NotificationService {
       message = event.messageTemplates.byAdmin;
     }
     if (eventType === 'LOGIN_SUCCESS' && data.isNewDevice) {
-      message = event.messageTemplates.withDevice.replace('{device}', data.device || 'thiết bị mới');
+      message = event.messageTemplates.withDevice;
+    }
+    if (eventType === 'LOGIN_FAILED' && data.count) {
+      message = event.messageTemplates.withCount || message;
+    }
+    if (eventType === 'PERMISSION_GRANTED' && data.fromMatrix) {
+      message = event.messageTemplates.matrix || message;
+    }
+    if (eventType === 'PERMISSION_MATRIX_UPDATED') {
+      if (data.bulk) message = event.messageTemplates.bulk || message;
+      else if (data.roleScreen) message = event.messageTemplates.roleScreen || message;
+      else if (data.userOverride) message = event.messageTemplates.userOverride || message;
+    }
+
+    // Replace placeholders in message
+    if (data.device) message = message.replace('{device}', data.device);
+    if (data.location) message = message.replace('{location}', data.location);
+    if (data.count != null) message = message.replace('{count}', String(data.count));
+    if (data.roles) message = message.replace('{roles}', data.roles);
+    // CRUD placeholders
+    if (data.actorName) message = message.replace('{actorName}', data.actorName);
+    if (data.targetName) message = message.replace('{targetName}', data.targetName);
+    if (data.targetCode) message = message.replace('{targetCode}', data.targetCode);
+    if (data.permissionKey) message = message.replace('{permissionKey}', data.permissionKey);
+    if (data.reason) {
+      message = message.replace('{reason}', ` — Lý do: ${data.reason}`);
+    } else {
+      message = message.replace('{reason}', '');
     }
 
     // Build metadata
@@ -475,6 +528,13 @@ class NotificationService {
     if (data.actorName) metadata.actorName = data.actorName;
     if (data.targetName) metadata.targetName = data.targetName;
     if (data.targetCode) metadata.targetCode = data.targetCode;
+    if (data.permissionKey) metadata.permissionKey = data.permissionKey;
+    if (data.quickAssignPermission) metadata.quickAssignPermission = data.quickAssignPermission;
+    if (data.requesterId) metadata.requesterId = data.requesterId;
+    if (data.page) metadata.page = data.page;
+    if (data.reason) metadata.reason = data.reason;
+    if (data.screenKey) metadata.screenKey = data.screenKey;
+    if (data.pendingId) metadata.pendingId = data.pendingId;
 
     // Create notification in DB
     const notification = await this.notificationRepo.create({
@@ -502,6 +562,7 @@ class NotificationService {
    * @param {number|null} options.excludeUserId - Loại trừ user ID nào (vd: người thực hiện)
    */
   async notifyAdmins(eventType, data, { excludeUserId = null } = {}) {
+    // Gửi tới mọi admin active (kể cả offline) — tránh mất request khi admin chưa online
     const adminsResult = await query(`
       SELECT u.id
       FROM users u
@@ -509,12 +570,6 @@ class NotificationService {
       JOIN roles r ON r.id = ur.role_id
       WHERE r.role_name = 'admin'
         AND u.status = 'active'
-        AND EXISTS (
-          SELECT 1 FROM login_sessions ls
-          WHERE ls.user_id = u.id
-            AND ls.status = 'active'
-            AND ls.action_type = 'LOGIN'
-        )
     `);
 
     const adminIds = adminsResult.recordset

@@ -18,7 +18,30 @@ function buildAuthRouter() {
   const deviceService = new DeviceService();
 
   router.post('/login', controller.login);
+  router.get('/login/challenges', authenticate, controller.listMyLoginChallenges);
+  router.get('/login/pending/:pendingId', controller.getPendingLogin);
+  router.post('/login/pending/:pendingId/approve', authenticate, controller.approvePendingLogin);
+  router.post('/login/pending/:pendingId/reject', authenticate, controller.rejectPendingLogin);
   router.get('/me', authenticate, controller.getMe);
+
+  // Quên mật khẩu / đặt lại mật khẩu (public + rate limit)
+  const rateLimit = require('express-rate-limit');
+  const forgotLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 8,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.' },
+  });
+  const resetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' },
+  });
+  router.post('/forgot-password', forgotLimiter, controller.forgotPassword);
+  router.post('/reset-password', resetLimiter, controller.resetPassword);
 
   /**
    * POST /api/auth/refresh-permissions
@@ -69,7 +92,8 @@ function buildAuthRouter() {
       }
 
       // Re-issue token voi permissions moi tu DB. PermissionService se
-      // bypass cache neu vua invalidate (case user vua bi admin thay doi).
+      // bypass cache (chi refresh path) de dam bao lay permission moi nhat
+      // ngay sau khi admin thay doi (tranh 60s cache TTL).
       let refreshed;
       try {
         const deviceId = req.user.deviceId || null;
@@ -80,7 +104,20 @@ function buildAuthRouter() {
         return next(new ApiError(503, 'Khong the tao token moi'));
       }
 
-      return success(res, refreshed, 'Refresh permissions thanh cong');
+      // FE ưu tiên effectivePermissions (full L2) để UI; JWT/user.permissions vẫn compact.
+      return success(
+        res,
+        {
+          token: refreshed.token,
+          user: {
+            ...refreshed.user,
+            // Gắn full set vào user.permissions cho FE storage (JWT đã compact riêng).
+            permissions: refreshed.effectivePermissions || refreshed.user.permissions,
+          },
+          effectivePermissions: refreshed.effectivePermissions || [],
+        },
+        'Refresh permissions thanh cong'
+      );
     } catch (err) {
       console.error('[auth.refresh-permissions] unexpected:', err?.message || err);
       return next(new ApiError(500, 'Loi may chu noi bo'));

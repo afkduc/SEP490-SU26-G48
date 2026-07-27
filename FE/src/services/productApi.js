@@ -49,8 +49,21 @@ export async function updateProductApi(id, payload) {
   return httpClient.put(`/products/${id}`, stripStock(payload));
 }
 
-export async function deleteProductApi(id) {
+/**
+ * Soft-disable phụ tùng (status=inactive). Không hard delete.
+ * BE: DELETE /api/products/:id → deactivate
+ */
+export async function deactivateProductApi(id) {
   return httpClient.delete(`/products/${id}`);
+}
+
+/** @deprecated Dùng deactivateProductApi — giữ alias để tương thích import cũ */
+export async function deleteProductApi(id) {
+  return deactivateProductApi(id);
+}
+
+export async function reactivateProductApi(id) {
+  return httpClient.patch(`/products/${id}/reactivate`);
 }
 
 export async function getCategoriesApi() {
