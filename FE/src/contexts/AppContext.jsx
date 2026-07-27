@@ -1,6 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { loginApi, logoutApi, getMeApi, getServerTime, getMyLoginChallengesApi } from '../services/authApi';
 import { ROLES } from '../constants/roles';
+import {
+  ROLE_PROFILE_CONFIG,
+  getProfileConfigByRole,
+} from '../config/roleProfileConfig';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
 import { useNotifications } from '../hooks/useNotifications';
@@ -102,15 +106,20 @@ const ROLE_PRIORITY = [
   ROLES.MANAGER,
   ROLES.SERVICE_ADVISOR,
   ROLES.TEAM_LEADER,
+  ROLES.TECHNICIAN,
   ROLES.WAREHOUSE_STAFF,
 ];
 
-function getPrimaryRole(user) {
+export function getPrimaryRole(user) {
   const roles = normalizeRoles(user?.roles);
+  if (!roles.length) return user?.primaryRole || null;
+  // Uu tien role cao nhat (admin > GD > manager > ...) de route/profile khong bi lech
+  const prioritized = ROLE_PRIORITY.find((role) => roles.includes(role));
+  if (prioritized) return prioritized;
   if (user?.primaryRole && roles.includes(user.primaryRole)) {
     return user.primaryRole;
   }
-  return ROLE_PRIORITY.find((role) => roles.includes(role)) || roles[0] || null;
+  return roles[0] || null;
 }
 
 /**
@@ -124,6 +133,7 @@ export function getRoleHome(user) {
   if (role === ROLES.MANAGER) return '/manager';
   if (role === ROLES.SERVICE_ADVISOR) return '/dashboard';
   if (role === ROLES.TEAM_LEADER) return '/repair-orders';
+  if (role === ROLES.TECHNICIAN) return '/repair-orders';
   if (role === ROLES.WAREHOUSE_STAFF) return '/inventory';
   return '/dashboard';
 }
@@ -133,18 +143,14 @@ export function getRoleHome(user) {
  */
 export function getRoleProfilePath(user) {
   const role = getPrimaryRole(user);
-  if (!role) return '/dashboard/profile';
-  if (role === ROLES.ADMIN) return '/admin/profile';
-  if (role === ROLES.GENERAL_DIRECTOR) return '/general-director/profile';
-  if (role === ROLES.MANAGER) return '/manager/profile';
-  if (role === ROLES.SERVICE_ADVISOR) return '/dashboard/profile';
-  if (role === ROLES.TEAM_LEADER) return '/repair-orders/profile';
-  if (role === ROLES.WAREHOUSE_STAFF) return '/inventory/profile';
-  return '/dashboard/profile';
+  const cfg = getProfileConfigByRole(role);
+  return cfg?.profilePath || ROLE_PROFILE_CONFIG[ROLES.SERVICE_ADVISOR].profilePath;
 }
 
 export function getRoleProfileEditPath(user) {
-  return `${getRoleProfilePath(user)}/edit`;
+  const role = getPrimaryRole(user);
+  const cfg = getProfileConfigByRole(role);
+  return cfg?.profileEditPath || `${getRoleProfilePath(user)}/edit`;
 }
 
 export function AppProvider({ children }) {
