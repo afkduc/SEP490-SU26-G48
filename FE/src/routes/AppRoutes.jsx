@@ -116,22 +116,6 @@ function ProfilePageLayout() {
   );
 }
 
-function RoleProfileRoutes({ path, roles }) {
-  return (
-    <Route
-      path={path}
-      element={
-        <ProtectedRoute roles={roles}>
-          <ProfilePageLayout />
-        </ProtectedRoute>
-      }
-    >
-      <Route index element={<AdminProfilePage />} />
-      <Route path="edit" element={<AdminProfilePage />} />
-    </Route>
-  );
-}
-
 function AppRoutes() {
   return (
     <>
@@ -192,12 +176,63 @@ function AppRoutes() {
           <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
         </Route>
 
-        {/* Hồ sơ cá nhân — URL riêng theo từng role (view + edit) */}
-        <RoleProfileRoutes path={ROUTES.DASHBOARD_PROFILE} roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]} />
-        <RoleProfileRoutes path={ROUTES.MANAGER_PROFILE} roles={[ROLES.MANAGER, ROLES.ADMIN]} />
-        <RoleProfileRoutes path={ROUTES.DIRECTOR_PROFILE} roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]} />
-        <RoleProfileRoutes path={ROUTES.REPAIR_ORDERS_PROFILE} roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]} />
-        <RoleProfileRoutes path={ROUTES.INVENTORY_PROFILE} roles={[ROLES.WAREHOUSE_STAFF, ROLES.ADMIN]} />
+        {/* Hồ sơ cá nhân — URL riêng theo từng role (view + edit).
+            Phải là <Route> trực tiếp trong <Routes>, không bọc component custom. */}
+        <Route
+          path={ROUTES.DASHBOARD_PROFILE}
+          element={
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
+              <ProfilePageLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminProfilePage />} />
+          <Route path="edit" element={<AdminProfilePage />} />
+        </Route>
+        <Route
+          path={ROUTES.MANAGER_PROFILE}
+          element={
+            <ProtectedRoute roles={[ROLES.MANAGER, ROLES.ADMIN]}>
+              <ProfilePageLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminProfilePage />} />
+          <Route path="edit" element={<AdminProfilePage />} />
+        </Route>
+        <Route
+          path={ROUTES.DIRECTOR_PROFILE}
+          element={
+            <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
+              <ProfilePageLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminProfilePage />} />
+          <Route path="edit" element={<AdminProfilePage />} />
+        </Route>
+        <Route
+          path={ROUTES.REPAIR_ORDERS_PROFILE}
+          element={
+            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]}>
+              <ProfilePageLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminProfilePage />} />
+          <Route path="edit" element={<AdminProfilePage />} />
+        </Route>
+        <Route
+          path={ROUTES.INVENTORY_PROFILE}
+          element={
+            <ProtectedRoute roles={[ROLES.WAREHOUSE_STAFF, ROLES.ADMIN]}>
+              <ProfilePageLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminProfilePage />} />
+          <Route path="edit" element={<AdminProfilePage />} />
+        </Route>
 
         {/* Legacy /profile, /profile/edit → redirect theo role */}
         <Route
