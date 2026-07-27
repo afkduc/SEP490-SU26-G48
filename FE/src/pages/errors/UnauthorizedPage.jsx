@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { getRoleHome } from '../../contexts/AppContext';
 import { requestPermission } from '../../services/notificationApi';
+import { getPermissionScreenLabel } from '../../utils/screenLabels';
 import './UnauthorizedPage.css';
 
 export default function UnauthorizedPage({ permissionKey, customMessage }) {
@@ -12,6 +13,12 @@ export default function UnauthorizedPage({ permissionKey, customMessage }) {
   const [sent, setSent] = useState(false);
   const [reason, setReason] = useState('');
   const [sendError, setSendError] = useState('');
+
+  const friendlyKey = permissionKey
+    ? (getPermissionScreenLabel(permissionKey) !== '—'
+      ? getPermissionScreenLabel(permissionKey)
+      : 'truy cập trang này')
+    : null;
 
   const handleGoHome = () => {
     navigate(getRoleHome(user), { replace: true });
@@ -70,8 +77,8 @@ export default function UnauthorizedPage({ permissionKey, customMessage }) {
         {/* Description */}
         <p className="error-card__desc">
           {customMessage || (
-            permissionKey
-              ? `Bạn không có quyền "${permissionKey}" để thực hiện thao tác này.`
+            friendlyKey
+              ? `Bạn không có quyền truy cập «${friendlyKey}».`
               : 'Bạn không có quyền truy cập vào trang hoặc thao tác này.'
           )}
         </p>
@@ -156,7 +163,7 @@ export default function UnauthorizedPage({ permissionKey, customMessage }) {
                 </button>
 
                 <p className="error-card__request-hint">
-                  Quyền yêu cầu: <code>{permissionKey}</code>
+                  Quyền yêu cầu: <strong>{friendlyKey}</strong>
                 </p>
               </>
             )}
