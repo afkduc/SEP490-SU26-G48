@@ -89,23 +89,62 @@ function clearSession() {
 export function normalizeRoles(roles) {
   if (!Array.isArray(roles)) return [];
   return roles
-    .map((r) => (typeof r === 'string' ? r : r?.roleName))
+    .map((r) => {
+      if (typeof r === 'string') return r;
+      return r?.roleName || r?.name || null;
+    })
     .filter((name) => typeof name === 'string' && name.trim().length > 0);
+}
+
+const ROLE_PRIORITY = [
+  ROLES.ADMIN,
+  ROLES.GENERAL_DIRECTOR,
+  ROLES.MANAGER,
+  ROLES.SERVICE_ADVISOR,
+  ROLES.TEAM_LEADER,
+  ROLES.WAREHOUSE_STAFF,
+];
+
+function getPrimaryRole(user) {
+  const roles = normalizeRoles(user?.roles);
+  if (user?.primaryRole && roles.includes(user.primaryRole)) {
+    return user.primaryRole;
+  }
+  return ROLE_PRIORITY.find((role) => roles.includes(role)) || roles[0] || null;
 }
 
 /**
  * Tra ve path home phu hop nhat theo thu tu role (admin uu tien cao nhat)
  */
 export function getRoleHome(user) {
-  const roles = normalizeRoles(user?.roles);
-  if (!roles.length) return '/dashboard';
-  if (roles.includes(ROLES.ADMIN)) return '/admin/dashboard';
-  if (roles.includes(ROLES.GENERAL_DIRECTOR)) return '/general-director';
-  if (roles.includes(ROLES.MANAGER)) return '/manager';
-  if (roles.includes(ROLES.SERVICE_ADVISOR)) return '/dashboard';
-  if (roles.includes(ROLES.TEAM_LEADER)) return '/repair-orders';
-  if (roles.includes(ROLES.WAREHOUSE_STAFF)) return '/inventory';
+  const role = getPrimaryRole(user);
+  if (!role) return '/dashboard';
+  if (role === ROLES.ADMIN) return '/admin/dashboard';
+  if (role === ROLES.GENERAL_DIRECTOR) return '/general-director';
+  if (role === ROLES.MANAGER) return '/manager';
+  if (role === ROLES.SERVICE_ADVISOR) return '/dashboard';
+  if (role === ROLES.TEAM_LEADER) return '/repair-orders';
+  if (role === ROLES.WAREHOUSE_STAFF) return '/inventory';
   return '/dashboard';
+}
+
+/**
+ * Tra ve path ho so ca nhan theo role (moi role co URL rieng, khong dung /profile chung).
+ */
+export function getRoleProfilePath(user) {
+  const role = getPrimaryRole(user);
+  if (!role) return '/dashboard/profile';
+  if (role === ROLES.ADMIN) return '/admin/profile';
+  if (role === ROLES.GENERAL_DIRECTOR) return '/general-director/profile';
+  if (role === ROLES.MANAGER) return '/manager/profile';
+  if (role === ROLES.SERVICE_ADVISOR) return '/dashboard/profile';
+  if (role === ROLES.TEAM_LEADER) return '/repair-orders/profile';
+  if (role === ROLES.WAREHOUSE_STAFF) return '/inventory/profile';
+  return '/dashboard/profile';
+}
+
+export function getRoleProfileEditPath(user) {
+  return `${getRoleProfilePath(user)}/edit`;
 }
 
 export function AppProvider({ children }) {

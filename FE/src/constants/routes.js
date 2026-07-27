@@ -11,6 +11,13 @@ export const ROUTES = Object.freeze({
   ADMIN_USERS: '/admin/users',
   ADMIN_LOGS: '/admin/logs',
   ADMIN_LOGIN_SESSIONS: '/admin/login-sessions',
+  ADMIN_PROFILE: '/admin/profile',
+
+  MANAGER_PROFILE: '/manager/profile',
+  DIRECTOR_PROFILE: '/general-director/profile',
+  DASHBOARD_PROFILE: '/dashboard/profile',
+  REPAIR_ORDERS_PROFILE: '/repair-orders/profile',
+  INVENTORY_PROFILE: '/inventory/profile',
 
   INVENTORY: '/inventory',
 
