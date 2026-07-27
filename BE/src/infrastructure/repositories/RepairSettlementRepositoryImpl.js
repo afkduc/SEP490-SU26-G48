@@ -441,6 +441,35 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     const withinKm = currentKm == null ? true : Number(currentKm) <= wr.warranty_km;
     return withinPeriod && withinKm;
   }
+
+  // ─── PayOS ───────────────────────────────────────────────────────
+  async createPayosTransaction(serviceOrderId, { orderCode, paymentLinkId, qrCode, checkoutUrl, amount, expiredAt }) {
+    await query(
+      `INSERT INTO payos_transactions (service_order_id, order_code, payment_link_id, qr_code, checkout_url, amount, expired_at)
+       VALUES (@serviceOrderId, @orderCode, @paymentLinkId, @qrCode, @checkoutUrl, @amount, @expiredAt)`,
+      {
+        serviceOrderId,
+        orderCode,
+        paymentLinkId: paymentLinkId || null,
+        qrCode: qrCode || null,
+        checkoutUrl: checkoutUrl || null,
+        amount,
+        expiredAt: expiredAt || null,
+      }
+    );
+  }
+
+  async findPayosTransactionByOrderCode(orderCode) {
+    const result = await query(`SELECT * FROM payos_transactions WHERE order_code = @orderCode`, { orderCode });
+    return result.recordset[0] || null;
+  }
+
+  async markPayosTransactionPaid(orderCode, { reference, paidAt }) {
+    await query(
+      `UPDATE payos_transactions SET status = 'paid', webhook_reference = @reference, paid_at = @paidAt WHERE order_code = @orderCode`,
+      { orderCode, reference: reference || null, paidAt }
+    );
+  }
 }
 
 module.exports = RepairSettlementRepositoryImpl;

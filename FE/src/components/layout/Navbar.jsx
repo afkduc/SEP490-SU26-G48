@@ -46,14 +46,6 @@ const SERVICE_ADVISOR_NAV = [
     ],
   },
   {
-    label: 'Lệnh sửa chữa',
-    permission: 'screen:repair-orders:access',
-    children: [
-      { label: 'Danh sách lệnh sửa chữa', path: '/repair-orders', permission: 'repair_orders:read' },
-      { label: 'Tạo lệnh sửa chữa', path: '/repair-orders/create', permission: 'repair_orders:create' },
-    ],
-  },
-  {
     label: 'Chăm sóc khách hàng',
     path: '/customer-care',
     permission: 'screen:customer-care:access',

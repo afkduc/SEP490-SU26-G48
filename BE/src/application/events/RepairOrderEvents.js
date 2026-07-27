@@ -9,6 +9,9 @@
  *   - 'task-updated'      : to truong vua tich hoan thanh 1 dau muc cong viec
  *   - 'order-completed'   : to truong vua hoan thanh toan bo lenh sua chua
  *                           (phieu quyet toan goc chuyen sang "Cho thanh toan")
+ *   - 'invoiced'          : PayOS webhook bao da nhan tien -> phieu tu dong
+ *                           chuyen sang "Da xuat hoa don" (RepairSettlementService
+ *                           .handlePayosWebhook), khong can CVDV bam xac nhan.
  */
 
 const { EventEmitter } = require('events');
