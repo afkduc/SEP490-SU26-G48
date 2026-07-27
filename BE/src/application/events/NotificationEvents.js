@@ -10,17 +10,19 @@ class NotificationEvents extends EventEmitter {
    * Emit notification event cho user qua SSE
    */
   emitNotification(userId, notification) {
-    this.emit(`notification:${userId}`, notification);
+    const key = String(userId);
+    this.emit(`notification:${key}`, notification);
   }
 
   /**
    * Subscribe to notifications cho user
    */
   onNotification(userId, handler) {
+    const key = String(userId);
     const listener = (notification) => handler(notification);
-    this.on(`notification:${userId}`, listener);
+    this.on(`notification:${key}`, listener);
     return () => {
-      this.off(`notification:${userId}`, listener);
+      this.off(`notification:${key}`, listener);
     };
   }
 
@@ -28,7 +30,7 @@ class NotificationEvents extends EventEmitter {
    * Remove all listeners cho user
    */
   removeAllListenersForUser(userId) {
-    this.removeAllListeners(`notification:${userId}`);
+    this.removeAllListeners(`notification:${String(userId)}`);
   }
 }
 

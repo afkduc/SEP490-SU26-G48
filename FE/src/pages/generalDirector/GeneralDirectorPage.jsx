@@ -2547,6 +2547,9 @@ export default function GeneralDirectorPage() {
   return (
     <Routes>
       <Route index element={<Navigate to="reports/settlements" replace />} />
+      <Route path="reports" element={<Navigate to="reports/revenue" replace />} />
+      <Route path="settlements" element={<Navigate to="reports/settlements" replace />} />
+      <Route path="branches" element={<Navigate to="branch-managers" replace />} />
       <Route
         path="reports/settlements"
         element={

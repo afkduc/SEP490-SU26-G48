@@ -19,7 +19,11 @@ jobs:
           password: ${{ secrets.DEPLOY_PASSWORD }}
           script_stop: true
           script: |
+            set -e
             cd ~/SEP490-SU26-G48
-            git pull origin dev
+            # reset --hard: an toan sau force-push (git pull se fail neu history bi rewrite)
+            git fetch origin
+            git checkout dev
+            git reset --hard origin/dev
             docker compose up -d --build
             sudo systemctl reload nginx

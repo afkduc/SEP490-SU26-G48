@@ -24,7 +24,17 @@ export function PermissionProvider({ children }) {
       if (!permissionKey) return false;
       if (!Array.isArray(permissions)) return false;
       if (permissions.includes('*')) return true;
-      return permissions.includes(permissionKey);
+      if (permissions.includes(permissionKey)) return true;
+      // L1 screen:X:access được coi là có nếu đã có bất kỳ L2 action nào trên cùng screen
+      // (tránh lệch sync tạm thời giữa role_permissions và role_screen_permissions).
+      const accessMatch = String(permissionKey).match(/^screen:(.+):access$/i);
+      if (accessMatch) {
+        const screenKey = accessMatch[1];
+        return L2_ACTIONS.some((action) =>
+          permissions.includes(`screen:${screenKey}:${action}`)
+        );
+      }
+      return false;
     },
     [permissions]
   );

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AppContext';
 import { useNotifications } from '../hooks/useNotifications';
 import { formatDateSafe } from '../utils/dateUtils';
+import { dispatchLoginChallenge } from '../services/authApi';
 import './NotificationBell.css';
 
 const ICON_COLORS = {
@@ -119,7 +120,24 @@ export default function NotificationBell() {
     if (!notif.isRead && !notif.readAt) {
       markRead(notif.id);
     }
-    // Co the navigate den chi tiet neu notif.metadata co link (optional)
+    let metadata = notif.metadata;
+    if (typeof metadata === 'string') {
+      try { metadata = JSON.parse(metadata); } catch { metadata = {}; }
+    }
+    if (notif.type === 'LOGIN_CHALLENGE' || metadata?.eventType === 'LOGIN_CHALLENGE') {
+      const pendingId = metadata?.pendingId || notif.pendingId;
+      if (pendingId) {
+        dispatchLoginChallenge({
+          pendingId,
+          metadata: metadata || {},
+          title: notif.title,
+          message: notif.message,
+          device: [metadata?.browser, metadata?.os].filter(Boolean).join(' · ') || undefined,
+          ip: metadata?.ip,
+        });
+        setOpen(false);
+      }
+    }
   }, [markRead]);
 
   return (
