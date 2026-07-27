@@ -188,7 +188,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
 
   /**
    * Lay Repair Order co the xuat kho (status IN ('pending','inprogress')) va chua xuat.
-   * Chi loc nhung RO co it nhat 1 task_type='PART' chua duoc xuat.
+   * Chi loc nhung RO co it nhat 1 task_type='product' chua duoc xuat.
    */
   async findExportableRepairOrders({ branchId, search, page = 1, limit = 20 } = {}) {
     const safePage = Math.max(1, Number(page) || 1);
@@ -222,14 +222,14 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
           SELECT COUNT(*)
           FROM repair_order_tasks rot
           WHERE rot.repair_order_id = ro.id
-            AND rot.task_type = 'PART'
+            AND rot.task_type = 'product'
             AND rot.product_id IS NOT NULL
         ) AS part_task_count,
         (
           SELECT ISNULL(SUM(rot.quantity), 0)
           FROM repair_order_tasks rot
           WHERE rot.repair_order_id = ro.id
-            AND rot.task_type = 'PART'
+            AND rot.task_type = 'product'
             AND rot.product_id IS NOT NULL
         ) AS total_part_quantity,
         CASE WHEN EXISTS (
@@ -287,7 +287,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   }
 
   /**
-   * Lay 1 Repair Order kem cac phu tung (task_type='PART') de hien thi trong form xuat.
+   * Lay 1 Repair Order kem cac phu tung (task_type='product') de hien thi trong form xuat.
    * Tra ve kem stock_quantity hien tai de FE check truoc khi submit.
    */
   async findRepairOrderForExport(repairOrderId) {
@@ -330,7 +330,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
        LEFT JOIN products p ON p.id = rot.product_id
        LEFT JOIN units u ON u.id = p.unit_id
        WHERE rot.repair_order_id = @id
-         AND rot.task_type = 'PART'
+         AND rot.task_type = 'product'
          AND rot.product_id IS NOT NULL
        ORDER BY rot.id ASC`,
       { id: repairOrderId }
