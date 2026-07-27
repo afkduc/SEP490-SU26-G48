@@ -18,6 +18,7 @@ import {
   resetLoggedOutFlag,
   SESSION_LOGGED_OUT_EVENT,
 } from '../services/httpClient';
+import { mergeAuthRefreshUser } from '../utils/profileSession';
 
 const AppContext = createContext(null);
 
@@ -191,10 +192,10 @@ export function AppProvider({ children }) {
         return currentToken;
       });
       setUser((currentUser) => {
-        if (newSession.user !== currentUser) {
-          return newSession.user;
-        }
-        return currentUser;
+        const fromStorage = newSession.user;
+        if (!fromStorage) return currentUser;
+        if (!currentUser) return fromStorage;
+        return mergeAuthRefreshUser(fromStorage, currentUser);
       });
       setPermissions((currentPerms) => {
         if (JSON.stringify(newSession.permissions) !== JSON.stringify(currentPerms)) {
@@ -219,10 +220,10 @@ export function AppProvider({ children }) {
           return currentToken;
         });
         setUser((currentUser) => {
-          if (e.data.user !== currentUser) {
-            return e.data.user;
-          }
-          return currentUser;
+          const incoming = e.data.user;
+          if (!incoming) return currentUser;
+          if (!currentUser) return incoming;
+          return mergeAuthRefreshUser(currentUser, incoming);
         });
         setPermissions((currentPerms) => {
           if (JSON.stringify(e.data.permissions) !== JSON.stringify(currentPerms)) {
