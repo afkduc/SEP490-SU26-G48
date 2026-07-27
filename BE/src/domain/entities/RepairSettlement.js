@@ -26,8 +26,6 @@ class RepairSettlement {
     this.vat = data.vat ?? 0;
     this.freeAmount = data.freeAmount ?? 0;
     this.total = data.total ?? 0;
-    this.nextMaintenanceKm = data.nextMaintenanceKm ?? null;
-    this.nextMaintenanceDate = data.nextMaintenanceDate ?? null;
     this.isWarranty = data.isWarranty ?? false;
     this.intakeDate = data.intakeDate ?? null;
     this.completedDate = data.completedDate ?? null;
@@ -66,8 +64,6 @@ class RepairSettlement {
       vat: headerRow.vat,
       freeAmount: headerRow.free_amount,
       total: headerRow.total,
-      nextMaintenanceKm: headerRow.next_maintenance_km,
-      nextMaintenanceDate: headerRow.next_maintenance_date,
       isWarranty: Boolean(headerRow.is_warranty),
       intakeDate: headerRow.intake_date,
       completedDate: headerRow.completed_date,

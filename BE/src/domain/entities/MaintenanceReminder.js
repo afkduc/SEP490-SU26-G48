@@ -1,17 +1,18 @@
 /**
- * MaintenanceReminder entity - tuong ung bang `maintenance_reminders`, sinh tu
- * du doan next_maintenance_km/next_maintenance_date cua phieu quyet toan gan
- * nhat (service_orders), kem thong tin join tu vehicles/customers de hien thi.
+ * MaintenanceReminder entity - tuong ung bang `maintenance_reminders`, tu dong
+ * sinh 3 moc (1 tuan/1 thang/2 thang tinh tu ngay tao phieu) cho moi phieu
+ * quyet toan (service_orders), kem thong tin join tu vehicles/customers de
+ * hien thi.
  */
 class MaintenanceReminder {
   constructor(data = {}) {
     this.id = data.id ?? null;
+    this.serviceOrderId = data.serviceOrderId ?? null;
     this.vehicleId = data.vehicleId ?? null;
     this.customerId = data.customerId ?? null;
     this.branchId = data.branchId ?? null;
     this.reminderType = data.reminderType ?? null;
     this.dueDate = data.dueDate ?? null;
-    this.dueKm = data.dueKm ?? null;
     this.isSent = data.isSent ?? false;
     this.sentAt = data.sentAt ?? null;
     this.isConfirmed = data.isConfirmed ?? false;
@@ -27,12 +28,12 @@ class MaintenanceReminder {
     if (!row) return null;
     return new MaintenanceReminder({
       id: row.id,
+      serviceOrderId: row.service_order_id,
       vehicleId: row.vehicle_id,
       customerId: row.customer_id,
       branchId: row.branch_id,
       reminderType: row.reminder_type,
       dueDate: row.due_date,
-      dueKm: row.due_km,
       isSent: Boolean(row.is_sent),
       sentAt: row.sent_at,
       isConfirmed: Boolean(row.is_confirmed),

@@ -15,6 +15,7 @@ import {
   createRepairSettlementApi,
   updateRepairSettlementApi,
   updateRepairSettlementStatusApi,
+  createPayosPaymentLinkApi,
 } from '../../services/repairSettlementApi';
 import { updateRepairOrderStatusApi } from '../../services/repairOrderApi';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
@@ -172,22 +173,13 @@ function maskLast4(value) {
   return '*'.repeat(str.length - 4) + str.slice(-4);
 }
 
-// TK ngan hang de tao QR VietQR - dang la so DEMO cho do an (chua ket noi
-// cong thanh toan/webhook that), chi de sinh ma QR chuan de quet. Xac nhan
-// "da thanh toan" van la thao tac tay cua co van (nut Xuat hoa don) sau khi
-// tu kiem tra bien dong so du - giong day, sua lai 3 hang so nay thanh TK
-// ngan hang thuc te cua AutoGara khi trien khai.
-const VIETQR_BANK_BIN = '970422'; // MB Bank
-const VIETQR_ACCOUNT_NO = '0868888686';
-const VIETQR_ACCOUNT_NAME = 'CONG TY TNHH AUTOGARA';
-
-function buildVietQrUrl(amount, addInfo) {
-  const params = new URLSearchParams({
-    amount: String(Math.round(amount || 0)),
-    addInfo: addInfo || '',
-    accountName: VIETQR_ACCOUNT_NAME,
-  });
-  return `https://img.vietqr.io/image/${VIETQR_BANK_BIN}-${VIETQR_ACCOUNT_NO}-compact2.png?${params.toString()}`;
+// QR thanh toan PayOS (that, gan voi tai khoan ngan hang da lien ket) - dung
+// chung 1 dich vu ve QR-image cho ca modal xem truoc lan ban in, dung du lieu
+// PayOS tra ve (qrCode). Khong con QR tinh/demo nua - phieu nao khong co
+// qrCode (chua den buoc cho thanh toan, hoac da xuat hoa don roi) thi khong
+// hien QR gi ca, tranh nham lan voi tai khoan gia truoc day.
+function buildPayosQrImageUrl(qrCode) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCode)}`;
 }
 
 // "total" = so tien THUC SU thu cua khach hang cho dong nay - dong mien phi
@@ -287,7 +279,10 @@ export function printWorkList(order) {
 }
 
 // ─── In phiếu quyết toán sửa chữa ────────────────────────────────────
-function printSettlement(order) {
+// payosQrCode: chuoi QR PayOS dang con hieu luc (chi co khi in tu modal xem
+// truoc luc phieu dang "cho thanh toan") - khong truyen thi khong hien QR
+// gi ca (vd in luc vua tao phieu, hoac in lai phieu da xuat hoa don roi).
+function printSettlement(order, payosQrCode) {
   // Tach 2 nhom "Cong viec can thuc hien" / "Phu tung, vat tu" khi in - giong
   // cach hien thi ben form tao/sua phieu va modal Xem chi tiet (giu nguyen so
   // thu tu goc trong mang items, khong danh lai tu 1 cho tung nhom).
@@ -332,6 +327,13 @@ function printSettlement(order) {
       + partItems.map(renderItemRow).join('')
       + groupSubtotalRow(partSubtotal);
   }
+
+  const qrBlockHtml = payosQrCode
+    ? `<div style="text-align:center;flex-shrink:0">
+    <img src="${buildPayosQrImageUrl(payosQrCode)}" style="width:90px;height:90px;border:1px solid #ddd" />
+    <div style="font-size:9px;color:#888">Quét app ngân hàng để thanh toán</div>
+  </div>`
+    : '';
 
   const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
 <title>Quyết toán sửa chữa ${order.code}</title>
@@ -396,14 +398,10 @@ function printSettlement(order) {
 
 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-top:6px">
   <div style="flex:1;font-size:10px;border-top:1px solid #ccc;padding-top:4px">
-    Lần bảo dưỡng kế tiếp: <b>${order.nextMaintenanceKm ? order.nextMaintenanceKm.toLocaleString() + ' km' : '……… km'}</b> hoặc ngày <b>${order.nextMaintenanceDate || '………………'}</b>.
     Phụ tùng thay thế tại trung tâm Dịch vụ ủy quyền AutoGara được bảo hành 06 tháng hoặc 10.000km tùy theo điều kiện nào đến trước.
     <br>Phiếu này chỉ có giá trị xuất hóa đơn trong ngày.
   </div>
-  <div style="text-align:center;flex-shrink:0">
-    <img src="${buildVietQrUrl(order.total, order.code)}" style="width:90px;height:90px;border:1px solid #ddd" />
-    <div style="font-size:9px;color:#888">Quét để thanh toán</div>
-  </div>
+  ${qrBlockHtml}
   <table class="totals" style="width:280px;flex-shrink:0;margin:0">
     <tr><td class="lbl">Tổng cộng trước giảm giá:</td><td class="val">${(order.subtotal || 0).toLocaleString('vi-VN')}</td></tr>
     <tr><td class="lbl">Tổng cộng giảm giá:</td><td class="val">${(order.discountAmount || 0).toLocaleString('vi-VN')}</td></tr>
@@ -527,15 +525,52 @@ function printVehicleOutSlip(order) {
 }
 
 // ─── Modal xem trước & xuất phiếu quyết toán ────────────────────────
-function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
-  const canConfirm = canManage && order.status === 'waiting_payment';
-  // Bat buoc phai In phieu quyet toan (xem lai giay to) TRUOC khi duoc phep
-  // Xac nhan xuat hoa don - nut xac nhan chi xuat hien SAU lan in dau tien,
-  // tranh xac nhan xuat hoa don ma chua thuc su in/kiem tra lai phieu giay.
+function SettlementPreviewModal({ order, onClose }) {
+  // Chi con dung de doi chu nut in ("In phieu" vs "In lai phieu") - khong con
+  // nut "Xac nhan xuat hoa don" thu cong nua, PayOS webhook tu dong chuyen
+  // trang thai "invoiced" khi thanh toan thanh cong (xem handlePayosWebhook).
   const [hasPrinted, setHasPrinted] = useState(false);
 
+  // PayOS: QR dong that, tu tao ngay khi mo modal cho phieu dang cho thanh
+  // toan (khong doi CVDV bam them nut nao) - het han sau 60s, khach quet la
+  // ra dung so tien can chuyen. Khi PayOS bao da nhan tien (webhook), phieu
+  // tu dong chuyen "Da xuat hoa don" qua SSE 'invoiced' (xem handleRepairOrderEvent
+  // ben duoi) - khong lien quan gi den hasPrinted/xac nhan tay o tren.
+  const [payos, setPayos] = useState(null); // { qrCode, checkoutUrl, orderCode, expiredAt }
+  const [payosLoading, setPayosLoading] = useState(false);
+  const [payosError, setPayosError] = useState('');
+  const [secondsLeft, setSecondsLeft] = useState(0);
+
+  const requestPayosQr = async () => {
+    setPayosLoading(true);
+    setPayosError('');
+    try {
+      const result = await createPayosPaymentLinkApi(order.id);
+      setPayos(result);
+    } catch (err) {
+      setPayosError(err.message || 'Không tạo được mã QR thanh toán');
+    } finally {
+      setPayosLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (order.status === 'waiting_payment') {
+      requestPayosQr();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id]);
+
+  useEffect(() => {
+    if (!payos) return undefined;
+    const tick = () => setSecondsLeft(Math.max(0, payos.expiredAt - Math.floor(Date.now() / 1000)));
+    tick();
+    const intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
+  }, [payos]);
+
   const handlePrint = () => {
-    printSettlement(order);
+    printSettlement(order, payos?.qrCode);
     setHasPrinted(true);
   };
 
@@ -622,13 +657,45 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
               <div style={{ flex: 1, fontSize: 11 }}>
                 <b>Bằng chữ:</b> <i>{numberToVietnamese(order.total)}</i>
                 <div style={{ fontSize: 10, color: '#444', marginTop: 4, lineHeight: 1.6 }}>
-                  Lần bảo dưỡng kế tiếp: {order.nextMaintenanceKm ? `${order.nextMaintenanceKm.toLocaleString()} km` : '……… km'} hoặc ngày {order.nextMaintenanceDate || '………'}.
-                  <br /><i>Phiếu này chỉ có giá trị xuất hóa đơn trong ngày.</i>
+                  <i>Phiếu này chỉ có giá trị xuất hóa đơn trong ngày.</i>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                <img src={buildVietQrUrl(order.total, order.code)} alt="QR thanh toán" style={{ width: 90, height: 90, border: '1px solid #DDD' }} />
-                <div style={{ fontSize: 9, color: '#888' }}>Quét để thanh toán</div>
+                {order.status === 'waiting_payment' ? (
+                  <>
+                    {payos && secondsLeft > 0 ? (
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(payos.qrCode)}`}
+                        alt="QR thanh toán PayOS"
+                        style={{ width: 130, height: 130, border: '1px solid #DDD' }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: 130, height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '1px dashed #ccc', textAlign: 'center', fontSize: 11, color: '#888', padding: 6,
+                      }}>
+                        {payosLoading ? 'Đang tạo mã QR…' : payos ? 'Mã QR đã hết hạn' : (payosError || 'Chưa có mã QR')}
+                      </div>
+                    )}
+                    {payos && secondsLeft > 0 ? (
+                      <div style={{ fontSize: 9, color: '#888' }}>Quét app ngân hàng — hết hạn sau {secondsLeft}s</div>
+                    ) : (
+                      !payosLoading && (
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, padding: '4px 8px' }} onClick={requestPayosQr}>
+                          Tạo lại mã QR
+                        </button>
+                      )
+                    )}
+                  </>
+                ) : (
+                  <div style={{
+                    width: 130, height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '1px solid #A5D6A7', borderRadius: 8, background: '#E8F5E9',
+                    textAlign: 'center', fontSize: 12, color: '#2E7D32', fontWeight: 600, padding: 6,
+                  }}>
+                    ✓ Đã thanh toán
+                  </div>
+                )}
               </div>
               <div style={{ minWidth: 260, flexShrink: 0 }}>
                 {[
@@ -655,11 +722,6 @@ function SettlementPreviewModal({ order, onClose, onConfirm, canManage }) {
           <button className="btn btn-secondary" onClick={handlePrint}>
             {hasPrinted ? 'In lại phiếu quyết toán' : 'In phiếu quyết toán'}
           </button>
-          {canConfirm && hasPrinted && (
-            <button className="btn btn-primary" onClick={() => { onConfirm(order.id); onClose(); }}>
-              Xác nhận xuất hóa đơn
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -908,6 +970,10 @@ function RepairSettlementList() {
   //     dang mo dung modal chi tiet phieu do thi hien popup thong bao, doi
   //     CVDV bam X moi chuyen sang tab "Cho thanh toan" (khong tu dong nhay
   //     ngang khi ho dang doc do).
+  //   - 'invoiced': PayOS webhook bao da nhan tien -> phieu tu dong xuat hoa
+  //     don (RepairSettlementService.handlePayosWebhook) - nap lai danh sach;
+  //     neu dang mo dung modal xem/in phieu nay thi dong modal va nhay thang
+  //     sang tab "Da xuat hoa don" luon, khong can CVDV thao tac gi them.
   const handleRepairOrderEvent = (event) => {
     if (event.type === 'task-updated' && view && String(view.id) === String(event.settlementId)) {
       getRepairSettlementApi(view.id).then(setView).catch(() => {});
@@ -916,6 +982,14 @@ function RepairSettlementList() {
       loadAll({ silent: true });
       if (view && String(view.id) === String(event.settlementId)) {
         setCompletedPopupOrder(view);
+      }
+    }
+    if (event.type === 'invoiced') {
+      loadAll({ silent: true });
+      if (previewOrder && String(previewOrder.id) === String(event.settlementId)) {
+        setPreviewOrder(null);
+        setView(null);
+        setTab('invoiced');
       }
     }
   };
@@ -978,12 +1052,6 @@ function RepairSettlementList() {
   // fetchFullOrder (von chi de bo sung "items" day du).
   const handlePrintVehicleOut = (o) => {
     printVehicleOutSlip(o);
-  };
-
-  const handleInvoice = async (id) => {
-    const updated = await updateRepairSettlementStatusApi(id, 'invoiced');
-    setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
-    setTab('invoiced');
   };
 
   const handleConfirmCancel = async (reason) => {
@@ -1186,8 +1254,6 @@ function RepairSettlementList() {
         <SettlementPreviewModal
           order={previewOrder}
           onClose={() => setPreviewOrder(null)}
-          onConfirm={handleInvoice}
-          canManage={canManage}
         />
       )}
 
@@ -1309,8 +1375,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   });
 
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
-  const [nextKm, setNextKm] = useState(existingOrder?.nextMaintenanceKm || '');
-  const [nextDate, setNextDate] = useState(existingOrder?.nextMaintenanceDate || '');
   // Bo dem chung sinh groupId - dung ca luc tai du lieu cu (assignGroupIds)
   // lan luc chon dich vu/goi moi trong phien lam viec nay (xem selectCatalog*).
   const catalogGroupSeq = useRef(0);
@@ -1474,6 +1538,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // Dong con (duoc tu dong chen kem theo 1 dich vu/goi da chon - dich vu con
   // trong goi hoac phu tung tieu hao) khong duoc sua/xoa rieng le - chi dau
   // nhom (isGroupParent) moi thao tac duoc, xoa dau nhom se xoa het ca cum.
+  // Rieng So luong cua dong phu tung con (lhsc 'PT') van cho sua tay truc tiep
+  // (xem cot So luong ben duoi) - vi dinh muc phu tung uoc tinh theo cong thuc
+  // co the lech thuc te, can co van dieu chinh duoc ma khong phai doi so luong
+  // ca dau nhom (se keo theo ty le lam sai cac phu tung khac cung nhom).
   const isChildRow = (it) => Boolean(it.groupId) && !it.isGroupParent;
 
   // Doi Hinh thuc thanh toan tren dong dau nhom (dich vu/goi chinh) -> tu
@@ -1785,8 +1853,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     currentKm: vehicleInfo.currentKm || null,
     items,
     ...totals,
-    nextMaintenanceKm: nextKm ? Number(nextKm) : null,
-    nextMaintenanceDate: nextDate,
   });
 
   const handleSave = async () => {
@@ -2185,7 +2251,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         )}
                       </td>
                       <td>
-                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} type="number" min={1} value={item.qty} readOnly={isChild && !item.manualQtyUnlock} onChange={(e) => handleGroupQtyChange(idx, e.target.value)} />
+                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} type="number" min={1} value={item.qty} readOnly={isChild && item.lhsc !== 'PT' && !item.manualQtyUnlock} onChange={(e) => handleGroupQtyChange(idx, e.target.value)} />
                       </td>
                       <td>
                         <input className="form-input" style={{ fontSize: 12, background: 'transparent' }}
@@ -2244,26 +2310,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         </div>
       </div>
 
-      <div className="settlement-summary-grid">
-        {/* Lịch bảo dưỡng kế tiếp */}
-        <div className="card">
-          <div className="card-header"><span className="card-title">Lịch bảo dưỡng kế tiếp</span></div>
-          <div className="card-body">
-            <div className="form-grid form-grid-2">
-              <div className="form-group">
-                <label className="form-label">Số Km kế tiếp</label>
-                <input className="form-input" type="number" value={nextKm} onChange={(e) => setNextKm(e.target.value)} placeholder="Ví dụ: 47000" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Ngày kế tiếp</label>
-                <input className="form-input" placeholder="dd/mm/yyyy" value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         {/* Tổng kết */}
-        <div className="card" style={{ position: 'sticky', top: 70, alignSelf: 'start' }}>
+        <div className="card" style={{ width: '100%', maxWidth: 340, position: 'sticky', top: 70, alignSelf: 'start' }}>
           <div className="card-header"><span className="card-title">Tổng kết thanh toán</span></div>
           <div className="card-body">
             <div className="summary-box" style={{ marginBottom: 14 }}>

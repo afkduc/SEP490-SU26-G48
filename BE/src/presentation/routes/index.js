@@ -22,6 +22,8 @@ const buildMaintenanceReminderRouter = require('./maintenanceReminderRoutes');
 const buildSSERouter = require('./sseRoutes');
 const buildPublicRouter = require('./publicRoutes');
 const buildServiceRequestRouter = require('./serviceRequestRoutes');
+const buildPayosWebhookRouter = require('./payosWebhookRoutes');
+
 const router = express.Router();
 
 router.get('/', (req, res) => {
@@ -67,5 +69,7 @@ router.use('/sse', buildSSERouter());
 // sua chua bang ma, khong can dang nhap). Mount rieng, KHONG dat trong
 // repairOrderRoutes.js vi file do gan authenticate cho ca router.
 router.use('/public', buildPublicRouter());
+// PayOS webhook - khong qua authenticate (xem ghi chu trong payosWebhookRoutes.js).
+router.use('/payos', buildPayosWebhookRouter());
 
 module.exports = router;
