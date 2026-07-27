@@ -11,9 +11,9 @@ const { makeMaintenanceReminderRepository } = require('./infrastructure/reposito
 
 const MAINTENANCE_REMINDER_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 gio/lan
 
-// Tu dong sinh nhac nho bao duong tu next_maintenance_km/date cua phieu quyet
-// toan gan nhat - chay 1 lan luc khoi dong roi lap lai dinh ky, khong lam
-// gian doan server neu loi (chi log).
+// Tu dong sinh 3 moc nhac nho bao duong (1 tuan/1 thang/2 thang tinh tu ngay
+// tao phieu) cho tung phieu quyet toan - chay 1 lan luc khoi dong roi lap lai
+// dinh ky, khong lam gian doan server neu loi (chi log).
 async function syncMaintenanceReminders() {
   try {
     await makeMaintenanceReminderRepository().syncFromServiceOrders();

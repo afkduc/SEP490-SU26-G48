@@ -206,8 +206,6 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('vat', sql.Decimal(18, 2), data.vat || 0)
         .input('freeAmount', sql.Decimal(18, 2), data.freeAmount || 0)
         .input('total', sql.Decimal(18, 2), data.total || 0)
-        .input('nextMaintenanceKm', sql.Int, data.nextMaintenanceKm || null)
-        .input('nextMaintenanceDate', sql.Date, data.nextMaintenanceDate || null)
         .input('isWarranty', sql.Bit, isWarranty)
         .input('intakeDate', sql.DateTime, nowVN())
         .query(`
@@ -215,13 +213,13 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             order_code, branch_id, vehicle_id, customer_id, advisor_id,
             customer_request, current_km, status,
             subtotal, discount_amount, after_discount, vat, free_amount, total,
-            next_maintenance_km, next_maintenance_date, is_warranty, intake_date
+            is_warranty, intake_date
           )
           VALUES (
             '', @branchId, @vehicleId, @customerId, @advisorId,
             @customerRequest, @currentKm, @status,
             @subtotal, @discountAmount, @afterDiscount, @vat, @freeAmount, @total,
-            @nextMaintenanceKm, @nextMaintenanceDate, @isWarranty, @intakeDate
+            @isWarranty, @intakeDate
           );
           SELECT SCOPE_IDENTITY() AS id;
         `);
@@ -254,8 +252,6 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('vat', sql.Decimal(18, 2), data.vat || 0)
         .input('freeAmount', sql.Decimal(18, 2), data.freeAmount || 0)
         .input('total', sql.Decimal(18, 2), data.total || 0)
-        .input('nextMaintenanceKm', sql.Int, data.nextMaintenanceKm || null)
-        .input('nextMaintenanceDate', sql.Date, data.nextMaintenanceDate || null)
         .input('isWarranty', sql.Bit, isWarranty)
         .query(`
           UPDATE service_orders SET
@@ -267,8 +263,6 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             vat = @vat,
             free_amount = @freeAmount,
             total = @total,
-            next_maintenance_km = @nextMaintenanceKm,
-            next_maintenance_date = @nextMaintenanceDate,
             is_warranty = @isWarranty
           WHERE id = @id
         `);
