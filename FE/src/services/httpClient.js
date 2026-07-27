@@ -105,7 +105,7 @@ export function cancelAllPendingRequests() {
   pendingControllers.clear();
 }
 
-export function showSessionExpired() {
+export function showSessionExpired(detail = {}) {
   // Bo qua neu user da o trang login (modal khong can hien).
   if (typeof window !== 'undefined' && window.location.pathname === '/login') {
     return;
@@ -116,7 +116,7 @@ export function showSessionExpired() {
     return;
   }
   sessionExpiredDispatchedRef = true;
-  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_KEY));
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_KEY, { detail: detail || {} }));
 
   // Reset sau 60s de phong tru hop user dong modal nhung khong logout,
   // lan sau gap 401 se hien lai modal.
@@ -240,7 +240,10 @@ class HttpClient {
       }
 
       if (response.status === 401 && belongsToCurrentSession && !skipSessionExpired) {
-        showSessionExpired();
+        showSessionExpired({
+          code: payload?.code || null,
+          message: (payload && payload.message) || '',
+        });
       }
       const message = (payload && payload.message) || response.statusText;
       const error = new Error(message);
