@@ -42,6 +42,12 @@ export function dispatchLoginChallenge(detail) {
   window.dispatchEvent(new CustomEvent('login-challenge', { detail }));
 }
 
+/** Mở popup khi phiên bị thiết bị khác thay thế. */
+export function dispatchSessionTakenOver(detail = {}) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('session-taken-over', { detail }));
+}
+
 export async function forgotPasswordApi(email) {
   return httpClient.post(
     '/auth/forgot-password',

@@ -15,6 +15,11 @@ module.exports = {
     allowEthereal: process.env.SMTP_ALLOW_ETHEREAL !== 'false',
   },
   passwordResetExpiresMinutes: Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES || 30),
+  payos: {
+    clientId: process.env.PAYOS_CLIENT_ID || '',
+    apiKey: process.env.PAYOS_API_KEY || '',
+    checksumKey: process.env.PAYOS_CHECKSUM_KEY || '',
+  },
   db: {
     server: process.env.DB_SERVER || 'localhost',
     database: process.env.DB_NAME || 'AutoGaraDB',

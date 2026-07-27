@@ -38,7 +38,9 @@ async function authenticate(req, res, next) {
     const authRow = result.recordset[0];
     const dbVersion = authRow?.token_version;
     if (dbVersion !== undefined && decoded.tokenVersion !== dbVersion) {
-      return next(new ApiError(401, 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.'));
+      const e = new ApiError(401, 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại.');
+      e.code = 'SESSION_REPLACED';
+      return next(e);
     }
 
     if (authRow?.status && authRow.status !== 'active') {
