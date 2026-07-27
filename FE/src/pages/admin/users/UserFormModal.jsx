@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adminBranchesApi, adminRolesApi, adminUsersApi, userScreenPermissionsApi } from '../../../services/adminApi';
+import { adminBranchesApi, adminRolesApi, adminUsersApi } from '../../../services/adminApi';
 import './UserFormModal.css';
 
 const STATUS_OPTIONS = [
@@ -95,16 +95,6 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  // Tab state (Permissions tab chi hien thi khi edit)
-  const [activeTab, setActiveTab] = useState('info');
-
-  // Permission override state (edit mode only)
-  const [permData, setPermData] = useState(null);  // { screens, roleMatrix, overrides, userRoles }
-  const [permLoading, setPermLoading] = useState(false);
-  const [permSaving, setPermSaving] = useState(false);
-  const [permError, setPermError] = useState('');
-  const [permFilter, setPermFilter] = useState('');
-
   // Load branches + roles dropdown
   useEffect(() => {
     let cancelled = false;
@@ -122,31 +112,6 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     })();
     return () => { cancelled = true; };
   }, []);
-
-  // Load permissions khi user mo tab Permissions (edit mode only)
-  useEffect(() => {
-    if (!isEdit || !user?.id) return;
-    if (activeTab !== 'permissions') return;
-    let cancelled = false;
-    setPermLoading(true);
-    setPermError('');
-    (async () => {
-      try {
-        const res = await userScreenPermissionsApi.getPermissions(user.id);
-        if (!cancelled) {
-          const data = res?.data?.data || res?.data || {};
-          setPermData(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setPermError(err?.response?.data?.message || err.message || 'Lỗi tải permissions');
-        }
-      } finally {
-        if (!cancelled) setPermLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [activeTab, isEdit, user?.id]);
 
   // Khi user object hoac roles list thay doi -> cap nhat form
   useEffect(() => {
@@ -281,7 +246,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className={`modal ${activeTab === 'permissions' ? 'modal--wide' : ''}`}>
+      <div className="modal">
         <div className="modal__header">
           <div className="modal__title-block">
             <div className="modal__title-icon">
@@ -299,34 +264,10 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           </button>
         </div>
 
-        {/* Tab bar (chi hien thi o edit mode) */}
-        {isEdit && (
-          <div className="modal__tabs">
-            <button
-              type="button"
-              className={`modal__tab ${activeTab === 'info' ? 'modal__tab--active' : ''}`}
-              onClick={() => setActiveTab('info')}
-            >
-              Thông tin
-            </button>
-            <button
-              type="button"
-              className={`modal__tab ${activeTab === 'permissions' ? 'modal__tab--active' : ''}`}
-              onClick={() => setActiveTab('permissions')}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4, verticalAlign: '-2px' }}>
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-              Quyền truy cập
-            </button>
-          </div>
-        )}
-
         <div className="modal__body">
           {apiError && <div className="form-error">{apiError}</div>}
 
-          {activeTab === 'info' && (
-            <form onSubmit={handleSubmit} autoComplete="off">
+          <form onSubmit={handleSubmit} autoComplete="off">
             {/* Section: Thông tin đăng nhập */}
             <div className="form__section">
               <div className="form__section-title">Thông tin đăng nhập</div>
@@ -507,304 +448,28 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
               )}
             </div>
           </form>
-          )}
-
-          {activeTab === 'permissions' && isEdit && (
-            <UserPermissionsTab
-              user={user}
-              permData={permData}
-              loading={permLoading}
-              saving={permSaving}
-              error={permError}
-              filter={permFilter}
-              onFilterChange={setPermFilter}
-              onSave={async () => {
-                if (!permData) return;
-                setPermSaving(true);
-                setPermError('');
-                try {
-                  await userScreenPermissionsApi.savePermissions(user.id, permData.overrides);
-                  onSuccess?.();
-                } catch (err) {
-                  setPermError(err?.response?.data?.message || err.message || 'Lỗi lưu');
-                } finally {
-                  setPermSaving(false);
-                }
-              }}
-              onClear={async () => {
-                if (!window.confirm('Xóa toàn bộ override và quay về quyền từ role?')) return;
-                setPermSaving(true);
-                setPermError('');
-                try {
-                  await userScreenPermissionsApi.clearPermissions(user.id);
-                  // Reload
-                  const res = await userScreenPermissionsApi.getPermissions(user.id);
-                  const data = res?.data?.data || res?.data || {};
-                  setPermData(data);
-                } catch (err) {
-                  setPermError(err?.response?.data?.message || err.message || 'Lỗi xóa');
-                } finally {
-                  setPermSaving(false);
-                }
-              }}
-              onChangeOverride={(item) => {
-                setPermData((prev) => {
-                  if (!prev) return prev;
-                  const existing = prev.overrides.findIndex((o) => o.screenKey === item.screenKey);
-                  const newOverrides = [...prev.overrides];
-                  if (existing >= 0) newOverrides[existing] = item;
-                  else newOverrides.push(item);
-                  return { ...prev, overrides: newOverrides };
-                });
-              }}
-            />
-          )}
         </div>
 
-        {activeTab === 'info' && (
-          <div className="modal__footer">
-            <button type="button" className="btn btn--ghost" onClick={onClose} disabled={loading}>
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={loading}
-              onClick={handleSubmit}
-            >
-              {loading ? (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 0.7s linear infinite' }}>
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                  </svg>
-                  Đang xử lý...
-                </>
-              ) : (isEdit ? 'Lưu thay đổi' : 'Tạo người dùng')}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * UserPermissionsTab - tab Quan ly quyen truy cap rieng cho user.
- * Hien thi full grid 119 screens x 5 actions (V/C/U/D/E) cho admin override.
- */
-function UserPermissionsTab({
-  user, permData, loading, saving, error, filter, onFilterChange,
-  onSave, onClear, onChangeOverride,
-}) {
-  if (loading) {
-    return (
-      <div className="uperm">
-        <div className="uperm__loading">
-          <span className="uperm__spinner" />
-          Đang tải cấu hình quyền...
+        <div className="modal__footer">
+          <button type="button" className="btn btn--ghost" onClick={onClose} disabled={loading}>
+            Hủy
+          </button>
+          <button
+            type="submit"
+            className="btn btn--primary"
+            disabled={loading}
+            onClick={handleSubmit}
+          >
+            {loading ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 0.7s linear infinite' }}>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                Đang xử lý...
+              </>
+            ) : (isEdit ? 'Lưu thay đổi' : 'Tạo người dùng')}
+          </button>
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="uperm__error">{error}</div>;
-  }
-
-  if (!permData) {
-    return <div className="uperm__empty">Chưa có dữ liệu quyền.</div>;
-  }
-
-  const { screens = [], roleMatrix = [], overrides = [], userRoles = [], user: uhead } = permData;
-
-  // Filter screens
-  const filteredScreens = screens.filter((s) => {
-    if (!filter) return true;
-    const q = filter.toLowerCase();
-    return (s.screenKey || '').toLowerCase().includes(q)
-      || (s.module || '').toLowerCase().includes(q)
-      || (s.resource || '').toLowerCase().includes(q);
-  });
-
-  // Build lookup: roleMatrixMap[screenKey] = { canView, ... }
-  const roleMatrixMap = {};
-  for (const r of roleMatrix) {
-    roleMatrixMap[r.screenKey] = r;
-  }
-
-  // Build lookup: overrideMap[screenKey] = { ... }
-  const overrideMap = {};
-  for (const o of overrides) {
-    overrideMap[o.screenKey] = o;
-  }
-
-  // Get item for a screen (override or empty)
-  const getItem = (screenKey) => {
-    const ov = overrideMap[screenKey];
-    if (ov) return ov;
-    return {
-      screenKey,
-      canView: false,
-      canCreate: false,
-      canUpdate: false,
-      canDelete: false,
-      canExport: false,
-      overrideType: 'full',
-      note: '',
-    };
-  };
-
-  const updateBit = (screenKey, bit, value) => {
-    const current = getItem(screenKey);
-    const next = { ...current, [bit]: value };
-    onChangeOverride(next);
-  };
-
-  const setOverrideType = (screenKey, overrideType) => {
-    const current = getItem(screenKey);
-    onChangeOverride({ ...current, overrideType });
-  };
-
-  // Stats
-  const totalOverridden = overrides.length;
-  const totalFullOverride = overrides.filter((o) => o.overrideType === 'full').length;
-
-  return (
-    <div className="uperm">
-      <div className="uperm__header">
-        <div className="uperm__user-info">
-          <strong>{uhead?.fullName || uhead?.email || user?.email || 'User'}</strong>
-          <span className="uperm__user-email">{uhead?.email}</span>
-          {userRoles.length > 0 && (
-            <span className="uperm__user-roles">
-              Vai trò: {userRoles.map((r) => r.roleName).join(', ')}
-            </span>
-          )}
-        </div>
-        <div className="uperm__stats">
-          <span className="uperm__stat-pill">
-            {totalOverridden} screen đã override
-          </span>
-          {totalFullOverride > 0 && (
-            <span className="uperm__stat-pill uperm__stat-pill--warn">
-              {totalFullOverride} full override (bỏ qua role)
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="uperm__info">
-        <strong>Hướng dẫn:</strong> Mỗi dòng là 1 màn hình. Tick V/C/U/D/E để cấp quyền cho user này.{' '}
-        <strong>Full override</strong> = thay thế hoàn toàn quyền từ role (dùng khi cần loại bỏ 1 số quyền role cấp).{' '}
-        <strong>Grant</strong> = cộng thêm vào quyền từ role.{' '}
-        <strong>Deny</strong> = thu hồi quyền từ role.
-      </div>
-
-      <div className="uperm__toolbar">
-        <input
-          type="search"
-          className="uperm__search"
-          placeholder="Tìm theo tên màn hình, module hoặc resource..."
-          value={filter}
-          onChange={(e) => onFilterChange(e.target.value)}
-        />
-        <button
-          type="button"
-          className="btn btn--ghost"
-          onClick={onClear}
-          disabled={saving || totalOverridden === 0}
-        >
-          Gỡ hết override
-        </button>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={onSave}
-          disabled={saving}
-        >
-          {saving ? 'Đang lưu...' : 'Lưu quyền'}
-        </button>
-      </div>
-
-      <div className="uperm__table-wrap">
-        <table className="uperm__table">
-          <thead>
-            <tr>
-              <th className="uperm__col-screen">Màn hình</th>
-              <th className="uperm__col-role">Quyền từ role</th>
-              <th className="uperm__col-type">Loại override</th>
-              <th className="uperm__col-action">V</th>
-              <th className="uperm__col-action">C</th>
-              <th className="uperm__col-action">U</th>
-              <th className="uperm__col-action">D</th>
-              <th className="uperm__col-action">E</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredScreens.map((s) => {
-              const rM = roleMatrixMap[s.screenKey] || {};
-              const item = getItem(s.screenKey);
-              const hasRolePerm = rM.canView || rM.canCreate || rM.canUpdate || rM.canDelete || rM.canExport;
-              const isOverridden = !!overrideMap[s.screenKey];
-              return (
-                <tr key={s.screenKey} className={isOverridden ? 'uperm__row--overridden' : ''}>
-                  <td className="uperm__col-screen">
-                    {s.screenLabel ? (
-                      <div className="uperm__screen-label">{s.screenLabel}</div>
-                    ) : null}
-                    <div className="uperm__screen-key">{s.screenKey}</div>
-                    <div className="uperm__screen-meta">
-                      {s.groupLabel && <span className="uperm__chip uperm__chip--group">{s.groupLabel}</span>}
-                      {s.resource && <span className="uperm__chip uperm__chip--resource">{s.resource}</span>}
-                    </div>
-                  </td>
-                  <td className="uperm__col-role">
-                    {hasRolePerm ? (
-                      <div className="uperm__role-perms">
-                        {rM.canView && <span className="uperm__role-bit">V</span>}
-                        {rM.canCreate && <span className="uperm__role-bit">C</span>}
-                        {rM.canUpdate && <span className="uperm__role-bit">U</span>}
-                        {rM.canDelete && <span className="uperm__role-bit">D</span>}
-                        {rM.canExport && <span className="uperm__role-bit">E</span>}
-                      </div>
-                    ) : (
-                      <span className="uperm__role-none">—</span>
-                    )}
-                  </td>
-                  <td className="uperm__col-type">
-                    <select
-                      className="input input--select uperm__type-select"
-                      value={item.overrideType}
-                      onChange={(e) => setOverrideType(s.screenKey, e.target.value)}
-                      disabled={!isOverridden}
-                    >
-                      <option value="full">Full</option>
-                      <option value="grant">Grant</option>
-                      <option value="deny">Deny</option>
-                    </select>
-                  </td>
-                  {['canView', 'canCreate', 'canUpdate', 'canDelete', 'canExport'].map((bit) => (
-                    <td key={bit} className="uperm__col-action">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(item[bit])}
-                        onChange={(e) => updateBit(s.screenKey, bit, e.target.checked)}
-                        aria-label={`${bit} for ${s.screenKey}`}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-            {filteredScreens.length === 0 && (
-              <tr>
-                <td colSpan={8} className="uperm__empty">
-                  Không có màn hình nào khớp với bộ lọc.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
       </div>
     </div>
   );
