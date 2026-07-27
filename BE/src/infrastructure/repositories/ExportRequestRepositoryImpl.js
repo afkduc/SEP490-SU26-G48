@@ -187,8 +187,9 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   }
 
   /**
-   * Lay Repair Order co the xuat kho (status IN ('pending','inprogress')) va chua xuat.
-   * Chi loc nhung RO co it nhat 1 task_type='product' chua duoc xuat.
+   * Lay Repair Order co the xuat kho (status <> 'cancelled', bao gom ca
+   * 'inprogress' va 'completed' - phu tung co the phat sinh/chua xuat du
+   * lenh da hoan thanh) va chua tung duoc xuat.
    */
   async findExportableRepairOrders({ branchId, search, page = 1, limit = 20 } = {}) {
     const safePage = Math.max(1, Number(page) || 1);
@@ -197,7 +198,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
 
     const where = [
       `ro.branch_id = @branchId`,
-      `ro.status IN ('pending','inprogress')`,
+      `ro.status <> 'cancelled'`,
     ];
     const params = { branchId };
     if (search) {
@@ -264,7 +265,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   async countExportableRepairOrders({ branchId, search } = {}) {
     const where = [
       `ro.branch_id = @branchId`,
-      `ro.status IN ('pending','inprogress')`,
+      `ro.status <> 'cancelled'`,
     ];
     const params = { branchId };
     if (search) {
