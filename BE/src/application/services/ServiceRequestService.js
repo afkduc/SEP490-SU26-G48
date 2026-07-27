@@ -27,10 +27,17 @@ class ServiceRequestService {
   // Public - danh sach hang xe cho dropdown tren landing page. AutoGara chi
   // nhan bao duong/sua chua Kia va Mazda nen loc cung ngay tai day.
   async getPublicVehicleBrands() {
-    const result = await query(
-      "SELECT id, brand_name FROM brands WHERE LOWER(brand_name) IN ('kia', 'mazda') ORDER BY brand_name ASC"
-    );
-    return result.recordset.map((row) => ({ id: row.id, name: row.brand_name }));
+    const VehicleBrandRepository = require('../../infrastructure/repositories/VehicleBrandRepository');
+    const repo = new VehicleBrandRepository();
+    try {
+      const items = await repo.list({ includeInactive: false });
+      return items.map((b) => ({ id: b.id, name: b.brandName }));
+    } catch (_) {
+      const result = await query(
+        'SELECT id, brand_name FROM brands ORDER BY brand_name ASC'
+      );
+      return result.recordset.map((row) => ({ id: row.id, name: row.brand_name }));
+    }
   }
 
   // Public - vai goi dich vu tieu bieu cho section "Goi dich vu" tren landing
