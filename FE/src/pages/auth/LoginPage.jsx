@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { routeAfterLogin } from '../../utils/roleRedirect';
 import httpClient from '../../services/httpClient';
-import { getPendingLoginApi } from '../../services/authApi';
 import './LoginPage.css';
 
 const WRONG_BRANCH_MESSAGE = 'Tài khoản của bạn không có quyền đăng nhập vào chi nhánh này';
@@ -19,9 +18,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWrongBranchModal, setShowWrongBranchModal] = useState(false);
-  const [pendingLogin, setPendingLogin] = useState(null); // { pendingId, message, session }
+  /** { message, session, waitSeconds, remaining } — chờ takeover rồi force login */
+  const [loginWait, setLoginWait] = useState(null);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
-  const pollRef = useRef(null);
+  const waitTimerRef = useRef(null);
+  const cancelledWaitRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -51,7 +52,8 @@ export default function LoginPage() {
   }, [lockoutSeconds]);
 
   useEffect(() => () => {
-    if (pollRef.current) clearInterval(pollRef.current);
+    if (waitTimerRef.current) clearInterval(waitTimerRef.current);
+    cancelledWaitRef.current = true;
   }, []);
 
   const handleChange = (e) => {
@@ -59,66 +61,77 @@ export default function LoginPage() {
     setError('');
   };
 
-  const stopPolling = () => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
+  const stopLoginWait = () => {
+    cancelledWaitRef.current = true;
+    if (waitTimerRef.current) {
+      clearInterval(waitTimerRef.current);
+      waitTimerRef.current = null;
+    }
+    setLoginWait(null);
+  };
+
+  const completeForceLogin = async () => {
+    setLoading(true);
+    try {
+      const result = await login(form.identifier, form.password, rememberMe, form.branchId, {
+        force: true,
+      });
+      if (cancelledWaitRef.current) return;
+      setLoginWait(null);
+      navigate(routeAfterLogin(result?.user), { replace: true });
+    } catch (err) {
+      if (cancelledWaitRef.current) return;
+      setLoginWait(null);
+      setError(err.message || 'Không thể hoàn tất đăng nhập');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const startPendingPoll = (pendingId) => {
-    stopPolling();
-    pollRef.current = setInterval(async () => {
-      try {
-        const status = await getPendingLoginApi(pendingId);
-        if (status?.status === 'approved') {
-          stopPolling();
-          setLoading(true);
-          try {
-            const result = await login(form.identifier, form.password, rememberMe, form.branchId, {
-              pendingId,
-            });
-            setPendingLogin(null);
-            navigate(routeAfterLogin(result?.user), { replace: true });
-          } catch (err) {
-            setPendingLogin(null);
-            setError(err.message || 'Không thể hoàn tất đăng nhập');
-          } finally {
-            setLoading(false);
-          }
-        } else if (status?.status === 'rejected') {
-          stopPolling();
-          setPendingLogin(null);
-          setError('Phiên đang đăng nhập đã từ chối yêu cầu của bạn.');
-        } else if (status?.status === 'expired') {
-          stopPolling();
-          setPendingLogin(null);
-          setError('Yêu cầu đăng nhập đã hết hạn. Vui lòng thử lại.');
+  const startLoginWait = ({ message, session, waitSeconds }) => {
+    cancelledWaitRef.current = false;
+    if (waitTimerRef.current) clearInterval(waitTimerRef.current);
+    let remaining = Math.max(1, Number(waitSeconds) || 5);
+    setLoginWait({ message, session, waitSeconds: remaining, remaining });
+    waitTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(waitTimerRef.current);
+        waitTimerRef.current = null;
+        setLoginWait((prev) => (prev ? { ...prev, remaining: 0 } : null));
+        if (!cancelledWaitRef.current) {
+          completeForceLogin();
         }
-      } catch {
-        // ignore transient poll errors
+        return;
       }
-    }, 2000);
+      setLoginWait((prev) => (prev ? { ...prev, remaining } : null));
+    }, 1000);
   };
 
   const doLogin = async () => {
     setLoading(true);
     setError('');
+    stopLoginWait();
+    cancelledWaitRef.current = false;
     try {
       const result = await login(form.identifier, form.password, rememberMe, form.branchId);
-      setPendingLogin(null);
+      setLoginWait(null);
       navigate(routeAfterLogin(result?.user), { replace: true });
     } catch (err) {
       if (err.status === 403 && err.message === WRONG_BRANCH_MESSAGE) {
         setShowWrongBranchModal(true);
-      } else if (err.status === 409 || err.code === 'LOGIN_PENDING') {
-        const pendingId = err.details?.pendingId;
-        setPendingLogin({
-          pendingId,
+      } else if (
+        err.status === 409
+        && (err.code === 'LOGIN_WAIT' || err.details?.code === 'LOGIN_WAIT'
+          || err.code === 'LOGIN_PENDING' || err.details?.code === 'LOGIN_PENDING')
+      ) {
+        // LOGIN_WAIT: countdown rồi force. LOGIN_PENDING legacy: cũng countdown force (không poll approve).
+        const waitSeconds = err.details?.waitSeconds || 5;
+        startLoginWait({
           message: err.message,
           session: err.details?.session || null,
+          waitSeconds,
         });
-        if (pendingId) startPendingPoll(pendingId);
       } else if (err.status === 429 || err.code === 'LOGIN_LOCKED' || err.details?.suggestChangePassword) {
         const wait = err.details?.waitSeconds || Math.ceil((err.details?.remainingMs || 0) / 1000) || 10;
         setLockoutSeconds(wait);
@@ -280,7 +293,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      {pendingLogin && (
+      {loginWait && (
         <div className="login-modal-overlay">
           <div className="login-modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="login-modal-icon" style={{ color: '#4f46e5' }}>
@@ -289,26 +302,29 @@ export default function LoginPage() {
                 <polyline points="12 6 12 12 16 14" />
               </svg>
             </div>
-            <h2 className="login-modal-title">Đang chờ xác nhận</h2>
+            <h2 className="login-modal-title">
+              {loginWait.remaining > 0
+                ? `Đăng nhập sau ${loginWait.remaining}s`
+                : 'Đang đăng nhập...'}
+            </h2>
             <p className="login-modal-message">
-              {pendingLogin.message || 'Đã gửi yêu cầu tới phiên đang đăng nhập. Vui lòng chờ họ đồng ý.'}
+              {loginWait.message
+                || 'Tài khoản đang được sử dụng trên thiết bị khác. Bạn sẽ được đăng nhập tự động.'}
             </p>
-            {pendingLogin.session && (
+            {loginWait.session && (
               <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px' }}>
-                Phiên hiện tại: {[pendingLogin.session.browser, pendingLogin.session.os].filter(Boolean).join(' · ') || 'Thiết bị khác'}
-                {pendingLogin.session.ip ? ` · IP ${pendingLogin.session.ip}` : ''}
+                Phiên hiện tại: {[loginWait.session.browser, loginWait.session.os].filter(Boolean).join(' · ') || 'Thiết bị khác'}
+                {loginWait.session.ip ? ` · IP ${loginWait.session.ip}` : ''}
               </p>
             )}
             <button
               type="button"
               className="login-modal-btn"
               style={{ background: '#fff', color: '#334155', border: '1px solid #cbd5e1' }}
-              onClick={() => {
-                stopPolling();
-                setPendingLogin(null);
-              }}
+              onClick={stopLoginWait}
+              disabled={loading || loginWait.remaining <= 0}
             >
-              Hủy chờ
+              Hủy
             </button>
           </div>
         </div>

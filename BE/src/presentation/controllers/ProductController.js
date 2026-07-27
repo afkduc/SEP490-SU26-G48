@@ -1,6 +1,7 @@
 const { success } = require('../../utils/response');
 const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
+const { formatEntityName } = require('../../utils/notificationFormat');
 
 class ProductController {
   constructor({ productService }) {
@@ -60,7 +61,11 @@ class ProductController {
       });
       await this.notificationService.notifyAdmins('PRODUCT_CREATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: product?.name || product?.product_name || `ID-${product?.id}`,
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id,
+          'Sản phẩm',
+        ),
         targetCode: product?.product_code || product?.code || '',
         userId: product?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
@@ -82,7 +87,11 @@ class ProductController {
       });
       await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: product?.name || product?.product_name || `ID-${req.params.id}`,
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id || req.params.id,
+          'Sản phẩm',
+        ),
         targetCode: product?.product_code || product?.code || '',
         userId: product?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
@@ -105,7 +114,11 @@ class ProductController {
       });
       await this.notificationService.notifyAdmins('PRODUCT_DISABLED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: product?.name || product?.product_name || `ID-${req.params.id}`,
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id || req.params.id,
+          'Sản phẩm',
+        ),
         targetCode: product?.product_code || product?.code || '',
         userId: Number(req.params.id) || null,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
@@ -127,7 +140,11 @@ class ProductController {
       });
       await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: product?.name || product?.product_name || `ID-${req.params.id}`,
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id || req.params.id,
+          'Sản phẩm',
+        ),
         targetCode: product?.product_code || product?.code || '',
         userId: product?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
