@@ -529,7 +529,7 @@ function TeamLeaderTaskCards() {
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
                 Đầu mục công việc ({doneCount}/{serviceTasks.length})
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: partTasks.length > 0 ? 10 : 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: partTasks.length > 0 ? 10 : 14, maxHeight: 260, overflowY: 'auto', paddingRight: 2 }}>
                 {serviceTasks.map((task) => {
                   const key = `${order.id}-${task.id}`;
                   const isBusy = busyTaskKey === key;
@@ -562,7 +562,7 @@ function TeamLeaderTaskCards() {
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
                     Phụ tùng cần dùng
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto', paddingRight: 2 }}>
                     {partTasks.map((task) => (
                       <div
                         key={task.id}
