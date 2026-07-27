@@ -343,7 +343,7 @@ class ManagerRepositoryImpl {
     return this.getEmployeeById(branchId, userId);
   }
 
-  async updateEmployee(branchId, id, { fullName, email, phone, roleId, status, specialtyIds }) {
+  async updateEmployee(branchId, id, { fullName, email, phone, roleId, status, specialtyIds, passwordHash }) {
     await query(
       `UPDATE users
        SET user_name = @fullName,
@@ -361,6 +361,15 @@ class ManagerRepositoryImpl {
         branchId: Number(branchId),
       }
     );
+
+    // Chi doi mat khau khi Quan ly co nhap mat khau moi (passwordHash) - de
+    // trong thi giu nguyen mat khau cu, khong bat buoc phai nhap moi lan sua.
+    if (passwordHash) {
+      await query(
+        `UPDATE users SET user_password = @passwordHash WHERE id = @id AND branch_id = @branchId`,
+        { passwordHash, id: Number(id), branchId: Number(branchId) }
+      );
+    }
 
     if (roleId) {
       await query('DELETE FROM user_role WHERE user_id = @id', { id: Number(id) });

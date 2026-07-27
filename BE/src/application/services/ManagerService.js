@@ -115,7 +115,7 @@ class ManagerService {
     const existing = await this.managerRepository.getEmployeeById(branchId, id);
     if (!existing) throw new ApiError(404, 'Không tìm thấy nhân viên');
 
-    const { fullName, email, phone, roleId, status } = payload;
+    const { fullName, email, phone, roleId, status, password, confirmPassword } = payload;
 
     if (!fullName || !email || !phone || !roleId) {
       throw new ApiError(400, 'Họ tên, email, số điện thoại và vai trò là bắt buộc');
@@ -131,6 +131,19 @@ class ManagerService {
 
     if (status && !VALID_STATUSES.includes(status)) {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+
+    // Doi mat khau la tuy chon - chi validate/hash khi Quan ly co nhap mat
+    // khau moi, khong bat buoc phai nhap lai moi lan chinh sua nhan vien.
+    let passwordHash;
+    if (password) {
+      if (password.length < 8) {
+        throw new ApiError(400, 'Mật khẩu mới phải có ít nhất 8 ký tự');
+      }
+      if (confirmPassword !== password) {
+        throw new ApiError(400, 'Xác nhận mật khẩu không khớp');
+      }
+      passwordHash = bcrypt.hashSync(password, 10);
     }
 
     if (email !== existing.email) {
@@ -157,6 +170,7 @@ class ManagerService {
       roleId: Number(roleId),
       status: status || existing.status,
       specialtyIds: specialtyIds || [],
+      passwordHash,
     });
   }
 

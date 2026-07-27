@@ -48,7 +48,7 @@ const SERVICE_ADVISOR_NAV = [
 
 // ===== Manager =====
 const MANAGER_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Dashboard', path: '/manager/dashboard' },
   { label: 'Kho', path: '/inventory' },
   { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests' },
   { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests' },
@@ -60,7 +60,6 @@ const MANAGER_NAV = [
     ],
   },
   { label: 'Quyết toán sửa chữa', path: '/manager/settlements' },
-  { label: 'Chăm sóc khách hàng', path: '/customer-care' },
   { label: 'Khách hàng', path: '/customers' },
   {
     label: 'Dịch vụ',
