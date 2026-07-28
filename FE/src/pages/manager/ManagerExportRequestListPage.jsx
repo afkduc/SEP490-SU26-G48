@@ -5,14 +5,14 @@ import { useManagerExportRequests } from '../../hooks/manager/useManagerExportRe
 import './ManagerExportRequestListPage.css';
 
 const STATUS_META = {
-  completed: { label: 'Da xuat', className: 'badge--success' },
-  cancelled: { label: 'Huy', className: 'badge--danger' },
+  completed: { label: 'Đã xuất', className: 'badge--success' },
+  cancelled: { label: 'Hủy', className: 'badge--danger' },
 };
 
 const STATUS_TABS = [
-  { value: '', label: 'Tat ca' },
-  { value: 'completed', label: 'Da xuat' },
-  { value: 'cancelled', label: 'Huy' },
+  { value: '', label: 'Tất cả' },
+  { value: 'completed', label: 'Đã xuất' },
+  { value: 'cancelled', label: 'Hủy' },
 ];
 
 function formatDate(d) {
@@ -60,10 +60,10 @@ export default function ManagerExportRequestListPage() {
     <div className="mer-list">
       <div className="mer-list__header">
         <div>
-          <h1 className="mer-list__title">Phieu xuat kho (Manager)</h1>
+          <h1 className="mer-list__title">Phiếu xuất kho</h1>
           <p className="mer-list__subtitle">
-            Xem lich su xuat kho cua chi nhanh ban quan ly. NV kho tu xuat truc tiep
-            theo phieu sua chua - khong can Manager duyet.
+            Xem lịch sử xuất kho của chi nhánh bạn quản lý. NV kho tự xuất trực tiếp
+            theo phiếu sửa chữa - không cần Manager duyệt.
           </p>
         </div>
       </div>
@@ -85,7 +85,7 @@ export default function ManagerExportRequestListPage() {
         <input
           className="input input--search"
           type="text"
-          placeholder="Tim theo ma phieu, ma phieu sua chua, ghi chu..."
+          placeholder="Tìm theo mã phiếu, mã phiếu sửa chữa, ghi chú..."
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -95,46 +95,46 @@ export default function ManagerExportRequestListPage() {
           type="date"
           value={draftFromDate}
           onChange={(e) => setDraftFromDate(e.target.value)}
-          title="Tu ngay"
+          title="Từ ngày"
         />
         <input
           className="input"
           type="date"
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
-          title="Den ngay"
+          title="Đến ngày"
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
-          Loc
+          Lọc
         </button>
       </div>
 
       {loading ? (
-        <div className="mer-list__loading">Dang tai...</div>
+        <div className="mer-list__loading">Đang tải...</div>
       ) : error ? (
-        <div className="mer-list__error">Loi: {error}</div>
+        <div className="mer-list__error">Lỗi: {error}</div>
       ) : (
         <div className="table-responsive">
           <table className="table">
             <thead>
               <tr>
-                <th>Ma phieu</th>
-                <th>Ngay tao</th>
-                <th>Ngay xuat</th>
-                <th>Phieu sua chua</th>
-                <th>Khach hang</th>
-                <th>So dong</th>
-                <th>Tong SL</th>
-                <th>Trang thai</th>
-                <th>Nguoi xuat</th>
-                <th style={{ width: 90 }}>Hanh dong</th>
+                <th>Mã phiếu</th>
+                <th>Ngày tạo</th>
+                <th>Ngày xuất</th>
+                <th>Phiếu sửa chữa</th>
+                <th>Khách hàng</th>
+                <th>Số dòng</th>
+                <th>Tổng SL</th>
+                <th>Trạng thái</th>
+                <th>Người xuất</th>
+                <th style={{ width: 90 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="table__empty">
-                    Khong co phieu xuat nao trong chi nhanh cua ban
+                    Không có phiếu xuất nào trong chi nhánh của bạn
                   </td>
                 </tr>
               ) : (
@@ -158,7 +158,7 @@ export default function ManagerExportRequestListPage() {
                           to={`/manager/export-requests/${r.id}`}
                           className="btn btn--ghost btn--sm"
                         >
-                          Xem
+                          Chi tiết
                         </Link>
                       </td>
                     </tr>
@@ -173,7 +173,7 @@ export default function ManagerExportRequestListPage() {
       {!loading && total > 0 && (
         <div className="mer-list__pagination">
           <span className="mer-list__pagination-info">
-            Tong: <strong>{total}</strong> phieu
+            Tổng: <strong>{total}</strong> phiếu
           </span>
           <div className="mer-list__pagination-controls">
             <button
@@ -182,7 +182,7 @@ export default function ManagerExportRequestListPage() {
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
             >
-              &laquo; Truoc
+              &laquo; Trước
             </button>
             <span className="mer-list__pagination-current">
               Trang {page} / {totalPages}

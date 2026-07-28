@@ -2,16 +2,20 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
+import ProfileRedirect from '../components/ProfileRedirect';
 import SessionExpiredModal from '../components/SessionExpiredModal';
 import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
+import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
 import { SharedDataProvider } from '../contexts/SharedDataContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
+const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
@@ -25,10 +29,8 @@ const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
-const AdminRolesPage = lazy(() => import('../pages/admin/AdminRolesPage'));
 const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
 const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
-const AdminPermissionMatrixPage = lazy(() => import('../pages/admin/AdminPermissionMatrixPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
 const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
 const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
@@ -68,6 +70,19 @@ function ErrorHandler() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [globalError, clearError]);
 
+  // Auto-clear globalError khi user dang o trang /login.
+  // Ly do: khi token stale va user click "Dang nhap lai" tu SessionExpiredModal,
+  // navigate('/login') se fire. AppContext clear token, nhung globalError van
+  // con giu set403Error tu ProtectedRoute truoc do -> ErrorHandler van show
+  // UnauthorizedPage full-screen, che form login. Clear o day de form login
+  // render binh thuong.
+  useEffect(() => {
+    if (!globalError) return;
+    if (window.location.pathname === '/login') {
+      clearError();
+    }
+  }, [globalError, clearError]);
+
   if (!globalError) return null;
 
   return (
@@ -94,6 +109,14 @@ function Loading() {
   );
 }
 
+function ProfilePageLayout() {
+  return (
+    <AppLayout>
+      <Outlet />
+    </AppLayout>
+  );
+}
+
 function AppRoutes() {
   return (
     <>
@@ -105,13 +128,24 @@ function AppRoutes() {
           <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         {/* Protected – wrapped in AppLayout (Navbar) */}
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute
+              roles={[
+                ROLES.SERVICE_ADVISOR,
+                ROLES.MANAGER,
+                ROLES.GENERAL_DIRECTOR,
+                ROLES.TEAM_LEADER,
+                ROLES.TECHNICIAN,
+                ROLES.ADMIN,
+              ]}
+            >
               <AppLayout>
                 <DashboardPage />
               </AppLayout>
@@ -132,62 +166,65 @@ function AppRoutes() {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="users" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="admin:users:read">
-              <AdminUsersPage />
-            </ProtectedRoute>
-          } />
-          <Route path="branches" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:branches:access">
-              <AdminBranchesPage />
-            </ProtectedRoute>
-          } />
-          <Route path="roles" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:roles:access">
-              <AdminRolesPage />
-            </ProtectedRoute>
-          } />
-          <Route path="devices" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:devices:access">
-              <AdminDevicesPage />
-            </ProtectedRoute>
-          } />
-          <Route path="specialties" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:specialties:access">
-              <AdminSpecialtiesPage />
-            </ProtectedRoute>
-          } />
-          <Route path="permission-matrix" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:permission_matrix:access">
-              <AdminPermissionMatrixPage />
-            </ProtectedRoute>
-          } />
-          <Route path="logs" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:audit_logs:access">
-              <AuditLogsPage />
-            </ProtectedRoute>
-          } />
-          <Route path="login-sessions" element={
-            <ProtectedRoute roles={[ROLES.ADMIN]} permission="screen:login_sessions:access">
-              <LoginSessionsPage />
-            </ProtectedRoute>
-          } />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="branches" element={<AdminBranchesPage />} />
+          <Route path="roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
+          <Route path="devices" element={<AdminDevicesPage />} />
+          <Route path="specialties" element={<AdminSpecialtiesPage />} />
+          <Route path="logs" element={<AuditLogsPage />} />
+          <Route path="login-sessions" element={<LoginSessionsPage />} />
           <Route path="profile" element={<AdminProfilePage />} />
+          <Route path="profile/edit" element={<AdminProfilePage />} />
           <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
         </Route>
-        {/* General Director settlement reports */}
-                <Route
-                  path="/general-director/*"
-                  element={
-                    <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
-                      <AppLayout>
-                        <GeneralDirectorPage />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
 
-        {/* Quản lý chi nhánh - Nhân viên / Thợ máy / Tổ trưởng */}
+        {/* Hồ sơ cá nhân — URL view/edit riêng cho từng role (AppLayout) */}
+        {APP_PROFILE_ROUTE_CONFIGS.map(({ profilePath, allowedRoles }) => (
+          <Route
+            key={profilePath}
+            path={profilePath}
+            element={
+              <ProtectedRoute roles={allowedRoles}>
+                <ProfilePageLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminProfilePage />} />
+            <Route path="edit" element={<AdminProfilePage />} />
+          </Route>
+        ))}
+
+        {/* Legacy /profile, /profile/edit → redirect theo role */}
+        <Route
+          path="/profile/edit"
+          element={
+            <ProtectedRoute>
+              <ProfileRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfileRedirect />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* General Director */}
+        <Route
+          path="/general-director/*"
+          element={
+            <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
+              <AppLayout>
+                <GeneralDirectorPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý chi nhánh */}
         <Route
           path="/manager/*"
           element={
@@ -203,7 +240,7 @@ function AppRoutes() {
         <Route
           path="/repair-settlement/*"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <RepairSettlementPage />
               </AppLayout>
@@ -215,7 +252,7 @@ function AppRoutes() {
         <Route
           path="/repair-orders/*"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.TEAM_LEADER, ROLES.TECHNICIAN, ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <RepairOrderPage />
               </AppLayout>
@@ -227,7 +264,7 @@ function AppRoutes() {
         <Route
           path="/customers"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <CustomerHistoryPage />
               </AppLayout>
@@ -251,7 +288,7 @@ function AppRoutes() {
         <Route
           path="/customer-care"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
               <AppLayout>
                 <CustomerCarePage />
               </AppLayout>
@@ -263,7 +300,9 @@ function AppRoutes() {
         <Route
           path={ROUTES.INVENTORY}
           element={
-            <ProtectedRoute roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ACCOUNTANT, ROLES.ADMIN]}>
+            <ProtectedRoute
+              roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}
+            >
               <AppLayout>
                 <InventoryLayout />
               </AppLayout>

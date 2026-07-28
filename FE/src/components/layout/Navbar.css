@@ -425,3 +425,10 @@
     font-size: 12.5px;
   }
 }
+
+/* Container cho inline children (khi parent dropdown bi an, chi render children). */
+.navbar__inline-children {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}

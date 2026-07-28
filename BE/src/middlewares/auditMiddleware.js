@@ -154,7 +154,6 @@ const ROLE_LABEL = {
   sale: 'Nhân viên bán hàng',
   technician: 'Kỹ thuật viên',
   warehouse_staff: 'Thủ kho',
-  accountant: 'Kế toán',
   customer_care: 'Chăm sóc khách hàng',
   general_director: 'Giám đốc',
   director: 'Giám đốc',
@@ -189,8 +188,6 @@ const ACTION_VERB = {
 const TABLE_LABEL = {
   users: 'tài khoản',
   user: 'tài khoản',
-  contracts: 'hợp đồng',
-  contract: 'hợp đồng',
   customers: 'khách hàng',
   customer: 'khách hàng',
   vehicles: 'xe',

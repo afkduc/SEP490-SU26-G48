@@ -136,7 +136,7 @@ function BranchFormModal({ branch, onClose, onSuccess, managerCandidates }) {
         address: form.address.trim() || undefined,
         phone: form.phone.trim() || undefined,
         email: form.email.trim() || undefined,
-        managerId: form.managerId ? Number(form.managerId) : undefined,
+        managerId: form.managerId ? Number(form.managerId) : null,
       };
       if (!isEdit) {
         payload.branchCode = form.branchCode.trim();
@@ -149,9 +149,7 @@ function BranchFormModal({ branch, onClose, onSuccess, managerCandidates }) {
       }
       onSuccess();
     } catch (err) {
-      if (!handleApiError(err, isEdit ? 'admin:branches:update' : 'admin:branches:create')) {
-        setError(err.message || 'Lỗi khi lưu chi nhánh');
-      }
+      setError(err.message || 'Lỗi khi lưu chi nhánh');
     } finally {
       setSaving(false);
     }
@@ -288,7 +286,7 @@ function ConfirmDeactivateModal({ branch, onClose, onConfirm, loading }) {
             Hủy
           </button>
           <button className="btn btn--danger" onClick={onConfirm} disabled={loading}>
-            {loading ? 'Đang xử lý...' : 'Ngưng hoạt động'}
+            {loading ? 'Đang xử lý...' : 'Ngưng'}
           </button>
         </div>
       </div>
@@ -311,7 +309,8 @@ function BranchCard({ branch, onEdit, onDeactivate, onStats }) {
           <span className="branch-card__name">{branch.branchName}</span>
         </div>
         <span className={`branch-card__status-badge branch-card__status-badge--${branch.isActive ? 'active' : 'inactive'}`}>
-          {branch.isActive ? 'Hoạt động' : 'Ngừng'}
+          <span className="branch-card__status-dot" aria-hidden="true" />
+          {branch.isActive ? 'Hoạt động' : 'Dừng hoạt động'}
         </span>
       </div>
 
@@ -351,22 +350,19 @@ function BranchCard({ branch, onEdit, onDeactivate, onStats }) {
       </div>
 
       <div className="branch-card__actions">
-        <button className="btn btn--sm btn--secondary" onClick={() => onStats(branch)} title="Xem thống kê">
+        <button type="button" className="branch-card__btn branch-card__btn--stats" onClick={() => onStats(branch)} title="Xem thống kê">
           <IconRefresh />
           Thống kê
         </button>
-        {/*
-          Restore PermissionGate. Nếu nút không hiện -> permissions chưa được grant đúng trong DB.
-        */}
         <PermissionGate permission="admin:branches:update">
-          <button className="btn btn--sm btn--secondary" onClick={() => onEdit(branch)} title="Chỉnh sửa">
+          <button type="button" className="branch-card__btn branch-card__btn--edit" onClick={() => onEdit(branch)} title="Chỉnh sửa">
             <IconEdit />
             Sửa
           </button>
         </PermissionGate>
         {branch.isActive ? (
           <PermissionGate permission="admin:branches:deactivate">
-            <button className="btn btn--sm btn--danger" onClick={() => onDeactivate(branch)} title="Ngưng hoạt động">
+            <button type="button" className="branch-card__btn branch-card__btn--danger" onClick={() => onDeactivate(branch)} title="Ngưng hoạt động">
               <IconTrash />
               Ngưng
             </button>
@@ -571,13 +567,13 @@ export default function AdminBranchesPage() {
               <span className="branch-stat-card__value">{branches.length}</span>
               <span className="branch-stat-card__label">Tổng chi nhánh</span>
             </div>
-            <div className="branch-stat-card">
-              <span className="branch-stat-card__value" style={{ color: '#10b981' }}>{activeCount}</span>
+            <div className="branch-stat-card branch-stat-card--active">
+              <span className="branch-stat-card__value">{activeCount}</span>
               <span className="branch-stat-card__label">Đang hoạt động</span>
             </div>
-            <div className="branch-stat-card">
-              <span className="branch-stat-card__value" style={{ color: '#94a3b8' }}>{inactiveCount}</span>
-              <span className="branch-stat-card__label">Ngừng hoạt động</span>
+            <div className="branch-stat-card branch-stat-card--inactive">
+              <span className="branch-stat-card__value">{inactiveCount}</span>
+              <span className="branch-stat-card__label">Dừng hoạt động</span>
             </div>
           </div>
 

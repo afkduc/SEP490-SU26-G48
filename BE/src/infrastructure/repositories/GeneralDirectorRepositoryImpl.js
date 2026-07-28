@@ -24,8 +24,6 @@ function mapSettlementRow(row) {
     afterDiscount: Number(row.after_discount || 0),
     vat: Number(row.vat || 0),
     freeAmount: Number(row.free_amount || 0),
-    nextMaintenanceKm: row.next_maintenance_km,
-    nextMaintenanceDate: row.next_maintenance_date ? normalizeDate(row.next_maintenance_date) : null,
     customerRequest: row.customer_request,
     currentKm: row.current_km,
     branch: {
@@ -538,8 +536,6 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           so.vat,
           so.free_amount,
           so.total,
-          so.next_maintenance_km,
-          so.next_maintenance_date,
           so.intake_date,
           so.completed_date
        FROM service_orders so
@@ -626,8 +622,6 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           so.vat,
           so.free_amount,
           so.total,
-          so.next_maintenance_km,
-          so.next_maintenance_date,
           so.intake_date,
           so.completed_date
        FROM service_orders so
@@ -763,7 +757,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN user_role ur ON ur.user_id = u.id
        LEFT JOIN roles r ON r.id = ur.role_id
        ${USER_SPECIALTY_APPLY}
-       WHERE r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'accountant', 'team_leader')
+       WHERE r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'team_leader')
          AND (@branchId IS NULL OR u.branch_id = @branchId)
          AND (@status IS NULL OR u.status = @status)
          AND (@role IS NULL OR r.role_name = @role)
@@ -813,14 +807,13 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN roles r ON r.id = ur.role_id
        ${USER_SPECIALTY_APPLY}
        WHERE u.id = @id
-         AND r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'accountant', 'team_leader')
+         AND r.role_name IN ('manager', 'service_advisor', 'warehouse_staff', 'team_leader')
        ORDER BY
          CASE r.role_name
            WHEN 'manager' THEN 1
            WHEN 'service_advisor' THEN 2
            WHEN 'team_leader' THEN 3
            WHEN 'warehouse_staff' THEN 4
-           WHEN 'accountant' THEN 5
            ELSE 99
          END`,
       { id: Number(id) }

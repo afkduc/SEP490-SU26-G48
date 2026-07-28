@@ -1,43 +1,65 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SESSION_EXPIRED_KEY } from '../services/httpClient';
+import { SESSION_EXPIRED_KEY, SESSION_LOGGED_OUT_EVENT } from '../services/httpClient';
+
+// Module-level flag da chong spam DUNG ROI giua cac instance StrictMode/HMR.
+let modalShownAt = 0;
+const MIN_REDISPLAY_INTERVAL_MS = 60_000;
 
 export default function SessionExpiredModal() {
   const [visible, setVisible] = useState(false);
+  const [detail, setDetail] = useState(null);
   const navigate = useNavigate();
-  const visibleRef = useRef(false);
 
   useEffect(() => {
     const handler = (event) => {
-      // Bo qua neu user dang o trang login (tranh modal nhap nhay).
       if (window.location.pathname === '/login') return;
-      // Tranh spam: neu modal dang hien thi -> khong dispatch nua.
-      if (visibleRef.current) return;
-      // Cho phep caller bo qua bang cach truyen detail.skipIfVisible
-      const detail = event?.detail || {};
-      if (detail.skipIfVisible && visibleRef.current) return;
-
-      visibleRef.current = true;
+      const now = Date.now();
+      if (now - modalShownAt < MIN_REDISPLAY_INTERVAL_MS) {
+        return;
+      }
+      modalShownAt = now;
+      setDetail(event?.detail || null);
       setVisible(true);
     };
     window.addEventListener(SESSION_EXPIRED_KEY, handler);
     return () => window.removeEventListener(SESSION_EXPIRED_KEY, handler);
   }, []);
 
-  // Reset flag khi modal dong va user bam "Dang nhap lai"
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === 'token' && e.newValue) {
+        modalShownAt = 0;
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   function handleLogin() {
-    visibleRef.current = false;
+    modalShownAt = 0;
     setVisible(false);
+    setDetail(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('permissions');
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('permissions');
+    window.dispatchEvent(new CustomEvent(SESSION_LOGGED_OUT_EVENT));
     navigate('/login', { replace: true });
   }
 
   if (!visible) return null;
+
+  const replaced = detail?.code === 'SESSION_REPLACED';
+  const title = replaced
+    ? 'Đã có người đăng nhập tài khoản của bạn'
+    : 'Phiên đăng nhập đã hết hạn';
+  const message = replaced
+    ? (detail?.message
+      || 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại để tiếp tục.')
+    : 'Phiên đăng nhập của bạn đã hết hiệu lực. Vui lòng đăng nhập lại để tiếp tục sử dụng hệ thống.';
 
   return (
     <div className="modal-overlay">
@@ -49,10 +71,8 @@ export default function SessionExpiredModal() {
             <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
         </div>
-        <h2 className="modal-title">Phiên đăng nhập đã hết hạn</h2>
-        <p className="modal-message">
-          Phiên đăng nhập của bạn đã hết hiệu lực. Vui lòng đăng nhập lại để tiếp tục sử dụng hệ thống.
-        </p>
+        <h2 className="modal-title">{title}</h2>
+        <p className="modal-message">{message}</p>
         <div className="modal-actions">
           <button className="btn btn--primary" onClick={handleLogin}>
             Đăng nhập lại

@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AppContext';
 import { useNotifications } from '../hooks/useNotifications';
 import { formatDateSafe } from '../utils/dateUtils';
+import { humanizeNotificationMessage } from '../utils/notificationDisplay';
+import { dispatchLoginChallenge } from '../services/authApi';
 import './NotificationBell.css';
 
 const ICON_COLORS = {
@@ -29,11 +31,11 @@ const ICON_LABELS = {
   FORCE_LOGOUT: 'Bị đăng xuất',
   PASSWORD_CHANGED: 'Mật khẩu',
   ROLE_CHANGED: 'Phân quyền',
-  USER_CREATED: 'Tạo user',
-  USER_UPDATED: 'Cập nhật user',
-  USER_DISABLED: 'Disable user',
-  USER_ENABLED: 'Kích hoạt user',
-  USER_PASSWORD_RESET: 'Reset mật khẩu',
+  USER_CREATED: 'Tạo người dùng',
+  USER_UPDATED: 'Cập nhật người dùng',
+  USER_DISABLED: 'Vô hiệu hóa người dùng',
+  USER_ENABLED: 'Kích hoạt người dùng',
+  USER_PASSWORD_RESET: 'Đặt lại mật khẩu',
   REPAIR_ORDER_CREATED: 'Tạo phiếu sửa',
   REPAIR_ORDER_UPDATED: 'Cập nhật phiếu sửa',
   SETTLEMENT_CREATED: 'Tạo quyết toán',
@@ -50,8 +52,9 @@ const ICON_LABELS = {
   ROLE_DELETED: 'Xóa vai trò',
   PRODUCT_CREATED: 'Tạo sản phẩm',
   PRODUCT_UPDATED: 'Cập nhật sản phẩm',
-  PRODUCT_DELETED: 'Xóa sản phẩm',
-  CUSTOMER_UPDATED: 'Cập nhật KH',
+  PRODUCT_DISABLED: 'Ngừng sản phẩm',
+  PRODUCT_DELETED: 'Ngừng sản phẩm',
+  CUSTOMER_UPDATED: 'Cập nhật khách hàng',
   SPECIALTY_CREATED: 'Tạo chuyên môn',
   SPECIALTY_UPDATED: 'Cập nhật chuyên môn',
   SPECIALTY_DELETED: 'Xóa chuyên môn',
@@ -118,7 +121,24 @@ export default function NotificationBell() {
     if (!notif.isRead && !notif.readAt) {
       markRead(notif.id);
     }
-    // Co the navigate den chi tiet neu notif.metadata co link (optional)
+    let metadata = notif.metadata;
+    if (typeof metadata === 'string') {
+      try { metadata = JSON.parse(metadata); } catch { metadata = {}; }
+    }
+    if (notif.type === 'LOGIN_CHALLENGE' || metadata?.eventType === 'LOGIN_CHALLENGE') {
+      const pendingId = metadata?.pendingId || notif.pendingId;
+      if (pendingId) {
+        dispatchLoginChallenge({
+          pendingId,
+          metadata: metadata || {},
+          title: notif.title,
+          message: notif.message,
+          device: [metadata?.browser, metadata?.os].filter(Boolean).join(' · ') || undefined,
+          ip: metadata?.ip,
+        });
+        setOpen(false);
+      }
+    }
   }, [markRead]);
 
   return (
@@ -202,7 +222,7 @@ export default function NotificationBell() {
                         {notif.title || ICON_LABELS[notif.type] || 'Thông báo'}
                       </div>
                       <div className="notif-bell__item-message">
-                        {notif.message || ''}
+                        {humanizeNotificationMessage(notif.message, notif.metadata)}
                       </div>
                       <div className="notif-bell__item-time">
                         {formatDateSafe(notif.createdAt || notif.timestamp, {

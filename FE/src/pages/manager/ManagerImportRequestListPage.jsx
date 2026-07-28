@@ -5,16 +5,16 @@ import { useManagerImportRequests } from '../../hooks/manager/useManagerImportRe
 import './ManagerImportRequestListPage.css';
 
 const STATUS_META = {
-  pending: { label: 'Cho duyet', className: 'badge--warning' },
-  approved: { label: 'Da duyet', className: 'badge--success' },
-  rejected: { label: 'Tu choi', className: 'badge--danger' },
+  pending: { label: 'Chờ duyệt', className: 'badge--warning' },
+  approved: { label: 'Đã duyệt', className: 'badge--success' },
+  rejected: { label: 'Từ chối', className: 'badge--danger' },
 };
 
 const STATUS_TABS = [
-  { value: '', label: 'Tat ca' },
-  { value: 'pending', label: 'Cho duyet' },
-  { value: 'approved', label: 'Da duyet' },
-  { value: 'rejected', label: 'Tu choi' },
+  { value: '', label: 'Tất cả' },
+  { value: 'pending', label: 'Chờ duyệt' },
+  { value: 'approved', label: 'Đã duyệt' },
+  { value: 'rejected', label: 'Từ chối' },
 ];
 
 function formatDate(d) {
@@ -62,10 +62,10 @@ export default function ManagerImportRequestListPage() {
     <div className="mir-list">
       <div className="mir-list__header">
         <div>
-          <h1 className="mir-list__title">Phieu nhap kho (Manager)</h1>
+          <h1 className="mir-list__title">Phiếu nhập kho</h1>
           <p className="mir-list__subtitle">
-            Xem va duyet cac phieu nhap phu tung tu nha cung cap cua chi nhanh ban quan ly.
-            Khi duyet thanh cong, he thong se cong ton kho va ghi log giao dich.
+            Xem và duyệt các phiếu nhập phụ tùng từ nhà cung cấp của chi nhánh bạn quản lý.
+            Khi duyệt thành công, hệ thống sẽ cộng tồn kho và ghi log giao dịch.
           </p>
         </div>
       </div>
@@ -87,7 +87,7 @@ export default function ManagerImportRequestListPage() {
         <input
           className="input input--search"
           type="text"
-          placeholder="Tim theo ma phieu, ghi chu..."
+          placeholder="Tìm theo mã phiếu, ghi chú..."
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -97,45 +97,45 @@ export default function ManagerImportRequestListPage() {
           type="date"
           value={draftFromDate}
           onChange={(e) => setDraftFromDate(e.target.value)}
-          title="Tu ngay"
+          title="Từ ngày"
         />
         <input
           className="input"
           type="date"
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
-          title="Den ngay"
+          title="Đến ngày"
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
-          Loc
+          Lọc
         </button>
       </div>
 
       {loading ? (
-        <div className="mir-list__loading">Dang tai...</div>
+        <div className="mir-list__loading">Đang tải...</div>
       ) : error ? (
-        <div className="mir-list__error">Loi: {error}</div>
+        <div className="mir-list__error">Lỗi: {error}</div>
       ) : (
         <div className="table-responsive">
           <table className="table">
             <thead>
               <tr>
-                <th>Ma phieu</th>
-                <th>Ngay tao</th>
-                <th>Ngay nhap</th>
-                <th>Nha cung cap</th>
-                <th>So dong</th>
-                <th>Tong SL</th>
-                <th>Trang thai</th>
-                <th>Nguoi tao</th>
-                <th style={{ width: 110 }}>Hanh dong</th>
+                <th>Mã phiếu</th>
+                <th>Ngày tạo</th>
+                <th>Ngày nhập</th>
+                <th>Nhà cung cấp</th>
+                <th>Số dòng</th>
+                <th>Tổng SL</th>
+                <th>Trạng thái</th>
+                <th>Người tạo</th>
+                <th style={{ width: 110 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="table__empty">
-                    Khong co phieu nhap nao trong chi nhanh cua ban
+                    Không có phiếu nhập nào trong chi nhánh của bạn
                   </td>
                 </tr>
               ) : (
@@ -158,7 +158,7 @@ export default function ManagerImportRequestListPage() {
                           to={`/manager/import-requests/${r.id}`}
                           className="btn btn--ghost btn--sm"
                         >
-                          {r.status === 'pending' ? 'Duyet' : 'Xem'}
+                          {r.status === 'pending' ? 'Duyệt' : 'Xem'}
                         </Link>
                       </td>
                     </tr>
@@ -173,7 +173,7 @@ export default function ManagerImportRequestListPage() {
       {!loading && total > 0 && (
         <div className="mir-list__pagination">
           <span className="mir-list__pagination-info">
-            Tong: <strong>{total}</strong> phieu
+            Tổng: <strong>{total}</strong> phiếu
           </span>
           <div className="mir-list__pagination-controls">
             <button
@@ -182,7 +182,7 @@ export default function ManagerImportRequestListPage() {
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
             >
-              &laquo; Truoc
+              &laquo; Trước
             </button>
             <span className="mir-list__pagination-current">
               Trang {page} / {totalPages}

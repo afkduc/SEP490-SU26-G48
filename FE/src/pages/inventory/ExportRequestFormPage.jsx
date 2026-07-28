@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useExportRequestForm } from '../../hooks/inventory/useExportRequestForm';
 import { productApi } from '../../services';
+import { PermissionGate } from '../../components/PermissionGate';
 import './ExportRequestFormPage.css';
 
 function todayIso() {
@@ -257,7 +258,7 @@ export default function ExportRequestFormPage() {
                               disabled={ro.alreadyExported}
                               onClick={() => handlePickRo(ro)}
                             >
-                              Chon
+                              Chọn
                             </button>
                           </td>
                         </tr>
@@ -270,11 +271,11 @@ export default function ExportRequestFormPage() {
           ) : (
             <div className="er-form__so-summary">
               <div className="er-form__info-grid">
-                <div><strong>Ma LSC:</strong> <span className="font-mono">{selectedRo.repairOrderCode}</span></div>
-                <div><strong>Ma RO:</strong> <span className="font-mono">{selectedRo.serviceOrderCode || '—'}</span></div>
-                <div><strong>Khach hang:</strong> {selectedRo.customerName || '—'}</div>
+                <div><strong>Mã LSC:</strong> <span className="font-mono">{selectedRo.repairOrderCode}</span></div>
+                <div><strong>Mã RO:</strong> <span className="font-mono">{selectedRo.serviceOrderCode || '—'}</span></div>
+                <div><strong>Khách hàng:</strong> {selectedRo.customerName || '—'}</div>
                 <div><strong>Xe:</strong> {selectedRo.vehiclePlate || '—'}</div>
-                <div><strong>To truong:</strong> {selectedRo.teamLeaderName || '—'}</div>
+                <div><strong>Tổ trưởng:</strong> {selectedRo.teamLeaderName || '—'}</div>
               </div>
               <button type="button" className="btn btn--ghost btn--sm" onClick={handleChangeRo}>
                 Đổi phiếu khác
@@ -393,9 +394,9 @@ export default function ExportRequestFormPage() {
                                 type="button"
                                 className="btn btn--ghost btn--sm"
                                 onClick={() => removeItem(it.rowKey)}
-                                title="Xoa dong nay"
+                                title="Xóa dòng này"
                               >
-                                Xoa
+                                Xóa
                               </button>
                             </td>
                           </tr>
@@ -404,7 +405,7 @@ export default function ExportRequestFormPage() {
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan={6} className="text-right"><strong>Tong so luong:</strong></td>
+                        <td colSpan={6} className="text-right"><strong>Tổng số lượng:</strong></td>
                         <td className="text-right"><strong>{totalQuantity}</strong></td>
                       </tr>
                     </tfoot>
@@ -432,7 +433,7 @@ export default function ExportRequestFormPage() {
                         <button type="button" className="er-form__product-hit" onClick={() => addManualProduct(p)}>
                           <span className="font-mono">{p.code || p.productCode}</span>
                           <span className="er-form__product-name">{p.name || p.productName}</span>
-                          <span className="er-form__product-stock">Ton: {p.stockQuantity ?? p.stock_quantity ?? '—'}</span>
+                          <span className="er-form__product-stock">Tồn: {p.stockQuantity ?? p.stock_quantity ?? '—'}</span>
                         </button>
                       </li>
                     ))}
@@ -454,13 +455,15 @@ export default function ExportRequestFormPage() {
             <Link to="/inventory/export-requests" className="btn btn--ghost">
               Hủy
             </Link>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={submitting || loadingCode || !nextCode || items.length === 0}
-            >
-              {submitting ? 'Đang lưu...' : 'Tạo phiếu xuất'}
-            </button>
+            <PermissionGate permission="export_requests:create">
+              <button
+                type="submit"
+                className="btn btn--primary"
+                disabled={submitting || loadingCode || !nextCode || items.length === 0}
+              >
+                {submitting ? 'Đang lưu...' : 'Tạo phiếu xuất'}
+              </button>
+            </PermissionGate>
           </div>
         )}
       </form>

@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useAuth, getPrimaryRole } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { ROLES } from '../../constants/roles';
+import ScrollToggleButton from '../common/ScrollToggleButton';
+import UserProfileMenu from './UserProfileMenu';
 import './Navbar.css';
 
 // ===== Admin =====
@@ -40,14 +42,8 @@ const SERVICE_ADVISOR_NAV = [
       { label: 'Tạo quyết toán', path: '/repair-settlement/create' },
     ],
   },
-  {
-    label: 'Chăm sóc khách hàng',
-    path: '/customer-care',
-  },
-  {
-    label: 'Khách hàng',
-    path: '/customers',
-  },
+  { label: 'Chăm sóc khách hàng', path: '/customer-care' },
+  { label: 'Khách hàng', path: '/customers' },
 ];
 
 // ===== Manager =====
@@ -74,7 +70,7 @@ const MANAGER_NAV = [
   },
 ];
 
-// ===== Warehouse Staff (Nhân viên kho) - menu phẳng, không dropdown =====
+// ===== Warehouse Staff (Nhân viên kho) =====
 const WAREHOUSE_STAFF_NAV = [
   { label: 'Tổng quan kho', path: '/inventory', end: true },
   { label: 'Phụ tùng', path: '/inventory/parts' },
@@ -84,27 +80,25 @@ const WAREHOUSE_STAFF_NAV = [
   { label: 'Nhà cung cấp', path: '/inventory/suppliers' },
 ];
 
-// ===== Accountant (Kế toán) - chỉ xem kho, không dropdown =====
-const ACCOUNTANT_NAV = [
-  { label: 'Tổng quan kho', path: '/inventory' },
-  { label: 'Phụ tùng', path: '/inventory/parts' },
-  { label: 'Tồn kho', path: '/inventory/stock' },
-  { label: 'Phiếu nhập', path: '/inventory/import-requests' },
-  { label: 'Phiếu xuất', path: '/inventory/export-requests' },
-  { label: 'Nhà cung cấp', path: '/inventory/suppliers' },
-];
-
-// ===== General Director (Giám đốc) - xem báo cáo tổng quan, có dropdown =====
+// ===== General Director =====
 const GENERAL_DIRECTOR_NAV = [
-  { label: 'Phiếu quyết toán', path: '/general-director/reports/settlements' },
-  { label: 'Doanh thu', path: '/general-director/reports/revenue' },
-  { label: 'Nhân sự vận hành', path: '/general-director/employees' },
-  { label: 'Kỹ thuật viên', path: '/general-director/technicians' },
-  { label: 'Giám đốc chi nhánh', path: '/general-director/branch-managers' },
+  { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Báo cáo doanh thu', path: '/general-director/reports/revenue' },
+  { label: 'Báo cáo quyết toán', path: '/general-director/reports/settlements' },
+  { label: 'Chi nhánh', path: '/general-director/branch-managers' },
+  { label: 'Nhân viên', path: '/general-director/employees' },
+  { label: 'Quản lý chi nhánh', path: '/general-director/branch-managers' },
+  { label: 'Thợ máy', path: '/general-director/technicians' },
 ];
 
-// ===== Team Leader (Tổ trưởng kỹ thuật) - chỉ xem công việc được giao =====
+// ===== Team Leader =====
 const TEAM_LEADER_NAV = [
+  { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Công việc của tôi', path: '/repair-orders', end: true },
+];
+
+// ===== Technician (Kỹ thuật viên) =====
+const TECHNICIAN_NAV = [
   { label: 'Công việc của tôi', path: '/repair-orders', end: true },
 ];
 
@@ -114,8 +108,8 @@ const NAV_ITEMS_BY_ROLE = {
   [ROLES.MANAGER]: MANAGER_NAV,
   [ROLES.SERVICE_ADVISOR]: SERVICE_ADVISOR_NAV,
   [ROLES.WAREHOUSE_STAFF]: WAREHOUSE_STAFF_NAV,
-  [ROLES.ACCOUNTANT]: ACCOUNTANT_NAV,
   [ROLES.TEAM_LEADER]: TEAM_LEADER_NAV,
+  [ROLES.TECHNICIAN]: TECHNICIAN_NAV,
 };
 
 // Cac role co dropdown (vi cac role khac chi co 1-2 muc khong can dropdown).
@@ -124,12 +118,6 @@ const ROLES_WITH_DROPDOWN = new Set([
   'service_advisor',
   'manager',
 ]);
-
-function getInitials(name = '') {
-  const parts = name.trim().split(' ');
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 // Phai trung voi breakpoint @media (max-width: 1024px) trong Navbar.css noi
 // menu chinh gap thanh hamburger. Duoi nguong nay, dropdown con dieu khien
@@ -197,6 +185,25 @@ function NavDropdownItem({ item, currentPath, badgeCount, onNavigate }) {
     );
   }
 
+  // Truong hop parent bi an (label === null) nhung co children -> render chi children
+  if (!item.label) {
+    return (
+      <div className="navbar__inline-children">
+        {item.children.map((child) => (
+          <NavLink
+            key={child.path}
+            to={child.path}
+            className={({ isActive }) =>
+              'navbar__link' + ((isActive || isPathMatch(child.path)) ? ' navbar__link--active' : '')
+            }
+          >
+            {child.label}
+          </NavLink>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div
       className="navbar__dropdown-wrapper"
@@ -240,29 +247,16 @@ function NavDropdownItem({ item, currentPath, badgeCount, onNavigate }) {
 }
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
   const { pendingCount } = useServiceRequests();
-  const navigate = useNavigate();
   const location = useLocation();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  // Menu chinh tren man hep (tablet/dien thoai) - an mac dinh, mo qua nut
-  // hamburger, dong lai ngay khi bam vao 1 muc de khong che het man hinh.
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const role = user?.primaryRole;
+  const { user } = useAuth();
+  const role = getPrimaryRole(user);
   const navItems = NAV_ITEMS_BY_ROLE[role] ?? [];
   const supportsDropdown = ROLES_WITH_DROPDOWN.has(role);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   const closeMobileNav = () => setMobileNavOpen(false);
-
-  const initials = getInitials(user?.name || '');
-  const roleLabel = user?.primaryRoleLabel || user?.primaryRole || '';
-  const displayName = user?.lastName || user?.name?.split(' ').pop() || '';
 
   return (
     <header className="navbar">
@@ -284,7 +278,7 @@ export default function Navbar() {
         {supportsDropdown
           ? navItems.map((item) => (
               <NavDropdownItem
-                key={item.label}
+                key={item.label || item.path}
                 item={item}
                 currentPath={location.pathname}
                 badgeCount={pendingCount}
@@ -307,31 +301,7 @@ export default function Navbar() {
       </nav>
 
       <div className="navbar__right">
-        {/* Online indicator */}
-        <div className="navbar__online-indicator" title="Tai khoan dang hoat dong">
-          <span className="online-dot" />
-          <span className="online-label">Trực tuyến</span>
-        </div>
-        {roleLabel && <span className="navbar__role-badge">{roleLabel}</span>}
-
-        <div className="navbar__user" onClick={() => setDropdownOpen((v) => !v)}>
-          <div className="navbar__avatar">{initials}</div>
-          <span className="navbar__display-name">{displayName}</span>
-          <span className="navbar__caret">▾</span>
-        </div>
-
-        {dropdownOpen && (
-          <div className="navbar__dropdown">
-            <div className="navbar__dropdown-header">
-              <p className="navbar__dropdown-name">{user?.name}</p>
-              <p className="navbar__dropdown-email">{user?.email}</p>
-            </div>
-            <hr />
-            <button className="navbar__dropdown-item" onClick={handleLogout}>
-              Đăng xuất
-            </button>
-          </div>
-        )}
+        <UserProfileMenu />
       </div>
     </header>
   );

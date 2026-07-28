@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { usePartDetail } from '../../hooks/inventory/usePartDetail';
 import { useParts } from '../../hooks/inventory/useParts';
 import { useAuth } from '../../contexts/AppContext';
 import { listUnitsApi } from '../../services/productApi';
+import { PermissionGate } from '../../components/PermissionGate';
 import './PartDetailPage.css';
 
 const STATUS_LABELS = {
@@ -14,17 +15,16 @@ const STATUS_LABELS = {
 
 export default function PartDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const branchId = user?.branchId;
   const { part, history, loading, error, refetch } = usePartDetail(id);
-  const { update, remove } = useParts({ branchId });
+  const { update, deactivate, reactivate } = useParts({ branchId });
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const [units, setUnits] = useState([]);
 
   useEffect(() => {
@@ -76,16 +76,22 @@ export default function PartDetailPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!window.confirm('Xác nhận xóa phụ tùng này?')) return;
-    setDeleting(true);
+  async function handleToggleStatus() {
+    const isActive = part.status === 'active';
+    const msg = isActive
+      ? 'Xác nhận tạm ngừng phụ tùng này?'
+      : 'Xác nhận kích hoạt lại phụ tùng này?';
+    if (!window.confirm(msg)) return;
+    setToggling(true);
     setFormError('');
     try {
-      await remove(id);
-      navigate('/inventory/parts', { replace: true });
+      if (isActive) await deactivate(id);
+      else await reactivate(id);
+      await refetch();
     } catch (err) {
       setFormError(err.message);
-      setDeleting(false);
+    } finally {
+      setToggling(false);
     }
   }
 
@@ -108,14 +114,22 @@ export default function PartDetailPage() {
           <div className="part-detail__actions">
             {!editing && (
               <>
-                <button className="btn btn--secondary" onClick={startEdit}>Sửa</button>
-                <button
-                  className="btn btn--ghost btn--danger"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                >
-                  {deleting ? 'Đang xóa...' : 'Xóa'}
-                </button>
+                <PermissionGate permission="screen:inventory:products:update">
+                  <button className="btn btn--secondary" onClick={startEdit}>Sửa</button>
+                </PermissionGate>
+                <PermissionGate permission="screen:inventory:products:delete">
+                  <button
+                    className="btn btn--ghost btn--danger"
+                    onClick={handleToggleStatus}
+                    disabled={toggling}
+                  >
+                    {toggling
+                      ? 'Đang xử lý...'
+                      : part.status === 'active'
+                        ? 'Ngừng'
+                        : 'Kích hoạt'}
+                  </button>
+                </PermissionGate>
               </>
             )}
             <Link to="/inventory/parts" className="btn btn--ghost">Quay lại</Link>
@@ -124,12 +138,15 @@ export default function PartDetailPage() {
         <span className={`badge ${isLow ? 'badge--warning' : 'badge--success'}`}>
           {isLow ? 'Cảnh báo sắp hết hàng' : 'Còn hàng'}
         </span>
+        <span className={`badge ${part.status === 'inactive' ? 'badge--danger' : 'badge--success'}`} style={{ marginLeft: 8 }}>
+          {STATUS_LABELS[part.status] || part.status}
+        </span>
       </div>
 
       {/* Info grid */}
       <div className="detail-grid">
         <div className="detail-card">
-          <h3 className="detail-card__title">Thong tin co ban</h3>
+          <h3 className="detail-card__title">Thông tin cơ bản</h3>
 
           {editing ? (
             <form onSubmit={handleSave} className="detail-form">
