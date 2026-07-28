@@ -14,6 +14,30 @@ const RULE_KEYS = {
   NEW_DEVICE_IP: 'new_device_ip',
 };
 
+/** Map rule_key → notification event type (chuông thông báo đồng bộ panel cảnh báo). */
+const RULE_TO_NOTIF = {
+  [RULE_KEYS.FAILED_LOGIN_BURST]: 'SECURITY_FAILED_LOGIN_BURST',
+  [RULE_KEYS.NEW_ADMIN_ROLE]: 'SECURITY_NEW_ADMIN_ROLE',
+  [RULE_KEYS.INACTIVE_ADMIN]: 'SECURITY_INACTIVE_ADMIN',
+  [RULE_KEYS.NEW_DEVICE_IP]: 'SECURITY_NEW_DEVICE_IP',
+};
+
+const SEVERITY_TO_NOTIF = {
+  critical: 'critical',
+  high: 'error',
+  medium: 'warning',
+  info: 'info',
+};
+
+let notificationService = null;
+function getNotificationService() {
+  if (!notificationService) {
+    const NotificationService = require('../application/services/NotificationService');
+    notificationService = new NotificationService();
+  }
+  return notificationService;
+}
+
 /**
  * Insert 1 security alert
  *
@@ -54,7 +78,7 @@ async function insertAlert({ severity, title, message, userId, branchId, ruleKey
             AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
         `, { uid: userId, rk: ruleKey });
       }
-      if (existing.recordset && existing.recordset.length > 0) return;
+      if (existing.recordset && existing.recordset.length > 0) return false;
     } else if (ruleKey) {
       // Alerts không gắn user (burst theo IP): dedupe theo rule + fingerprint/IP
       let existing;
@@ -74,7 +98,7 @@ async function insertAlert({ severity, title, message, userId, branchId, ruleKey
             AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
         `, { rk: ruleKey });
       }
-      if (existing.recordset && existing.recordset.length > 0) return;
+      if (existing.recordset && existing.recordset.length > 0) return false;
     }
 
     await query(
@@ -90,6 +114,35 @@ async function insertAlert({ severity, title, message, userId, branchId, ruleKey
         p7: metadata ? JSON.stringify(metadata) : null,
       }
     );
+
+    // Đồng bộ chuông thông báo: mỗi alert mới → notify toàn bộ admin
+    try {
+      const eventType = RULE_TO_NOTIF[ruleKey] || 'SECURITY_ALERT';
+      await getNotificationService().notifyAdmins(
+        eventType,
+        {
+          title,
+          message,
+          severity: SEVERITY_TO_NOTIF[severity] || severity || 'warning',
+          ruleKey,
+          metadata: {
+            ...(metadata || {}),
+            ruleKey,
+            alertSeverity: severity,
+            relatedUserId: userId || null,
+            branchId: branchId || null,
+          },
+        },
+        { excludeUserId: null }
+      );
+    } catch (notifErr) {
+      console.warn(
+        '[securityAlertJob] notifyAdmins failed (alert đã lưu):',
+        notifErr && notifErr.message ? notifErr.message : notifErr
+      );
+    }
+
+    return true;
   } catch (err) {
     const msg = err && err.message ? err.message : String(err);
     // Bang/thieu cot -> chi log 1 lan moi 30 phut (tranh spam console)
@@ -103,6 +156,7 @@ async function insertAlert({ severity, title, message, userId, branchId, ruleKey
     } else {
       console.error('[securityAlertJob] insertAlert failed:', msg);
     }
+    return false;
   }
 }
 
