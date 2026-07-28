@@ -81,7 +81,7 @@ function formatDate(dateStr) {
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
-  { value: 'true', label: '● Hiện tại' },
+  { value: 'true', label: '● Đang hoạt động' },
   { value: 'false', label: '○ Không hoạt động' },
 ];
 
@@ -247,12 +247,17 @@ export default function AdminDevicesPage() {
 
   useEffect(() => { loadData(1); }, []);
 
+  // Reload khi đổi filter (status/browser/os/date) — không phụ thuộc blur
+  useEffect(() => {
+    loadData(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, browserFilter, osFilter, dateFrom, dateTo]);
+
   // SSE listener - chi cap nhat row bi anh huong (login/logout/force),
   // tranh loadData() gay giat man hinh khi user dang cuon/xem.
   const handleSSEEvent = useCallback((eventData) => {
     if (!eventData || !['login', 'logout', 'force'].includes(eventData.type)) return;
 
-    // Truong hop co deviceId va ta biet id do, patch ngay row tuong ung
     const changedDeviceId = Number(
       eventData.deviceId ?? eventData.payload?.deviceId ?? eventData.device?.id
     );
@@ -260,19 +265,24 @@ export default function AdminDevicesPage() {
       eventData.userId ?? eventData.payload?.userId ?? eventData.user?.id
     );
 
-    if (eventData.type === 'force' && changedDeviceId) {
+    if (eventData.type === 'force' || eventData.type === 'logout') {
       setDevices((prev) =>
-        prev.map((d) => (d.id === changedDeviceId ? { ...d, isCurrent: false } : d))
+        prev.map((d) => {
+          if (changedDeviceId && d.id === changedDeviceId) return { ...d, isCurrent: false };
+          if (!changedDeviceId && userIdChanged && d.userId === userIdChanged) {
+            return { ...d, isCurrent: false };
+          }
+          return d;
+        })
       );
+      // force/logout không có deviceId → refetch để đồng bộ với lịch sử đăng nhập
+      if (!changedDeviceId) loadData(page);
       return;
     }
 
-    // Truong hop login: neu co deviceId, patch row do thanh current; neu khong,
-    // fallback refetch (khi do co the co row moi hoac row cu bi set isCurrent=0)
     if (eventData.type === 'login' && (changedDeviceId || userIdChanged)) {
       setDevices((prev) => {
         let next = prev;
-        // Set isCurrent=false cho moi row cua user (tru row moi)
         if (userIdChanged) {
           next = next.map((d) =>
             d.userId === userIdChanged && d.id !== changedDeviceId
@@ -280,20 +290,15 @@ export default function AdminDevicesPage() {
               : d
           );
         }
-        // Set isCurrent=true cho row moi neu co deviceId
         if (changedDeviceId) {
           next = next.map((d) => (d.id === changedDeviceId ? { ...d, isCurrent: true } : d));
         }
         return next;
       });
-      // Neu khong co deviceId, can refetch de lay row moi insert
-      if (!changedDeviceId) {
-        loadData(page);
-      }
+      if (!changedDeviceId) loadData(page);
       return;
     }
 
-    // Truong hop logout hoac khong ro deviceId -> refetch
     loadData(page);
   }, [loadData, page]);
 
@@ -369,7 +374,7 @@ export default function AdminDevicesPage() {
     setLogoutLoading(true);
     try {
       await adminDevicesApi.forceLogout(targetId);
-      toast.success(`Đã đăng xuất thiết bị "${targetName}"`);
+      toast.warning(`Đã đăng xuất thiết bị "${targetName}"`);
       setLogoutTarget(null);
       
       // Smooth update - chi cap nhat device bi revoke, khong load lai toan bo trang
@@ -427,8 +432,7 @@ export default function AdminDevicesPage() {
             <SelectFilter
               value={statusFilter}
               options={STATUS_OPTIONS}
-              onChange={(e) => { setStatusFilter(e.target.value); }}
-              onBlur={handleFilterChange}
+              onChange={(e) => setStatusFilter(e.target.value)}
             />
           </div>
 
@@ -436,8 +440,7 @@ export default function AdminDevicesPage() {
             <SelectFilter
               value={browserFilter}
               options={BROWSER_OPTIONS}
-              onChange={(e) => { setBrowserFilter(e.target.value); }}
-              onBlur={handleFilterChange}
+              onChange={(e) => setBrowserFilter(e.target.value)}
             />
           </div>
 
@@ -445,8 +448,7 @@ export default function AdminDevicesPage() {
             <SelectFilter
               value={osFilter}
               options={OS_OPTIONS}
-              onChange={(e) => { setOsFilter(e.target.value); }}
-              onBlur={handleFilterChange}
+              onChange={(e) => setOsFilter(e.target.value)}
             />
           </div>
 
@@ -455,8 +457,7 @@ export default function AdminDevicesPage() {
               type="date"
               className="date-input"
               value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); }}
-              onBlur={handleFilterChange}
+              onChange={(e) => setDateFrom(e.target.value)}
               title="Từ ngày"
             />
             <span className="date-separator">—</span>
@@ -464,8 +465,7 @@ export default function AdminDevicesPage() {
               type="date"
               className="date-input"
               value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); }}
-              onBlur={handleFilterChange}
+              onChange={(e) => setDateTo(e.target.value)}
               title="Đến ngày"
             />
           </div>

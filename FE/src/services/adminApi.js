@@ -156,15 +156,7 @@ const adminBranchesApi = new AdminBranchesApi();
  *   - listPermissions():         GET /api/admin/permissions
  *   - getRolePermissions(id):    GET /api/admin/roles/:id/permissions
  *   - setRolePermissions(id, permIds[]): PUT /api/admin/roles/:id/permissions
- *   - saveMatrix(changes[]):            PUT /api/admin/roles/matrix/permissions
  *   - getRoleUsers(id):         GET /api/admin/roles/:id/users
- *
- * Permission Groups (Phase 3):
- *   - listPermissionGroups():    GET /api/admin/permission-groups
- *   - getPermissionGroup(id):    GET /api/admin/permission-groups/:id
- *   - getRoleGroupIds(id):       GET /api/admin/roles/:id/groups
- *   - setRoleGroups(id, gids):   PUT /api/admin/roles/:id/groups
- *   - saveRoleGroupsMatrix(chs): PUT /api/admin/roles/groups/matrix
  *
  * LUU Y: KHONG co `delete()` - he thong chi dung soft delete (active/inactive).
  */
@@ -205,59 +197,8 @@ class AdminRolesApi {
     return httpClient.put(`/admin/roles/${id}/permissions`, { permissionIds });
   }
 
-  /**
-   * Bulk save permissions cho nhieu role trong 1 call (atomic).
-   * changes: [{roleId, permissionIds}, ...]
-   */
-  saveMatrix(changes) {
-    return httpClient.put('/admin/roles/matrix/permissions', { changes });
-  }
-
   getRoleUsers(id) {
     return httpClient.get(`/admin/roles/${id}/users`);
-  }
-
-  // ============================================================
-  // PERMISSION GROUPS (Phase 3)
-  // ============================================================
-
-  /**
-   * Lay tat ca nhom quyen (kem permissionKeys).
-   * Tra ve: { items, byModule, total }
-   */
-  listPermissionGroups() {
-    return httpClient.get('/admin/permission-groups');
-  }
-
-  /**
-   * Lay chi tiet 1 nhom quyen (kem permissionKeys).
-   */
-  getPermissionGroup(id) {
-    return httpClient.get(`/admin/permission-groups/${id}`);
-  }
-
-  /**
-   * Lay groupIds da gan cho 1 role (suy ra tu role_permissions).
-   * Tra ve: { roleId, groupIds }
-   */
-  getRoleGroupIds(id) {
-    return httpClient.get(`/admin/roles/${id}/groups`);
-  }
-
-  /**
-   * Gan danh sach groupIds cho 1 role.
-   * groupIds: number[]
-   */
-  setRoleGroups(id, groupIds) {
-    return httpClient.put(`/admin/roles/${id}/groups`, { groupIds });
-  }
-
-  /**
-   * Bulk save groups cho nhieu role trong 1 call (atomic).
-   * changes: [{ roleId, groupIds }, ...]
-   */
-  saveRoleGroupsMatrix(changes) {
-    return httpClient.put('/admin/roles/groups/matrix', { changes });
   }
 }
 
@@ -326,7 +267,7 @@ export async function reissueAdminToken() {
 
 /**
  * POST /api/admin/refresh-permissions
- * Lay permissions moi nhat tu DB sau khi admin sua ma tran quyen.
+ * Lay permissions moi nhat tu DB.
  * Tra ve: { token, permissions }
  */
 export async function refreshPermissionsApi() {
@@ -446,30 +387,3 @@ class AdminSecurityAlertsApi {
 const adminSecurityAlertsApi = new AdminSecurityAlertsApi();
 
 export { AdminSecurityAlertsApi, adminSecurityAlertsApi };
-
-/**
- * Permission Matrix API (admin-only)
- *   - getMatrix():      GET   /api/admin/permission-matrix
- *                       tra ve: { roles: [...], screens: [...], grants: [{roleId,permissionId}], generatedAt }
- *   - toggleCell(payload): PATCH /api/admin/permission-matrix
- *                       payload: { roleId, permissionId, granted: boolean }
- *   - bulkToggle(payload): POST  /api/admin/permission-matrix/bulk
- *                       payload: { cells: [{roleId, permissionId, granted}, ...] }
- */
-class PermissionMatrixApi {
-  getMatrix() {
-    return httpClient.get('/admin/permission-matrix');
-  }
-
-  toggleCell({ roleId, permissionId, granted }) {
-    return httpClient.patch('/admin/permission-matrix', { roleId, permissionId, granted });
-  }
-
-  bulkToggle(cells) {
-    return httpClient.post('/admin/permission-matrix/bulk', { cells });
-  }
-}
-
-const permissionMatrixApi = new PermissionMatrixApi();
-
-export { PermissionMatrixApi, permissionMatrixApi };

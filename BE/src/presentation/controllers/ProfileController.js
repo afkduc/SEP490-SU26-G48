@@ -2,6 +2,9 @@ const { success } = require('../../utils/response');
 const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
 const ProfileBranchService = require('../../application/services/ProfileBranchService');
+const ApiError = require('../../utils/ApiError');
+const fs = require('fs');
+const path = require('path');
 
 class ProfileController {
   constructor(profileService) {
@@ -17,7 +20,8 @@ class ProfileController {
     this.markNotificationRead = this.markNotificationRead.bind(this);
     this.markAllNotificationsRead = this.markAllNotificationsRead.bind(this);
     this.getUnreadCount = this.getUnreadCount.bind(this);
-    this.requestPermission = this.requestPermission.bind(this);
+    this.getMyAvatar = this.getMyAvatar.bind(this);
+    this.uploadAvatar = this.uploadAvatar.bind(this);
   }
 
   /**
@@ -146,49 +150,75 @@ class ProfileController {
     }
   }
 
-  /**
-   * POST /profile/me/request-permission
-   * User gửi yêu cầu cấp quyền cho admin.
-   * Gửi notification tới tất cả admin đang online.
-   */
-  async requestPermission(req, res, next) {
+  // GET /profile/me/avatar - stream ảnh avatar hiện tại của user
+  async getMyAvatar(req, res, next) {
     try {
-      const { permissionKey, reason, page } = req.body;
-      if (!permissionKey) {
-        return res.status(400).json({ success: false, message: 'permissionKey là bắt buộc' });
+      const profile = await this.profileService.getProfile(req.user.userId);
+      const avatar = profile?.avatar;
+      if (!avatar) {
+        throw new ApiError(404, 'Avatar chưa được thiết lập');
       }
 
-      // Lấy thông tin user hiện tại
-      const { query } = require('../../infrastructure/database/sqlServer');
-      const userResult = await query(
-        `SELECT u.id, u.email, u.first_name, u.last_name, u.user_name,
-                r.role_name, r.role_label
-         FROM users u
-         LEFT JOIN user_role ur ON ur.user_id = u.id AND ISNULL(ur.is_active, 1) = 1
-         LEFT JOIN roles r ON r.id = ur.role_id
-         WHERE u.id = @p1`,
-        { p1: req.user.userId }
-      );
-      const user = userResult.recordset[0];
-      const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.user_name || user.email;
+      // Lấy basename để tránh path traversal.
+      const fileName = path.basename(String(avatar));
+      const avatarDir = path.join(__dirname, '..', '..', '..', 'avatar');
+      const filePath = path.join(avatarDir, fileName);
 
-      // Gửi notification tới tất cả admin
-      await this.notificationService.notifyAdmins('PERMISSION_REQUEST', {
-        actorName: userName,
-        targetCode: user.email,
-        reason: reason || null,
-        permissionKey,
-        page: page || null,
-        // Metadata đặc biệt để admin có thể quick-assign
-        quickAssignPermission: permissionKey,
-        requesterId: req.user.userId,
-      }, { excludeUserId: req.user.userId });
+      if (!fs.existsSync(filePath)) {
+        throw new ApiError(404, 'Avatar không tồn tại');
+      }
 
-      return success(res, null, 'Đã gửi yêu cầu cấp quyền tới quản trị viên');
+      return res.sendFile(filePath);
     } catch (err) {
       next(err);
     }
   }
+
+  // POST /profile/me/avatar - upload file avatar
+  async uploadAvatar(req, res, next) {
+    try {
+      const file = req.file;
+      if (!file) {
+        throw new ApiError(400, 'Vui lòng chọn ảnh avatar');
+      }
+
+      const allowedExt = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      if (!allowedExt.has(ext)) {
+        throw new ApiError(400, 'Định dạng ảnh không được hỗ trợ');
+      }
+
+      const avatarDir = path.join(__dirname, '..', '..', '..', 'avatar');
+      if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
+
+      const newFileName = `${req.user.userId}_${Date.now()}_${Math.random().toString(16).slice(2)}${ext}`;
+      const filePath = path.join(avatarDir, newFileName);
+
+      fs.writeFileSync(filePath, file.buffer);
+
+      const updatedProfile = await this.profileService.updateAvatar(req.user.userId, newFileName);
+
+      // Sync lại branch info như getMyProfile/updateMyProfile
+      const branchInfo = await this.branchService.getProfileBranches(req.user.userId);
+      updatedProfile.branchId = branchInfo.branchId ?? updatedProfile.branchId ?? null;
+      updatedProfile.branchName = branchInfo.branchName ?? updatedProfile.branchName ?? null;
+      updatedProfile.assignedBranches = branchInfo.assignedBranches || [];
+
+      await auditCrud.update(req, {
+        tableName: 'users',
+        entityCode: req.user.email || `ID-${req.user.userId}`,
+        recordId: req.user.userId,
+        entityName: 'Hồ sơ cá nhân',
+        newData: { avatar: newFileName },
+        description: `Cập nhật avatar`,
+      });
+
+      return success(res, updatedProfile, 'Cập nhật avatar thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
 }
 
 module.exports = ProfileController;

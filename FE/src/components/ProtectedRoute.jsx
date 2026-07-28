@@ -3,90 +3,165 @@ import { useAuth } from '../contexts/AppContext';
 import { usePermission } from '../contexts';
 import { getRoleHome, normalizeRoles } from '../contexts/AppContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { mergeAuthRefreshUser } from '../utils/profileSession';
+import { refreshPermissionsApi } from '../services/authApi';
+import { getPermissionScreenLabel } from '../utils/screenLabels';
 
 /**
  * ProtectedRoute — bảo vệ route bằng role và/hoặc permission.
  *
- * Phan biet 2 loai chan truy cap (production-grade):
+ * mode:
+ * - 'strict' (mặc định): cần đủ role (nếu có) VÀ permission (nếu có)
+ * - 'any': đủ role HOẶC permission là được (dùng sau khi gỡ ma trận quyền)
  *
- * - Sai ROLE (VD: user dang nhap nhung khong phai admin)
- *   -> Redirect ve trang home cua role (UX binh thuong, khong gay so)
- *
- * - Sai PERMISSION (user co role admin nhung admin vua tick bo permission)
- *   -> Show trang 403 full-screen voi nut "Yeu cau cap quyen"
- *   -> Day moi la dung production-grade: nguoi dung hieu ro quyen cua minh,
- *      khong bi "redirect home" am tham.
- *
- * Permission check doc tu JWT permissions (frontend cache cua AuthService).
- * BE cung check real-time qua PermissionService, vi the neu admin vua thu hoi
- * quyen o tab khac, SSE se push permission-changed -> FE refresh token ->
- * usePermission tu cap nhat -> ProtectedRoute re-render -> set403Error.
+ * - Sai ROLE (không thuộc danh sách roles, và mode=strict hoặc không có perm)
+ *   -> Redirect về home của role
+ * - Sai PERMISSION (có role nhưng thiếu quyền khi mode=strict, hoặc không match cả hai khi mode=any)
+ *   -> Trang 403
  */
+function friendlyPermissionLabel(key) {
+  if (!key) return 'truy cập trang này';
+  const screenLabel = getPermissionScreenLabel(key);
+  if (screenLabel && screenLabel !== '—') return screenLabel;
+  return 'truy cập trang này';
+}
+
 export default function ProtectedRoute({
   children,
   roles,
   permission,
   permissions,
-  match = 'all', // 'all' | 'any'
+  match = 'all', // 'all' | 'any' — cho danh sách permissions
+  mode = 'strict', // 'strict' | 'any' — quan hệ giữa roles và permissions
 }) {
   const { isAuthenticated, user } = useAuth();
   const { can, canAll, canAny } = usePermission();
   const { set403Error, clearError } = useGlobalError();
   const location = useLocation();
-  // Anti-spam: tranh set403Error lien tuc neu component re-render nhieu lan
   const firedRef = useRef(null);
+  const [syncDone, setSyncDone] = useState(false);
 
-  // Buoc 1: Kiem tra authentication
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
-  // Buoc 2: Kiem tra role (neu co)
-  if (roles && roles.length > 0) {
-    const hasRole = normalizeRoles(user?.roles).some((r) => roles.includes(r));
-    if (!hasRole) {
-      // Sai role -> redirect home (cu - khong phai 403 permission)
-      return <Navigate to={getRoleHome(user)} replace />;
-    }
-  }
+    refreshPermissionsApi()
+      .then((res) => {
+        if (res && res.token && res.user) {
+          const inLocal = localStorage.getItem('token');
+          const inSession = sessionStorage.getItem('token');
+          const storage = res.token === inLocal ? localStorage : (res.token === inSession ? sessionStorage : null);
+          if (!storage) return;
 
-  // Buoc 3: Kiem tra granular permission (neu co)
+          let existing = {};
+          try {
+            const raw = storage.getItem('user');
+            existing = raw ? JSON.parse(raw) : {};
+          } catch {
+            existing = {};
+          }
+
+          const mergedUser = mergeAuthRefreshUser(existing, res.user);
+          storage.setItem('token', res.token);
+          storage.setItem('user', JSON.stringify(mergedUser));
+          const newPerms = Array.isArray(mergedUser.permissions) ? mergedUser.permissions : [];
+          storage.setItem('permissions', JSON.stringify(newPerms));
+          window.dispatchEvent(new StorageEvent('storage', {
+            key: 'user',
+            newValue: JSON.stringify(mergedUser),
+            storageArea: storage,
+          }));
+        }
+      })
+      .catch((e) => {
+        if (typeof console !== 'undefined') {
+          console.debug('[ProtectedRoute] sync perm failed (ignored):', e?.message);
+        }
+      })
+      .finally(() => {
+        setSyncDone(true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const permKeys = permissions
     ? permissions
     : permission
     ? [permission]
     : [];
 
-  const hasPermission = permKeys.length === 0
+  const hasRoleRequirement = Array.isArray(roles) && roles.length > 0;
+  const hasPermRequirement = permKeys.length > 0;
+
+  const userHasRole = hasRoleRequirement
+    ? normalizeRoles(user?.roles).some((r) => roles.includes(r))
+    : true;
+
+  const userHasPermission = !hasPermRequirement
     ? true
     : (match === 'any' ? canAny(...permKeys) : canAll(...permKeys));
 
-  const missingKey = hasPermission
-    ? null
-    : (permKeys.find((k) => !can(k)) || permKeys[0]);
+  // mode=any: pass nếu có role HOẶC có permission (ít nhất một phía được cấu hình và khớp)
+  const accessGranted = (() => {
+    if (!hasRoleRequirement && !hasPermRequirement) return true;
+    if (mode === 'any') {
+      if (hasRoleRequirement && userHasRole) return true;
+      if (hasPermRequirement && userHasPermission) return true;
+      return false;
+    }
+    // strict: cả hai đều phải đúng (phía không cấu hình = true)
+    return userHasRole && userHasPermission;
+  })();
 
-  // Effect dong bo: khi permission thay doi (admin vua tick bo) -> set403Error,
-  // khi permission duoc tra lai -> clearError.
+  const missingKey = (() => {
+    if (accessGranted) return null;
+    if (hasPermRequirement && !userHasPermission) {
+      return permKeys.find((k) => !can(k)) || permKeys[0];
+    }
+    return null;
+  })();
+
   useEffect(() => {
-    if (missingKey) {
-      // Chi dispatch 1 lan cho moi permission key (tranh spam)
+    if (!accessGranted && missingKey) {
       if (firedRef.current !== missingKey) {
         firedRef.current = missingKey;
+        const label = friendlyPermissionLabel(missingKey);
         set403Error(
           missingKey,
-          `Bạn không có quyền "${missingKey}" để truy cập trang này.`
+          `Bạn không có quyền truy cập «${label}».`,
         );
       }
     } else if (firedRef.current) {
-      // Permission duoc tra lai (admin vua tick lai) -> clear
       firedRef.current = null;
       clearError();
     }
-  }, [missingKey, set403Error, clearError]);
+  }, [accessGranted, missingKey, set403Error, clearError]);
 
-  if (missingKey) {
-    // Render null trong khi ErrorHandler show UnauthorizedPage full-screen
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (!syncDone) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '60vh',
+        color: '#6b7280',
+        fontSize: 14,
+      }}>
+        Đang đồng bộ quyền...
+      </div>
+    );
+  }
+
+  // Role sai + không pass qua permission (mode any) → redirect home
+  if (hasRoleRequirement && !userHasRole && !(mode === 'any' && userHasPermission)) {
+    return <Navigate to={getRoleHome(user)} replace />;
+  }
+
+  if (!accessGranted) {
     return null;
   }
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { heartbeatApi, getServerTime } from '../services/authApi';
 import { computeClockOffsetMs } from '../utils/dateUtils';
-import { showSessionExpired } from '../services/httpClient';
+import { showSessionExpired, LOGOUT_KEY } from '../services/httpClient';
 
 const HEARTBEAT_INTERVAL_MS = 60_000;      // 60s - khop voi throttle phia BE
 const OFFSET_REFRESH_MS = 5 * 60_000;      // 5 phut refresh offset 1 lan
@@ -54,6 +54,20 @@ export function useHeartbeat(options = {}) {
     let stopped = false;
     let timeoutId = null;
 
+    // Lang nghe logout de cleanup SOM (truoc khi React unmount). Neu khong
+    // lang nghe, mot tick co the duoc len lich (setTimeout 60s) se FIRE ngay
+    // sau khi user logout, goi API voi token = null -> 401 -> SessionExpiredModal.
+    const onLogout = () => {
+      stopped = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener(LOGOUT_KEY, onLogout);
+    }
+
     refreshOffset();
     const offsetTimer = setInterval(refreshOffset, OFFSET_REFRESH_MS);
 
@@ -69,6 +83,11 @@ export function useHeartbeat(options = {}) {
         }
       } catch (err) {
         if (stopped) return;
+        // Nuot cac loi do-logout (AbortError tu cancelAllPendingRequests) de
+        // khong hien SessionExpiredModal khong can thiet.
+        if (err && (err.name === 'AbortError' || err.code === 'ABORTED' || err.code === 'LOGGED_OUT')) {
+          return;
+        }
         const status = err?.status;
 
         if (status === 401 || status === 403) {
@@ -103,6 +122,9 @@ export function useHeartbeat(options = {}) {
       clearInterval(offsetTimer);
       backoffRef.current = 0;
       sessionExpiredFiredRef.current = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(LOGOUT_KEY, onLogout);
+      }
     };
   }, [enabled, intervalMs, refreshOffset]);
 

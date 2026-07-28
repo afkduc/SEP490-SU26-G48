@@ -1,5 +1,20 @@
+const { PayOS } = require('@payos/node');
 const ApiError = require('../../utils/ApiError');
+const config = require('../../config');
 const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
+const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
+
+let payosClient = null;
+function getPayOS() {
+  if (!payosClient) {
+    payosClient = new PayOS({
+      clientId: config.payos.clientId,
+      apiKey: config.payos.apiKey,
+      checksumKey: config.payos.checksumKey,
+    });
+  }
+  return payosClient;
+}
 
 // LHSC (ten cot lich su, thuc chat la "loai hang muc") chi con phan anh noi
 // dung dong (cong/vat tu); "ai tra tien" da chuyen het sang HTTT (tranh 2
@@ -15,15 +30,6 @@ const ACTIVE_STATUS_LABELS = {
   inprogress: 'đang sửa chữa',
   waiting_payment: 'chờ thanh toán',
 };
-
-// FE gui "Ngay ke tiep" dang dd/mm/yyyy (o nhap tu do, khong phai <input type="date">).
-function parseDDMMYYYY(value) {
-  if (!value) return null;
-  const m = String(value).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  const [, dd, mm, yyyy] = m;
-  return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-}
 
 class RepairSettlementService {
   constructor({ repairSettlementRepository }) {
@@ -119,6 +125,68 @@ class RepairSettlementService {
     return RepairSettlementResponseDto.fromEntity(entity);
   }
 
+  // ─── PayOS ───────────────────────────────────────────────────────
+  // Tao link/QR dong cho phieu dang cho thanh toan - goi tu dong ngay khi
+  // CVDV mo modal "In phieu va xuat hoa don" (xem SettlementPreviewModal o
+  // FE). Het han sau 60s (test nhanh theo yeu cau) - moi lan goi la 1
+  // orderCode moi (Date.now()), khong tai su dung orderCode cu vi PayOS bat
+  // buoc orderCode duy nhat.
+  async createPayosPaymentLink(id) {
+    const existing = await this.repairSettlementRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
+    if (existing.status !== 'waiting_payment') {
+      throw new ApiError(409, 'Phiếu không ở trạng thái chờ thanh toán');
+    }
+
+    const orderCode = Date.now();
+    const expiredAtUnix = Math.floor(Date.now() / 1000) + 60;
+    const amount = Math.round(existing.total || 0);
+
+    const paymentLink = await getPayOS().paymentRequests.create({
+      orderCode,
+      amount,
+      description: `TT ${existing.code}`.slice(0, 25),
+      cancelUrl: `${config.frontendUrl}/repair-settlements`,
+      returnUrl: `${config.frontendUrl}/repair-settlements`,
+      expiredAt: expiredAtUnix,
+      buyerName: existing.customer?.fullName || undefined,
+    });
+
+    await this.repairSettlementRepository.createPayosTransaction(id, {
+      orderCode,
+      paymentLinkId: paymentLink.paymentLinkId,
+      qrCode: paymentLink.qrCode,
+      checkoutUrl: paymentLink.checkoutUrl,
+      amount,
+      expiredAt: new Date(expiredAtUnix * 1000),
+    });
+
+    return { qrCode: paymentLink.qrCode, checkoutUrl: paymentLink.checkoutUrl, orderCode, expiredAt: expiredAtUnix };
+  }
+
+  // Webhook PayOS bao da nhan tien - TU DONG xuat hoa don luon (khong doi
+  // CVDV bam xac nhan, theo dung yeu cau "thanh toan that"). Idempotent: bo
+  // qua neu khong tim thay transaction, da 'paid' roi, hoac phieu khong con
+  // o 'waiting_payment' (vd CVDV da xac nhan tay truoc do) - vi PayOS co the
+  // goi lai webhook nhieu lan cho cung 1 giao dich.
+  async handlePayosWebhook(rawBody) {
+    const webhookData = await getPayOS().webhooks.verify(rawBody);
+
+    const tx = await this.repairSettlementRepository.findPayosTransactionByOrderCode(webhookData.orderCode);
+    if (!tx || tx.status === 'paid') return;
+
+    await this.repairSettlementRepository.markPayosTransactionPaid(webhookData.orderCode, {
+      reference: webhookData.reference,
+      paidAt: new Date(),
+    });
+
+    const settlement = await this.repairSettlementRepository.findById(tx.service_order_id);
+    if (!settlement || settlement.status !== 'waiting_payment') return;
+
+    await this.repairSettlementRepository.updateStatus(tx.service_order_id, 'invoiced', { issuedBy: settlement.advisorId });
+    emitRepairOrderEvent(settlement.branchId, 'invoiced', { settlementId: tx.service_order_id });
+  }
+
   _validateAndNormalize(payload) {
     if (!payload.customerId || !payload.vehicleId) {
       throw new ApiError(400, 'Phải chọn khách hàng và xe từ gợi ý tra cứu');
@@ -160,8 +228,6 @@ class RepairSettlementService {
       vat: payload.vat,
       freeAmount: payload.freeAmount,
       total: payload.total,
-      nextMaintenanceKm: payload.nextMaintenanceKm ? Number(payload.nextMaintenanceKm) : null,
-      nextMaintenanceDate: parseDDMMYYYY(payload.nextMaintenanceDate),
       items,
     };
   }

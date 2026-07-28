@@ -154,7 +154,7 @@ function RoleUsersModal({ role, users, onClose }) {
                     background: u.status === 'active' ? '#dcfce7' : '#fee2e2',
                     padding: '2px 8px', borderRadius: '4px',
                   }}>
-                    {u.status === 'active' ? 'Hoạt động' : 'Khóa'}
+                    {u.status === 'active' ? 'Hoạt động' : 'Dừng hoạt động'}
                 </span>
               </div>
               ))}
@@ -171,37 +171,34 @@ function RoleUsersModal({ role, users, onClose }) {
 
 // ─── Role Card ──────────────────────────────────────────────────
 
-function RoleCard({ role, onEdit, onToggleStatus, onUsers }) {
+function RoleCard({ role, onEdit, onToggleStatus, onUsers, usersActionLabel = 'Người dùng' }) {
   return (
     <div className={`role-card ${role.isActive ? '' : 'role-card--inactive'}`}>
-      <div className="role-card__header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <span className={`role-card__badge ${role.isActive ? '' : 'role-card__badge--inactive'}`}>
-              {role.roleName}
-            </span>
-            <span className={`role-card__status-chip ${role.isActive ? 'role-card__status-chip--active' : 'role-card__status-chip--inactive'}`}>
-              {role.isActive ? 'Hoạt động' : 'Tắt'}
-            </span>
-          </div>
-          <div className="role-card__name">{role.roleLabel}</div>
-        </div>
-      </div>
-      <div className="role-card__meta">
-        <span className="role-card__meta-item">
-          <IconUsers />
-          {role.userCount ?? 0} người dùng
+      <div className="role-card__top">
+        <span className="role-card__code">{role.roleName}</span>
+        <span className={`role-card__status ${role.isActive ? 'role-card__status--active' : 'role-card__status--inactive'}`}>
+          <span className="role-card__status-dot" aria-hidden="true" />
+          {role.isActive ? 'Hoạt động' : 'Dừng hoạt động'}
         </span>
       </div>
+
+      <h3 className="role-card__title">{role.roleLabel}</h3>
+
+      <div className="role-card__meta">
+        <IconUsers />
+        <span>{role.userCount ?? 0} người dùng</span>
+      </div>
+
       <div className="role-card__actions">
-        <button className="btn btn--sm btn--secondary" onClick={() => onUsers(role)} title="Xem người dùng">
-          <IconUsers /> Người dùng
+        <button type="button" className="role-card__btn role-card__btn--users" onClick={() => onUsers(role)} title={usersActionLabel}>
+          <IconUsers /> {usersActionLabel}
         </button>
-        <button className="btn btn--sm btn--secondary" onClick={() => onEdit(role)} title="Chỉnh sửa">
+        <button type="button" className="role-card__btn role-card__btn--edit" onClick={() => onEdit(role)} title="Chỉnh sửa">
           <IconEdit /> Sửa
         </button>
         <button
-          className={`btn btn--sm ${role.isActive ? 'btn--warning' : 'btn--success-outline'}`}
+          type="button"
+          className={`role-card__btn ${role.isActive ? 'role-card__btn--off' : 'role-card__btn--on'}`}
           onClick={() => onToggleStatus(role)}
           title={role.isActive ? 'Tắt vai trò' : 'Kích hoạt vai trò'}
         >
@@ -214,10 +211,14 @@ function RoleCard({ role, onEdit, onToggleStatus, onUsers }) {
 
 // ─── Main ────────────────────────────────────────────────────────
 
-export default function AdminRolesPage() {
+/**
+ * @param {object} [props]
+ * @param {boolean} [props.embedded] - Khi embed trong trang Người dùng (ẩn header trang đầy đủ)
+ * @param {(roleId: number) => void} [props.onFilterUsersByRole] - Cross-link sang tab Người dùng + filter role
+ */
+export default function AdminRolesPage({ embedded = false, onFilterUsersByRole } = {}) {
   const toast = useToast();
-  // Trang nay chi quan ly danh sach vai tro + CRUD.
-  // Ma tran quyen (Role x Screen) da chuyen sang trang rieng: /admin/permission-matrix.
+  // Trang nay chi quan ly danh sach vai tro + CRUD (khong con ma tran quyen).
 
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -244,9 +245,21 @@ export default function AdminRolesPage() {
   useEffect(() => { loadRoles(); }, []);
 
   async function handleToggleStatus(role) {
+    if (role.roleName === 'admin') {
+      toast.error('Không thể tắt vai trò Admin');
+      return;
+    }
+    const nextActive = !role.isActive;
+    const ok = window.confirm(
+      nextActive
+        ? `Kích hoạt lại vai trò "${role.roleLabel || role.roleName}"?`
+        : `Tắt vai trò "${role.roleLabel || role.roleName}"? Người dùng thuộc vai trò này có thể mất quyền tương ứng.`
+    );
+    if (!ok) return;
     try {
       await adminRolesApi.toggleStatus(role.id);
-      toast.success('Cập nhật trạng thái thành công');
+      if (nextActive) toast.success('Đã kích hoạt vai trò');
+      else toast.warning('Đã tắt vai trò');
       loadRoles();
     } catch (err) {
       toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
@@ -254,26 +267,47 @@ export default function AdminRolesPage() {
   }
 
   async function handleUsersModal(role) {
+    if (typeof onFilterUsersByRole === 'function') {
+      onFilterUsersByRole(role.id);
+      return;
+    }
     try {
       const data = await adminRolesApi.getRoleUsers(role.id);
       setUsersModal({ role, users: data?.items || [] });
-    } catch {
+    } catch (err) {
+      toast.error(err.message || 'Không tải được danh sách người dùng');
       setUsersModal({ role, users: [] });
     }
   }
 
   return (
-    <div className="admin-roles">
-      {/* Header */}
-      <div className="admin-roles__header">
-        <div className="admin-roles__title-block">
-          <div className="admin-roles__title-icon"><IconShield /></div>
-          <div className="admin-roles__title-group">
-            <h1>Vai trò &amp; Quyền hạn</h1>
-            <p className="admin-roles__subtitle">Quản lý vai trò và người dùng được gán vai trò</p>
+    <div className={`admin-roles${embedded ? ' admin-roles--embedded' : ''}`}>
+      {/* Header — standalone only */}
+      {!embedded && (
+        <div className="admin-roles__header">
+          <div className="admin-roles__title-block">
+            <div className="admin-roles__title-icon"><IconShield /></div>
+            <div className="admin-roles__title-group">
+              <h1>Vai trò &amp; Quyền hạn</h1>
+              <p className="admin-roles__subtitle">Quản lý vai trò và người dùng được gán vai trò</p>
+            </div>
+          </div>
+          <div className="admin-roles__actions">
+            {roles.length > 0 && (
+              <span className="admin-roles__total-badge">{roles.length} vai trò</span>
+            )}
+            <button className="btn btn--primary" onClick={() => { setEditRole(null); setShowForm(true); }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Thêm vai trò
+            </button>
           </div>
         </div>
-        <div className="admin-roles__actions">
+      )}
+
+      {embedded && (
+        <div className="admin-roles__toolbar">
           {roles.length > 0 && (
             <span className="admin-roles__total-badge">{roles.length} vai trò</span>
           )}
@@ -284,7 +318,7 @@ export default function AdminRolesPage() {
             Thêm vai trò
           </button>
         </div>
-      </div>
+      )}
 
       {/* List */}
       {loading && (
@@ -321,6 +355,7 @@ export default function AdminRolesPage() {
               onEdit={(r) => { setEditRole(r); setShowForm(true); }}
               onToggleStatus={handleToggleStatus}
               onUsers={handleUsersModal}
+              usersActionLabel={embedded ? 'Lọc người dùng' : 'Người dùng'}
             />
           ))}
         </div>

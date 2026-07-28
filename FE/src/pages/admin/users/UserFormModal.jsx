@@ -5,7 +5,6 @@ import './UserFormModal.css';
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Hoạt động' },
   { value: 'inactive', label: 'Ngừng hoạt động' },
-  { value: 'locked', label: 'Bị khóa' },
 ];
 
 /**
@@ -124,9 +123,9 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     // Phan biet user "all branches" (co row trong user_branches) vs user 1 branch
     // - assignedBranchIds tu BE co nhieu hon 1 row, hoac user.branchId null -> ALL
     // - assignedBranchIds co 1 row -> set dropdown theo row do
-    const isAllBranches = Array.isArray(user.assignedBranchIds)
-      ? user.assignedBranchIds.length > 0
-      : (user.branchId === null || user.branchId === undefined);
+    const isAllBranches = user.scopeAllBranches === true
+      || user.branchId === null
+      || user.branchId === undefined;
     let branchIdValue = '';
     if (isAllBranches) {
       branchIdValue = ALL_BRANCHES_SENTINEL;
@@ -415,11 +414,6 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                       <option key={b.id} value={b.id}>{b.branchName}</option>
                     ))}
                   </select>
-                  {form.branchId === ALL_BRANCHES_SENTINEL && (
-                    <span style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
-                      Backend sẽ tự động gom tất cả chi nhánh đang hoạt động cho user này
-                    </span>
-                  )}
                   {errors.branchId && <span className="form__err">{errors.branchId}</span>}
                 </div>
                 <div className="form__field">
