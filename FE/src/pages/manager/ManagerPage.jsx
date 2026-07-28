@@ -10,6 +10,7 @@ import ManagerImportRequestDetailPage from './ManagerImportRequestDetailPage';
 import ManagerExportRequestListPage from './ManagerExportRequestListPage';
 import ManagerExportRequestDetailPage from './ManagerExportRequestDetailPage';
 import ManagerDashboardPage from './ManagerDashboardPage';
+import ManagerInventoryPage from './ManagerInventoryPage';
 
 const SERVICE_STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -2690,6 +2691,7 @@ export default function ManagerPage() {
     <Routes>
       <Route index element={<Navigate to="employees" replace />} />
       <Route path="dashboard" element={<ManagerDashboardPage />} />
+      <Route path="inventory" element={<ManagerInventoryPage />} />
       <Route path="employees" element={<EmployeeListPage />} />
       <Route path="employees/create" element={<EmployeeFormPage mode="create" />} />
       <Route path="employees/:id/edit" element={<EmployeeFormPage mode="edit" />} />
