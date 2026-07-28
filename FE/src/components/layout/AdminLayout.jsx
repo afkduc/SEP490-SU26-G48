@@ -226,7 +226,12 @@ export default function AdminLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navLoading, setNavLoading] = useState(false);
   const [contentKey, setContentKey] = useState(0);
-  const prevPathRef = useRef(location.pathname);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
+  const adminHistoryRef = useRef([]);
+  const adminHistoryIndexRef = useRef(-1);
+  const pendingHistoryJumpRef = useRef(null);
+  const remountOnHistoryJumpRef = useRef(false);
 
   // Clear leftover dark-theme preference (admin luôn dùng light)
   useEffect(() => {
@@ -236,6 +241,55 @@ export default function AdminLayout({ children }) {
 
   const refreshContent = () => {
     setContentKey((k) => k + 1);
+  };
+
+  const getLocationEntry = () => ({
+    navKey: location.key || `${Date.now()}-${Math.random()}`,
+    url: `${location.pathname}${location.search}${location.hash}`,
+  });
+
+  const syncAdminHistoryState = () => {
+    const entry = getLocationEntry();
+    const key = entry.url;
+    const isAdminRoute = String(location.pathname).startsWith('/admin');
+    if (!isAdminRoute) return;
+
+    const stack = adminHistoryRef.current;
+    const pending = pendingHistoryJumpRef.current;
+    if (pending && pending.url === key) {
+      adminHistoryIndexRef.current = pending.index;
+      pendingHistoryJumpRef.current = null;
+      setCanGoBack(pending.index > 0);
+      setCanGoForward(pending.index < stack.length - 1);
+      if (remountOnHistoryJumpRef.current) {
+        refreshContent();
+        remountOnHistoryJumpRef.current = false;
+      }
+      return;
+    }
+
+    const indexByNavKey = stack.findIndex((item) => item.navKey === entry.navKey);
+    if (indexByNavKey >= 0) {
+      adminHistoryIndexRef.current = indexByNavKey;
+      setCanGoBack(indexByNavKey > 0);
+      setCanGoForward(indexByNavKey < stack.length - 1);
+      return;
+    }
+
+    const index = adminHistoryIndexRef.current;
+    const currentItem = index >= 0 ? stack[index] : null;
+    if (currentItem && currentItem.url === key) {
+      setCanGoBack(index > 0);
+      setCanGoForward(index < stack.length - 1);
+      return;
+    }
+
+    const nextStack = stack.slice(0, index + 1);
+    nextStack.push(entry);
+    adminHistoryRef.current = nextStack;
+    adminHistoryIndexRef.current = nextStack.length - 1;
+    setCanGoBack(nextStack.length > 1);
+    setCanGoForward(false);
   };
 
   const visibleGroups = ADMIN_SIDEBAR
@@ -250,13 +304,8 @@ export default function AdminLayout({ children }) {
   // Khi vừa login và điều hướng từ trang public (/login) vào admin,
   // ép remount nội dung để tránh render sai frame (cần F5 mới đúng).
   useEffect(() => {
-    const prev = prevPathRef.current;
-    const now = location.pathname;
-    prevPathRef.current = now;
-
-    const nowAdmin = String(now).startsWith('/admin');
-    const prevAdmin = String(prev).startsWith('/admin');
-    if (nowAdmin && !prevAdmin) {
+    const isAdminRoute = String(location.pathname).startsWith('/admin');
+    if (isAdminRoute && adminHistoryRef.current.length === 0) {
       refreshContent();
     }
   }, [location.pathname]);
@@ -272,6 +321,42 @@ export default function AdminLayout({ children }) {
     }
     return undefined;
   }, [mobileOpen]);
+
+  useEffect(() => {
+    syncAdminHistoryState();
+  }, [location.pathname, location.search, location.hash, location.key]);
+
+  const handleGoBack = () => {
+    const stack = adminHistoryRef.current;
+    const index = adminHistoryIndexRef.current;
+    if (index <= 0) return;
+
+    const targetIndex = index - 1;
+    const target = stack[targetIndex];
+    if (!target) return;
+    pendingHistoryJumpRef.current = { index: targetIndex, url: target.url };
+    remountOnHistoryJumpRef.current = true;
+    adminHistoryIndexRef.current = targetIndex;
+    setCanGoBack(targetIndex > 0);
+    setCanGoForward(true);
+    navigate(target.url, { replace: true });
+  };
+
+  const handleGoForward = () => {
+    const stack = adminHistoryRef.current;
+    const index = adminHistoryIndexRef.current;
+    if (index < 0 || index >= stack.length - 1) return;
+
+    const targetIndex = index + 1;
+    const target = stack[targetIndex];
+    if (!target) return;
+    pendingHistoryJumpRef.current = { index: targetIndex, url: target.url };
+    remountOnHistoryJumpRef.current = true;
+    adminHistoryIndexRef.current = targetIndex;
+    setCanGoBack(targetIndex > 0);
+    setCanGoForward(targetIndex < stack.length - 1);
+    navigate(target.url, { replace: true });
+  };
 
   const allItems = visibleGroups.flatMap((g) => g.items);
   const matchedPaths = allItems
@@ -373,6 +458,32 @@ export default function AdminLayout({ children }) {
             </button>
 
             <div className="admin-topbar__breadcrumb">
+              <div className="admin-topbar__history-nav">
+                <button
+                  type="button"
+                  className="admin-topbar__history-btn"
+                  onClick={handleGoBack}
+                  aria-label="Quay lại trang trước"
+                  title="Quay lại trang trước"
+                  disabled={!canGoBack}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="admin-topbar__history-btn"
+                  onClick={handleGoForward}
+                  aria-label="Đi tới trang sau"
+                  title="Đi tới trang sau"
+                  disabled={!canGoForward}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              </div>
               <span className="admin-topbar__section">Quản trị</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="9 18 15 12 9 6"/>
@@ -387,7 +498,7 @@ export default function AdminLayout({ children }) {
         </header>
 
         <main className="admin-content">
-          <div key={`${location.pathname}::${contentKey}`} className="admin-content__remount">
+          <div key={`${location.pathname}${location.search}${location.hash}::${contentKey}`} className="admin-content__remount">
             {children}
           </div>
         </main>
