@@ -1,7 +1,6 @@
 const express = require('express');
 const { authenticate } = require('../../middlewares/auth');
 const { trackActivity } = require('../../middlewares');
-const multer = require('multer');
 const ProfileController = require('../controllers/ProfileController');
 const ProfileService = require('../../application/services/ProfileService');
 const ProfileRepositoryImpl = require('../../infrastructure/repositories/ProfileRepositoryImpl');
@@ -12,13 +11,6 @@ function buildProfileRouter() {
   const repo = new ProfileRepositoryImpl();
   const service = new ProfileService(repo);
   const controller = new ProfileController(service);
-
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-      fileSize: 5 * 1024 * 1024, // 5MB
-    },
-  });
 
   // Lấy thông tin profile hiện tại (chính mình)
   router.get('/me', authenticate, trackActivity, controller.getMyProfile);
@@ -49,9 +41,8 @@ function buildProfileRouter() {
   // Lấy số thông báo chưa đọc
   router.get('/me/notifications/unread-count', authenticate, controller.getUnreadCount);
 
-  // Avatar
+  // Avatar (chỉ xem, không upload)
   router.get('/me/avatar', authenticate, trackActivity, controller.getMyAvatar);
-  router.post('/me/avatar', authenticate, trackActivity, upload.single('avatar'), controller.uploadAvatar);
 
   return router;
 }

@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   useAuth,
   getRoleProfilePath,
   getRoleProfileEditPath,
 } from '../../contexts/AppContext';
-import { getMyProfile, updateMyProfile, changePassword, uploadMyAvatar } from '../../services/profileApi';
+import { getMyProfile, updateMyProfile, changePassword } from '../../services/profileApi';
 import {
   syncProfileSession,
 } from '../../utils/profileSession';
@@ -272,15 +272,9 @@ export default function AdminProfilePage({ embedded = false } = {}) {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(null);
 
-  // ─── Avatar upload state ────────────────────────────────────────────────
-  const avatarInputRef = useRef(null);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarError, setAvatarError] = useState(null);
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null);
-  const [avatarCacheBuster, setAvatarCacheBuster] = useState(0);
+  // ─── Avatar display ─────────────────────────────────────────────────────
   const [avatarImgBroken, setAvatarImgBroken] = useState(false);
-  const avatarDisplayUrl = useAuthenticatedAvatarUrl(profile?.avatar, avatarCacheBuster);
-  const prevAvatarDisplayUrlRef = useRef(null);
+  const avatarDisplayUrl = useAuthenticatedAvatarUrl(profile?.avatar);
 
   // Load profile on mount
   useEffect(() => {
@@ -367,53 +361,8 @@ export default function AdminProfilePage({ embedded = false } = {}) {
   }
 
   useEffect(() => {
-    if (!avatarPreviewUrl) return undefined;
-    return () => {
-      try { URL.revokeObjectURL(avatarPreviewUrl); } catch (_) {}
-    };
-  }, [avatarPreviewUrl]);
-
-  // Chi bo preview local khi blob tu server da doi (fetch xong sau upload)
-  useEffect(() => {
-    if (!avatarPreviewUrl || !avatarDisplayUrl) return;
-    if (avatarDisplayUrl !== prevAvatarDisplayUrlRef.current) {
-      setAvatarPreviewUrl(null);
-      setAvatarImgBroken(false);
-    }
-    prevAvatarDisplayUrlRef.current = avatarDisplayUrl;
-  }, [avatarDisplayUrl, avatarPreviewUrl]);
-
-  useEffect(() => {
     setAvatarImgBroken(false);
-  }, [avatarPreviewUrl, avatarDisplayUrl]);
-
-  function openAvatarPicker() {
-    avatarInputRef.current?.click?.();
-  }
-
-  async function handleAvatarChange(e) {
-    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-    if (!file) return;
-
-    setAvatarError(null);
-    setAvatarPreviewUrl(() => URL.createObjectURL(file));
-    setAvatarUploading(true);
-    try {
-      const updated = await uploadMyAvatar(file);
-      if (!updated?.avatar) {
-        throw new Error('Máy chủ chưa trả về thông tin avatar');
-      }
-      setAvatarCacheBuster((v) => v + 1);
-      setProfile(updated);
-      syncProfileSession(user, updated, setUser);
-    } catch (err) {
-      setAvatarError(err?.message || 'Không thể cập nhật avatar');
-      setAvatarPreviewUrl(null);
-    } finally {
-      setAvatarUploading(false);
-      e.target.value = '';
-    }
-  }
+  }, [avatarDisplayUrl]);
 
   // Password form handlers
   function handlePwChange(e) {
@@ -497,10 +446,10 @@ export default function AdminProfilePage({ embedded = false } = {}) {
           {/* ── Left: avatar card ──────────────────────────────── */}
           <div className="profile-card profile-card--left">
             <div className="profile-avatar-wrap">
-              {(avatarPreviewUrl || avatarDisplayUrl) && !avatarImgBroken ? (
+              {avatarDisplayUrl && !avatarImgBroken ? (
                 <img
                   className="profile-avatar profile-avatar--img"
-                  src={avatarPreviewUrl || avatarDisplayUrl}
+                  src={avatarDisplayUrl}
                   alt="Avatar"
                   onError={() => setAvatarImgBroken(true)}
                 />
@@ -510,28 +459,6 @@ export default function AdminProfilePage({ embedded = false } = {}) {
               <div className="profile-avatar__badge">
                 <IconShield />
               </div>
-
-              <input
-                ref={avatarInputRef}
-                id="profile-avatar-input"
-                name="avatar"
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleAvatarChange}
-              />
-            </div>
-
-            <div style={{ width: '100%', marginBottom: 10, textAlign: 'center' }}>
-              <button
-                type="button"
-                className="btn profile-card__avatar-btn"
-                onClick={openAvatarPicker}
-                disabled={avatarUploading}
-              >
-                {avatarUploading ? 'Đang cập nhật...' : 'Đổi avatar'}
-              </button>
-              {avatarError && <div className="form-error" style={{ marginTop: 6 }}>{avatarError}</div>}
             </div>
 
             <div className="profile-card__name">{displayName}</div>

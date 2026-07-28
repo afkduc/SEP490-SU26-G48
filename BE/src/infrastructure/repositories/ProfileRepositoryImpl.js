@@ -133,17 +133,6 @@ class ProfileRepositoryImpl {
     return this.findById(userId);
   }
 
-  async updateAvatar(userId, avatarFileName) {
-    await query(
-      `UPDATE users
-       SET    avatar      = @p1,
-              updated_at  = SYSUTCDATETIME()
-       WHERE  id = @p2`,
-      { p1: avatarFileName || null, p2: userId }
-    );
-    return this.findById(userId);
-  }
-
   async updatePassword(userId, passwordHash, mustChangePassword = false) {
     await query(
       `UPDATE users
