@@ -49,7 +49,7 @@ const SERVICE_ADVISOR_NAV = [
 // ===== Manager =====
 const MANAGER_NAV = [
   { label: 'Dashboard', path: '/manager/dashboard' },
-  { label: 'Kho', path: '/inventory' },
+  { label: 'Kho', path: '/manager/inventory' },
   { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests' },
   { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests' },
   {
