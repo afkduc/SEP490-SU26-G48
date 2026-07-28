@@ -4,8 +4,8 @@ export const ROLES = Object.freeze({
   MANAGER: 'manager',
   SERVICE_ADVISOR: 'service_advisor',
   WAREHOUSE_STAFF: 'warehouse_staff',
-  ACCOUNTANT: 'accountant',
   TEAM_LEADER: 'team_leader',
+  TECHNICIAN: 'technician',
 });
 
 export const ROLE_LABELS = Object.freeze({
@@ -14,8 +14,8 @@ export const ROLE_LABELS = Object.freeze({
   [ROLES.MANAGER]: 'Quản lý chi nhánh',
   [ROLES.SERVICE_ADVISOR]: 'Cố vấn dịch vụ',
   [ROLES.WAREHOUSE_STAFF]: 'Nhân viên kho',
-  [ROLES.ACCOUNTANT]: 'Kế toán',
   [ROLES.TEAM_LEADER]: 'Tổ trưởng kỹ thuật',
+  [ROLES.TECHNICIAN]: 'Kỹ thuật viên',
 });
 
 export const ROLE_VALUES = Object.freeze(Object.values(ROLES));

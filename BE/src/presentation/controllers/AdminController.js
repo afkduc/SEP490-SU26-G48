@@ -68,7 +68,6 @@ class AdminController {
     this.listPermissions = this.listPermissions.bind(this);
     this.getRolePermissions = this.getRolePermissions.bind(this);
     this.setRolePermissions = this.setRolePermissions.bind(this);
-    this.saveRolePermissionsMatrix = this.saveRolePermissionsMatrix.bind(this);
     this.getRoleUsers = this.getRoleUsers.bind(this);
     this.listPermissionGroups = this.listPermissionGroups.bind(this);
     this.getPermissionGroupDetail = this.getPermissionGroupDetail.bind(this);
@@ -356,60 +355,6 @@ class AdminController {
         description: `Cập nhật quyền cho vai trò ID ${req.params.id} (${permissions.length || 0} quyền)`,
       });
       return success(res, { items: permissions, total: permissions.length }, 'Cap nhat quyen vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  /**
-   * Bulk save permissions cho nhieu role trong 1 transaction (atomic).
-   * Body: { changes: [{roleId, permissionIds}, ...] }
-   * Dung cho trang "Ma tran quyen" (Permission Matrix).
-   * - 1 call duy nhat, khong N+1
-   * - Last-admin guard trong service (khong cho tuoc het admin:roles:* cua role admin)
-   * - Audit log + permission cache invalidation tu dong
-   */
-  saveRolePermissionsMatrix = async (req, res, next) => {
-    try {
-      const { changes } = req.body;
-      const result = await this.roleService.setRolePermissionsMatrix({
-        changes,
-        actorUserId: req.user?.userId,
-      });
-
-      // Push SSE event de cac user bi anh huong tu refresh permission realtime
-      // (FE nhan event -> goi getMeApi -> cap nhat token + permissions vao storage).
-      // Bo qua neu khong co user nao bi anh huong (best-effort, khong fail request).
-      try {
-        const roleIds = (changes || []).map((c) => Number(c.roleId)).filter(Number.isFinite);
-        emitPermissionChanged({
-          action: 'matrix_updated',
-          userIds: result.affectedUserIds || [],
-          roleIds,
-          actorUserId: req.user?.userId || null,
-        });
-      } catch (eventErr) {
-        // Log nhung khong fail API - SSE chi la optional enhancement.
-        console.warn('[AdminController] emitPermissionChanged failed:', eventErr.message);
-      }
-
-      await auditCrud.update(req, {
-        tableName: 'role_permissions',
-        entityCode: 'MATRIX',
-        recordId: null,
-        entityName: 'Ma trận quyền',
-        newData: {
-          changeCount: changes?.length || 0,
-          invalidations: result.invalidations,
-          affectedUserCount: (result.affectedUserIds || []).length,
-        },
-        description: `Cập nhật ma trận quyền (${changes?.length || 0} vai trò, ${result.invalidations} user bị ảnh hưởng cache)`,
-      });
-      return success(
-        res,
-        result,
-        `Da luu ma tran quyen (${result.results.length} vai tro, ${result.invalidations} user invalidate cache)`
-      );
     } catch (err) {
       next(err);
     }
@@ -936,11 +881,13 @@ class AdminController {
       const roles = await this.userRoleService.getUserRoles(userId);
       const roleNames = roles.map((r) => r.roleName).filter(Boolean);
 
-      // Lay permissions tu DB
+      // Lay permissions tu DB (bo qua cache de lay gia tri moi nhat -
+      // tranh truong hop admin vua thay doi ma tran quyen nhung cache 60s
+      // van con permission cu)
       const PermissionService = require('../../application/services/PermissionService');
       const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
       const ps = new PermissionService({ roleRepository: new RoleRepositoryImpl() });
-      const permissions = await ps.getUserPermissions(userId);
+      const permissions = await ps.getUserPermissions(userId, { skipCache: true });
       const permissionKeys = Array.from(permissions);
 
       const newToken = jwt.sign(
@@ -980,12 +927,12 @@ class AdminController {
       const roles = await this.userRoleService.getUserRoles(userId);
       const roleNames = roles.map((r) => r.roleName).filter(Boolean);
 
-      // Lay permissions tu DB (bypass cache de lay gia tri moi nhat)
+      // JWT: compact (tránh 431). Response permissions: full L2 cho FE UI.
       const PermissionService = require('../../application/services/PermissionService');
       const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
       const ps = new PermissionService({ roleRepository: new RoleRepositoryImpl() });
-      const permissions = await ps.getUserPermissions(userId);
-      const permissionKeys = Array.from(permissions);
+      const compactKeys = await ps.getUserPermissionsCompact(userId, { skipCache: true });
+      const fullKeys = Array.from(await ps.getUserPermissions(userId, { skipCache: true }));
 
       const newToken = jwt.sign(
         {
@@ -993,7 +940,7 @@ class AdminController {
           email: req.user.email,
           name: req.user.name,
           roles: roleNames,
-          permissions: permissionKeys,
+          permissions: compactKeys,
           branchId: req.user.branchId,
           tokenVersion: req.user.tokenVersion,
           ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
@@ -1002,7 +949,11 @@ class AdminController {
         { expiresIn: config.jwtExpiresIn }
       );
 
-      return success(res, { token: newToken, permissions: permissionKeys }, 'Cap nhat quyen thanh cong');
+      return success(
+        res,
+        { token: newToken, permissions: fullKeys, effectivePermissions: fullKeys },
+        'Cap nhat quyen thanh cong'
+      );
     } catch (err) {
       next(err);
     }

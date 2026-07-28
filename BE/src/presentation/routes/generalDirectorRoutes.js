@@ -5,6 +5,9 @@ const GeneralDirectorController = require('../controllers/GeneralDirectorControl
 const GeneralDirectorService = require('../../application/services/GeneralDirectorService');
 const GeneralDirectorRepositoryImpl = require('../../infrastructure/repositories/GeneralDirectorRepositoryImpl');
 
+/**
+ * General Director routes — gate theo role (đã gỡ ma trận quyền screen:*).
+ */
 function buildGeneralDirectorRouter() {
   const router = express.Router();
   const repository = new GeneralDirectorRepositoryImpl();
@@ -17,16 +20,13 @@ function buildGeneralDirectorRouter() {
   router.get('/reports/settlements', controller.getSettlementReports);
   router.get('/reports/settlements/:id', controller.getSettlementReportById);
 
-  // Reference data + personnel modules
   router.get('/branches', controller.getBranches);
   router.get('/employees', controller.getEmployees);
   router.get('/employees/:id', controller.getEmployeeById);
 
-  // UC51 - technician coordination
   router.get('/technicians', controller.getTechnicians);
   router.get('/technicians/:id', controller.getTechnicianById);
 
-  // UC52-55 - branch manager management
   router.get('/branch-managers', controller.getBranchManagers);
   router.get('/branch-managers/:id', controller.getBranchManagerById);
   router.post('/branch-managers', controller.createBranchManager);

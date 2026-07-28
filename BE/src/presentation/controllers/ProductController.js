@@ -1,6 +1,7 @@
 const { success } = require('../../utils/response');
 const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
+const { formatEntityName } = require('../../utils/notificationFormat');
 
 class ProductController {
   constructor({ productService }) {
@@ -60,7 +61,11 @@ class ProductController {
       });
       await this.notificationService.notifyAdmins('PRODUCT_CREATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: product?.name || product?.product_name || `ID-${product?.id}`,
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id,
+          'Sản phẩm',
+        ),
         targetCode: product?.product_code || product?.code || '',
         userId: product?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
@@ -82,7 +87,11 @@ class ProductController {
       });
       await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: product?.name || product?.product_name || `ID-${req.params.id}`,
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id || req.params.id,
+          'Sản phẩm',
+        ),
         targetCode: product?.product_code || product?.code || '',
         userId: product?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
@@ -94,21 +103,52 @@ class ProductController {
 
   remove = async (req, res, next) => {
     try {
+      // Soft-disable: không hard delete. Đồng bộ nghiệp vụ Ngừng/Disable.
       const product = await this.productService.deleteProduct(req.params.id);
-      await auditCrud.delete(req, {
+      await auditCrud.update(req, {
         tableName: 'products',
         entityCode: product?.product_code || `ID-${req.params.id}`,
         recordId: product?.id || Number(req.params.id) || null,
         entityName: 'Phụ tùng / Sản phẩm',
-        oldData: product,
+        newData: { status: 'inactive' },
       });
-      await this.notificationService.notifyAdmins('PRODUCT_DELETED', {
+      await this.notificationService.notifyAdmins('PRODUCT_DISABLED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: product?.name || product?.product_name || `ID-${req.params.id}`,
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id || req.params.id,
+          'Sản phẩm',
+        ),
         targetCode: product?.product_code || product?.code || '',
         userId: Number(req.params.id) || null,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
-      return success(res, product, 'Product deleted');
+      return success(res, product, 'Product deactivated');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  reactivate = async (req, res, next) => {
+    try {
+      const product = await this.productService.reactivateProduct(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'products',
+        entityCode: product?.product_code || `ID-${req.params.id}`,
+        recordId: product?.id || Number(req.params.id) || null,
+        entityName: 'Phụ tùng / Sản phẩm',
+        newData: { status: 'active' },
+      });
+      await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id || req.params.id,
+          'Sản phẩm',
+        ),
+        targetCode: product?.product_code || product?.code || '',
+        userId: product?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
+      return success(res, product, 'Product reactivated');
     } catch (err) {
       next(err);
     }

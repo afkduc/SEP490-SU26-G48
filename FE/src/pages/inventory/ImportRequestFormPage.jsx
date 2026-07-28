@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useImportRequestForm } from '../../hooks/inventory/useImportRequestForm';
 import { getSuppliersApi } from '../../services/supplierApi';
+import { PermissionGate } from '../../components/PermissionGate';
 import { searchProductsApi } from '../../services/productApi';
 import './ImportRequestFormPage.css';
 
@@ -362,7 +363,7 @@ export default function ImportRequestFormPage() {
                         className="btn btn--ghost btn--sm"
                         onClick={() => removeItem(it.rowKey)}
                         disabled={items.length <= 1}
-                        title="Xoa dong"
+                        title="Xóa dòng"
                       >
                         X
                       </button>
@@ -371,7 +372,7 @@ export default function ImportRequestFormPage() {
                           type="button"
                           className="btn btn--ghost btn--sm"
                           onClick={() => clearProduct(it.rowKey)}
-                          title="Bo chon"
+                          title="Bỏ chọn"
                         >
                           ⟲
                         </button>
@@ -382,7 +383,7 @@ export default function ImportRequestFormPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={4} className="text-right"><strong>Tong so luong:</strong></td>
+                  <td colSpan={4} className="text-right"><strong>Tổng số lượng:</strong></td>
                   <td className="text-right"><strong>{totalQuantity}</strong></td>
                   <td></td>
                 </tr>
@@ -398,13 +399,15 @@ export default function ImportRequestFormPage() {
           <Link to="/inventory/import-requests" className="btn btn--ghost">
             Hủy
           </Link>
-          <button
-            type="submit"
-            className="btn btn--primary"
-            disabled={submitting || loadingCode || !nextCode}
-          >
-            {submitting ? 'Đang lưu...' : 'Tạo phiếu nhập'}
-          </button>
+          <PermissionGate permission="import_requests:create">
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={submitting || loadingCode || !nextCode}
+            >
+              {submitting ? 'Đang lưu...' : 'Tạo phiếu nhập'}
+            </button>
+          </PermissionGate>
         </div>
       </form>
     </div>

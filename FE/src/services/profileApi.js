@@ -22,3 +22,13 @@ export async function updateMyProfile(payload) {
 export async function changePassword(payload) {
   return httpClient.put('/profile/me/password', payload);
 }
+
+/**
+ * POST /api/profile/me/avatar
+ * @param {File} file
+ */
+export async function uploadMyAvatar(file) {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  return httpClient.postForm('/profile/me/avatar', formData);
+}

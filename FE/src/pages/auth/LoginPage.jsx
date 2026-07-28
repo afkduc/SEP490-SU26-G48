@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { routeAfterLogin } from '../../utils/roleRedirect';
 import httpClient from '../../services/httpClient';
@@ -9,15 +9,16 @@ const WRONG_BRANCH_MESSAGE = 'Tài khoản của bạn không có quyền đăng
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
 
-  const [form, setForm] = useState({ email: '', password: '', branchId: '' });
+  const [form, setForm] = useState({ identifier: '', password: '', branchId: '' });
   const [branches, setBranches] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWrongBranchModal, setShowWrongBranchModal] = useState(false);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -26,40 +27,82 @@ export default function LoginPage() {
       .then((data) => {
         if (alive) setBranches(data || []);
       })
-      .catch(() => {
-        // Im lang neu loi - dropdown chi nhanh se rong, khach van thay thong
-        // bao "vui long chon chi nhanh" nhu binh thuong khi bam dang nhap.
-      });
+      .catch(() => {});
     return () => {
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(routeAfterLogin(user), { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return undefined;
+    const t = setInterval(() => {
+      setLockoutSeconds((s) => Math.max(0, s - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [lockoutSeconds]);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setError('');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.email || !form.password) {
-      setError('Vui lòng nhập đầy đủ email và mật khẩu');
-      return;
-    }
+  const doLogin = async () => {
     setLoading(true);
+    setError('');
     try {
-      const result = await login(form.email, form.password, rememberMe, form.branchId);
-      // Luôn chuyển thẳng về dashboard theo role — bỏ luồng ép đổi mật khẩu tạm.
+      const result = await login(form.identifier, form.password, rememberMe, form.branchId);
       navigate(routeAfterLogin(result?.user), { replace: true });
     } catch (err) {
       if (err.status === 403 && err.message === WRONG_BRANCH_MESSAGE) {
         setShowWrongBranchModal(true);
+      } else if (
+        err.status === 409
+        && (err.code === 'LOGIN_WAIT' || err.details?.code === 'LOGIN_WAIT'
+          || err.code === 'LOGIN_PENDING' || err.details?.code === 'LOGIN_PENDING')
+      ) {
+        // Backward compatibility: nếu BE cũ vẫn trả 409 thì force-login ngay.
+        try {
+          const result = await login(form.identifier, form.password, rememberMe, form.branchId, {
+            force: true,
+          });
+          navigate(routeAfterLogin(result?.user), { replace: true });
+        } catch (forceErr) {
+          setError(forceErr?.message || 'Không thể đăng nhập ngay lúc này');
+        }
+      } else if (err.status === 429 || err.code === 'LOGIN_LOCKED' || err.details?.suggestChangePassword) {
+        const wait = err.details?.waitSeconds || Math.ceil((err.details?.remainingMs || 0) / 1000) || 10;
+        setLockoutSeconds(wait);
+        setError(err.message || 'Vui lòng đợi rồi thử lại. Nên đổi mật khẩu nếu không phải bạn.');
       } else {
+        if (err.details?.waitSeconds) setLockoutSeconds(err.details.waitSeconds);
         setError(err.message || 'Đăng nhập thất bại');
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.identifier || !form.password) {
+      setError('Vui lòng nhập đầy đủ email/số điện thoại và mật khẩu');
+      return;
+    }
+    if (!form.branchId) {
+      setError('Vui lòng chọn chi nhánh trước khi đăng nhập');
+      return;
+    }
+    if (lockoutSeconds > 0) {
+      setError(`Vui lòng đợi ${lockoutSeconds}s trước khi thử lại.`);
+      return;
+    }
+    await doLogin();
   };
 
   return (
@@ -73,21 +116,21 @@ export default function LoginPage() {
 
         <div className="login-panel-right">
           <h2 className="login-title">Đăng nhập</h2>
-          <p className="login-subtitle">Nhập thông tin tài khoản để truy cập hệ thống</p>
+          <p className="login-subtitle">Dùng email hoặc số điện thoại đã đăng ký</p>
 
           <form className="login-form" onSubmit={handleSubmit} noValidate>
             <div className="login-field">
-              <label htmlFor="email">
-                Email <span className="required">*</span>
+              <label htmlFor="identifier">
+                Email hoặc số điện thoại <span className="required">*</span>
               </label>
               <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                value={form.email}
+                id="identifier"
+                name="identifier"
+                type="text"
+                autoComplete="username"
+                value={form.identifier}
                 onChange={handleChange}
-                placeholder="email@autogara.vn"
+                placeholder="email@autogara.vn hoặc 09xxxxxxxx"
               />
             </div>
 
@@ -133,8 +176,10 @@ export default function LoginPage() {
             </div>
 
             <div className="login-field">
-              <label htmlFor="branchId">Chi nhánh</label>
-              <select id="branchId" name="branchId" value={form.branchId} onChange={handleChange}>
+              <label htmlFor="branchId">
+                Chi nhánh <span className="required">*</span>
+              </label>
+              <select id="branchId" name="branchId" value={form.branchId} onChange={handleChange} required>
                 <option value="">Chọn chi nhánh</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -145,6 +190,11 @@ export default function LoginPage() {
             </div>
 
             {error && <p className="login-error">{error}</p>}
+            {lockoutSeconds > 0 && (
+              <p className="login-error" style={{ color: '#b45309' }}>
+                Thử lại sau <strong>{lockoutSeconds}s</strong>. Nếu không phải bạn, hãy đổi mật khẩu.
+              </p>
+            )}
 
             <div className="login-row">
               <label className="login-checkbox">
@@ -155,13 +205,13 @@ export default function LoginPage() {
                 />
                 <span>Ghi nhớ đăng nhập</span>
               </label>
-              <a href="/forgot-password" className="login-forgot">
+              <Link to="/forgot-password" className="login-forgot">
                 Quên mật khẩu?
-              </a>
+              </Link>
             </div>
 
-            <button type="submit" className="login-btn" disabled={loading}>
-              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+            <button type="submit" className="login-btn" disabled={loading || lockoutSeconds > 0}>
+              {loading ? 'Đang đăng nhập...' : lockoutSeconds > 0 ? `Chờ ${lockoutSeconds}s` : 'Đăng nhập'}
             </button>
           </form>
         </div>
