@@ -532,9 +532,10 @@ function TeamLeaderTaskCards() {
           return (
             <div
               key={order.id}
+              className="team-leader-order-card"
               style={{ background: 'var(--white)', border: '1px solid var(--gray-200)', borderRadius: 10, padding: 16, boxShadow: 'var(--shadow-sm)' }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8, flexShrink: 0 }}>
                 <div>
                   <div style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)', fontSize: 14 }}>{order.code}</div>
                   <div style={{ fontWeight: 700, marginTop: 2 }}>{order.customer?.fullName}</div>
@@ -544,15 +545,15 @@ function TeamLeaderTaskCards() {
               </div>
 
               {order.notes && (
-                <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 10px', fontSize: 12, marginBottom: 12 }}>
+                <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 10px', fontSize: 12, marginBottom: 12, flexShrink: 0 }}>
                   {order.notes}
                 </div>
               )}
 
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6, flexShrink: 0 }}>
                 Đầu mục công việc ({doneCount}/{serviceTasks.length})
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: partTasks.length > 0 ? 10 : 14, maxHeight: 260, overflowY: 'auto', paddingRight: 2 }}>
+              <div className="team-leader-tasklist" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: partTasks.length > 0 ? 10 : 14, paddingRight: 2 }}>
                 {serviceTasks.map((task) => {
                   const key = `${order.id}-${task.id}`;
                   const isBusy = busyTaskKey === key;
@@ -581,7 +582,7 @@ function TeamLeaderTaskCards() {
               </div>
 
               {partTasks.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
+                <div style={{ marginBottom: 14, flexShrink: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
                     Phụ tùng cần dùng
                   </div>
@@ -605,7 +606,7 @@ function TeamLeaderTaskCards() {
               {isActive && (
                 <button
                   className="btn btn-primary btn-sm"
-                  style={{ width: '100%', justifyContent: 'center' }}
+                  style={{ width: '100%', justifyContent: 'center', flexShrink: 0 }}
                   disabled={!allDone || busyOrderId === order.id}
                   title={!allDone ? 'Cần tích hoàn thành tất cả đầu mục trước' : ''}
                   onClick={() => handleComplete(order)}
