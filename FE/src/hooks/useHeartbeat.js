@@ -75,7 +75,16 @@ export function useHeartbeat(options = {}) {
       if (stopped) return;
       try {
         const result = await heartbeatApi();
-        if (result && result.serverTime) {
+        if (result?.unauthorized) {
+          if (!sessionExpiredFiredRef.current) {
+            sessionExpiredFiredRef.current = true;
+            showSessionExpired({
+              code: 'SESSION_REPLACED',
+              message: 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại để tiếp tục.',
+            });
+          }
+          backoffRef.current = Math.min(backoffRef.current + 1, 4);
+        } else if (result && result.serverTime) {
           setLastServerTimeIso(result.serverTime);
           setLastHeartbeatAt(Date.now());
           backoffRef.current = 0; // Reset backoff khi thanh cong

@@ -59,6 +59,7 @@ export default function SecurityAlertsPanel({
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [countsError, setCountsError] = useState(false);
   const [ackingId, setAckingId] = useState(null);
   const [ackingAll, setAckingAll] = useState(false);
   const [severity, setSeverity] = useState('');
@@ -69,8 +70,10 @@ export default function SecurityAlertsPanel({
       const data = await adminSecurityAlertsApi.getCounts();
       const next = data || { total: 0, critical: 0, high: 0, medium: 0, info: 0 };
       setCounts(next);
+      setCountsError(false);
       onCountChange?.(Number(next.total) || 0);
     } catch {
+      setCountsError(true);
       setCounts({ total: 0, critical: 0, high: 0, medium: 0, info: 0 });
       onCountChange?.(0);
     }
@@ -166,12 +169,16 @@ export default function SecurityAlertsPanel({
           </span>
           <div className="sec-panel__banner-text">
             <strong>
-              {total > 0
+              {countsError
+                ? 'Không tải được số lượng cảnh báo'
+                : total > 0
                 ? `${total > 100 ? '99+' : total} cảnh báo chưa xử lý`
                 : 'Không có cảnh báo chưa xử lý'}
             </strong>
             <span>
-              {urgent > 0
+              {countsError
+                ? 'Vui lòng bấm Làm mới hoặc kiểm tra kết nối API.'
+                : urgent > 0
                 ? `${urgent} mức Critical/High — kiểm tra rồi xử lý trên danh sách thiết bị bên dưới`
                 : 'Cảnh báo chỉ là tín hiệu; thao tác đăng xuất nằm ở bảng thiết bị'}
             </span>
