@@ -98,14 +98,24 @@ export default function ResetPasswordPage() {
                 <label htmlFor="confirm">
                   Xác nhận mật khẩu <span className="required">*</span>
                 </label>
-                <input
-                  id="confirm"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  value={confirm}
-                  onChange={(e) => { setConfirm(e.target.value); setError(''); }}
-                  disabled={!token}
-                />
+                <div className="login-input-wrap">
+                  <input
+                    id="confirm"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={confirm}
+                    onChange={(e) => { setConfirm(e.target.value); setError(''); }}
+                    disabled={!token}
+                  />
+                  <button
+                    type="button"
+                    className="login-eye"
+                    onClick={() => setShowPassword((v) => !v)}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? 'Ẩn' : 'Hiện'}
+                  </button>
+                </div>
               </div>
 
               {error && <p className="login-error">{error}</p>}
