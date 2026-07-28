@@ -83,7 +83,7 @@ export default function AdminLoginSecurityPage() {
       else next.set('tab', tab);
       if (tab === 'sessions') next.delete('alerts');
       return next;
-    }, { replace: true });
+    });
   }, [setSearchParams]);
 
   const handleAlertsExpanded = useCallback((open) => {
@@ -93,7 +93,7 @@ export default function AdminLoginSecurityPage() {
       if (open) next.set('alerts', '1');
       else next.delete('alerts');
       return next;
-    }, { replace: true });
+    });
   }, [setSearchParams]);
 
   const handleFocusDevice = useCallback((alertOrPayload) => {

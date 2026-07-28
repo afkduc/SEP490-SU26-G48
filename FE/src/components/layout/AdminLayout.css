@@ -299,6 +299,37 @@
   min-width: 0;
 }
 
+.admin-topbar__history-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+}
+
+.admin-topbar__history-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.admin-topbar__history-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.admin-topbar__history-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .admin-topbar__section {
   color: #94a3b8;
   font-weight: 500;
@@ -620,6 +651,10 @@
 
   .admin-topbar__section {
     display: none;
+  }
+
+  .admin-topbar__history-nav {
+    margin-right: 0;
   }
 
   .admin-topbar__online-indicator {
