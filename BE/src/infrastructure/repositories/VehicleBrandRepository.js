@@ -60,6 +60,15 @@ class VehicleBrandRepository {
     return result.recordset.map(mapBrandRow);
   }
 
+  async getNextSortOrder() {
+    await this.ensureColumns();
+    const result = await query(`
+      SELECT ISNULL(MAX(ISNULL(sort_order, 0)), 0) + 1 AS next_sort_order
+      FROM brands
+    `);
+    return Number(result.recordset?.[0]?.next_sort_order) || 1;
+  }
+
   /**
    * Tao brand_code duy nhat (neu trung thi them _2, _3...), max 20 ky tu.
    */
@@ -86,7 +95,6 @@ class VehicleBrandRepository {
   async create({
     brandName,
     brandCode,
-    sortOrder = 0,
     warrantyYears = DEFAULT_WARRANTY_YEARS,
     warrantyKm = DEFAULT_WARRANTY_KM,
   }) {
@@ -94,6 +102,7 @@ class VehicleBrandRepository {
     const code = await this.allocateBrandCode(brandName, brandCode);
     const years = Number(warrantyYears);
     const km = Number(warrantyKm);
+    const nextSortOrder = await this.getNextSortOrder();
     const result = await query(
       `
       INSERT INTO brands (brand_code, brand_name, warranty_years, warranty_km, is_active, sort_order)
@@ -107,7 +116,7 @@ class VehicleBrandRepository {
         p1: brandName,
         pYears: Number.isFinite(years) && years > 0 ? years : DEFAULT_WARRANTY_YEARS,
         pKm: Number.isFinite(km) && km > 0 ? km : DEFAULT_WARRANTY_KM,
-        p2: Number(sortOrder) || 0,
+        p2: nextSortOrder,
       }
     );
     return mapBrandRow(result.recordset[0]);

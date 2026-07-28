@@ -1185,7 +1185,6 @@ class AdminController {
       const brand = await this.vehicleBrandRepository.create({
         brandName,
         brandCode: brandCode || undefined,
-        sortOrder: req.body?.sortOrder,
         warrantyYears: req.body?.warrantyYears,
         warrantyKm: req.body?.warrantyKm,
       });
@@ -1207,7 +1206,6 @@ class AdminController {
       const brand = await this.vehicleBrandRepository.update(req.params.id, {
         brandName: req.body?.brandName != null ? String(req.body.brandName).trim() : undefined,
         brandCode: req.body?.brandCode != null ? String(req.body.brandCode).trim() : undefined,
-        sortOrder: req.body?.sortOrder,
         warrantyYears: req.body?.warrantyYears,
         warrantyKm: req.body?.warrantyKm,
       });

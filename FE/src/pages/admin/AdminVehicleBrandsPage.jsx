@@ -13,7 +13,6 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({
     brandName: '',
-    sortOrder: '0',
     warrantyYears: '5',
     warrantyKm: '100000',
   });
@@ -40,7 +39,6 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
     setEditItem(null);
     setForm({
       brandName: '',
-      sortOrder: String((items.length || 0) + 1),
       warrantyYears: '5',
       warrantyKm: '100000',
     });
@@ -51,7 +49,6 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
     setEditItem(item);
     setForm({
       brandName: item.brandName || '',
-      sortOrder: String(item.sortOrder ?? 0),
       warrantyYears: String(item.warrantyYears ?? 5),
       warrantyKm: String(item.warrantyKm ?? 100000),
     });
@@ -66,7 +63,6 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
     }
     const payload = {
       brandName: form.brandName.trim(),
-      sortOrder: Number(form.sortOrder) || 0,
       warrantyYears: Number(form.warrantyYears) || 5,
       warrantyKm: Number(form.warrantyKm) || 100000,
     };
@@ -133,11 +129,10 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
           <table className="specialties-table brands-table">
             <colgroup>
               <col style={{ width: '6%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '22%' }} />
               <col style={{ width: '12%' }} />
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '10%' }} />
               <col style={{ width: '12%' }} />
-              <col style={{ width: '8%' }} />
               <col style={{ width: '14%' }} />
               <col style={{ width: '20%' }} />
             </colgroup>
@@ -148,7 +143,6 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
                 <th className="brands-col brands-col--name">Tên hãng</th>
                 <th className="brands-col brands-col--num">BH (năm)</th>
                 <th className="brands-col brands-col--num">BH (km)</th>
-                <th className="brands-col brands-col--num">Thứ tự</th>
                 <th className="brands-col brands-col--status">Trạng thái</th>
                 <th className="brands-col brands-col--actions">Thao tác</th>
               </tr>
@@ -167,7 +161,6 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
                   <td className="brands-col brands-col--num">
                     {item.warrantyKm != null ? Number(item.warrantyKm).toLocaleString('vi-VN') : '—'}
                   </td>
-                  <td className="brands-col brands-col--num">{item.sortOrder}</td>
                   <td className="brands-col brands-col--status">
                     <span className={`specialty-status-badge ${item.isActive ? 'specialty-status-badge--active' : 'specialty-status-badge--inactive'}`}>
                       {item.isActive ? 'Hoạt động' : 'Tắt'}
@@ -188,7 +181,7 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
                 </tr>
               ))}
               {items.length === 0 && (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24 }}>Chưa có hãng xe</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>Chưa có hãng xe</td></tr>
               )}
             </tbody>
           </table>
@@ -215,10 +208,6 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
                 <div className="form-group">
                   <label>Bảo hành (km)</label>
                   <input className="form-input" type="number" min="0" value={form.warrantyKm} onChange={(e) => setForm((f) => ({ ...f, warrantyKm: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label>Thứ tự</label>
-                  <input className="form-input" type="number" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
                 </div>
               </div>
               <div className="specialty-modal__footer">

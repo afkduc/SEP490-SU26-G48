@@ -32,7 +32,7 @@ export default function AdminAccountPage() {
       if (tab === 'notifications') next.set('tab', 'notifications');
       else next.delete('tab');
       return next;
-    }, { replace: true });
+    });
   }, [setSearchParams]);
 
   return (
