@@ -21,7 +21,6 @@ class ProfileController {
     this.markAllNotificationsRead = this.markAllNotificationsRead.bind(this);
     this.getUnreadCount = this.getUnreadCount.bind(this);
     this.getMyAvatar = this.getMyAvatar.bind(this);
-    this.uploadAvatar = this.uploadAvatar.bind(this);
   }
 
   /**
@@ -169,51 +168,6 @@ class ProfileController {
       }
 
       return res.sendFile(filePath);
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  // POST /profile/me/avatar - upload file avatar
-  async uploadAvatar(req, res, next) {
-    try {
-      const file = req.file;
-      if (!file) {
-        throw new ApiError(400, 'Vui lòng chọn ảnh avatar');
-      }
-
-      const allowedExt = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
-      const ext = path.extname(file.originalname || '').toLowerCase();
-      if (!allowedExt.has(ext)) {
-        throw new ApiError(400, 'Định dạng ảnh không được hỗ trợ');
-      }
-
-      const avatarDir = path.join(__dirname, '..', '..', '..', 'avatar');
-      if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
-
-      const newFileName = `${req.user.userId}_${Date.now()}_${Math.random().toString(16).slice(2)}${ext}`;
-      const filePath = path.join(avatarDir, newFileName);
-
-      fs.writeFileSync(filePath, file.buffer);
-
-      const updatedProfile = await this.profileService.updateAvatar(req.user.userId, newFileName);
-
-      // Sync lại branch info như getMyProfile/updateMyProfile
-      const branchInfo = await this.branchService.getProfileBranches(req.user.userId);
-      updatedProfile.branchId = branchInfo.branchId ?? updatedProfile.branchId ?? null;
-      updatedProfile.branchName = branchInfo.branchName ?? updatedProfile.branchName ?? null;
-      updatedProfile.assignedBranches = branchInfo.assignedBranches || [];
-
-      await auditCrud.update(req, {
-        tableName: 'users',
-        entityCode: req.user.email || `ID-${req.user.userId}`,
-        recordId: req.user.userId,
-        entityName: 'Hồ sơ cá nhân',
-        newData: { avatar: newFileName },
-        description: `Cập nhật avatar`,
-      });
-
-      return success(res, updatedProfile, 'Cập nhật avatar thành công');
     } catch (err) {
       next(err);
     }
