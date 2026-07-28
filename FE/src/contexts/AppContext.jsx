@@ -11,12 +11,12 @@ import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
 import LoginChallengeModal from '../components/LoginChallengeModal';
-import SessionTakenOverModal from '../components/SessionTakenOverModal';
 import {
   resetSessionExpiredFlag,
   cancelAllPendingRequests,
   resetLoggedOutFlag,
   SESSION_LOGGED_OUT_EVENT,
+  showSessionExpired,
 } from '../services/httpClient';
 import { mergeAuthRefreshUser } from '../utils/profileSession';
 
@@ -566,24 +566,20 @@ function LoginChallengeRunner() {
 function SessionTakenOverRunner() {
   const { token } = useAuth();
   useNotifications(token);
-  const [takenOver, setTakenOver] = useState(null);
 
   useEffect(() => {
     const onTakenOver = (e) => {
       const detail = e?.detail || {};
-      setTakenOver((prev) => prev || detail);
+      showSessionExpired({
+        code: detail?.metadata?.code || detail?.code || 'SESSION_REPLACED',
+        message: detail?.message || 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại để tiếp tục.',
+      });
     };
     window.addEventListener('session-taken-over', onTakenOver);
     return () => window.removeEventListener('session-taken-over', onTakenOver);
   }, []);
 
-  if (!takenOver) return null;
-  return (
-    <SessionTakenOverModal
-      detail={takenOver}
-      onClose={() => setTakenOver(null)}
-    />
-  );
+  return null;
 }
 
 export function useAuth() {

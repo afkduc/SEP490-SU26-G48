@@ -128,21 +128,66 @@ async function cleanupOrphanedDevices() {
  */
 async function healActiveDevices() {
   try {
+    // Chi heal device gan session active MOI NHAT cua tung user
+    // (tranh heal ca Chrome + Edge → 2 dong "Hiện tại").
     const result = await query(
       `UPDATE ud
        SET    ud.is_current = 1,
               ud.last_activity_at = COALESCE(ud.last_activity_at, SYSUTCDATETIME())
        FROM   user_devices ud
-       INNER JOIN login_sessions ls
-               ON ls.device_id = ud.id
-              AND ls.user_id = ud.user_id
-              AND ls.status = 'active'
-              AND ls.action_type = 'LOGIN'
+       INNER JOIN (
+         SELECT ls.user_id, ls.device_id,
+                ROW_NUMBER() OVER (
+                  PARTITION BY ls.user_id
+                  ORDER BY COALESCE(ls.last_activity_at, ls.login_time) DESC, ls.id DESC
+                ) AS rn
+         FROM   login_sessions ls
+         WHERE  ls.status = 'active'
+           AND  ls.action_type = 'LOGIN'
+           AND  ls.device_id IS NOT NULL
+       ) latest ON latest.user_id = ud.user_id
+                AND latest.device_id = ud.id
+                AND latest.rn = 1
        WHERE  ud.is_current = 0`
     );
     const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
     if (affected > 0) {
-      console.log(`[loginSessionJob] Healed ${affected} device(s) still tied to active sessions`);
+      console.log(`[loginSessionJob] Healed ${affected} device(s) still tied to newest active session`);
+    }
+
+    // Dam bao moi user chi co 1 device is_current=1 (device cua session moi nhat).
+    const demoted = await query(
+      `UPDATE ud
+       SET    ud.is_current = 0
+       FROM   user_devices ud
+       WHERE  ud.is_current = 1
+         AND  NOT EXISTS (
+           SELECT 1
+           FROM (
+             SELECT ls.user_id, ls.device_id,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY ls.user_id
+                      ORDER BY COALESCE(ls.last_activity_at, ls.login_time) DESC, ls.id DESC
+                    ) AS rn
+             FROM   login_sessions ls
+             WHERE  ls.status = 'active'
+               AND  ls.action_type = 'LOGIN'
+               AND  ls.device_id IS NOT NULL
+           ) latest
+           WHERE latest.user_id = ud.user_id
+             AND latest.device_id = ud.id
+             AND latest.rn = 1
+         )
+         AND EXISTS (
+           SELECT 1 FROM login_sessions ls
+           WHERE  ls.user_id = ud.user_id
+             AND  ls.status = 'active'
+             AND  ls.action_type = 'LOGIN'
+         )`
+    );
+    const demotedCount = demoted.rowsAffected && demoted.rowsAffected[0] ? demoted.rowsAffected[0] : 0;
+    if (demotedCount > 0) {
+      console.log(`[loginSessionJob] Demoted ${demotedCount} extra current device(s) to inactive`);
     }
   } catch (err) {
     console.error('[loginSessionJob] healActiveDevices failed:', err && err.message ? err.message : err);
