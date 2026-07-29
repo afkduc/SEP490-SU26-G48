@@ -122,10 +122,19 @@ export function parseAuditJson(value) {
 
 /**
  * Đổi mô tả kỹ thuật (cả log cũ) sang tiếng Việt dễ đọc.
+ * @param {string} description
+ * @param {string} action
+ * @param {object|string} newValue
+ * @param {{ entityCode?: string, entityName?: string }|string} [metaOrEntityCode]
  */
-export function humanizeAuditDescription(description, action, newValue) {
+export function humanizeAuditDescription(description, action, newValue, metaOrEntityCode) {
   const details = parseAuditJson(newValue) || {};
   const actionLabel = getAuditActionLabel(action);
+  const meta = typeof metaOrEntityCode === 'string'
+    ? { entityCode: metaOrEntityCode }
+    : (metaOrEntityCode || {});
+  const entityCodeHint = meta.entityCode || details.entityCode || null;
+  const entityNameHint = meta.entityName || details.entityName || null;
 
   // Ưu tiên dựng lại từ details nếu có permission/screen/role
   const hasUsefulDetails =
@@ -207,7 +216,70 @@ export function humanizeAuditDescription(description, action, newValue) {
   }
 
   let text = String(description || '').trim();
-  if (!text) return actionLabel;
+
+  // Gắn tên thật từ newValue khi mô tả còn dạng kỹ thuật ID-n
+  const personLabel = [
+    details.firstName || details.first_name,
+    details.lastName || details.last_name,
+  ].filter(Boolean).join(' ').trim()
+    || details.name
+    || details.userName
+    || details.user_name
+    || details.email
+    || details.targetName
+    || null;
+  const specialtyLabel =
+    details.specialtyName || details.specialty_name
+      ? [
+        details.specialtyCode || details.specialty_code || details.code,
+        details.specialtyName || details.specialty_name,
+      ].filter(Boolean).join(' — ')
+      : (details.specialtyCode || details.specialty_code || null);
+  const roleLabel =
+    details.roleName || details.role_name || details.roleLabel || details.role || null;
+  const branchLabel =
+    details.branchName || details.branch_name || details.branchCode || details.branch_code || null;
+
+  if (!text) {
+    if (specialtyLabel || details.isActive != null || details.is_active != null) {
+      const label = specialtyLabel ? String(specialtyLabel) : '';
+      if (action === 'CREATE') return label ? `Tạo mới chuyên môn ${label}` : 'Tạo mới chuyên môn';
+      if (details.isActive === false || details.is_active === false || details.isActive === 0) {
+        return label ? `Vô hiệu hóa chuyên môn ${label}` : 'Vô hiệu hóa chuyên môn';
+      }
+      if (details.isActive === true || details.is_active === true || details.isActive === 1) {
+        return label ? `Kích hoạt chuyên môn ${label}` : 'Kích hoạt chuyên môn';
+      }
+      return label ? `Cập nhật chuyên môn ${label}` : 'Cập nhật chuyên môn';
+    }
+    if (personLabel) {
+      if (action === 'CREATE') return `Tạo mới người dùng ${personLabel}`;
+      return `Cập nhật người dùng ${personLabel}`;
+    }
+    return actionLabel;
+  }
+
+  // Thay «Người dùng ID-12» / «Chuyên môn ID-8» bằng tên nếu có trong newValue
+  text = text.replace(/\bNgười dùng\s+ID-(\d+)\b/gi, (_, id) => (
+    personLabel ? `người dùng ${personLabel}` : `người dùng #${id}`
+  ));
+  text = text.replace(/\bChuyên môn\s+ID-(\d+)\b/gi, (_, id) => (
+    specialtyLabel ? `chuyên môn ${specialtyLabel}` : `chuyên môn #${id}`
+  ));
+  text = text.replace(/\bvai trò\s+ID-(\d+)\b/gi, (_, id) => (
+    roleLabel ? `vai trò ${getRoleLabel(roleLabel)}` : `vai trò #${id}`
+  ));
+  text = text.replace(/\bchi nhánh\s+ID-(\d+)\b/gi, (_, id) => (
+    branchLabel ? `chi nhánh ${branchLabel}` : `chi nhánh #${id}`
+  ));
+  text = text.replace(/\buser\s+ID\s+(\d+)\b/gi, (_, id) => (
+    personLabel ? `người dùng ${personLabel}` : `người dùng #${id}`
+  ));
+  text = text.replace(/\bID-(\d+)\b/g, (_, id) => {
+    if (personLabel && /người dùng|user/i.test(text)) return personLabel;
+    if (specialtyLabel && /chuyên môn/i.test(text)) return specialtyLabel;
+    return `#${id}`;
+  });
 
   // Thay mã action đầu chuỗi
   Object.keys(AUDIT_ACTION_LABELS).forEach((code) => {
@@ -344,6 +416,7 @@ export function formatAuditTime(value) {
   const sec = secondsSince(value, Date.now() + offset);
   let ago = '';
   if (sec == null) ago = '';
+  else if (sec < -120) ago = ''; // lech gio lon — khong hien "vừa xong" gia
   else if (sec < 0) ago = 'vừa xong';
   else if (sec < 5) ago = 'vừa xong';
   else if (sec < 60) ago = `${sec} giây trước`;
