@@ -133,10 +133,6 @@
   display: block;
 }
 
-.profile-card__avatar-btn {
-  width: 100%;
-}
-
 .profile-avatar__badge {
   position: absolute;
   bottom: 2px;

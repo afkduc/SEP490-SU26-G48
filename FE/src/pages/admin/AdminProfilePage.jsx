@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   useAuth,
   getRoleProfilePath,
   getRoleProfileEditPath,
 } from '../../contexts/AppContext';
-import { getMyProfile, updateMyProfile, changePassword, uploadMyAvatar } from '../../services/profileApi';
+import { getMyProfile, updateMyProfile, changePassword } from '../../services/profileApi';
 import {
   syncProfileSession,
 } from '../../utils/profileSession';
@@ -204,7 +204,7 @@ function PasswordInput({ label, id, value, onChange, placeholder, error }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AdminProfilePage() {
+export default function AdminProfilePage({ embedded = false } = {}) {
   const { user, setUser, reloadPermissions } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -225,7 +225,7 @@ export default function AdminProfilePage() {
   useEffect(() => {
     if (!user) return;
     const path = location.pathname;
-    if (isProfileNotificationsPath(path)) return;
+    if (isProfileNotificationsPath(path, location.search)) return;
     if (!isRoleProfilePath(path)) return;
 
     const viewPath = getRoleProfilePath(user);
@@ -238,7 +238,7 @@ export default function AdminProfilePage() {
     if (path !== viewPath) {
       navigate(viewPath, { replace: true });
     }
-  }, [user, location.pathname, navigate]);
+  }, [user, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (searchParams.get('tab') !== 'edit') return;
@@ -272,13 +272,9 @@ export default function AdminProfilePage() {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(null);
 
-  // ─── Avatar upload state ────────────────────────────────────────────────
-  const avatarInputRef = useRef(null);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarError, setAvatarError] = useState(null);
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null);
-  const [avatarCacheBuster, setAvatarCacheBuster] = useState(0);
-  const avatarDisplayUrl = useAuthenticatedAvatarUrl(profile?.avatar, avatarCacheBuster);
+  // ─── Avatar display ─────────────────────────────────────────────────────
+  const [avatarImgBroken, setAvatarImgBroken] = useState(false);
+  const avatarDisplayUrl = useAuthenticatedAvatarUrl(profile?.avatar);
 
   // Load profile on mount
   useEffect(() => {
@@ -365,43 +361,8 @@ export default function AdminProfilePage() {
   }
 
   useEffect(() => {
-    if (!avatarPreviewUrl) return undefined;
-    return () => {
-      try { URL.revokeObjectURL(avatarPreviewUrl); } catch (_) {}
-    };
-  }, [avatarPreviewUrl]);
-
-  // Giu preview local cho den khi anh tu server load xong
-  useEffect(() => {
-    if (avatarDisplayUrl && avatarPreviewUrl) {
-      setAvatarPreviewUrl(null);
-    }
-  }, [avatarDisplayUrl, avatarPreviewUrl]);
-
-  function openAvatarPicker() {
-    avatarInputRef.current?.click?.();
-  }
-
-  async function handleAvatarChange(e) {
-    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-    if (!file) return;
-
-    setAvatarError(null);
-    setAvatarPreviewUrl(() => URL.createObjectURL(file));
-    setAvatarUploading(true);
-    try {
-      const updated = await uploadMyAvatar(file);
-      setAvatarCacheBuster((v) => v + 1);
-      setProfile(updated);
-      syncProfileSession(user, updated, setUser);
-    } catch (err) {
-      setAvatarError(err?.message || 'Không thể cập nhật avatar');
-      setAvatarPreviewUrl(null);
-    } finally {
-      setAvatarUploading(false);
-      e.target.value = '';
-    }
-  }
+    setAvatarImgBroken(false);
+  }, [avatarDisplayUrl]);
 
   // Password form handlers
   function handlePwChange(e) {
@@ -452,19 +413,20 @@ export default function AdminProfilePage() {
     : '?';
 
   return (
-    <div className="admin-profile">
-      {/* ── Page header ─────────────────────────────────────────── */}
-      <div className="admin-profile__header">
-        <div className="admin-profile__title-block">
-          <div className="admin-profile__title-icon">
-            <IconUser size={22} />
-          </div>
-          <div>
-            <h1>Hồ sơ cá nhân</h1>
-            <p className="admin-profile__subtitle">Xem và chỉnh sửa thông tin tài khoản</p>
+    <div className={`admin-profile${embedded ? ' admin-profile--embedded' : ''}`}>
+      {!embedded && (
+        <div className="admin-profile__header">
+          <div className="admin-profile__title-block">
+            <div className="admin-profile__title-icon">
+              <IconUser size={22} />
+            </div>
+            <div>
+              <h1>Hồ sơ cá nhân</h1>
+              <p className="admin-profile__subtitle">Xem và chỉnh sửa thông tin tài khoản</p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Loading / Error ─────────────────────────────────────── */}
       {loading && (
@@ -484,11 +446,12 @@ export default function AdminProfilePage() {
           {/* ── Left: avatar card ──────────────────────────────── */}
           <div className="profile-card profile-card--left">
             <div className="profile-avatar-wrap">
-              {avatarPreviewUrl || avatarDisplayUrl ? (
+              {avatarDisplayUrl && !avatarImgBroken ? (
                 <img
                   className="profile-avatar profile-avatar--img"
-                  src={avatarPreviewUrl || avatarDisplayUrl}
+                  src={avatarDisplayUrl}
                   alt="Avatar"
+                  onError={() => setAvatarImgBroken(true)}
                 />
               ) : (
                 <div className="profile-avatar">{initials}</div>
@@ -496,28 +459,6 @@ export default function AdminProfilePage() {
               <div className="profile-avatar__badge">
                 <IconShield />
               </div>
-
-              <input
-                ref={avatarInputRef}
-                id="profile-avatar-input"
-                name="avatar"
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleAvatarChange}
-              />
-            </div>
-
-            <div style={{ width: '100%', marginBottom: 10, textAlign: 'center' }}>
-              <button
-                type="button"
-                className="btn profile-card__avatar-btn"
-                onClick={openAvatarPicker}
-                disabled={avatarUploading}
-              >
-                {avatarUploading ? 'Đang cập nhật...' : 'Đổi avatar'}
-              </button>
-              {avatarError && <div className="form-error" style={{ marginTop: 6 }}>{avatarError}</div>}
             </div>
 
             <div className="profile-card__name">{displayName}</div>

@@ -2,6 +2,9 @@
 @import './theme-admin.css';
 @import './global.css';
 @import '../pages/admin/AdminShared.css';
-/* Page CSS sau theme/shared — tránh bị ghi đè màu nút/badge */
-@import '../pages/admin/AdminBranchesPage.css';
-@import '../pages/admin/AdminRolesPage.css';
+/*
+  KHÔNG @import CSS từng trang admin ở đây.
+  Vite giữ CSS của lazy route sau khi rời trang → class global (.btn, .filter-row, .table)
+  từ trang A sẽ làm vỡ layout trang B cho đến khi F5.
+  Mỗi page tự import CSS của nó; chỉ giữ token + AdminShared ở entry.
+*/

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SESSION_EXPIRED_KEY, SESSION_LOGGED_OUT_EVENT } from '../services/httpClient';
+import { useAuth } from '../contexts/AppContext';
 
 // Module-level flag da chong spam DUNG ROI giua cac instance StrictMode/HMR.
 let modalShownAt = 0;
@@ -10,6 +11,7 @@ export default function SessionExpiredModal() {
   const [visible, setVisible] = useState(false);
   const [detail, setDetail] = useState(null);
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   useEffect(() => {
     const handler = (event) => {
@@ -36,18 +38,27 @@ export default function SessionExpiredModal() {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  function handleLogin() {
+  async function handleLogin() {
     modalShownAt = 0;
     setVisible(false);
     setDetail(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('permissions');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
-    sessionStorage.removeItem('permissions');
-    window.dispatchEvent(new CustomEvent(SESSION_LOGGED_OUT_EVENT));
-    navigate('/login', { replace: true });
+    try {
+      // Dung logout trung tam de bao dam clear state + cancel request + redirect.
+      await logout();
+    } catch {
+      // Fallback an toan neu logout throw bat ngo.
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('permissions');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('permissions');
+      window.dispatchEvent(new CustomEvent(SESSION_LOGGED_OUT_EVENT));
+      navigate('/login', { replace: true });
+      if (window.location.pathname !== '/login') {
+        window.location.replace('/login');
+      }
+    }
   }
 
   if (!visible) return null;
