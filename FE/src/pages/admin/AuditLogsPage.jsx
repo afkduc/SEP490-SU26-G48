@@ -330,6 +330,7 @@ export default function AuditLogsPage() {
       startDate: '',
       endDate: '',
       branchId: undefined,
+      excludeAuthEvents: true,
       page: 1,
       pageSize: 10,
     }));
@@ -405,6 +406,20 @@ export default function AuditLogsPage() {
               onChange={(e) => audit.updateParam('keyword', e.target.value)}
             />
           </div>
+          <label className="admin-logs__auth-toggle" title="Mặc định ẩn đăng nhập / thất bại (xem ở Lịch sử đăng nhập)">
+            <input
+              type="checkbox"
+              checked={audit.params.excludeAuthEvents !== false && audit.params.excludeAuthEvents !== 'false'}
+              onChange={(e) => {
+                audit.setParams((prev) => ({
+                  ...prev,
+                  excludeAuthEvents: e.target.checked,
+                  page: 1,
+                }));
+              }}
+            />
+            <span>Ẩn đăng nhập / thất bại</span>
+          </label>
         </div>
 
         {showFilters && (
@@ -662,7 +677,13 @@ function AuditTable({ items, onRowClick, now }) {
                 </span>
               </td>
               <td className="audit-logs__cell--branch">
-                {item.branch_name || item.branchId || '—'}
+                {item.branch_name
+                  || item.branchName
+                  || ((item.user_name || item.userName || '').toLowerCase() === 'system'
+                    ? 'Hệ thống'
+                    : (item.branch_id != null || item.branchId != null
+                      ? `#${item.branch_id ?? item.branchId}`
+                      : '—'))}
               </td>
               <td className="audit-logs__cell--time">
                 <div className="audit-logs__time-cell">
@@ -903,10 +924,10 @@ function AuditLogDetailModal({ log, onClose }) {
                 <span className="audit-detail__duration">{log.duration_ms}ms</span>
               </div>
             )}
-            {log.branch_name && (
+            {(log.branch_name || log.branchName) && (
               <div className="audit-detail__field">
                 <label>Chi nhánh</label>
-                <span>{log.branch_name}</span>
+                <span>{log.branch_name || log.branchName}</span>
               </div>
             )}
           </div>

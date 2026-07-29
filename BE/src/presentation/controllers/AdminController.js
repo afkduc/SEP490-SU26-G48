@@ -50,7 +50,6 @@ class AdminController {
     this.specialtyService = new SpecialtyService();
     this.securityAlertService = new SecurityAlertService();
     this.notificationService = new NotificationService();
-    this.vehicleBrandRepository = new (require('../../infrastructure/repositories/VehicleBrandRepository'))();
 
     this.getDashboardStats = this.getDashboardStats.bind(this);
     this.listUsers = this.listUsers.bind(this);
@@ -352,13 +351,20 @@ class AdminController {
         req.params.id,
         permissionIds
       );
+      let roleLabel = `vai trò #${req.params.id}`;
+      let roleCode = null;
+      try {
+        const role = await this.roleService.getRoleDetail(req.params.id);
+        roleLabel = role?.role_label || role?.roleLabel || role?.role_name || role?.roleName || roleLabel;
+        roleCode = role?.role_code || role?.roleCode || null;
+      } catch (_) { /* keep fallback */ }
       await auditCrud.update(req, {
         tableName: 'role_permissions',
-        entityCode: `ID-${req.params.id}`,
+        entityCode: roleCode || roleLabel,
         recordId: Number(req.params.id) || null,
         entityName: 'Phân quyền vai trò',
-        newData: { permissionIds },
-        description: `Cập nhật quyền cho vai trò ID ${req.params.id} (${permissions.length || 0} quyền)`,
+        newData: { permissionIds, roleName: roleLabel, roleCode },
+        description: `Cập nhật quyền cho ${roleLabel} (${permissions.length || 0} quyền)`,
       });
       return success(res, { items: permissions, total: permissions.length }, 'Cap nhat quyen vai tro thanh cong');
     } catch (err) {
@@ -472,7 +478,9 @@ class AdminController {
   setDeviceTrusted = async (req, res, next) => {
     try {
       const trusted = req.body?.trusted === true || req.body?.trusted === 1 || req.body?.trusted === 'true';
-      const device = await this.deviceService.setTrustedByAdmin(req.params.deviceId, trusted);
+      const actorId = req.user?.userId ?? req.user?.id;
+      // Chi cho phep tin cay thiet bi CUA CHINH minh — khong tin cay thay user khac
+      const device = await this.deviceService.setTrustedForOwner(actorId, req.params.deviceId, trusted);
       return success(res, device, trusted ? 'Đã đánh dấu thiết bị tin cậy' : 'Đã bỏ tin cậy thiết bị');
     } catch (err) {
       next(err);
@@ -550,17 +558,20 @@ class AdminController {
   createSpecialty = async (req, res, next) => {
     try {
       const actorInfo = {
-        userId: req.user?.id,
-        userName: req.user?.user_name,
-        name: req.user?.full_name || req.user?.name,
+        userId: req.user?.userId ?? req.user?.id,
+        userName: req.user?.name || req.user?.email,
+        name: req.user?.name || req.user?.email,
       };
       const specialty = await this.specialtyService.create(req.body, actorInfo);
+      const code = specialty?.specialtyCode || specialty?.specialty_code || specialty?.code || null;
+      const name = specialty?.specialtyName || specialty?.specialty_name || '';
       await auditCrud.create(req, {
         tableName: 'specialties',
-        entityCode: specialty?.specialty_code || specialty?.code || null,
+        entityCode: code,
         recordId: specialty?.id || null,
         entityName: 'Chuyên môn',
-        data: req.body,
+        data: specialty || req.body,
+        description: `Tạo mới chuyên môn ${code || ''}${name ? ` — ${name}` : ''}`.trim(),
       });
       return success(res, specialty, 'Tao chuyen mon thanh cong', 201);
     } catch (err) {
@@ -571,17 +582,25 @@ class AdminController {
   updateSpecialty = async (req, res, next) => {
     try {
       const actorInfo = {
-        userId: req.user?.id,
-        userName: req.user?.user_name,
-        name: req.user?.full_name || req.user?.name,
+        userId: req.user?.userId ?? req.user?.id,
+        userName: req.user?.name || req.user?.email,
+        name: req.user?.name || req.user?.email,
       };
       const specialty = await this.specialtyService.update(req.params.id, req.body, actorInfo);
+      const code = specialty?.specialtyCode || specialty?.specialty_code || null;
+      const name = specialty?.specialtyName || specialty?.specialty_name || '';
+      const label = [code, name].filter(Boolean).join(' — ') || `chuyên môn #${req.params.id}`;
       await auditCrud.update(req, {
         tableName: 'specialties',
-        entityCode: specialty?.specialty_code || `ID-${req.params.id}`,
+        entityCode: code || name || String(req.params.id),
         recordId: specialty?.id || Number(req.params.id) || null,
         entityName: 'Chuyên môn',
-        newData: req.body,
+        newData: {
+          ...(specialty || req.body || {}),
+          specialtyCode: code,
+          specialtyName: name,
+        },
+        description: `Cập nhật chuyên môn ${label}`,
       });
       return success(res, specialty, 'Cap nhat chuyen mon thanh cong');
     } catch (err) {
@@ -592,13 +611,21 @@ class AdminController {
   toggleSpecialtyStatus = async (req, res, next) => {
     try {
       const specialty = await this.specialtyService.toggleStatus(req.params.id);
+      const code = specialty?.specialtyCode || specialty?.specialty_code || null;
+      const name = specialty?.specialtyName || specialty?.specialty_name || '';
+      const label = [code, name].filter(Boolean).join(' — ') || `chuyên môn #${req.params.id}`;
+      const isActive = specialty?.isActive ?? specialty?.is_active;
       await auditCrud.update(req, {
         tableName: 'specialties',
-        entityCode: specialty?.specialty_code || `ID-${req.params.id}`,
+        entityCode: code || name || String(req.params.id),
         recordId: specialty?.id || Number(req.params.id) || null,
         entityName: 'Chuyên môn',
-        newData: { isActive: specialty?.is_active },
-        description: `${specialty?.is_active ? 'Kích hoạt' : 'Vô hiệu hóa'} chuyên môn ${specialty?.specialty_code || req.params.id}`,
+        newData: {
+          isActive: Boolean(isActive),
+          specialtyCode: code,
+          specialtyName: name,
+        },
+        description: `${isActive ? 'Kích hoạt' : 'Vô hiệu hóa'} chuyên môn ${label}`,
       });
       return success(res, specialty, 'Cap nhat trang thai chuyen mon thanh cong');
     } catch (err) {
@@ -622,13 +649,28 @@ class AdminController {
         req.params.userId,
         Array.isArray(specialtyIds) ? specialtyIds.map(Number) : []
       );
+      let userLabel = `người dùng #${req.params.userId}`;
+      try {
+        const u = await this.adminUserService.getUserDetail(req.params.userId);
+        const full = [u?.firstName, u?.lastName].filter(Boolean).join(' ').trim();
+        userLabel = full || u?.name || u?.email || userLabel;
+      } catch (_) { /* keep fallback */ }
+      const specialtyNames = (specialties || [])
+        .map((s) => s.specialtyName || s.specialty_name || s.specialtyCode || s.specialty_code)
+        .filter(Boolean);
       await auditCrud.update(req, {
         tableName: 'user_specialty',
-        entityCode: `ID-${req.params.userId}`,
+        entityCode: userLabel,
         recordId: Number(req.params.userId) || null,
         entityName: 'Chuyên môn nhân viên',
-        newData: { specialtyIds },
-        description: `Cập nhật chuyên môn cho user ID ${req.params.userId}`,
+        newData: {
+          specialtyIds,
+          specialtyNames,
+          targetUserName: userLabel,
+        },
+        description: specialtyNames.length
+          ? `Cập nhật chuyên môn cho ${userLabel}: ${specialtyNames.join(', ')}`
+          : `Xóa toàn bộ chuyên môn của ${userLabel}`,
       });
       return success(res, { items: specialties, total: specialties.length }, 'Cap nhat chuyen mon nguoi dung thanh cong');
     } catch (err) {
@@ -822,29 +864,45 @@ class AdminController {
         branchId,
         scopeAllBranches,
       });
+      const displayName =
+        [updated?.firstName, updated?.lastName].filter(Boolean).join(' ').trim() ||
+        updated?.name ||
+        updated?.email ||
+        `ID-${userId}`;
       await auditCrud.update(req, {
         tableName: 'users',
-        entityCode: updated?.user_code || updated?.userName || `ID-${userId}`,
+        entityCode: displayName,
         recordId: updated?.id || userId,
         entityName: 'Người dùng',
         oldData,
-        newData: { firstName, lastName, email, phone, status, roleId, branchId },
+        newData: {
+          firstName: firstName ?? updated?.firstName,
+          lastName: lastName ?? updated?.lastName,
+          email: email ?? updated?.email,
+          phone,
+          status,
+          roleId,
+          branchId,
+          scopeAllBranches,
+          name: displayName,
+        },
+        description: `Cập nhật người dùng ${displayName}`,
       });
       const eventType = status === 'inactive' ? 'USER_DISABLED' : 'USER_UPDATED';
 
       // Gui notification cho chinh admin thuc hien
       await this.notificationService.notify(eventType, {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: updated?.full_name || updated?.userName || `ID-${userId}`,
-        targetCode: updated?.user_code || '',
+        targetName: displayName,
+        targetCode: updated?.name || '',
         userId: req.user?.userId,
       }).catch((e) => console.warn('[AdminController] notify USER_UPDATE:', e.message));
 
       // Gui notification cho cac admin khac (exclude chinh minh)
       await this.notificationService.notifyAdmins(eventType, {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: updated?.full_name || updated?.userName || `ID-${userId}`,
-        targetCode: updated?.user_code || '',
+        targetName: displayName,
+        targetCode: updated?.name || '',
         userId: updated?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_UPDATE:', e.message));
 
@@ -938,10 +996,12 @@ class AdminController {
           permissions: permissionKeys,
           branchId: req.user.branchId,
           tokenVersion: req.user.tokenVersion,
+          remember: Boolean(req.user.remember),
           ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
+          ...(req.user.sessionId ? { sessionId: req.user.sessionId } : {}),
         },
         config.jwtSecret,
-        { expiresIn: config.jwtExpiresIn }
+        { expiresIn: req.user.remember ? config.jwtRememberExpiresIn : config.jwtExpiresIn }
       );
 
       return success(res, { token: newToken, roles: roleNames, permissions: permissionKeys }, 'Cap lai token thanh cong');
@@ -982,10 +1042,12 @@ class AdminController {
           permissions: compactKeys,
           branchId: req.user.branchId,
           tokenVersion: req.user.tokenVersion,
+          remember: Boolean(req.user.remember),
           ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
+          ...(req.user.sessionId ? { sessionId: req.user.sessionId } : {}),
         },
         config.jwtSecret,
-        { expiresIn: config.jwtExpiresIn }
+        { expiresIn: req.user.remember ? config.jwtRememberExpiresIn : config.jwtExpiresIn }
       );
 
       return success(
@@ -1185,112 +1247,6 @@ class AdminController {
         description: `Cap nhat ma tran nhom quyen (${result.updatedRoles} vai tro, ${result.affectedUserCount} user bi anh huong)`,
       });
       return success(res, result, 'Cap nhat ma tran nhom quyen thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // ── Vehicle brands ───────────────────────────────────────────────
-  listVehicleBrands = async (req, res, next) => {
-    try {
-      const items = await this.vehicleBrandRepository.list({ includeInactive: true });
-      return success(res, { items, total: items.length }, 'Danh sach hang xe');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  createVehicleBrand = async (req, res, next) => {
-    try {
-      const ApiError = require('../../utils/ApiError');
-      const brandName = String(req.body?.brandName || '').trim();
-      if (!brandName) {
-        throw new ApiError(400, 'Ten hang xe la bat buoc');
-      }
-      const warrantyYears = Number(req.body?.warrantyYears);
-      const warrantyKm = Number(req.body?.warrantyKm);
-      if (!Number.isFinite(warrantyYears) || warrantyYears < 0 || warrantyYears > 100) {
-        throw new ApiError(400, 'So nam bao hanh phai tu 0 den 100');
-      }
-      if (!Number.isFinite(warrantyKm) || warrantyKm < 0) {
-        throw new ApiError(400, 'So km bao hanh phai >= 0');
-      }
-      const brandCode = req.body?.brandCode != null
-        ? String(req.body.brandCode).trim()
-        : undefined;
-      const brand = await this.vehicleBrandRepository.create({
-        brandName,
-        brandCode: brandCode || undefined,
-        warrantyYears,
-        warrantyKm,
-      });
-      await auditCrud.create(req, {
-        tableName: 'brands',
-        entityCode: brand.brandCode || brand.brandName,
-        recordId: brand.id,
-        entityName: 'Hãng xe',
-        data: brand,
-      });
-      return success(res, brand, 'Tao hang xe thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  updateVehicleBrand = async (req, res, next) => {
-    try {
-      const ApiError = require('../../utils/ApiError');
-      const patch = {};
-      if (req.body?.brandName != null) {
-        const brandName = String(req.body.brandName).trim();
-        if (!brandName) throw new ApiError(400, 'Ten hang xe khong duoc rong');
-        patch.brandName = brandName;
-      }
-      if (req.body?.brandCode != null) {
-        patch.brandCode = String(req.body.brandCode).trim();
-      }
-      if (req.body?.warrantyYears !== undefined) {
-        const warrantyYears = Number(req.body.warrantyYears);
-        if (!Number.isFinite(warrantyYears) || warrantyYears < 0 || warrantyYears > 100) {
-          throw new ApiError(400, 'So nam bao hanh phai tu 0 den 100');
-        }
-        patch.warrantyYears = warrantyYears;
-      }
-      if (req.body?.warrantyKm !== undefined) {
-        const warrantyKm = Number(req.body.warrantyKm);
-        if (!Number.isFinite(warrantyKm) || warrantyKm < 0) {
-          throw new ApiError(400, 'So km bao hanh phai >= 0');
-        }
-        patch.warrantyKm = warrantyKm;
-      }
-      const brand = await this.vehicleBrandRepository.update(req.params.id, patch);
-      if (!brand) {
-        throw new ApiError(404, 'Hang xe khong ton tai');
-      }
-      await auditCrud.update(req, {
-        tableName: 'brands',
-        entityCode: brand?.brandCode || brand?.brandName,
-        recordId: req.params.id,
-        entityName: 'Hãng xe',
-        newData: req.body,
-      });
-      return success(res, brand, 'Cap nhat hang xe thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  toggleVehicleBrandStatus = async (req, res, next) => {
-    try {
-      const brand = await this.vehicleBrandRepository.toggleStatus(req.params.id);
-      await auditCrud.update(req, {
-        tableName: 'brands',
-        entityCode: brand?.brandName,
-        recordId: req.params.id,
-        entityName: 'Hãng xe',
-        newData: { isActive: brand?.isActive },
-      });
-      return success(res, brand, 'Cap nhat trang thai hang xe thanh cong');
     } catch (err) {
       next(err);
     }
