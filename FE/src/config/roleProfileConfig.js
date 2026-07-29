@@ -60,7 +60,7 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     label: 'Nhân viên kho',
     profilePath: ROUTES.INVENTORY_PROFILE,
     profileEditPath: `${ROUTES.INVENTORY_PROFILE}/edit`,
-    allowedRoles: [ROLES.WAREHOUSE_STAFF, ROLES.ADMIN],
+    allowedRoles: [ROLES.WAREHOUSE_STAFF],
     useAdminLayout: false,
   },
 });
