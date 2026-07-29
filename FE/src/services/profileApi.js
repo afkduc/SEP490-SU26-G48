@@ -20,7 +20,8 @@ export async function updateMyProfile(payload) {
 }
 
 export async function changePassword(payload) {
-  return httpClient.put('/profile/me/password', payload);
+  // skipSessionExpired: phòng BE cũ còn trả 401 khi sai mật khẩu hiện tại
+  return httpClient.put('/profile/me/password', payload, { skipSessionExpired: true });
 }
 
 /** GET /api/profile/me/devices */
