@@ -1,6 +1,6 @@
 import httpClient from './httpClient';
 
-export async function loginApi(identifier, password, branchId, { force = false, pendingId = null } = {}) {
+export async function loginApi(identifier, password, branchId, { force = false, pendingId = null, remember = false } = {}) {
   const data = await httpClient.post(
     '/auth/login',
     {
@@ -8,6 +8,7 @@ export async function loginApi(identifier, password, branchId, { force = false, 
       email: identifier,
       password,
       branchId,
+      remember: Boolean(remember),
       force: Boolean(force),
       ...(pendingId ? { pendingId } : {}),
     },

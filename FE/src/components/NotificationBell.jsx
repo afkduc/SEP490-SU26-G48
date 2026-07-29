@@ -1,11 +1,71 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useAuth } from '../contexts/AppContext';
+import { useNavigate } from 'react-router-dom';
+import { useAuth, normalizeRoles } from '../contexts/AppContext';
 import { useNotifications } from '../hooks/useNotifications';
 import { formatDateSafe } from '../utils/dateUtils';
 import { humanizeNotificationMessage } from '../utils/notificationDisplay';
 import { dispatchLoginChallenge } from '../services/authApi';
 import { dispatchSessionTakenOverPrompt } from './SessionTakenOverPrompt';
+import { ROLES } from '../constants/roles';
 import './NotificationBell.css';
+
+function parseNotifMeta(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  try {
+    return JSON.parse(raw) || {};
+  } catch {
+    return {};
+  }
+}
+
+function notifTypeOf(notif, metadata = {}) {
+  return notif?.type || metadata?.eventType || metadata?.ruleKey || '';
+}
+
+function isSessionTakeoverNotif(type, metadata = {}) {
+  const t = String(type || '').toUpperCase();
+  const rule = String(metadata.ruleKey || '').toLowerCase();
+  return (
+    t === 'SESSION_TAKEN_OVER'
+    || t === 'SECURITY_SESSION_TAKEOVER'
+    || rule === 'session_takeover'
+    || /đăng nhập trên thiết bị khác|đã có người đăng nhập tài khoản/i.test(
+      `${metadata.title || ''} ${metadata.message || ''}`,
+    )
+  );
+}
+
+function isNewDeviceNotif(type, metadata = {}) {
+  const t = String(type || '').toUpperCase();
+  const rule = String(metadata.ruleKey || '').toLowerCase();
+  return (
+    t === 'NEW_DEVICE'
+    || t === 'SECURITY_NEW_DEVICE_IP'
+    || rule === 'new_device_ip'
+    || /đăng nhập từ thiết bị mới|ip\/thiết bị mới/i.test(
+      `${metadata.title || ''} ${metadata.message || ''}`,
+    )
+  );
+}
+
+function isAdminSecurityNotif(type) {
+  const t = String(type || '').toUpperCase();
+  return t.startsWith('SECURITY_');
+}
+
+function buildLoginSecurityPath(metadata = {}, { tab = 'devices' } = {}) {
+  const params = new URLSearchParams();
+  if (tab && tab !== 'devices') params.set('tab', tab);
+  const userId = metadata.relatedUserId || metadata.userId || metadata.targetUserId;
+  const userName = metadata.userName || metadata.targetUserName || metadata.actorName;
+  const ip = metadata.ipAddress || metadata.ip || metadata.location;
+  if (userId != null && userId !== '') params.set('userId', String(userId));
+  if (userName) params.set('search', String(userName));
+  if (ip) params.set('ip', String(ip));
+  const qs = params.toString();
+  return qs ? `/admin/login-security?${qs}` : '/admin/login-security';
+}
 
 const ICON_COLORS = {
   LOGIN_SUCCESS: '#10b981',
@@ -43,7 +103,7 @@ const ICON_LABELS = {
   SECURITY_FAILED_LOGIN_BURST: 'Brute-force',
   SECURITY_NEW_ADMIN_ROLE: 'Admin mới',
   SECURITY_INACTIVE_ADMIN: 'Admin idle',
-  SECURITY_NEW_DEVICE_IP: 'IP mới',
+  SECURITY_NEW_DEVICE_IP: 'Đăng nhập từ thiết bị mới',
   SECURITY_SESSION_TAKEOVER: 'Thiết bị khác',
   USER_CREATED: 'Tạo người dùng',
   USER_UPDATED: 'Cập nhật người dùng',
@@ -166,7 +226,8 @@ function getIcon(notif) {
  * Hook vao useNotifications (SSE realtime + poll fallback).
  */
 export default function NotificationBell() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
   const {
     notifications,
     unreadCount,
@@ -178,6 +239,8 @@ export default function NotificationBell() {
   } = useNotifications(token);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const roles = normalizeRoles(user?.roles);
+  const canOpenLoginSecurity = roles.includes(ROLES.ADMIN) || roles.includes(ROLES.GENERAL_DIRECTOR);
 
   // Close dropdown khi click ngoai
   useEffect(() => {
@@ -205,11 +268,15 @@ export default function NotificationBell() {
     if (!notif.isRead && !notif.readAt) {
       markRead(notif.id);
     }
-    let metadata = notif.metadata;
-    if (typeof metadata === 'string') {
-      try { metadata = JSON.parse(metadata); } catch { metadata = {}; }
-    }
-    if (notif.type === 'LOGIN_CHALLENGE' || metadata?.eventType === 'LOGIN_CHALLENGE') {
+    const metadata = {
+      ...parseNotifMeta(notif.metadata),
+      title: notif.title,
+      message: notif.message,
+    };
+    const type = notifTypeOf(notif, metadata);
+
+    // 1) Challenge đăng nhập thiết bị mới (đồng ý / từ chối)
+    if (type === 'LOGIN_CHALLENGE' || metadata?.eventType === 'LOGIN_CHALLENGE') {
       const pendingId = metadata?.pendingId || notif.pendingId;
       if (pendingId) {
         dispatchLoginChallenge({
@@ -225,24 +292,46 @@ export default function NotificationBell() {
       return;
     }
 
-    // Thông báo thay phiên → popup Đổi mật khẩu / Lúc khác (mọi role)
-    if (
-      notif.type === 'SESSION_TAKEN_OVER'
-      || metadata?.eventType === 'SESSION_TAKEN_OVER'
-    ) {
+    const promptPayload = {
+      title: notif.title,
+      message: notif.message,
+      metadata: metadata || {},
+      ip: metadata?.ip || metadata?.ipAddress || metadata?.location,
+      browser: metadata?.browser,
+      os: metadata?.os,
+      device: [metadata?.browser, metadata?.os].filter(Boolean).join(' · ') || undefined,
+      createdAt: notif.createdAt || notif.timestamp || metadata?.timestamp,
+      canOpenDevices: canOpenLoginSecurity,
+    };
+
+    // 2) Cảnh báo admin (SECURITY_*) về user khác → màn Bảo mật đăng nhập để xử lý thiết bị/phiên
+    if (isAdminSecurityNotif(type) && canOpenLoginSecurity) {
+      const tab = isSessionTakeoverNotif(type, metadata) ? 'sessions' : 'devices';
+      navigate(buildLoginSecurityPath(metadata, { tab }));
+      setOpen(false);
+      return;
+    }
+
+    // 3) Thay phiên trên tài khoản của mình → popup Đổi mật khẩu
+    if (isSessionTakeoverNotif(type, metadata)) {
       dispatchSessionTakenOverPrompt({
-        title: notif.title,
-        message: notif.message,
-        metadata: metadata || {},
-        ip: metadata?.ip || metadata?.ipAddress || metadata?.location,
-        browser: metadata?.browser,
-        os: metadata?.os,
-        device: [metadata?.browser, metadata?.os].filter(Boolean).join(' · ') || undefined,
-        createdAt: notif.createdAt || notif.timestamp || metadata?.timestamp,
+        ...promptPayload,
+        variant: 'session_takeover',
+      });
+      setOpen(false);
+      return;
+    }
+
+    // 4) Đăng nhập thiết bị mới (của mình) → popup: Tin cậy / Đổi MK
+    if (isNewDeviceNotif(type, metadata)) {
+      dispatchSessionTakenOverPrompt({
+        ...promptPayload,
+        variant: 'new_device',
+        deviceId: metadata?.deviceId || metadata?.device_id || null,
       });
       setOpen(false);
     }
-  }, [markRead]);
+  }, [markRead, navigate, canOpenLoginSecurity]);
 
   return (
     <div className="notif-bell" ref={dropdownRef}>
@@ -322,7 +411,9 @@ export default function NotificationBell() {
                     {getIcon(notif)}
                     <div className="notif-bell__item-body">
                       <div className="notif-bell__item-title">
-                        {notif.title || ICON_LABELS[notif.type] || 'Thông báo'}
+                        {notif.type === 'SECURITY_NEW_DEVICE_IP'
+                          ? (ICON_LABELS.SECURITY_NEW_DEVICE_IP)
+                          : (notif.title || ICON_LABELS[notif.type] || 'Thông báo')}
                       </div>
                       <div className="notif-bell__item-message">
                         {humanizeNotificationMessage(notif.message, notif.metadata)}

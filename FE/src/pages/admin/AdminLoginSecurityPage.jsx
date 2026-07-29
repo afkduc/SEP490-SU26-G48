@@ -48,9 +48,10 @@ function resolveTab(rawTab) {
 
 /**
  * Luồng gọn:
- * 1. Tab Thiết bị — panel cảnh báo + danh sách thiết bị
- * 2. «Xem phiên» → thẳng tab Lịch sử (lọc sẵn), không qua popup
- * 3. Bảng «các lần cùng loại» chỉ hiện khi ≥ 2 lần
+ * 1. Tab Thiết bị — panel cảnh báo (banner) + danh sách thiết bị
+ * 2. «Xem phiên» → thẳng tab Lịch sử (lọc sẵn), highlight phiên mới nhất
+ * 3. «Xử lý trên tab Thiết bị» → thu gọn cảnh báo về banner
+ * 4. Bảng «các lần cùng loại» chỉ hiện khi ≥ 2 lần
  */
 export default function AdminLoginSecurityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -80,6 +81,8 @@ export default function AdminLoginSecurityPage() {
     search: '',
     focusIp: '',
     focusLoginTime: '',
+    // '' = mọi thiết bị của user; 'true' = chỉ đang Hiện tại
+    isCurrent: '',
   });
 
   useEffect(() => {
@@ -92,6 +95,47 @@ export default function AdminLoginSecurityPage() {
     }, { replace: true });
     setAlertsExpanded(true);
   }, [searchParams, setSearchParams]);
+
+  // Deep-link từ chuông thông báo: ?userId=&search=&ip=&tab=devices|sessions
+  useEffect(() => {
+    const userId = searchParams.get('userId');
+    const search = searchParams.get('search');
+    const ip = searchParams.get('ip');
+    if (!userId && !search && !ip) return;
+
+    const tab = resolveTab(searchParams.get('tab'));
+    if (tab === 'sessions') {
+      setSessionSeed((prev) => ({
+        ...prev,
+        key: prev.key + 1,
+        userName: search || '',
+        ipAddress: ip || '',
+        focusIp: ip || '',
+        actionType: 'LOGIN',
+        preferLatest: true,
+        context: [search, ip].filter(Boolean).join(' · '),
+      }));
+    } else {
+      setDeviceSeed((prev) => ({
+        ...prev,
+        key: prev.key + 1,
+        userId: userId ? Number(userId) || userId : null,
+        search: search || '',
+        focusIp: ip || '',
+        isCurrent: '',
+      }));
+    }
+
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('userId');
+      next.delete('search');
+      next.delete('ip');
+      return next;
+    }, { replace: true });
+  // Chi chay khi mount / khi query deep-link doi
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('userId'), searchParams.get('search'), searchParams.get('ip'), searchParams.get('tab')]);
 
   const setActiveTab = useCallback((tab) => {
     setSearchParams((prev) => {
@@ -169,21 +213,29 @@ export default function AdminLoginSecurityPage() {
     }));
   }, []);
 
-  /** Từ cảnh báo / phiên → tab Thiết bị để force logout. */
+  /** Từ cảnh báo / phiên → tab Thiết bị để force logout / tin cậy. */
   const handleOpenDevicesToProcess = useCallback((opts = {}) => {
     const alert = opts.alert || sessionSeed.alert;
     const userId = opts.userId || alert?.userId || null;
     const userName = opts.userName || alert?.userName || alert?.displayName || '';
+    const rule = alert?.ruleKey || '';
+    // session_takeover: ưu tiên máy đang Hiện tại để đăng xuất.
+    // new_device_ip / còn lại: xem mọi thiết bị của user (máy mới có thể đã không còn is_current).
+    const isCurrent = opts.isCurrent != null
+      ? opts.isCurrent
+      : (rule === 'session_takeover' ? 'true' : '');
     setDeviceSeed((prev) => ({
       key: prev.key + 1,
       userId: userId ? Number(userId) : null,
       search: userId ? '' : (userName || ''),
       focusIp: opts.ipAddress || sessionSeed.focusIp || sessionSeed.ipAddress || '',
       focusLoginTime: opts.loginTime || sessionSeed.focusLoginTime || '',
+      isCurrent,
     }));
-    // Không thu gọn panel cảnh báo — tránh thêm nhảy layout
+    // Thu gọn cảnh báo về banner — ưu tiên bảng thiết bị khi đang xử lý
+    handleAlertsExpanded(false);
     setActiveTab('devices');
-  }, [sessionSeed, setActiveTab]);
+  }, [sessionSeed, setActiveTab, handleAlertsExpanded]);
 
   return (
     <div className="admin-page admin-hub">
@@ -234,7 +286,7 @@ export default function AdminLoginSecurityPage() {
                 seedSearch={deviceSeed.search}
                 seedFocusIp={deviceSeed.focusIp}
                 seedFocusLoginTime={deviceSeed.focusLoginTime}
-                seedIsCurrent="true"
+                seedIsCurrent={deviceSeed.isCurrent}
               />
             </div>
           </div>

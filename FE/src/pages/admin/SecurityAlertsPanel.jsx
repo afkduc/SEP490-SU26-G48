@@ -390,7 +390,7 @@ export default function SecurityAlertsPanel({
 
           <p className="sec-panel__hint">
             <strong>Đã xem</strong> đánh dấu xử lý.
-            <strong> Xem phiên</strong> mở tab Lịch sử đã lọc theo cảnh báo.
+            <strong> Xem phiên</strong> mở tab Lịch sử (lọc theo cảnh báo, highlight phiên mới nhất).
             Đăng xuất thiết bị ở bảng bên dưới.
           </p>
         </div>
