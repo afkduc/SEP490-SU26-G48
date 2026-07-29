@@ -3,7 +3,6 @@ import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useAuth } from '../../contexts/AppContext';
-import UserDetailDrawer from './users/UserDetailDrawer';
 import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import { formatDateSafe } from '../../utils/dateUtils';
@@ -237,7 +236,7 @@ function TableSkeleton({ rows }) {
 
 // ─── Session Table ─────────────────────────────────────────────────
 
-function SessionTable({ items, onViewUser, onViewSession }) {
+function SessionTable({ items, onViewSession, focusedSessionId = null }) {
   useDurationTicker(30000);
 
   const head = (
@@ -274,7 +273,11 @@ function SessionTable({ items, onViewUser, onViewSession }) {
       {head}
       <tbody>
         {items.map((item) => (
-          <tr key={item.id}>
+          <tr
+            key={item.id}
+            id={`admin-session-row-${item.id}`}
+            className={Number(focusedSessionId) === Number(item.id) ? 'admin-sessions__row--focused' : ''}
+          >
             <td>
               <span className="admin-sessions__date">{formatDate(item.login_time)}</span>
             </td>
@@ -325,19 +328,6 @@ function SessionTable({ items, onViewUser, onViewSession }) {
                   </svg>
                   <span className="admin-sessions__action-label">Chi tiết</span>
                 </button>
-                {item.user_id && onViewUser && (
-                  <button
-                    type="button"
-                    className="admin-sessions__action-btn"
-                    onClick={() => onViewUser(item.user_id)}
-                    title="Xem người dùng"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                      <circle cx="12" cy="7" r="4"/>
-                    </svg>
-                  </button>
-                )}
               </div>
             </td>
           </tr>
@@ -356,7 +346,12 @@ export default function AdminLoginSessionsPage({
   seedStartDate = '',
   seedEndDate = '',
   seedActionType = '',
+  seedSessionId = null,
+  seedFocusSessionId = null,
+  seedFocusIp = '',
+  seedFocusLoginTime = '',
   seedKey = 0,
+  onOpenDevicesToProcess,
 } = {}) {
   const sessions = useLoginSessions(
     seedKey
@@ -366,20 +361,35 @@ export default function AdminLoginSessionsPage({
           startDate: seedStartDate || '',
           endDate: seedEndDate || '',
           actionType: seedActionType || '',
+          sessionId: seedSessionId || undefined,
+          pageSize: seedSessionId ? 20 : 10,
         }
       : {}
   );
   const { branches, branchesError } = useSharedBranches();
   const { token } = useAuth();
-  const [detailUserId, setDetailUserId] = useState(null);
   const [detailSession, setDetailSession] = useState(null);
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
+  const [focusedSessionId, setFocusedSessionId] = useState(null);
+  const focusScrollPendingRef = useRef(false);
+  const focusPayloadRef = useRef({
+    sessionId: null,
+    ip: '',
+    loginTime: '',
+  });
 
   // Seed từ panel cảnh báo ("Lịch sử") — khi đổi cảnh báo trong lúc tab đang mở
   useEffect(() => {
     if (!seedKey) return;
+    focusPayloadRef.current = {
+      sessionId: seedFocusSessionId || seedSessionId || null,
+      ip: seedFocusIp || '',
+      loginTime: seedFocusLoginTime || '',
+    };
+    focusScrollPendingRef.current = true;
+    setFocusedSessionId(null);
     sessions.setParams(() => ({
       userName: seedUserName || '',
       phone: '',
@@ -389,11 +399,77 @@ export default function AdminLoginSessionsPage({
       endDate: seedEndDate || '',
       branchId: undefined,
       ipAddress: seedIpAddress || '',
+      sessionId: seedSessionId || undefined,
       page: 1,
-      pageSize: 10,
+      pageSize: seedSessionId ? 20 : 10,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey]);
+
+  function pickFocusSession(list, { sessionId, ip, loginTime }) {
+    if (!Array.isArray(list) || list.length === 0) return null;
+    if (sessionId != null && Number.isFinite(Number(sessionId))) {
+      const byId = list.find((s) => Number(s.id) === Number(sessionId));
+      if (byId) return byId;
+    }
+
+    const ipNorm = String(ip || '').trim();
+    const candidates = ipNorm
+      ? list.filter((s) => String(s.ip_address || '').trim() === ipNorm)
+      : list;
+    if (candidates.length === 0) return null;
+
+    const anchorMs = loginTime ? new Date(loginTime).getTime() : NaN;
+    if (!Number.isNaN(anchorMs)) {
+      let best = null;
+      let bestDiff = Infinity;
+      for (const s of candidates) {
+        const t = s.login_time ? new Date(s.login_time).getTime() : NaN;
+        if (Number.isNaN(t)) continue;
+        const diff = Math.abs(t - anchorMs);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          best = s;
+        }
+      }
+      return best;
+    }
+
+    return candidates[0];
+  }
+
+  // Sau khi seed + list load xong: highlight + scroll tới phiên liên quan (không mở drawer)
+  useEffect(() => {
+    if (!focusScrollPendingRef.current) return;
+    if (sessions.loading) return;
+
+    const payload = focusPayloadRef.current;
+    const hasFocus = payload.sessionId != null
+      || String(payload.ip || '').trim()
+      || String(payload.loginTime || '').trim();
+    if (!hasFocus) {
+      setFocusedSessionId(null);
+      focusScrollPendingRef.current = false;
+      return;
+    }
+
+    const match = pickFocusSession(sessions.data?.items || [], payload);
+    if (!match) {
+      setFocusedSessionId(null);
+      focusScrollPendingRef.current = false;
+      return;
+    }
+
+    setFocusedSessionId(match.id);
+    // Không tự mở drawer chi tiết phiên — chỉ highlight + scroll trên bảng lịch sử
+    requestAnimationFrame(() => {
+      document.getElementById(`admin-session-row-${match.id}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    });
+    focusScrollPendingRef.current = false;
+  }, [sessions.data?.items, sessions.loading]);
 
   // Debounce refetch SSE - gom nhieu event thanh 1 lan refetch
   // (tranh nhap nhay khi user click nhieu action cung luc)
@@ -528,6 +604,7 @@ export default function AdminLoginSessionsPage({
     sessions.params.actionType || sessions.params.status ||
     sessions.params.startDate || sessions.params.endDate ||
     sessions.params.ipAddress ||
+    sessions.params.sessionId ||
     (sessions.params.branchId != null);
 
   function resetFilters() {
@@ -540,9 +617,11 @@ export default function AdminLoginSessionsPage({
       endDate: '',
       branchId: undefined,
       ipAddress: '',
+      sessionId: undefined,
       page: 1,
       pageSize: 10,
     }));
+    setFocusedSessionId(null);
   }
 
   const headerActions = (
@@ -754,8 +833,8 @@ export default function AdminLoginSessionsPage({
             <div className="admin-sessions__table-wrapper">
               <SessionTable
                 items={sessions.data.items}
-                onViewUser={setDetailUserId}
                 onViewSession={setDetailSession}
+                focusedSessionId={focusedSessionId}
               />
             </div>
             <Pagination
@@ -769,19 +848,23 @@ export default function AdminLoginSessionsPage({
         )}
       </div>
 
-      {/* User detail drawer */}
-      {detailUserId && (
-        <UserDetailDrawer
-          userId={detailUserId}
-          onClose={() => setDetailUserId(null)}
-        />
-      )}
-
-      {/* Session detail drawer */}
       {detailSession && (
         <SessionDetailDrawer
           session={detailSession}
           onClose={() => setDetailSession(null)}
+          onOpenDevicesToProcess={
+            typeof onOpenDevicesToProcess === 'function'
+              ? () => {
+                  onOpenDevicesToProcess({
+                    userId: detailSession.user_id,
+                    userName: detailSession.user_name,
+                    ipAddress: detailSession.ip_address,
+                    loginTime: detailSession.login_time,
+                  });
+                  setDetailSession(null);
+                }
+              : undefined
+          }
         />
       )}
     </div>

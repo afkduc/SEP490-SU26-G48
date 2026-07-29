@@ -6,8 +6,11 @@ const PasswordResetService = require('../../application/services/PasswordResetSe
 const AuthRepositoryImpl = require('../../infrastructure/repositories/AuthRepositoryImpl');
 const NotificationService = require('../../application/services/NotificationService');
 const LoginAttemptGuard = require('../../application/services/LoginAttemptGuard');
+const AuthService = require('../../application/services/AuthService');
 const { auditCrud } = require('../../utils/auditHelper');
 const ApiError = require('../../utils/ApiError');
+
+const withLoginLock = AuthService.withLoginLock;
 
 class AuthController {
   constructor(authService) {
@@ -62,29 +65,68 @@ class AuthController {
       const ua = req.headers['user-agent'] || '';
       const { browser, os } = parseUserAgent(ua);
 
-      const { user } = await this.authService.login(identifier, password, branchId, {
-        force: Boolean(force),
-        pendingId: pendingId || null,
-        clientMeta: { ip, userAgent: ua, browser, os },
+      // Serialize toàn bộ login + trackLogin theo tài khoản — người thứ 2 vào được,
+      // người thứ 1 bị thay phiên (không đua is_current / token_version).
+      const payload = await withLoginLock(identifier, async () => {
+        const { user, replacedLive, clientMeta } = await this.authService.login(
+          identifier,
+          password,
+          branchId,
+          {
+            force: Boolean(force),
+            pendingId: pendingId || null,
+            clientMeta: { ip, userAgent: ua, browser, os },
+          }
+        );
+
+        LoginAttemptGuard.clearFailures(identifier, ip);
+
+        const trackResult = await trackLogin(req, user);
+        const deviceId = trackResult?.deviceId || null;
+        const sessionId = trackResult?.sessionId || null;
+        user.sessionId = sessionId;
+
+        const result = await this.authService.issueTokenWithDevice(user, deviceId);
+
+        if (replacedLive) {
+          this.authService
+            .notifySessionTakenOver(user.id, {
+              ...(clientMeta || { ip, userAgent: ua, browser, os }),
+              newTokenVersion: user.token_version,
+              newSessionId: sessionId,
+            })
+            .catch(() => {});
+
+          // Cảnh báo bảo mật realtime: 2 thiết bị / thay phiên (không chờ cron)
+          try {
+            const { raiseSessionTakeoverAlert } = require('../../jobs/securityAlertJob');
+            raiseSessionTakeoverAlert({
+              userId: user.id,
+              userName: user.user_name || user.name || user.email,
+              ip,
+              browser,
+              os,
+              newSessionId: sessionId,
+            }).catch((e) =>
+              console.warn('[AuthController] raiseSessionTakeoverAlert:', e.message)
+            );
+          } catch (e) {
+            console.warn('[AuthController] securityAlertJob load failed:', e.message);
+          }
+        }
+
+        return result;
       });
 
-      LoginAttemptGuard.clearFailures(identifier, ip);
-
-      const trackResult = await trackLogin(req, user);
-      const deviceId = trackResult?.deviceId || null;
-      const sessionId = trackResult?.sessionId || null;
-      user.sessionId = sessionId;
-
-      const result = await this.authService.issueTokenWithDevice(user, deviceId);
       return success(
         res,
         {
-          token: result.token,
+          token: payload.token,
           user: {
-            ...result.user,
-            permissions: result.effectivePermissions || result.user.permissions,
+            ...payload.user,
+            permissions: payload.effectivePermissions || payload.user.permissions,
           },
-          effectivePermissions: result.effectivePermissions || [],
+          effectivePermissions: payload.effectivePermissions || [],
         },
         'Đăng nhập thành công'
       );
@@ -104,6 +146,21 @@ class AuthController {
             remainingMs: lock.remainingMs,
             suggestChangePassword: true,
           };
+        }
+        // Cảnh báo bảo mật realtime khi ≥5 lần sai (không chờ cron)
+        if (lock.failCount >= 5) {
+          try {
+            const { raiseFailedLoginBurstAlert } = require('../../jobs/securityAlertJob');
+            raiseFailedLoginBurstAlert({
+              ipAddress: ip,
+              count: lock.failCount,
+              identifier,
+            }).catch((e) =>
+              console.warn('[AuthController] raiseFailedLoginBurstAlert:', e.message)
+            );
+          } catch (e) {
+            console.warn('[AuthController] securityAlertJob load failed:', e.message);
+          }
         }
       }
 

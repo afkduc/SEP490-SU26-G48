@@ -28,6 +28,12 @@ class SpecialtyService {
     if (!specialtyName || !specialtyName.trim()) {
       throw new ApiError(400, 'specialtyName la bat buoc');
     }
+    if (specialtyCode.trim().length > 30) {
+      throw new ApiError(400, 'specialtyCode toi da 30 ky tu');
+    }
+    if (specialtyName.trim().length > 100) {
+      throw new ApiError(400, 'specialtyName toi da 100 ky tu');
+    }
 
     const existed = await this.specialtyRepository.findByCode(specialtyCode.trim());
     if (existed) {
@@ -92,8 +98,30 @@ class SpecialtyService {
   }
 
   async setUserSpecialties(userId, specialtyIds) {
-    await this.specialtyRepository.setUserSpecialties(Number(userId), specialtyIds);
-    return this.specialtyRepository.findByUserId(Number(userId));
+    const uid = Number(userId);
+    if (!Number.isInteger(uid) || uid <= 0) {
+      throw new ApiError(400, 'userId khong hop le');
+    }
+    if (!Array.isArray(specialtyIds)) {
+      throw new ApiError(400, 'specialtyIds phai la mang');
+    }
+    const ids = specialtyIds
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    if (ids.length !== specialtyIds.length) {
+      throw new ApiError(400, 'specialtyIds chua ID khong hop le');
+    }
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length > 0) {
+      const all = await this.specialtyRepository.findAll();
+      const valid = new Set(all.map((s) => Number(s.id)));
+      const invalid = uniqueIds.filter((id) => !valid.has(id));
+      if (invalid.length > 0) {
+        throw new ApiError(400, `Chuyen mon khong ton tai: ${invalid.join(', ')}`);
+      }
+    }
+    await this.specialtyRepository.setUserSpecialties(uid, uniqueIds);
+    return this.specialtyRepository.findByUserId(uid);
   }
 }
 

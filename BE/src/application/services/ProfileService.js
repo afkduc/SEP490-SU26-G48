@@ -20,19 +20,29 @@ class ProfileService {
   async updateProfile(userId, payload) {
     const errors = [];
 
-    if (payload.email !== undefined && payload.email !== null && payload.email !== '') {
-      if (!EMAIL_REGEX.test(payload.email)) {
+    if (payload.email !== undefined && payload.email !== null) {
+      const email = String(payload.email).trim();
+      if (!email) {
+        errors.push('Email là bắt buộc');
+      } else if (!EMAIL_REGEX.test(email)) {
         errors.push('Email không đúng định dạng');
-      }
-      const existing = await this.profileRepository.findByEmail(payload.email);
-      if (existing && Number(existing.id) !== Number(userId)) {
-        errors.push('Email đã được sử dụng bởi người khác');
+      } else {
+        const existing = await this.profileRepository.findByEmail(email);
+        if (existing && Number(existing.id) !== Number(userId)) {
+          errors.push('Email đã được sử dụng bởi người khác');
+        }
+        payload.email = email;
       }
     }
 
-    if (payload.phone !== undefined && payload.phone !== null && payload.phone !== '') {
-      if (!PHONE_REGEX.test(payload.phone)) {
+    if (payload.phone !== undefined && payload.phone !== null) {
+      const phone = String(payload.phone).trim();
+      if (!phone) {
+        errors.push('Số điện thoại là bắt buộc');
+      } else if (!PHONE_REGEX.test(phone)) {
         errors.push('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+      } else {
+        payload.phone = phone;
       }
     }
 
@@ -74,9 +84,7 @@ class ProfileService {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    // Khi user tu doi MK (force change), reset flag must_change_password = 0
-    // de lan dang nhap sau binh thuong (khong bi redirect ve trang doi MK)
-    await this.profileRepository.updatePassword(userId, passwordHash, false);
+    await this.profileRepository.updatePassword(userId, passwordHash);
 
     // Notify user about password change
     this._sendPasswordChangedNotification(userId);

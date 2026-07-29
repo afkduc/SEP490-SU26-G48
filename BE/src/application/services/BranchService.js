@@ -2,6 +2,22 @@ const ApiError = require('../../utils/ApiError');
 const BranchRepositoryImpl = require('../../infrastructure/repositories/BranchRepositoryImpl');
 const { auditCrud } = require('../../utils/auditHelper');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^0[0-9]{9,10}$/;
+
+function validateOptionalContact({ phone, email }) {
+  if (phone !== undefined && phone !== null && String(phone).trim()) {
+    if (!PHONE_REGEX.test(String(phone).trim())) {
+      throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
+    }
+  }
+  if (email !== undefined && email !== null && String(email).trim()) {
+    if (!EMAIL_REGEX.test(String(email).trim())) {
+      throw new ApiError(400, 'Email khong dung dinh dang');
+    }
+  }
+}
+
 class BranchService {
   constructor() {
     this.branchRepository = new BranchRepositoryImpl();
@@ -34,13 +50,18 @@ class BranchService {
   async create(payload, req = {}) {
     const { branchCode, branchName, address, phone, email, managerId } = payload;
 
-    if (!branchCode || !branchName) {
-      throw new ApiError(400, 'branchCode va branchName la bat buoc');
+    if (!branchCode || !String(branchCode).trim()) {
+      throw new ApiError(400, 'branchCode la bat buoc');
+    }
+    if (!branchName || !String(branchName).trim()) {
+      throw new ApiError(400, 'branchName la bat buoc');
     }
 
     if (branchCode.trim().length > 20) {
       throw new ApiError(400, 'branchCode toi da 20 ky tu');
     }
+
+    validateOptionalContact({ phone, email });
 
     const existed = await this.branchRepository.findByCode(branchCode.trim());
     if (existed) {
@@ -50,9 +71,9 @@ class BranchService {
     const id = await this.branchRepository.create({
       branchCode: branchCode.trim(),
       branchName: branchName.trim(),
-      address,
-      phone,
-      email,
+      address: address ? String(address).trim() : null,
+      phone: phone ? String(phone).trim() : null,
+      email: email ? String(email).trim() : null,
       managerId: managerId ? Number(managerId) : null,
     });
 
@@ -75,15 +96,17 @@ class BranchService {
 
     const { branchName, address, phone, email, managerId } = payload;
 
-    if (branchName !== undefined && !branchName.trim()) {
+    if (branchName !== undefined && !String(branchName).trim()) {
       throw new ApiError(400, 'branchName khong duoc rong');
     }
 
+    validateOptionalContact({ phone, email });
+
     const updated = await this.branchRepository.update(id, {
       branchName: branchName ? branchName.trim() : undefined,
-      address: address !== undefined ? (address ? address.trim() : null) : undefined,
-      phone: phone !== undefined ? (phone ? phone.trim() : null) : undefined,
-      email: email !== undefined ? (email ? email.trim() : null) : undefined,
+      address: address !== undefined ? (address ? String(address).trim() : null) : undefined,
+      phone: phone !== undefined ? (phone ? String(phone).trim() : null) : undefined,
+      email: email !== undefined ? (email ? String(email).trim() : null) : undefined,
       managerId: managerId !== undefined ? (managerId ? Number(managerId) : null) : undefined,
     });
 

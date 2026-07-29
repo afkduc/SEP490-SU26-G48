@@ -5,7 +5,7 @@ import {
   getRoleProfilePath,
   getRoleProfileEditPath,
 } from '../../contexts/AppContext';
-import { getMyProfile, updateMyProfile, changePassword } from '../../services/profileApi';
+import { getMyProfile, updateMyProfile, changePassword, logoutAllMyDevices } from '../../services/profileApi';
 import {
   syncProfileSession,
 } from '../../utils/profileSession';
@@ -14,7 +14,7 @@ import {
   isProfileNotificationsPath,
   isProfileEditPath,
 } from '../../utils/profilePaths';
-import { useAuthenticatedAvatarUrl } from '../../hooks/useAuthenticatedAvatarUrl';
+import { useToast } from '../../components/common/ToastContext';
 import './AdminProfilePage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -205,10 +205,12 @@ function PasswordInput({ label, id, value, onChange, placeholder, error }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AdminProfilePage({ embedded = false } = {}) {
-  const { user, setUser, reloadPermissions } = useAuth();
+  const { user, setUser, reloadPermissions, logout } = useAuth();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
 
   const profileBasePath = getRoleProfilePath(user);
   const profileEditPath = getRoleProfileEditPath(user);
@@ -218,8 +220,6 @@ export default function AdminProfilePage({ embedded = false } = {}) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
-
-  const forcedChange = searchParams.get('reason') === 'forced';
 
   // Redirect ve dung URL profile/edit theo role (khong de /dashboard/profile cho admin...)
   useEffect(() => {
@@ -271,10 +271,6 @@ export default function AdminProfilePage({ embedded = false } = {}) {
   const [pwErrors, setPwErrors] = useState({});
   const [pwLoading, setPwLoading] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(null);
-
-  // ─── Avatar display ─────────────────────────────────────────────────────
-  const [avatarImgBroken, setAvatarImgBroken] = useState(false);
-  const avatarDisplayUrl = useAuthenticatedAvatarUrl(profile?.avatar);
 
   // Load profile on mount
   useEffect(() => {
@@ -329,14 +325,35 @@ export default function AdminProfilePage({ embedded = false } = {}) {
     e.preventDefault();
     setEditError(null);
     setEditSuccess(null);
+
+    const phone = editForm.phone.trim();
+    const email = editForm.email.trim();
+    if (!email) {
+      setEditError('Email là bắt buộc');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEditError('Email không đúng định dạng');
+      return;
+    }
+    if (!phone) {
+      setEditError('Số điện thoại là bắt buộc');
+      return;
+    }
+    if (!/^0[0-9]{9,10}$/.test(phone)) {
+      setEditError('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+      return;
+    }
+
     setEditLoading(true);
 
     try {
-      const payload = {};
-      if (editForm.email.trim()) payload.email = editForm.email.trim();
+      const payload = {
+        email,
+        phone,
+      };
       if (editForm.firstName.trim()) payload.firstName = editForm.firstName.trim();
       if (editForm.lastName.trim()) payload.lastName = editForm.lastName.trim();
-      if (editForm.phone.trim()) payload.phone = editForm.phone.trim();
 
       const updated = await updateMyProfile(payload);
       setProfile(updated);
@@ -359,10 +376,6 @@ export default function AdminProfilePage({ embedded = false } = {}) {
       setEditLoading(false);
     }
   }
-
-  useEffect(() => {
-    setAvatarImgBroken(false);
-  }, [avatarDisplayUrl]);
 
   // Password form handlers
   function handlePwChange(e) {
@@ -412,6 +425,24 @@ export default function AdminProfilePage({ embedded = false } = {}) {
     ? getInitials(profile.firstName, profile.lastName)
     : '?';
 
+  async function handleLogoutAllDevices() {
+    const ok = window.confirm(
+      'Đăng xuất mọi thiết bị (kể cả máy này)? Bạn sẽ phải đăng nhập lại.'
+    );
+    if (!ok) return;
+
+    setLoggingOutAll(true);
+    try {
+      await logoutAllMyDevices();
+      toast.success('Đã đăng xuất mọi thiết bị');
+      await logout();
+    } catch (err) {
+      toast.error(err?.message || 'Không thể đăng xuất mọi thiết bị');
+    } finally {
+      setLoggingOutAll(false);
+    }
+  }
+
   return (
     <div className={`admin-profile${embedded ? ' admin-profile--embedded' : ''}`}>
       {!embedded && (
@@ -440,22 +471,12 @@ export default function AdminProfilePage({ embedded = false } = {}) {
         <AlertBanner type="error" message={loadError} />
       )}
 
-      {/* ── Profile layout ──────────────────────────────────────── */}
       {!loading && !loadError && profile && (
         <div className="admin-profile__layout">
           {/* ── Left: avatar card ──────────────────────────────── */}
           <div className="profile-card profile-card--left">
             <div className="profile-avatar-wrap">
-              {avatarDisplayUrl && !avatarImgBroken ? (
-                <img
-                  className="profile-avatar profile-avatar--img"
-                  src={avatarDisplayUrl}
-                  alt="Avatar"
-                  onError={() => setAvatarImgBroken(true)}
-                />
-              ) : (
-                <div className="profile-avatar">{initials}</div>
-              )}
+              <div className="profile-avatar">{initials}</div>
               <div className="profile-avatar__badge">
                 <IconShield />
               </div>
@@ -529,6 +550,14 @@ export default function AdminProfilePage({ embedded = false } = {}) {
             >
               <IconEdit />
               Chỉnh sửa hồ sơ
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary profile-card__logout-all-btn"
+              disabled={loggingOutAll}
+              onClick={handleLogoutAllDevices}
+            >
+              {loggingOutAll ? 'Đang xử lý...' : 'Đăng xuất mọi thiết bị'}
             </button>
           </div>
 
@@ -620,47 +649,6 @@ export default function AdminProfilePage({ embedded = false } = {}) {
                     </span>
                   </div>
                 </div>
-
-                {/* ── Section: Danh sách chi nhánh ────────────── */}
-                <div className="profile-branches">
-                  <div className="profile-branches__header">
-                    <IconBranch size={16} />
-                    <h3>Chi nhánh được phân công</h3>
-                    <span className="profile-branches__count">
-                      {profile.assignedBranches?.length || 0}
-                    </span>
-                  </div>
-
-                  {profile.assignedBranches?.length > 0 ? (
-                    <div className="profile-branches__grid">
-                      {profile.assignedBranches.map((b) => {
-                        const isPrimary = Number(b.branchId) === Number(profile.branchId);
-                        return (
-                          <div
-                            key={b.branchId}
-                            className={`branch-card ${isPrimary ? 'branch-card--primary' : ''}`}
-                          >
-                            <div className="branch-card__icon">
-                              <IconBranch size={18} />
-                            </div>
-                            <div className="branch-card__body">
-                              <div className="branch-card__name">{b.branchName}</div>
-                              <div className="branch-card__id">Mã CN: #{b.branchId}</div>
-                            </div>
-                            {isPrimary && (
-                              <span className="branch-card__badge">Chính</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="profile-branches__empty">
-                      <IconBranch size={20} />
-                      <span>Bạn chưa được phân công vào chi nhánh nào.</span>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
@@ -722,7 +710,7 @@ export default function AdminProfilePage({ embedded = false } = {}) {
                   <div className="form-group">
                     <label className="form-label" htmlFor="phone">
                       <span className="form-label__icon" aria-hidden="true"><IconPhone /></span>
-                      Số điện thoại
+                      Số điện thoại <span className="required">*</span>
                     </label>
                     <input
                       id="phone"
@@ -732,6 +720,9 @@ export default function AdminProfilePage({ embedded = false } = {}) {
                       value={editForm.phone}
                       onChange={handleEditChange}
                       placeholder="0xxxxxxxxx"
+                      required
+                      inputMode="numeric"
+                      maxLength={11}
                     />
                   </div>
 
@@ -773,12 +764,6 @@ export default function AdminProfilePage({ embedded = false } = {}) {
             {/* ── Tab: Password ───────────────────────────── */}
             {activeTab === 'password' && (
               <div className="profile-tab-content">
-                {forcedChange && !pwSuccess && (
-                  <AlertBanner
-                    type="error"
-                    message="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống. Mật khẩu hiện tại là mật khẩu tạm do quản trị viên cấp."
-                  />
-                )}
                 {pwErrors.global && (
                   <AlertBanner type="error" message={pwErrors.global} onClose={() => setPwErrors({})} />
                 )}

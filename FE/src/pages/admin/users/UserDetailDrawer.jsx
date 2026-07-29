@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { adminUsersApi, adminSpecialtiesApi } from '../../../services/adminApi';
 import { useToast } from '../../../components/common/ToastContext';
 import '../components/AdminDrawer.css';
@@ -149,9 +148,6 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                   @{user.name}
                   {user.phone ? ` · ${user.phone}` : ''}
                 </p>
-                {user.mustChangePassword && (
-                  <span className="badge badge--danger" style={{ marginTop: 8 }}>Phải đổi mật khẩu</span>
-                )}
                 {user.roles?.length > 0 && (
                   <div className="user-info-card__roles">
                     {user.roles.map((r) => {
@@ -176,11 +172,6 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                     label="Trạng thái"
                     value={STATUS_LABELS[user.status] || user.status}
                     badge={STATUS_CLASS[user.status] || ''}
-                  />
-                  <DetailRow
-                    label="Đổi MK bắt buộc"
-                    value={user.mustChangePassword ? 'Có' : 'Không'}
-                    badge={user.mustChangePassword ? 'badge--danger' : 'badge--success'}
                   />
                 </div>
 
@@ -270,19 +261,6 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
               </dl>
             </>
           ) : null}
-        </div>
-
-        <div className="drawer__footer" style={{ flexWrap: 'wrap', gap: 8 }}>
-          {user?.name && (
-            <Link
-              className="drawer__btn-secondary"
-              to={`/admin/logs?userName=${encodeURIComponent(user.name)}`}
-              onClick={() => onClose?.()}
-              title="Mở nhật ký hoạt động đã lọc theo user này"
-            >
-              Xem nhật ký
-            </Link>
-          )}
         </div>
       </div>
     </div>

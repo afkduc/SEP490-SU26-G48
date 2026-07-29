@@ -14,8 +14,7 @@ function toUserDto(user, roles, permissionKeys = []) {
     primaryRole: roles[0]?.role_name || null,
     primaryRoleLabel: roles[0]?.role_label || null,
     permissions: permissionKeys,
-    mustChangePassword: Boolean(user.must_change_password),
-    tokenVersion: user.token_version || 1,
+    tokenVersion: user.token_version ?? 1,
   };
 }
 

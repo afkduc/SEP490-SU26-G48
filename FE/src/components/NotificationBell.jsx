@@ -4,6 +4,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { formatDateSafe } from '../utils/dateUtils';
 import { humanizeNotificationMessage } from '../utils/notificationDisplay';
 import { dispatchLoginChallenge } from '../services/authApi';
+import { dispatchSessionTakenOverPrompt } from './SessionTakenOverPrompt';
 import './NotificationBell.css';
 
 const ICON_COLORS = {
@@ -19,9 +20,9 @@ const ICON_COLORS = {
   SECURITY_NEW_ADMIN_ROLE: '#dc2626',
   SECURITY_INACTIVE_ADMIN: '#f59e0b',
   SECURITY_NEW_DEVICE_IP: '#3b82f6',
+  SECURITY_SESSION_TAKEOVER: '#dc2626',
 };
 
-// Màu theo severity — phủ định danh sách cố định + fallback
 const SEVERITY_COLORS = {
   success:  '#10b981',
   info:     '#3b82f6',
@@ -43,6 +44,7 @@ const ICON_LABELS = {
   SECURITY_NEW_ADMIN_ROLE: 'Admin mới',
   SECURITY_INACTIVE_ADMIN: 'Admin idle',
   SECURITY_NEW_DEVICE_IP: 'IP mới',
+  SECURITY_SESSION_TAKEOVER: 'Thiết bị khác',
   USER_CREATED: 'Tạo người dùng',
   USER_UPDATED: 'Cập nhật người dùng',
   USER_DISABLED: 'Vô hiệu hóa người dùng',
@@ -72,17 +74,87 @@ const ICON_LABELS = {
   SPECIALTY_DELETED: 'Xóa chuyên môn',
 };
 
+/** Icon SVG theo loại — không dùng chữ cái (tránh nhầm là avatar người B/T…). */
+function NotifTypeIcon({ type }) {
+  const common = {
+    width: 14,
+    height: 14,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: '2.2',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': true,
+  };
+  if (type === 'LOGIN_FAILED' || type === 'SECURITY_FAILED_LOGIN_BURST') {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+      </svg>
+    );
+  }
+  if (type === 'SESSION_TAKEN_OVER' || type === 'SECURITY_SESSION_TAKEOVER' || type === 'FORCE_LOGOUT' || type === 'FORCE_LOGO') {
+    return (
+      <svg {...common}>
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+    );
+  }
+  if (type === 'NEW_DEVICE' || type === 'SECURITY_NEW_DEVICE_IP') {
+    return (
+      <svg {...common}>
+        <rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" />
+      </svg>
+    );
+  }
+  if (type === 'LOGIN_SUCCESS') {
+    return (
+      <svg {...common}>
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" />
+      </svg>
+    );
+  }
+  if (type === 'PASSWORD_CHANGED' || type === 'USER_PASSWORD_RESET') {
+    return (
+      <svg {...common}>
+        <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </svg>
+    );
+  }
+  if (type === 'ROLE_CHANGED' || type === 'SECURITY_NEW_ADMIN_ROLE' || String(type || '').startsWith('ROLE_')) {
+    return (
+      <svg {...common}>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    );
+  }
+  if (String(type || '').startsWith('SECURITY_') || type === 'SECURITY_ALERT') {
+    return (
+      <svg {...common}>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    );
+  }
+  // CRUD / mặc định: chuông nhỏ
+  return (
+    <svg {...common}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
 function getIcon(notif) {
-  // Ưu tiên: severity → type (legacy)
   const color = SEVERITY_COLORS[notif.severity] || ICON_COLORS[notif.type] || '#64748b';
-  const label = ICON_LABELS[notif.type] || (notif.title ? notif.title.charAt(0) : '?');
   return (
     <span
       className="notif-bell__item-icon"
       style={{ background: color }}
       aria-hidden
+      title={ICON_LABELS[notif.type] || notif.title || 'Thông báo'}
     >
-      {label.charAt(0)}
+      <NotifTypeIcon type={notif.type} />
     </span>
   );
 }
@@ -150,6 +222,25 @@ export default function NotificationBell() {
         });
         setOpen(false);
       }
+      return;
+    }
+
+    // Thông báo thay phiên → popup Đổi mật khẩu / Lúc khác (mọi role)
+    if (
+      notif.type === 'SESSION_TAKEN_OVER'
+      || metadata?.eventType === 'SESSION_TAKEN_OVER'
+    ) {
+      dispatchSessionTakenOverPrompt({
+        title: notif.title,
+        message: notif.message,
+        metadata: metadata || {},
+        ip: metadata?.ip || metadata?.ipAddress || metadata?.location,
+        browser: metadata?.browser,
+        os: metadata?.os,
+        device: [metadata?.browser, metadata?.os].filter(Boolean).join(' · ') || undefined,
+        createdAt: notif.createdAt || notif.timestamp || metadata?.timestamp,
+      });
+      setOpen(false);
     }
   }, [markRead]);
 

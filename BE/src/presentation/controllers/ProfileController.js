@@ -21,6 +21,9 @@ class ProfileController {
     this.markAllNotificationsRead = this.markAllNotificationsRead.bind(this);
     this.getUnreadCount = this.getUnreadCount.bind(this);
     this.getMyAvatar = this.getMyAvatar.bind(this);
+    this.listMyDevices = this.listMyDevices.bind(this);
+    this.setMyDeviceTrusted = this.setMyDeviceTrusted.bind(this);
+    this.logoutAllMyDevices = this.logoutAllMyDevices.bind(this);
   }
 
   /**
@@ -168,6 +171,59 @@ class ProfileController {
       }
 
       return res.sendFile(filePath);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /profile/me/devices — thiết bị của chính mình
+  async listMyDevices(req, res, next) {
+    try {
+      const DeviceService = require('../../application/services/DeviceService');
+      const devices = await new DeviceService().listByUser(req.user.userId);
+      const currentDeviceId = req.user.deviceId != null ? Number(req.user.deviceId) : null;
+      const items = (devices || []).map((d) => ({
+        ...d,
+        isThisDevice: currentDeviceId != null && Number(d.id) === currentDeviceId,
+      }));
+      return success(res, { items, total: items.length, currentDeviceId }, 'Danh sách thiết bị của bạn');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // PATCH /profile/me/devices/:deviceId/trust — đánh dấu / bỏ tin cậy
+  async setMyDeviceTrusted(req, res, next) {
+    try {
+      const DeviceService = require('../../application/services/DeviceService');
+      const trusted = req.body?.trusted === true || req.body?.trusted === 1 || req.body?.trusted === 'true';
+      const device = await new DeviceService().setTrustedForOwner(
+        req.user.userId,
+        req.params.deviceId,
+        trusted
+      );
+      return success(
+        res,
+        device,
+        trusted ? 'Đã đánh dấu thiết bị tin cậy' : 'Đã bỏ tin cậy thiết bị'
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // DELETE /profile/me/devices/all — đăng xuất mọi thiết bị của chính mình
+  async logoutAllMyDevices(req, res, next) {
+    try {
+      const DeviceService = require('../../application/services/DeviceService');
+      const result = await new DeviceService().forceLogoutAllDevices(req.user.userId);
+      return success(
+        res,
+        result,
+        result?.revoked > 0
+          ? 'Đã đăng xuất mọi thiết bị. Vui lòng đăng nhập lại.'
+          : (result?.message || 'Không có thiết bị nào đang hoạt động')
+      );
     } catch (err) {
       next(err);
     }

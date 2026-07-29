@@ -4,6 +4,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import RoleAwareRedirect from '../components/RoleAwareRedirect';
 import ProfileRedirect from '../components/ProfileRedirect';
 import SessionExpiredModal from '../components/SessionExpiredModal';
+import SessionTakenOverPrompt from '../components/SessionTakenOverPrompt';
 import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
@@ -122,6 +123,7 @@ function AppRoutes() {
     <>
       <SharedDataProvider>
         <SessionExpiredModal />
+        <SessionTakenOverPrompt />
         <ForbiddenModal />
         <ErrorHandler />
         <Suspense fallback={<Loading />}>
@@ -172,8 +174,6 @@ function AppRoutes() {
           <Route path="branches" element={<Navigate to="/admin/catalog" replace />} />
           <Route path="specialties" element={<Navigate to="/admin/catalog?tab=specialties" replace />} />
           <Route path="vehicle-brands" element={<Navigate to="/admin/catalog?tab=brands" replace />} />
-          <Route path="settings" element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="broadcasts" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="login-security" element={<AdminLoginSecurityPage />} />
           <Route path="security-alerts" element={<Navigate to="/admin/login-security?alerts=1" replace />} />
           <Route path="login-sessions" element={<Navigate to="/admin/login-security?tab=sessions" replace />} />
