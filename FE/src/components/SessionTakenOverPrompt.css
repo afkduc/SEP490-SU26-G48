@@ -149,6 +149,16 @@
   background: #1d4ed8;
 }
 
+.sto-prompt__btn--secondary {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.sto-prompt__btn--secondary:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
 .sto-prompt__btn--ghost {
   background: #fff;
   color: #0f172a;

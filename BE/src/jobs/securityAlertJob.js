@@ -422,8 +422,8 @@ async function checkNewDeviceIp() {
     for (const row of result.recordset) {
       await insertAlert({
         severity: 'info',
-        title: 'Đăng nhập từ IP mới',
-        message: `User "${row.user_name}" đăng nhập từ IP mới ${row.ip_address}.`,
+        title: 'Đăng nhập từ thiết bị mới',
+        message: `User "${row.user_name}" đăng nhập từ thiết bị mới (IP ${row.ip_address}).`,
         userId: row.user_id,
         branchId: null,
         ruleKey: RULE_KEYS.NEW_DEVICE_IP,

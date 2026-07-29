@@ -1,8 +1,8 @@
 /**
- * Helpers: map security alert → filter seed cho tab Lịch sử.
+ * Helpers: map security alert → filter seed cho tab Lịch sử / Thiết bị.
  *
- * Mục tiêu: admin bấm từ cảnh báo phải nhảy tới đúng phiên đăng nhập
- * tại thời điểm cảnh báo (IP / sessionId / khoảng ngày).
+ * Quy ước: luôn hướng tới bản ghi MỚI NHẤT trong tập lọc (user / IP),
+ * không ghim theo sessionId cũ trong metadata cảnh báo.
  */
 
 export function parseAlertMeta(metadata) {
@@ -15,28 +15,12 @@ export function parseAlertMeta(metadata) {
   }
 }
 
-function toYmd(value) {
-  if (!value) return '';
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function addDays(value, days) {
-  const d = value instanceof Date ? new Date(value.getTime()) : new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
 const RULE_LABEL = {
   failed_login_burst: 'Đăng nhập sai liên tiếp',
   new_admin_role: 'Gán quyền Admin',
   inactive_admin: 'Admin không hoạt động',
   session_takeover: 'Đăng nhập trên thiết bị khác',
+  new_device_ip: 'Đăng nhập từ thiết bị mới',
 };
 
 /**
@@ -55,11 +39,8 @@ export function describeAlertFocus(alert) {
 }
 
 /**
- * Seed lọc lịch sử đăng nhập từ 1 cảnh báo + id phiên để highlight.
- *
- * - new_device_ip: user + IP + ngày quanh loginTime, focus theo sessionId nếu có
- * - failed_login_burst: IP + LOGIN_FAILED quanh thời điểm cảnh báo
- * - còn lại: lịch sử theo user (không cắt ngày)
+ * Seed lọc lịch sử đăng nhập từ 1 cảnh báo.
+ * Highlight luôn chọn phiên mới nhất trong kết quả lọc (xem pickFocusSession).
  */
 export function buildSessionSeedFromAlert(alert) {
   if (!alert) return null;
@@ -67,86 +48,117 @@ export function buildSessionSeedFromAlert(alert) {
   const ip = String(meta.ipAddress || meta.ip || '').trim();
   const userName = String(alert.userName || meta.userName || '').trim();
   const rule = alert.ruleKey || '';
-  const createdAt = alert.createdAt ? new Date(alert.createdAt) : new Date();
-  const sessionId = meta.sessionId != null && meta.sessionId !== ''
-    ? Number(meta.sessionId)
-    : null;
-  const loginTime = meta.loginTime ? String(meta.loginTime) : '';
+  const context = describeAlertFocus(alert);
 
-  // Có sessionId → ưu tiên đúng 1 phiên; vẫn giữ user/IP để modal fallback nếu id lệch
-  if (Number.isFinite(sessionId) && sessionId > 0) {
+  // Không ghim sessionId cũ — để UI chọn phiên mới nhất sau khi lọc.
+  const base = {
+    sessionId: null,
+    focusSessionId: null,
+    focusIp: ip,
+    focusLoginTime: '',
+    preferLatest: true,
+    context,
+  };
+
+  if (rule === 'session_takeover') {
     return {
-      userName: rule === 'session_takeover' ? userName : '',
+      ...base,
+      userName,
       ipAddress: '',
       startDate: '',
       endDate: '',
-      actionType: '',
-      sessionId,
-      focusSessionId: sessionId,
-      focusIp: ip,
-      focusLoginTime: loginTime || (alert.createdAt ? String(alert.createdAt) : ''),
-      context: describeAlertFocus(alert),
-    };
-  }
-
-  if (rule === 'session_takeover') {
-    const anchor = createdAt;
-    return {
-      userName,
-      ipAddress: ip,
-      startDate: toYmd(addDays(anchor, -1)),
-      endDate: toYmd(addDays(anchor, 1)),
       actionType: 'LOGIN',
-      sessionId: null,
-      focusSessionId: null,
-      focusIp: ip,
-      focusLoginTime: alert.createdAt ? String(alert.createdAt) : '',
-      context: describeAlertFocus(alert),
     };
   }
 
   if (rule === 'failed_login_burst') {
-    const anchor = createdAt;
     return {
+      ...base,
       userName: '',
       ipAddress: ip,
-      startDate: toYmd(addDays(anchor, -1)),
-      endDate: toYmd(addDays(anchor, 1)),
+      startDate: '',
+      endDate: '',
       actionType: 'LOGIN_FAILED',
-      sessionId: null,
-      focusSessionId: null,
-      focusIp: ip,
-      focusLoginTime: alert.createdAt ? String(alert.createdAt) : '',
-      context: describeAlertFocus(alert),
     };
   }
 
   if (rule === 'new_device_ip') {
-    const anchor = meta.loginTime ? new Date(meta.loginTime) : createdAt;
     return {
+      ...base,
       userName,
       ipAddress: ip,
-      startDate: toYmd(addDays(anchor, -1)),
-      endDate: toYmd(addDays(anchor, 1)),
+      startDate: '',
+      endDate: '',
       actionType: '',
-      sessionId: null,
-      focusSessionId: null,
-      focusIp: ip,
-      focusLoginTime: loginTime || (alert.createdAt ? String(alert.createdAt) : ''),
-      context: describeAlertFocus(alert),
     };
   }
 
   return {
+    ...base,
     userName,
     ipAddress: '',
     startDate: '',
     endDate: '',
     actionType: '',
-    sessionId: null,
-    focusSessionId: null,
-    focusIp: '',
-    focusLoginTime: '',
-    context: describeAlertFocus(alert),
   };
+}
+
+/**
+ * Chọn phiên mới nhất trong list (theo login_time, rồi id).
+ * Có IP thì ưu tiên trong tập cùng IP; không có thì cả list đã lọc.
+ */
+export function pickLatestSession(list, { ip = '' } = {}) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const ipNorm = String(ip || '').trim();
+  const candidates = ipNorm
+    ? list.filter((s) => String(s.ip_address || s.ipAddress || '').trim() === ipNorm)
+    : list;
+  const pool = candidates.length > 0 ? candidates : list;
+
+  let best = null;
+  let bestMs = -Infinity;
+  let bestId = -Infinity;
+  for (const s of pool) {
+    const t = s.login_time || s.loginTime || s.createdAt;
+    const ms = t ? new Date(t).getTime() : NaN;
+    const id = Number(s.id) || 0;
+    const score = Number.isNaN(ms) ? 0 : ms;
+    if (score > bestMs || (score === bestMs && id > bestId)) {
+      bestMs = score;
+      bestId = id;
+      best = s;
+    }
+  }
+  return best;
+}
+
+/**
+ * Chọn thiết bị mới nhất (lastLoginAt / lastActivityAt).
+ */
+export function pickLatestDevice(list, { ip = '' } = {}) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const ipNorm = String(ip || '').trim();
+  const candidates = ipNorm
+    ? list.filter((d) => String(d.ipAddress || d.ip_address || '').trim() === ipNorm)
+    : list;
+  const pool = candidates.length > 0 ? candidates : list;
+
+  const toMs = (v) => {
+    const t = v ? new Date(v).getTime() : NaN;
+    return Number.isNaN(t) ? 0 : t;
+  };
+
+  let best = null;
+  let bestMs = -Infinity;
+  let bestId = -Infinity;
+  for (const d of pool) {
+    const ms = Math.max(toMs(d.lastLoginAt), toMs(d.lastActivityAt), toMs(d.createdAt));
+    const id = Number(d.id) || 0;
+    if (ms > bestMs || (ms === bestMs && id > bestId)) {
+      bestMs = ms;
+      bestId = id;
+      best = d;
+    }
+  }
+  return best;
 }

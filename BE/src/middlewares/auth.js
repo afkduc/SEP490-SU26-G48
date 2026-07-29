@@ -92,6 +92,7 @@ async function authenticate(req, res, next) {
       tokenVersion: decoded.tokenVersion,
       sessionId: decoded.sessionId || null,
       deviceId: decoded.deviceId || null,
+      remember: Boolean(decoded.remember),
     };
     next();
   } catch {

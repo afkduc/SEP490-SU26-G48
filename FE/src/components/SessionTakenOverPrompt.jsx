@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { changePassword } from '../services/profileApi';
+import { useNavigate } from 'react-router-dom';
+import { changePassword, setMyDeviceTrusted } from '../services/profileApi';
 import { useToast } from './common/ToastContext';
 import './SessionTakenOverPrompt.css';
 
@@ -37,12 +38,13 @@ function formatWhen(value) {
 }
 
 /**
- * Popup kiểu Facebook khi user bấm thông báo SESSION_TAKEN_OVER:
- * — Text: tài khoản đang login ở nơi khác
- * — Đổi mật khẩu / Lúc khác
+ * Popup bảo mật khi bấm thông báo:
+ * — session_takeover: tài khoản login ở nơi khác → Đổi MK
+ * — new_device: thiết bị / IP mới → Đổi MK hoặc Xem thiết bị
  */
 export default function SessionTakenOverPrompt() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
   const [detail, setDetail] = useState(null);
   const [step, setStep] = useState('info'); // info | password
@@ -53,6 +55,7 @@ export default function SessionTakenOverPrompt() {
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [trusting, setTrusting] = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
@@ -71,6 +74,37 @@ export default function SessionTakenOverPrompt() {
     setVisible(false);
     setDetail(null);
     setStep('info');
+  }
+
+  function openDevices() {
+    const meta = parseMeta(detail?.metadata);
+    const params = new URLSearchParams();
+    const ip = detail?.ip || meta.ip || meta.ipAddress || meta.location;
+    if (ip) params.set('ip', String(ip));
+    const qs = params.toString();
+    close();
+    navigate(qs ? `/admin/login-security?${qs}` : '/admin/login-security');
+  }
+
+  async function handleTrustDevice() {
+    const meta = parseMeta(detail?.metadata);
+    const deviceId = meta.deviceId || detail?.deviceId || meta.device_id;
+    if (!deviceId) {
+      toast.info('Không xác định được thiết bị. Hãy mở danh sách thiết bị để đánh dấu tin cậy.');
+      if (detail?.canOpenDevices) openDevices();
+      else close();
+      return;
+    }
+    setTrusting(true);
+    try {
+      await setMyDeviceTrusted(deviceId, true);
+      toast.success('Đã tin cậy thiết bị này — lần sau login máy này sẽ không báo thiết bị lạ.');
+      close();
+    } catch (err) {
+      toast.error(err?.message || 'Không đánh dấu tin cậy được');
+    } finally {
+      setTrusting(false);
+    }
   }
 
   async function handleChangePassword(e) {
@@ -98,7 +132,12 @@ export default function SessionTakenOverPrompt() {
       toast.success('Đã đổi mật khẩu. Các phiên khác sẽ không dùng được mật khẩu cũ.');
       close();
     } catch (err) {
-      setErrors({ form: err?.message || 'Không thể đổi mật khẩu' });
+      const msg = err?.message || 'Không thể đổi mật khẩu';
+      if (/mật khẩu hiện tại không đúng/i.test(msg)) {
+        setErrors({ currentPassword: 'Mật khẩu hiện tại không đúng' });
+      } else {
+        setErrors({ form: msg });
+      }
     } finally {
       setSaving(false);
     }
@@ -106,14 +145,23 @@ export default function SessionTakenOverPrompt() {
 
   if (!visible) return null;
 
+  const variant = detail?.variant === 'new_device' ? 'new_device' : 'session_takeover';
   const meta = parseMeta(detail?.metadata);
   const ip = detail?.ip || meta.ip || meta.ipAddress || meta.location || '';
   const browser = detail?.browser || meta.browser || '';
   const os = detail?.os || meta.os || '';
   const device = detail?.device
     || [browser, os].filter(Boolean).join(' · ')
-    || 'Thiết bị khác';
+    || (variant === 'new_device' ? 'Thiết bị mới' : 'Thiết bị khác');
   const when = formatWhen(detail?.createdAt || meta.timestamp || meta.loginTime);
+  const showDevicesBtn = Boolean(detail?.canOpenDevices);
+
+  const title = variant === 'new_device'
+    ? 'Đăng nhập từ thiết bị mới'
+    : 'Tài khoản của bạn đang login ở nơi khác';
+  const lead = variant === 'new_device'
+    ? 'Phát hiện đăng nhập từ thiết bị hoặc IP chưa từng dùng. Nếu không phải bạn, hãy đổi mật khẩu và kiểm tra danh sách thiết bị.'
+    : 'Ai đó vừa đăng nhập tài khoản của bạn từ thiết bị khác. Nếu không phải bạn, hãy đổi mật khẩu ngay.';
 
   return (
     <div
@@ -138,12 +186,9 @@ export default function SessionTakenOverPrompt() {
             </div>
 
             <h2 id="sto-prompt-title" className="sto-prompt__title">
-              Tài khoản của bạn đang login ở nơi khác
+              {title}
             </h2>
-            <p className="sto-prompt__lead">
-              Ai đó vừa đăng nhập tài khoản của bạn từ thiết bị khác.
-              Nếu không phải bạn, hãy đổi mật khẩu ngay.
-            </p>
+            <p className="sto-prompt__lead">{lead}</p>
 
             <div className="sto-prompt__card">
               <div className="sto-prompt__card-icon" aria-hidden>
@@ -160,25 +205,69 @@ export default function SessionTakenOverPrompt() {
             </div>
 
             <div className="sto-prompt__recommend">
-              <h3>Hãy đổi mật khẩu ngay</h3>
-              <p>Ai đó đã dùng thông tin đăng nhập của bạn và có thể thử đăng nhập lại.</p>
+              <h3>{variant === 'new_device' ? 'Nếu đây là máy của bạn' : 'Hãy đổi mật khẩu ngay'}</h3>
+              <p>
+                {variant === 'new_device'
+                  ? 'Bấm «Đây là tôi — tin cậy» để không bị cảnh báo lại. Nếu không phải bạn, hãy đổi mật khẩu ngay.'
+                  : 'Ai đó đã dùng thông tin đăng nhập của bạn và có thể thử đăng nhập lại.'}
+              </p>
             </div>
 
             <div className="sto-prompt__actions">
-              <button
-                type="button"
-                className="sto-prompt__btn sto-prompt__btn--primary"
-                onClick={() => setStep('password')}
-              >
-                Đổi mật khẩu
-              </button>
-              <button
-                type="button"
-                className="sto-prompt__btn sto-prompt__btn--ghost"
-                onClick={close}
-              >
-                Lúc khác
-              </button>
+              {variant === 'new_device' ? (
+                <>
+                  <button
+                    type="button"
+                    className="sto-prompt__btn sto-prompt__btn--primary"
+                    onClick={handleTrustDevice}
+                    disabled={trusting}
+                  >
+                    {trusting ? 'Đang lưu...' : 'Đây là tôi — tin cậy'}
+                  </button>
+                  <button
+                    type="button"
+                    className="sto-prompt__btn sto-prompt__btn--secondary"
+                    onClick={() => setStep('password')}
+                  >
+                    Không phải tôi — đổi mật khẩu
+                  </button>
+                  {showDevicesBtn && (
+                    <button
+                      type="button"
+                      className="sto-prompt__btn sto-prompt__btn--ghost"
+                      onClick={openDevices}
+                    >
+                      Xem thiết bị
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="sto-prompt__btn sto-prompt__btn--primary"
+                    onClick={() => setStep('password')}
+                  >
+                    Đổi mật khẩu
+                  </button>
+                  {showDevicesBtn && (
+                    <button
+                      type="button"
+                      className="sto-prompt__btn sto-prompt__btn--secondary"
+                      onClick={openDevices}
+                    >
+                      Xem thiết bị
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="sto-prompt__btn sto-prompt__btn--ghost"
+                    onClick={close}
+                  >
+                    Lúc khác
+                  </button>
+                </>
+              )}
             </div>
           </>
         ) : (

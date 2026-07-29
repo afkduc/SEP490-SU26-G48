@@ -74,7 +74,7 @@ class PasswordResetService {
     const user = await this.authRepository.findUserByEmail(normalizedEmail);
     if (!user || (user.status && user.status !== 'active')) {
       // Không tiết lộ — trả success giả
-      return { message: GENERIC_MSG, sent: false };
+      return { message: GENERIC_MSG, sent: false, auditUserId: null, auditBranchId: null };
     }
 
     // Vô hiệu token cũ chưa dùng
@@ -121,6 +121,9 @@ class PasswordResetService {
       message: GENERIC_MSG,
       sent: Boolean(mailResult.sent),
       mode: mailResult.mode || null,
+      // Chi dung noi bo cho audit (controller khong dua ra response)
+      auditUserId: user.id,
+      auditBranchId: user.branch_id != null ? user.branch_id : null,
       // Dev helpers — không lộ token thô khi đã có preview Ethereal
       ...(config.nodeEnv !== 'production' && mailResult.previewUrl
         ? { emailPreviewUrl: mailResult.previewUrl }
