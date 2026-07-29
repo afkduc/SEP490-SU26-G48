@@ -55,25 +55,35 @@ class SecurityAlertRepository {
       OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
     `, { ...params, offset, pageSize });
 
-    const items = dataResult.recordset.map((row) => ({
-      id: row.id,
-      severity: row.severity,
-      title: row.title,
-      message: row.message,
-      userId: row.user_id,
-      userName: row.user_name,
-      displayName: row.user_first_name && row.user_last_name
-        ? `${row.user_first_name} ${row.user_last_name}`
-        : row.user_name || null,
-      branchId: row.branch_id,
-      createdAt: row.created_at,
-      isAcknowledged: row.is_acknowledged === 1 || row.is_acknowledged === true,
-      acknowledgedBy: row.acknowledged_by,
-      acknowledgedByName: row.acknowledged_by_name,
-      acknowledgedAt: row.acknowledged_at,
-      ruleKey: row.rule_key,
-      metadata: row.metadata,
-    }));
+    const items = dataResult.recordset.map((row) => {
+      let metadata = row.metadata;
+      if (typeof metadata === 'string' && metadata.trim()) {
+        try {
+          metadata = JSON.parse(metadata);
+        } catch {
+          // giữ nguyên string nếu JSON hỏng
+        }
+      }
+      return {
+        id: row.id,
+        severity: row.severity,
+        title: row.title,
+        message: row.message,
+        userId: row.user_id,
+        userName: row.user_name,
+        displayName: row.user_first_name && row.user_last_name
+          ? `${row.user_first_name} ${row.user_last_name}`
+          : row.user_name || null,
+        branchId: row.branch_id,
+        createdAt: row.created_at,
+        isAcknowledged: row.is_acknowledged === 1 || row.is_acknowledged === true,
+        acknowledgedBy: row.acknowledged_by,
+        acknowledgedByName: row.acknowledged_by_name,
+        acknowledgedAt: row.acknowledged_at,
+        ruleKey: row.rule_key,
+        metadata,
+      };
+    });
 
     return {
       items,

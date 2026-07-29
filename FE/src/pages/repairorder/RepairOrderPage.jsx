@@ -355,6 +355,9 @@ function TeamLeaderTaskCards() {
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [filterStatus, setFilterStatus] = useState('inprogress');
+  // Chi ap dung cho tab "Hoan thanh" - danh sach phieu da xong se ngay cang
+  // dai theo thoi gian, can loc bot theo thang cho de tim.
+  const [completedMonth, setCompletedMonth] = useState('');
   const [busyTaskKey, setBusyTaskKey] = useState(null);
   const [busyOrderId, setBusyOrderId] = useState(null);
   const [confirmTarget, setConfirmTarget] = useState(null); // { order, task } - dang cho xac nhan hoan thanh
@@ -396,7 +399,21 @@ function TeamLeaderTaskCards() {
   };
   useRepairOrderEventsSSE(handleRepairOrderEvent, Boolean(user));
 
-  const filteredOrders = orders.filter((o) => o.status === filterStatus);
+  // completedAt dang "dd/mm/yyyy" (BE tra san qua toDDMMYYYY) - cat lay
+  // "mm/yyyy" de gom theo thang, sap xep giam dan (thang gan nhat truoc).
+  const completedMonthOptions = Array.from(new Set(
+    orders.filter((o) => o.status === 'completed' && o.completedAt).map((o) => o.completedAt.slice(3))
+  )).sort((a, b) => {
+    const [am, ay] = a.split('/').map(Number);
+    const [bm, by] = b.split('/').map(Number);
+    return by !== ay ? by - ay : bm - am;
+  });
+
+  const filteredOrders = orders.filter((o) => {
+    if (o.status !== filterStatus) return false;
+    if (filterStatus === 'completed' && completedMonth && o.completedAt?.slice(3) !== completedMonth) return false;
+    return true;
+  });
   const tabCounts = orders.reduce((acc, o) => {
     acc[o.status] = (acc[o.status] || 0) + 1;
     return acc;
@@ -472,6 +489,12 @@ function TeamLeaderTaskCards() {
             </button>
           );
         })}
+        {filterStatus === 'completed' && completedMonthOptions.length > 0 && (
+          <select className="form-select" style={{ width: 150 }} value={completedMonth} onChange={(e) => setCompletedMonth(e.target.value)}>
+            <option value="">Tất cả các tháng</option>
+            {completedMonthOptions.map((m) => <option key={m} value={m}>Tháng {m}</option>)}
+          </select>
+        )}
         <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)' }}>
           {filteredOrders.length} / {orders.length} công việc
         </div>
@@ -509,9 +532,10 @@ function TeamLeaderTaskCards() {
           return (
             <div
               key={order.id}
+              className="team-leader-order-card"
               style={{ background: 'var(--white)', border: '1px solid var(--gray-200)', borderRadius: 10, padding: 16, boxShadow: 'var(--shadow-sm)' }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8, flexShrink: 0 }}>
                 <div>
                   <div style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)', fontSize: 14 }}>{order.code}</div>
                   <div style={{ fontWeight: 700, marginTop: 2 }}>{order.customer?.fullName}</div>
@@ -521,15 +545,15 @@ function TeamLeaderTaskCards() {
               </div>
 
               {order.notes && (
-                <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 10px', fontSize: 12, marginBottom: 12 }}>
+                <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 10px', fontSize: 12, marginBottom: 12, flexShrink: 0 }}>
                   {order.notes}
                 </div>
               )}
 
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6, flexShrink: 0 }}>
                 Đầu mục công việc ({doneCount}/{serviceTasks.length})
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: partTasks.length > 0 ? 10 : 14 }}>
+              <div className="team-leader-tasklist" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: partTasks.length > 0 ? 10 : 14, paddingRight: 2 }}>
                 {serviceTasks.map((task) => {
                   const key = `${order.id}-${task.id}`;
                   const isBusy = busyTaskKey === key;
@@ -558,11 +582,11 @@ function TeamLeaderTaskCards() {
               </div>
 
               {partTasks.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
+                <div style={{ marginBottom: 14, flexShrink: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
                     Phụ tùng cần dùng
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto', paddingRight: 2 }}>
                     {partTasks.map((task) => (
                       <div
                         key={task.id}
@@ -582,7 +606,7 @@ function TeamLeaderTaskCards() {
               {isActive && (
                 <button
                   className="btn btn-primary btn-sm"
-                  style={{ width: '100%', justifyContent: 'center' }}
+                  style={{ width: '100%', justifyContent: 'center', flexShrink: 0 }}
                   disabled={!allDone || busyOrderId === order.id}
                   title={!allDone ? 'Cần tích hoàn thành tất cả đầu mục trước' : ''}
                   onClick={() => handleComplete(order)}

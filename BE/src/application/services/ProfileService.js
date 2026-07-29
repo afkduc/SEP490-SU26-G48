@@ -54,15 +54,6 @@ class ProfileService {
     return updated;
   }
 
-  async updateAvatar(userId, avatarFileName) {
-    // avatarFileName already validated in controller.
-    const updated = await this.profileRepository.updateAvatar(userId, avatarFileName);
-    if (!updated) {
-      throw new ApiError(404, 'Không tìm thấy người dùng');
-    }
-    return updated;
-  }
-
   async changePassword(userId, currentPassword, newPassword) {
     if (!currentPassword || !newPassword) {
       throw new ApiError(400, 'Mật khẩu hiện tại và mật khẩu mới không được để trống');

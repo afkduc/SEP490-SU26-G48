@@ -31,11 +31,14 @@ function monthKey(monthStart) {
 }
 
 // Dieu kien loc dung chung: chi nhanh (bat buoc) + khoang ngay + trang thai +
-// danh muc dich vu (tuy chon). categoryId = 'PARTS' nghia la hang muc phu tung
-// (khong gan category_id vi phu tung khong thuoc service_categories).
-function buildScopeParams({ branchId, fromDate, toDate, status, categoryId }) {
+// danh muc dich vu (tuy chon) + advisorId (tuy chon - Co van dich vu chi xem
+// duoc thong ke cua chinh minh, cac vai tro khac xem toan chi nhanh nen
+// advisorId = null). categoryId = 'PARTS' nghia la hang muc phu tung (khong
+// gan category_id vi phu tung khong thuoc service_categories).
+function buildScopeParams({ branchId, advisorId, fromDate, toDate, status, categoryId }) {
   return {
     branchId,
+    advisorId: advisorId || null,
     fromDate: fromDate || null,
     toDate: toDate || null,
     status: status || null,
@@ -44,14 +47,15 @@ function buildScopeParams({ branchId, fromDate, toDate, status, categoryId }) {
 }
 
 class DashboardRepositoryImpl extends DashboardRepository {
-  async getOverview({ branchId, fromDate, toDate, status, categoryId } = {}) {
-    const params = buildScopeParams({ branchId, fromDate, toDate, status, categoryId });
+  async getOverview({ branchId, advisorId, fromDate, toDate, status, categoryId } = {}) {
+    const params = buildScopeParams({ branchId, advisorId, fromDate, toDate, status, categoryId });
 
     const kpiResult = await query(
       `WITH filtered_orders AS (
          SELECT so.id, so.status, so.total
          FROM   service_orders so
          WHERE  so.branch_id = @branchId
+           AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
            AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
            AND  (@status IS NULL OR so.status = @status)
@@ -82,6 +86,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
          SELECT so.id, so.status, so.total, so.intake_date
          FROM   service_orders so
          WHERE  so.branch_id = @branchId
+           AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
            AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
            AND  (@status IS NULL OR so.status = @status)
@@ -114,6 +119,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
          SELECT so.id, so.status
          FROM   service_orders so
          WHERE  so.branch_id = @branchId
+           AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
            AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
            AND  (@status IS NULL OR so.status = @status)
@@ -144,6 +150,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
          SELECT so.id, so.status, so.intake_date
          FROM   service_orders so
          WHERE  so.branch_id = @branchId
+           AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
            AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
            AND  (@status IS NULL OR so.status = @status)
@@ -164,7 +171,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
        FROM   month_category_orders
        GROUP BY month_start, repair_category
        ORDER BY month_start ASC`,
-      { branchId: params.branchId, fromDate: params.fromDate, toDate: params.toDate, status: params.status }
+      { branchId: params.branchId, advisorId: params.advisorId, fromDate: params.fromDate, toDate: params.toDate, status: params.status }
     );
 
     // Hieu suat tong theo loai hinh sua chua (khong loc theo categoryId, cung
@@ -174,6 +181,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
          SELECT so.id, so.status
          FROM   service_orders so
          WHERE  so.branch_id = @branchId
+           AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
            AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
            AND  (@status IS NULL OR so.status = @status)
@@ -212,7 +220,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
        FROM category_order_stats cos
        LEFT JOIN category_revenue cr ON cr.repair_category = cos.repair_category
        ORDER BY cos.order_count DESC`,
-      { branchId: params.branchId, fromDate: params.fromDate, toDate: params.toDate, status: params.status }
+      { branchId: params.branchId, advisorId: params.advisorId, fromDate: params.fromDate, toDate: params.toDate, status: params.status }
     );
 
     const kpiRow = kpiResult.recordset[0] || {};

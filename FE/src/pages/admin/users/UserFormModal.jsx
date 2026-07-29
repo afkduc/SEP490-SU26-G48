@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { adminBranchesApi, adminRolesApi, adminUsersApi } from '../../../services/adminApi';
+import {
+  adminBranchesApi,
+  adminRolesApi,
+  adminUsersApi,
+  adminDevicesApi,
+  setUserMustChangePassword,
+} from '../../../services/adminApi';
+import { useToast } from '../../../components/common/ToastContext';
+import ResetPasswordModal from './ResetPasswordModal';
 import './UserFormModal.css';
 
 const STATUS_OPTIONS = [
@@ -75,6 +83,7 @@ function hasMultipleRoles(userRoles) {
 
 export default function UserFormModal({ user, onClose, onSuccess }) {
   const isEdit = Boolean(user);
+  const toast = useToast();
 
   const [form, setForm] = useState({
     name: '',
@@ -94,6 +103,10 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [showReset, setShowReset] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [togglingMustChange, setTogglingMustChange] = useState(false);
+  const [forceLogoutLoading, setForceLogoutLoading] = useState(false);
 
   // Load branches + roles dropdown
   useEffect(() => {
@@ -145,6 +158,9 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       status: user.status || 'active',
       scopeAllBranches: isAllBranches,
     });
+    setMustChangePassword(Boolean(user.mustChangePassword));
+    setErrors({});
+    setApiError('');
   }, [user, JSON.stringify(roles)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function validate() {
@@ -229,6 +245,35 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       setApiError(err?.response?.data?.message || err.message || 'Lỗi hệ thống');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleToggleMustChange() {
+    if (!user?.id) return;
+    setTogglingMustChange(true);
+    try {
+      const next = !mustChangePassword;
+      await setUserMustChangePassword(user.id, next);
+      setMustChangePassword(next);
+      toast.success(next ? 'Đã bật bắt buộc đổi mật khẩu' : 'Đã tắt bắt buộc đổi mật khẩu');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || 'Không thể cập nhật');
+    } finally {
+      setTogglingMustChange(false);
+    }
+  }
+
+  async function handleForceLogoutAll() {
+    if (!user?.id) return;
+    if (!window.confirm('Đăng xuất user này khỏi mọi thiết bị? Phiên đăng nhập hiện tại sẽ bị thu hồi.')) return;
+    setForceLogoutLoading(true);
+    try {
+      await adminDevicesApi.forceLogoutAllDevices(user.id);
+      toast.success('Đã đăng xuất mọi thiết bị');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || 'Không thể đăng xuất thiết bị');
+    } finally {
+      setForceLogoutLoading(false);
     }
   }
 
@@ -390,7 +435,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                   vai trò hiện tại được giữ nguyên.
                   <br />
                   Nếu bạn <b>chọn vai trò khác</b>, các vai trò còn lại sẽ bị
-                  xóa — hãy dùng modal <b>Phân quyền</b> riêng để quản lý.
+                  xóa — hãy mở <b>Chi tiết → Quản lý vai trò</b> nếu cần giữ nhiều role.
                 </div>
               )}
 
@@ -447,6 +492,41 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                 </div>
               )}
             </div>
+
+            {isEdit && (
+              <div className="form__section form__section--security">
+                <div className="form__section-title">Bảo mật tài khoản</div>
+                <div className="form__security-actions">
+                  <button
+                    type="button"
+                    className="btn btn--outline"
+                    onClick={() => setShowReset(true)}
+                  >
+                    Đặt lại mật khẩu
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--outline"
+                    onClick={handleToggleMustChange}
+                    disabled={togglingMustChange}
+                  >
+                    {togglingMustChange
+                      ? 'Đang cập nhật...'
+                      : mustChangePassword
+                        ? 'Tắt bắt buộc đổi MK'
+                        : 'Bắt buộc đổi MK'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--danger"
+                    onClick={handleForceLogoutAll}
+                    disabled={forceLogoutLoading}
+                  >
+                    {forceLogoutLoading ? 'Đang xử lý...' : 'Đăng xuất mọi thiết bị'}
+                  </button>
+                </div>
+              </div>
+            )}
           </form>
         </div>
 
@@ -471,6 +551,17 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           </button>
         </div>
       </div>
+
+      {showReset && user && (
+        <ResetPasswordModal
+          user={user}
+          onClose={() => setShowReset(false)}
+          onSuccess={() => {
+            setShowReset(false);
+            toast.success('Đã đặt lại mật khẩu');
+          }}
+        />
+      )}
     </div>
   );
 }

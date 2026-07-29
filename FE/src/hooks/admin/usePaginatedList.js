@@ -150,9 +150,18 @@ export function usePaginatedList({
     setParamsState((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       paramsRef.current = next;
+      // Đồng bộ debounce ref để lần fetch dùng đúng giá trị seed/filter
+      debounceKeys.forEach((k) => {
+        if (Object.prototype.hasOwnProperty.call(next, k)) {
+          debouncedRef.current[k] = next[k] ?? '';
+        }
+      });
       return next;
     });
-  }, []);
+    // Quan trọng: setParams trước đây chỉ cập nhật state, không gọi API
+    // → seed từ cảnh báo ("Lịch sử") không lọc được dữ liệu.
+    setTimeout(() => callApi(getEffectiveParams(paramsRef.current)), 0);
+  }, [callApi, debounceKeys]);
 
   const refresh = useCallback(async () => {
     debounceKeys.forEach((key) => {
