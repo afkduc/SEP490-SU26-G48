@@ -100,6 +100,21 @@ class InventoryController {
       next(err);
     }
   };
+
+  getTopUsedParts = async (req, res, next) => {
+    try {
+      const { fromDate, toDate, limit } = req.query;
+      const result = await this.inventoryService.getTopUsedPartsStats({
+        branchId: req.user.branchId,
+        fromDate,
+        toDate,
+        limit: limit ? Number(limit) : undefined,
+      });
+      return success(res, result, 'Thống kê phụ tùng sử dụng nhiều nhất');
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 module.exports = InventoryController;
