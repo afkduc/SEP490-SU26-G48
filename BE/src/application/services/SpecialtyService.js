@@ -1,6 +1,5 @@
 const SpecialtyRepository = require('../../infrastructure/repositories/SpecialtyRepository');
 const ApiError = require('../../utils/ApiError');
-const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('./NotificationService');
 
 class SpecialtyService {

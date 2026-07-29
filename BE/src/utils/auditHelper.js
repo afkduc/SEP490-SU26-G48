@@ -109,6 +109,29 @@ function buildDescription(action, entityName, entityCode, userName) {
  *     description: 'Đăng nhập thành công',
  *   });
  */
+/**
+ * Resolve branch_id tu JWT/req.user; neu thieu thi doi tu bang users.
+ */
+async function resolveActorBranchId(user = {}) {
+  const raw = user.branch_id ?? user.branchId ?? null;
+  if (raw !== null && raw !== undefined && raw !== '') {
+    const n = Number(raw);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  }
+  const userId = user.id ?? user.userId ?? null;
+  if (!userId) return null;
+  try {
+    const result = await query(
+      'SELECT branch_id FROM users WHERE id = @p1',
+      { p1: userId }
+    );
+    const bid = result.recordset[0]?.branch_id;
+    return bid != null ? Number(bid) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function auditLog({
   req = {},
   res = {},
@@ -129,7 +152,7 @@ async function auditLog({
     const userId = user.id ?? user.userId ?? null;
     const userName = user.user_name || user.name || user.email || 'system';
     const phoneNumber = user.phone || user.phone_number || null;
-    const branchId = user.branch_id || null;
+    const branchId = await resolveActorBranchId(user);
 
     const ipAddress = getClientIp(req);
     const requestMethod = req.method || null;
@@ -157,7 +180,7 @@ async function auditLog({
         @p6, @p7, @p8,
         @p9, @p10, @p11, @p12,
         @p13, @p14, @p15, @p16,
-        @p17, @p18, @p19
+        @p17, @p18, SYSUTCDATETIME()
       )`,
       {
         p1: userId,
@@ -178,9 +201,12 @@ async function auditLog({
         p16: desc,
         p17: oldValueStr,
         p18: newValueStr,
-        p19: new Date(),
       }
     );
+    // Danh dau de auditMiddleware khong ghi trung sau khi controller da audit
+    if (req && typeof req === 'object') {
+      req._manualAuditWritten = true;
+    }
   } catch (err) {
     console.error('[auditHelper] Failed to write audit log:', err.message);
     // Khong throw de khong anh huong tien trinh chinh
@@ -191,7 +217,7 @@ async function auditLog({
  * Helper chi tiet hon cho cac thao tac CRUD
  */
 const auditCrud = {
-  async create(req, { tableName, entityCode, recordId, entityName, data }) {
+  async create(req, { tableName, entityCode, recordId, entityName, data, description }) {
     await auditLog({
       req,
       action: ACTION_TYPES.CREATE,
@@ -200,11 +226,13 @@ const auditCrud = {
       recordId,
       entityName,
       newValue: data,
-      description: `Tạo mới ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`,
+      description:
+        description ||
+        `Tạo mới ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`,
     });
   },
 
-  async update(req, { tableName, entityCode, recordId, entityName, oldData, newData }) {
+  async update(req, { tableName, entityCode, recordId, entityName, oldData, newData, description }) {
     await auditLog({
       req,
       action: ACTION_TYPES.UPDATE,
@@ -214,7 +242,9 @@ const auditCrud = {
       entityName,
       oldValue: oldData,
       newValue: newData,
-      description: `Cập nhật ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`,
+      description:
+        description ||
+        `Cập nhật ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`,
     });
   },
 

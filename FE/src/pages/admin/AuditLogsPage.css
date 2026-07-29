@@ -147,10 +147,16 @@
 
 .admin-logs__quick-search {
   margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
 
 .admin-logs__quick-search .filter-field {
   position: relative;
+  flex: 1 1 240px;
+  min-width: 0;
 }
 
 .admin-logs__quick-search .filter-field > svg {
@@ -159,6 +165,24 @@
 
 .admin-logs__quick-search .filter-field__input {
   padding-left: 12px;
+}
+
+.admin-logs__auth-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: #475569;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.admin-logs__auth-toggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: #4f46e5;
+  cursor: pointer;
 }
 
 .admin-logs__filter-title {
