@@ -307,7 +307,7 @@ function AppRoutes() {
           path={ROUTES.INVENTORY}
           element={
             <ProtectedRoute
-              roles={[ROLES.WAREHOUSE_STAFF, ROLES.MANAGER, ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}
+              roles={[ROLES.WAREHOUSE_STAFF]}
             >
               <AppLayout>
                 <InventoryLayout />

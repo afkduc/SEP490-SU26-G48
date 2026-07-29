@@ -82,6 +82,12 @@ class InventoryService {
     );
     return InventoryResponseDto.fromEntityList(matched.slice(0, 10));
   }
+
+  // Thong ke phu tung duoc su dung nhieu nhat (Dashboard Tong quan kho).
+  async getTopUsedPartsStats({ branchId, fromDate, toDate, limit } = {}) {
+    if (!branchId) throw new ApiError(400, 'branchId is required');
+    return this.inventoryRepository.getTopUsedPartsStats(branchId, { fromDate, toDate, limit });
+  }
 }
 
 module.exports = InventoryService;
