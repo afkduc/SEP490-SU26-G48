@@ -1,5 +1,3 @@
-/* AdminProfilePage – styles */
-
 .admin-profile {
   padding: 28px 32px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -208,6 +206,12 @@
   width: 100%;
   justify-content: center;
   gap: 6px;
+}
+
+.profile-card__logout-all-btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
 }
 
 /* ── Right card ── */

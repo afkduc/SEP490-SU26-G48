@@ -165,17 +165,18 @@ function _sendLoginNotification(userId, browser, os, ipAddress, deviceId) {
   try {
     const NotificationService = require('../application/services/NotificationService');
     const ns = new NotificationService();
-    // notify() la async - PHAI bat .catch() vi khong await o day (fire-and-
-    // forget), neu khong reject se thanh unhandled rejection va lam crash
-    // ca process (Node moi mac dinh thoat process khi co unhandled rejection).
-    ns.notify('LOGIN_SUCCESS', {
+    const deviceLabel = [browser, os].filter(Boolean).join(' · ') || 'Thiết bị mới';
+    // Báo kiểu Facebook: login từ thiết bị/IP mới → luôn hiện in-app (skipSettings)
+    ns.notify('NEW_DEVICE', {
       userId,
       browser,
       os,
       ip: ipAddress,
       deviceId,
-    }).catch((err) => {
-      console.error('[loginSessionMiddleware] Failed to send login notification:', err.message);
+      device: deviceLabel,
+      location: ipAddress || 'vị trí không xác định',
+    }, { skipSettings: true }).catch((err) => {
+      console.error('[loginSessionMiddleware] Failed to send new-device notification:', err.message);
     });
   } catch (err) {
     console.error('[loginSessionMiddleware] Failed to send login notification:', err.message);
@@ -233,6 +234,13 @@ async function _writeLoginAuditLog(req, { success, userId, userName, reason, ipA
 
 async function trackLogin(req, user) {
   try {
+    // Dam bao cot is_trusted ton tai truoc khi upsert device
+    try {
+      await require('../infrastructure/repositories/DeviceRepository').ensureTrustedSchema();
+    } catch (schemaErr) {
+      console.warn('[trackLogin] ensureTrustedSchema:', schemaErr.message);
+    }
+
     const { ipAddress, userAgent } = getRequestMeta(req);
     const { browser, os } = parseUserAgent(userAgent);
 
@@ -253,7 +261,7 @@ async function trackLogin(req, user) {
     //   - Moi: 1 transaction de dat consistency.
     // ============================================================
     const result = await executeTransaction(async (txQuery) => {
-      const out = { sessionId: null, deviceId: null };
+      const out = { sessionId: null, deviceId: null, isNewDevice: false, isTrusted: false };
 
       // Step 1: Close stale sessions CUA USER HIEN TAI (logic single-session).
       if (userId) {
@@ -303,17 +311,25 @@ async function trackLogin(req, user) {
       out.sessionId = rawSessionId !== null && rawSessionId !== undefined ? Number(rawSessionId) : null;
 
       // Step 3: Upsert device (trong transaction)
-      if (userId && ipAddress) {
+      // - Khớp đúng IP+browser+os
+      // - Hoặc tái dùng thiết bị TIN CẬY cùng browser+os (IP đổi nhưng vẫn là máy quen)
+      // - Ngược lại tạo mới (chưa tin cậy) → báo thiết bị lạ
+      // Luôn gắn device (IP fallback) để JWT có deviceId + session active —
+      // tránh heartbeat/API đá phiên mới ngay sau login.
+      const deviceIp = ipAddress || '0.0.0.0';
+      if (userId) {
         const { deviceName } = parseUserAgent(userAgent);
         const existing = await txQuery(
-          `SELECT TOP 1 id, is_current FROM user_devices
+          `SELECT TOP 1 id, is_current, is_trusted FROM user_devices
            WHERE user_id = @p1 AND ip_address = @p2 AND browser = @p3 AND os = @p4`,
-          { p1: userId, p2: ipAddress, p3: browser, p4: os }
+          { p1: userId, p2: deviceIp, p3: browser, p4: os }
         );
 
         if (existing.recordset.length > 0) {
           const existingDevice = existing.recordset[0];
           out.deviceId = existingDevice.id;
+          out.isNewDevice = false;
+          out.isTrusted = existingDevice.is_trusted === 1 || existingDevice.is_trusted === true;
           await txQuery(
             `UPDATE user_devices
              SET    is_current = 1,
@@ -324,14 +340,46 @@ async function trackLogin(req, user) {
             { p1: existingDevice.id, p5: userAgent }
           );
         } else {
-          const insertDevice = await txQuery(
-            `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, last_login_at, last_activity_at)
-             VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
-             SELECT @@IDENTITY AS new_id;`,
-            { p1: userId, p2: deviceName, p3: browser, p4: os, p5: ipAddress, p6: userAgent }
+          // Máy tin cậy cùng browser+os (IP có thể đổi WiFi/4G)
+          const trustedSame = await txQuery(
+            `SELECT TOP 1 id, is_current FROM user_devices
+             WHERE user_id = @p1 AND browser = @p2 AND os = @p3 AND is_trusted = 1
+             ORDER BY ISNULL(last_activity_at, last_login_at) DESC`,
+            { p1: userId, p2: browser, p3: os }
           );
-          const rawNewId = insertDevice.recordset?.[0]?.new_id;
-          out.deviceId = rawNewId !== null && rawNewId !== undefined ? Number(rawNewId) : null;
+          if (trustedSame.recordset.length > 0) {
+            const trustedDevice = trustedSame.recordset[0];
+            out.deviceId = trustedDevice.id;
+            out.isNewDevice = false;
+            out.isTrusted = true;
+            await txQuery(
+              `UPDATE user_devices
+               SET    is_current = 1,
+                      ip_address = @p5,
+                      last_login_at = SYSUTCDATETIME(),
+                      last_activity_at = SYSUTCDATETIME(),
+                      user_agent = @p6,
+                      device_name = @p7
+               WHERE  id = @p1`,
+              {
+                p1: trustedDevice.id,
+                p5: deviceIp,
+                p6: userAgent,
+                p7: deviceName,
+              }
+            );
+          } else {
+            const insertDevice = await txQuery(
+              `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, is_trusted, last_login_at, last_activity_at)
+               VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+               SELECT @@IDENTITY AS new_id;`,
+              { p1: userId, p2: deviceName, p3: browser, p4: os, p5: deviceIp, p6: userAgent }
+            );
+            const rawNewId = insertDevice.recordset?.[0]?.new_id;
+            out.deviceId = rawNewId !== null && rawNewId !== undefined ? Number(rawNewId) : null;
+            out.isNewDevice = true;
+            out.isTrusted = false;
+          }
         }
       }
 
@@ -346,7 +394,7 @@ async function trackLogin(req, user) {
       return out;
     });
 
-    const { sessionId, deviceId } = result;
+    const { sessionId, deviceId, isNewDevice, isTrusted } = result;
 
     // Post-commit (khong can transaction): log event + SSE
     if (sessionId) {
@@ -372,7 +420,10 @@ async function trackLogin(req, user) {
         branchId,
         deviceId,
       });
-      _sendLoginNotification(userId, browser, os, ipAddress, deviceId);
+      // Chỉ báo khi thiết bị mới VÀ chưa tin cậy
+      if (isNewDevice && !isTrusted) {
+        _sendLoginNotification(userId, browser, os, ipAddress, deviceId);
+      }
       await _writeLoginAuditLog(req, {
         success: true,
         userId,

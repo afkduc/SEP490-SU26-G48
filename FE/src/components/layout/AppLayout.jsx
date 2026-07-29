@@ -7,7 +7,7 @@ export default function AppLayout({ children, showNavbar = true }) {
   return (
     <ServiceRequestsProvider>
       <div className="app-layout">
-        {showNavbar ? <Navbar /> : <UserProfileMenu standalone showOnline />}
+        {showNavbar ? <Navbar /> : <UserProfileMenu standalone />}
         <main className="app-layout__main">{children}</main>
       </div>
     </ServiceRequestsProvider>

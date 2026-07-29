@@ -570,6 +570,20 @@ function SessionTakenOverRunner() {
   useEffect(() => {
     const onTakenOver = (e) => {
       const detail = e?.detail || {};
+      const meta = detail?.metadata || {};
+      // Bỏ qua nếu event dành cho phiên mới (chính tab vừa login)
+      try {
+        const t = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (t) {
+          const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          const metaSessionId = meta.newSessionId != null ? Number(meta.newSessionId) : null;
+          const metaVersion = meta.newTokenVersion != null ? Number(meta.newTokenVersion) : NaN;
+          if (metaSessionId && Number(payload.sessionId) === metaSessionId) return;
+          if (Number.isFinite(metaVersion) && Number(payload.tokenVersion) >= metaVersion) return;
+        }
+      } catch {
+        // ignore parse errors — vẫn hiện modal an toàn cho phiên cũ
+      }
       showSessionExpired({
         code: detail?.metadata?.code || detail?.code || 'SESSION_REPLACED',
         message: detail?.message || 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại để tiếp tục.',

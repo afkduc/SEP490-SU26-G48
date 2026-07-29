@@ -62,6 +62,10 @@ function RoleFormModal({ role, onClose, onSuccess }) {
     e.preventDefault();
     if (!form.roleName.trim()) { setError('Tên vai trò là bắt buộc'); return; }
     if (!form.roleLabel.trim()) { setError('Nhãn hiển thị là bắt buộc'); return; }
+    if (!isEdit && !/^[a-z0-9_]{2,50}$/.test(form.roleName.trim())) {
+      setError('Tên vai trò chỉ gồm a-z, 0-9, _ và tối thiểu 2 ký tự');
+      return;
+    }
 
     setSaving(true);
     setError('');

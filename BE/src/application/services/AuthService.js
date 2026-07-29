@@ -10,6 +10,28 @@ const PendingLoginStore = require('./PendingLoginStore');
 const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '5', 10);
 /** Giữ flag cũ: chỉ bật Approve/Reject nếu LOGIN_CHALLENGE_ENABLED=true (mặc định tắt). */
 const LOGIN_CHALLENGE_ENABLED = process.env.LOGIN_CHALLENGE_ENABLED === 'true';
+
+/** Serialize login theo identifier — tránh 2 login cùng lúc đua token_version / is_current. */
+const loginLocks = new Map();
+
+async function withLoginLock(lockKey, fn) {
+  const key = String(lockKey || '').trim().toLowerCase() || '_anonymous';
+  const prev = loginLocks.get(key) || Promise.resolve();
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const chained = prev.then(() => gate, () => gate);
+  loginLocks.set(key, chained);
+  await prev.catch(() => {});
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (loginLocks.get(key) === chained) loginLocks.delete(key);
+  }
+}
+
 class AuthService {
   constructor(authRepository) {
     this.authRepository = authRepository;
@@ -146,6 +168,8 @@ class AuthService {
 
     // Chính sách mới: có phiên sống thì thay thế ngay, không chờ countdown.
     // Giữ biến `force` chỉ để backward-compat với FE cũ.
+    // Thông báo SESSION_TAKEN_OVER gửi SAU trackLogin (AuthController) kèm
+    // newTokenVersion/newSessionId để phiên mới không tự đá chính mình.
     const replacedLive = Boolean(live);
     if (live) {
       await this._closeActiveSessionsForUser(user.id, 'FORCE_NEW_LOGIN');
@@ -154,11 +178,7 @@ class AuthService {
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
     user.token_version = newTokenVersion;
 
-    if (replacedLive) {
-      this._notifySessionTakenOver(user.id, clientMeta).catch(() => {});
-    }
-
-    return { user, pendingComplete: false };
+    return { user, pendingComplete: false, replacedLive, clientMeta };
   }
 
   async _completePendingLogin(pendingId, identifier, password) {
@@ -282,14 +302,25 @@ class AuthService {
   }
 
   /** Báo phiên cũ: đã có thiết bị khác đăng nhập (sau force takeover). */
-  async _notifySessionTakenOver(userId, clientMeta = {}) {
+  async notifySessionTakenOver(userId, clientMeta = {}) {
     try {
       const NotificationService = require('./NotificationService');
       const ns = new NotificationService();
+      const deviceLabel = [clientMeta?.browser, clientMeta?.os].filter(Boolean)
+        .join(' · ') || 'Thiết bị khác';
+      const location = clientMeta?.ip || clientMeta?.ipAddress || 'IP không xác định';
       await ns.notify(
         'SESSION_TAKEN_OVER',
         {
           userId,
+          device: deviceLabel,
+          location,
+          ip: clientMeta?.ip || clientMeta?.ipAddress,
+          browser: clientMeta?.browser,
+          os: clientMeta?.os,
+          // FE: phiên mới bỏ qua khi tokenVersion/sessionId khớp
+          newTokenVersion: clientMeta?.newTokenVersion ?? null,
+          newSessionId: clientMeta?.newSessionId ?? null,
         },
         { skipSettings: true }
       );
@@ -356,3 +387,4 @@ class AuthService {
 }
 
 module.exports = AuthService;
+module.exports.withLoginLock = withLoginLock;

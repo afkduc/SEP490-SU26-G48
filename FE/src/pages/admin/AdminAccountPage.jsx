@@ -18,19 +18,23 @@ function IconUser() {
   );
 }
 
+function resolveTab(raw) {
+  if (raw === 'notifications') return 'notifications';
+  // tab=devices cũ → về hồ sơ
+  return 'profile';
+}
+
 export default function AdminAccountPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isEditMode = location.pathname.endsWith('/edit');
-  const activeTab = !isEditMode && searchParams.get('tab') === 'notifications'
-    ? 'notifications'
-    : 'profile';
+  const activeTab = isEditMode ? 'profile' : resolveTab(searchParams.get('tab'));
 
   const setActiveTab = useCallback((tab) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (tab === 'notifications') next.set('tab', 'notifications');
-      else next.delete('tab');
+      if (tab === 'profile') next.delete('tab');
+      else next.set('tab', tab);
       return next;
     });
   }, [setSearchParams]);
@@ -44,7 +48,7 @@ export default function AdminAccountPage() {
           </div>
           <div className="admin-hub__title-group">
             <h1>Tài khoản của tôi</h1>
-            <p className="admin-hub__subtitle">Hồ sơ cá nhân và cài đặt thông báo</p>
+            <p className="admin-hub__subtitle">Hồ sơ và cài đặt thông báo</p>
           </div>
         </div>
       </div>

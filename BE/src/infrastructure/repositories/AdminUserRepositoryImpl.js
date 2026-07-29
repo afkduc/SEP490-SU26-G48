@@ -10,7 +10,6 @@ const ADMIN_USER_COLUMNS = `
   u.branch_id,
   b.branch_name,
   u.status,
-  u.must_change_password,
   u.created_at,
   (SELECT COUNT(*) FROM user_branches ub WHERE ub.user_id = u.id) AS assigned_branch_count,
   (SELECT MAX(ud.last_login_at) FROM user_devices ud WHERE ud.user_id = u.id) AS last_login_at
@@ -33,7 +32,6 @@ function toAdminUserRow(row) {
     scopeAllBranches,
     assignedBranchCount: assignedCount,
     status: row.status,
-    mustChangePassword: row.must_change_password === 1 || row.must_change_password === true,
     createdAt: row.created_at,
     lastLoginAt: row.last_login_at || null,
     roles: [],
@@ -473,16 +471,14 @@ class AdminUserRepositoryImpl {
    * Update mat khau user (admin reset password)
    * @param {number} userId - ID user can reset
    * @param {string} passwordHash - mat khau da hash (bcrypt)
-   * @param {boolean} mustChangePassword - co bat buoc doi lan dang nhap sau khong
    * @returns {Promise<boolean>} true neu update thanh cong
    */
-  async updatePassword(userId, passwordHash, mustChangePassword) {
+  async updatePassword(userId, passwordHash) {
     const result = await query(
       `UPDATE users
-       SET    user_password       = @p1,
-              must_change_password = @p2
-       WHERE  id = @p3`,
-      { p1: passwordHash, p2: mustChangePassword ? 1 : 0, p3: userId }
+       SET    user_password = @p1
+       WHERE  id = @p2`,
+      { p1: passwordHash, p2: userId }
     );
     return result.rowsAffected[0] > 0;
   }
@@ -510,7 +506,7 @@ class AdminUserRepositoryImpl {
     let recentLogs = [];
     try {
       const logsResult = await query(`
-        SELECT TOP 8
+        SELECT TOP 20
           al.id,
           al.action,
           al.user_name,
@@ -547,7 +543,7 @@ class AdminUserRepositoryImpl {
     let recentFailedLogins = 0;
     try {
       const loginResult = await query(`
-        SELECT TOP 8
+        SELECT TOP 24
           ls.id,
           ls.user_name,
           ls.action_type,
@@ -605,15 +601,25 @@ class AdminUserRepositoryImpl {
       recentLogins = [];
     }
 
-    // System alerts — preview (TOP 5) + counts thật cho banner
+    // System alerts — preview (TOP 5 đã gom) + counts đã gom (cùng logic panel)
     let alerts = [];
     let alertCounts = { total: 0, critical: 0, high: 0, medium: 0, info: 0 };
     try {
       const alertsResult = await query(`
         SELECT TOP 5
           id, severity, title, message, user_id, created_at, rule_key
-        FROM security_alerts
-        WHERE is_acknowledged = 0
+        FROM (
+          SELECT
+            id, severity, title, message, user_id, created_at, rule_key,
+            ROW_NUMBER() OVER (
+              PARTITION BY ISNULL(rule_key, N''),
+                CASE WHEN user_id IS NULL THEN 0 ELSE user_id END
+              ORDER BY created_at DESC
+            ) AS rn
+          FROM security_alerts
+          WHERE is_acknowledged = 0
+        ) ranked
+        WHERE rn = 1
         ORDER BY
           CASE severity
             WHEN 'critical' THEN 1
@@ -632,20 +638,31 @@ class AdminUserRepositoryImpl {
         icon: row.rule_key === 'failed_login_burst' ? 'alert'
             : row.rule_key === 'new_admin_role' ? 'shield'
             : row.rule_key === 'inactive_admin' ? 'user'
+            : row.rule_key === 'session_takeover' ? 'alert'
             : 'info',
         time: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
         alertId: row.id,
       }));
 
+      // Đếm đã gom (1 nhóm rule+user = 1) — khớp /security-alerts/counts
       const countsResult = await query(`
         SELECT
           COUNT(*) AS total,
-          SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) AS criticalCount,
-          SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) AS highCount,
-          SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) AS mediumCount,
-          SUM(CASE WHEN severity = 'info' THEN 1 ELSE 0 END) AS infoCount
-        FROM security_alerts
-        WHERE is_acknowledged = 0
+          SUM(CASE WHEN t.severity = 'critical' THEN 1 ELSE 0 END) AS criticalCount,
+          SUM(CASE WHEN t.severity = 'high' THEN 1 ELSE 0 END) AS highCount,
+          SUM(CASE WHEN t.severity = 'medium' THEN 1 ELSE 0 END) AS mediumCount,
+          SUM(CASE WHEN t.severity = 'info' THEN 1 ELSE 0 END) AS infoCount
+        FROM (
+          SELECT severity,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY ISNULL(rule_key, N''),
+                     CASE WHEN user_id IS NULL THEN 0 ELSE user_id END
+                   ORDER BY created_at DESC
+                 ) AS rn
+          FROM security_alerts
+          WHERE is_acknowledged = 0
+        ) t
+        WHERE t.rn = 1
       `);
       const c = countsResult.recordset[0] || {};
       alertCounts = {

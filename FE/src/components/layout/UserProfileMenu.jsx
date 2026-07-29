@@ -7,7 +7,6 @@ import {
 } from '../../contexts/AppContext';
 import { ROLE_LABELS } from '../../constants/roles';
 import { getProfileConfigByRole } from '../../config/roleProfileConfig';
-import { useAuthenticatedAvatarUrl } from '../../hooks/useAuthenticatedAvatarUrl';
 import './UserProfileMenu.css';
 
 function getInitials(name = '') {
@@ -44,34 +43,14 @@ function IconChevron({ size = 14 }) {
   );
 }
 
-function AvatarBubble({ name, imageUrl, className }) {
-  const initials = getInitials(name);
-  const [broken, setBroken] = useState(false);
-
-  useEffect(() => {
-    setBroken(false);
-  }, [imageUrl]);
-
-  if (imageUrl && !broken) {
-    return (
-      <div className={className}>
-        <img
-          src={imageUrl}
-          alt=""
-          className="user-profile-menu__avatar-img"
-          onError={() => setBroken(true)}
-        />
-      </div>
-    );
-  }
-  return <div className={className}>{initials}</div>;
+function AvatarBubble({ name, className }) {
+  return <div className={className}>{getInitials(name)}</div>;
 }
 
 /**
  * Menu hồ sơ + logout dùng chung cho 7 role (giống dropdown admin).
  */
 export default function UserProfileMenu({
-  showOnline = true,
   standalone = false,
   compact = false,
 }) {
@@ -91,7 +70,6 @@ export default function UserProfileMenu({
 
   const profilePath = getRoleProfilePath(user);
   const displayName = user?.name || user?.userName || '—';
-  const avatarUrl = useAuthenticatedAvatarUrl(user?.avatar);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -123,13 +101,6 @@ export default function UserProfileMenu({
       ref={rootRef}
       className={`user-profile-menu${standalone ? ' user-profile-menu--standalone' : ''}`}
     >
-      {showOnline && (
-        <div className="user-profile-menu__online" title="Tài khoản đang hoạt động">
-          <span className="user-profile-menu__online-dot" />
-          <span className="user-profile-menu__online-label">Trực tuyến</span>
-        </div>
-      )}
-
       <div
         className="user-profile-menu__trigger"
         role="button"
@@ -146,7 +117,6 @@ export default function UserProfileMenu({
       >
         <AvatarBubble
           name={displayName}
-          imageUrl={avatarUrl}
           className="user-profile-menu__avatar"
         />
         {!compact && (
@@ -163,7 +133,6 @@ export default function UserProfileMenu({
           <div className="user-profile-menu__dropdown-header">
             <AvatarBubble
               name={displayName}
-              imageUrl={avatarUrl}
               className="user-profile-menu__dropdown-avatar"
             />
             <div>

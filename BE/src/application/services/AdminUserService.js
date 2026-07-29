@@ -86,6 +86,24 @@ class AdminUserService {
       throw new ApiError(400, 'name, email, password, roleId la bat buoc');
     }
 
+    const nameTrimmed = String(name).trim();
+    const emailTrimmed = String(email).trim();
+    const lastNameTrimmed = lastName !== undefined && lastName !== null ? String(lastName).trim() : '';
+    if (!nameTrimmed) {
+      throw new ApiError(400, 'Ten dang nhap khong duoc rong');
+    }
+    if (!lastNameTrimmed) {
+      throw new ApiError(400, 'Ten la bat buoc');
+    }
+
+    const phoneTrimmed = phone !== undefined && phone !== null ? String(phone).trim() : '';
+    if (!phoneTrimmed) {
+      throw new ApiError(400, 'So dien thoai la bat buoc');
+    }
+    if (!PHONE_REGEX.test(phoneTrimmed)) {
+      throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
+    }
+
     // scopeAllBranches === true -> branchId KHONG duoc set (hoac null)
     // branchId la so duong -> gan user vao 1 chi nhanh cu the
     // branchId undefined/'' -> reject
@@ -102,7 +120,7 @@ class AdminUserService {
       throw new ApiError(400, 'branchId la bat buoc (hoac chon "Tat ca chi nhanh")');
     }
 
-    if (!EMAIL_REGEX.test(email)) {
+    if (!EMAIL_REGEX.test(emailTrimmed)) {
       throw new ApiError(400, 'Email khong dung dinh dang');
     }
 
@@ -110,11 +128,7 @@ class AdminUserService {
       throw new ApiError(400, `Mat khau phai co it nhat ${PASSWORD_MIN_LENGTH} ky tu`);
     }
 
-    if (phone && !PHONE_REGEX.test(phone)) {
-      throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
-    }
-
-    const existed = await this.adminUserRepository.findByEmail(email);
+    const existed = await this.adminUserRepository.findByEmail(emailTrimmed);
     if (existed) {
       throw new ApiError(409, 'Email da ton tai');
     }
@@ -123,12 +137,12 @@ class AdminUserService {
 
     try {
       const user = await this.adminUserRepository.create({
-        name,
-        email,
+        name: nameTrimmed,
+        email: emailTrimmed,
         passwordHash,
-        firstName: firstName || name,
-        lastName: lastName || '',
-        phone,
+        firstName: (firstName && String(firstName).trim()) || nameTrimmed,
+        lastName: lastNameTrimmed,
+        phone: phoneTrimmed,
         branchId: parsedBranchId,
         roleId: Number(roleId),
         scopeAllBranches: isScopeAllBranches,
@@ -160,20 +174,42 @@ class AdminUserService {
       throw new ApiError(400, 'status khong hop le: active, inactive');
     }
 
-    // Validate email neu co
-    if (email !== undefined && email !== null && email !== '') {
-      const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!EMAIL_REGEX.test(email)) {
+    // Validate email neu co gui len
+    if (email !== undefined && email !== null) {
+      const emailTrimmed = String(email).trim();
+      if (!emailTrimmed) {
+        throw new ApiError(400, 'Email khong duoc rong');
+      }
+      if (!EMAIL_REGEX.test(emailTrimmed)) {
         throw new ApiError(400, 'Email khong dung dinh dang');
       }
+      const emailOwner = await this.adminUserRepository.findByEmail(emailTrimmed);
+      if (emailOwner && Number(emailOwner.id) !== Number(userId)) {
+        throw new ApiError(409, 'Email da ton tai');
+      }
+      payload.email = emailTrimmed;
     }
 
-    // Validate phone neu co
-    if (phone !== undefined && phone !== null && phone !== '') {
-      const PHONE_REGEX = /^0\d{9,10}$/;
-      if (!PHONE_REGEX.test(String(phone))) {
+    // Phone bat buoc khi gui len (create/update form admin)
+    if (phone !== undefined && phone !== null) {
+      const phoneTrimmed = String(phone).trim();
+      if (!phoneTrimmed) {
+        throw new ApiError(400, 'So dien thoai la bat buoc');
+      }
+      if (!PHONE_REGEX.test(phoneTrimmed)) {
         throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
       }
+      payload.phone = phoneTrimmed;
+    }
+
+    if (lastName !== undefined && lastName !== null && !String(lastName).trim()) {
+      throw new ApiError(400, 'Ten khong duoc rong');
+    }
+    if (lastName !== undefined && lastName !== null) {
+      payload.lastName = String(lastName).trim();
+    }
+    if (firstName !== undefined && firstName !== null) {
+      payload.firstName = String(firstName).trim();
     }
 
     // Validate branchId neu co
@@ -285,10 +321,10 @@ class AdminUserService {
    * - Co 2 che do:
    *   + newPassword duoc cung cap: dung MK do (admin nhap tay)
    *   + newPassword khong cung cap: generate MK ngau nhien 12 ky tu (hoa+thuong+so+dac biet)
-   * - Hash bcrypt, luu DB, dat must_change_password theo flag
+   * - Hash bcrypt, luu DB (khong bat buoc doi MK lan sau)
    * - Tra ve MK plain text 1 lan duy nhat (controller se gui cho FE)
    */
-  async resetPassword({ userId, mustChangePassword = true, newPassword } = {}) {
+  async resetPassword({ userId, newPassword } = {}) {
     if (!userId) {
       throw new ApiError(400, 'userId la bat buoc');
     }
@@ -298,9 +334,6 @@ class AdminUserService {
     if (!existing) {
       throw new ApiError(404, 'Nguoi dung khong ton tai');
     }
-
-    // Khong reset MK cho chinh admin dang thuc hien (tranh tu khoa tai khoan)
-    // (Controller se xu ly truong hop nay neu can, o service chi check don gian)
 
     // Quyet dinh MK plain text:
     //   - newPassword undefined/empty -> random
@@ -320,8 +353,7 @@ class AdminUserService {
     // Update DB
     const ok = await this.adminUserRepository.updatePassword(
       Number(userId),
-      passwordHash,
-      mustChangePassword
+      passwordHash
     );
 
     if (!ok) {
@@ -335,11 +367,8 @@ class AdminUserService {
       userId: Number(userId),
       newPassword: plainPassword, // plain text - chi tra 1 lan
       isManual,
-      mustChangePassword: Boolean(mustChangePassword),
       message: isManual
         ? 'Mat khau moi da duoc dat theo gia tri admin nhap.'
-        : mustChangePassword
-        ? 'Mat khau da duoc dat lai. User phai doi mat khau khi dang nhap lan sau.'
         : 'Mat khau da duoc dat lai thanh cong.',
     };
   }

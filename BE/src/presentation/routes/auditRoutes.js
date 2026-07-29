@@ -129,6 +129,7 @@ function buildAuditRouter() {
         status: req.query.status,
         branchId: req.query.branchId,
         ipAddress: req.query.ipAddress,
+        sessionId: req.query.sessionId,
         page: req.query.page,
         pageSize: req.query.pageSize,
       });

@@ -3,7 +3,9 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import ScrollToggleButton from '../common/ScrollToggleButton';
 import UserProfileMenu from './UserProfileMenu';
+import NotificationBell from '../NotificationBell';
 import { adminSecurityAlertsApi } from '../../services/adminApi';
+import { SECURITY_ALERTS_COUNT_EVENT } from '../../utils/securityAlertEvents';
 import './AdminLayout.css';
 
 const ADMIN_SIDEBAR = [
@@ -109,19 +111,37 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd
 
   useEffect(() => {
     let cancelled = false;
+
+    function urgentFrom(data) {
+      if (!data || typeof data !== 'object') return 0;
+      return (Number(data.critical) || 0) + (Number(data.high) || 0);
+    }
+
     async function loadCounts() {
       try {
         const data = await adminSecurityAlertsApi.getCounts();
-        if (!cancelled) setAlertCount(Number(data?.total) || 0);
+        if (!cancelled) setAlertCount(urgentFrom(data));
       } catch {
         if (!cancelled) setAlertCount(0);
       }
     }
     loadCounts();
     const t = setInterval(loadCounts, 60_000);
+
+    const onCountChanged = (e) => {
+      const detail = e?.detail;
+      if (detail && typeof detail === 'object' && ('critical' in detail || 'high' in detail)) {
+        setAlertCount(urgentFrom(detail));
+        return;
+      }
+      loadCounts();
+    };
+    window.addEventListener(SECURITY_ALERTS_COUNT_EVENT, onCountChanged);
+
     return () => {
       cancelled = true;
       clearInterval(t);
+      window.removeEventListener(SECURITY_ALERTS_COUNT_EVENT, onCountChanged);
     };
   }, [location.pathname]);
 
@@ -144,12 +164,16 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd
   const handleItemClick = (targetPath) => {
     if (onItemClick) onItemClick();
     if (!targetPath) return;
+    const samePage = targetPath === location.pathname;
     onNavStart?.();
-    // Cùng trang hoặc đổi trang: luôn remount content (soft F5) để state sạch
-    if (targetPath !== location.pathname) {
+    if (!samePage) {
       navigate(targetPath);
     }
-    onContentRefresh?.();
+    // Chỉ soft-remount khi click lại đúng trang hiện tại (làm mới state).
+    // Đổi trang: React Router đã mount page mới — remount thêm chỉ hủy API đang chạy.
+    if (samePage) {
+      onContentRefresh?.();
+    }
     requestAnimationFrame(() => {
       setTimeout(() => onNavEnd?.(), 180);
     });
@@ -299,15 +323,6 @@ export default function AdminLayout({ children }) {
   // Close mobile drawer when route changes
   useEffect(() => {
     setMobileOpen(false);
-  }, [location.pathname]);
-
-  // Khi vừa login và điều hướng từ trang public (/login) vào admin,
-  // ép remount nội dung để tránh render sai frame (cần F5 mới đúng).
-  useEffect(() => {
-    const isAdminRoute = String(location.pathname).startsWith('/admin');
-    if (isAdminRoute && adminHistoryRef.current.length === 0) {
-      refreshContent();
-    }
   }, [location.pathname]);
 
   // Lock body scroll khi mobile drawer mo
@@ -493,12 +508,15 @@ export default function AdminLayout({ children }) {
           </div>
 
           <div className="admin-topbar__right">
+            <NotificationBell />
             <UserProfileMenu />
           </div>
         </header>
 
         <main className="admin-content">
-          <div key={`${location.pathname}${location.search}${location.hash}::${contentKey}`} className="admin-content__remount">
+          {/* Không gắn location.search vào key: đổi ?alerts= / ?tab= sẽ remount
+              và xóa state popup (vd. Chi tiết lịch sử). Remount chủ đích dùng contentKey. */}
+          <div key={`${location.pathname}${location.hash}::${contentKey}`} className="admin-content__remount">
             {children}
           </div>
         </main>

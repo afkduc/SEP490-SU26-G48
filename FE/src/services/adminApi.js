@@ -48,12 +48,11 @@ function buildQuery(params = {}) {
  *     tra ve: { id, name, email, fullName, phone, branchId, branchName, status, roles, ... }
  *
  *   - resetPassword(userId, options): POST /api/admin/users/:id/reset-password
- *     options: { mustChangePassword?: boolean, newPassword?: string }
- *       mustChangePassword: mac dinh true (co the client override qua body)
+ *     options: { newPassword?: string }
  *       newPassword:
  *         - undefined/empty -> BE sinh MK random 12 ky tu (hoa+thuong+so+dac biet)
  *         - co gia tri      -> BE validate (>=6 ky tu) va dung MK do
- *     tra ve: { userId, newPassword, isManual, mustChangePassword, message }
+ *     tra ve: { userId, newPassword, isManual, message }
  */
 class AdminUsersApi {
   list(params = {}) {
@@ -72,8 +71,8 @@ class AdminUsersApi {
     return httpClient.put(`/admin/users/${payload.userId}`, payload);
   }
 
-  resetPassword(userId, { mustChangePassword = true, newPassword } = {}) {
-    const body = { mustChangePassword };
+  resetPassword(userId, { newPassword } = {}) {
+    const body = {};
     if (newPassword !== undefined && newPassword !== null && newPassword !== '') {
       body.newPassword = newPassword;
     }
@@ -306,6 +305,10 @@ class AdminDevicesApi {
     return httpClient.delete(`/admin/devices/${deviceId}`);
   }
 
+  setTrusted(deviceId, trusted) {
+    return httpClient.patch(`/admin/devices/${deviceId}/trust`, { trusted: Boolean(trusted) });
+  }
+
   forceLogoutOthers(userId, currentDeviceId) {
     return httpClient.delete(`/admin/devices/user/${userId}/others?currentDeviceId=${currentDeviceId || ''}`);
   }
@@ -376,6 +379,16 @@ class AdminSecurityAlertsApi {
     return httpClient.get(`/admin/security-alerts${buildQuery(params)}`);
   }
 
+  /** Lịch sử đầy đủ cùng nhóm rule+user (cho popup chi tiết) */
+  related({ ruleKey, userId, pageSize = 50 } = {}) {
+    return httpClient.get(`/admin/security-alerts${buildQuery({
+      related: '1',
+      ruleKey,
+      userId: userId ?? '',
+      pageSize,
+    })}`);
+  }
+
   getCounts() {
     return httpClient.get('/admin/security-alerts/counts');
   }
@@ -413,7 +426,3 @@ class AdminVehicleBrandsApi {
 
 const adminVehicleBrandsApi = new AdminVehicleBrandsApi();
 export { AdminVehicleBrandsApi, adminVehicleBrandsApi };
-
-export async function setUserMustChangePassword(userId, mustChangePassword) {
-  return httpClient.patch(`/admin/users/${userId}/must-change-password`, { mustChangePassword });
-}

@@ -133,14 +133,13 @@ class ProfileRepositoryImpl {
     return this.findById(userId);
   }
 
-  async updatePassword(userId, passwordHash, mustChangePassword = false) {
+  async updatePassword(userId, passwordHash) {
     await query(
       `UPDATE users
-       SET    user_password         = @p1,
-              must_change_password  = @p2,
-              updated_at            = SYSUTCDATETIME()
-       WHERE  id = @p3`,
-      { p1: passwordHash, p2: mustChangePassword ? 1 : 0, p3: userId }
+       SET    user_password = @p1,
+              updated_at    = SYSUTCDATETIME()
+       WHERE  id = @p2`,
+      { p1: passwordHash, p2: userId }
     );
   }
 }

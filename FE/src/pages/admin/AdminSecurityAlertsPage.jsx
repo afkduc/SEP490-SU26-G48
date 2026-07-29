@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { adminSecurityAlertsApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
 import AdminPagination from './components/AdminPagination';
+import { emitSecurityAlertsCount } from '../../utils/securityAlertEvents';
 import './AdminShared.css';
 import './AdminSecurityAlertsPage.css';
 
@@ -32,6 +33,7 @@ const RULE_LABEL = {
   new_admin_role: 'Gán quyền Admin',
   inactive_admin: 'Admin không hoạt động',
   new_device_ip: 'IP/thiết bị mới',
+  session_takeover: 'Đăng nhập trên thiết bị khác',
 };
 
 function formatDateTime(value) {
@@ -74,7 +76,9 @@ export default function AdminSecurityAlertsPage({ embedded = false } = {}) {
   const loadCounts = useCallback(async () => {
     try {
       const data = await adminSecurityAlertsApi.getCounts();
-      setCounts(data || { total: 0, critical: 0, high: 0, medium: 0, info: 0 });
+      const next = data || { total: 0, critical: 0, high: 0, medium: 0, info: 0 };
+      setCounts(next);
+      emitSecurityAlertsCount(next);
     } catch {
       /* ignore */
     }
@@ -112,6 +116,8 @@ export default function AdminSecurityAlertsPage({ embedded = false } = {}) {
     try {
       await adminSecurityAlertsApi.ack(id);
       toast.success('Đã đánh dấu xử lý cảnh báo');
+      const optimistic = Math.max(0, (Number(counts.total) || 0) - 1);
+      emitSecurityAlertsCount({ ...counts, total: optimistic });
       await Promise.all([loadList(), loadCounts()]);
     } catch (err) {
       toast.error(err?.message || 'Không thể xử lý cảnh báo');

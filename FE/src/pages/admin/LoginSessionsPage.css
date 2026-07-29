@@ -255,6 +255,11 @@
   font-size: 0.72rem;
 }
 
+.admin-sessions__table-wrapper > .table.admin-sessions__table tbody tr.admin-sessions__row--focused td {
+  background: rgba(8, 145, 178, 0.08) !important;
+  box-shadow: inset 0 0 0 2px rgba(8, 145, 178, 0.55);
+}
+
 /* Reset override kiểu AuditLogs: td > * { display:block; white-space:nowrap } */
 .admin-sessions__table-wrapper > .table.admin-sessions__table tbody td > * {
   display: inline-flex;
