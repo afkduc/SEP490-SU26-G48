@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AppContext';
 import { usePermission } from '../contexts';
 import { getRoleHome, normalizeRoles } from '../contexts/AppContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { mergeAuthRefreshUser } from '../utils/profileSession';
 import { refreshPermissionsApi } from '../services/authApi';
 import { getPermissionScreenLabel } from '../utils/screenLabels';
@@ -40,7 +40,6 @@ export default function ProtectedRoute({
   const { set403Error, clearError } = useGlobalError();
   const location = useLocation();
   const firedRef = useRef(null);
-  const [syncDone, setSyncDone] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -77,9 +76,6 @@ export default function ProtectedRoute({
         if (typeof console !== 'undefined') {
           console.debug('[ProtectedRoute] sync perm failed (ignored):', e?.message);
         }
-      })
-      .finally(() => {
-        setSyncDone(true);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -141,20 +137,8 @@ export default function ProtectedRoute({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!syncDone) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '60vh',
-        color: '#6b7280',
-        fontSize: 14,
-      }}>
-        Đang đồng bộ quyền...
-      </div>
-    );
-  }
+  // Không chặn render bằng "Đang đồng bộ quyền..." — tránh unmount AdminLayout
+  // rồi remount → hủy request dashboard → spinner "Đang tải thống kê..." mãi.
 
   // Role sai + không pass qua permission (mode any) → redirect home
   if (hasRoleRequirement && !userHasRole && !(mode === 'any' && userHasPermission)) {

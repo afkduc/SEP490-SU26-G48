@@ -7,6 +7,8 @@ import {
   markAllAsRead,
 } from '../services/notificationApi';
 import { dispatchLoginChallenge, dispatchSessionTakenOver } from '../services/authApi';
+import { emitSecurityAlertsCount } from '../utils/securityAlertEvents';
+import { adminSecurityAlertsApi } from '../services/adminApi';
 
 const SSE_RECONNECT_DELAY_MS = 5000;
 const SSE_RECONNECT_MAX_MS = 60_000;
@@ -43,12 +45,37 @@ function maybeOpenLoginChallenge(data) {
   });
 }
 
-/** Phiên bị thay bởi login mới — popup báo người trước. */
+function parseJwtPayload() {
+  try {
+    const token =
+      (typeof localStorage !== 'undefined' && localStorage.getItem('token'))
+      || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token'));
+    if (!token) return null;
+    const part = token.split('.')[1];
+    if (!part) return null;
+    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+/** Phiên bị thay bởi login mới — popup báo người trước (không đá phiên vừa login). */
 function maybeOpenSessionTakenOver(data) {
   if (!data || typeof window === 'undefined') return;
   const metadata = parseNotifMetadata(data.metadata);
   const type = data.type || data.eventType || metadata.eventType;
   if (type !== 'SESSION_TAKEN_OVER') return;
+
+  // Người vừa login cũng nhận SSE cùng userId — bỏ qua nếu đây là phiên mới.
+  const payload = parseJwtPayload();
+  if (payload) {
+    const metaSessionId = metadata.newSessionId != null ? Number(metadata.newSessionId) : null;
+    const metaVersion = metadata.newTokenVersion != null ? Number(metadata.newTokenVersion) : NaN;
+    if (metaSessionId && Number(payload.sessionId) === metaSessionId) return;
+    if (Number.isFinite(metaVersion) && Number(payload.tokenVersion) >= metaVersion) return;
+  }
+
   dispatchSessionTakenOver({
     metadata,
     title: data.title || 'Đã có người đăng nhập tài khoản của bạn',
@@ -56,6 +83,41 @@ function maybeOpenSessionTakenOver(data) {
     device: [metadata.browser, metadata.os].filter(Boolean).join(' · ') || undefined,
     ip: metadata.ip,
   });
+}
+
+/** Cảnh báo bảo mật mới → cập nhật badge sidebar ngay (không chờ poll 60s). */
+function maybeRefreshSecurityBadge(data) {
+  if (!data || typeof window === 'undefined') return;
+  const metadata = parseNotifMetadata(data.metadata);
+  const type = data.type || data.eventType || metadata.eventType || '';
+  if (!String(type).startsWith('SECURITY_')) return;
+  adminSecurityAlertsApi
+    .getCounts()
+    .then((counts) => emitSecurityAlertsCount(counts || 0))
+    .catch(() => {});
+}
+
+/** Type dễ spam — chuông chỉ giữ 1 bản mới nhất mỗi type (đồng bộ BE). */
+const COLLAPSE_TYPES = new Set([
+  'SESSION_TAKEN_OVER',
+  'SECURITY_SESSION_TAKEOVER',
+  'NEW_DEVICE',
+  'SECURITY_NEW_DEVICE_IP',
+  'SECURITY_FAILED_LOGIN_BURST',
+  'SECURITY_INACTIVE_ADMIN',
+  'LOGIN_FAILED',
+]);
+
+function collapseNotifications(list) {
+  const seen = new Set();
+  const out = [];
+  for (const n of list) {
+    const key = COLLAPSE_TYPES.has(n?.type) ? n.type : `id:${n?.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(n);
+  }
+  return out;
 }
 
 /**
@@ -104,9 +166,10 @@ export function useNotifications(token, options = {}) {
     try {
       const list = await getNotifications({ limit: maxItems });
       const items = Array.isArray(list) ? list : (list?.items || []);
-      setNotifications(items);
+      const collapsed = collapseNotifications(items);
+      setNotifications(collapsed);
       // Dem unread tu list (tranh 1 extra request neu list da co)
-      setUnreadCount(items.filter((n) => !n.isRead && !n.readAt).length);
+      setUnreadCount(collapsed.filter((n) => !n.isRead && !n.readAt).length);
       setError(null);
     } catch (err) {
       console.warn('[useNotifications] refresh error:', err && err.message);
@@ -214,15 +277,21 @@ export function useNotifications(token, options = {}) {
           try {
             const data = JSON.parse(e.data);
             setNotifications((prev) => {
-              const next = [data, ...prev.filter((n) => n.id !== data.id)];
+              const next = collapseNotifications([data, ...prev.filter((n) => n.id !== data.id)]);
               return next.slice(0, maxItems);
             });
             const wasRead = Boolean(data.isRead || data.readAt);
             if (!wasRead) {
-              setUnreadCount((c) => c + 1);
+              // Spam type: thay bản cũ → không tăng badge vô hạn
+              if (COLLAPSE_TYPES.has(data.type)) {
+                refreshUnreadCount();
+              } else {
+                setUnreadCount((c) => c + 1);
+              }
             }
             maybeOpenLoginChallenge(data);
             maybeOpenSessionTakenOver(data);
+            maybeRefreshSecurityBadge(data);
           } catch (parseErr) {
             console.warn('[useNotifications] parse SSE error:', parseErr);
           }

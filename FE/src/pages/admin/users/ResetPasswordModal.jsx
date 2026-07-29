@@ -49,8 +49,8 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
     try {
       const payload =
         mode === 'manual'
-          ? { mustChangePassword: true, newPassword }
-          : { mustChangePassword: true };
+          ? { newPassword }
+          : {};
       const res = await adminUsersApi.resetPassword(user.id, payload);
       setResult(res);
       setPhase('result');
@@ -154,7 +154,7 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
                   </svg>
                   <span>
                     Mat khau chi hien thi <strong>1 lan</strong>. Hay copy va gui cho nguoi dung
-                    qua kenh an toan. Nguoi dung se buoc phai doi mat khau o lan dang nhap tiep theo.
+                    qua kenh an toan de dung o lan dang nhap tiep theo.
                   </span>
                 </div>
 
@@ -264,8 +264,8 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
               </svg>
               <ul className="reset-pw-warning__list">
                 <li>Mot mat khau moi se duoc tao tu dong (gom chu hoa, chu thuong, so va ky tu dac biet).</li>
-                <li>Nguoi dung se <strong>buoc phai doi mat khau</strong> o lan dang nhap tiep theo.</li>
                 <li>Mat khau chi duoc hien thi <strong>1 lan</strong> sau khi dat lai.</li>
+                <li>Hay gui mat khau moi cho nguoi dung qua kenh an toan.</li>
               </ul>
             </div>
           ) : (
@@ -327,9 +327,8 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
               )}
 
               <p className="reset-pw-form-hint">
-                Mat khau phai co it nhat {PASSWORD_MIN_LENGTH} ky tu. Nguoi dung se
-                <strong> buoc phai doi mat khau </strong>
-                o lan dang nhap tiep theo.
+                Mat khau phai co it nhat {PASSWORD_MIN_LENGTH} ky tu. Hay gui mat khau moi
+                cho nguoi dung qua kenh an toan.
               </p>
             </div>
           )}

@@ -22,3 +22,18 @@ export async function updateMyProfile(payload) {
 export async function changePassword(payload) {
   return httpClient.put('/profile/me/password', payload);
 }
+
+/** GET /api/profile/me/devices */
+export async function getMyDevices() {
+  return httpClient.get('/profile/me/devices');
+}
+
+/** PATCH /api/profile/me/devices/:id/trust { trusted: boolean } */
+export async function setMyDeviceTrusted(deviceId, trusted) {
+  return httpClient.patch(`/profile/me/devices/${deviceId}/trust`, { trusted: Boolean(trusted) });
+}
+
+/** DELETE /api/profile/me/devices/all — đăng xuất mọi thiết bị của chính mình */
+export async function logoutAllMyDevices() {
+  return httpClient.delete('/profile/me/devices/all');
+}

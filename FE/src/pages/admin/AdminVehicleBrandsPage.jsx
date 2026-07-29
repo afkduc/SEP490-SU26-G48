@@ -61,10 +61,20 @@ export default function AdminVehicleBrandsPage({ embedded = false } = {}) {
       toast.error('Tên hãng xe là bắt buộc');
       return;
     }
+    const years = Number(form.warrantyYears);
+    const km = Number(form.warrantyKm);
+    if (!Number.isFinite(years) || years < 0 || years > 100) {
+      toast.error('Số năm bảo hành phải từ 0 đến 100');
+      return;
+    }
+    if (!Number.isFinite(km) || km < 0) {
+      toast.error('Số km bảo hành phải >= 0');
+      return;
+    }
     const payload = {
       brandName: form.brandName.trim(),
-      warrantyYears: Number(form.warrantyYears) || 5,
-      warrantyKm: Number(form.warrantyKm) || 100000,
+      warrantyYears: years,
+      warrantyKm: km,
     };
     setSaving(true);
     try {

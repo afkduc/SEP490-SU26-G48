@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
-import { getAdminDashboardStats } from '../../services/adminApi';
+import { getAdminDashboardStats, adminSecurityAlertsApi } from '../../services/adminApi';
 import { getNotifications } from '../../services/notificationApi';
 import { humanizeNotificationMessage } from '../../utils/notificationDisplay';
 import { humanizeAuditDescription, getAuditActionLabel } from '../../utils/auditDisplay';
+import { SECURITY_ALERTS_COUNT_EVENT } from '../../utils/securityAlertEvents';
 import './AdminDashboardPage.css';
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
@@ -673,6 +674,7 @@ function generateAlertsFromStats(stats) {
 
 // Gop audit_logs + login_sessions thanh mot danh sach thoi gian thong nhat,
 // dam bao widget nhat ky khong bao gio trong neu it nhat mot trong hai co du lieu.
+// Gom trùng: cùng loại login (action+user+IP) / cùng audit gần giống → chỉ giữ bản mới nhất.
 function buildCombinedActivity(recentLogs, recentLogins) {
   const items = [];
 
@@ -689,7 +691,7 @@ function buildCombinedActivity(recentLogs, recentLogins) {
     items.push({
       kind: 'login_session',
       id: `session-${s.id}`,
-      time: s.login_time || s.logout_time,
+      time: s.loginTime || s.login_time || s.logoutTime || s.logout_time,
       payload: s,
     });
   });
@@ -700,7 +702,58 @@ function buildCombinedActivity(recentLogs, recentLogins) {
     return tb - ta;
   });
 
-  return items.slice(0, 10);
+  const seen = new Set();
+  const collapsed = [];
+  for (const item of items) {
+    let key;
+    if (item.kind === 'login_session') {
+      const s = item.payload || {};
+      key = `login:${s.actionType || s.action_type || ''}|${s.userName || s.user_name || ''}|${s.ipAddress || s.ip_address || ''}`;
+    } else {
+      const log = item.payload || {};
+      key = `audit:${log.action || ''}|${log.actorName || log.user_name || ''}|${log.targetType || log.table_name || ''}|${log.targetId || log.record_id || ''}|${log.responseStatus ?? log.response_status ?? ''}`;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    collapsed.push(item);
+  }
+
+  return collapsed.slice(0, 10);
+}
+
+/** Gom thông báo/cảnh báo trùng trên widget Tổng quan (giống chuông). */
+const DASH_SPAM_PATTERNS = [
+  { re: /đăng nhập trên thiết bị khác|đăng nhập thay phiên|đã có người đăng nhập tài khoản|session_takeover|SESSION_TAKEN_OVER|SECURITY_SESSION_TAKEOVER/i, key: 'session_takeover' },
+  { re: /admin không hoạt động|inactive_admin|SECURITY_INACTIVE_ADMIN/i, key: 'inactive_admin' },
+  { re: /đăng nhập từ ip mới|new_device|SECURITY_NEW_DEVICE_IP|NEW_DEVICE/i, key: 'new_device_ip' },
+  { re: /nhiều lần đăng nhập thất bại|failed_login|SECURITY_FAILED_LOGIN_BURST/i, key: 'failed_login_burst' },
+];
+
+function dashAlertCollapseKey(item) {
+  const rule = item.ruleKey || item.rule_key || item.metadata?.ruleKey;
+  const uid = item.userId || item.metadata?.relatedUserId || item.metadata?.userId || 0;
+  if (rule) return `rule:${rule}:${uid}`;
+
+  const type = item.notifType || item.metadata?.eventType || '';
+  const title = String(item.title || '');
+  const hay = `${type} ${title}`;
+  for (const { re, key } of DASH_SPAM_PATTERNS) {
+    if (re.test(hay)) return `rule:${key}:${uid}`;
+  }
+  if (type) return `type:${type}`;
+  return `id:${item.id}`;
+}
+
+function collapseDashboardAlerts(list) {
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    const key = dashAlertCollapseKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
 }
 
 function ActivityItem({ log }) {
@@ -869,19 +922,29 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+
     (async () => {
       try {
         const statsData = await getAdminDashboardStats();
-        if (!cancelled) {
-          setStats(statsData);
-        }
+        if (cancelled) return;
+        setStats(statsData);
+        setError(null);
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Không thể tải thống kê');
+        if (cancelled) return;
+        if (err?.name === 'AbortError' || err?.code === 'ABORTED' || err?.code === 'LOGGED_OUT') {
+          return;
+        }
+        setError(err.message || 'Không thể tải thống kê');
       } finally {
+        // Luôn tắt spinner trên instance còn sống — tránh kẹt "Đang tải..." khi remount
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Fetch notifications CRUD gan day (poll 60s de dashboard cap nhat realtime-like)
@@ -901,10 +964,62 @@ export default function AdminDashboardPage() {
 
     fetchNotifs();
     intervalId = setInterval(fetchNotifs, 60_000);
-
     return () => {
       cancelled = true;
       if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
+
+  // Đồng bộ số cảnh báo bảo mật (đã gom) — event từ panel + poll ngắn
+  useEffect(() => {
+    let cancelled = false;
+
+    const applyCounts = (counts) => {
+      if (cancelled || !counts) return;
+      setStats((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          alertCounts: {
+            total: Number(counts.total) || 0,
+            critical: Number(counts.critical) || 0,
+            high: Number(counts.high) || 0,
+            medium: Number(counts.medium) || 0,
+            info: Number(counts.info) || 0,
+          },
+        };
+      });
+    };
+
+    const refreshCounts = async () => {
+      try {
+        const counts = await adminSecurityAlertsApi.getCounts();
+        applyCounts(counts);
+      } catch (_) {
+        // Silent
+      }
+    };
+
+    refreshCounts();
+    const intervalId = setInterval(refreshCounts, 30_000);
+
+    const onCountEvent = (e) => {
+      const detail = e?.detail;
+      if (detail && typeof detail === 'object' && ('critical' in detail || 'high' in detail)) {
+        applyCounts(detail);
+      } else {
+        refreshCounts();
+      }
+    };
+    window.addEventListener(SECURITY_ALERTS_COUNT_EVENT, onCountEvent);
+    const onFocus = () => refreshCounts();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+      window.removeEventListener(SECURITY_ALERTS_COUNT_EVENT, onCountEvent);
+      window.removeEventListener('focus', onFocus);
     };
   }, []);
 
@@ -920,6 +1035,7 @@ export default function AdminDashboardPage() {
       message: humanizeNotificationMessage(n.message, n.metadata),
       severity: n.severity || null,
       type: n.severity || 'info',
+      notifType: n.type,
       time: n.createdAt || n.timestamp || n.created_at,
       actorName: n.metadata?.actorName || null,
       targetName: n.metadata?.targetName || null,
@@ -928,15 +1044,21 @@ export default function AdminDashboardPage() {
       _source: 'notification',
     }));
 
-    // 2. Security alerts tu backend (system alerts)
-    const backendAlerts = Array.isArray(stats.alerts) ? stats.alerts : [];
+    // 2. Security alerts — chỉ Critical/High trên widget Tổng quan
+    const backendAlerts = (Array.isArray(stats.alerts) ? stats.alerts : [])
+      .filter((a) => a.severity === 'critical' || a.severity === 'high')
+      .map((a) => ({
+        ...a,
+        ruleKey: a.ruleKey || a.rule_key,
+        userId: a.userId || a.user_id,
+      }));
 
     // 3. Alerts tu sinh (auto) neu backend tra rong
     const autoAlerts = (backendAlerts.length === 0 && notifications.length === 0)
       ? generateAlertsFromStats(stats)
       : [];
 
-    // Gop + sort theo thoi gian moi nhat
+    // Gop + sort theo thoi gian moi nhat + bỏ trùng (giống chuông)
     const all = [...notifItems, ...backendAlerts, ...autoAlerts];
     all.sort((a, b) => {
       const ta = a.time ? new Date(a.time).getTime() : 0;
@@ -944,7 +1066,7 @@ export default function AdminDashboardPage() {
       return tb - ta;
     });
 
-    return all.slice(0, 20);
+    return collapseDashboardAlerts(all).slice(0, 12);
   })();
 
   // Gop nhat ky hoat dong voi login sessions, sort theo thoi gian moi nhat.
@@ -1049,31 +1171,25 @@ export default function AdminDashboardPage() {
             />
           </div>
 
-          {/* Badge cảnh báo bảo mật chưa xử lý */}
-          {((stats.alertCounts?.total > 0) || (Array.isArray(stats.alerts) && stats.alerts.length > 0)) && (
-            <Link to="/admin/login-security?alerts=1" className="dash-alert-banner">
-              <IconAlert />
-              <span>
-                Có{' '}
-                <strong>
-                  {(stats.alertCounts?.total ?? stats.alerts?.length ?? 0) > 100
-                    ? '99+'
-                    : (stats.alertCounts?.total ?? stats.alerts?.length ?? 0)}
-                </strong>{' '}
-                cảnh báo bảo mật chưa xử lý
-                {stats.alertCounts && (
-                  <>
-                    {' '}
-                    (Critical {stats.alertCounts.critical || 0}
-                    · High {stats.alertCounts.high || 0}
-                    · Medium {stats.alertCounts.medium || 0}
-                    · Info {stats.alertCounts.info || 0})
-                  </>
-                )}
-              </span>
-              <span className="dash-alert-banner__link">Xem và xử lý <IconArrowRight /></span>
-            </Link>
-          )}
+          {/* Banner chỉ Critical/High — tránh ồn Info/Medium */}
+          {(() => {
+            const critical = Number(stats.alertCounts?.critical) || 0;
+            const high = Number(stats.alertCounts?.high) || 0;
+            const urgent = critical + high;
+            if (urgent <= 0) return null;
+            return (
+              <Link to="/admin/login-security?alerts=1" className="dash-alert-banner">
+                <IconAlert />
+                <span>
+                  Có{' '}
+                  <strong>{urgent > 99 ? '99+' : urgent}</strong>
+                  {' '}cảnh báo bảo mật cần xử lý
+                  {' '}(Critical {critical} · High {high})
+                </span>
+                <span className="dash-alert-banner__link">Xem và xử lý <IconArrowRight /></span>
+              </Link>
+            );
+          })()}
 
           {/* ── Row 2: Alerts + Logs widget ────────────────────── */}
           <div className="dash-row-2">

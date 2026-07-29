@@ -1,8 +1,8 @@
 /**
- * Helpers: map security alert → filter seed cho tab Thiết bị / Lịch sử.
+ * Helpers: map security alert → filter seed cho tab Lịch sử.
  *
- * Mục tiêu: admin bấm từ cảnh báo phải thấy đúng thiết bị + lịch sử
- * của tài khoản (hoặc của IP nếu cảnh báo không gắn user).
+ * Mục tiêu: admin bấm từ cảnh báo phải nhảy tới đúng phiên đăng nhập
+ * tại thời điểm cảnh báo (IP / sessionId / khoảng ngày).
  */
 
 export function parseAlertMeta(metadata) {
@@ -36,7 +36,7 @@ const RULE_LABEL = {
   failed_login_burst: 'Đăng nhập sai liên tiếp',
   new_admin_role: 'Gán quyền Admin',
   inactive_admin: 'Admin không hoạt động',
-  new_device_ip: 'IP/thiết bị mới',
+  session_takeover: 'Đăng nhập trên thiết bị khác',
 };
 
 /**
@@ -55,54 +55,11 @@ export function describeAlertFocus(alert) {
 }
 
 /**
- * Seed lọc danh sách thiết bị từ 1 cảnh báo.
+ * Seed lọc lịch sử đăng nhập từ 1 cảnh báo + id phiên để highlight.
  *
- * - Có userId: lọc CHÍNH XÁC theo userId (không kèm displayName — tránh AND search làm rỗng kết quả).
- * - failed_login_burst: lọc theo IP.
- * - new_device_ip: userId + ưu tiên search IP để nổi thiết bị nghi vấn.
- */
-export function buildDeviceSeedFromAlert(alert) {
-  if (!alert) return null;
-  const meta = parseAlertMeta(alert.metadata);
-  const ip = String(meta.ipAddress || meta.ip || '').trim();
-  const userName = String(alert.userName || meta.userName || '').trim();
-  const rule = alert.ruleKey || '';
-
-  if (rule === 'failed_login_burst') {
-    return {
-      userId: null,
-      search: ip,
-      isCurrent: '',
-      context: describeAlertFocus(alert),
-    };
-  }
-
-  if (rule === 'new_device_ip') {
-    return {
-      userId: alert.userId || null,
-      // Chỉ search IP khi có — không dùng displayName
-      search: ip || userName,
-      isCurrent: '',
-      context: describeAlertFocus(alert),
-    };
-  }
-
-  // inactive_admin / new_admin_role / mặc định: toàn bộ thiết bị của tài khoản
-  return {
-    userId: alert.userId || null,
-    // Không set search khi đã có userId — tránh LIKE displayName làm mất kết quả
-    search: alert.userId ? '' : userName,
-    isCurrent: '',
-    context: describeAlertFocus(alert),
-  };
-}
-
-/**
- * Seed lọc lịch sử đăng nhập từ 1 cảnh báo.
- *
- * - Cảnh báo gắn tài khoản: TOÀN BỘ lịch sử của user (không cắt ngày).
- * - failed_login_burst: theo IP + LOGIN_FAILED quanh thời điểm cảnh báo.
- * - new_device_ip: toàn bộ lịch sử user (có thể kèm IP để hẹp hơn nếu cần — mặc định full account).
+ * - new_device_ip: user + IP + ngày quanh loginTime, focus theo sessionId nếu có
+ * - failed_login_burst: IP + LOGIN_FAILED quanh thời điểm cảnh báo
+ * - còn lại: lịch sử theo user (không cắt ngày)
  */
 export function buildSessionSeedFromAlert(alert) {
   if (!alert) return null;
@@ -111,8 +68,43 @@ export function buildSessionSeedFromAlert(alert) {
   const userName = String(alert.userName || meta.userName || '').trim();
   const rule = alert.ruleKey || '';
   const createdAt = alert.createdAt ? new Date(alert.createdAt) : new Date();
+  const sessionId = meta.sessionId != null && meta.sessionId !== ''
+    ? Number(meta.sessionId)
+    : null;
+  const loginTime = meta.loginTime ? String(meta.loginTime) : '';
 
-  // Brute-force theo IP — không có user: lọc đúng vấn đề thông báo
+  // Có sessionId → ưu tiên đúng 1 phiên; vẫn giữ user/IP để modal fallback nếu id lệch
+  if (Number.isFinite(sessionId) && sessionId > 0) {
+    return {
+      userName: rule === 'session_takeover' ? userName : '',
+      ipAddress: '',
+      startDate: '',
+      endDate: '',
+      actionType: '',
+      sessionId,
+      focusSessionId: sessionId,
+      focusIp: ip,
+      focusLoginTime: loginTime || (alert.createdAt ? String(alert.createdAt) : ''),
+      context: describeAlertFocus(alert),
+    };
+  }
+
+  if (rule === 'session_takeover') {
+    const anchor = createdAt;
+    return {
+      userName,
+      ipAddress: ip,
+      startDate: toYmd(addDays(anchor, -1)),
+      endDate: toYmd(addDays(anchor, 1)),
+      actionType: 'LOGIN',
+      sessionId: null,
+      focusSessionId: null,
+      focusIp: ip,
+      focusLoginTime: alert.createdAt ? String(alert.createdAt) : '',
+      context: describeAlertFocus(alert),
+    };
+  }
+
   if (rule === 'failed_login_burst') {
     const anchor = createdAt;
     return {
@@ -121,17 +113,40 @@ export function buildSessionSeedFromAlert(alert) {
       startDate: toYmd(addDays(anchor, -1)),
       endDate: toYmd(addDays(anchor, 1)),
       actionType: 'LOGIN_FAILED',
+      sessionId: null,
+      focusSessionId: null,
+      focusIp: ip,
+      focusLoginTime: alert.createdAt ? String(alert.createdAt) : '',
       context: describeAlertFocus(alert),
     };
   }
 
-  // Cảnh báo gắn tài khoản → toàn bộ lịch sử đăng nhập của user đó
+  if (rule === 'new_device_ip') {
+    const anchor = meta.loginTime ? new Date(meta.loginTime) : createdAt;
+    return {
+      userName,
+      ipAddress: ip,
+      startDate: toYmd(addDays(anchor, -1)),
+      endDate: toYmd(addDays(anchor, 1)),
+      actionType: '',
+      sessionId: null,
+      focusSessionId: null,
+      focusIp: ip,
+      focusLoginTime: loginTime || (alert.createdAt ? String(alert.createdAt) : ''),
+      context: describeAlertFocus(alert),
+    };
+  }
+
   return {
     userName,
     ipAddress: '',
     startDate: '',
     endDate: '',
     actionType: '',
+    sessionId: null,
+    focusSessionId: null,
+    focusIp: '',
+    focusLoginTime: '',
     context: describeAlertFocus(alert),
   };
 }

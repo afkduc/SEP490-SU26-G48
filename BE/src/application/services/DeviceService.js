@@ -12,8 +12,27 @@ class DeviceService {
     return this.deviceRepository.findByUserId(Number(userId));
   }
 
-  async listAll({ userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize }) {
-    return this.deviceRepository.findAll({ userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize });
+  async listAll({ userId, search, browser, os, isCurrent, isTrusted, dateFrom, dateTo, page, pageSize }) {
+    return this.deviceRepository.findAll({
+      userId, search, browser, os, isCurrent, isTrusted, dateFrom, dateTo, page, pageSize,
+    });
+  }
+
+  async setTrustedForOwner(userId, deviceId, trusted) {
+    const device = await this.deviceRepository.findById(Number(deviceId));
+    if (!device) throw new ApiError(404, 'Thiết bị không tồn tại');
+    if (Number(device.userId) !== Number(userId)) {
+      throw new ApiError(403, 'Bạn không thể đánh dấu thiết bị của người khác');
+    }
+    const updated = await this.deviceRepository.setTrusted(deviceId, userId, Boolean(trusted));
+    if (!updated) throw new ApiError(404, 'Thiết bị không tồn tại');
+    return updated;
+  }
+
+  async setTrustedByAdmin(deviceId, trusted) {
+    const updated = await this.deviceRepository.setTrustedByAdmin(deviceId, Boolean(trusted));
+    if (!updated) throw new ApiError(404, 'Thiết bị không tồn tại');
+    return updated;
   }
 
   async forceLogoutDevice(deviceId) {

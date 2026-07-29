@@ -504,6 +504,7 @@ async function getLoginSessions(filters = {}) {
     status,
     branchId,
     ipAddress,
+    sessionId,
     page = 1,
     pageSize = 20,
   } = filters;
@@ -511,6 +512,16 @@ async function getLoginSessions(filters = {}) {
   const conditions = ['1=1'];
   const params = {};
   let paramIndex = 1;
+
+  // Exact session — dùng khi admin nhảy từ cảnh báo (kể cả phiên đã ended/offline)
+  if (sessionId != null && String(sessionId).trim() !== '') {
+    const sid = Number(sessionId);
+    if (Number.isFinite(sid) && sid > 0) {
+      conditions.push(`ls.id = @p${paramIndex}`);
+      params[`p${paramIndex}`] = sid;
+      paramIndex++;
+    }
+  }
 
   if (userName) {
     conditions.push(`LOWER(ls.user_name) LIKE LOWER(@p${paramIndex})`);

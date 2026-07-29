@@ -200,6 +200,8 @@ export default function AdminDevicesPage({
   seedUserId = null,
   seedIsCurrent = '',
   seedKey = 0,
+  seedFocusIp = '',
+  seedFocusLoginTime = '',
 } = {}) {
   const toast = useToast();
   const [devices, setDevices] = useState([]);
@@ -222,8 +224,15 @@ export default function AdminDevicesPage({
 
   const [logoutTarget, setLogoutTarget] = useState(null);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [trustBusyId, setTrustBusyId] = useState(null);
+
+  const [focusedDeviceId, setFocusedDeviceId] = useState(null);
+  const focusScrollPendingRef = useRef(false);
+  const focusPayloadRef = useRef({ ip: '', loginTime: '' });
 
   const PAGE_SIZE = 20;
+  /** Bỏ qua effect filter khi vừa seed / lần mount đầu — tránh loadData chồng → giật màn hình */
+  const skipFilterReloadRef = useRef(true);
 
   const loadData = useCallback(async (pageNum = 1, extraParams = {}) => {
     setLoading(true);
@@ -260,11 +269,23 @@ export default function AdminDevicesPage({
     }
   }, [search, userIdFilter, statusFilter, browserFilter, osFilter, dateFrom, dateTo]);
 
-  useEffect(() => { loadData(1); }, []);
+  // Mount: chỉ load mặc định khi KHÔNG có seed (seed effect sẽ load 1 lần)
+  useEffect(() => {
+    if (seedKey) return undefined;
+    loadData(1);
+    // Cho phép filter effect sau frame đầu
+    const t = requestAnimationFrame(() => {
+      skipFilterReloadRef.current = false;
+    });
+    return () => cancelAnimationFrame(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Seed từ panel cảnh báo ("Xem thiết bị")
+  // Seed từ cảnh báo / «Xử lý trên tab Thiết bị» — đúng 1 lần load
   useEffect(() => {
     if (!seedKey) return;
+    skipFilterReloadRef.current = true;
+
     const nextSearch = seedSearch || '';
     const nextUserId = seedUserId || null;
     const nextStatus = seedIsCurrent ?? '';
@@ -275,6 +296,14 @@ export default function AdminDevicesPage({
     setOsFilter('');
     setDateFrom('');
     setDateTo('');
+
+    focusPayloadRef.current = {
+      ip: seedFocusIp || '',
+      loginTime: seedFocusLoginTime || '',
+    };
+    focusScrollPendingRef.current = true;
+    setFocusedDeviceId(null);
+
     loadData(1, {
       search: nextSearch || undefined,
       userId: nextUserId || undefined,
@@ -283,12 +312,89 @@ export default function AdminDevicesPage({
       os: undefined,
       dateFrom: undefined,
       dateTo: undefined,
+    }).finally(() => {
+      // Đợi state filter settle rồi mới bật lại auto-reload
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          skipFilterReloadRef.current = false;
+        });
+      });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey]);
 
-  // Reload khi đổi filter (status/browser/os/date) — không phụ thuộc blur
+  function pickFocusDeviceId(list, focusIp, focusLoginTime) {
+    if (!Array.isArray(list) || list.length === 0) return null;
+    const ip = String(focusIp || '').trim();
+    const anchorMs = focusLoginTime ? new Date(focusLoginTime).getTime() : NaN;
+
+    const candidates = ip
+      ? list.filter((d) => String(d.ipAddress || '').trim() === ip)
+      : list;
+    if (candidates.length === 0) return null;
+
+    const toMs = (v) => {
+      const t = v ? new Date(v).getTime() : NaN;
+      return Number.isNaN(t) ? null : t;
+    };
+
+    if (!Number.isNaN(anchorMs)) {
+      let bestId = null;
+      let bestDiff = Infinity;
+      for (const d of candidates) {
+        const t = toMs(d.lastLoginAt) ?? toMs(d.lastActivityAt) ?? 0;
+        const diff = Math.abs(t - anchorMs);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestId = d.id;
+        }
+      }
+      return bestId;
+    }
+
+    // Fallback: ưu tiên thiết bị mới nhất trong danh sách filter
+    let best = candidates[0];
+    let bestMs = toMs(best.lastActivityAt) ?? toMs(best.lastLoginAt) ?? 0;
+    for (const d of candidates) {
+      const ms = toMs(d.lastActivityAt) ?? toMs(d.lastLoginAt) ?? 0;
+      if (ms > bestMs) {
+        bestMs = ms;
+        best = d;
+      }
+    }
+    return best?.id ?? null;
+  }
+
+  // Sau khi seed thay đổi + danh sách load xong, scroll tới đúng device.
   useEffect(() => {
+    if (!focusScrollPendingRef.current) return;
+    if (loading) return;
+
+    const { ip, loginTime } = focusPayloadRef.current;
+    if (!String(ip || '').trim() && !String(loginTime || '').trim()) {
+      setFocusedDeviceId(null);
+      focusScrollPendingRef.current = false;
+      return;
+    }
+
+    const focusId = pickFocusDeviceId(devices, ip, loginTime);
+    setFocusedDeviceId(focusId);
+
+    if (focusId) {
+      requestAnimationFrame(() => {
+        document.getElementById(`admin-device-row-${focusId}`)?.scrollIntoView({
+          behavior: 'auto',
+          block: 'nearest',
+        });
+      });
+    }
+
+    focusScrollPendingRef.current = false;
+  }, [devices, loading]);
+
+  // Reload khi đổi filter — bỏ qua lần mount / lúc đang seed
+  useEffect(() => {
+    if (skipFilterReloadRef.current) return;
     loadData(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, browserFilter, osFilter, dateFrom, dateTo, userIdFilter]);
@@ -440,6 +546,25 @@ export default function AdminDevicesPage({
     }
   }
 
+  async function handleToggleTrusted(device) {
+    if (!device?.id || trustBusyId) return;
+    const next = !device.isTrusted;
+    setTrustBusyId(device.id);
+    try {
+      const updated = await adminDevicesApi.setTrusted(device.id, next);
+      setDevices((prev) =>
+        prev.map((d) => (d.id === device.id
+          ? { ...d, isTrusted: updated?.isTrusted ?? next, trustedAt: updated?.trustedAt || null }
+          : d))
+      );
+      toast.success(next ? 'Đã đánh dấu thiết bị tin cậy' : 'Đã bỏ tin cậy thiết bị');
+    } catch (err) {
+      toast.error(err?.message || 'Không cập nhật được trạng thái tin cậy');
+    } finally {
+      setTrustBusyId(null);
+    }
+  }
+
   const hasActiveFilters = statusFilter || browserFilter || osFilter || dateFrom || dateTo || search || userIdFilter;
 
   return (
@@ -560,12 +685,12 @@ export default function AdminDevicesPage({
         <div className="admin-devices__table-wrap">
           <table className="admin-devices__table">
             <colgroup>
-              <col style={{ width: '22%' }} />
-              <col style={{ width: '18%' }} />
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '12%' }} />
               <col style={{ width: '14%' }} />
-              <col style={{ width: '18%' }} />
               <col style={{ width: '14%' }} />
-              <col style={{ width: '14%' }} />
+              <col style={{ width: '24%' }} />
             </colgroup>
             <thead>
               <tr>
@@ -579,7 +704,11 @@ export default function AdminDevicesPage({
             </thead>
             <tbody>
               {sortedDevices.map((device) => (
-                <tr key={device.id}>
+                <tr
+                  key={device.id}
+                  id={`admin-device-row-${device.id}`}
+                  className={focusedDeviceId === device.id ? 'admin-devices__row--focused' : ''}
+                >
                   <td>
                     <div className="admin-devices__cell-stack">
                       <span className="admin-devices__cell-title">
@@ -601,25 +730,41 @@ export default function AdminDevicesPage({
                     <span className="admin-devices__mono">{formatDate(device.lastLoginAt)}</span>
                   </td>
                   <td>
-                    <span className={`admin-devices__badge ${device.isCurrent ? 'admin-devices__badge--on' : 'admin-devices__badge--off'}`}>
-                      {device.isCurrent ? '● Hiện tại' : '○ Không hoạt động'}
-                    </span>
+                    <div className="admin-devices__status-stack">
+                      <span className={`admin-devices__badge ${device.isCurrent ? 'admin-devices__badge--on' : 'admin-devices__badge--off'}`}>
+                        {device.isCurrent ? '● Hiện tại' : '○ Không hoạt động'}
+                      </span>
+                      <span className={`admin-devices__badge ${device.isTrusted ? 'admin-devices__badge--trusted' : 'admin-devices__badge--untrusted'}`}>
+                        {device.isTrusted ? '★ Tin cậy' : 'Thiết bị lạ'}
+                      </span>
+                    </div>
                   </td>
                   <td>
-                    {!device.isCurrent ? (
-                      <span className="btn btn--secondary btn--sm btn--disabled">
-                        Đã đăng xuất
-                      </span>
-                    ) : (
+                    <div className="admin-devices__row-actions">
                       <button
                         type="button"
-                        className="btn btn--danger btn--sm"
-                        onClick={() => setLogoutTarget(device)}
-                        title="Đăng xuất khỏi thiết bị này"
+                        className={`btn btn--sm ${device.isTrusted ? 'btn--ghost' : 'btn--secondary'}`}
+                        disabled={trustBusyId === device.id}
+                        onClick={() => handleToggleTrusted(device)}
+                        title={device.isTrusted ? 'Bỏ tin cậy thiết bị này' : 'Đánh dấu thiết bị tin cậy'}
                       >
-                        <IconLogout /> Đăng xuất
+                        {trustBusyId === device.id ? '...' : (device.isTrusted ? 'Bỏ tin cậy' : 'Tin cậy')}
                       </button>
-                    )}
+                      {!device.isCurrent ? (
+                        <span className="btn btn--secondary btn--sm btn--disabled">
+                          Đã đăng xuất
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn--danger btn--sm"
+                          onClick={() => setLogoutTarget(device)}
+                          title="Đăng xuất khỏi thiết bị này"
+                        >
+                          <IconLogout /> Đăng xuất
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

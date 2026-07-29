@@ -12,6 +12,7 @@ const RULE_KEYS = {
   NEW_ADMIN_ROLE: 'new_admin_role',
   INACTIVE_ADMIN: 'inactive_admin',
   NEW_DEVICE_IP: 'new_device_ip',
+  SESSION_TAKEOVER: 'session_takeover',
 };
 
 /** Map rule_key → notification event type (chuông thông báo đồng bộ panel cảnh báo). */
@@ -20,6 +21,7 @@ const RULE_TO_NOTIF = {
   [RULE_KEYS.NEW_ADMIN_ROLE]: 'SECURITY_NEW_ADMIN_ROLE',
   [RULE_KEYS.INACTIVE_ADMIN]: 'SECURITY_INACTIVE_ADMIN',
   [RULE_KEYS.NEW_DEVICE_IP]: 'SECURITY_NEW_DEVICE_IP',
+  [RULE_KEYS.SESSION_TAKEOVER]: 'SECURITY_SESSION_TAKEOVER',
 };
 
 const SEVERITY_TO_NOTIF = {
@@ -49,56 +51,93 @@ const DB_MISSING_RE = /Invalid object name 'security_alerts'|'security_alerts' n
 let lastMissingLogTs = 0;
 
 /**
- * Deduplication: tránh spam mỗi 5 phút.
- * - Có userId: cùng user + rule_key trong 25h
- * - Không userId (vd. failed_login_burst): cùng rule_key + fingerprint (IP) trong 25h
- * - Fingerprint tùy chọn khi có userId (vd. new_device_ip theo từng IP)
+ * Deduplication:
+ * - forceNew=false (cron): nếu đã có alert chưa ack cùng nhóm → bỏ qua (không insert/notify lại).
+ * - forceNew=true (realtime takeover/burst): ack bản cũ rồi ghi bản mới + notify 1 lần.
+ * - severity=info: chỉ ghi panel cảnh báo, không đẩy chuông admin (tránh spam “IP mới”).
  */
-async function insertAlert({ severity, title, message, userId, branchId, ruleKey, metadata, fingerprint }) {
+async function insertAlert({
+  severity,
+  title,
+  message,
+  userId,
+  branchId,
+  ruleKey,
+  metadata,
+  fingerprint,
+  forceNew = false,
+}) {
   try {
     const fp = fingerprint
       || (metadata && (metadata.ipAddress || metadata.ip))
       || null;
 
-    if (userId && ruleKey) {
-      let existing;
-      if (fp) {
-        existing = await query(`
-          SELECT TOP 1 1 AS ok FROM security_alerts
-          WHERE user_id = @uid
-            AND rule_key = @rk
-            AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
-            AND metadata LIKE @fpLike
-        `, { uid: userId, rk: ruleKey, fpLike: `%${fp}%` });
-      } else {
-        existing = await query(`
-          SELECT TOP 1 1 AS ok FROM security_alerts
-          WHERE user_id = @uid
-            AND rule_key = @rk
-            AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
-        `, { uid: userId, rk: ruleKey });
+    // Nhóm: rule + user + fingerprint (IP) nếu có
+    let existsParams = { rk: ruleKey };
+    let existsSql = `
+      SELECT TOP 1 id FROM security_alerts
+      WHERE rule_key = @rk AND is_acknowledged = 0
+    `;
+    if (userId) {
+      existsSql += ' AND user_id = @uid';
+      existsParams.uid = userId;
+    } else {
+      existsSql += ' AND user_id IS NULL';
+    }
+    if (fp) {
+      existsSql += ' AND metadata LIKE @fpLike';
+      existsParams.fpLike = `%${fp}%`;
+    }
+
+    if (ruleKey) {
+      const existing = await query(existsSql, existsParams);
+      if (existing.recordset?.length && !forceNew) {
+        return false;
       }
-      if (existing.recordset && existing.recordset.length > 0) return false;
-    } else if (ruleKey) {
-      // Alerts không gắn user (burst theo IP): dedupe theo rule + fingerprint/IP
-      let existing;
-      if (fp) {
-        existing = await query(`
-          SELECT TOP 1 1 AS ok FROM security_alerts
-          WHERE rule_key = @rk
-            AND user_id IS NULL
-            AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
-            AND metadata LIKE @fpLike
-        `, { rk: ruleKey, fpLike: `%${fp}%` });
-      } else {
-        existing = await query(`
-          SELECT TOP 1 1 AS ok FROM security_alerts
-          WHERE rule_key = @rk
-            AND user_id IS NULL
-            AND created_at >= DATEADD(HOUR, -25, SYSUTCDATETIME())
-        `, { rk: ruleKey });
+
+      if (existing.recordset?.length && forceNew) {
+        if (userId) {
+          if (fp) {
+            await query(`
+              UPDATE security_alerts
+              SET is_acknowledged = 1,
+                  acknowledged_at = SYSUTCDATETIME()
+              WHERE user_id = @uid
+                AND rule_key = @rk
+                AND is_acknowledged = 0
+                AND metadata LIKE @fpLike
+            `, { uid: userId, rk: ruleKey, fpLike: `%${fp}%` });
+          } else {
+            await query(`
+              UPDATE security_alerts
+              SET is_acknowledged = 1,
+                  acknowledged_at = SYSUTCDATETIME()
+              WHERE user_id = @uid
+                AND rule_key = @rk
+                AND is_acknowledged = 0
+            `, { uid: userId, rk: ruleKey });
+          }
+        } else if (fp) {
+          await query(`
+            UPDATE security_alerts
+            SET is_acknowledged = 1,
+                acknowledged_at = SYSUTCDATETIME()
+            WHERE rule_key = @rk
+              AND user_id IS NULL
+              AND is_acknowledged = 0
+              AND metadata LIKE @fpLike
+          `, { rk: ruleKey, fpLike: `%${fp}%` });
+        } else {
+          await query(`
+            UPDATE security_alerts
+            SET is_acknowledged = 1,
+                acknowledged_at = SYSUTCDATETIME()
+            WHERE rule_key = @rk
+              AND user_id IS NULL
+              AND is_acknowledged = 0
+          `, { rk: ruleKey });
+        }
       }
-      if (existing.recordset && existing.recordset.length > 0) return false;
     }
 
     await query(
@@ -115,7 +154,15 @@ async function insertAlert({ severity, title, message, userId, branchId, ruleKey
       }
     );
 
-    // Đồng bộ chuông thông báo: mỗi alert mới → notify toàn bộ admin
+    // Chỉ chuông cho Critical/High (brute-force, takeover, gán admin...).
+    // Info + Medium inactive_admin: chỉ panel cảnh báo — tránh spam chuông.
+    if (
+      severity === 'info'
+      || ruleKey === RULE_KEYS.INACTIVE_ADMIN
+    ) {
+      return true;
+    }
+
     try {
       const eventType = RULE_TO_NOTIF[ruleKey] || 'SECURITY_ALERT';
       await getNotificationService().notifyAdmins(
@@ -258,17 +305,8 @@ async function checkNewAdminRole() {
 }
 
 /**
- * Rule 3 (MEDIUM): Admin không có action trong audit_logs 30 ngày
- *
- * Bug cu (da fix):
- *   - Chi check `audit_logs` -> neu admin moi login (chua co action nao
- *     ngoai login) se bi bao sai "30 ngay khong hoat dong".
- *   - `login_sessions` cung la mot dang "hoat dong" cua admin (login thanh
- *     cong), nen phai union 2 bang de biet dung admin co thuc su
- *     inactive hay khong.
- *
- * Fix: dem "last_activity_at" = MAX(logged_at, login_time). Neu ca hai
- * NULL hoac < 30 ngay -> that su inactive.
+ * Rule 3 (MEDIUM): Admin không có hoạt động 30 ngày.
+ * Chỉ ghi panel cảnh báo (không chuông). Tối đa 1 alert / admin / 30 ngày.
  */
 async function checkInactiveAdmin() {
   try {
@@ -292,8 +330,6 @@ async function checkInactiveAdmin() {
       JOIN roles r ON r.id = ur.role_id
       WHERE r.role_name = 'admin'
         AND u.status = 'active'
-        -- Loai bo admin dang co session active (khong biet last_action_at
-        -- vi session moi chua co action nao ngoai login -> tranh false alert)
         AND NOT EXISTS (
           SELECT 1 FROM login_sessions ls_active
           WHERE ls_active.user_id = u.id
@@ -313,6 +349,13 @@ async function checkInactiveAdmin() {
           WHERE recent.user_id = u.id
             AND recent.last_at >= DATEADD(DAY, -30, SYSUTCDATETIME())
         )
+        -- Đã báo trong 30 ngày (kể cả đã xem) → không spam lại
+        AND NOT EXISTS (
+          SELECT 1 FROM security_alerts sa
+          WHERE sa.rule_key = N'inactive_admin'
+            AND sa.user_id = u.id
+            AND sa.created_at >= DATEADD(DAY, -30, SYSUTCDATETIME())
+        )
     `);
 
     for (const row of result.recordset) {
@@ -323,6 +366,7 @@ async function checkInactiveAdmin() {
         userId: row.id,
         branchId: null,
         ruleKey: RULE_KEYS.INACTIVE_ADMIN,
+        forceNew: false,
         metadata: { lastActionAt: row.last_action_at, userName: row.user_name, email: row.email },
       });
     }
@@ -332,7 +376,8 @@ async function checkInactiveAdmin() {
 }
 
 /**
- * Rule 4 (INFO): Login từ IP mới (chưa từng thấy trong 30 ngày)
+ * Rule 4 (INFO): Login từ IP mới (chưa từng thấy trong 30 ngày).
+ * Chỉ ghi panel — không spam chuông. Bỏ qua session đã có alert / máy tin cậy.
  */
 async function checkNewDeviceIp() {
   try {
@@ -341,7 +386,7 @@ async function checkNewDeviceIp() {
       FROM login_sessions ls
       JOIN users u ON u.id = ls.user_id
       WHERE ls.action_type = 'LOGIN'
-        AND ls.login_time >= DATEADD(HOUR, -24, GETDATE())
+        AND ls.login_time >= DATEADD(HOUR, -6, GETDATE())
         AND NOT EXISTS (
           SELECT 1 FROM login_sessions ls2
           WHERE ls2.user_id = ls.user_id
@@ -355,6 +400,22 @@ async function checkNewDeviceIp() {
             AND ls3.ip_address != ls.ip_address
             AND ls3.action_type = 'LOGIN'
         )
+        -- Đã có alert chưa xử lý cùng user+IP → không tạo lại
+        AND NOT EXISTS (
+          SELECT 1 FROM security_alerts sa
+          WHERE sa.rule_key = N'new_device_ip'
+            AND sa.is_acknowledged = 0
+            AND sa.user_id = ls.user_id
+            AND sa.metadata LIKE N'%' + ls.ip_address + N'%'
+        )
+        -- Máy đã tin cậy (cùng browser+os) → không cảnh báo IP mới
+        AND NOT EXISTS (
+          SELECT 1 FROM user_devices ud
+          WHERE ud.user_id = ls.user_id
+            AND ud.is_trusted = 1
+            AND ud.browser = ls.browser
+            AND ud.os = ls.os
+        )
       ORDER BY ls.login_time DESC
     `);
 
@@ -367,6 +428,7 @@ async function checkNewDeviceIp() {
         branchId: null,
         ruleKey: RULE_KEYS.NEW_DEVICE_IP,
         fingerprint: String(row.ip_address || ''),
+        forceNew: false,
         metadata: {
           ipAddress: row.ip_address,
           userName: row.user_name,
@@ -378,6 +440,61 @@ async function checkNewDeviceIp() {
   } catch (err) {
     console.error('[securityAlertJob] checkNewDeviceIp failed:', err && err.message ? err.message : err);
   }
+}
+
+/**
+ * Gọi realtime khi sai mật khẩu đạt ngưỡng (≥5) — không chờ cron 30 phút.
+ */
+async function raiseFailedLoginBurstAlert({ ipAddress, count, identifier } = {}) {
+  const ip = ipAddress || 'unknown';
+  const cnt = Number(count) || 0;
+  if (cnt < 5) return false;
+  return insertAlert({
+    severity: 'high',
+    title: 'Nhiều lần đăng nhập thất bại',
+    message: `IP ${ip} có ${cnt} lần đăng nhập thất bại liên tiếp${identifier ? ` (tài khoản: ${identifier})` : ''}. Có thể là tấn công brute-force.`,
+    userId: null,
+    branchId: null,
+    ruleKey: RULE_KEYS.FAILED_LOGIN_BURST,
+    fingerprint: String(ip),
+    forceNew: true,
+    metadata: { ipAddress: ip, count: cnt, identifier: identifier || null },
+  });
+}
+
+/**
+ * Gọi realtime khi thiết bị B đăng nhập thay phiên thiết bị A (cùng tài khoản).
+ * Rule new_device_ip không bắt được 2 browser cùng IP localhost.
+ */
+async function raiseSessionTakeoverAlert({
+  userId,
+  userName,
+  ip,
+  browser,
+  os,
+  newSessionId,
+} = {}) {
+  if (!userId) return false;
+  const deviceLabel = [browser, os].filter(Boolean).join(' · ') || 'Thiết bị khác';
+  const location = ip || 'IP không xác định';
+  const name = userName || `user#${userId}`;
+  return insertAlert({
+    severity: 'high',
+    title: 'Đăng nhập trên thiết bị khác',
+    message: `Tài khoản "${name}" vừa đăng nhập từ thiết bị khác (${deviceLabel}, ${location}). Phiên cũ trên thiết bị trước đó đã bị đăng xuất.`,
+    userId,
+    branchId: null,
+    ruleKey: RULE_KEYS.SESSION_TAKEOVER,
+    fingerprint: String(userId),
+    forceNew: true,
+    metadata: {
+      ipAddress: ip || null,
+      userName: name,
+      browser: browser || null,
+      os: os || null,
+      sessionId: newSessionId || null,
+    },
+  });
 }
 
 async function runAllRules() {
@@ -398,12 +515,12 @@ function start() {
     console.log('[securityAlertJob] Already running');
     return;
   }
-  // Run every 5 minutes
+  // Backup quét mỗi 5 phút; sự kiện quan trọng đã raise realtime khi login fail / takeover
   scheduledTask = cron.schedule('*/5 * * * *', runAllRules, {
     scheduled: true,
     timezone: 'Asia/Ho_Chi_Minh',
   });
-  console.log('[securityAlertJob] Started — running every 5 minutes');
+  console.log('[securityAlertJob] Started — running every 5 minutes (+ realtime on login events)');
 }
 
 function stop() {
@@ -417,4 +534,11 @@ function stop() {
 // Run immediately on start (once)
 runAllRules().catch((e) => console.error('[securityAlertJob] Initial run error:', e));
 
-module.exports = { start, stop, runAllRules };
+module.exports = {
+  start,
+  stop,
+  runAllRules,
+  raiseFailedLoginBurstAlert,
+  raiseSessionTakeoverAlert,
+  RULE_KEYS,
+};

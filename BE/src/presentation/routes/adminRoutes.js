@@ -53,6 +53,7 @@ function buildAdminRouter() {
 
   router.get('/devices', controller.listDevices);
   router.get('/devices/user/:userId', controller.listUserDevices);
+  router.patch('/devices/:deviceId/trust', controller.setDeviceTrusted);
   router.delete('/devices/:deviceId', controller.forceLogoutDevice);
   router.delete('/devices/user/:userId/others', controller.forceLogoutAllOtherDevices);
   router.delete('/devices/user/:userId/all', controller.forceLogoutAllDevices);
@@ -73,8 +74,6 @@ function buildAdminRouter() {
   router.post('/vehicle-brands', controller.createVehicleBrand);
   router.put('/vehicle-brands/:id', controller.updateVehicleBrand);
   router.patch('/vehicle-brands/:id/toggle-status', controller.toggleVehicleBrandStatus);
-
-  router.patch('/users/:id/must-change-password', controller.setMustChangePassword);
 
   router.post('/sessions/cleanup', controller.cleanupDuplicateSessions);
   router.get('/login-sessions/recent', controller.getRecentLoginSessions);

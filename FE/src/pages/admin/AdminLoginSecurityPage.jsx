@@ -3,10 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import AdminLoginSessionsPage from './AdminLoginSessionsPage';
 import AdminDevicesPage from './AdminDevicesPage';
 import SecurityAlertsPanel from './SecurityAlertsPanel';
-import {
-  buildDeviceSeedFromAlert,
-  buildSessionSeedFromAlert,
-} from './securityAlertFocus';
+import SecurityAlertRelatedHistory from './SecurityAlertRelatedHistory';
+import { buildSessionSeedFromAlert } from './securityAlertFocus';
 import './AdminHub.css';
 
 const TABS = [
@@ -22,16 +20,23 @@ function IconShield() {
   );
 }
 
-function FocusContextBanner({ text, onClear }) {
+function FocusContextBanner({ text, onClear, onHandleDevices }) {
   if (!text) return null;
   return (
     <div className="admin-hub__focus-banner" role="status">
       <div className="admin-hub__focus-banner-text">
         <strong>Đang xem theo cảnh báo:</strong> {text}
       </div>
-      <button type="button" className="btn btn--ghost btn--sm" onClick={onClear}>
-        Xóa bộ lọc
-      </button>
+      <div className="admin-hub__focus-banner-actions">
+        {typeof onHandleDevices === 'function' && (
+          <button type="button" className="btn btn--primary btn--sm" onClick={onHandleDevices}>
+            Xử lý trên tab Thiết bị
+          </button>
+        )}
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onClear}>
+          Xóa bộ lọc
+        </button>
+      </div>
     </div>
   );
 }
@@ -41,20 +46,19 @@ function resolveTab(rawTab) {
   return 'devices';
 }
 
+/**
+ * Luồng gọn:
+ * 1. Tab Thiết bị — panel cảnh báo + danh sách thiết bị
+ * 2. «Xem phiên» → thẳng tab Lịch sử (lọc sẵn), không qua popup
+ * 3. Bảng «các lần cùng loại» chỉ hiện khi ≥ 2 lần
+ */
 export default function AdminLoginSecurityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = resolveTab(searchParams.get('tab'));
-  const [alertCount, setAlertCount] = useState(0);
+  const [urgentCount, setUrgentCount] = useState(0);
   const [alertsExpanded, setAlertsExpanded] = useState(
     () => searchParams.get('alerts') === '1' || searchParams.get('tab') === 'alerts'
   );
-  const [deviceSeed, setDeviceSeed] = useState({
-    key: 0,
-    search: '',
-    userId: null,
-    isCurrent: '',
-    context: '',
-  });
   const [sessionSeed, setSessionSeed] = useState({
     key: 0,
     userName: '',
@@ -62,7 +66,20 @@ export default function AdminLoginSecurityPage() {
     startDate: '',
     endDate: '',
     actionType: '',
+    sessionId: null,
+    focusSessionId: null,
+    focusIp: '',
+    focusLoginTime: '',
     context: '',
+    alert: null,
+  });
+
+  const [deviceSeed, setDeviceSeed] = useState({
+    key: 0,
+    userId: null,
+    search: '',
+    focusIp: '',
+    focusLoginTime: '',
   });
 
   useEffect(() => {
@@ -96,31 +113,25 @@ export default function AdminLoginSecurityPage() {
     });
   }, [setSearchParams]);
 
-  const handleFocusDevice = useCallback((alertOrPayload) => {
-    const seed = alertOrPayload?.ruleKey != null || alertOrPayload?.id != null
-      ? buildDeviceSeedFromAlert(alertOrPayload)
-      : alertOrPayload;
-    if (!seed) return;
-    setActiveTab('devices');
-    setDeviceSeed((prev) => ({
-      key: prev.key + 1,
-      search: seed.search || '',
-      userId: seed.userId || null,
-      isCurrent: seed.isCurrent ?? '',
-      context: seed.context || '',
-    }));
-    // Đợi tab/panel render rồi cuộn tới bảng thiết bị
-    setTimeout(() => {
-      document.getElementById('admin-devices-anchor')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    }, 80);
-  }, [setActiveTab]);
+  const handleCounts = useCallback((countsOrTotal) => {
+    if (countsOrTotal && typeof countsOrTotal === 'object') {
+      const urgent = (Number(countsOrTotal.critical) || 0) + (Number(countsOrTotal.high) || 0);
+      setUrgentCount(urgent);
+      return;
+    }
+    setUrgentCount(Number(countsOrTotal) || 0);
+  }, []);
 
+  /** Thẳng sang tab Lịch sử — lọc phiên theo cảnh báo. */
   const handleOpenSessions = useCallback((alert) => {
     const seed = buildSessionSeedFromAlert(alert);
     if (!seed) {
+      setSessionSeed((prev) => ({
+        ...prev,
+        key: prev.key + 1,
+        alert: alert || null,
+        context: alert?.title || '',
+      }));
       setActiveTab('sessions');
       return;
     }
@@ -131,20 +142,15 @@ export default function AdminLoginSecurityPage() {
       startDate: seed.startDate || '',
       endDate: seed.endDate || '',
       actionType: seed.actionType || '',
+      sessionId: seed.sessionId || null,
+      focusSessionId: seed.focusSessionId || seed.sessionId || null,
+      focusIp: seed.focusIp || '',
+      focusLoginTime: seed.focusLoginTime || '',
       context: seed.context || '',
+      alert: alert || null,
     }));
     setActiveTab('sessions');
   }, [setActiveTab]);
-
-  const clearDeviceFocus = useCallback(() => {
-    setDeviceSeed((prev) => ({
-      key: prev.key + 1,
-      search: '',
-      userId: null,
-      isCurrent: '',
-      context: '',
-    }));
-  }, []);
 
   const clearSessionFocus = useCallback(() => {
     setSessionSeed((prev) => ({
@@ -154,9 +160,30 @@ export default function AdminLoginSecurityPage() {
       startDate: '',
       endDate: '',
       actionType: '',
+      sessionId: null,
+      focusSessionId: null,
+      focusIp: '',
+      focusLoginTime: '',
       context: '',
+      alert: null,
     }));
   }, []);
+
+  /** Từ cảnh báo / phiên → tab Thiết bị để force logout. */
+  const handleOpenDevicesToProcess = useCallback((opts = {}) => {
+    const alert = opts.alert || sessionSeed.alert;
+    const userId = opts.userId || alert?.userId || null;
+    const userName = opts.userName || alert?.userName || alert?.displayName || '';
+    setDeviceSeed((prev) => ({
+      key: prev.key + 1,
+      userId: userId ? Number(userId) : null,
+      search: userId ? '' : (userName || ''),
+      focusIp: opts.ipAddress || sessionSeed.focusIp || sessionSeed.ipAddress || '',
+      focusLoginTime: opts.loginTime || sessionSeed.focusLoginTime || '',
+    }));
+    // Không thu gọn panel cảnh báo — tránh thêm nhảy layout
+    setActiveTab('devices');
+  }, [sessionSeed, setActiveTab]);
 
   return (
     <div className="admin-page admin-hub">
@@ -168,7 +195,7 @@ export default function AdminLoginSecurityPage() {
           <div className="admin-hub__title-group">
             <h1>Bảo mật đăng nhập</h1>
             <p className="admin-hub__subtitle">
-              Từ cảnh báo có thể mở đúng thiết bị và toàn bộ lịch sử của tài khoản liên quan
+              Xem cảnh báo → Đã xem hoặc Xem phiên. Xử lý đăng xuất trên danh sách thiết bị / chi tiết phiên.
             </p>
           </div>
         </div>
@@ -183,8 +210,8 @@ export default function AdminLoginSecurityPage() {
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
-            {tab.id === 'devices' && alertCount > 0 && (
-              <span className="admin-hub__tab-count">{alertCount > 100 ? '99+' : alertCount}</span>
+            {tab.id === 'devices' && urgentCount > 0 && (
+              <span className="admin-hub__tab-count">{urgentCount > 99 ? '99+' : urgentCount}</span>
             )}
           </button>
         ))}
@@ -196,25 +223,33 @@ export default function AdminLoginSecurityPage() {
             <SecurityAlertsPanel
               expanded={alertsExpanded}
               onExpandedChange={handleAlertsExpanded}
-              onFocusDevice={handleFocusDevice}
               onOpenSessions={handleOpenSessions}
-              onCountChange={setAlertCount}
+              onCountChange={handleCounts}
             />
-            <FocusContextBanner text={deviceSeed.context} onClear={clearDeviceFocus} />
             <div id="admin-devices-anchor">
               <AdminDevicesPage
                 embedded
-                seedSearch={deviceSeed.search}
-                seedUserId={deviceSeed.userId}
-                seedIsCurrent={deviceSeed.isCurrent}
                 seedKey={deviceSeed.key}
+                seedUserId={deviceSeed.userId}
+                seedSearch={deviceSeed.search}
+                seedFocusIp={deviceSeed.focusIp}
+                seedFocusLoginTime={deviceSeed.focusLoginTime}
+                seedIsCurrent="true"
               />
             </div>
           </div>
         )}
         {activeTab === 'sessions' && (
           <div className="admin-hub__stack">
-            <FocusContextBanner text={sessionSeed.context} onClear={clearSessionFocus} />
+            <FocusContextBanner
+              text={sessionSeed.context}
+              onClear={clearSessionFocus}
+              onHandleDevices={
+                (sessionSeed.alert?.userId || sessionSeed.userName)
+                  ? () => handleOpenDevicesToProcess()
+                  : undefined
+              }
+            />
             <AdminLoginSessionsPage
               embedded
               seedUserName={sessionSeed.userName}
@@ -222,7 +257,17 @@ export default function AdminLoginSecurityPage() {
               seedStartDate={sessionSeed.startDate}
               seedEndDate={sessionSeed.endDate}
               seedActionType={sessionSeed.actionType}
+              seedSessionId={sessionSeed.sessionId}
+              seedFocusSessionId={sessionSeed.focusSessionId}
+              seedFocusIp={sessionSeed.focusIp}
+              seedFocusLoginTime={sessionSeed.focusLoginTime}
               seedKey={sessionSeed.key}
+              onOpenDevicesToProcess={handleOpenDevicesToProcess}
+            />
+            <SecurityAlertRelatedHistory
+              alert={sessionSeed.alert}
+              minCount={2}
+              onClear={() => setSessionSeed((prev) => ({ ...prev, alert: null }))}
             />
           </div>
         )}

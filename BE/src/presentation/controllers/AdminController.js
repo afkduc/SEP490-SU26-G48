@@ -342,18 +342,22 @@ class AdminController {
   // UC-11: set permissions for a role
   setRolePermissions = async (req, res, next) => {
     try {
+      const ApiError = require('../../utils/ApiError');
       const { permissionIds } = req.body;
+      if (!Array.isArray(permissionIds)) {
+        throw new ApiError(400, 'permissionIds phai la mang');
+      }
       // Validation chi tiet (loai bo NaN, check ton tai) lam trong RoleService.setRolePermissions
       const permissions = await this.roleService.setRolePermissions(
         req.params.id,
-        Array.isArray(permissionIds) ? permissionIds : []
+        permissionIds
       );
       await auditCrud.update(req, {
         tableName: 'role_permissions',
         entityCode: `ID-${req.params.id}`,
         recordId: Number(req.params.id) || null,
         entityName: 'Phân quyền vai trò',
-        newData: { permissionIds: Array.isArray(permissionIds) ? permissionIds : [] },
+        newData: { permissionIds },
         description: `Cập nhật quyền cho vai trò ID ${req.params.id} (${permissions.length || 0} quyền)`,
       });
       return success(res, { items: permissions, total: permissions.length }, 'Cap nhat quyen vai tro thanh cong');
@@ -446,19 +450,30 @@ class AdminController {
   // Devices
   listDevices = async (req, res, next) => {
     try {
-      const { userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize } = req.query;
+      const { userId, search, browser, os, isCurrent, isTrusted, dateFrom, dateTo, page, pageSize } = req.query;
       const result = await this.deviceService.listAll({
         userId,
         search,
         browser,
         os,
         isCurrent,
+        isTrusted,
         dateFrom,
         dateTo,
         page: page ? Number(page) : 1,
         pageSize: pageSize ? Number(pageSize) : 20,
       });
       return success(res, result, 'Danh sach thiet bi');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setDeviceTrusted = async (req, res, next) => {
+    try {
+      const trusted = req.body?.trusted === true || req.body?.trusted === 1 || req.body?.trusted === 'true';
+      const device = await this.deviceService.setTrustedByAdmin(req.params.deviceId, trusted);
+      return success(res, device, trusted ? 'Đã đánh dấu thiết bị tin cậy' : 'Đã bỏ tin cậy thiết bị');
     } catch (err) {
       next(err);
     }
@@ -624,12 +639,24 @@ class AdminController {
   // Security Alerts
   listSecurityAlerts = async (req, res, next) => {
     try {
-      const { severity, isAcknowledged, page, pageSize } = req.query;
+      const { severity, isAcknowledged, page, pageSize, collapsed, ruleKey, userId, related } = req.query;
+
+      // ?related=1&ruleKey=...&userId=... → lịch sử đầy đủ nhóm (popup chi tiết)
+      if (related === '1' || related === 'true') {
+        const items = await this.securityAlertService.getRelated({
+          ruleKey,
+          userId: userId !== undefined && userId !== '' ? userId : null,
+          limit: pageSize ? Number(pageSize) : 50,
+        });
+        return success(res, { items, total: items.length }, 'Lich su canh bao lien quan');
+      }
+
       const result = await this.securityAlertService.list({
         severity,
         isAcknowledged: isAcknowledged !== undefined ? isAcknowledged === 'true' : undefined,
         page: page ? Number(page) : 1,
-        pageSize: pageSize ? Number(pageSize) : 20,
+        pageSize: pageSize ? Number(pageSize) : 10,
+        collapsed: collapsed !== 'false',
       });
       return success(res, result, 'Danh sach canh bao bao mat');
     } catch (err) {
@@ -764,23 +791,26 @@ class AdminController {
 
   async updateUser(req, res, next) {
     try {
-      const { userId, firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } = req.body;
-      console.log('[AdminController] updateUser - req.body:', JSON.stringify(req.body));
-      const oldData = {};
-      if (userId) {
-        try {
-          const existing = await this.adminUserService.getUserDetail(userId);
-          if (existing) {
-            oldData.firstName = existing.firstName;
-            oldData.lastName = existing.lastName;
-            oldData.email = existing.email;
-            oldData.phone = existing.phone;
-            oldData.status = existing.status;
-            oldData.roleId = existing.roleId;
-            oldData.branchId = existing.branchId;
-          }
-        } catch (_) {}
+      const userId = Number(req.params.id);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        const ApiError = require('../../utils/ApiError');
+        throw new ApiError(400, 'ID người dùng không hợp lệ');
       }
+      const { firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } = req.body;
+      console.log('[AdminController] updateUser - params.id:', userId, 'body:', JSON.stringify(req.body));
+      const oldData = {};
+      try {
+        const existing = await this.adminUserService.getUserDetail(userId);
+        if (existing) {
+          oldData.firstName = existing.firstName;
+          oldData.lastName = existing.lastName;
+          oldData.email = existing.email;
+          oldData.phone = existing.phone;
+          oldData.status = existing.status;
+          oldData.roleId = existing.roleId;
+          oldData.branchId = existing.branchId;
+        }
+      } catch (_) {}
       const updated = await this.adminUserService.updateUser({
         userId,
         firstName,
@@ -795,7 +825,7 @@ class AdminController {
       await auditCrud.update(req, {
         tableName: 'users',
         entityCode: updated?.user_code || updated?.userName || `ID-${userId}`,
-        recordId: updated?.id || Number(userId) || null,
+        recordId: updated?.id || userId,
         entityName: 'Người dùng',
         oldData,
         newData: { firstName, lastName, email, phone, status, roleId, branchId },
@@ -850,12 +880,10 @@ class AdminController {
         ));
       }
 
-      const mustChangePassword = req.body?.mustChangePassword !== false;
       const newPassword = req.body?.newPassword;
 
       const result = await this.adminUserService.resetPassword({
         userId: targetUserId,
-        mustChangePassword,
         newPassword,
       });
 
@@ -1174,10 +1202,18 @@ class AdminController {
 
   createVehicleBrand = async (req, res, next) => {
     try {
+      const ApiError = require('../../utils/ApiError');
       const brandName = String(req.body?.brandName || '').trim();
       if (!brandName) {
-        const ApiError = require('../../utils/ApiError');
         throw new ApiError(400, 'Ten hang xe la bat buoc');
+      }
+      const warrantyYears = Number(req.body?.warrantyYears);
+      const warrantyKm = Number(req.body?.warrantyKm);
+      if (!Number.isFinite(warrantyYears) || warrantyYears < 0 || warrantyYears > 100) {
+        throw new ApiError(400, 'So nam bao hanh phai tu 0 den 100');
+      }
+      if (!Number.isFinite(warrantyKm) || warrantyKm < 0) {
+        throw new ApiError(400, 'So km bao hanh phai >= 0');
       }
       const brandCode = req.body?.brandCode != null
         ? String(req.body.brandCode).trim()
@@ -1185,8 +1221,8 @@ class AdminController {
       const brand = await this.vehicleBrandRepository.create({
         brandName,
         brandCode: brandCode || undefined,
-        warrantyYears: req.body?.warrantyYears,
-        warrantyKm: req.body?.warrantyKm,
+        warrantyYears,
+        warrantyKm,
       });
       await auditCrud.create(req, {
         tableName: 'brands',
@@ -1203,12 +1239,34 @@ class AdminController {
 
   updateVehicleBrand = async (req, res, next) => {
     try {
-      const brand = await this.vehicleBrandRepository.update(req.params.id, {
-        brandName: req.body?.brandName != null ? String(req.body.brandName).trim() : undefined,
-        brandCode: req.body?.brandCode != null ? String(req.body.brandCode).trim() : undefined,
-        warrantyYears: req.body?.warrantyYears,
-        warrantyKm: req.body?.warrantyKm,
-      });
+      const ApiError = require('../../utils/ApiError');
+      const patch = {};
+      if (req.body?.brandName != null) {
+        const brandName = String(req.body.brandName).trim();
+        if (!brandName) throw new ApiError(400, 'Ten hang xe khong duoc rong');
+        patch.brandName = brandName;
+      }
+      if (req.body?.brandCode != null) {
+        patch.brandCode = String(req.body.brandCode).trim();
+      }
+      if (req.body?.warrantyYears !== undefined) {
+        const warrantyYears = Number(req.body.warrantyYears);
+        if (!Number.isFinite(warrantyYears) || warrantyYears < 0 || warrantyYears > 100) {
+          throw new ApiError(400, 'So nam bao hanh phai tu 0 den 100');
+        }
+        patch.warrantyYears = warrantyYears;
+      }
+      if (req.body?.warrantyKm !== undefined) {
+        const warrantyKm = Number(req.body.warrantyKm);
+        if (!Number.isFinite(warrantyKm) || warrantyKm < 0) {
+          throw new ApiError(400, 'So km bao hanh phai >= 0');
+        }
+        patch.warrantyKm = warrantyKm;
+      }
+      const brand = await this.vehicleBrandRepository.update(req.params.id, patch);
+      if (!brand) {
+        throw new ApiError(404, 'Hang xe khong ton tai');
+      }
       await auditCrud.update(req, {
         tableName: 'brands',
         entityCode: brand?.brandCode || brand?.brandName,
@@ -1233,32 +1291,6 @@ class AdminController {
         newData: { isActive: brand?.isActive },
       });
       return success(res, brand, 'Cap nhat trang thai hang xe thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  setMustChangePassword = async (req, res, next) => {
-    try {
-      const ApiError = require('../../utils/ApiError');
-      const userId = Number(req.params.id);
-      if (!userId) throw new ApiError(400, 'userId khong hop le');
-      const flag = req.body?.mustChangePassword !== false && req.body?.mustChangePassword !== 'false';
-      const { query } = require('../../infrastructure/database/sqlServer');
-      await query(
-        `UPDATE users SET must_change_password = @p1, updated_at = SYSUTCDATETIME() WHERE id = @p2`,
-        { p1: flag ? 1 : 0, p2: userId }
-      );
-      await auditCrud.update(req, {
-        tableName: 'users',
-        entityCode: `ID-${userId}`,
-        recordId: userId,
-        entityName: 'Người dùng',
-        newData: { mustChangePassword: flag },
-        description: flag ? 'Bật bắt buộc đổi mật khẩu' : 'Tắt bắt buộc đổi mật khẩu',
-      });
-      const user = await this.adminUserService.getUserDetail(userId);
-      return success(res, user, 'Cap nhat bat buoc doi mat khau thanh cong');
     } catch (err) {
       next(err);
     }
