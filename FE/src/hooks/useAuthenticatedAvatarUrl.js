@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
+import { API_BASE_URL } from '../config';
 
 /**
- * Load avatar qua API co JWT, tra ve blob URL an toan.
- * Quan ly revoke blob cu dung cach — tranh anh bien mat sau upload.
+ * Load avatar qua API co JWT, tra ve blob URL.
+ * Giu anh cu khi fetch loi / remount (React Strict Mode) de tranh avatar bien mat.
  */
 export function useAuthenticatedAvatarUrl(avatarFilename, cacheBuster = 0) {
   const [url, setUrl] = useState(null);
   const blobRef = useRef(null);
+  const avatarFilenameRef = useRef(avatarFilename);
+
+  useEffect(() => {
+    avatarFilenameRef.current = avatarFilename;
+  }, [avatarFilename]);
 
   useEffect(() => {
     let cancelled = false;
@@ -22,32 +28,30 @@ export function useAuthenticatedAvatarUrl(avatarFilename, cacheBuster = 0) {
       }
 
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setUrl(null);
-        return;
-      }
+      if (!token) return;
 
       try {
-        const res = await fetch(`/api/profile/me/avatar?ts=${cacheBuster}`, {
+        const res = await fetch(`${API_BASE_URL}/profile/me/avatar?ts=${cacheBuster}`, {
           headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
         });
-        if (!res.ok) {
-          if (!cancelled) setUrl(null);
-          return;
-        }
+        if (!res.ok) return;
+
         const blob = await res.blob();
         const nextUrl = URL.createObjectURL(blob);
-        if (cancelled) {
+
+        if (cancelled || avatarFilenameRef.current !== avatarFilename) {
           URL.revokeObjectURL(nextUrl);
           return;
         }
+
         if (blobRef.current) {
           URL.revokeObjectURL(blobRef.current);
         }
         blobRef.current = nextUrl;
         setUrl(nextUrl);
       } catch {
-        if (!cancelled) setUrl(null);
+        // Giu url hien tai neu fetch that bai (upload vua xong, reload tam thoi...)
       }
     }
 
@@ -57,13 +61,6 @@ export function useAuthenticatedAvatarUrl(avatarFilename, cacheBuster = 0) {
       cancelled = true;
     };
   }, [avatarFilename, cacheBuster]);
-
-  useEffect(() => () => {
-    if (blobRef.current) {
-      URL.revokeObjectURL(blobRef.current);
-      blobRef.current = null;
-    }
-  }, []);
 
   return url;
 }

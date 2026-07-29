@@ -27,14 +27,14 @@ const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralD
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
-const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
-const AdminDevicesPage = lazy(() => import('../pages/admin/AdminDevicesPage'));
-const AdminSpecialtiesPage = lazy(() => import('../pages/admin/AdminSpecialtiesPage'));
+const AdminCatalogPage = lazy(() => import('../pages/admin/AdminCatalogPage'));
+const AdminLoginSecurityPage = lazy(() => import('../pages/admin/AdminLoginSecurityPage'));
+const AdminAccountPage = lazy(() => import('../pages/admin/AdminAccountPage'));
 const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
-const LoginSessionsPage = lazy(() => import('../pages/admin/AdminLoginSessionsPage'));
-const AdminProfileNotificationsPage = lazy(() => import('../pages/admin/AdminProfileNotificationsPage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
+/** Legacy alias — chi nhánh đã redirect sang /admin/catalog; giữ import để tránh HMR ReferenceError */
+const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'));
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
 const SupplierListPage = lazy(() => import('../pages/inventory/SupplierListPage'));
@@ -167,15 +167,21 @@ function AppRoutes() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="users" element={<AdminUsersPage />} />
-          <Route path="branches" element={<AdminBranchesPage />} />
           <Route path="roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
-          <Route path="devices" element={<AdminDevicesPage />} />
-          <Route path="specialties" element={<AdminSpecialtiesPage />} />
+          <Route path="catalog" element={<AdminCatalogPage />} />
+          <Route path="branches" element={<Navigate to="/admin/catalog" replace />} />
+          <Route path="specialties" element={<Navigate to="/admin/catalog?tab=specialties" replace />} />
+          <Route path="vehicle-brands" element={<Navigate to="/admin/catalog?tab=brands" replace />} />
+          <Route path="settings" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="broadcasts" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="login-security" element={<AdminLoginSecurityPage />} />
+          <Route path="security-alerts" element={<Navigate to="/admin/login-security?alerts=1" replace />} />
+          <Route path="login-sessions" element={<Navigate to="/admin/login-security?tab=sessions" replace />} />
+          <Route path="devices" element={<Navigate to="/admin/login-security" replace />} />
           <Route path="logs" element={<AuditLogsPage />} />
-          <Route path="login-sessions" element={<LoginSessionsPage />} />
-          <Route path="profile" element={<AdminProfilePage />} />
-          <Route path="profile/edit" element={<AdminProfilePage />} />
-          <Route path="profile/notifications" element={<AdminProfileNotificationsPage />} />
+          <Route path="profile" element={<AdminAccountPage />} />
+          <Route path="profile/edit" element={<AdminAccountPage />} />
+          <Route path="profile/notifications" element={<Navigate to="/admin/profile?tab=notifications" replace />} />
         </Route>
 
         {/* Hồ sơ cá nhân — URL view/edit riêng cho từng role (AppLayout) */}

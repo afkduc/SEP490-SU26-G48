@@ -4,7 +4,7 @@ const { trackActivity } = require('../../middlewares');
 const { success } = require('../../utils/response');
 const AuditService = require('../../application/services/AuditService');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
-const { exportAuditLogsToExcel } = require('../../utils/excelExporter');
+const { exportAuditLogsToExcel, exportLoginSessionsToExcel } = require('../../utils/excelExporter');
 
 /**
  * Audit routes - chi danh cho user co role admin
@@ -128,10 +128,47 @@ function buildAuditRouter() {
         endDate: req.query.endDate,
         status: req.query.status,
         branchId: req.query.branchId,
+        ipAddress: req.query.ipAddress,
         page: req.query.page,
         pageSize: req.query.pageSize,
       });
       return success(res, data, 'Lay danh sach login session thanh cong');
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  router.get('/login-sessions/export', async (req, res, next) => {
+    try {
+      const { items } = await auditService.exportLoginSessions({
+        userName: req.query.userName,
+        phone: req.query.phone,
+        actionType: req.query.actionType,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+        status: req.query.status,
+        branchId: req.query.branchId,
+        ipAddress: req.query.ipAddress,
+      });
+      const buffer = await exportLoginSessionsToExcel(items || [], {
+        userName: req.query.userName,
+        phone: req.query.phone,
+        actionType: req.query.actionType,
+        status: req.query.status,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+      });
+
+      const date = new Date();
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const filename = `login_sessions_${yyyy}${mm}${dd}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', buffer.length);
+      return res.send(Buffer.from(buffer));
     } catch (err) {
       return next(err);
     }
