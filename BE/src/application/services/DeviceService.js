@@ -313,21 +313,79 @@ class DeviceService {
   async heartbeat(deviceId) {
     const { query } = require('../../infrastructure/database/sqlServer');
     const devId = Number(deviceId);
-    // 1. Update user_devices.last_activity_at (existing logic)
+    // 1. Update user_devices.last_activity_at
     const updatedDevice = await this.deviceRepository.updateLastActivityIfNeeded(devId);
-    // 2. Update login_sessions.last_activity_at (BUG FIX: was missing)
-    //    This ensures the cleanup job can correctly identify stale sessions.
-    //    Use throttle: only update if >= 60s since last update to avoid DB spam.
+
+    // 2. Neu session vua bi TIMEOUT nham (user van heartbeat) → mo lai
+    //    Chi revive session TIMEOUT gan day cua dung device, va chi khi
+    //    user khong con session active nao khac.
     await query(
-      `UPDATE TOP (1) login_sessions
-       SET    last_activity_at = SYSUTCDATETIME()
-       WHERE  device_id = @p1
-         AND  status    = 'active'
-         AND  action_type = 'LOGIN'
-         AND  (last_activity_at IS NULL
-               OR last_activity_at < DATEADD(SECOND, -60, SYSUTCDATETIME()))`,
+      `UPDATE ls
+       SET    ls.status = 'active',
+              ls.logout_time = NULL,
+              ls.logout_reason = NULL,
+              ls.session_duration_seconds = NULL,
+              ls.last_activity_at = SYSUTCDATETIME()
+       FROM   login_sessions ls
+       INNER JOIN user_devices ud ON ud.id = @p1 AND ud.user_id = ls.user_id
+       WHERE  ls.device_id = @p1
+         AND  ls.status = 'ended'
+         AND  ls.logout_reason = 'TIMEOUT'
+         AND  ls.action_type = 'LOGIN'
+         AND  ls.logout_time >= DATEADD(HOUR, -2, SYSUTCDATETIME())
+         AND  NOT EXISTS (
+           SELECT 1 FROM login_sessions a
+           WHERE  a.user_id = ls.user_id
+             AND  a.status = 'active'
+             AND  a.action_type = 'LOGIN'
+         )`,
       { p1: devId }
     );
+
+    // 3. Chi update session active GAN DUNG device nay (khong touch session thiet bi khac).
+    await query(
+      `UPDATE ls
+       SET    ls.last_activity_at = SYSUTCDATETIME()
+       FROM   login_sessions ls
+       WHERE  ls.device_id = @p1
+         AND  ls.status = 'active'
+         AND  ls.action_type = 'LOGIN'
+         AND  (ls.last_activity_at IS NULL
+               OR ls.last_activity_at < DATEADD(SECOND, -60, SYSUTCDATETIME()))`,
+      { p1: devId }
+    );
+
+    // 4. Heal is_current CHI khi DUNG device nay con session active.
+    // Bug cu: check EXISTS session cua USER → device cu bi bat lai "Hiện tại"
+    // khi user da login o thiet bi khac (2 dong Hiện tại cùng lúc).
+    await query(
+      `UPDATE ud
+       SET    ud.is_current = 1
+       FROM   user_devices ud
+       WHERE  ud.id = @p1
+         AND  ud.is_current = 0
+         AND  EXISTS (
+           SELECT 1 FROM login_sessions ls
+           WHERE  ls.device_id = ud.id
+             AND  ls.user_id = ud.user_id
+             AND  ls.status = 'active'
+             AND  ls.action_type = 'LOGIN'
+         )`,
+      { p1: devId }
+    );
+
+    // 5. Single-session: neu device nay dang current thi tat cac device khac cung user.
+    await query(
+      `UPDATE other
+       SET    other.is_current = 0
+       FROM   user_devices other
+       INNER JOIN user_devices cur ON cur.id = @p1 AND cur.user_id = other.user_id
+       WHERE  other.id <> @p1
+         AND  other.is_current = 1
+         AND  cur.is_current = 1`,
+      { p1: devId }
+    );
+
     return {
       updated: updatedDevice,
       deviceId: devId,

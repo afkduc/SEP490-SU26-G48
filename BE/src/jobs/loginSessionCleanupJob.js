@@ -1,52 +1,26 @@
 /**
- * Job tu dong cleanup cac phien dang nhap stale (khong heartbeat >= 15 phut)
+ * Job tu dong cleanup cac phien dang nhap stale (khong heartbeat)
  * va backfill du lieu browser/os cho cac row cu.
  *
- * Chay ngay khi server khoi dong va moi 5 phut.
+ * Chay ngay khi server khoi dong va moi 1 phut.
  *
- * Vi sao can job nay:
- *   - User dong tab / mat ket noi -> khong goi duoc /api/auth/logout
- *   -> phien mac dinh o trang thai 'active' mai mai
- *   - Job se tu dong dong cac phien co last_activity_at < 15 phut truoc
- *     (last_activity_at duoc cap nhat moi 60s qua heartbeat).
- *   - Dong thoi backfill browser/os cho row cu bi NULL (inserted truoc khi fix).
- *
- * THRESHOLD GOC: 24h. VI LY DO:
- *   - Admin logout nhung session van 'active' → visible 24h qua trang "Lich su"
- *   - Cleanup nhat 1h/lan → moi session stale co the ton tai 24-25h.
- *
- * THRESHOLD MOI: 15 phut tu last heartbeat. Job chay moi 5 phut.
- *   → User dong tab khong logout → toi da 20 phut sau session bi close.
- *   → Trang "Lich su" luon phan anh trang thai that (< 20 phut lag).
+ * QUAN TRONG (bug da fix):
+ *   Khi dong session stale, KHONG duoc set is_current=0 cho TAT CA device
+ *   cua user neu user van con session active khac. Truoc day lam dung vay
+ *   → admin dang dung app nhung man Thiet bi / Lich su hien "da dang xuat".
  */
 
 const { query, executeTransaction } = require('../infrastructure/database/sqlServer');
 
-// Nguong stale: 5 phut khong co heartbeat → session bi close.
-// Job chay moi 1 phut → toi da session stale = 6 phut.
-// (Cu: 15 phut, chay 5 phut/lan → toi da 20 phut stale → user thay
-// "5 phien dang hoat dong" tren man login history trong khi that te
-// chi co 1. Giam xuong 5 phut de phan anh trang thai that gan nhat.)
-const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '5', 10);
-const STALE_HOURS = STALE_MINUTES / 60; // giu tuong thich voi code cu
-// Gioi han de tranh CPU lock neu backlog rat lon (millions rows).
-// Moi batch update TOP(@p1) rows, sau do delay 1s de DB va event loop thay.
-// MAX_ITERATIONS an toan de 1 lan job khong chay qua lau (max ~30 phut).
+// Nguong stale: khong heartbeat → coi la dong tab. Mac dinh 30 phut
+// (an toan hon 5 phut khi heartbeat/API loi tam thoi).
+const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '30', 10);
 const BACKFILL_BATCH = 1000;
-const BACKFILL_MAX_ITERATIONS = 100; // 100 * 1000 = 100k rows moi lan runAll
-const BACKFILL_DELAY_MS = 1000; // delay giua moi batch
+const BACKFILL_MAX_ITERATIONS = 100;
+const BACKFILL_DELAY_MS = 1000;
 
 async function cleanupStaleSessions() {
   try {
-    // QUAN TRONG: dung last_activity_at (cap nhat boi heartbeat moi 60s), KHONG
-    // dung login_time. Vi login_time chi cap nhat khi login, con last_activity_at
-    // la "lan hoat dong cuoi cung" (heartbeat). Neu user login 1h truoc, van
-    // dang dung (heartbeat vua chay) → KHONG close. Neu user dong tab 6 phut
-    // truoc → close ngay lap tuc.
-    //
-    // TRANSACTION: close session + close device cung luc de dam bao rang
-    // 2 màn login-history va devices luon dong bo (cu: 2 query rieng le,
-    // co the 1 query fail lam 1 màn hien "active" trong khi màn kia da end).
     const result = await executeTransaction(async (txQuery) => {
       const closedSessions = await txQuery(
         `UPDATE login_sessions
@@ -54,31 +28,67 @@ async function cleanupStaleSessions() {
                 logout_reason            = 'TIMEOUT',
                 session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
                 status                   = 'ended'
-         OUTPUT INSERTED.user_id
+         OUTPUT INSERTED.user_id, INSERTED.device_id
          WHERE  status               = 'active'
            AND  action_type          = 'LOGIN'
            AND  COALESCE(last_activity_at, login_time) < DATEADD(MINUTE, -@p1, SYSUTCDATETIME())`,
         { p1: STALE_MINUTES }
       );
+
+      const rows = closedSessions.recordset || [];
       const userIds = [...new Set(
-        (closedSessions.recordset || []).map((r) => Number(r.user_id)).filter(Number.isFinite)
+        rows.map((r) => Number(r.user_id)).filter(Number.isFinite)
       )];
+      const deviceIds = [...new Set(
+        rows.map((r) => Number(r.device_id)).filter(Number.isFinite)
+      )];
+
+      // Chi tat device khi user KHONG CON session active nao.
+      // Neu van con session live → giu is_current (tranh mat trang thai dang hoat dong).
       if (userIds.length > 0) {
-        // Dong cac device cua nhung user nay neu is_current=1
         const inClause = userIds.map((_, i) => `@u${i}`).join(',');
         const params = Object.fromEntries(userIds.map((id, i) => [`u${i}`, id]));
         await txQuery(
           `UPDATE user_devices
            SET    is_current = 0
            WHERE  is_current = 1
-             AND  user_id IN (${inClause})`,
+             AND  user_id IN (${inClause})
+             AND  NOT EXISTS (
+               SELECT 1
+               FROM   login_sessions ls
+               WHERE  ls.user_id = user_devices.user_id
+                 AND  ls.status = 'active'
+                 AND  ls.action_type = 'LOGIN'
+             )`,
           params
         );
       }
-      return closedSessions.rowsAffected && closedSessions.rowsAffected[0] ? closedSessions.rowsAffected[0] : 0;
+
+      // Neu session stale gan device_id cu the va user khong con session live
+      // → dam bao device do cung tat (phong truong hop user_id NULL).
+      if (deviceIds.length > 0) {
+        const inDev = deviceIds.map((_, i) => `@d${i}`).join(',');
+        const params = Object.fromEntries(deviceIds.map((id, i) => [`d${i}`, id]));
+        await txQuery(
+          `UPDATE user_devices
+           SET    is_current = 0
+           WHERE  id IN (${inDev})
+             AND  is_current = 1
+             AND  NOT EXISTS (
+               SELECT 1
+               FROM   login_sessions ls
+               WHERE  ls.user_id = user_devices.user_id
+                 AND  ls.status = 'active'
+                 AND  ls.action_type = 'LOGIN'
+             )`,
+          params
+        );
+      }
+
+      return rows.length;
     });
     if (result > 0) {
-      console.log(`[loginSessionJob] Cleaned ${result} stale sessions + their devices (>= ${STALE_MINUTES} min no heartbeat)`);
+      console.log(`[loginSessionJob] Cleaned ${result} stale sessions (>= ${STALE_MINUTES} min no heartbeat)`);
     }
   } catch (err) {
     console.error('[loginSessionJob] cleanupStaleSessions failed:', err && err.message ? err.message : err);
@@ -86,38 +96,22 @@ async function cleanupStaleSessions() {
 }
 
 /**
- * Dong tat ca device co is_current=1 nhung khong co session active nao
- * (hoac session cua no da stale > 15 phut khong heartbeat).
- *
- * Vi du: user bi dong tab, device van la is_current=1 nhung session da
- * bi cleanup job dong roi.
+ * Tat device is_current=1 khi user khong con session active nao.
+ * KHONG tat device chi vi ton tai 1 session stale khac (bug cu).
  */
 async function cleanupOrphanedDevices() {
   try {
-    // Dong bo theo 2 tieu chi:
-    //  (a) device is_current=1 nhung khong con session active nao
-    //  (b) device is_current=1 nhung session active da stale > 15 phut
     const result = await query(
       `UPDATE ud
        SET    ud.is_current = 0
        FROM   user_devices ud
        WHERE  ud.is_current = 1
-         AND (
-           NOT EXISTS (
-             SELECT 1 FROM login_sessions ls
-             WHERE  ls.user_id = ud.user_id
-               AND  ls.status = 'active'
-               AND  ls.action_type = 'LOGIN'
-           )
-           OR EXISTS (
-             SELECT 1 FROM login_sessions ls
-             WHERE  ls.user_id = ud.user_id
-               AND  ls.status = 'active'
-               AND  ls.action_type = 'LOGIN'
-               AND  COALESCE(ls.last_activity_at, ls.login_time) < DATEADD(MINUTE, -@p1, SYSUTCDATETIME())
-           )
-         )`,
-      { p1: STALE_MINUTES }
+         AND  NOT EXISTS (
+           SELECT 1 FROM login_sessions ls
+           WHERE  ls.user_id = ud.user_id
+             AND  ls.status = 'active'
+             AND  ls.action_type = 'LOGIN'
+         )`
     );
     const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
     if (affected > 0) {
@@ -128,11 +122,105 @@ async function cleanupOrphanedDevices() {
   }
 }
 
+/**
+ * Heal: neu user dang co session active gan device_id ma device bi is_current=0
+ * (do bug cleanup cu) → bat lai is_current=1.
+ */
+async function healActiveDevices() {
+  try {
+    // Chi heal device gan session active MOI NHAT cua tung user
+    // (tranh heal ca Chrome + Edge → 2 dong "Hiện tại").
+    const result = await query(
+      `UPDATE ud
+       SET    ud.is_current = 1,
+              ud.last_activity_at = COALESCE(ud.last_activity_at, SYSUTCDATETIME())
+       FROM   user_devices ud
+       INNER JOIN (
+         SELECT ls.user_id, ls.device_id,
+                ROW_NUMBER() OVER (
+                  PARTITION BY ls.user_id
+                  ORDER BY COALESCE(ls.last_activity_at, ls.login_time) DESC, ls.id DESC
+                ) AS rn
+         FROM   login_sessions ls
+         WHERE  ls.status = 'active'
+           AND  ls.action_type = 'LOGIN'
+           AND  ls.device_id IS NOT NULL
+       ) latest ON latest.user_id = ud.user_id
+                AND latest.device_id = ud.id
+                AND latest.rn = 1
+       WHERE  ud.is_current = 0`
+    );
+    const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
+    if (affected > 0) {
+      console.log(`[loginSessionJob] Healed ${affected} device(s) still tied to newest active session`);
+    }
+
+    // Dam bao moi user chi co 1 device is_current=1 (device cua session moi nhat).
+    const demoted = await query(
+      `UPDATE ud
+       SET    ud.is_current = 0
+       FROM   user_devices ud
+       WHERE  ud.is_current = 1
+         AND  NOT EXISTS (
+           SELECT 1
+           FROM (
+             SELECT ls.user_id, ls.device_id,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY ls.user_id
+                      ORDER BY COALESCE(ls.last_activity_at, ls.login_time) DESC, ls.id DESC
+                    ) AS rn
+             FROM   login_sessions ls
+             WHERE  ls.status = 'active'
+               AND  ls.action_type = 'LOGIN'
+               AND  ls.device_id IS NOT NULL
+           ) latest
+           WHERE latest.user_id = ud.user_id
+             AND latest.device_id = ud.id
+             AND latest.rn = 1
+         )
+         AND EXISTS (
+           SELECT 1 FROM login_sessions ls
+           WHERE  ls.user_id = ud.user_id
+             AND  ls.status = 'active'
+             AND  ls.action_type = 'LOGIN'
+         )`
+    );
+    const demotedCount = demoted.rowsAffected && demoted.rowsAffected[0] ? demoted.rowsAffected[0] : 0;
+    if (demotedCount > 0) {
+      console.log(`[loginSessionJob] Demoted ${demotedCount} extra current device(s) to inactive`);
+    }
+  } catch (err) {
+    console.error('[loginSessionJob] healActiveDevices failed:', err && err.message ? err.message : err);
+  }
+}
+
+/**
+ * Heal session active nhung status hien "ended" tren UI do lech device:
+ * khong can — session status la nguon that. Chi heal device o tren.
+ *
+ * Them: neu session active nhung last_activity_at null → set = login_time
+ * de tranh bi timeout ngay lap tuc.
+ */
+async function healSessionActivityTimestamp() {
+  try {
+    const result = await query(
+      `UPDATE login_sessions
+       SET    last_activity_at = login_time
+       WHERE  status = 'active'
+         AND  action_type = 'LOGIN'
+         AND  last_activity_at IS NULL
+         AND  login_time IS NOT NULL`
+    );
+    const affected = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
+    if (affected > 0) {
+      console.log(`[loginSessionJob] Backfilled last_activity_at for ${affected} active session(s)`);
+    }
+  } catch (err) {
+    console.error('[loginSessionJob] healSessionActivityTimestamp failed:', err && err.message ? err.message : err);
+  }
+}
+
 async function backfillBrowserOs(limit = BACKFILL_BATCH) {
-  // Dung iterative loop (khong recursive setImmediate) de:
-  //  - Gioi han so iteration (MAX_ITERATIONS) tranh CPU lock khi backlog lon.
-  //  - Co the await Promise-based delay giua moi batch -> event loop tho hang.
-  //  - Co the break som khi khong con row nao can backfill (affected = 0).
   const start = Date.now();
   let total = 0;
   for (let i = 0; i < BACKFILL_MAX_ITERATIONS; i++) {
@@ -166,9 +254,7 @@ async function backfillBrowserOs(limit = BACKFILL_BATCH) {
     }
 
     total += affected;
-    if (affected === 0) break; // Het row can backfill -> dung som
-
-    // Delay giua cac batch de DB va event loop khong bi qua tai.
+    if (affected === 0) break;
     await new Promise((r) => setTimeout(r, BACKFILL_DELAY_MS));
   }
 
@@ -196,8 +282,10 @@ async function backfillLogoutReason() {
 }
 
 async function runAll() {
+  await healSessionActivityTimestamp();
   await cleanupStaleSessions();
   await cleanupOrphanedDevices();
+  await healActiveDevices();
   await backfillLogoutReason();
   await backfillBrowserOs();
 }
@@ -205,11 +293,7 @@ async function runAll() {
 let timer = null;
 
 function start() {
-  // Chay 1 lan ngay khi server start
   setImmediate(runAll);
-  // Lap lai moi 1 phut (thay vi 5 phut) → session stale toi da = 5+1=6 phut.
-  // Gop ca cleanupStaleSessions + cleanupOrphanedDevices de tranh tinh
-  // trang session dong nhung device van "current" (hoac nguoc lai).
   timer = setInterval(runAll, 60 * 1000);
   console.log(`[loginSessionJob] Started - cleanup every 1 minute, stale threshold = ${STALE_MINUTES} min (no heartbeat)`);
 }
@@ -221,4 +305,13 @@ function stop() {
   }
 }
 
-module.exports = { start, stop, runAll, cleanupStaleSessions, cleanupOrphanedDevices, backfillBrowserOs, backfillLogoutReason };
+module.exports = {
+  start,
+  stop,
+  runAll,
+  cleanupStaleSessions,
+  cleanupOrphanedDevices,
+  healActiveDevices,
+  backfillBrowserOs,
+  backfillLogoutReason,
+};

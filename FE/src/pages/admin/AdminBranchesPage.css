@@ -66,8 +66,8 @@
   font-weight: 600;
 }
 
-/* ── Buttons ─────────────────────────────────────────────────────── */
-.btn {
+/* ── Buttons (scoped — tránh pollute global .btn khi CSS còn lại sau SPA nav) ── */
+.admin-branches .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -83,7 +83,7 @@
   text-decoration: none;
 }
 
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.admin-branches .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .admin-shell .admin-content .admin-branches .btn--primary,
 .admin-shell .admin-content .admin-branches .btn.btn--primary {
@@ -104,35 +104,35 @@
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35) !important;
 }
 
-.btn--secondary {
+.admin-branches .btn--secondary {
   background: #fff;
   color: #374151;
   border-color: #d1d5db;
 }
-.btn--secondary:hover:not(:disabled) { background: #f9fafb; border-color: #9ca3af; }
+.admin-branches .btn--secondary:hover:not(:disabled) { background: #f9fafb; border-color: #9ca3af; }
 
-.btn--danger {
+.admin-branches .btn--danger {
   background: #fff;
   color: #dc2626;
   border-color: #fecaca;
 }
-.btn--danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
+.admin-branches .btn--danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
 
-.btn--sm { padding: 6px 12px; font-size: 0.8rem; }
+.admin-branches .btn--sm { padding: 6px 12px; font-size: 0.8rem; }
 
-.btn--icon {
+.admin-branches .btn--icon {
   width: 32px;
   height: 32px;
   padding: 0;
   justify-content: center;
 }
 
-.btn--ghost {
+.admin-branches .btn--ghost {
   background: transparent;
   color: #64748b;
   border-color: transparent;
 }
-.btn--ghost:hover { background: #f1f5f9; color: #1e293b; }
+.admin-branches .btn--ghost:hover { background: #f1f5f9; color: #1e293b; }
 
 /* ── Stats Row ────────────────────────────────────────────────────── */
 .admin-branches__stats-row {
@@ -552,26 +552,26 @@
   border-top: 1px solid #e2e8f0;
 }
 
-/* ── Forms ────────────────────────────────────────────────────────── */
-.form-group {
+/* ── Forms (scoped trong modal — không pollute .form-group global) ── */
+.branch-modal .form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.form-group label {
+.branch-modal .form-group label {
   font-size: 0.85rem;
   font-weight: 600;
   color: #374151;
 }
 
-.form-group label span {
+.branch-modal .form-group label span {
   color: #ef4444;
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
+.branch-modal .form-group input,
+.branch-modal .form-group select,
+.branch-modal .form-group textarea {
   width: 100%;
   padding: 9px 12px;
   border: 1.5px solid #d1d5db;
@@ -584,22 +584,22 @@
   font-family: inherit;
 }
 
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
+.branch-modal .form-group input:focus,
+.branch-modal .form-group select:focus,
+.branch-modal .form-group textarea:focus {
   outline: none;
   border-color: var(--ag-primary, #4f46e5);
   box-shadow: 0 0 0 3px var(--ag-focus-ring, rgba(79, 70, 229, 0.35));
 }
 
-.form-group input:disabled,
-.form-group select:disabled {
+.branch-modal .form-group input:disabled,
+.branch-modal .form-group select:disabled {
   background: #f8fafc;
   color: #94a3b8;
   cursor: not-allowed;
 }
 
-.form-group .form-hint {
+.branch-modal .form-group .form-hint {
   font-size: 0.75rem;
   color: #94a3b8;
   margin: 0;

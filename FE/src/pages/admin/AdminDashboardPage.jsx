@@ -854,10 +854,10 @@ function QuickAction({ to, icon, label, desc, accent }) {
 
 const QUICK_ACTIONS = [
   { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem, chỉnh sửa & phân quyền', accent: '#4f46e5' },
-  { to: '/admin/users/create', icon: <IconUsers />, label: 'Thêm người dùng mới', desc: 'Tạo tài khoản mới', accent: '#059669' },
+  { to: '/admin/login-security', icon: <IconAlert />, label: 'Bảo mật đăng nhập', desc: 'Thiết bị + tín hiệu cảnh báo', accent: '#ef4444' },
   { to: '/admin/logs', icon: <IconLog />, label: 'Nhật ký hoạt động', desc: 'Lịch sử thao tác', accent: '#d97706' },
-  { to: '/admin/login-sessions', icon: <IconLogin />, label: 'Lịch sử đăng nhập', desc: 'Theo dõi thiết bị & phiên', accent: '#0891b2' },
-  { to: '/admin/profile', icon: <IconTerminal />, label: 'Hồ sơ cá nhân', desc: 'Chỉnh sửa thông tin', accent: '#db2777' },
+  { to: '/admin/catalog', icon: <IconLogin />, label: 'Danh mục hệ thống', desc: 'Chi nhánh · Chuyên môn · Hãng xe', accent: '#0891b2' },
+  { to: '/admin/profile', icon: <IconTerminal />, label: 'Tài khoản của tôi', desc: 'Hồ sơ & thông báo', accent: '#db2777' },
 ];
 
 export default function AdminDashboardPage() {
@@ -1049,6 +1049,32 @@ export default function AdminDashboardPage() {
             />
           </div>
 
+          {/* Badge cảnh báo bảo mật chưa xử lý */}
+          {((stats.alertCounts?.total > 0) || (Array.isArray(stats.alerts) && stats.alerts.length > 0)) && (
+            <Link to="/admin/login-security?alerts=1" className="dash-alert-banner">
+              <IconAlert />
+              <span>
+                Có{' '}
+                <strong>
+                  {(stats.alertCounts?.total ?? stats.alerts?.length ?? 0) > 100
+                    ? '99+'
+                    : (stats.alertCounts?.total ?? stats.alerts?.length ?? 0)}
+                </strong>{' '}
+                cảnh báo bảo mật chưa xử lý
+                {stats.alertCounts && (
+                  <>
+                    {' '}
+                    (Critical {stats.alertCounts.critical || 0}
+                    · High {stats.alertCounts.high || 0}
+                    · Medium {stats.alertCounts.medium || 0}
+                    · Info {stats.alertCounts.info || 0})
+                  </>
+                )}
+              </span>
+              <span className="dash-alert-banner__link">Xem và xử lý <IconArrowRight /></span>
+            </Link>
+          )}
+
           {/* ── Row 2: Alerts + Logs widget ────────────────────── */}
           <div className="dash-row-2">
             {/* Alerts widget */}
@@ -1057,6 +1083,8 @@ export default function AdminDashboardPage() {
                 dot="linear-gradient(135deg, #ef4444, #f97316)"
                 title="Thông báo hệ thống"
                 badge={derivedAlerts.length}
+                link="/admin/login-security?alerts=1"
+                linkLabel="Cảnh báo bảo mật"
               />
               <div className="dash-widget__body">
                 {derivedAlerts.length > 0 ? (
@@ -1085,7 +1113,7 @@ export default function AdminDashboardPage() {
                   <Link to="/admin/logs" className="section-header__link">
                     Xem tất cả <IconArrowRight />
                   </Link>
-                  <Link to="/admin/login-sessions" className="section-header__link section-header__link--alt">
+                  <Link to="/admin/login-security?tab=sessions" className="section-header__link section-header__link--alt">
                     Lịch sử đăng nhập <IconArrowRight />
                   </Link>
                 </div>

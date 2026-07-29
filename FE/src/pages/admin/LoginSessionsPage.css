@@ -220,68 +220,141 @@
 
 .admin-sessions__table-title svg { color: #94a3b8; }
 
-.admin-sessions__table-wrapper { overflow-x: auto; }
+.admin-sessions__table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
 
-/* ── Table cells ─────────────────────────────────────────── */
-.admin-sessions__date {
+/* Cô lập khỏi CSS global .table (AuditLogs từng pollute td > * { display:block }) */
+.admin-sessions__table-wrapper > .table.admin-sessions__table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  min-width: 0;
+}
+
+.admin-sessions__table-wrapper > .table.admin-sessions__table colgroup col {
+  width: 20%;
+}
+
+.admin-sessions__table-wrapper > .table.admin-sessions__table thead th,
+.admin-sessions__table-wrapper > .table.admin-sessions__table tbody td {
+  padding: 12px 10px;
+  vertical-align: middle;
+  text-align: center;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.admin-sessions__table-wrapper > .table.admin-sessions__table thead th {
   white-space: nowrap;
-  font-size: 0.8rem;
-  color: #64748b;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  line-height: 1.25;
+  font-size: 0.72rem;
 }
 
-.admin-sessions__user-name {
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: #1e293b;
+/* Reset override kiểu AuditLogs: td > * { display:block; white-space:nowrap } */
+.admin-sessions__table-wrapper > .table.admin-sessions__table tbody td > * {
+  display: inline-flex;
+  max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  margin-left: auto;
+  margin-right: auto;
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 
-.admin-sessions__phone {
-  font-size: 0.78rem;
-  color: #64748b;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-.admin-sessions__ip {
-  font-size: 0.78rem;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: #64748b;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-}
-
-.admin-sessions__user-agent {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* ── Table cells: nội dung căn giữa dưới header ───────────── */
+.admin-sessions__table-wrapper .admin-sessions__date {
+  display: inline-block;
   white-space: nowrap;
   font-size: 0.75rem;
   color: #64748b;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  line-height: 1.35;
 }
 
-.admin-sessions__duration {
-  font-size: 0.78rem;
-  color: #64748b;
+.admin-sessions__table-wrapper .admin-sessions__user-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.admin-sessions__table-wrapper .admin-sessions__user-name,
+.admin-sessions__table-wrapper .admin-sessions__phone {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
+}
+
+.admin-sessions__table-wrapper .admin-sessions__user-name {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: #1e293b;
+}
+
+.admin-sessions__table-wrapper .admin-sessions__phone {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.admin-sessions__table-wrapper .admin-sessions__event-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 120px;
+  max-width: 100%;
+}
+
+.admin-sessions__table-wrapper .admin-sessions__event-cell .badge {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.admin-sessions__table-wrapper .admin-sessions__duration {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: #64748b;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 /* ── Row actions ─────────────────────────────────────────── */
-.admin-sessions__row-actions {
+.admin-sessions__table-wrapper .admin-sessions__row-actions {
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 6px;
-  flex-wrap: nowrap;
+  width: 112px;
+  max-width: 100%;
 }
 
 .admin-sessions__action-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 5px 10px;
-  font-size: 0.76rem;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 5px 8px;
+  font-size: 0.72rem;
   font-weight: 600;
   color: #475569;
   background: #fff;
@@ -314,6 +387,12 @@
 }
 
 .admin-sessions__action-btn svg { flex-shrink: 0; }
+
+@media (max-width: 900px) {
+  .admin-sessions__action-label {
+    display: none;
+  }
+}
 
 /* ── Skeleton ────────────────────────────────────────────── */
 @keyframes skeleton-shimmer {

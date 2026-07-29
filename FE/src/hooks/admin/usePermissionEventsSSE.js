@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../../config';
 import { LOGOUT_KEY, consumeSkipNextPermissionChange } from '../../services/httpClient';
+import { mergeAuthRefreshUser } from '../../utils/profileSession';
 
 const SSE_RECONNECT_DELAY_MS = 5000;
 const REFRESH_API_TIMEOUT_MS = 10000;
@@ -136,18 +137,27 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
       const inLocal = localStorage.getItem('token');
       const storage = currentToken === inLocal ? localStorage : sessionStorage;
 
+      let existingUser = {};
+      try {
+        const raw = storage.getItem('user');
+        existingUser = raw ? JSON.parse(raw) : {};
+      } catch {
+        existingUser = {};
+      }
+      const mergedUser = mergeAuthRefreshUser(existingUser, newUser);
+
       // QUAN TRONG: luu token moi vao storage TRUOC, dispatch event sau.
       // AppContext se lang nghe 'storage' event va cap nhat React state.
       // Day la flow "storage first, state last" theo .cursorrules.
       storage.setItem('token', newToken);
-      storage.setItem('user', JSON.stringify(newUser));
+      storage.setItem('user', JSON.stringify(mergedUser));
       storage.setItem('permissions', JSON.stringify(newPermissions));
 
       // Cross-tab broadcast (neu co BroadcastChannel)
       try {
         if (typeof BroadcastChannel !== 'undefined') {
           const channel = new BroadcastChannel('app-session');
-          channel.postMessage({ token: newToken, user: newUser, permissions: newPermissions });
+          channel.postMessage({ token: newToken, user: mergedUser, permissions: newPermissions });
           channel.close();
         }
       } catch {
@@ -159,8 +169,8 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
       // nhung mot so component khac co the chi nghe storage event.
       try {
         window.dispatchEvent(new StorageEvent('storage', {
-          key: 'token',
-          newValue: newToken,
+          key: 'user',
+          newValue: JSON.stringify(mergedUser),
           storageArea: storage,
         }));
       } catch {

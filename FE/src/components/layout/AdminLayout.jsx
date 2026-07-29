@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import ScrollToggleButton from '../common/ScrollToggleButton';
 import UserProfileMenu from './UserProfileMenu';
+import { adminSecurityAlertsApi } from '../../services/adminApi';
 import './AdminLayout.css';
 
 const ADMIN_SIDEBAR = [
@@ -35,24 +36,15 @@ const ADMIN_SIDEBAR = [
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
         ),
-        badge: 'Hệ thống',
+        badge: null,
       },
       {
-        label: 'Chi nhánh',
-        path: '/admin/branches',
+        label: 'Danh mục hệ thống',
+        path: '/admin/catalog',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
-          </svg>
-        ),
-      },
-      {
-        label: 'Chuyên môn',
-        path: '/admin/specialties',
-        icon: (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
           </svg>
         ),
       },
@@ -61,6 +53,16 @@ const ADMIN_SIDEBAR = [
   {
     group: 'Giám sát',
     items: [
+      {
+        label: 'Bảo mật đăng nhập',
+        path: '/admin/login-security',
+        icon: (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        ),
+        countKey: 'securityAlerts',
+      },
       {
         label: 'Nhật ký hoạt động',
         path: '/admin/logs',
@@ -74,49 +76,18 @@ const ADMIN_SIDEBAR = [
           </svg>
         ),
       },
-      {
-        label: 'Lịch sử đăng nhập',
-        path: '/admin/login-sessions',
-        icon: (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-        ),
-      },
-      {
-        label: 'Thiết bị',
-        path: '/admin/devices',
-        icon: (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-            <line x1="8" y1="21" x2="16" y2="21"/>
-            <line x1="12" y1="17" x2="12" y2="21"/>
-          </svg>
-        ),
-      },
     ],
   },
   {
     group: 'Tài khoản',
     items: [
       {
-        label: 'Hồ sơ cá nhân',
+        label: 'Tài khoản của tôi',
         path: '/admin/profile',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
             <circle cx="12" cy="7" r="4"/>
-          </svg>
-        ),
-      },
-      {
-        label: 'Cài đặt thông báo',
-        path: '/admin/profile/notifications',
-        icon: (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a1.94 1.94 0 0 1-3.46 0"/>
           </svg>
         ),
       },
@@ -134,6 +105,27 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [alertCount, setAlertCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCounts() {
+      try {
+        const data = await adminSecurityAlertsApi.getCounts();
+        if (!cancelled) setAlertCount(Number(data?.total) || 0);
+      } catch {
+        if (!cancelled) setAlertCount(0);
+      }
+    }
+    loadCounts();
+    const t = setInterval(loadCounts, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [location.pathname]);
+
+  const countMap = { securityAlerts: alertCount };
 
   const visibleGroups = ADMIN_SIDEBAR
     .map((g) => ({ ...g, items: g.items.filter((item) => !item.hidden) }))
@@ -200,6 +192,7 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd
             )}
             {group.items.map((item) => {
               const isActive = item.path === longestMatch;
+              const count = item.countKey ? countMap[item.countKey] : 0;
               return (
                 <NavLink
                   key={item.path}
@@ -213,6 +206,9 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd
                   <span className="admin-sidebar__item-icon">{item.icon}</span>
                   <span className="admin-sidebar__item-label">{item.label}</span>
                   {item.badge && <span className="admin-sidebar__item-badge">{item.badge}</span>}
+                  {count > 0 && (
+                    <span className="admin-sidebar__item-count">{count > 100 ? '99+' : count}</span>
+                  )}
                 </NavLink>
               );
             })}
@@ -230,7 +226,12 @@ export default function AdminLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navLoading, setNavLoading] = useState(false);
   const [contentKey, setContentKey] = useState(0);
-  const prevPathRef = useRef(location.pathname);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
+  const adminHistoryRef = useRef([]);
+  const adminHistoryIndexRef = useRef(-1);
+  const pendingHistoryJumpRef = useRef(null);
+  const remountOnHistoryJumpRef = useRef(false);
 
   // Clear leftover dark-theme preference (admin luôn dùng light)
   useEffect(() => {
@@ -240,6 +241,55 @@ export default function AdminLayout({ children }) {
 
   const refreshContent = () => {
     setContentKey((k) => k + 1);
+  };
+
+  const getLocationEntry = () => ({
+    navKey: location.key || `${Date.now()}-${Math.random()}`,
+    url: `${location.pathname}${location.search}${location.hash}`,
+  });
+
+  const syncAdminHistoryState = () => {
+    const entry = getLocationEntry();
+    const key = entry.url;
+    const isAdminRoute = String(location.pathname).startsWith('/admin');
+    if (!isAdminRoute) return;
+
+    const stack = adminHistoryRef.current;
+    const pending = pendingHistoryJumpRef.current;
+    if (pending && pending.url === key) {
+      adminHistoryIndexRef.current = pending.index;
+      pendingHistoryJumpRef.current = null;
+      setCanGoBack(pending.index > 0);
+      setCanGoForward(pending.index < stack.length - 1);
+      if (remountOnHistoryJumpRef.current) {
+        refreshContent();
+        remountOnHistoryJumpRef.current = false;
+      }
+      return;
+    }
+
+    const indexByNavKey = stack.findIndex((item) => item.navKey === entry.navKey);
+    if (indexByNavKey >= 0) {
+      adminHistoryIndexRef.current = indexByNavKey;
+      setCanGoBack(indexByNavKey > 0);
+      setCanGoForward(indexByNavKey < stack.length - 1);
+      return;
+    }
+
+    const index = adminHistoryIndexRef.current;
+    const currentItem = index >= 0 ? stack[index] : null;
+    if (currentItem && currentItem.url === key) {
+      setCanGoBack(index > 0);
+      setCanGoForward(index < stack.length - 1);
+      return;
+    }
+
+    const nextStack = stack.slice(0, index + 1);
+    nextStack.push(entry);
+    adminHistoryRef.current = nextStack;
+    adminHistoryIndexRef.current = nextStack.length - 1;
+    setCanGoBack(nextStack.length > 1);
+    setCanGoForward(false);
   };
 
   const visibleGroups = ADMIN_SIDEBAR
@@ -254,13 +304,8 @@ export default function AdminLayout({ children }) {
   // Khi vừa login và điều hướng từ trang public (/login) vào admin,
   // ép remount nội dung để tránh render sai frame (cần F5 mới đúng).
   useEffect(() => {
-    const prev = prevPathRef.current;
-    const now = location.pathname;
-    prevPathRef.current = now;
-
-    const nowAdmin = String(now).startsWith('/admin');
-    const prevAdmin = String(prev).startsWith('/admin');
-    if (nowAdmin && !prevAdmin) {
+    const isAdminRoute = String(location.pathname).startsWith('/admin');
+    if (isAdminRoute && adminHistoryRef.current.length === 0) {
       refreshContent();
     }
   }, [location.pathname]);
@@ -276,6 +321,42 @@ export default function AdminLayout({ children }) {
     }
     return undefined;
   }, [mobileOpen]);
+
+  useEffect(() => {
+    syncAdminHistoryState();
+  }, [location.pathname, location.search, location.hash, location.key]);
+
+  const handleGoBack = () => {
+    const stack = adminHistoryRef.current;
+    const index = adminHistoryIndexRef.current;
+    if (index <= 0) return;
+
+    const targetIndex = index - 1;
+    const target = stack[targetIndex];
+    if (!target) return;
+    pendingHistoryJumpRef.current = { index: targetIndex, url: target.url };
+    remountOnHistoryJumpRef.current = true;
+    adminHistoryIndexRef.current = targetIndex;
+    setCanGoBack(targetIndex > 0);
+    setCanGoForward(true);
+    navigate(target.url, { replace: true });
+  };
+
+  const handleGoForward = () => {
+    const stack = adminHistoryRef.current;
+    const index = adminHistoryIndexRef.current;
+    if (index < 0 || index >= stack.length - 1) return;
+
+    const targetIndex = index + 1;
+    const target = stack[targetIndex];
+    if (!target) return;
+    pendingHistoryJumpRef.current = { index: targetIndex, url: target.url };
+    remountOnHistoryJumpRef.current = true;
+    adminHistoryIndexRef.current = targetIndex;
+    setCanGoBack(targetIndex > 0);
+    setCanGoForward(targetIndex < stack.length - 1);
+    navigate(target.url, { replace: true });
+  };
 
   const allItems = visibleGroups.flatMap((g) => g.items);
   const matchedPaths = allItems
@@ -377,6 +458,32 @@ export default function AdminLayout({ children }) {
             </button>
 
             <div className="admin-topbar__breadcrumb">
+              <div className="admin-topbar__history-nav">
+                <button
+                  type="button"
+                  className="admin-topbar__history-btn"
+                  onClick={handleGoBack}
+                  aria-label="Quay lại trang trước"
+                  title="Quay lại trang trước"
+                  disabled={!canGoBack}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="admin-topbar__history-btn"
+                  onClick={handleGoForward}
+                  aria-label="Đi tới trang sau"
+                  title="Đi tới trang sau"
+                  disabled={!canGoForward}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              </div>
               <span className="admin-topbar__section">Quản trị</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="9 18 15 12 9 6"/>
@@ -391,7 +498,7 @@ export default function AdminLayout({ children }) {
         </header>
 
         <main className="admin-content">
-          <div key={`${location.pathname}::${contentKey}`} className="admin-content__remount">
+          <div key={`${location.pathname}${location.search}${location.hash}::${contentKey}`} className="admin-content__remount">
             {children}
           </div>
         </main>
