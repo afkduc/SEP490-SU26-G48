@@ -70,11 +70,6 @@ function buildAdminRouter() {
   router.patch('/security-alerts/ack-all', controller.acknowledgeAllAlerts);
   router.patch('/security-alerts/:id/ack', controller.acknowledgeAlert);
 
-  router.get('/vehicle-brands', controller.listVehicleBrands);
-  router.post('/vehicle-brands', controller.createVehicleBrand);
-  router.put('/vehicle-brands/:id', controller.updateVehicleBrand);
-  router.patch('/vehicle-brands/:id/toggle-status', controller.toggleVehicleBrandStatus);
-
   router.post('/sessions/cleanup', controller.cleanupDuplicateSessions);
   router.get('/login-sessions/recent', controller.getRecentLoginSessions);
 

@@ -405,24 +405,3 @@ class AdminSecurityAlertsApi {
 const adminSecurityAlertsApi = new AdminSecurityAlertsApi();
 
 export { AdminSecurityAlertsApi, adminSecurityAlertsApi };
-
-class AdminVehicleBrandsApi {
-  list() {
-    return httpClient.get('/admin/vehicle-brands');
-  }
-
-  create(payload) {
-    return httpClient.post('/admin/vehicle-brands', payload);
-  }
-
-  update(id, payload) {
-    return httpClient.put(`/admin/vehicle-brands/${id}`, payload);
-  }
-
-  toggleStatus(id) {
-    return httpClient.patch(`/admin/vehicle-brands/${id}/toggle-status`);
-  }
-}
-
-const adminVehicleBrandsApi = new AdminVehicleBrandsApi();
-export { AdminVehicleBrandsApi, adminVehicleBrandsApi };
