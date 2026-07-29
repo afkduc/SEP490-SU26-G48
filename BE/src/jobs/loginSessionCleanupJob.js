@@ -11,6 +11,7 @@
  */
 
 const { query, executeTransaction } = require('../infrastructure/database/sqlServer');
+const { emitLoginSessionEvent } = require('../application/events/LoginSessionEvents');
 
 // Nguong stale: khong heartbeat → coi la dong tab. Mac dinh 30 phut
 // (an toan hon 5 phut khi heartbeat/API loi tam thoi).
@@ -28,7 +29,12 @@ async function cleanupStaleSessions() {
                 logout_reason            = 'TIMEOUT',
                 session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
                 status                   = 'ended'
-         OUTPUT INSERTED.user_id, INSERTED.device_id
+         OUTPUT INSERTED.id AS session_id,
+                INSERTED.user_id,
+                INSERTED.device_id,
+                INSERTED.ip_address,
+                INSERTED.browser,
+                INSERTED.os
          WHERE  status               = 'active'
            AND  action_type          = 'LOGIN'
            AND  COALESCE(last_activity_at, login_time) < DATEADD(MINUTE, -@p1, SYSUTCDATETIME())`,
@@ -85,10 +91,47 @@ async function cleanupStaleSessions() {
         );
       }
 
-      return rows.length;
+      return rows;
     });
-    if (result > 0) {
-      console.log(`[loginSessionJob] Cleaned ${result} stale sessions (>= ${STALE_MINUTES} min no heartbeat)`);
+
+    const closedRows = Array.isArray(result) ? result : [];
+    if (closedRows.length > 0) {
+      console.log(`[loginSessionJob] Cleaned ${closedRows.length} stale sessions (>= ${STALE_MINUTES} min no heartbeat)`);
+
+      // Push SSE để FE lịch sử / thiết bị cập nhật realtime (truoc day chi login/logout/force)
+      const nameByUser = new Map();
+      const uidList = [...new Set(closedRows.map((r) => Number(r.user_id)).filter(Number.isFinite))];
+      if (uidList.length > 0) {
+        try {
+          const inU = uidList.map((_, i) => `@n${i}`).join(',');
+          const nparams = Object.fromEntries(uidList.map((id, i) => [`n${i}`, id]));
+          const names = await query(
+            `SELECT id, user_name, first_name, last_name
+             FROM users WHERE id IN (${inU})`,
+            nparams
+          );
+          for (const u of names.recordset || []) {
+            const full = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+            nameByUser.set(Number(u.id), full || u.user_name || `user#${u.id}`);
+          }
+        } catch (e) {
+          console.warn('[loginSessionJob] load user names for SSE failed:', e.message);
+        }
+      }
+
+      for (const row of closedRows) {
+        const uid = Number(row.user_id);
+        emitLoginSessionEvent('logout', {
+          userId: uid || null,
+          userName: nameByUser.get(uid) || null,
+          sessionId: row.session_id || null,
+          deviceId: row.device_id || null,
+          ipAddress: row.ip_address || null,
+          browser: row.browser || null,
+          os: row.os || null,
+          reason: 'TIMEOUT',
+        });
+      }
     }
   } catch (err) {
     console.error('[loginSessionJob] cleanupStaleSessions failed:', err && err.message ? err.message : err);
