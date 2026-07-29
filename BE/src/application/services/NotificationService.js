@@ -70,12 +70,63 @@ const NOTIFICATION_EVENTS = {
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
+  // Đồng bộ với security_alerts (job quét rule bảo mật)
+  SECURITY_ALERT: {
+    title: 'Cảnh báo bảo mật',
+    severity: SEVERITY.WARNING,
+    messageTemplates: {
+      default: '{message}',
+      withTitle: '{title}: {message}',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  SECURITY_FAILED_LOGIN_BURST: {
+    title: 'Nhiều lần đăng nhập thất bại',
+    severity: SEVERITY.ERROR,
+    messageTemplates: {
+      default: '{message}',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  SECURITY_NEW_ADMIN_ROLE: {
+    title: 'Phân quyền Admin mới',
+    severity: SEVERITY.CRITICAL,
+    messageTemplates: {
+      default: '{message}',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  SECURITY_INACTIVE_ADMIN: {
+    title: 'Admin không hoạt động',
+    severity: SEVERITY.WARNING,
+    messageTemplates: {
+      default: '{message}',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  SECURITY_NEW_DEVICE_IP: {
+    title: 'Đăng nhập từ IP mới',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{message}',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
   FORCE_LOGO: {
     title: 'Phiên đã bị kết thúc',
     severity: SEVERITY.WARNING,
     messageTemplates: {
       default: 'Phiên đăng nhập của bạn đã bị kết thúc.',
       byAdmin: 'Tài khoản của bạn đã bị đăng xuất bởi quản trị viên.',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  SYSTEM_BROADCAST: {
+    title: 'Thông báo hệ thống',
+    severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{message}',
+      withTitle: '{title}: {message}',
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
@@ -473,10 +524,19 @@ class NotificationService {
     }
 
     // Tạo title và message
-    const title = event.title;
+    let title = event.title;
     let message = event.messageTemplates.default || Object.values(event.messageTemplates)[0] || event.title;
 
     // Handle different message templates based on data (trước replace placeholder)
+    if (eventType === 'SYSTEM_BROADCAST' || eventType === 'SECURITY_ALERT'
+      || eventType.startsWith('SECURITY_')) {
+      if (data.title) title = String(data.title);
+      if (data.templateKey === 'withTitle' && event.messageTemplates.withTitle) {
+        message = event.messageTemplates.withTitle;
+      } else if (data.message) {
+        message = '{message}';
+      }
+    }
     if (eventType === 'PASSWORD_CHANGED' && data.resetByAdmin) {
       message = event.messageTemplates.byAdmin;
     }
@@ -537,15 +597,17 @@ class NotificationService {
     if (data.reason) metadata.reason = data.reason;
     if (data.screenKey) metadata.screenKey = data.screenKey;
     if (data.pendingId) metadata.pendingId = data.pendingId;
+    if (data.ruleKey) metadata.ruleKey = data.ruleKey;
+    if (data.severity) metadata.alertSeverity = data.severity;
 
     // Create notification in DB
     const notification = await this.notificationRepo.create({
       userId,
-      title: event.title,
+      title,
       message,
       type: eventType,
-      severity: event.severity || null,
-      metadata,
+      severity: (data.severity || event.severity) || null,
+      metadata: { ...metadata, ...(data.metadata || {}) },
     });
 
     // Emit SSE event for real-time update
@@ -586,6 +648,22 @@ class NotificationService {
         results.push({ adminId, notification: result });
       } catch (err) {
         console.warn(`[NotificationService] Failed to notify admin ${adminId}:`, err.message);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Broadcast thong bao toi danh sach userId (dung cho Admin broadcast).
+   */
+  async notifyUsers(userIds = [], eventType, data = {}) {
+    const results = [];
+    for (const userId of userIds) {
+      try {
+        const result = await this.notify(eventType, { ...data, userId }, { skipSettings: true });
+        results.push({ userId, notification: result });
+      } catch (err) {
+        console.warn(`[NotificationService] Failed to notify user ${userId}:`, err.message);
       }
     }
     return results;

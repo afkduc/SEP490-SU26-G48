@@ -162,6 +162,14 @@ class AuditService {
     });
   }
 
+  async exportLoginSessions(filters = {}) {
+    return this.auditRepository.getLoginSessions({
+      ...filters,
+      page: 1,
+      pageSize: 5000,
+    });
+  }
+
   async getLoginSessionsSince(since, limit = 50) {
     const sinceDate = since ? new Date(since) : new Date(Date.now() - 60 * 1000);
     if (Number.isNaN(sinceDate.getTime())) {

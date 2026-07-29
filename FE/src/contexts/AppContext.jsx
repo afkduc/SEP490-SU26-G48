@@ -11,13 +11,14 @@ import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../components/common/ToastContext';
 import { API_BASE_URL } from '../config';
 import LoginChallengeModal from '../components/LoginChallengeModal';
-import SessionTakenOverModal from '../components/SessionTakenOverModal';
 import {
   resetSessionExpiredFlag,
   cancelAllPendingRequests,
   resetLoggedOutFlag,
   SESSION_LOGGED_OUT_EVENT,
+  showSessionExpired,
 } from '../services/httpClient';
+import { mergeAuthRefreshUser } from '../utils/profileSession';
 
 const AppContext = createContext(null);
 
@@ -191,10 +192,10 @@ export function AppProvider({ children }) {
         return currentToken;
       });
       setUser((currentUser) => {
-        if (newSession.user !== currentUser) {
-          return newSession.user;
-        }
-        return currentUser;
+        const fromStorage = newSession.user;
+        if (!fromStorage) return currentUser;
+        if (!currentUser) return fromStorage;
+        return mergeAuthRefreshUser(fromStorage, currentUser);
       });
       setPermissions((currentPerms) => {
         if (JSON.stringify(newSession.permissions) !== JSON.stringify(currentPerms)) {
@@ -219,10 +220,10 @@ export function AppProvider({ children }) {
           return currentToken;
         });
         setUser((currentUser) => {
-          if (e.data.user !== currentUser) {
-            return e.data.user;
-          }
-          return currentUser;
+          const incoming = e.data.user;
+          if (!incoming) return currentUser;
+          if (!currentUser) return incoming;
+          return mergeAuthRefreshUser(currentUser, incoming);
         });
         setPermissions((currentPerms) => {
           if (JSON.stringify(e.data.permissions) !== JSON.stringify(currentPerms)) {
@@ -565,24 +566,20 @@ function LoginChallengeRunner() {
 function SessionTakenOverRunner() {
   const { token } = useAuth();
   useNotifications(token);
-  const [takenOver, setTakenOver] = useState(null);
 
   useEffect(() => {
     const onTakenOver = (e) => {
       const detail = e?.detail || {};
-      setTakenOver((prev) => prev || detail);
+      showSessionExpired({
+        code: detail?.metadata?.code || detail?.code || 'SESSION_REPLACED',
+        message: detail?.message || 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại để tiếp tục.',
+      });
     };
     window.addEventListener('session-taken-over', onTakenOver);
     return () => window.removeEventListener('session-taken-over', onTakenOver);
   }, []);
 
-  if (!takenOver) return null;
-  return (
-    <SessionTakenOverModal
-      detail={takenOver}
-      onClose={() => setTakenOver(null)}
-    />
-  );
+  return null;
 }
 
 export function useAuth() {

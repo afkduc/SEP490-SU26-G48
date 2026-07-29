@@ -46,10 +46,21 @@ function IconChevron({ size = 14 }) {
 
 function AvatarBubble({ name, imageUrl, className }) {
   const initials = getInitials(name);
-  if (imageUrl) {
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    setBroken(false);
+  }, [imageUrl]);
+
+  if (imageUrl && !broken) {
     return (
       <div className={className}>
-        <img src={imageUrl} alt="" className="user-profile-menu__avatar-img" />
+        <img
+          src={imageUrl}
+          alt=""
+          className="user-profile-menu__avatar-img"
+          onError={() => setBroken(true)}
+        />
       </div>
     );
   }

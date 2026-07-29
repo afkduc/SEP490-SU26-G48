@@ -296,7 +296,7 @@ function ConfirmDeactivateModal({ branch, onClose, onConfirm, loading }) {
 
 // ─── Branch Card ────────────────────────────────────────────────────
 
-function BranchCard({ branch, onEdit, onDeactivate, onStats }) {
+function BranchCard({ branch, onEdit, onDeactivate, onReactivate, onStats }) {
   const initials = getInitials(null, null, branch.managerName);
 
   return (
@@ -367,7 +367,14 @@ function BranchCard({ branch, onEdit, onDeactivate, onStats }) {
               Ngưng
             </button>
           </PermissionGate>
-        ) : null}
+        ) : (
+          <PermissionGate permission="admin:branches:update">
+            <button type="button" className="branch-card__btn branch-card__btn--edit" onClick={() => onReactivate?.(branch)} title="Kích hoạt lại">
+              <IconRefresh />
+              Kích hoạt
+            </button>
+          </PermissionGate>
+        )}
       </div>
     </div>
   );
@@ -422,7 +429,7 @@ function StatsModal({ branch, stats, onClose }) {
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export default function AdminBranchesPage() {
+export default function AdminBranchesPage({ embedded = false } = {}) {
   const toast = useToast();
   const { handleApiError } = useApiError();
   const [branches, setBranches] = useState([]);
@@ -434,6 +441,7 @@ export default function AdminBranchesPage() {
   const [editBranch, setEditBranch] = useState(null);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [reactivateLoadingId, setReactivateLoadingId] = useState(null);
   const [statsTarget, setStatsTarget] = useState(null);
   const [statsData, setStatsData] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -496,6 +504,22 @@ export default function AdminBranchesPage() {
     }
   }
 
+  async function handleReactivate(branch) {
+    if (!branch?.id || reactivateLoadingId) return;
+    setReactivateLoadingId(branch.id);
+    try {
+      await adminBranchesApi.reactivate(branch.id);
+      toast.success(`Chi nhánh "${branch.branchName}" đã được kích hoạt lại`);
+      loadData();
+    } catch (err) {
+      if (!handleApiError(err, 'admin:branches:update')) {
+        toast.error(err.message || 'Lỗi khi kích hoạt chi nhánh');
+      }
+    } finally {
+      setReactivateLoadingId(null);
+    }
+  }
+
   function handleFormSuccess() {
     toast.success(editBranch ? 'Cập nhật chi nhánh thành công' : 'Tạo chi nhánh mới thành công');
     setShowForm(false);
@@ -511,33 +535,44 @@ export default function AdminBranchesPage() {
   const activeCount = branches.filter((b) => b.isActive).length;
   const inactiveCount = branches.filter((b) => !b.isActive).length;
 
+  const headerActions = (
+    <div className="admin-branches__actions">
+      {branches.length > 0 && (
+        <span className="admin-branches__total-badge">
+          {activeCount} hoạt động{activeCount !== inactiveCount && inactiveCount > 0 ? ` · ${inactiveCount} ngừng` : ''}
+        </span>
+      )}
+      <button className="btn btn--primary" onClick={() => { setEditBranch(null); setShowForm(true); }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Thêm chi nhánh
+      </button>
+    </div>
+  );
+
   return (
-    <div className="admin-branches">
-      {/* Header */}
-      <div className="admin-branches__header">
-        <div className="admin-branches__title-block">
-          <div className="admin-branches__title-icon">
-            <IconBranch />
+    <div className={`admin-branches${embedded ? ' admin-branches--embedded' : ''}`}>
+      {!embedded && (
+        <div className="admin-branches__header">
+          <div className="admin-branches__title-block">
+            <div className="admin-branches__title-icon">
+              <IconBranch />
+            </div>
+            <div className="admin-branches__title-group">
+              <h1>Quản lý chi nhánh</h1>
+              <p className="admin-branches__subtitle">Danh sách và thông tin các chi nhánh AutoGara</p>
+            </div>
           </div>
-          <div className="admin-branches__title-group">
-            <h1>Quản lý chi nhánh</h1>
-            <p className="admin-branches__subtitle">Danh sách và thông tin các chi nhánh AutoGara</p>
-          </div>
+          {headerActions}
         </div>
-        <div className="admin-branches__actions">
-          {branches.length > 0 && (
-            <span className="admin-branches__total-badge">
-              {activeCount} hoạt động{activeCount !== inactiveCount && inactiveCount > 0 ? ` · ${inactiveCount} ngừng` : ''}
-            </span>
-          )}
-          <button className="btn btn--primary" onClick={() => { setEditBranch(null); setShowForm(true); }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Thêm chi nhánh
-          </button>
+      )}
+
+      {embedded && (
+        <div className="admin-hub__toolbar">
+          {headerActions}
         </div>
-      </div>
+      )}
 
       {/* Loading */}
       {loading && (
@@ -594,6 +629,7 @@ export default function AdminBranchesPage() {
                   branch={branch}
                   onEdit={handleEdit}
                   onDeactivate={(b) => setDeactivateTarget(b)}
+                  onReactivate={handleReactivate}
                   onStats={handleStats}
                 />
               ))}

@@ -204,7 +204,7 @@ function PasswordInput({ label, id, value, onChange, placeholder, error }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AdminProfilePage() {
+export default function AdminProfilePage({ embedded = false } = {}) {
   const { user, setUser, reloadPermissions } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -225,7 +225,7 @@ export default function AdminProfilePage() {
   useEffect(() => {
     if (!user) return;
     const path = location.pathname;
-    if (isProfileNotificationsPath(path)) return;
+    if (isProfileNotificationsPath(path, location.search)) return;
     if (!isRoleProfilePath(path)) return;
 
     const viewPath = getRoleProfilePath(user);
@@ -238,7 +238,7 @@ export default function AdminProfilePage() {
     if (path !== viewPath) {
       navigate(viewPath, { replace: true });
     }
-  }, [user, location.pathname, navigate]);
+  }, [user, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (searchParams.get('tab') !== 'edit') return;
@@ -278,7 +278,9 @@ export default function AdminProfilePage() {
   const [avatarError, setAvatarError] = useState(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null);
   const [avatarCacheBuster, setAvatarCacheBuster] = useState(0);
+  const [avatarImgBroken, setAvatarImgBroken] = useState(false);
   const avatarDisplayUrl = useAuthenticatedAvatarUrl(profile?.avatar, avatarCacheBuster);
+  const prevAvatarDisplayUrlRef = useRef(null);
 
   // Load profile on mount
   useEffect(() => {
@@ -371,12 +373,19 @@ export default function AdminProfilePage() {
     };
   }, [avatarPreviewUrl]);
 
-  // Giu preview local cho den khi anh tu server load xong
+  // Chi bo preview local khi blob tu server da doi (fetch xong sau upload)
   useEffect(() => {
-    if (avatarDisplayUrl && avatarPreviewUrl) {
+    if (!avatarPreviewUrl || !avatarDisplayUrl) return;
+    if (avatarDisplayUrl !== prevAvatarDisplayUrlRef.current) {
       setAvatarPreviewUrl(null);
+      setAvatarImgBroken(false);
     }
+    prevAvatarDisplayUrlRef.current = avatarDisplayUrl;
   }, [avatarDisplayUrl, avatarPreviewUrl]);
+
+  useEffect(() => {
+    setAvatarImgBroken(false);
+  }, [avatarPreviewUrl, avatarDisplayUrl]);
 
   function openAvatarPicker() {
     avatarInputRef.current?.click?.();
@@ -391,6 +400,9 @@ export default function AdminProfilePage() {
     setAvatarUploading(true);
     try {
       const updated = await uploadMyAvatar(file);
+      if (!updated?.avatar) {
+        throw new Error('Máy chủ chưa trả về thông tin avatar');
+      }
       setAvatarCacheBuster((v) => v + 1);
       setProfile(updated);
       syncProfileSession(user, updated, setUser);
@@ -452,19 +464,20 @@ export default function AdminProfilePage() {
     : '?';
 
   return (
-    <div className="admin-profile">
-      {/* ── Page header ─────────────────────────────────────────── */}
-      <div className="admin-profile__header">
-        <div className="admin-profile__title-block">
-          <div className="admin-profile__title-icon">
-            <IconUser size={22} />
-          </div>
-          <div>
-            <h1>Hồ sơ cá nhân</h1>
-            <p className="admin-profile__subtitle">Xem và chỉnh sửa thông tin tài khoản</p>
+    <div className={`admin-profile${embedded ? ' admin-profile--embedded' : ''}`}>
+      {!embedded && (
+        <div className="admin-profile__header">
+          <div className="admin-profile__title-block">
+            <div className="admin-profile__title-icon">
+              <IconUser size={22} />
+            </div>
+            <div>
+              <h1>Hồ sơ cá nhân</h1>
+              <p className="admin-profile__subtitle">Xem và chỉnh sửa thông tin tài khoản</p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Loading / Error ─────────────────────────────────────── */}
       {loading && (
@@ -484,11 +497,12 @@ export default function AdminProfilePage() {
           {/* ── Left: avatar card ──────────────────────────────── */}
           <div className="profile-card profile-card--left">
             <div className="profile-avatar-wrap">
-              {avatarPreviewUrl || avatarDisplayUrl ? (
+              {(avatarPreviewUrl || avatarDisplayUrl) && !avatarImgBroken ? (
                 <img
                   className="profile-avatar profile-avatar--img"
                   src={avatarPreviewUrl || avatarDisplayUrl}
                   alt="Avatar"
+                  onError={() => setAvatarImgBroken(true)}
                 />
               ) : (
                 <div className="profile-avatar">{initials}</div>

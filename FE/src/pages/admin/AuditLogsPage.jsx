@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
@@ -265,13 +266,27 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
 
 export default function AuditLogsPage() {
   const toast = useToast();
-  const audit = useAuditLogs();
+  const [searchParams] = useSearchParams();
+  const initialUserName = searchParams.get('userName') || '';
+  const audit = useAuditLogs(initialUserName ? { userName: initialUserName } : {});
   const { branches, branchesError } = useSharedBranches();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [now, setNow] = useState(() => Date.now());
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(Boolean(initialUserName));
   const [selectedLog, setSelectedLog] = useState(null);
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('userName') || '';
+    if (!fromUrl) return;
+    audit.setParams((p) => ({
+      ...p,
+      userName: fromUrl,
+      page: 1,
+    }));
+    setShowFilters(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 15_000);

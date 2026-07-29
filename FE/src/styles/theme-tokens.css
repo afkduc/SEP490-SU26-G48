@@ -1,89 +1,90 @@
 /**
  * AutoGara Design Tokens — Light / Dark
- * Mục tiêu: WCAG AA, đồng bộ toàn hệ thống Admin (và dùng chung được).
- * Không dùng màu neon; ưu tiên độ tương phản và phân cấp rõ.
+ * Mục tiêu: WCAG AA, màu đủ “đậm” để dễ nhìn, vẫn dịu mắt (không neon).
  */
 
 :root,
 [data-theme='light'],
 .admin-shell:not(.admin-shell--dark) {
-  /* Surfaces — bớt xám phẳng, nền hơi indigo-cool */
-  --ag-bg: #eef2ff;
+  /* Surfaces — nền cool có chiều sâu, tránh tím nhạt phẳng */
+  --ag-bg: #e8eef8;
   --ag-surface: #ffffff;
-  --ag-surface-2: #f5f7ff;
+  --ag-surface-2: #f0f5fc;
   --ag-card: #ffffff;
-  --ag-card-hover: #f8fafc;
+  --ag-card-hover: #eef4fb;
 
-  /* Text */
-  --ag-text-primary: #0f172a;
-  --ag-text-secondary: #475569;
-  --ag-text-muted: #64748b;
+  /* Text — tương phản rõ hơn */
+  --ag-text-primary: #0b1220;
+  --ag-text-secondary: #334155;
+  --ag-text-muted: #52657a;
   --ag-text-disabled: #94a3b8;
   --ag-text-inverse: #ffffff;
 
-  /* Brand */
-  --ag-primary: #4f46e5;
-  --ag-primary-hover: #4338ca;
-  --ag-primary-soft: #eef2ff;
+  /* Brand — indigo đậm + soft rõ */
+  --ag-primary: #4338ca;
+  --ag-primary-hover: #3730a3;
+  --ag-primary-soft: #e0e7ff;
   --ag-primary-text: #ffffff;
+  --ag-accent: #0891b2;
+  --ag-accent-soft: #cffafe;
 
-  /* Semantic */
-  --ag-success: #15803d;
-  --ag-success-bg: #dcfce7;
-  --ag-success-border: #86efac;
-  --ag-warning: #a16207;
-  --ag-warning-bg: #fef3c7;
-  --ag-warning-border: #fde68a;
-  --ag-danger: #b91c1c;
-  --ag-danger-bg: #fee2e2;
-  --ag-danger-border: #fecaca;
+  /* Semantic — bão hòa vừa phải, dễ phân biệt */
+  --ag-success: #047857;
+  --ag-success-bg: #d1fae5;
+  --ag-success-border: #6ee7b7;
+  --ag-warning: #b45309;
+  --ag-warning-bg: #ffedd5;
+  --ag-warning-border: #fdba74;
+  --ag-danger: #be123c;
+  --ag-danger-bg: #ffe4e6;
+  --ag-danger-border: #fda4af;
   --ag-info: #1d4ed8;
   --ag-info-bg: #dbeafe;
   --ag-info-border: #93c5fd;
 
   /* Status extras */
-  --ag-pending: #a16207;
-  --ag-pending-bg: #fef3c7;
+  --ag-pending: #b45309;
+  --ag-pending-bg: #ffedd5;
   --ag-draft: #475569;
   --ag-draft-bg: #e2e8f0;
   --ag-inactive: #64748b;
   --ag-inactive-bg: #f1f5f9;
-  --ag-approved: #15803d;
-  --ag-approved-bg: #dcfce7;
-  --ag-rejected: #b91c1c;
-  --ag-rejected-bg: #fee2e2;
+  --ag-approved: #047857;
+  --ag-approved-bg: #d1fae5;
+  --ag-rejected: #be123c;
+  --ag-rejected-bg: #ffe4e6;
   --ag-cancelled: #64748b;
   --ag-cancelled-bg: #e2e8f0;
 
   /* Chrome */
-  --ag-border: #e0e7ff;
-  --ag-divider: #e2e8f0;
-  --ag-focus-ring: rgba(79, 70, 229, 0.35);
-  --ag-overlay: rgba(15, 23, 42, 0.45);
+  --ag-border: #c7d5ea;
+  --ag-divider: #d8e0ec;
+  --ag-focus-ring: rgba(67, 56, 202, 0.28);
+  --ag-overlay: rgba(15, 23, 42, 0.5);
 
-  /* Sidebar (luôn tối để brand rõ) */
-  --ag-sidebar-bg: #1e1b4b;
+  /* Sidebar — navy sâu, active sáng hơn */
+  --ag-sidebar-bg: #12163a;
   --ag-sidebar-text: #c7d2fe;
   --ag-sidebar-muted: #a5b4fc;
-  --ag-sidebar-active-bg: rgba(99, 102, 241, 0.35);
+  --ag-sidebar-active-bg: rgba(99, 102, 241, 0.42);
   --ag-sidebar-active-text: #ffffff;
-  --ag-sidebar-hover: rgba(255, 255, 255, 0.08);
-  --ag-sidebar-border: rgba(255, 255, 255, 0.1);
+  --ag-sidebar-hover: rgba(255, 255, 255, 0.1);
+  --ag-sidebar-border: rgba(165, 180, 252, 0.18);
 
   /* Topbar / content */
-  --ag-topbar-bg: #ffffff;
+  --ag-topbar-bg: rgba(255, 255, 255, 0.92);
   --ag-input-bg: #ffffff;
-  --ag-input-border: #c7d2fe;
+  --ag-input-border: #b8c7e0;
   --ag-input-placeholder: #94a3b8;
-  --ag-table-header-bg: #eef2ff;
+  --ag-table-header-bg: #e4ebf8;
   --ag-table-row-hover: #e0e7ff;
-  --ag-table-row-alt: #f8fafc;
-  --ag-table-border: #e2e8f0;
+  --ag-table-row-alt: #f5f8fc;
+  --ag-table-border: #d5dee9;
 
-  /* Shadow */
-  --ag-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --ag-shadow-md: 0 8px 24px rgba(15, 23, 42, 0.1);
-  --ag-shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.16);
+  /* Shadow — có chút tint indigo */
+  --ag-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.07), 0 1px 2px rgba(67, 56, 202, 0.04);
+  --ag-shadow-md: 0 10px 28px rgba(15, 23, 42, 0.1), 0 4px 10px rgba(67, 56, 202, 0.06);
+  --ag-shadow-lg: 0 20px 48px rgba(15, 23, 42, 0.14), 0 8px 16px rgba(67, 56, 202, 0.08);
 
   /* Radius */
   --ag-radius-sm: 8px;
@@ -93,77 +94,77 @@
 
 .admin-shell--dark,
 [data-theme='dark'] {
-  /* Nền đen rõ — dễ tách khối */
-  --ag-bg: #0a0a0a;
-  --ag-surface: #141414;
-  --ag-surface-2: #1a1a1a;
-  --ag-card: #121212;
-  --ag-card-hover: #1f1f1f;
+  /* Nền đen ấm hơn một chút, card tách khối rõ */
+  --ag-bg: #07090f;
+  --ag-surface: #12161f;
+  --ag-surface-2: #1a2030;
+  --ag-card: #10141c;
+  --ag-card-hover: #1c2433;
 
-  /* Chữ trắng / xám sáng */
-  --ag-text-primary: #ffffff;
-  --ag-text-secondary: #f3f4f6;
-  --ag-text-muted: #d1d5db;
-  --ag-text-disabled: #9ca3af;
-  --ag-text-inverse: #0a0a0a;
+  --ag-text-primary: #f8fafc;
+  --ag-text-secondary: #e2e8f0;
+  --ag-text-muted: #94a3b8;
+  --ag-text-disabled: #64748b;
+  --ag-text-inverse: #0b1220;
 
-  /* Nút màu giữ màu brand (không đổi thành xám) */
-  --ag-primary: #6366f1;
-  --ag-primary-hover: #818cf8;
-  --ag-primary-soft: rgba(99, 102, 241, 0.22);
-  --ag-primary-text: #ffffff;
+  --ag-primary: #818cf8;
+  --ag-primary-hover: #a5b4fc;
+  --ag-primary-soft: rgba(129, 140, 248, 0.22);
+  --ag-primary-text: #0b1220;
+  --ag-accent: #22d3ee;
+  --ag-accent-soft: rgba(34, 211, 238, 0.16);
 
-  --ag-success: #22c55e;
-  --ag-success-bg: rgba(34, 197, 94, 0.18);
-  --ag-success-border: #22c55e;
-  --ag-warning: #f59e0b;
-  --ag-warning-bg: rgba(245, 158, 11, 0.18);
-  --ag-warning-border: #f59e0b;
-  --ag-danger: #ef4444;
-  --ag-danger-bg: rgba(239, 68, 68, 0.18);
-  --ag-danger-border: #ef4444;
-  --ag-info: #3b82f6;
-  --ag-info-bg: rgba(59, 130, 246, 0.18);
-  --ag-info-border: #3b82f6;
+  --ag-success: #34d399;
+  --ag-success-bg: rgba(52, 211, 153, 0.16);
+  --ag-success-border: #34d399;
+  --ag-warning: #fbbf24;
+  --ag-warning-bg: rgba(251, 191, 36, 0.16);
+  --ag-warning-border: #fbbf24;
+  --ag-danger: #fb7185;
+  --ag-danger-bg: rgba(251, 113, 133, 0.16);
+  --ag-danger-border: #fb7185;
+  --ag-info: #60a5fa;
+  --ag-info-bg: rgba(96, 165, 250, 0.16);
+  --ag-info-border: #60a5fa;
 
-  --ag-pending: #f59e0b;
-  --ag-pending-bg: rgba(245, 158, 11, 0.18);
-  --ag-draft: #d1d5db;
-  --ag-draft-bg: rgba(209, 213, 219, 0.12);
-  --ag-inactive: #d1d5db;
-  --ag-inactive-bg: rgba(209, 213, 219, 0.1);
-  --ag-approved: #22c55e;
-  --ag-approved-bg: rgba(34, 197, 94, 0.18);
-  --ag-rejected: #ef4444;
-  --ag-rejected-bg: rgba(239, 68, 68, 0.18);
-  --ag-cancelled: #d1d5db;
-  --ag-cancelled-bg: rgba(209, 213, 219, 0.1);
+  --ag-pending: #fbbf24;
+  --ag-pending-bg: rgba(251, 191, 36, 0.16);
+  --ag-draft: #cbd5e1;
+  --ag-draft-bg: rgba(148, 163, 184, 0.14);
+  --ag-inactive: #94a3b8;
+  --ag-inactive-bg: rgba(148, 163, 184, 0.12);
+  --ag-approved: #34d399;
+  --ag-approved-bg: rgba(52, 211, 153, 0.16);
+  --ag-rejected: #fb7185;
+  --ag-rejected-bg: rgba(251, 113, 133, 0.16);
+  --ag-cancelled: #94a3b8;
+  --ag-cancelled-bg: rgba(148, 163, 184, 0.12);
 
-  --ag-border: #2e2e2e;
-  --ag-divider: #262626;
-  --ag-focus-ring: rgba(99, 102, 241, 0.45);
+  --ag-border: #2a3344;
+  --ag-divider: #222a38;
+  --ag-focus-ring: rgba(129, 140, 248, 0.4);
   --ag-overlay: rgba(0, 0, 0, 0.72);
 
-  --ag-sidebar-bg: #000000;
-  --ag-sidebar-text: #ffffff;
-  --ag-sidebar-muted: #e5e7eb;
-  --ag-sidebar-active-bg: rgba(99, 102, 241, 0.45);
+  --ag-sidebar-bg: #05070c;
+  --ag-sidebar-text: #e2e8f0;
+  --ag-sidebar-muted: #94a3b8;
+  --ag-sidebar-active-bg: rgba(129, 140, 248, 0.32);
   --ag-sidebar-active-text: #ffffff;
-  --ag-sidebar-hover: rgba(255, 255, 255, 0.1);
-  --ag-sidebar-border: #1f1f1f;
+  --ag-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --ag-sidebar-border: #1e2636;
 
-  --ag-topbar-bg: #0a0a0a;
-  --ag-input-bg: #000000;
-  --ag-input-border: #3f3f3f;
-  --ag-input-placeholder: #9ca3af;
-  --ag-table-header-bg: #000000;
-  --ag-table-row-hover: #1f1f1f;
-  --ag-table-row-alt: #111111;
-  --ag-table-border: #2e2e2e;
+  --ag-topbar-bg: rgba(7, 9, 15, 0.92);
+  --ag-input-bg: #0a0e16;
+  --ag-input-border: #334155;
+  --ag-input-placeholder: #64748b;
+  --ag-table-header-bg: #0c1018;
+  --ag-table-row-hover: #1a2230;
+  --ag-table-row-alt: #0e121a;
+  --ag-table-border: #2a3344;
 
-  --ag-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --ag-shadow-md: 0 10px 28px rgba(0, 0, 0, 0.55);
-  --ag-shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.65);
+  --ag-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --ag-shadow-md: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --ag-shadow-lg: 0 20px 52px rgba(0, 0, 0, 0.6);
 }
 
 /* Focus ring dùng chung */

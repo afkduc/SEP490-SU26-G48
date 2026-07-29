@@ -7,6 +7,8 @@ import UserDetailDrawer from './users/UserDetailDrawer';
 import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import { formatDateSafe } from '../../utils/dateUtils';
+import { auditApi } from '../../services/auditApi';
+import { downloadBlob } from '../../utils/downloadBlob';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -36,27 +38,6 @@ function formatDate(value) {
     locale: 'vi-VN',
     withSeconds: true,
   });
-}
-
-function renderBrowser(item) {
-  if (item.browser && item.os) {
-    return (
-      <span>
-        <strong>{item.browser}</strong>
-        <span style={{ color: '#64748b' }}> · {item.os}</span>
-      </span>
-    );
-  }
-  if (item.browser) {
-    return <strong>{item.browser}</strong>;
-  }
-  if (!item.user_agent) return '—';
-  const match = item.user_agent.match(/(Edge|Edg|Chrome|Firefox|Safari|OPR|Opera)[\/ ]?([\d.]+)/i);
-  if (match) {
-    const name = match[1] === 'Edg' ? 'Edge' : match[1];
-    return <span><strong>{name}</strong> {match[2]}</span>;
-  }
-  return item.user_agent.slice(0, 30);
 }
 
 function formatDuration(seconds) {
@@ -216,18 +197,25 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
 
 // ─── Table Skeleton ────────────────────────────────────────────────
 
+const SESSION_COLS = (
+  <colgroup>
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '20%' }} />
+  </colgroup>
+);
+
 function TableSkeleton({ rows }) {
   return (
-    <table className="table">
+    <table className="table admin-sessions__table">
+      {SESSION_COLS}
       <thead>
         <tr>
-          <th>Thời gian đăng nhập</th>
+          <th>Thời gian</th>
           <th>Người dùng</th>
-          <th>Số điện thoại</th>
-          <th>Hành động</th>
-          <th>Trạng thái</th>
-          <th>IP</th>
-          <th>Trình duyệt</th>
+          <th>Sự kiện</th>
           <th>Thời lượng</th>
           <th>Thao tác</th>
         </tr>
@@ -235,9 +223,9 @@ function TableSkeleton({ rows }) {
       <tbody>
         {Array.from({ length: rows }).map((_, i) => (
           <tr key={i}>
-            {[...Array(9)].map((_, j) => (
+            {[...Array(5)].map((__, j) => (
               <td key={j}>
-                <div className="skeleton-line" style={{ width: `${50 + Math.random() * 40}%` }} />
+                <div className="skeleton-line" style={{ width: `${50 + ((i * 7 + j * 13) % 40)}%` }} />
               </td>
             ))}
           </tr>
@@ -252,25 +240,26 @@ function TableSkeleton({ rows }) {
 function SessionTable({ items, onViewUser, onViewSession }) {
   useDurationTicker(30000);
 
+  const head = (
+    <thead>
+      <tr>
+        <th>Thời gian</th>
+        <th>Người dùng</th>
+        <th>Sự kiện</th>
+        <th>Thời lượng</th>
+        <th>Thao tác</th>
+      </tr>
+    </thead>
+  );
+
   if (!items || items.length === 0) {
     return (
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Thời gian đăng nhập</th>
-            <th>Người dùng</th>
-            <th>Số điện thoại</th>
-            <th>Hành động</th>
-            <th>Trạng thái</th>
-            <th>IP</th>
-            <th>Trình duyệt</th>
-            <th>Thời lượng</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
+      <table className="table admin-sessions__table">
+        {SESSION_COLS}
+        {head}
         <tbody>
           <tr>
-            <td colSpan={9} className="table__empty">
+            <td colSpan={5} className="table__empty">
               Không có lịch sử đăng nhập nào phù hợp với bộ lọc
             </td>
           </tr>
@@ -280,52 +269,47 @@ function SessionTable({ items, onViewUser, onViewSession }) {
   }
 
   return (
-    <table className="table">
-      <thead>
-        <tr>
-          <th>Thời gian đăng nhập</th>
-          <th>Người dùng</th>
-          <th>Số điện thoại</th>
-          <th>Hành động</th>
-          <th>Trạng thái</th>
-          <th>IP</th>
-          <th>Trình duyệt</th>
-          <th>Thời lượng</th>
-          <th>Thao tác</th>
-        </tr>
-      </thead>
+    <table className="table admin-sessions__table">
+      {SESSION_COLS}
+      {head}
       <tbody>
         {items.map((item) => (
           <tr key={item.id}>
-            <td className="admin-sessions__date">{formatDate(item.login_time)}</td>
-            <td className="admin-sessions__user-name">{item.user_name || '—'}</td>
-            <td className="admin-sessions__phone">{item.phone_number || '—'}</td>
             <td>
-              {item.action_type ? (
-                <span className={`badge ${ACTION_CLASS[item.action_type] || 'badge--secondary'}`}>
-                  {ACTION_LABEL[item.action_type] || item.action_type}
-                </span>
-              ) : '—'}
+              <span className="admin-sessions__date">{formatDate(item.login_time)}</span>
             </td>
             <td>
-              {item.status ? (
-                <span className={`badge ${STATUS_CLASS[item.status] || 'badge--secondary'}`}>
-                  {STATUS_LABEL[item.status] || item.status}
-                </span>
-              ) : '—'}
+              <div className="admin-sessions__user-cell">
+                <span className="admin-sessions__user-name">{item.user_name || '—'}</span>
+                <span className="admin-sessions__phone">{item.phone_number || '—'}</span>
+              </div>
             </td>
-            <td className="admin-sessions__ip">{item.ip_address || '—'}</td>
-            <td className="admin-sessions__user-agent" title={item.user_agent || ''}>
-              {renderBrowser(item)}
+            <td>
+              <div className="admin-sessions__event-cell">
+                {item.action_type ? (
+                  <span className={`badge ${ACTION_CLASS[item.action_type] || 'badge--secondary'}`}>
+                    {ACTION_LABEL[item.action_type] || item.action_type}
+                  </span>
+                ) : (
+                  <span className="badge badge--secondary">—</span>
+                )}
+                {item.status ? (
+                  <span className={`badge ${STATUS_CLASS[item.status] || 'badge--secondary'}`}>
+                    {STATUS_LABEL[item.status] || item.status}
+                  </span>
+                ) : null}
+              </div>
             </td>
-            <td className="admin-sessions__duration">
-              {item.status === 'active' ? (
-                <span style={{ color: '#0891b2', fontWeight: 600 }}>
-                  {formatDuration(liveDurationSeconds(item.login_time)) || '—'}
-                </span>
-              ) : (
-                formatDuration(item.session_duration_seconds) || '—'
-              )}
+            <td>
+              <span className="admin-sessions__duration">
+                {item.status === 'active' ? (
+                  <span style={{ color: '#0891b2', fontWeight: 600 }}>
+                    {formatDuration(liveDurationSeconds(item.login_time)) || '—'}
+                  </span>
+                ) : (
+                  formatDuration(item.session_duration_seconds) || '—'
+                )}
+              </span>
             </td>
             <td>
               <div className="admin-sessions__row-actions">
@@ -339,8 +323,21 @@ function SessionTable({ items, onViewUser, onViewSession }) {
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
-                  Chi tiết
+                  <span className="admin-sessions__action-label">Chi tiết</span>
                 </button>
+                {item.user_id && onViewUser && (
+                  <button
+                    type="button"
+                    className="admin-sessions__action-btn"
+                    onClick={() => onViewUser(item.user_id)}
+                    title="Xem người dùng"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                      <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                  </button>
+                )}
               </div>
             </td>
           </tr>
@@ -352,13 +349,51 @@ function SessionTable({ items, onViewUser, onViewSession }) {
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export default function AdminLoginSessionsPage() {
-  const sessions = useLoginSessions();
+export default function AdminLoginSessionsPage({
+  embedded = false,
+  seedUserName = '',
+  seedIpAddress = '',
+  seedStartDate = '',
+  seedEndDate = '',
+  seedActionType = '',
+  seedKey = 0,
+} = {}) {
+  const sessions = useLoginSessions(
+    seedKey
+      ? {
+          userName: seedUserName || '',
+          ipAddress: seedIpAddress || '',
+          startDate: seedStartDate || '',
+          endDate: seedEndDate || '',
+          actionType: seedActionType || '',
+        }
+      : {}
+  );
   const { branches, branchesError } = useSharedBranches();
   const { token } = useAuth();
   const [detailUserId, setDetailUserId] = useState(null);
   const [detailSession, setDetailSession] = useState(null);
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+
+  // Seed từ panel cảnh báo ("Lịch sử") — khi đổi cảnh báo trong lúc tab đang mở
+  useEffect(() => {
+    if (!seedKey) return;
+    sessions.setParams(() => ({
+      userName: seedUserName || '',
+      phone: '',
+      actionType: seedActionType || '',
+      status: '',
+      startDate: seedStartDate || '',
+      endDate: seedEndDate || '',
+      branchId: undefined,
+      ipAddress: seedIpAddress || '',
+      page: 1,
+      pageSize: 10,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey]);
 
   // Debounce refetch SSE - gom nhieu event thanh 1 lan refetch
   // (tranh nhap nhay khi user click nhieu action cung luc)
@@ -492,6 +527,7 @@ export default function AdminLoginSessionsPage() {
   const hasFilters = sessions.params.userName || sessions.params.phone ||
     sessions.params.actionType || sessions.params.status ||
     sessions.params.startDate || sessions.params.endDate ||
+    sessions.params.ipAddress ||
     (sessions.params.branchId != null);
 
   function resetFilters() {
@@ -503,35 +539,70 @@ export default function AdminLoginSessionsPage() {
       startDate: '',
       endDate: '',
       branchId: undefined,
+      ipAddress: '',
       page: 1,
       pageSize: 10,
     }));
   }
 
+  const headerActions = (
+    <div className="admin-page__header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={realtimeEnabled}
+          onChange={(e) => setRealtimeEnabled(e.target.checked)}
+        />
+        Cập nhật realtime
+      </label>
+      <button
+        type="button"
+        className="btn btn--secondary btn--sm"
+        disabled={exporting}
+        onClick={async () => {
+          setExporting(true);
+          setExportError(null);
+          try {
+            const blob = await auditApi.exportLoginSessions(sessions.params);
+            downloadBlob(blob, 'login_sessions.xlsx');
+          } catch (err) {
+            setExportError(err?.message || 'Xuất Excel thất bại');
+          } finally {
+            setExporting(false);
+          }
+        }}
+      >
+        {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+      </button>
+    </div>
+  );
+
   return (
-    <div className="admin-page">
-      {/* Header */}
-      <div className="admin-page__header">
-        <div className="admin-page__title-block">
-          <div className="admin-page__title-icon" style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)', boxShadow: '0 6px 20px rgba(8, 145, 178, 0.35)' }}>
-            <IconSession />
+    <div className={`admin-page${embedded ? ' admin-page--embedded' : ''}`}>
+      {!embedded && (
+        <div className="admin-page__header">
+          <div className="admin-page__title-block">
+            <div className="admin-page__title-icon" style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)', boxShadow: '0 6px 20px rgba(8, 145, 178, 0.35)' }}>
+              <IconSession />
+            </div>
+            <div className="admin-page__title-group">
+              <h1>Lịch sử đăng nhập</h1>
+              <p className="admin-page__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
+            </div>
           </div>
-          <div className="admin-page__title-group">
-            <h1>Lịch sử đăng nhập</h1>
-            <p className="admin-page__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
-          </div>
+          {headerActions}
         </div>
-        <div className="admin-page__header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={realtimeEnabled}
-              onChange={(e) => setRealtimeEnabled(e.target.checked)}
-            />
-            Cập nhật realtime
-          </label>
+      )}
+
+      {embedded && (
+        <div className="admin-hub__toolbar">
+          {headerActions}
         </div>
-      </div>
+      )}
+
+      {exportError && (
+        <div className="admin-page__error" style={{ marginBottom: 12 }}>{exportError}</div>
+      )}
 
       {/* Stats Cards */}
       <StatsCards stats={sessions.data.stats} loading={sessions.loading} />
@@ -554,6 +625,17 @@ export default function AdminLoginSessionsPage() {
               placeholder="Nhập tên người dùng..."
               value={sessions.params.userName || ''}
               onChange={(e) => sessions.updateParam('userName', e.target.value)}
+            />
+          </div>
+
+          <div className="filter-field">
+            <label className="filter-field__label">Địa chỉ IP</label>
+            <input
+              className="filter-field__input"
+              type="text"
+              placeholder="VD: 192.168..."
+              value={sessions.params.ipAddress || ''}
+              onChange={(e) => sessions.updateParam('ipAddress', e.target.value)}
             />
           </div>
 

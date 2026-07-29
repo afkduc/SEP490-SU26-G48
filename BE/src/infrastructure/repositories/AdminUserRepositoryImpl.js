@@ -10,6 +10,7 @@ const ADMIN_USER_COLUMNS = `
   u.branch_id,
   b.branch_name,
   u.status,
+  u.must_change_password,
   u.created_at,
   (SELECT COUNT(*) FROM user_branches ub WHERE ub.user_id = u.id) AS assigned_branch_count,
   (SELECT MAX(ud.last_login_at) FROM user_devices ud WHERE ud.user_id = u.id) AS last_login_at
@@ -32,6 +33,7 @@ function toAdminUserRow(row) {
     scopeAllBranches,
     assignedBranchCount: assignedCount,
     status: row.status,
+    mustChangePassword: row.must_change_password === 1 || row.must_change_password === true,
     createdAt: row.created_at,
     lastLoginAt: row.last_login_at || null,
     roles: [],
@@ -603,8 +605,9 @@ class AdminUserRepositoryImpl {
       recentLogins = [];
     }
 
-    // System alerts — REAL data from security_alerts table (max 5 recent unacknowledged)
+    // System alerts — preview (TOP 5) + counts thật cho banner
     let alerts = [];
+    let alertCounts = { total: 0, critical: 0, high: 0, medium: 0, info: 0 };
     try {
       const alertsResult = await query(`
         SELECT TOP 5
@@ -633,8 +636,28 @@ class AdminUserRepositoryImpl {
         time: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
         alertId: row.id,
       }));
+
+      const countsResult = await query(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) AS criticalCount,
+          SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) AS highCount,
+          SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) AS mediumCount,
+          SUM(CASE WHEN severity = 'info' THEN 1 ELSE 0 END) AS infoCount
+        FROM security_alerts
+        WHERE is_acknowledged = 0
+      `);
+      const c = countsResult.recordset[0] || {};
+      alertCounts = {
+        total: Number(c.total) || 0,
+        critical: Number(c.criticalCount) || 0,
+        high: Number(c.highCount) || 0,
+        medium: Number(c.mediumCount) || 0,
+        info: Number(c.infoCount) || 0,
+      };
     } catch (_) {
       alerts = [];
+      alertCounts = { total: 0, critical: 0, high: 0, medium: 0, info: 0 };
     }
 
     return {
@@ -653,6 +676,7 @@ class AdminUserRepositoryImpl {
       failedLogins,
       recentFailedLogins,
       alerts,
+      alertCounts,
     };
   }
 }

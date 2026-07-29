@@ -503,6 +503,7 @@ async function getLoginSessions(filters = {}) {
     endDate,
     status,
     branchId,
+    ipAddress,
     page = 1,
     pageSize = 20,
   } = filters;
@@ -541,6 +542,12 @@ async function getLoginSessions(filters = {}) {
     paramIndex++;
   }
 
+  if (ipAddress) {
+    conditions.push(`ls.ip_address LIKE @p${paramIndex}`);
+    params[`p${paramIndex}`] = `%${ipAddress}%`;
+    paramIndex++;
+  }
+
   if (startDate) {
     conditions.push(`ls.login_time >= @p${paramIndex}`);
     params[`p${paramIndex}`] = startDate;
@@ -548,8 +555,13 @@ async function getLoginSessions(filters = {}) {
   }
 
   if (endDate) {
+    // Bao gồm cả ngày endDate (so sánh tới cuối ngày nếu chỉ YYYY-MM-DD)
+    const endRaw = String(endDate);
+    const endInclusive = /^\d{4}-\d{2}-\d{2}$/.test(endRaw)
+      ? `${endRaw} 23:59:59`
+      : endDate;
     conditions.push(`ls.login_time <= @p${paramIndex}`);
-    params[`p${paramIndex}`] = endDate;
+    params[`p${paramIndex}`] = endInclusive;
     paramIndex++;
   }
 
