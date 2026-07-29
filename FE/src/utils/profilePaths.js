@@ -10,8 +10,16 @@ export function isRoleProfilePath(pathname = '') {
   );
 }
 
-export function isProfileNotificationsPath(pathname = '') {
-  return pathname.includes('/profile/notifications');
+export function isProfileNotificationsPath(pathname = '', search = '') {
+  if (pathname.includes('/profile/notifications')) return true;
+  const baseOk = pathname === '/admin/profile' || pathname.endsWith('/profile');
+  if (!baseOk || pathname.endsWith('/edit')) return false;
+  try {
+    const q = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+    return q.get('tab') === 'notifications';
+  } catch {
+    return false;
+  }
 }
 
 export function isProfileEditPath(pathname = '') {

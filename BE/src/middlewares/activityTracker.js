@@ -32,7 +32,7 @@ function isExcludedPath(path) {
 
 /**
  * Middleware to track user activity.
- * Updates last_activity_at in DB with 60s throttle.
+ * Updates last_activity_at (device + active login session) with 60s throttle.
  * Does NOT emit SSE events (only login/logout/force do).
  */
 function trackActivity(req, res, next) {
@@ -47,7 +47,9 @@ function trackActivity(req, res, next) {
   }
 
   // Fire and forget - don't block the request
-  deviceService.updateLastActivity(req.user.deviceId)
+  // Dung heartbeat de cap nhat ca device + login_sessions (tranh session bi
+  // TIMEOUT trong khi user van goi API).
+  deviceService.heartbeat(req.user.deviceId)
     .catch((err) => {
       console.error('[activityTracker] Failed to update last_activity:', err.message);
     });

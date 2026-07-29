@@ -11,7 +11,7 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     label: 'Quản trị hệ thống',
     profilePath: ROUTES.ADMIN_PROFILE,
     profileEditPath: `${ROUTES.ADMIN_PROFILE}/edit`,
-    notificationsPath: `${ROUTES.ADMIN_PROFILE}/notifications`,
+    notificationsPath: `${ROUTES.ADMIN_PROFILE}?tab=notifications`,
     allowedRoles: [ROLES.ADMIN],
     useAdminLayout: true,
   },
