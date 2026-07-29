@@ -105,7 +105,7 @@ const NOTIFICATION_EVENTS = {
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
   SECURITY_NEW_DEVICE_IP: {
-    title: 'Đăng nhập từ IP mới',
+    title: 'Đăng nhập từ thiết bị mới',
     severity: SEVERITY.INFO,
     messageTemplates: {
       default: '{message}',

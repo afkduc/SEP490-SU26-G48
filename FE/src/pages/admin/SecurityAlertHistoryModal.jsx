@@ -120,12 +120,8 @@ export default function SecurityAlertHistoryModal({ alert, onClose, onOpenFullHi
                 <dd>{[meta.browser, meta.os].filter(Boolean).join(' · ')}</dd>
               </>
             )}
-            {seed?.focusSessionId && (
-              <>
-                <dt>Session</dt>
-                <dd><code>#{seed.focusSessionId}</code></dd>
-              </>
-            )}
+            <dt>Đối chiếu</dt>
+            <dd>Phiên / thiết bị mới nhất trong bộ lọc</dd>
           </dl>
         </div>
 

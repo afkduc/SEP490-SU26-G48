@@ -49,7 +49,8 @@ export default function ProtectedRoute({
         if (res && res.token && res.user) {
           const inLocal = localStorage.getItem('token');
           const inSession = sessionStorage.getItem('token');
-          const storage = res.token === inLocal ? localStorage : (res.token === inSession ? sessionStorage : null);
+          // Chọn storage theo chỗ đang giữ token cũ (token mới luôn khác chuỗi cũ).
+          const storage = inLocal ? localStorage : (inSession ? sessionStorage : null);
           if (!storage) return;
 
           let existing = {};

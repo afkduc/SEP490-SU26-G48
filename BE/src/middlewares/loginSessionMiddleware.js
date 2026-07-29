@@ -202,28 +202,32 @@ function _sendLoginFailedNotification(userId, reason, ipAddress, browser, os) {
   }
 }
 
-async function _writeLoginAuditLog(req, { success, userId, userName, reason, ipAddress }) {
+async function _writeLoginAuditLog(req, { success, userId, userName, reason, ipAddress, branchId = null }) {
   try {
     const { auditLog, ACTION_TYPES } = require('../utils/auditHelper');
     // Gan tam user vao req de auditLog lay dung actor (login chua co JWT)
     const prevUser = req.user;
+    const actorLabel = userName || prevUser?.name || prevUser?.email || 'unknown';
     req.user = {
       ...(prevUser || {}),
       userId: userId || prevUser?.userId || null,
       id: userId || prevUser?.id || null,
-      name: userName || prevUser?.name || userName,
-      email: userName || prevUser?.email,
+      name: actorLabel,
+      email: userName || prevUser?.email || actorLabel,
+      user_name: actorLabel,
+      phone: prevUser?.phone || null,
+      branch_id: branchId != null ? branchId : (prevUser?.branch_id ?? null),
     };
     await auditLog({
       req,
       action: success ? ACTION_TYPES.LOGIN : ACTION_TYPES.FAILED_LOGIN,
       tableName: 'login_sessions',
       entityName: success ? 'Đăng nhập thành công' : 'Đăng nhập thất bại',
-      entityCode: userName || null,
+      entityCode: actorLabel || null,
       recordId: userId || null,
       description: success
-        ? `Đăng nhập thành công${userName ? `: ${userName}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`
-        : `Đăng nhập thất bại${userName ? `: ${userName}` : ''}${reason ? ` — ${reason}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`,
+        ? `Đăng nhập thành công${actorLabel ? `: ${actorLabel}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`
+        : `Đăng nhập thất bại${actorLabel ? `: ${actorLabel}` : ''}${reason ? ` — ${reason}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`,
       responseStatus: success ? 200 : 401,
     });
     req.user = prevUser;
@@ -670,6 +674,13 @@ async function trackLoginFailed(req, payload) {
         });
       }
 
+      // Soft-fail (sai chi nhánh / tài khoản khóa…): không chuông, không audit FAILED_LOGIN.
+      // AuthController cũng không gọi trackLoginFailed cho các case này; giữ guard phòng gọi khác.
+      const skipSecurityNoise = ['WRONG_BRANCH', 'BRANCH_REQUIRED', 'ACCOUNT_DISABLED', 'BRANCH_DISABLED'];
+      if (skipSecurityNoise.includes(failureReason)) {
+        return;
+      }
+
       _sendLoginFailedNotification(userId, failureReason, ipAddress, browser, os);
       await _writeLoginAuditLog(req, {
         success: false,
@@ -677,6 +688,7 @@ async function trackLoginFailed(req, payload) {
         userName,
         reason: failureReason,
         ipAddress,
+        branchId,
       });
     }
   } catch (err) {

@@ -4,6 +4,8 @@ module.exports = {
   apiPrefix: '/api',
   jwtSecret: process.env.JWT_SECRET || 'autogara_secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
+  /** TTL khi tick «Ghi nhớ đăng nhập» (localStorage). */
+  jwtRememberExpiresIn: process.env.JWT_REMEMBER_EXPIRES_IN || '30d',
   frontendUrl: (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, ''),
   mail: {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',

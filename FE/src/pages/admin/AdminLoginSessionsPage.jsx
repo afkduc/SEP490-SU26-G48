@@ -8,6 +8,7 @@ import AdminPagination from './components/AdminPagination';
 import { formatDateSafe } from '../../utils/dateUtils';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
+import { pickLatestSession } from './securityAlertFocus';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -384,9 +385,10 @@ export default function AdminLoginSessionsPage({
   useEffect(() => {
     if (!seedKey) return;
     focusPayloadRef.current = {
-      sessionId: seedFocusSessionId || seedSessionId || null,
-      ip: seedFocusIp || '',
-      loginTime: seedFocusLoginTime || '',
+      // Không ghim sessionId cũ — luôn chọn phiên mới nhất trong list đã lọc
+      sessionId: null,
+      ip: seedFocusIp || seedIpAddress || '',
+      loginTime: '',
     };
     focusScrollPendingRef.current = true;
     setFocusedSessionId(null);
@@ -399,61 +401,31 @@ export default function AdminLoginSessionsPage({
       endDate: seedEndDate || '',
       branchId: undefined,
       ipAddress: seedIpAddress || '',
-      sessionId: seedSessionId || undefined,
+      sessionId: undefined,
       page: 1,
-      pageSize: seedSessionId ? 20 : 10,
+      pageSize: 20,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey]);
 
-  function pickFocusSession(list, { sessionId, ip, loginTime }) {
-    if (!Array.isArray(list) || list.length === 0) return null;
-    if (sessionId != null && Number.isFinite(Number(sessionId))) {
-      const byId = list.find((s) => Number(s.id) === Number(sessionId));
-      if (byId) return byId;
-    }
-
-    const ipNorm = String(ip || '').trim();
-    const candidates = ipNorm
-      ? list.filter((s) => String(s.ip_address || '').trim() === ipNorm)
-      : list;
-    if (candidates.length === 0) return null;
-
-    const anchorMs = loginTime ? new Date(loginTime).getTime() : NaN;
-    if (!Number.isNaN(anchorMs)) {
-      let best = null;
-      let bestDiff = Infinity;
-      for (const s of candidates) {
-        const t = s.login_time ? new Date(s.login_time).getTime() : NaN;
-        if (Number.isNaN(t)) continue;
-        const diff = Math.abs(t - anchorMs);
-        if (diff < bestDiff) {
-          bestDiff = diff;
-          best = s;
-        }
-      }
-      return best;
-    }
-
-    return candidates[0];
-  }
-
-  // Sau khi seed + list load xong: highlight + scroll tới phiên liên quan (không mở drawer)
+  // Sau khi seed + list load xong: highlight + scroll tới phiên MỚI NHẤT
   useEffect(() => {
     if (!focusScrollPendingRef.current) return;
     if (sessions.loading) return;
 
     const payload = focusPayloadRef.current;
-    const hasFocus = payload.sessionId != null
-      || String(payload.ip || '').trim()
-      || String(payload.loginTime || '').trim();
+    const seeded = Boolean(
+      seedKey
+      && (seedUserName || seedIpAddress || seedFocusIp || seedFocusSessionId || seedSessionId)
+    );
+    const hasFocus = seeded || String(payload.ip || '').trim();
     if (!hasFocus) {
       setFocusedSessionId(null);
       focusScrollPendingRef.current = false;
       return;
     }
 
-    const match = pickFocusSession(sessions.data?.items || [], payload);
+    const match = pickLatestSession(sessions.data?.items || [], { ip: '' });
     if (!match) {
       setFocusedSessionId(null);
       focusScrollPendingRef.current = false;
@@ -461,7 +433,6 @@ export default function AdminLoginSessionsPage({
     }
 
     setFocusedSessionId(match.id);
-    // Không tự mở drawer chi tiết phiên — chỉ highlight + scroll trên bảng lịch sử
     requestAnimationFrame(() => {
       document.getElementById(`admin-session-row-${match.id}`)?.scrollIntoView({
         behavior: 'smooth',
@@ -469,7 +440,7 @@ export default function AdminLoginSessionsPage({
       });
     });
     focusScrollPendingRef.current = false;
-  }, [sessions.data?.items, sessions.loading]);
+  }, [sessions.data?.items, sessions.loading, seedKey, seedUserName, seedIpAddress, seedFocusIp, seedFocusSessionId, seedSessionId]);
 
   // Debounce refetch SSE - gom nhieu event thanh 1 lan refetch
   // (tranh nhap nhay khi user click nhieu action cung luc)
