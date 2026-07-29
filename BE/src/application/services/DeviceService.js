@@ -22,17 +22,22 @@ class DeviceService {
     const device = await this.deviceRepository.findById(Number(deviceId));
     if (!device) throw new ApiError(404, 'Thiết bị không tồn tại');
     if (Number(device.userId) !== Number(userId)) {
-      throw new ApiError(403, 'Bạn không thể đánh dấu thiết bị của người khác');
+      throw new ApiError(403, 'Chỉ chủ tài khoản mới được đánh dấu tin cậy thiết bị của mình. Admin chỉ nên đăng xuất thiết bị lạ.');
     }
     const updated = await this.deviceRepository.setTrusted(deviceId, userId, Boolean(trusted));
     if (!updated) throw new ApiError(404, 'Thiết bị không tồn tại');
     return updated;
   }
 
-  async setTrustedByAdmin(deviceId, trusted) {
-    const updated = await this.deviceRepository.setTrustedByAdmin(deviceId, Boolean(trusted));
-    if (!updated) throw new ApiError(404, 'Thiết bị không tồn tại');
-    return updated;
+  /**
+   * @deprecated Admin khong duoc tin cay thiet bi ho nguoi khac.
+   * Giữ method để tương thích — luôn ủy quyền qua setTrustedForOwner.
+   */
+  async setTrustedByAdmin(deviceId, trusted, actorUserId) {
+    if (!actorUserId) {
+      throw new ApiError(403, 'Chỉ chủ tài khoản mới được đánh dấu tin cậy thiết bị');
+    }
+    return this.setTrustedForOwner(actorUserId, deviceId, trusted);
   }
 
   async forceLogoutDevice(deviceId) {

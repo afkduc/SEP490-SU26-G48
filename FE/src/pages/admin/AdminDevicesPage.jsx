@@ -4,6 +4,7 @@ import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useAuth } from '../../contexts/AppContext';
 import { useToast } from '../../components/common/ToastContext';
 import { formatDateSafe } from '../../utils/dateUtils';
+import { pickLatestDevice } from './securityAlertFocus';
 import './AdminDevicesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -204,6 +205,7 @@ export default function AdminDevicesPage({
   seedFocusLoginTime = '',
 } = {}) {
   const toast = useToast();
+  const { token } = useAuth();
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -224,7 +226,6 @@ export default function AdminDevicesPage({
 
   const [logoutTarget, setLogoutTarget] = useState(null);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [trustBusyId, setTrustBusyId] = useState(null);
 
   const [focusedDeviceId, setFocusedDeviceId] = useState(null);
   const focusScrollPendingRef = useRef(false);
@@ -323,61 +324,25 @@ export default function AdminDevicesPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey]);
 
-  function pickFocusDeviceId(list, focusIp, focusLoginTime) {
-    if (!Array.isArray(list) || list.length === 0) return null;
-    const ip = String(focusIp || '').trim();
-    const anchorMs = focusLoginTime ? new Date(focusLoginTime).getTime() : NaN;
-
-    const candidates = ip
-      ? list.filter((d) => String(d.ipAddress || '').trim() === ip)
-      : list;
-    if (candidates.length === 0) return null;
-
-    const toMs = (v) => {
-      const t = v ? new Date(v).getTime() : NaN;
-      return Number.isNaN(t) ? null : t;
-    };
-
-    if (!Number.isNaN(anchorMs)) {
-      let bestId = null;
-      let bestDiff = Infinity;
-      for (const d of candidates) {
-        const t = toMs(d.lastLoginAt) ?? toMs(d.lastActivityAt) ?? 0;
-        const diff = Math.abs(t - anchorMs);
-        if (diff < bestDiff) {
-          bestDiff = diff;
-          bestId = d.id;
-        }
-      }
-      return bestId;
-    }
-
-    // Fallback: ưu tiên thiết bị mới nhất trong danh sách filter
-    let best = candidates[0];
-    let bestMs = toMs(best.lastActivityAt) ?? toMs(best.lastLoginAt) ?? 0;
-    for (const d of candidates) {
-      const ms = toMs(d.lastActivityAt) ?? toMs(d.lastLoginAt) ?? 0;
-      if (ms > bestMs) {
-        bestMs = ms;
-        best = d;
-      }
-    }
-    return best?.id ?? null;
+  function pickFocusDeviceId(list, focusIp) {
+    const latest = pickLatestDevice(list, { ip: focusIp });
+    return latest?.id ?? null;
   }
 
-  // Sau khi seed thay đổi + danh sách load xong, scroll tới đúng device.
+  // Sau khi seed thay đổi + danh sách load xong, scroll tới thiết bị MỚI NHẤT.
   useEffect(() => {
     if (!focusScrollPendingRef.current) return;
     if (loading) return;
 
-    const { ip, loginTime } = focusPayloadRef.current;
-    if (!String(ip || '').trim() && !String(loginTime || '').trim()) {
+    const { ip } = focusPayloadRef.current;
+    if (!String(ip || '').trim() && !seedUserId && !seedSearch) {
       setFocusedDeviceId(null);
       focusScrollPendingRef.current = false;
       return;
     }
 
-    const focusId = pickFocusDeviceId(devices, ip, loginTime);
+    // List đã lọc theo user/search — highlight thiết bị mới nhất trong list.
+    const focusId = pickFocusDeviceId(devices, '');
     setFocusedDeviceId(focusId);
 
     if (focusId) {
@@ -390,7 +355,7 @@ export default function AdminDevicesPage({
     }
 
     focusScrollPendingRef.current = false;
-  }, [devices, loading]);
+  }, [devices, loading, seedUserId, seedSearch]);
 
   // Reload khi đổi filter — bỏ qua lần mount / lúc đang seed
   useEffect(() => {
@@ -448,7 +413,6 @@ export default function AdminDevicesPage({
     loadData(page);
   }, [loadData, page]);
 
-  const { token } = useAuth();
   // Truyen token de SSE auth (BE validate Bearer hoac ?token= query)
   useLoginSessionsSSE(handleSSEEvent, true, token);
 
@@ -546,25 +510,6 @@ export default function AdminDevicesPage({
     }
   }
 
-  async function handleToggleTrusted(device) {
-    if (!device?.id || trustBusyId) return;
-    const next = !device.isTrusted;
-    setTrustBusyId(device.id);
-    try {
-      const updated = await adminDevicesApi.setTrusted(device.id, next);
-      setDevices((prev) =>
-        prev.map((d) => (d.id === device.id
-          ? { ...d, isTrusted: updated?.isTrusted ?? next, trustedAt: updated?.trustedAt || null }
-          : d))
-      );
-      toast.success(next ? 'Đã đánh dấu thiết bị tin cậy' : 'Đã bỏ tin cậy thiết bị');
-    } catch (err) {
-      toast.error(err?.message || 'Không cập nhật được trạng thái tin cậy');
-    } finally {
-      setTrustBusyId(null);
-    }
-  }
-
   const hasActiveFilters = statusFilter || browserFilter || osFilter || dateFrom || dateTo || search || userIdFilter;
 
   return (
@@ -585,6 +530,10 @@ export default function AdminDevicesPage({
 
       {/* Toolbar: tìm kiếm + lọc + làm mới trên 1 khối */}
       <div className="admin-devices__toolbar">
+        <p className="admin-devices__trust-hint">
+          Admin chỉ <strong>đăng xuất</strong> thiết bị đáng ngờ.
+          Đánh dấu <strong>tin cậy</strong> do chính chủ tài khoản xác nhận qua thông báo thiết bị lạ.
+        </p>
         <div className="admin-devices__toolbar-top">
           <div className="admin-devices__search-wrap">
             <span className="admin-devices__search-icon" aria-hidden="true">
@@ -720,6 +669,9 @@ export default function AdminDevicesPage({
                   <td>
                     <div className="admin-devices__cell-stack">
                       <span className="admin-devices__cell-title">{device.displayName || device.userName || '—'}</span>
+                      {device.userName && device.displayName && device.displayName !== device.userName && (
+                        <span className="admin-devices__cell-sub">@{String(device.userName).replace(/^@/, '')}</span>
+                      )}
                       {device.branchName && <span className="admin-devices__cell-sub">{device.branchName}</span>}
                     </div>
                   </td>
@@ -741,15 +693,6 @@ export default function AdminDevicesPage({
                   </td>
                   <td>
                     <div className="admin-devices__row-actions">
-                      <button
-                        type="button"
-                        className={`btn btn--sm ${device.isTrusted ? 'btn--ghost' : 'btn--secondary'}`}
-                        disabled={trustBusyId === device.id}
-                        onClick={() => handleToggleTrusted(device)}
-                        title={device.isTrusted ? 'Bỏ tin cậy thiết bị này' : 'Đánh dấu thiết bị tin cậy'}
-                      >
-                        {trustBusyId === device.id ? '...' : (device.isTrusted ? 'Bỏ tin cậy' : 'Tin cậy')}
-                      </button>
                       {!device.isCurrent ? (
                         <span className="btn btn--secondary btn--sm btn--disabled">
                           Đã đăng xuất
