@@ -30,12 +30,31 @@ const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const AdminCatalogPage = lazy(() => import('../pages/admin/AdminCatalogPage'));
-const AdminLoginSecurityPage = lazy(() => import('../pages/admin/AdminLoginSecurityPage'));
+const AdminLoginSecurityPage = lazy(() =>
+  import('../pages/admin/AdminLoginSecurityPage').then((m) => {
+    if (!m?.default) {
+      throw new Error('AdminLoginSecurityPage missing default export');
+    }
+    return { default: m.default };
+  })
+);
 const AdminAccountPage = lazy(() => import('../pages/admin/AdminAccountPage'));
-const AdminProfilePage = lazy(() => import('../pages/admin/AdminProfilePage'));
+const DirectorProfilePage = lazy(() => import('../pages/generalDirector/DirectorProfilePage'));
+const ManagerProfilePage = lazy(() => import('../pages/manager/ManagerProfilePage'));
+const ServiceAdvisorProfilePage = lazy(() => import('../pages/dashboard/ServiceAdvisorProfilePage'));
+const TeamLeaderProfilePage = lazy(() => import('../pages/repairorder/TeamLeaderProfilePage'));
+const TechnicianProfilePage = lazy(() => import('../pages/technician/TechnicianProfilePage'));
+const WarehouseProfilePage = lazy(() => import('../pages/inventory/WarehouseProfilePage'));
 const NotFoundPage = lazy(() => import('../pages/errors/NotFoundPage'));
-/** Legacy alias — chi nhánh đã redirect sang /admin/catalog; giữ import để tránh HMR ReferenceError */
-const AdminBranchesPage = lazy(() => import('../pages/admin/AdminBranchesPage'));
+
+const ROLE_PROFILE_PAGES = Object.freeze({
+  director: DirectorProfilePage,
+  manager: ManagerProfilePage,
+  serviceAdvisor: ServiceAdvisorProfilePage,
+  teamLeader: TeamLeaderProfilePage,
+  technician: TechnicianProfilePage,
+  warehouse: WarehouseProfilePage,
+});
 const InventoryLayout = lazy(() => import('../pages/inventory/InventoryLayout'));
 const InventoryDashboardPage = lazy(() => import('../pages/inventory/DashboardPage'));
 const SupplierListPage = lazy(() => import('../pages/inventory/SupplierListPage'));
@@ -173,7 +192,7 @@ function AppRoutes() {
           <Route path="catalog" element={<AdminCatalogPage />} />
           <Route path="branches" element={<Navigate to="/admin/catalog" replace />} />
           <Route path="specialties" element={<Navigate to="/admin/catalog?tab=specialties" replace />} />
-          <Route path="vehicle-brands" element={<Navigate to="/admin/catalog?tab=brands" replace />} />
+          <Route path="vehicle-brands" element={<Navigate to="/admin/catalog" replace />} />
           <Route path="login-security" element={<AdminLoginSecurityPage />} />
           <Route path="security-alerts" element={<Navigate to="/admin/login-security?alerts=1" replace />} />
           <Route path="login-sessions" element={<Navigate to="/admin/login-security?tab=sessions" replace />} />
@@ -184,21 +203,25 @@ function AppRoutes() {
           <Route path="profile/notifications" element={<Navigate to="/admin/profile?tab=notifications" replace />} />
         </Route>
 
-        {/* Hồ sơ cá nhân — URL view/edit riêng cho từng role (AppLayout) */}
-        {APP_PROFILE_ROUTE_CONFIGS.map(({ profilePath, allowedRoles }) => (
-          <Route
-            key={profilePath}
-            path={profilePath}
-            element={
-              <ProtectedRoute roles={allowedRoles}>
-                <ProfilePageLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<AdminProfilePage />} />
-            <Route path="edit" element={<AdminProfilePage />} />
-          </Route>
-        ))}
+        {/* Hồ sơ cá nhân — page riêng theo từng role (không dùng chung AdminProfile) */}
+        {APP_PROFILE_ROUTE_CONFIGS.map(({ profilePath, allowedRoles, pageKey }) => {
+          const ProfilePage = ROLE_PROFILE_PAGES[pageKey];
+          if (!ProfilePage) return null;
+          return (
+            <Route
+              key={profilePath}
+              path={profilePath}
+              element={
+                <ProtectedRoute roles={allowedRoles}>
+                  <ProfilePageLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<ProfilePage />} />
+              <Route path="edit" element={<ProfilePage />} />
+            </Route>
+          );
+        })}
 
         {/* Legacy /profile, /profile/edit → redirect theo role */}
         <Route

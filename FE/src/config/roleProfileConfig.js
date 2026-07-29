@@ -2,8 +2,8 @@ import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 
 /**
- * Cau hinh ho so ca nhan theo tung role (view + edit URL rieng).
- * Admin dung AdminLayout; cac role con lai dung AppLayout + ProfilePageLayout.
+ * Cấu hình hồ sơ cá nhân theo từng role (URL view/edit riêng + page riêng).
+ * Admin dùng AdminLayout + AdminAccountPage; các role còn lại dùng AppLayout.
  */
 export const ROLE_PROFILE_CONFIG = Object.freeze({
   [ROLES.ADMIN]: {
@@ -14,6 +14,7 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     notificationsPath: `${ROUTES.ADMIN_PROFILE}?tab=notifications`,
     allowedRoles: [ROLES.ADMIN],
     useAdminLayout: true,
+    pageKey: 'admin',
   },
   [ROLES.GENERAL_DIRECTOR]: {
     role: ROLES.GENERAL_DIRECTOR,
@@ -22,6 +23,7 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     profileEditPath: `${ROUTES.DIRECTOR_PROFILE}/edit`,
     allowedRoles: [ROLES.GENERAL_DIRECTOR, ROLES.ADMIN],
     useAdminLayout: false,
+    pageKey: 'director',
   },
   [ROLES.MANAGER]: {
     role: ROLES.MANAGER,
@@ -30,6 +32,7 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     profileEditPath: `${ROUTES.MANAGER_PROFILE}/edit`,
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     useAdminLayout: false,
+    pageKey: 'manager',
   },
   [ROLES.SERVICE_ADVISOR]: {
     role: ROLES.SERVICE_ADVISOR,
@@ -38,6 +41,7 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     profileEditPath: `${ROUTES.DASHBOARD_PROFILE}/edit`,
     allowedRoles: [ROLES.SERVICE_ADVISOR, ROLES.ADMIN],
     useAdminLayout: false,
+    pageKey: 'serviceAdvisor',
   },
   [ROLES.TEAM_LEADER]: {
     role: ROLES.TEAM_LEADER,
@@ -46,6 +50,7 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     profileEditPath: `${ROUTES.REPAIR_ORDERS_PROFILE}/edit`,
     allowedRoles: [ROLES.TEAM_LEADER, ROLES.ADMIN],
     useAdminLayout: false,
+    pageKey: 'teamLeader',
   },
   [ROLES.TECHNICIAN]: {
     role: ROLES.TECHNICIAN,
@@ -54,6 +59,7 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     profileEditPath: `${ROUTES.TECHNICIAN_PROFILE}/edit`,
     allowedRoles: [ROLES.TECHNICIAN, ROLES.ADMIN],
     useAdminLayout: false,
+    pageKey: 'technician',
   },
   [ROLES.WAREHOUSE_STAFF]: {
     role: ROLES.WAREHOUSE_STAFF,
@@ -62,14 +68,19 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     profileEditPath: `${ROUTES.INVENTORY_PROFILE}/edit`,
     allowedRoles: [ROLES.WAREHOUSE_STAFF],
     useAdminLayout: false,
+    pageKey: 'warehouse',
   },
 });
 
-/** Cac route profile dung AppLayout (khong gom admin). */
+/** Các route profile dùng AppLayout (không gồm admin). */
 export const APP_PROFILE_ROUTE_CONFIGS = Object.freeze(
   Object.values(ROLE_PROFILE_CONFIG)
     .filter((cfg) => !cfg.useAdminLayout)
-    .map(({ profilePath, allowedRoles }) => ({ profilePath, allowedRoles })),
+    .map(({ profilePath, allowedRoles, pageKey }) => ({
+      profilePath,
+      allowedRoles,
+      pageKey,
+    })),
 );
 
 export function getProfileConfigByRole(role) {

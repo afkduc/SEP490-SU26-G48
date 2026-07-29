@@ -80,7 +80,9 @@ class ProfileService {
 
     const isMatch = await this._verifyPassword(currentPassword, user.user_password);
     if (!isMatch) {
-      throw new ApiError(401, 'Mật khẩu hiện tại không đúng');
+      // 400 (không 401): sai mật khẩu hiện tại ≠ hết phiên JWT.
+      // FE coi 401 là session expired → đá user ra login.
+      throw new ApiError(400, 'Mật khẩu hiện tại không đúng');
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
