@@ -41,6 +41,17 @@ export async function getStockSummaryApi(branchId) {
   return httpClient.get(`/inventory/summary${qs}`);
 }
 
+/**
+ * getTopUsedPartsApi(params): GET /api/inventory/top-used-parts voi filter { fromDate, toDate, limit }.
+ * tra ve: { topParts: [{ productId, productCode, productName, category, brandName, unit,
+ *                         currentStock, exportQuantity, exportCount, demandQuantity, demandCount, totalQuantity }],
+ *           topBrands: [{ brandName, exportQuantity, exportCount, demandQuantity, demandCount, totalQuantity, percentage }],
+ *           summary: { distinctParts, totalExportQuantity, totalExportCount, totalDemandQuantity, totalDemandCount } }
+ */
+export async function getTopUsedPartsApi(params = {}) {
+  return httpClient.get(`/inventory/top-used-parts${buildQuery(params)}`);
+}
+
 export async function getCategoriesApi() {
   return httpClient.get('/products/categories');
 }
