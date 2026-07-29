@@ -57,14 +57,52 @@ function isAdminSecurityNotif(type) {
 function buildLoginSecurityPath(metadata = {}, { tab = 'devices' } = {}) {
   const params = new URLSearchParams();
   if (tab && tab !== 'devices') params.set('tab', tab);
-  const userId = metadata.relatedUserId || metadata.userId || metadata.targetUserId;
-  const userName = metadata.userName || metadata.targetUserName || metadata.actorName;
+  // Ưu tiên relatedUserId (user bị cảnh báo), không dùng nhầm userId người nhận thông báo
+  const userId = metadata.relatedUserId || metadata.targetUserId;
+  const userName = metadata.userName || metadata.targetUserName || metadata.targetName;
   const ip = metadata.ipAddress || metadata.ip || metadata.location;
   if (userId != null && userId !== '') params.set('userId', String(userId));
   if (userName) params.set('search', String(userName));
   if (ip) params.set('ip', String(ip));
   const qs = params.toString();
   return qs ? `/admin/login-security?${qs}` : '/admin/login-security';
+}
+
+/** User bị cảnh báo bảo mật (không phải người nhận chuông). */
+function relatedUserIdFromMeta(metadata = {}) {
+  const id = metadata.relatedUserId ?? metadata.targetUserId;
+  if (id == null || id === '') return null;
+  const n = Number(id);
+  return Number.isFinite(n) ? n : null;
+}
+
+function notifDisplayTitle(notif, metadata = {}) {
+  const type = notifTypeOf(notif, metadata);
+  const who = metadata.userName || metadata.targetUserName || metadata.targetName;
+  if (type === 'SECURITY_SESSION_TAKEOVER' && who) {
+    return `Đăng nhập trên thiết bị khác — ${who}`;
+  }
+  if (type === 'SECURITY_NEW_DEVICE_IP' && who) {
+    return `Thiết bị / IP mới — ${who}`;
+  }
+  if (type === 'SECURITY_NEW_DEVICE_IP') {
+    return ICON_LABELS.SECURITY_NEW_DEVICE_IP;
+  }
+  return notif.title || ICON_LABELS[type] || 'Thông báo';
+}
+
+function notifDisplayMessage(notif, metadata = {}) {
+  const raw = humanizeNotificationMessage(notif.message, metadata || notif.metadata);
+  if (raw && String(raw).trim()) return raw;
+  const who = metadata.userName || metadata.targetUserName || metadata.targetName;
+  const type = notifTypeOf(notif, metadata);
+  if (type === 'SECURITY_SESSION_TAKEOVER' && who) {
+    return `Cảnh báo bảo mật về tài khoản «${who}». Mở Bảo mật đăng nhập để xem phiên / đăng xuất thiết bị.`;
+  }
+  if (type === 'SECURITY_NEW_DEVICE_IP' && who) {
+    return `Tài khoản «${who}» đăng nhập từ thiết bị hoặc IP mới.`;
+  }
+  return raw || '';
 }
 
 const ICON_COLORS = {
@@ -274,6 +312,9 @@ export default function NotificationBell() {
       message: notif.message,
     };
     const type = notifTypeOf(notif, metadata);
+    const myId = Number(user?.userId ?? user?.id);
+    const relatedId = relatedUserIdFromMeta(metadata);
+    const isAboutMe = relatedId != null && Number.isFinite(myId) && relatedId === myId;
 
     // 1) Challenge đăng nhập thiết bị mới (đồng ý / từ chối)
     if (type === 'LOGIN_CHALLENGE' || metadata?.eventType === 'LOGIN_CHALLENGE') {
@@ -304,7 +345,29 @@ export default function NotificationBell() {
       canOpenDevices: canOpenLoginSecurity,
     };
 
-    // 2) Cảnh báo admin (SECURITY_*) về user khác → màn Bảo mật đăng nhập để xử lý thiết bị/phiên
+    // 2) Cảnh báo SECURITY_* về CHÍNH admin đang xem → xử lý như thông báo cá nhân
+    //    (không nhảy sang lọc user khác trên Bảo mật đăng nhập)
+    if (isAdminSecurityNotif(type) && isAboutMe) {
+      if (isSessionTakeoverNotif(type, metadata)) {
+        dispatchSessionTakenOverPrompt({
+          ...promptPayload,
+          variant: 'session_takeover',
+        });
+        setOpen(false);
+        return;
+      }
+      if (isNewDeviceNotif(type, metadata)) {
+        dispatchSessionTakenOverPrompt({
+          ...promptPayload,
+          variant: 'new_device',
+          deviceId: metadata?.deviceId || metadata?.device_id || null,
+        });
+        setOpen(false);
+        return;
+      }
+    }
+
+    // 3) Cảnh báo admin về USER KHÁC → màn Bảo mật đăng nhập (lọc đúng user đó)
     if (isAdminSecurityNotif(type) && canOpenLoginSecurity) {
       const tab = isSessionTakeoverNotif(type, metadata) ? 'sessions' : 'devices';
       navigate(buildLoginSecurityPath(metadata, { tab }));
@@ -312,7 +375,7 @@ export default function NotificationBell() {
       return;
     }
 
-    // 3) Thay phiên trên tài khoản của mình → popup Đổi mật khẩu
+    // 4) Thay phiên trên tài khoản của mình → popup Đổi mật khẩu
     if (isSessionTakeoverNotif(type, metadata)) {
       dispatchSessionTakenOverPrompt({
         ...promptPayload,
@@ -322,7 +385,7 @@ export default function NotificationBell() {
       return;
     }
 
-    // 4) Đăng nhập thiết bị mới (của mình) → popup: Tin cậy / Đổi MK
+    // 5) Đăng nhập thiết bị mới (của mình) → popup: Tin cậy / Đổi MK
     if (isNewDeviceNotif(type, metadata)) {
       dispatchSessionTakenOverPrompt({
         ...promptPayload,
@@ -331,7 +394,7 @@ export default function NotificationBell() {
       });
       setOpen(false);
     }
-  }, [markRead, navigate, canOpenLoginSecurity]);
+  }, [markRead, navigate, canOpenLoginSecurity, user]);
 
   return (
     <div className="notif-bell" ref={dropdownRef}>
@@ -400,6 +463,9 @@ export default function NotificationBell() {
             ) : (
               notifications.map((notif) => {
                 const isUnread = !notif.isRead && !notif.readAt;
+                const meta = parseNotifMeta(notif.metadata);
+                const title = notifDisplayTitle(notif, meta);
+                const message = notifDisplayMessage(notif, meta);
                 return (
                   <button
                     key={notif.id}
@@ -411,13 +477,13 @@ export default function NotificationBell() {
                     {getIcon(notif)}
                     <div className="notif-bell__item-body">
                       <div className="notif-bell__item-title">
-                        {notif.type === 'SECURITY_NEW_DEVICE_IP'
-                          ? (ICON_LABELS.SECURITY_NEW_DEVICE_IP)
-                          : (notif.title || ICON_LABELS[notif.type] || 'Thông báo')}
+                        {title}
                       </div>
-                      <div className="notif-bell__item-message">
-                        {humanizeNotificationMessage(notif.message, notif.metadata)}
-                      </div>
+                      {message ? (
+                        <div className="notif-bell__item-message">
+                          {message}
+                        </div>
+                      ) : null}
                       <div className="notif-bell__item-time">
                         {formatDateSafe(notif.createdAt || notif.timestamp, {
                           timeZone: 'Asia/Ho_Chi_Minh',
