@@ -2,13 +2,11 @@ import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminBranchesPage from './AdminBranchesPage';
 import AdminSpecialtiesPage from './AdminSpecialtiesPage';
-import AdminVehicleBrandsPage from './AdminVehicleBrandsPage';
 import './AdminHub.css';
 
 const TABS = [
   { id: 'branches', label: 'Chi nhánh' },
   { id: 'specialties', label: 'Chuyên môn' },
-  { id: 'brands', label: 'Hãng xe' },
 ];
 
 const VALID = new Set(TABS.map((t) => t.id));
@@ -46,7 +44,7 @@ export default function AdminCatalogPage() {
           <div className="admin-hub__title-group">
             <h1>Danh mục hệ thống</h1>
             <p className="admin-hub__subtitle">
-              Chi nhánh · Chuyên môn · Hãng xe — dữ liệu dùng chung toàn hệ thống
+              Chi nhánh · Chuyên môn — dữ liệu dùng chung toàn hệ thống
             </p>
           </div>
         </div>
@@ -68,7 +66,6 @@ export default function AdminCatalogPage() {
       <div className="admin-hub__body">
         {activeTab === 'branches' && <AdminBranchesPage embedded />}
         {activeTab === 'specialties' && <AdminSpecialtiesPage embedded />}
-        {activeTab === 'brands' && <AdminVehicleBrandsPage embedded />}
       </div>
     </div>
   );
