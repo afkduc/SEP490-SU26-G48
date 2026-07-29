@@ -136,44 +136,6 @@
 .specialties-table tr:last-child td { border-bottom: none; }
 .specialties-table tbody tr:hover td { background: #fafbfc; }
 
-/* ── Brands table: header + data cùng alignment ───────────────────── */
-.brands-table {
-  min-width: 860px;
-}
-
-.brands-table th.brands-col,
-.brands-table td.brands-col {
-  text-align: left;
-  vertical-align: middle;
-}
-
-.brands-table th.brands-col--stt,
-.brands-table td.brands-col--stt,
-.brands-table th.brands-col--num,
-.brands-table td.brands-col--num {
-  text-align: center;
-}
-
-.brands-table th.brands-col--status,
-.brands-table td.brands-col--status,
-.brands-table th.brands-col--actions,
-.brands-table td.brands-col--actions {
-  text-align: center;
-}
-
-.brands-table td.brands-col--actions .specialty-actions {
-  justify-content: center;
-  width: 100%;
-}
-
-.brands-code {
-  font-size: 0.78rem;
-  font-weight: 700;
-  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
-  letter-spacing: 0.3px;
-  color: #0f172a;
-}
-
 .specialty-code {
   display: inline-flex;
   align-items: center;
