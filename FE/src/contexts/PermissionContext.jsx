@@ -26,7 +26,7 @@ export function PermissionProvider({ children }) {
       if (permissions.includes('*')) return true;
       if (permissions.includes(permissionKey)) return true;
       // L1 screen:X:access được coi là có nếu đã có bất kỳ L2 action nào trên cùng screen
-      // (tránh lệch sync tạm thời giữa role_permissions và role_screen_permissions).
+      // Refresh permissions when roles/permissions change.
       const accessMatch = String(permissionKey).match(/^screen:(.+):access$/i);
       if (accessMatch) {
         const screenKey = accessMatch[1];

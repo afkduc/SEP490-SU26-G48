@@ -3,8 +3,6 @@ const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
 const ProfileBranchService = require('../../application/services/ProfileBranchService');
 const ApiError = require('../../utils/ApiError');
-const fs = require('fs');
-const path = require('path');
 
 class ProfileController {
   constructor(profileService) {
@@ -20,7 +18,6 @@ class ProfileController {
     this.markNotificationRead = this.markNotificationRead.bind(this);
     this.markAllNotificationsRead = this.markAllNotificationsRead.bind(this);
     this.getUnreadCount = this.getUnreadCount.bind(this);
-    this.getMyAvatar = this.getMyAvatar.bind(this);
     this.listMyDevices = this.listMyDevices.bind(this);
     this.setMyDeviceTrusted = this.setMyDeviceTrusted.bind(this);
     this.logoutAllMyDevices = this.logoutAllMyDevices.bind(this);
@@ -147,30 +144,6 @@ class ProfileController {
     try {
       const count = await this.notificationService.getUnreadCount(req.user.userId);
       return success(res, { count }, 'Lấy số thông báo chưa đọc thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  // GET /profile/me/avatar - stream ảnh avatar hiện tại của user
-  async getMyAvatar(req, res, next) {
-    try {
-      const profile = await this.profileService.getProfile(req.user.userId);
-      const avatar = profile?.avatar;
-      if (!avatar) {
-        throw new ApiError(404, 'Avatar chưa được thiết lập');
-      }
-
-      // Lấy basename để tránh path traversal.
-      const fileName = path.basename(String(avatar));
-      const avatarDir = path.join(__dirname, '..', '..', '..', 'avatar');
-      const filePath = path.join(avatarDir, fileName);
-
-      if (!fs.existsSync(filePath)) {
-        throw new ApiError(404, 'Avatar không tồn tại');
-      }
-
-      return res.sendFile(filePath);
     } catch (err) {
       next(err);
     }

@@ -41,9 +41,6 @@ function buildProfileRouter() {
   // Lấy số thông báo chưa đọc
   router.get('/me/notifications/unread-count', authenticate, controller.getUnreadCount);
 
-  // Avatar (chỉ xem, không upload)
-  router.get('/me/avatar', authenticate, trackActivity, controller.getMyAvatar);
-
   // Thiết bị đăng nhập của chính mình + đánh dấu tin cậy
   router.get('/me/devices', authenticate, trackActivity, controller.listMyDevices);
   router.patch('/me/devices/:deviceId/trust', authenticate, trackActivity, controller.setMyDeviceTrusted);
