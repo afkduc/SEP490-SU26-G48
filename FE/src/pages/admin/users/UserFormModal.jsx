@@ -5,6 +5,13 @@ import {
   adminUsersApi,
 } from '../../../services/adminApi';
 import { useToast } from '../../../components/common/ToastContext';
+import {
+  EMAIL_HINT,
+  isValidEmail,
+  isValidPassword,
+  isValidPhone,
+  isValidUsername,
+} from '../../../utils/validation';
 import ResetPasswordModal from './ResetPasswordModal';
 import './UserFormModal.css';
 
@@ -160,18 +167,21 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
   function validate() {
     const errs = {};
     if (!isEdit && !form.name.trim()) errs.name = 'Tên đăng nhập là bắt buộc';
+    else if (!isEdit && !isValidUsername(form.name)) {
+      errs.name = 'Tên đăng nhập 3–50 ký tự, chỉ gồm chữ, số, ., _, -';
+    }
     if (!isEdit && !form.email.trim()) errs.email = 'Email là bắt buộc';
     if (!isEdit && !form.password) errs.password = 'Mật khẩu là bắt buộc';
-    if (!isEdit && form.password && form.password.length < 6) {
-      errs.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+    if (!isEdit && form.password && !isValidPassword(form.password)) {
+      errs.password = 'Mật khẩu tối thiểu 6 ký tự, gồm chữ và số';
     }
     if (!form.lastName.trim()) errs.lastName = 'Tên là bắt buộc';
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errs.email = 'Email không đúng định dạng';
+    if (form.email && !isValidEmail(form.email)) {
+      errs.email = EMAIL_HINT;
     }
     if (!form.phone.trim()) {
       errs.phone = 'Số điện thoại là bắt buộc';
-    } else if (!/^0[0-9]{9,10}$/.test(form.phone.trim())) {
+    } else if (!isValidPhone(form.phone)) {
       errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
     }
     if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc (hoặc chọn "Tất cả chi nhánh")';

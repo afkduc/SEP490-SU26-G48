@@ -305,6 +305,48 @@ class AdminUserRepositoryImpl {
     return result.recordset[0] || null;
   }
 
+  async findByPhone(phone) {
+    const result = await query(
+      'SELECT TOP 1 id, phone FROM users WHERE phone = @p1',
+      { p1: phone }
+    );
+    return result.recordset[0] || null;
+  }
+
+  async findRoleById(roleId) {
+    const result = await query(
+      `SELECT id, role_name AS roleName, role_label AS roleLabel,
+              ISNULL(is_active, 1) AS isActive
+       FROM roles WHERE id = @p1`,
+      { p1: Number(roleId) }
+    );
+    const row = result.recordset[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      roleName: row.roleName,
+      roleLabel: row.roleLabel,
+      isActive: Boolean(row.isActive),
+    };
+  }
+
+  async findBranchById(branchId) {
+    const result = await query(
+      `SELECT id, branch_code AS branchCode, branch_name AS branchName,
+              ISNULL(is_active, 1) AS isActive
+       FROM branches WHERE id = @p1`,
+      { p1: Number(branchId) }
+    );
+    const row = result.recordset[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      branchCode: row.branchCode,
+      branchName: row.branchName,
+      isActive: Boolean(row.isActive),
+    };
+  }
+
   async nextPseudoId() {
     const result = await query(
       `SELECT ISNULL(MAX(TRY_CAST(SUBSTRING(pseudo_id, 3, LEN(pseudo_id) - 2) AS INT)), 0) + 1 AS next_num

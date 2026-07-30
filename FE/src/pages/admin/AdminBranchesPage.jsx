@@ -3,6 +3,7 @@ import { adminBranchesApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
 import { useApiError } from '../../hooks/useApiError';
 import PermissionGate from '../../components/PermissionGate';
+import { EMAIL_HINT, isValidEmail, isValidPhone } from '../../utils/validation';
 import './AdminBranchesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -129,12 +130,12 @@ function BranchFormModal({ branch, onClose, onSuccess, managerCandidates }) {
     }
     const phone = form.phone.trim();
     const email = form.email.trim();
-    if (phone && !/^0[0-9]{9,10}$/.test(phone)) {
+    if (phone && !isValidPhone(phone)) {
       setError('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
       return;
     }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Email không đúng định dạng');
+    if (email && !isValidEmail(email)) {
+      setError(EMAIL_HINT);
       return;
     }
 
