@@ -13,6 +13,7 @@ import {
   isProfileEditPath,
 } from '../../utils/profilePaths';
 import { useToast } from '../../components/common/ToastContext';
+import { EMAIL_HINT, isValidEmail, isValidPhone, isValidPassword } from '../../utils/validation';
 import './MyProfilePage.css';
 
 const IconUser = ({ size = 20 }) => (
@@ -321,15 +322,15 @@ export default function MyProfilePage({
       setEditError('Email là bắt buộc');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setEditError('Email không đúng định dạng');
+    if (!isValidEmail(email)) {
+      setEditError(EMAIL_HINT);
       return;
     }
     if (!phone) {
       setEditError('Số điện thoại là bắt buộc');
       return;
     }
-    if (!/^0[0-9]{9,10}$/.test(phone)) {
+    if (!isValidPhone(phone)) {
       setEditError('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
       return;
     }
@@ -371,7 +372,9 @@ export default function MyProfilePage({
     const errors = {};
     if (!pwForm.currentPassword) errors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại';
     if (!pwForm.newPassword) errors.newPassword = 'Vui lòng nhập mật khẩu mới';
-    else if (pwForm.newPassword.length < 6) errors.newPassword = 'Mật khẩu mới phải ít nhất 6 ký tự';
+    else if (!isValidPassword(pwForm.newPassword)) {
+      errors.newPassword = 'Mật khẩu mới tối thiểu 6 ký tự, gồm chữ và số';
+    }
     if (!pwForm.confirmPassword) errors.confirmPassword = 'Vui lòng xác nhận mật khẩu mới';
     else if (pwForm.newPassword !== pwForm.confirmPassword) errors.confirmPassword = 'Mật khẩu xác nhận không khớp';
 
@@ -770,7 +773,7 @@ export default function MyProfilePage({
 
                 <div className="password-hint">
                   <IconLock size={16} />
-                  <span>Mật khẩu phải có ít nhất <strong>6 ký tự</strong>.</span>
+                  <span>Mật khẩu phải có ít nhất <strong>6 ký tự</strong>, gồm chữ và số.</span>
                 </div>
 
                 <form className="profile-form" onSubmit={handlePwSubmit} autoComplete="off">

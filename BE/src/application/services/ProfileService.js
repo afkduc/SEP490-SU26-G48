@@ -1,8 +1,14 @@
 const bcrypt = require('bcryptjs');
 const ApiError = require('../../utils/ApiError');
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^(0[0-9]{9,10})$/;
+const {
+  EMAIL_HINT,
+  EMAIL_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  isValidEmail,
+  isValidPhone,
+  isValidPassword,
+} = require('../../utils/fieldValidation');
 
 class ProfileService {
   constructor(profileRepository) {
@@ -24,8 +30,8 @@ class ProfileService {
       const email = String(payload.email).trim();
       if (!email) {
         errors.push('Email là bắt buộc');
-      } else if (!EMAIL_REGEX.test(email)) {
-        errors.push('Email không đúng định dạng');
+      } else if (email.length > EMAIL_MAX_LENGTH || !isValidEmail(email)) {
+        errors.push(EMAIL_HINT);
       } else {
         const existing = await this.profileRepository.findByEmail(email);
         if (existing && Number(existing.id) !== Number(userId)) {
@@ -39,10 +45,32 @@ class ProfileService {
       const phone = String(payload.phone).trim();
       if (!phone) {
         errors.push('Số điện thoại là bắt buộc');
-      } else if (!PHONE_REGEX.test(phone)) {
+      } else if (!isValidPhone(phone)) {
         errors.push('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
       } else {
+        const phoneOwner = await this.profileRepository.findByPhone(phone);
+        if (phoneOwner && Number(phoneOwner.id) !== Number(userId)) {
+          errors.push('Số điện thoại đã được sử dụng bởi người khác');
+        }
         payload.phone = phone;
+      }
+    }
+
+    if (payload.firstName !== undefined && payload.firstName !== null) {
+      const firstName = String(payload.firstName).trim();
+      if (firstName.length > NAME_MAX_LENGTH) {
+        errors.push(`Họ tối đa ${NAME_MAX_LENGTH} ký tự`);
+      } else {
+        payload.firstName = firstName;
+      }
+    }
+
+    if (payload.lastName !== undefined && payload.lastName !== null) {
+      const lastName = String(payload.lastName).trim();
+      if (lastName.length > NAME_MAX_LENGTH) {
+        errors.push(`Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
+      } else {
+        payload.lastName = lastName;
       }
     }
 
@@ -69,8 +97,8 @@ class ProfileService {
       throw new ApiError(400, 'Mật khẩu hiện tại và mật khẩu mới không được để trống');
     }
 
-    if (newPassword.length < 6) {
-      throw new ApiError(400, 'Mật khẩu mới phải có ít nhất 6 ký tự');
+    if (!isValidPassword(newPassword)) {
+      throw new ApiError(400, `Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự, gồm chữ và số`);
     }
 
     const user = await this.profileRepository.findByIdWithPassword(userId);
