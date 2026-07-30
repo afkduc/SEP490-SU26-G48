@@ -5,7 +5,7 @@ export default function TechnicianProfilePage() {
   return (
     <MyProfilePage
       title="Hồ sơ kỹ thuật viên"
-      subtitle="Thông tin tài khoản và đổi mật khẩu"
+      subtitle="Thông tin tài khoản"
     />
   );
 }

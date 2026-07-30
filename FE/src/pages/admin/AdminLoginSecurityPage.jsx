@@ -213,7 +213,7 @@ export default function AdminLoginSecurityPage() {
     }));
   }, []);
 
-  /** Từ cảnh báo / phiên → tab Thiết bị để force logout / tin cậy. */
+  /** Từ cảnh báo / phiên → tab Thiết bị để force logout. */
   const handleOpenDevicesToProcess = useCallback((opts = {}) => {
     const alert = opts.alert || sessionSeed.alert;
     const userId = opts.userId || alert?.userId || null;

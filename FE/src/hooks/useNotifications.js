@@ -79,9 +79,7 @@ function maybeOpenSessionTakenOver(data) {
   dispatchSessionTakenOver({
     metadata,
     title: data.title || 'Đã có người đăng nhập tài khoản của bạn',
-    message: data.message,
-    device: [metadata.browser, metadata.os].filter(Boolean).join(' · ') || undefined,
-    ip: metadata.ip,
+    message: 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.',
   });
 }
 

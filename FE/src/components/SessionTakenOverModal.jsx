@@ -7,9 +7,9 @@ import './LoginChallengeModal.css';
  */
 export default function SessionTakenOverModal({ detail, onClose }) {
   const navigate = useNavigate();
+  // Chỉ hiển thị text cố định — không show IP / browser / OS
   const message =
-    detail?.message
-    || 'Đã có người khác đăng nhập tài khoản của bạn.';
+    'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.';
 
   function goLogin() {
     localStorage.removeItem('token');

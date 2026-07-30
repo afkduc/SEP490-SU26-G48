@@ -531,8 +531,7 @@ export default function AdminDevicesPage({
       {/* Toolbar: tìm kiếm + lọc + làm mới trên 1 khối */}
       <div className="admin-devices__toolbar">
         <p className="admin-devices__trust-hint">
-          Admin chỉ <strong>đăng xuất</strong> thiết bị đáng ngờ.
-          Đánh dấu <strong>tin cậy</strong> do chính chủ tài khoản xác nhận qua thông báo thiết bị lạ.
+          Admin chỉ <strong>đăng xuất</strong> thiết bị đáng ngờ. Không còn đánh dấu tin cậy thiết bị.
         </p>
         <div className="admin-devices__toolbar-top">
           <div className="admin-devices__search-wrap">
@@ -685,9 +684,6 @@ export default function AdminDevicesPage({
                     <div className="admin-devices__status-stack">
                       <span className={`admin-devices__badge ${device.isCurrent ? 'admin-devices__badge--on' : 'admin-devices__badge--off'}`}>
                         {device.isCurrent ? '● Hiện tại' : '○ Không hoạt động'}
-                      </span>
-                      <span className={`admin-devices__badge ${device.isTrusted ? 'admin-devices__badge--trusted' : 'admin-devices__badge--untrusted'}`}>
-                        {device.isTrusted ? '★ Tin cậy' : 'Thiết bị lạ'}
                       </span>
                     </div>
                   </td>

@@ -6,7 +6,7 @@ export default function AdminProfilePage({ embedded = false } = {}) {
     <MyProfilePage
       embedded={embedded}
       title="Tài khoản quản trị"
-      subtitle="Hồ sơ và bảo mật tài khoản quản trị hệ thống"
+      subtitle="Hồ sơ tài khoản quản trị hệ thống"
     />
   );
 }

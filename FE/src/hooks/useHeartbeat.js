@@ -80,7 +80,7 @@ export function useHeartbeat(options = {}) {
             sessionExpiredFiredRef.current = true;
             showSessionExpired({
               code: 'SESSION_REPLACED',
-              message: 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại để tiếp tục.',
+              message: 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.',
             });
           }
           backoffRef.current = Math.min(backoffRef.current + 1, 4);

@@ -377,7 +377,7 @@ async function checkInactiveAdmin() {
 
 /**
  * Rule 4 (INFO): Login từ IP mới (chưa từng thấy trong 30 ngày).
- * Chỉ ghi panel — không spam chuông. Bỏ qua session đã có alert / máy tin cậy.
+ * Chỉ ghi panel — không spam chuông. Bỏ qua session đã có alert.
  */
 async function checkNewDeviceIp() {
   try {
@@ -407,14 +407,6 @@ async function checkNewDeviceIp() {
             AND sa.is_acknowledged = 0
             AND sa.user_id = ls.user_id
             AND sa.metadata LIKE N'%' + ls.ip_address + N'%'
-        )
-        -- Máy đã tin cậy (cùng browser+os) → không cảnh báo IP mới
-        AND NOT EXISTS (
-          SELECT 1 FROM user_devices ud
-          WHERE ud.user_id = ls.user_id
-            AND ud.is_trusted = 1
-            AND ud.browser = ls.browser
-            AND ud.os = ls.os
         )
       ORDER BY ls.login_time DESC
     `);
