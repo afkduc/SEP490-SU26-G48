@@ -1,13 +1,10 @@
-const bcrypt = require('bcryptjs');
 const ApiError = require('../../utils/ApiError');
 const {
   EMAIL_HINT,
   EMAIL_MAX_LENGTH,
   NAME_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
   isValidEmail,
   isValidPhone,
-  isValidPassword,
 } = require('../../utils/fieldValidation');
 
 class ProfileService {
@@ -92,51 +89,13 @@ class ProfileService {
     return updated;
   }
 
-  async changePassword(userId, currentPassword, newPassword) {
-    if (!currentPassword || !newPassword) {
-      throw new ApiError(400, 'Mật khẩu hiện tại và mật khẩu mới không được để trống');
-    }
-
-    if (!isValidPassword(newPassword)) {
-      throw new ApiError(400, `Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự, gồm chữ và số`);
-    }
-
-    const user = await this.profileRepository.findByIdWithPassword(userId);
-    if (!user) {
-      throw new ApiError(404, 'Không tìm thấy người dùng');
-    }
-
-    const isMatch = await this._verifyPassword(currentPassword, user.user_password);
-    if (!isMatch) {
-      // 400 (không 401): sai mật khẩu hiện tại ≠ hết phiên JWT.
-      // FE coi 401 là session expired → đá user ra login.
-      throw new ApiError(400, 'Mật khẩu hiện tại không đúng');
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.profileRepository.updatePassword(userId, passwordHash);
-
-    // Notify user about password change
-    this._sendPasswordChangedNotification(userId);
-
-    return true;
-  }
-
-  async _sendPasswordChangedNotification(userId) {
-    try {
-      const NotificationService = require('./NotificationService');
-      const ns = new NotificationService();
-      await ns.notify('PASSWORD_CHANGED', { userId });
-    } catch (err) {
-      console.error('[ProfileService] Failed to send password changed notification:', err.message);
-    }
-  }
-
-  async _verifyPassword(input, stored) {
-    if (stored && stored.startsWith('$2b$')) {
-      return bcrypt.compare(input, stored);
-    }
-    return input === stored;
+  async changePassword(_userId, _currentPassword, _newPassword) {
+    // Không cho tự đổi MK bằng mật khẩu cũ: ai đã biết pass cũ sẽ chiếm được tài khoản.
+    // Đặt lại chỉ qua quên mật khẩu (email OTP) hoặc admin reset.
+    throw new ApiError(
+      403,
+      'Không hỗ trợ đổi mật khẩu trong hồ sơ. Vui lòng dùng Quên mật khẩu (email) hoặc liên hệ quản trị viên.'
+    );
   }
 }
 

@@ -58,7 +58,7 @@ const NOTIFICATION_EVENTS = {
     title: 'Đã có người đăng nhập tài khoản của bạn',
     severity: SEVERITY.CRITICAL,
     messageTemplates: {
-      default: 'Đã có người đăng nhập tài khoản của bạn từ {location} ({device}). Phiên hiện tại sẽ bị đăng xuất.',
+      default: 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.',
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },

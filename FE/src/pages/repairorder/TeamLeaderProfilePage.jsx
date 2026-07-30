@@ -5,7 +5,7 @@ export default function TeamLeaderProfilePage() {
   return (
     <MyProfilePage
       title="Hồ sơ tổ trưởng kỹ thuật"
-      subtitle="Thông tin tài khoản và đổi mật khẩu"
+      subtitle="Thông tin tài khoản"
     />
   );
 }

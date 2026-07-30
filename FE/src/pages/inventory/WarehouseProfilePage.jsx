@@ -5,7 +5,7 @@ export default function WarehouseProfilePage() {
   return (
     <MyProfilePage
       title="Hồ sơ nhân viên kho"
-      subtitle="Thông tin tài khoản và đổi mật khẩu"
+      subtitle="Thông tin tài khoản"
     />
   );
 }

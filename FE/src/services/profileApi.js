@@ -7,9 +7,7 @@ import httpClient from './httpClient';
  *   - updateMyProfile(payload): PUT /api/profile/me
  *     payload: { email, firstName, lastName, phone }
  *     tra ve: profile object
- *   - changePassword(payload): PUT /api/profile/me/password
- *     payload: { currentPassword, newPassword }
- *     tra ve: null
+ *   - changePassword(payload): PUT /api/profile/me/password (đã tắt — BE trả 403; dùng quên mật khẩu / admin reset)
  */
 export async function getMyProfile() {
   return httpClient.get('/profile/me');
@@ -29,7 +27,7 @@ export async function getMyDevices() {
   return httpClient.get('/profile/me/devices');
 }
 
-/** PATCH /api/profile/me/devices/:id/trust { trusted: boolean } */
+/** PATCH /api/profile/me/devices/:id/trust — đã tắt (BE trả 403) */
 export async function setMyDeviceTrusted(deviceId, trusted) {
   return httpClient.patch(`/profile/me/devices/${deviceId}/trust`, { trusted: Boolean(trusted) });
 }

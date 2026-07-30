@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { changePassword, setMyDeviceTrusted } from '../services/profileApi';
-import { useToast } from './common/ToastContext';
 import './SessionTakenOverPrompt.css';
 
 export const SESSION_TAKEN_OVER_PROMPT_KEY = 'SESSION_TAKEN_OVER_PROMPT';
@@ -38,32 +36,18 @@ function formatWhen(value) {
 }
 
 /**
- * Popup bảo mật khi bấm thông báo:
- * — session_takeover: tài khoản login ở nơi khác → Đổi MK
- * — new_device: thiết bị / IP mới → Đổi MK hoặc Xem thiết bị
+ * Popup bảo mật khi bấm thông báo (admin):
+ * session_takeover / new_device → quên mật khẩu / xem thiết bị (không còn tin cậy thiết bị).
  */
 export default function SessionTakenOverPrompt() {
-  const toast = useToast();
   const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
   const [detail, setDetail] = useState(null);
-  const [step, setStep] = useState('info'); // info | password
-  const [form, setForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
-  const [errors, setErrors] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [trusting, setTrusting] = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
       if (window.location.pathname === '/login') return;
       setDetail(e?.detail || {});
-      setStep('info');
-      setForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setErrors({});
       setVisible(true);
     };
     window.addEventListener(SESSION_TAKEN_OVER_PROMPT_KEY, handler);
@@ -73,7 +57,11 @@ export default function SessionTakenOverPrompt() {
   function close() {
     setVisible(false);
     setDetail(null);
-    setStep('info');
+  }
+
+  function openForgotPassword() {
+    close();
+    navigate('/forgot-password');
   }
 
   function openDevices() {
@@ -84,63 +72,6 @@ export default function SessionTakenOverPrompt() {
     const qs = params.toString();
     close();
     navigate(qs ? `/admin/login-security?${qs}` : '/admin/login-security');
-  }
-
-  async function handleTrustDevice() {
-    const meta = parseMeta(detail?.metadata);
-    const deviceId = meta.deviceId || detail?.deviceId || meta.device_id;
-    if (!deviceId) {
-      toast.info('Không xác định được thiết bị. Hãy mở danh sách thiết bị để đánh dấu tin cậy.');
-      if (detail?.canOpenDevices) openDevices();
-      else close();
-      return;
-    }
-    setTrusting(true);
-    try {
-      await setMyDeviceTrusted(deviceId, true);
-      toast.success('Đã tin cậy thiết bị này — lần sau login máy này sẽ không báo thiết bị lạ.');
-      close();
-    } catch (err) {
-      toast.error(err?.message || 'Không đánh dấu tin cậy được');
-    } finally {
-      setTrusting(false);
-    }
-  }
-
-  async function handleChangePassword(e) {
-    e.preventDefault();
-    const nextErrors = {};
-    if (!form.currentPassword) nextErrors.currentPassword = 'Nhập mật khẩu hiện tại';
-    if (!form.newPassword) nextErrors.newPassword = 'Nhập mật khẩu mới';
-    else if (form.newPassword.length < 6) nextErrors.newPassword = 'Mật khẩu mới tối thiểu 6 ký tự';
-    if (!form.confirmPassword) nextErrors.confirmPassword = 'Xác nhận mật khẩu mới';
-    else if (form.newPassword !== form.confirmPassword) {
-      nextErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
-    }
-    if (Object.keys(nextErrors).length) {
-      setErrors(nextErrors);
-      return;
-    }
-
-    setSaving(true);
-    setErrors({});
-    try {
-      await changePassword({
-        currentPassword: form.currentPassword,
-        newPassword: form.newPassword,
-      });
-      toast.success('Đã đổi mật khẩu. Các phiên khác sẽ không dùng được mật khẩu cũ.');
-      close();
-    } catch (err) {
-      const msg = err?.message || 'Không thể đổi mật khẩu';
-      if (/mật khẩu hiện tại không đúng/i.test(msg)) {
-        setErrors({ currentPassword: 'Mật khẩu hiện tại không đúng' });
-      } else {
-        setErrors({ form: msg });
-      }
-    } finally {
-      setSaving(false);
-    }
   }
 
   if (!visible) return null;
@@ -160,14 +91,14 @@ export default function SessionTakenOverPrompt() {
     ? 'Đăng nhập từ thiết bị mới'
     : 'Tài khoản của bạn đang login ở nơi khác';
   const lead = variant === 'new_device'
-    ? 'Phát hiện đăng nhập từ thiết bị hoặc IP chưa từng dùng. Nếu không phải bạn, hãy đổi mật khẩu và kiểm tra danh sách thiết bị.'
-    : 'Ai đó vừa đăng nhập tài khoản của bạn từ thiết bị khác. Nếu không phải bạn, hãy đổi mật khẩu ngay.';
+    ? 'Phát hiện đăng nhập từ thiết bị hoặc IP chưa từng dùng. Nếu không phải bạn, hãy đặt lại mật khẩu qua email.'
+    : 'Ai đó vừa đăng nhập tài khoản của bạn từ thiết bị khác. Nếu không phải bạn, hãy đặt lại mật khẩu qua email (OTP).';
 
   return (
     <div
       className="sto-prompt-overlay"
       onClick={(e) => {
-        if (e.target === e.currentTarget && step === 'info') close();
+        if (e.target === e.currentTarget) close();
       }}
       role="presentation"
     >
@@ -176,159 +107,65 @@ export default function SessionTakenOverPrompt() {
           ×
         </button>
 
-        {step === 'info' ? (
-          <>
-            <div className="sto-prompt__badge" aria-hidden>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            </div>
+        <div className="sto-prompt__badge" aria-hidden>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </div>
 
-            <h2 id="sto-prompt-title" className="sto-prompt__title">
-              {title}
-            </h2>
-            <p className="sto-prompt__lead">{lead}</p>
+        <h2 id="sto-prompt-title" className="sto-prompt__title">
+          {title}
+        </h2>
+        <p className="sto-prompt__lead">{lead}</p>
 
-            <div className="sto-prompt__card">
-              <div className="sto-prompt__card-icon" aria-hidden>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <rect x="2" y="3" width="20" height="14" rx="2" />
-                  <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
-                </svg>
-              </div>
-              <div className="sto-prompt__card-body">
-                <strong>Lần đăng nhập từ {device}</strong>
-                {ip && <span>IP {ip}</span>}
-                {when && <span>{when}</span>}
-              </div>
-            </div>
+        <div className="sto-prompt__card">
+          <div className="sto-prompt__card-icon" aria-hidden>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+          </div>
+          <div className="sto-prompt__card-body">
+            <strong>Lần đăng nhập từ {device}</strong>
+            {ip && <span>IP {ip}</span>}
+            {when && <span>{when}</span>}
+          </div>
+        </div>
 
-            <div className="sto-prompt__recommend">
-              <h3>{variant === 'new_device' ? 'Nếu đây là máy của bạn' : 'Hãy đổi mật khẩu ngay'}</h3>
-              <p>
-                {variant === 'new_device'
-                  ? 'Bấm «Đây là tôi — tin cậy» để không bị cảnh báo lại. Nếu không phải bạn, hãy đổi mật khẩu ngay.'
-                  : 'Ai đó đã dùng thông tin đăng nhập của bạn và có thể thử đăng nhập lại.'}
-              </p>
-            </div>
+        <div className="sto-prompt__recommend">
+          <h3>Đặt lại mật khẩu qua email</h3>
+          <p>
+            Nếu không phải bạn, dùng Quên mật khẩu để xác nhận qua email.
+            Có thể xem danh sách thiết bị và đăng xuất máy đáng ngờ.
+          </p>
+        </div>
 
-            <div className="sto-prompt__actions">
-              {variant === 'new_device' ? (
-                <>
-                  <button
-                    type="button"
-                    className="sto-prompt__btn sto-prompt__btn--primary"
-                    onClick={handleTrustDevice}
-                    disabled={trusting}
-                  >
-                    {trusting ? 'Đang lưu...' : 'Đây là tôi — tin cậy'}
-                  </button>
-                  <button
-                    type="button"
-                    className="sto-prompt__btn sto-prompt__btn--secondary"
-                    onClick={() => setStep('password')}
-                  >
-                    Không phải tôi — đổi mật khẩu
-                  </button>
-                  {showDevicesBtn && (
-                    <button
-                      type="button"
-                      className="sto-prompt__btn sto-prompt__btn--ghost"
-                      onClick={openDevices}
-                    >
-                      Xem thiết bị
-                    </button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className="sto-prompt__btn sto-prompt__btn--primary"
-                    onClick={() => setStep('password')}
-                  >
-                    Đổi mật khẩu
-                  </button>
-                  {showDevicesBtn && (
-                    <button
-                      type="button"
-                      className="sto-prompt__btn sto-prompt__btn--secondary"
-                      onClick={openDevices}
-                    >
-                      Xem thiết bị
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="sto-prompt__btn sto-prompt__btn--ghost"
-                    onClick={close}
-                  >
-                    Lúc khác
-                  </button>
-                </>
-              )}
-            </div>
-          </>
-        ) : (
-          <form className="sto-prompt__form" onSubmit={handleChangePassword}>
-            <h2 className="sto-prompt__title">Đổi mật khẩu</h2>
-            <p className="sto-prompt__lead">
-              Sau khi đổi, phiên đăng nhập ở thiết bị khác sẽ không còn hợp lệ với mật khẩu cũ.
-            </p>
-
-            {errors.form && <div className="sto-prompt__error">{errors.form}</div>}
-
-            <label className="sto-prompt__field">
-              <span>Mật khẩu hiện tại</span>
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={form.currentPassword}
-                onChange={(e) => setForm((f) => ({ ...f, currentPassword: e.target.value }))}
-              />
-              {errors.currentPassword && <em>{errors.currentPassword}</em>}
-            </label>
-            <label className="sto-prompt__field">
-              <span>Mật khẩu mới</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={form.newPassword}
-                onChange={(e) => setForm((f) => ({ ...f, newPassword: e.target.value }))}
-              />
-              {errors.newPassword && <em>{errors.newPassword}</em>}
-            </label>
-            <label className="sto-prompt__field">
-              <span>Xác nhận mật khẩu mới</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={form.confirmPassword}
-                onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
-              />
-              {errors.confirmPassword && <em>{errors.confirmPassword}</em>}
-            </label>
-
-            <div className="sto-prompt__actions">
-              <button
-                type="submit"
-                className="sto-prompt__btn sto-prompt__btn--primary"
-                disabled={saving}
-              >
-                {saving ? 'Đang lưu...' : 'Đổi mật khẩu'}
-              </button>
-              <button
-                type="button"
-                className="sto-prompt__btn sto-prompt__btn--ghost"
-                onClick={() => setStep('info')}
-                disabled={saving}
-              >
-                Quay lại
-              </button>
-            </div>
-          </form>
-        )}
+        <div className="sto-prompt__actions">
+          <button
+            type="button"
+            className="sto-prompt__btn sto-prompt__btn--primary"
+            onClick={openForgotPassword}
+          >
+            Quên mật khẩu
+          </button>
+          {showDevicesBtn && (
+            <button
+              type="button"
+              className="sto-prompt__btn sto-prompt__btn--secondary"
+              onClick={openDevices}
+            >
+              Xem thiết bị
+            </button>
+          )}
+          <button
+            type="button"
+            className="sto-prompt__btn sto-prompt__btn--ghost"
+            onClick={close}
+          >
+            Lúc khác
+          </button>
+        </div>
       </div>
     </div>
   );
