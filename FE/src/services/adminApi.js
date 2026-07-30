@@ -145,59 +145,16 @@ class AdminBranchesApi {
 const adminBranchesApi = new AdminBranchesApi();
 
 /**
- * Admin Roles API (UC-11)
- *   - list():                    GET /api/admin/roles
- *   - getDetail(id):            GET /api/admin/roles/:id
- *   - create(payload):          POST /api/admin/roles
- *   - update(id, payload):      PUT /api/admin/roles/:id
- *   - toggleStatus(id):         PATCH /api/admin/roles/:id/toggle-status (soft delete only)
- *   - listWithPermissions():    GET /api/admin/roles/full  (1 call, tranh N+1)
- *   - listPermissions():         GET /api/admin/permissions
- *   - getRolePermissions(id):    GET /api/admin/roles/:id/permissions
- *   - setRolePermissions(id, permIds[]): PUT /api/admin/roles/:id/permissions
- *   - getRoleUsers(id):         GET /api/admin/roles/:id/users
- *
- * LUU Y: KHONG co `delete()` - he thong chi dung soft delete (active/inactive).
+ * Admin Roles API — danh sách role để gán trên form user (không còn màn CRUD vai trò).
+ *   - list(): GET /api/admin/roles
  */
 class AdminRolesApi {
   list() {
     return httpClient.get('/admin/roles');
   }
 
-  listWithPermissions() {
-    return httpClient.get('/admin/roles/full');
-  }
-
   getDetail(id) {
     return httpClient.get(`/admin/roles/${id}`);
-  }
-
-  create(payload) {
-    return httpClient.post('/admin/roles', payload);
-  }
-
-  update(id, payload) {
-    return httpClient.put(`/admin/roles/${id}`, payload);
-  }
-
-  toggleStatus(id) {
-    return httpClient.patch(`/admin/roles/${id}/toggle-status`);
-  }
-
-  listPermissions() {
-    return httpClient.get('/admin/permissions');
-  }
-
-  getRolePermissions(id) {
-    return httpClient.get(`/admin/roles/${id}/permissions`);
-  }
-
-  setRolePermissions(id, permissionIds) {
-    return httpClient.put(`/admin/roles/${id}/permissions`, { permissionIds });
-  }
-
-  getRoleUsers(id) {
-    return httpClient.get(`/admin/roles/${id}/users`);
   }
 }
 
@@ -289,8 +246,8 @@ export {
  * Admin Devices API
  *   - list(params):     GET /api/admin/devices
  *   - listByUser(id): GET /api/admin/devices/user/:id
- *   - forceLogout(deviceId): DELETE /api/admin/devices/:deviceId
- *   - forceLogoutOthers(userId, currentDeviceId): DELETE /api/admin/devices/user/:userId/others
+ *   - forceLogout(deviceId): POST /api/admin/devices/:deviceId/logout
+ *   - forceLogoutOthers(userId, currentDeviceId): POST /api/admin/devices/user/:userId/others/logout
  */
 class AdminDevicesApi {
   list(params = {}) {
@@ -302,7 +259,7 @@ class AdminDevicesApi {
   }
 
   forceLogout(deviceId) {
-    return httpClient.delete(`/admin/devices/${deviceId}`);
+    return httpClient.post(`/admin/devices/${deviceId}/logout`);
   }
 
   /** @deprecated Tin cậy thiết bị đã tắt — BE trả 403 */
@@ -311,62 +268,23 @@ class AdminDevicesApi {
   }
 
   forceLogoutOthers(userId, currentDeviceId) {
-    return httpClient.delete(`/admin/devices/user/${userId}/others?currentDeviceId=${currentDeviceId || ''}`);
+    return httpClient.post(
+      `/admin/devices/user/${userId}/others/logout?currentDeviceId=${currentDeviceId || ''}`
+    );
   }
 
   /**
    * Admin force logout ALL devices of a user (including current).
-   * DELETE /api/admin/devices/user/:userId/all
+   * POST /api/admin/devices/user/:userId/all/logout
    */
   forceLogoutAllDevices(userId) {
-    return httpClient.delete(`/admin/devices/user/${userId}/all`);
+    return httpClient.post(`/admin/devices/user/${userId}/all/logout`);
   }
 }
 
 const adminDevicesApi = new AdminDevicesApi();
 
 export { AdminDevicesApi, adminDevicesApi };
-
-/**
- * Admin Specialties API
- *   - list():              GET /api/admin/specialties
- *   - create(payload):    POST /api/admin/specialties
- *   - update(id, payload): PUT /api/admin/specialties/:id
- *   - toggleStatus(id):   PATCH /api/admin/specialties/:id/toggle-status (soft delete only)
- *   - getUserSpecialties(userId): GET /api/admin/users/:userId/specialties
- *   - setUserSpecialties(userId, ids[]): PUT /api/admin/users/:userId/specialties
- *
- * LUU Y: KHONG co `delete()` - he thong chi dung soft delete (active/inactive).
- */
-class AdminSpecialtiesApi {
-  list() {
-    return httpClient.get('/admin/specialties');
-  }
-
-  create(payload) {
-    return httpClient.post('/admin/specialties', payload);
-  }
-
-  update(id, payload) {
-    return httpClient.put(`/admin/specialties/${id}`, payload);
-  }
-
-  toggleStatus(id) {
-    return httpClient.patch(`/admin/specialties/${id}/toggle-status`);
-  }
-
-  getUserSpecialties(userId) {
-    return httpClient.get(`/admin/users/${userId}/specialties`);
-  }
-
-  setUserSpecialties(userId, specialtyIds) {
-    return httpClient.put(`/admin/users/${userId}/specialties`, { specialtyIds });
-  }
-}
-
-const adminSpecialtiesApi = new AdminSpecialtiesApi();
-
-export { AdminSpecialtiesApi, adminSpecialtiesApi };
 
 /**
  * Admin Security Alerts API

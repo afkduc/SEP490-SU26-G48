@@ -1,15 +1,5 @@
-import { useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import AdminBranchesPage from './AdminBranchesPage';
-import AdminSpecialtiesPage from './AdminSpecialtiesPage';
 import './AdminHub.css';
-
-const TABS = [
-  { id: 'branches', label: 'Chi nhánh' },
-  { id: 'specialties', label: 'Chuyên môn' },
-];
-
-const VALID = new Set(TABS.map((t) => t.id));
 
 function IconCatalog() {
   return (
@@ -20,20 +10,8 @@ function IconCatalog() {
   );
 }
 
+/** Danh mục hệ thống — hiện chỉ quản lý chi nhánh (chuyên môn gán qua hồ sơ user / manager). */
 export default function AdminCatalogPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const raw = searchParams.get('tab');
-  const activeTab = VALID.has(raw) ? raw : 'branches';
-
-  const setActiveTab = useCallback((tab) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (tab === 'branches') next.delete('tab');
-      else next.set('tab', tab);
-      return next;
-    }, { replace: true });
-  }, [setSearchParams]);
-
   return (
     <div className="admin-page admin-hub">
       <div className="admin-hub__header">
@@ -44,28 +22,14 @@ export default function AdminCatalogPage() {
           <div className="admin-hub__title-group">
             <h1>Danh mục hệ thống</h1>
             <p className="admin-hub__subtitle">
-              Chi nhánh · Chuyên môn — dữ liệu dùng chung toàn hệ thống
+              Quản lý chi nhánh dùng chung toàn hệ thống
             </p>
           </div>
         </div>
       </div>
 
-      <nav className="admin-hub__tabs" aria-label="Danh mục hệ thống">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`admin-hub__tab${activeTab === tab.id ? ' admin-hub__tab--active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
-
       <div className="admin-hub__body">
-        {activeTab === 'branches' && <AdminBranchesPage embedded />}
-        {activeTab === 'specialties' && <AdminSpecialtiesPage embedded />}
+        <AdminBranchesPage embedded />
       </div>
     </div>
   );

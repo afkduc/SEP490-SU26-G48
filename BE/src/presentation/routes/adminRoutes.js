@@ -16,11 +16,6 @@ const {
   validateUpdateRole,
   validateSetPermissions,
 } = require('../validators/adminRoleValidator');
-const {
-  validateCreateSpecialty,
-  validateUpdateSpecialty,
-  validateSetUserSpecialties,
-} = require('../validators/adminSpecialtyValidator');
 
 /**
  * Admin routes — chỉ cần role admin (đã gỡ ma trận quyền screen:*).
@@ -93,41 +88,21 @@ function buildAdminRouter() {
   router.get('/devices', controller.listDevices);
   router.get('/devices/user/:userId', validateIdParam('userId'), controller.listUserDevices);
   router.patch('/devices/:deviceId/trust', validateIdParam('deviceId'), controller.setDeviceTrusted);
-  router.delete('/devices/:deviceId', validateIdParam('deviceId'), controller.forceLogoutDevice);
-  router.delete(
-    '/devices/user/:userId/others',
+  // POST …/logout — đăng xuất phiên thiết bị (tránh DELETE gây hiểu nhầm “xóa”)
+  router.post(
+    '/devices/:deviceId/logout',
+    validateIdParam('deviceId'),
+    controller.forceLogoutDevice
+  );
+  router.post(
+    '/devices/user/:userId/others/logout',
     validateIdParam('userId'),
     controller.forceLogoutAllOtherDevices
   );
-  router.delete(
-    '/devices/user/:userId/all',
+  router.post(
+    '/devices/user/:userId/all/logout',
     validateIdParam('userId'),
     controller.forceLogoutAllDevices
-  );
-
-  router.get('/specialties', controller.listSpecialties);
-  router.post('/specialties', validateCreateSpecialty, controller.createSpecialty);
-  router.put(
-    '/specialties/:id',
-    validateIdParam('id'),
-    validateUpdateSpecialty,
-    controller.updateSpecialty
-  );
-  router.patch(
-    '/specialties/:id/toggle-status',
-    validateIdParam('id'),
-    controller.toggleSpecialtyStatus
-  );
-  router.get(
-    '/users/:userId/specialties',
-    validateIdParam('userId'),
-    controller.getUserSpecialties
-  );
-  router.put(
-    '/users/:userId/specialties',
-    validateIdParam('userId'),
-    validateSetUserSpecialties,
-    controller.setUserSpecialties
   );
 
   router.get('/security-alerts', controller.listSecurityAlerts);

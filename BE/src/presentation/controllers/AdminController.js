@@ -486,7 +486,7 @@ class AdminController {
       const result = await this.deviceService.forceLogoutDevice(req.params.deviceId);
       await auditCrud.forceLogout(req, {
         targetUserName: result?.userName || null,
-        reason: `Đăng xuất thiết bị ${req.params.deviceId}`,
+        reason: 'Đăng xuất thiết bị',
       });
       return success(res, result, 'Da dang xuat khoi thiet bi');
     } catch (err) {
@@ -501,7 +501,7 @@ class AdminController {
       const result = await this.deviceService.forceLogoutAllOtherDevices(userId, currentDeviceId);
       await auditCrud.forceLogout(req, {
         targetUserName: `user-${userId}`,
-        reason: `Đăng xuất tất cả thiết bị khác (${result?.revoked || 0} thiết bị)`,
+        reason: 'Đăng xuất các thiết bị khác',
       });
       return success(res, result, 'Da dang xuat tat ca thiet bi khac');
     } catch (err) {
@@ -511,7 +511,7 @@ class AdminController {
 
   /**
    * Admin force logout ALL devices of a user (including current).
-   * DELETE /api/admin/devices/user/:userId/all
+   * POST /api/admin/devices/user/:userId/all/logout
    */
   forceLogoutAllDevices = async (req, res, next) => {
     try {
@@ -530,7 +530,7 @@ class AdminController {
       const result = await this.deviceService.forceLogoutAllDevices(userId);
       await auditCrud.forceLogout(req, {
         targetUserName: `user-${userId}`,
-        reason: `Buộc đăng xuất toàn bộ thiết bị của user (${result?.revoked || 0} thiết bị)`,
+        reason: 'Đăng xuất toàn bộ thiết bị',
       });
       return success(res, result, `Da dang xuat ${result.revoked} thiet bi`);
     } catch (err) {
