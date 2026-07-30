@@ -310,8 +310,9 @@ class RoleRepositoryImpl {
   }
 
   /**
-   * Lay permission_key cua user tu role_permissions (RBAC phang).
-   * Da bo ma tran man hinh (role_screen_permissions / user_screen_permissions).
+   * Lay permission_key cua user:
+   *  - Layer 1: role_permissions (DB)
+   *  - Layer 2: default screen:* theo role_name (code map) — thay ma tran DB da go
    * Wildcard '*' duoc PermissionService.can() check rieng.
    *
    * @param {number} userId
@@ -329,12 +330,33 @@ class RoleRepositoryImpl {
         AND p.permission_key IS NOT NULL
     `, { p1: userId });
 
-    return result.recordset.map((row) => row.perm_key);
+    const fromDb = result.recordset.map((row) => row.perm_key);
+    if (fromDb.includes('*')) {
+      return fromDb;
+    }
+
+    const rolesResult = await query(`
+      SELECT DISTINCT LOWER(LTRIM(RTRIM(r.role_name))) AS role_name
+      FROM user_role ur
+      JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
+      WHERE ur.user_id = @p1
+        AND ISNULL(ur.is_active, 1) = 1
+        AND r.role_name IS NOT NULL
+    `, { p1: userId });
+
+    const roleNames = rolesResult.recordset.map((row) => row.role_name);
+    const {
+      getDefaultScreenPermissionsForRoles,
+    } = require('../../config/defaultScreenPermissionsByRole');
+    const fromRoleDefaults = getDefaultScreenPermissionsForRoles(roleNames);
+
+    return [...new Set([...fromDb, ...fromRoleDefaults])];
   }
 
   /**
-   * Permission keys cho JWT (cung nguon role_permissions).
+   * Permission keys cho JWT.
    * Neu co wildcard '*' thi chi tra ['*'] de tranh JWT qua lon (431).
+   * Neu khong: role_permissions + default screen:*:access (va L2 can thiet).
    *
    * @param {number} userId
    * @returns {Promise<string[]>}
@@ -355,6 +377,7 @@ class RoleRepositoryImpl {
       return ['*'];
     }
 
+    // Full set (DB + default screen) — PermissionGate FE can L2 :view/:update
     return this.getUserPermissionKeys(userId);
   }
 
