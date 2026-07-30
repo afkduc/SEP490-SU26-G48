@@ -416,11 +416,11 @@
 
 /* Phân bổ độ rộng cột theo tỉ lệ % (tổng = 100%) — đều nhau ở mọi viewport ≥1100px.
    Ưu tiên cột Mô tả (description) vì chứa text dài nhất. */
-.admin-logs__table-wrapper .table colgroup col:nth-child(1)  { width: 17%;  }  /* Người dùng */
-.admin-logs__table-wrapper .table colgroup col:nth-child(2)  { width: 12%;  }  /* Hành động */
-.admin-logs__table-wrapper .table colgroup col:nth-child(3)  { width: 38%;  }  /* Mô tả — chiếm phần lớn nhất */
-.admin-logs__table-wrapper .table colgroup col:nth-child(4)  { width: 14%;  }  /* Chi nhánh */
-.admin-logs__table-wrapper .table colgroup col:nth-child(5)  { width: 19%;  }  /* Thời gian */
+.admin-logs__table-wrapper .table colgroup col:nth-child(1)  { width: 16%;  }  /* Người dùng */
+.admin-logs__table-wrapper .table colgroup col:nth-child(2)  { width: 14%;  }  /* Hành động */
+.admin-logs__table-wrapper .table colgroup col:nth-child(3)  { width: 34%;  }  /* Mô tả */
+.admin-logs__table-wrapper .table colgroup col:nth-child(4)  { width: 16%;  }  /* Chi nhánh */
+.admin-logs__table-wrapper .table colgroup col:nth-child(5)  { width: 20%;  }  /* Thời gian */
 
 .admin-logs__table-wrapper .table thead tr {
   background: #f8fafc;
@@ -428,7 +428,7 @@
 }
 
 .admin-logs__table-wrapper .table thead th {
-  padding: 10px 12px;
+  padding: 12px 14px;
   text-align: left;
   font-size: 0.72rem;
   font-weight: 700;
@@ -439,48 +439,54 @@
   border-bottom: none;
   overflow: hidden;
   text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
 .admin-logs__table-wrapper .table tbody td {
   padding: 12px 14px;
   color: #334155;
   vertical-align: middle;
-  /* Mặc định: 1 dòng + ellipsis. Description (line-clamp-2) sẽ override bên dưới. */
+  height: 56px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-height: 60px;
 }
 
-/* Các span nội dung trong cell cũng phải truncate theo */
+/* Nội dung trong cell: mặc định truncate 1 dòng; không stretch full-width (badge). */
 .admin-logs__table-wrapper .table tbody td > * {
-  display: block;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Description: cho phép xuống tối đa 2 dòng để không bị mất thông tin,
-   giữ các row cao đều nhau (line-height 1.4 → ~2 dòng = 2.8em). */
-.admin-logs__table-wrapper .table tbody td > .audit-logs__description {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  white-space: normal;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  word-break: break-word;
-  line-height: 1.4;
-  max-height: calc(1.4em * 2);
+/* Badge hành động: giữ pill gọn, căn giữa theo chiều dọc ô */
+.admin-logs__table-wrapper .table tbody td > .badge {
+  display: inline-flex !important;
+  width: fit-content;
+  max-width: 100%;
+  vertical-align: middle;
 }
 
-/* Đặt chiều cao tối thiểu cho mỗi row để tất cả row cao đều nhau
-   (đủ chứa 2 dòng description + padding). */
+/* Mô tả: 1 dòng + ellipsis để hàng cao đều, thẳng cột */
+.admin-logs__table-wrapper .table tbody td > .audit-logs__description {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+  max-height: none;
+}
+
+.admin-logs__table-wrapper .table tbody td.audit-logs__cell--branch {
+  white-space: nowrap;
+}
+
+/* Đặt chiều cao tối thiểu cho mỗi row để tất cả row cao đều nhau */
 .admin-logs__table-wrapper .table tbody tr {
   border-bottom: 1px solid #f1f5f9;
   transition: background 0.12s;
-  min-height: 60px;
+  height: 56px;
 }
 
 .admin-logs__table-wrapper .table tbody tr:nth-child(even) {
@@ -1067,6 +1073,18 @@
   font-size: 0.82rem;
   font-weight: 700;
   color: #0d9488;
+}
+
+.audit-detail__summary {
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #334155;
+  font-weight: 500;
 }
 
 .audit-detail__description {

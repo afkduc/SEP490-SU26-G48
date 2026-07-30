@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adminUsersApi, adminSpecialtiesApi } from '../../../services/adminApi';
-import { useToast } from '../../../components/common/ToastContext';
+import { adminUsersApi } from '../../../services/adminApi';
 import '../components/AdminDrawer.css';
 
 const STATUS_LABELS = {
@@ -52,14 +51,10 @@ function DetailRow({ label, value, badge }) {
   );
 }
 
-export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
-  const toast = useToast();
+export default function UserDetailDrawer({ userId, onClose }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [allSpecialties, setAllSpecialties] = useState([]);
-  const [userSpecialtyIds, setUserSpecialtyIds] = useState([]);
-  const [savingSpecs, setSavingSpecs] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -69,16 +64,8 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
 
     (async () => {
       try {
-        const [res, specs, userSpecs] = await Promise.all([
-          adminUsersApi.getDetail(userId),
-          adminSpecialtiesApi.list().catch(() => ({ items: [] })),
-          adminSpecialtiesApi.getUserSpecialties(userId).catch(() => ({ items: [] })),
-        ]);
-        if (!cancelled) {
-          setUser(res);
-          setAllSpecialties((specs?.items || []).filter((s) => s.isActive !== false));
-          setUserSpecialtyIds((userSpecs?.items || []).map((s) => s.id || s.specialtyId).filter(Boolean));
-        }
+        const res = await adminUsersApi.getDetail(userId);
+        if (!cancelled) setUser(res);
       } catch (err) {
         if (!cancelled) setError(err.message || 'Không tải được chi tiết người dùng');
       } finally {
@@ -92,25 +79,6 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
   const fullName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || '—'
     : '—';
-
-  function toggleSpecialty(id) {
-    setUserSpecialtyIds((prev) => (
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    ));
-  }
-
-  async function handleSaveSpecialties() {
-    setSavingSpecs(true);
-    try {
-      await adminSpecialtiesApi.setUserSpecialties(userId, userSpecialtyIds);
-      toast.success('Đã cập nhật chuyên môn');
-      onRolesChanged?.();
-    } catch (err) {
-      toast.error(err?.message || 'Không lưu được chuyên môn');
-    } finally {
-      setSavingSpecs(false);
-    }
-  }
 
   return (
     <div className="drawer-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
@@ -151,7 +119,9 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                 {user.roles?.length > 0 && (
                   <div className="user-info-card__roles">
                     {user.roles.map((r) => {
-                      const name = typeof r === 'object' && r !== null ? r.roleName : r;
+                      const name = typeof r === 'object' && r !== null
+                        ? (r.roleLabel || r.roleName)
+                        : r;
                       const key = typeof r === 'object' && r !== null ? r.roleId : r;
                       return (
                         <span key={key} className="badge badge--info">{name}</span>
@@ -196,56 +166,6 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                         : (user.branchName || '—')
                     }
                   />
-                </div>
-
-                <div className="detail-list__group">
-                  <div className="detail-list__group-title">Chuyên môn</div>
-                </div>
-                <div className="detail-list__group" style={{ padding: '8px 0 12px' }}>
-                  {allSpecialties.length === 0 ? (
-                    <span style={{ color: '#94a3b8', fontSize: 13 }}>Chưa có chuyên môn trong hệ thống</span>
-                  ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {allSpecialties.map((s) => {
-                        const id = s.id;
-                        const checked = userSpecialtyIds.includes(id);
-                        return (
-                          <label
-                            key={id}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              padding: '4px 10px',
-                              borderRadius: 999,
-                              border: `1px solid ${checked ? '#4f46e5' : '#e2e8f0'}`,
-                              background: checked ? '#eef2ff' : '#fff',
-                              fontSize: 12,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleSpecialty(id)}
-                            />
-                            {s.specialtyName || s.name}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {allSpecialties.length > 0 && (
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm"
-                      style={{ marginTop: 10 }}
-                      disabled={savingSpecs}
-                      onClick={handleSaveSpecialties}
-                    >
-                      {savingSpecs ? 'Đang lưu...' : 'Lưu chuyên môn'}
-                    </button>
-                  )}
                 </div>
 
                 <div className="detail-list__group">

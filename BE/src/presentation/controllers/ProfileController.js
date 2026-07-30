@@ -185,7 +185,7 @@ class ProfileController {
     }
   }
 
-  // DELETE /profile/me/devices/all — đăng xuất mọi thiết bị của chính mình
+  // POST /profile/me/devices/logout-all — đăng xuất mọi thiết bị của chính mình
   async logoutAllMyDevices(req, res, next) {
     try {
       const DeviceService = require('../../application/services/DeviceService');

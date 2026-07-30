@@ -18,12 +18,6 @@ const ADMIN_NAV = [
     ],
   },
   {
-    label: 'Vai trò',
-    children: [
-      { label: 'Phân quyền người dùng', path: '/admin/users' },
-    ],
-  },
-  {
     label: 'Nhật ký',
     children: [
       { label: 'Nhật ký hoạt động', path: '/admin/logs' },

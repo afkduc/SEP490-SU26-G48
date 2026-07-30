@@ -54,7 +54,7 @@ function buildProfileRouter() {
   // Thiết bị đăng nhập của chính mình + đánh dấu tin cậy
   router.get('/me/devices', authenticate, trackActivity, controller.listMyDevices);
   router.patch('/me/devices/:deviceId/trust', authenticate, trackActivity, controller.setMyDeviceTrusted);
-  router.delete('/me/devices/all', authenticate, trackActivity, controller.logoutAllMyDevices);
+  router.post('/me/devices/logout-all', authenticate, trackActivity, controller.logoutAllMyDevices);
 
   return router;
 }
