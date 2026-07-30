@@ -909,7 +909,7 @@ const QUICK_ACTIONS = [
   { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem, chỉnh sửa & phân quyền', accent: '#4f46e5' },
   { to: '/admin/login-security', icon: <IconAlert />, label: 'Bảo mật đăng nhập', desc: 'Thiết bị + tín hiệu cảnh báo', accent: '#ef4444' },
   { to: '/admin/logs', icon: <IconLog />, label: 'Nhật ký hoạt động', desc: 'Lịch sử thao tác', accent: '#d97706' },
-  { to: '/admin/catalog', icon: <IconLogin />, label: 'Danh mục hệ thống', desc: 'Chi nhánh · Chuyên môn', accent: '#0891b2' },
+  { to: '/admin/catalog', icon: <IconLogin />, label: 'Danh mục hệ thống', desc: 'Chi nhánh', accent: '#0891b2' },
   { to: '/admin/profile', icon: <IconTerminal />, label: 'Tài khoản của tôi', desc: 'Hồ sơ & thông báo', accent: '#db2777' },
 ];
 

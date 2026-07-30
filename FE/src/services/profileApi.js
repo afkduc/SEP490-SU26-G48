@@ -32,7 +32,7 @@ export async function setMyDeviceTrusted(deviceId, trusted) {
   return httpClient.patch(`/profile/me/devices/${deviceId}/trust`, { trusted: Boolean(trusted) });
 }
 
-/** DELETE /api/profile/me/devices/all — đăng xuất mọi thiết bị của chính mình */
+/** POST /api/profile/me/devices/logout-all — đăng xuất mọi thiết bị của chính mình */
 export async function logoutAllMyDevices() {
-  return httpClient.delete('/profile/me/devices/all');
+  return httpClient.post('/profile/me/devices/logout-all');
 }

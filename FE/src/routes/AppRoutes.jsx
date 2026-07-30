@@ -188,10 +188,9 @@ function AppRoutes() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="users" element={<AdminUsersPage />} />
-          <Route path="roles" element={<Navigate to="/admin/users?tab=roles" replace />} />
+          <Route path="roles" element={<Navigate to="/admin/users" replace />} />
           <Route path="catalog" element={<AdminCatalogPage />} />
           <Route path="branches" element={<Navigate to="/admin/catalog" replace />} />
-          <Route path="specialties" element={<Navigate to="/admin/catalog?tab=specialties" replace />} />
           <Route path="vehicle-brands" element={<Navigate to="/admin/catalog" replace />} />
           <Route path="login-security" element={<AdminLoginSecurityPage />} />
           <Route path="security-alerts" element={<Navigate to="/admin/login-security?alerts=1" replace />} />

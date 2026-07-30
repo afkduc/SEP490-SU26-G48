@@ -286,7 +286,7 @@ const auditCrud = {
       req,
       action: ACTION_TYPES.FORCE_LOGO,
       tableName: 'login_sessions',
-      description: `Buộc đăng xuất${targetUserName ? ` user ${targetUserName}` : ''}${reason ? `: ${reason}` : ''}`,
+      description: reason || 'Đăng xuất thiết bị',
       responseStatus: 200,
     });
   },
