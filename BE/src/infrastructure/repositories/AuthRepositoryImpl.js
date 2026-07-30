@@ -14,7 +14,7 @@ class AuthRepositoryImpl extends AuthRepository {
   async findUserByEmail(email) {
     const result = await query(
       `SELECT u.id, u.pseudo_id, u.user_name, u.email, u.user_password,
-              u.first_name, u.last_name, u.phone, u.branch_id, u.status, u.avatar,
+              u.first_name, u.last_name, u.phone, u.branch_id, u.status,
               b.is_active AS branch_is_active,
               token_version
        FROM   users u
@@ -42,7 +42,7 @@ class AuthRepositoryImpl extends AuthRepository {
 
     const result = await query(
       `SELECT u.id, u.pseudo_id, u.user_name, u.email, u.user_password,
-              u.first_name, u.last_name, u.phone, u.branch_id, u.status, u.avatar,
+              u.first_name, u.last_name, u.phone, u.branch_id, u.status,
               b.is_active AS branch_is_active,
               token_version
        FROM   users u

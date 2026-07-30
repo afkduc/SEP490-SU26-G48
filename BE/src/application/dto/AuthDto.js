@@ -8,7 +8,6 @@ function toUserDto(user, roles, permissionKeys = []) {
     lastName: user.last_name,
     phone: user.phone,
     branchId: user.branch_id,
-    avatar: user.avatar,
     roles: roles.map((r) => r.role_name),
     roleLabels: roles.map((r) => r.role_label),
     primaryRole: roles[0]?.role_name || null,
