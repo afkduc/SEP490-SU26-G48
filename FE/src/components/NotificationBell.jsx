@@ -375,7 +375,7 @@ export default function NotificationBell() {
       return;
     }
 
-    // 4) Thay phiên trên tài khoản của mình → popup Đổi mật khẩu
+    // 4) Thay phiên trên tài khoản của mình → popup bảo mật (quên mật khẩu)
     if (isSessionTakeoverNotif(type, metadata)) {
       dispatchSessionTakenOverPrompt({
         ...promptPayload,

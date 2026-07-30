@@ -5,7 +5,7 @@ export default function ServiceAdvisorProfilePage() {
   return (
     <MyProfilePage
       title="Hồ sơ cố vấn dịch vụ"
-      subtitle="Thông tin tài khoản và đổi mật khẩu"
+      subtitle="Thông tin tài khoản"
     />
   );
 }

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   useAuth,
   getRoleProfilePath,
   getRoleProfileEditPath,
 } from '../../contexts/AppContext';
-import { getMyProfile, updateMyProfile, changePassword, logoutAllMyDevices } from '../../services/profileApi';
+import { getMyProfile, updateMyProfile, logoutAllMyDevices } from '../../services/profileApi';
 import { syncProfileSession } from '../../utils/profileSession';
 import {
   isRoleProfilePath,
@@ -13,7 +13,7 @@ import {
   isProfileEditPath,
 } from '../../utils/profilePaths';
 import { useToast } from '../../components/common/ToastContext';
-import { EMAIL_HINT, isValidEmail, isValidPhone, isValidPassword } from '../../utils/validation';
+import { EMAIL_HINT, isValidEmail, isValidPhone } from '../../utils/validation';
 import './MyProfilePage.css';
 
 const IconUser = ({ size = 20 }) => (
@@ -55,27 +55,6 @@ const IconCalendar = ({ size = 16 }) => (
     <line x1="16" y1="2" x2="16" y2="6"/>
     <line x1="8" y1="2" x2="8" y2="6"/>
     <line x1="3" y1="10" x2="21" y2="10"/>
-  </svg>
-);
-
-const IconLock = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-  </svg>
-);
-
-const IconEye = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-    <circle cx="12" cy="12" r="3"/>
-  </svg>
-);
-
-const IconEyeOff = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-    <line x1="1" y1="1" x2="23" y2="23"/>
   </svg>
 );
 
@@ -152,42 +131,9 @@ function AlertBanner({ message, type = 'error', onClose }) {
   );
 }
 
-function PasswordInput({ label, id, value, onValueChange, placeholder, error, autoComplete }) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <div className={`form-group ${error ? 'form-group--error' : ''}`}>
-      <label className="form-label" htmlFor={id}>{label}</label>
-      <div className="input-wrapper">
-        <input
-          id={id}
-          name={id}
-          type={visible ? 'text' : 'password'}
-          className={`form-input form-input--with-toggle ${error ? 'form-input--error' : ''}`}
-          value={value}
-          onChange={(e) => onValueChange(id, e.target.value)}
-          placeholder={placeholder}
-          autoComplete={autoComplete || 'new-password'}
-          readOnly={false}
-          disabled={false}
-        />
-        <button
-          type="button"
-          className="input-toggle-visibility"
-          onClick={() => setVisible((v) => !v)}
-          tabIndex={-1}
-          aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-        >
-          {visible ? <IconEyeOff /> : <IconEye />}
-        </button>
-      </div>
-      {error && <span className="form-error">{error}</span>}
-    </div>
-  );
-}
-
 /**
- * UI hồ sơ + đổi mật khẩu dùng chung.
- * Mỗi role có page riêng (ManagerProfilePage, …) bọc component này — không route thẳng AdminProfile.
+ * UI hồ sơ dùng chung (không tự đổi mật khẩu — dùng Quên mật khẩu / admin reset).
+ * Mỗi role có page riêng (ManagerProfilePage, …) bọc component này.
  */
 export default function MyProfilePage({
   embedded = false,
@@ -250,17 +196,6 @@ export default function MyProfilePage({
   const [editError, setEditError] = useState(null);
   const [editSuccess, setEditSuccess] = useState(null);
 
-  const [pwForm, setPwForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
-  const [pwErrors, setPwErrors] = useState({});
-  const [pwLoading, setPwLoading] = useState(false);
-  const [pwSuccess, setPwSuccess] = useState(null);
-  const [pwFailCount, setPwFailCount] = useState(0);
-  const PW_FAIL_LIMIT = 5;
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -289,14 +224,12 @@ export default function MyProfilePage({
   function handleTabChange(tab) {
     setEditError(null);
     setEditSuccess(null);
-    setPwSuccess(null);
-    setPwErrors({});
 
     if (tab === 'edit') {
       setLocalTab('view');
       if (!isEditMode) navigate(profileEditPath);
     } else {
-      setLocalTab(tab);
+      setLocalTab(tab === 'password' ? 'view' : tab);
       if (isEditMode) navigate(profileBasePath);
     }
 
@@ -355,61 +288,6 @@ export default function MyProfilePage({
       setEditError(err.message || 'Không thể cập nhật thông tin');
     } finally {
       setEditLoading(false);
-    }
-  }
-
-  function handlePwChange(field, value) {
-    setPwForm((f) => ({ ...f, [field]: value }));
-    if (pwErrors[field] || pwErrors.global) {
-      setPwErrors((err) => ({ ...err, [field]: null, global: null }));
-    }
-  }
-
-  async function handlePwSubmit(e) {
-    e.preventDefault();
-    setPwSuccess(null);
-
-    const errors = {};
-    if (!pwForm.currentPassword) errors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại';
-    if (!pwForm.newPassword) errors.newPassword = 'Vui lòng nhập mật khẩu mới';
-    else if (!isValidPassword(pwForm.newPassword)) {
-      errors.newPassword = 'Mật khẩu mới tối thiểu 6 ký tự, gồm chữ và số';
-    }
-    if (!pwForm.confirmPassword) errors.confirmPassword = 'Vui lòng xác nhận mật khẩu mới';
-    else if (pwForm.newPassword !== pwForm.confirmPassword) errors.confirmPassword = 'Mật khẩu xác nhận không khớp';
-
-    if (Object.keys(errors).length > 0) {
-      setPwErrors(errors);
-      return;
-    }
-
-    setPwLoading(true);
-    try {
-      await changePassword({
-        currentPassword: pwForm.currentPassword,
-        newPassword: pwForm.newPassword,
-      });
-      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setPwFailCount(0);
-      setPwErrors({});
-      setPwSuccess('Đổi mật khẩu thành công!');
-      setTimeout(() => setPwSuccess(null), 4000);
-    } catch (err) {
-      const msg = err?.message || 'Không thể đổi mật khẩu';
-      if (/mật khẩu hiện tại không đúng/i.test(msg)) {
-        const next = pwFailCount + 1;
-        setPwFailCount(next);
-        setPwErrors({
-          currentPassword: 'Mật khẩu hiện tại không đúng',
-          global: next >= PW_FAIL_LIMIT
-            ? `Bạn đã nhập sai mật khẩu hiện tại ${next} lần. Hãy dùng quên mật khẩu để đặt lại qua email.`
-            : `Mật khẩu hiện tại không đúng (còn ${Math.max(0, PW_FAIL_LIMIT - next)} lần thử).`,
-        });
-      } else {
-        setPwErrors({ global: msg });
-      }
-    } finally {
-      setPwLoading(false);
     }
   }
 
@@ -572,14 +450,6 @@ export default function MyProfilePage({
                 <IconEdit size={15} />
                 Chỉnh sửa
               </button>
-              <button
-                type="button"
-                className={`profile-tabs__btn ${activeTab === 'password' ? 'profile-tabs__btn--active' : ''}`}
-                onClick={() => handleTabChange('password')}
-              >
-                <IconLock size={15} />
-                Đổi mật khẩu
-              </button>
             </div>
 
             {activeTab === 'view' && (
@@ -739,74 +609,6 @@ export default function MyProfilePage({
                   <div className="profile-form__actions">
                     <button type="submit" className="btn btn--primary" disabled={editLoading}>
                       {editLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {activeTab === 'password' && (
-              <div className="profile-tab-content">
-                {pwErrors.global && (
-                  <AlertBanner type="error" message={pwErrors.global} onClose={() => setPwErrors((e) => ({ ...e, global: null }))} />
-                )}
-                {pwSuccess && (
-                  <AlertBanner type="success" message={pwSuccess} onClose={() => setPwSuccess(null)} />
-                )}
-
-                {pwFailCount >= PW_FAIL_LIMIT && (
-                  <div className="password-forgot-hint" role="status">
-                    <IconLock size={16} />
-                    <div>
-                      <strong>Gợi ý:</strong> Bạn đã nhập sai mật khẩu hiện tại quá nhiều lần.
-                      {' '}
-                      <Link
-                        to="/forgot-password"
-                        state={{ email: profile?.email || '' }}
-                        className="password-forgot-hint__link"
-                      >
-                        Quên mật khẩu — đặt lại bằng email
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
-                <div className="password-hint">
-                  <IconLock size={16} />
-                  <span>Mật khẩu phải có ít nhất <strong>6 ký tự</strong>, gồm chữ và số.</span>
-                </div>
-
-                <form className="profile-form" onSubmit={handlePwSubmit} autoComplete="off">
-                  <PasswordInput
-                    id="currentPassword"
-                    label="Mật khẩu hiện tại"
-                    value={pwForm.currentPassword}
-                    onValueChange={handlePwChange}
-                    placeholder="Nhập mật khẩu hiện tại"
-                    error={pwErrors.currentPassword}
-                    autoComplete="current-password"
-                  />
-                  <PasswordInput
-                    id="newPassword"
-                    label="Mật khẩu mới"
-                    value={pwForm.newPassword}
-                    onValueChange={handlePwChange}
-                    placeholder="Ít nhất 6 ký tự"
-                    error={pwErrors.newPassword}
-                    autoComplete="new-password"
-                  />
-                  <PasswordInput
-                    id="confirmPassword"
-                    label="Xác nhận mật khẩu mới"
-                    value={pwForm.confirmPassword}
-                    onValueChange={handlePwChange}
-                    placeholder="Nhập lại mật khẩu mới"
-                    error={pwErrors.confirmPassword}
-                    autoComplete="new-password"
-                  />
-                  <div className="profile-form__actions">
-                    <button type="submit" className="btn btn--primary" disabled={pwLoading}>
-                      {pwLoading ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu'}
                     </button>
                   </div>
                 </form>

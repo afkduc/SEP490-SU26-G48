@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getMyDevices, setMyDeviceTrusted } from '../../services/profileApi';
-import { useToast } from '../../components/common/ToastContext';
+import { getMyDevices } from '../../services/profileApi';
 import { formatDateSafe } from '../../utils/dateUtils';
 import './MyDevicesPanel.css';
 
@@ -12,15 +11,13 @@ function formatDate(value) {
 }
 
 /**
- * Danh sách thiết bị của chính user + nút đánh dấu tin cậy.
- * Dùng trong tab Tài khoản (admin) hoặc khối hồ sơ các role khác.
+ * Danh sách thiết bị đăng nhập của chính user (xem + làm mới).
+ * Không còn đánh dấu tin cậy — đăng xuất thiết bị lạ do admin / logout all.
  */
 export default function MyDevicesPanel({ embedded = false } = {}) {
-  const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [busyId, setBusyId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,39 +37,18 @@ export default function MyDevicesPanel({ embedded = false } = {}) {
     load();
   }, [load]);
 
-  async function toggleTrusted(device) {
-    if (!device?.id || busyId) return;
-    const next = !device.isTrusted;
-    setBusyId(device.id);
-    try {
-      const updated = await setMyDeviceTrusted(device.id, next);
-      setItems((prev) =>
-        prev.map((d) => (d.id === device.id
-          ? { ...d, isTrusted: updated?.isTrusted ?? next, trustedAt: updated?.trustedAt || null }
-          : d))
-      );
-      toast.success(next
-        ? 'Đã đánh dấu thiết bị tin cậy — lần sau login máy này sẽ không báo “thiết bị lạ”'
-        : 'Đã bỏ tin cậy thiết bị');
-    } catch (err) {
-      toast.error(err?.message || 'Không cập nhật được trạng thái tin cậy');
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   return (
     <div className={`my-devices${embedded ? ' my-devices--embedded' : ''}`}>
       {!embedded && (
         <div className="my-devices__header">
           <h2>Thiết bị đăng nhập</h2>
-          <p>Đánh dấu máy của bạn là tin cậy để phân biệt với thiết bị lạ.</p>
+          <p>Các máy đã đăng nhập tài khoản của bạn.</p>
         </div>
       )}
 
       <div className="my-devices__hint">
-        <strong>Máy tin cậy:</strong> cùng trình duyệt + hệ điều hành đã được bạn xác nhận —
-        đổi WiFi/IP vẫn được nhận là máy quen. Thiết bị chưa tin cậy sẽ báo cảnh báo khi login mới.
+        Thiết bị được nhận diện theo trình duyệt, hệ điều hành và IP.
+        Nếu thấy máy lạ, dùng <strong>Đăng xuất mọi thiết bị</strong> hoặc nhờ admin đăng xuất thiết bị đó.
       </div>
 
       {loading && <div className="my-devices__loading">Đang tải thiết bị...</div>}
@@ -85,14 +61,11 @@ export default function MyDevicesPanel({ embedded = false } = {}) {
       {!loading && !error && items.length > 0 && (
         <ul className="my-devices__list">
           {items.map((d) => (
-            <li key={d.id} className={`my-devices__item${d.isThisDevice ? ' is-this' : ''}${d.isTrusted ? ' is-trusted' : ''}`}>
+            <li key={d.id} className={`my-devices__item${d.isThisDevice ? ' is-this' : ''}`}>
               <div className="my-devices__item-main">
                 <div className="my-devices__item-title">
                   {d.deviceName || 'Thiết bị'}
                   {d.isThisDevice && <span className="my-devices__pill my-devices__pill--this">Máy này</span>}
-                  {d.isTrusted
-                    ? <span className="my-devices__pill my-devices__pill--trusted">Tin cậy</span>
-                    : <span className="my-devices__pill my-devices__pill--new">Chưa tin cậy</span>}
                   {d.isCurrent
                     ? <span className="my-devices__pill my-devices__pill--on">Đang online</span>
                     : <span className="my-devices__pill">Offline</span>}
@@ -104,18 +77,6 @@ export default function MyDevicesPanel({ embedded = false } = {}) {
                   Đăng nhập gần nhất: {formatDate(d.lastLoginAt)}
                 </div>
               </div>
-              <button
-                type="button"
-                className={`btn btn--sm ${d.isTrusted ? 'btn--ghost' : 'btn--primary'}`}
-                disabled={busyId === d.id}
-                onClick={() => toggleTrusted(d)}
-              >
-                {busyId === d.id
-                  ? '...'
-                  : d.isTrusted
-                    ? 'Bỏ tin cậy'
-                    : 'Đánh dấu tin cậy'}
-              </button>
             </li>
           ))}
         </ul>

@@ -5,7 +5,6 @@ import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { ROLES } from '../../constants/roles';
 import ScrollToggleButton from '../common/ScrollToggleButton';
 import UserProfileMenu from './UserProfileMenu';
-import NotificationBell from '../NotificationBell';
 import './Navbar.css';
 
 // ===== Admin =====
@@ -302,7 +301,6 @@ export default function Navbar() {
       </nav>
 
       <div className="navbar__right">
-        <NotificationBell />
         <UserProfileMenu />
       </div>
     </header>

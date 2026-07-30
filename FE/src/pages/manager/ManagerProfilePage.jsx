@@ -5,7 +5,7 @@ export default function ManagerProfilePage() {
   return (
     <MyProfilePage
       title="Hồ sơ quản lý chi nhánh"
-      subtitle="Thông tin tài khoản và đổi mật khẩu"
+      subtitle="Thông tin tài khoản"
     />
   );
 }

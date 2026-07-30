@@ -305,6 +305,7 @@ class AdminDevicesApi {
     return httpClient.delete(`/admin/devices/${deviceId}`);
   }
 
+  /** @deprecated Tin cậy thiết bị đã tắt — BE trả 403 */
   setTrusted(deviceId, trusted) {
     return httpClient.patch(`/admin/devices/${deviceId}/trust`, { trusted: Boolean(trusted) });
   }

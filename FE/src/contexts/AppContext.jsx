@@ -601,7 +601,7 @@ function SessionTakenOverRunner() {
       }
       showSessionExpired({
         code: detail?.metadata?.code || detail?.code || 'SESSION_REPLACED',
-        message: detail?.message || 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại để tiếp tục.',
+        message: 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.',
       });
     };
     window.addEventListener('session-taken-over', onTakenOver);

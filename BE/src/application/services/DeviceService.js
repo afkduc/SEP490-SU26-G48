@@ -18,26 +18,21 @@ class DeviceService {
     });
   }
 
-  async setTrustedForOwner(userId, deviceId, trusted) {
-    const device = await this.deviceRepository.findById(Number(deviceId));
-    if (!device) throw new ApiError(404, 'Thiết bị không tồn tại');
-    if (Number(device.userId) !== Number(userId)) {
-      throw new ApiError(403, 'Chỉ chủ tài khoản mới được đánh dấu tin cậy thiết bị của mình. Admin chỉ nên đăng xuất thiết bị lạ.');
-    }
-    const updated = await this.deviceRepository.setTrusted(deviceId, userId, Boolean(trusted));
-    if (!updated) throw new ApiError(404, 'Thiết bị không tồn tại');
-    return updated;
+  async setTrustedForOwner(_userId, _deviceId, _trusted) {
+    throw new ApiError(
+      403,
+      'Chức năng đánh dấu thiết bị tin cậy đã tắt. Dùng đăng xuất thiết bị hoặc quên mật khẩu nếu nghi ngờ.'
+    );
   }
 
   /**
-   * @deprecated Admin khong duoc tin cay thiet bi ho nguoi khac.
-   * Giữ method để tương thích — luôn ủy quyền qua setTrustedForOwner.
+   * @deprecated Chức năng tin cậy đã tắt.
    */
-  async setTrustedByAdmin(deviceId, trusted, actorUserId) {
-    if (!actorUserId) {
-      throw new ApiError(403, 'Chỉ chủ tài khoản mới được đánh dấu tin cậy thiết bị');
-    }
-    return this.setTrustedForOwner(actorUserId, deviceId, trusted);
+  async setTrustedByAdmin(_deviceId, _trusted, _actorUserId) {
+    throw new ApiError(
+      403,
+      'Chức năng đánh dấu thiết bị tin cậy đã tắt. Dùng đăng xuất thiết bị nếu nghi ngờ.'
+    );
   }
 
   async forceLogoutDevice(deviceId) {
