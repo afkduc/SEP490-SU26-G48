@@ -19,8 +19,6 @@ const SecurityAlertService = require('../../application/services/SecurityAlertSe
 const NotificationService = require('../../application/services/NotificationService');
 const { auditCrud } = require('../../utils/auditHelper');
 const { emitPermissionChanged } = require('../../application/events/PermissionEvents');
-const PermissionGroupService = require('../../application/services/PermissionGroupService');
-const PermissionGroupRepositoryImpl = require('../../infrastructure/repositories/PermissionGroupRepositoryImpl');
 
 class AdminController {
   constructor() {
@@ -35,14 +33,6 @@ class AdminController {
     const roleRepo = new RoleRepositoryImpl();
     const userRepo = new UserRepositoryImpl();
     this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo, userRepository: userRepo });
-
-    // Permission Groups (Phase 3)
-    const groupRepository = new PermissionGroupRepositoryImpl();
-    this.permissionGroupService = new PermissionGroupService({
-      groupRepository,
-      permissionService,
-      roleRepository,
-    });
 
     this.auditService = new AuditService(AuditRepository);
     this.branchService = new BranchService();
@@ -69,11 +59,6 @@ class AdminController {
     this.getRolePermissions = this.getRolePermissions.bind(this);
     this.setRolePermissions = this.setRolePermissions.bind(this);
     this.getRoleUsers = this.getRoleUsers.bind(this);
-    this.listPermissionGroups = this.listPermissionGroups.bind(this);
-    this.getPermissionGroupDetail = this.getPermissionGroupDetail.bind(this);
-    this.getRoleGroupIds = this.getRoleGroupIds.bind(this);
-    this.setRoleGroups = this.setRoleGroups.bind(this);
-    this.setRoleGroupsMatrix = this.setRoleGroupsMatrix.bind(this);
     this.createRole = this.createRole.bind(this);
     this.updateRole = this.updateRole.bind(this);
     this.toggleRoleStatus = this.toggleRoleStatus.bind(this);
@@ -1190,67 +1175,6 @@ class AdminController {
     }
   };
 
-  // ============================================================
-  // PERMISSION GROUPS (Phase 3)
-  // ============================================================
-
-  listPermissionGroups = async (req, res, next) => {
-    try {
-      const result = await this.permissionGroupService.listGroups();
-      return success(res, result, 'Danh sach nhom quyen');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  getPermissionGroupDetail = async (req, res, next) => {
-    try {
-      const group = await this.permissionGroupService.getGroupDetail(req.params.id);
-      return success(res, group, 'Chi tiet nhom quyen');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  getRoleGroupIds = async (req, res, next) => {
-    try {
-      const result = await this.permissionGroupService.getRoleGroupIds(req.params.id);
-      return success(res, result, 'Danh sach nhom quyen cua vai tro');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  setRoleGroups = async (req, res, next) => {
-    try {
-      const { groupIds } = req.body;
-      const result = await this.permissionGroupService.setRoleGroups(
-        req.params.id,
-        Array.isArray(groupIds) ? groupIds : [],
-        req
-      );
-      return success(res, result, 'Cap nhat nhom quyen cho vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  setRoleGroupsMatrix = async (req, res, next) => {
-    try {
-      const { changes } = req.body;
-      const result = await this.permissionGroupService.setRoleGroupsMatrix({ changes }, req);
-      await auditCrud.update(req, {
-        tableName: 'role_permissions',
-        entityCode: 'MATRIX',
-        entityName: 'Ma tran nhom quyen',
-        newData: { roleCount: result.updatedRoles },
-        description: `Cap nhat ma tran nhom quyen (${result.updatedRoles} vai tro, ${result.affectedUserCount} user bi anh huong)`,
-      });
-      return success(res, result, 'Cap nhat ma tran nhom quyen thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
 }
 
 module.exports = AdminController;

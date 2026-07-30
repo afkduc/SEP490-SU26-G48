@@ -76,7 +76,7 @@ function buildAuthRouter() {
       try {
         const result = await query(
           `SELECT id, pseudo_id, user_name, email,
-                  first_name, last_name, phone, branch_id, status, avatar,
+                  first_name, last_name, phone, branch_id, status,
                   token_version
            FROM   users
            WHERE  id = @userId AND status = 'active'`,

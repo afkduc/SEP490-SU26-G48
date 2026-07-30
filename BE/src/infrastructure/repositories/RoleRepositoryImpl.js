@@ -310,141 +310,36 @@ class RoleRepositoryImpl {
   }
 
   /**
-   * Lay tat ca permission_key strings cua 1 user (dùng cho RBAC enforcement).
-   * Chỉ lấy roles đang active (is_active = 1) và permissions của các role đó.
-   * @param {number} userId
-   * @returns {Promise<string[]>}
-   */
-  /**
-   * Lay toan bo permission_key cua 1 user, bao gom:
-   *  - Layer 1: permissions truc tiep tu role_permissions (p.permission_key)
-   *  - Layer 2b: flatten role_screen_permissions thanh permission_key dang
-   *      "screen:<screen_key>:<action>" voi action ∈ {view, create, update, delete, export}
-   *    tuong ung cac bit can_view/can_create/can_update/can_delete/can_export = 1.
-   *  - User override: neu user_screen_permissions co override_type='deny' thi
-   *    cac bit tuong ung bi loai bo khoi Set.
-   *
-   * Luu y: Set string chi chua permission_key, khong phan biet wildcard. Wildcard '*'
-   * duoc PermissionService.can() check rieng.
+   * Lay permission_key cua user tu role_permissions (RBAC phang).
+   * Da bo ma tran man hinh (role_screen_permissions / user_screen_permissions).
+   * Wildcard '*' duoc PermissionService.can() check rieng.
    *
    * @param {number} userId
    * @returns {Promise<string[]>}
    */
   async getUserPermissionKeys(userId) {
-    // Union 3 nguon: role_permissions, role_screen_permissions (flatten),
-    // user_screen_permissions (full override).
     const result = await query(`
-      ;WITH RoleScreenBits AS (
-        SELECT
-          rsp.role_id,
-          rsp.screen_key,
-          rsp.can_view,
-          rsp.can_create,
-          rsp.can_update,
-          rsp.can_delete,
-          rsp.can_export
-        FROM role_screen_permissions rsp
-      ),
-      FlatScreenPerms AS (
-        SELECT role_id, screen_key, 'view'   AS act, can_view   AS bit_on FROM RoleScreenBits WHERE can_view   = 1
-        UNION ALL
-        SELECT role_id, screen_key, 'create' AS act, can_create AS bit_on FROM RoleScreenBits WHERE can_create = 1
-        UNION ALL
-        SELECT role_id, screen_key, 'update' AS act, can_update AS bit_on FROM RoleScreenBits WHERE can_update = 1
-        UNION ALL
-        SELECT role_id, screen_key, 'delete' AS act, can_delete AS bit_on FROM RoleScreenBits WHERE can_delete = 1
-        UNION ALL
-        SELECT role_id, screen_key, 'export' AS act, can_export AS bit_on FROM RoleScreenBits WHERE can_export = 1
-      ),
-      UserOverrides AS (
-        SELECT
-          usp.user_id,
-          usp.screen_key,
-          usp.override_type,
-          usp.can_view,
-          usp.can_create,
-          usp.can_update,
-          usp.can_delete,
-          usp.can_export
-        FROM user_screen_permissions usp
-        WHERE usp.user_id = @p1
-      )
-      SELECT DISTINCT CAST(perm_key AS NVARCHAR(500)) COLLATE database_default AS perm_key
-      FROM (
-        -- Layer 1: permission_key truc tiep tu role
-        SELECT CAST(p.permission_key AS NVARCHAR(500)) COLLATE database_default AS perm_key
-        FROM user_role ur
-        JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
-        JOIN role_permissions rp ON rp.role_id = r.id
-        JOIN permissions p ON p.id = rp.permission_id
-        WHERE ur.user_id = @p1
-          AND ISNULL(ur.is_active, 1) = 1
-
-        UNION
-
-        -- Layer 2b: flatten role_screen_permissions cua cac role user dang giu
-        SELECT CAST('screen:' + fsp.screen_key + ':' + fsp.act AS NVARCHAR(500)) COLLATE database_default AS perm_key
-        FROM user_role ur
-        JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
-        JOIN FlatScreenPerms fsp ON fsp.role_id = r.id
-        WHERE ur.user_id = @p1
-          AND ISNULL(ur.is_active, 1) = 1
-          -- Loai bo neu user co override_type='deny' cho action nay
-          AND NOT EXISTS (
-            SELECT 1
-            FROM UserOverrides uo
-            WHERE uo.user_id = ur.user_id
-              AND uo.screen_key COLLATE database_default = fsp.screen_key COLLATE database_default
-              AND uo.override_type = 'deny'
-              AND (
-                (fsp.act = 'view'   AND uo.can_view   = 1) OR
-                (fsp.act = 'create' AND uo.can_create = 1) OR
-                (fsp.act = 'update' AND uo.can_update = 1) OR
-                (fsp.act = 'delete' AND uo.can_delete = 1) OR
-                (fsp.act = 'export' AND uo.can_export = 1)
-              )
-          )
-
-        UNION
-
-        -- Layer 2b override 'grant' hoac 'full': them permission key
-        SELECT CAST('screen:' + CAST(uo.screen_key AS NVARCHAR(200)) COLLATE database_default + ':view'   AS NVARCHAR(500)) COLLATE database_default AS perm_key
-        FROM UserOverrides uo WHERE uo.override_type IN ('grant', 'full') AND uo.can_view   = 1
-        UNION ALL
-        SELECT CAST('screen:' + CAST(uo.screen_key AS NVARCHAR(200)) COLLATE database_default + ':create' AS NVARCHAR(500)) COLLATE database_default AS perm_key
-        FROM UserOverrides uo WHERE uo.override_type IN ('grant', 'full') AND uo.can_create = 1
-        UNION ALL
-        SELECT CAST('screen:' + CAST(uo.screen_key AS NVARCHAR(200)) COLLATE database_default + ':update' AS NVARCHAR(500)) COLLATE database_default AS perm_key
-        FROM UserOverrides uo WHERE uo.override_type IN ('grant', 'full') AND uo.can_update = 1
-        UNION ALL
-        SELECT CAST('screen:' + CAST(uo.screen_key AS NVARCHAR(200)) COLLATE database_default + ':delete' AS NVARCHAR(500)) COLLATE database_default AS perm_key
-        FROM UserOverrides uo WHERE uo.override_type IN ('grant', 'full') AND uo.can_delete = 1
-        UNION ALL
-        SELECT CAST('screen:' + CAST(uo.screen_key AS NVARCHAR(200)) COLLATE database_default + ':export' AS NVARCHAR(500)) COLLATE database_default AS perm_key
-        FROM UserOverrides uo WHERE uo.override_type IN ('grant', 'full') AND uo.can_export = 1
-      ) AS all_perms
-      WHERE perm_key IS NOT NULL
+      SELECT DISTINCT CAST(p.permission_key AS NVARCHAR(500)) COLLATE database_default AS perm_key
+      FROM user_role ur
+      JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
+      JOIN role_permissions rp ON rp.role_id = r.id
+      JOIN permissions p ON p.id = rp.permission_id
+      WHERE ur.user_id = @p1
+        AND ISNULL(ur.is_active, 1) = 1
+        AND p.permission_key IS NOT NULL
     `, { p1: userId });
 
     return result.recordset.map((row) => row.perm_key);
   }
 
   /**
-   * Lay permission keys "compact" - chi bao gom:
-   *  - Layer 1 (role_permissions direct)
-   *  - Layer 2a dang `screen:<screen_key>:access` (chi key :access, khong flatten)
-   *  - Wildcard '*' neu co
-   *
-   * Dung cho JWT de giam kich thuoc token. PermissionService van goi
-   * getUserPermissionKeys() (full) de co flattened permission cho middleware.
+   * Permission keys cho JWT (cung nguon role_permissions).
+   * Neu co wildcard '*' thi chi tra ['*'] de tranh JWT qua lon (431).
    *
    * @param {number} userId
    * @returns {Promise<string[]>}
    */
   async getUserPermissionKeysCompact(userId) {
-    // Optimization: neu user da co wildcard '*' thi khong can enumerate
-    // 350+ keys screen:* vi permissionService.can() se short-circuit tai `*`.
-    // Tra ve compact set chi chua '*' de JWT rat ngan (fix status 431).
     const star = await query(
       `SELECT TOP 1 p.id
        FROM user_role ur
@@ -460,37 +355,7 @@ class RoleRepositoryImpl {
       return ['*'];
     }
 
-    const result = await query(`
-      SELECT DISTINCT CAST(perm_key AS NVARCHAR(500)) COLLATE database_default AS perm_key
-      FROM (
-        -- Layer 1 (khong bao gom screen:*:access vi user khong co wildcard)
-        SELECT CAST(p.permission_key AS NVARCHAR(500)) COLLATE database_default AS perm_key
-        FROM user_role ur
-        JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
-        JOIN role_permissions rp ON rp.role_id = r.id
-        JOIN permissions p ON p.id = rp.permission_id
-        WHERE ur.user_id = @p1
-          AND ISNULL(ur.is_active, 1) = 1
-          AND p.permission_key NOT LIKE 'screen:%:access' COLLATE database_default
-
-        UNION
-
-        -- Layer 2a: cac key screen:<screen_key>:access (route-level access)
-        -- Day la cac key co dang 'screen:xxx:access' va chi lay cac key nay
-        -- (khong flatten -> tiet kiem kich thuoc JWT)
-        SELECT CAST(p.permission_key AS NVARCHAR(500)) COLLATE database_default AS perm_key
-        FROM user_role ur
-        JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
-        JOIN role_permissions rp ON rp.role_id = r.id
-        JOIN permissions p ON p.id = rp.permission_id
-        WHERE ur.user_id = @p1
-          AND ISNULL(ur.is_active, 1) = 1
-          AND p.permission_key LIKE 'screen:%:access' COLLATE database_default
-      ) AS all_perms
-      WHERE perm_key IS NOT NULL
-    `, { p1: userId });
-
-    return result.recordset.map((row) => row.perm_key);
+    return this.getUserPermissionKeys(userId);
   }
 
   /**
