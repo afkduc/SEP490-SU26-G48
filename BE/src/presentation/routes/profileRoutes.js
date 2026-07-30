@@ -4,6 +4,10 @@ const { trackActivity } = require('../../middlewares');
 const ProfileController = require('../controllers/ProfileController');
 const ProfileService = require('../../application/services/ProfileService');
 const ProfileRepositoryImpl = require('../../infrastructure/repositories/ProfileRepositoryImpl');
+const {
+  validateUpdateProfile,
+  validateChangePassword,
+} = require('../validators/profileValidator');
 
 function buildProfileRouter() {
   const router = express.Router();
@@ -16,10 +20,16 @@ function buildProfileRouter() {
   router.get('/me', authenticate, trackActivity, controller.getMyProfile);
 
   // Cập nhật thông tin cá nhân
-  router.put('/me', authenticate, trackActivity, controller.updateMyProfile);
+  router.put('/me', authenticate, trackActivity, validateUpdateProfile, controller.updateMyProfile);
 
   // Đổi mật khẩu
-  router.put('/me/password', authenticate, trackActivity, controller.changePassword);
+  router.put(
+    '/me/password',
+    authenticate,
+    trackActivity,
+    validateChangePassword,
+    controller.changePassword
+  );
 
   // === Notification Endpoints ===
 

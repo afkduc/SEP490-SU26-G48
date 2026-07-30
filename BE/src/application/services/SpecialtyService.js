@@ -113,10 +113,14 @@ class SpecialtyService {
     const uniqueIds = [...new Set(ids)];
     if (uniqueIds.length > 0) {
       const all = await this.specialtyRepository.findAll();
-      const valid = new Set(all.map((s) => Number(s.id)));
-      const invalid = uniqueIds.filter((id) => !valid.has(id));
-      if (invalid.length > 0) {
-        throw new ApiError(400, `Chuyen mon khong ton tai: ${invalid.join(', ')}`);
+      const byId = new Map(all.map((s) => [Number(s.id), s]));
+      const missing = uniqueIds.filter((id) => !byId.has(id));
+      if (missing.length > 0) {
+        throw new ApiError(400, `Chuyên môn không tồn tại: ${missing.join(', ')}`);
+      }
+      const inactive = uniqueIds.filter((id) => !byId.get(id).isActive);
+      if (inactive.length > 0) {
+        throw new ApiError(400, `Chuyên môn đang ngừng hoạt động: ${inactive.join(', ')}`);
       }
     }
     await this.specialtyRepository.setUserSpecialties(uid, uniqueIds);

@@ -519,6 +519,14 @@ class AdminController {
       if (!userId) {
         return res.status(400).json({ message: 'userId la bat buoc' });
       }
+      const actorId = req.user?.userId ?? req.user?.id;
+      if (actorId && Number(actorId) === Number(userId)) {
+        const ApiError = require('../../utils/ApiError');
+        throw new ApiError(
+          400,
+          'Không thể buộc đăng xuất toàn bộ thiết bị của chính mình. Dùng đăng xuất thiết bị khác hoặc nhờ admin khác.'
+        );
+      }
       const result = await this.deviceService.forceLogoutAllDevices(userId);
       await auditCrud.forceLogout(req, {
         targetUserName: `user-${userId}`,
@@ -744,7 +752,11 @@ class AdminController {
   assignRoles = async (req, res, next) => {
     try {
       const { roleIds } = req.body;
-      const roles = await this.userRoleService.assignRoles(req.params.userId, roleIds);
+      const roles = await this.userRoleService.assignRoles(
+        req.params.userId,
+        roleIds,
+        req.user?.userId ?? req.user?.id
+      );
       await auditCrud.assignRole(req, {
         userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
         roleName: roles?.[0]?.roleName || roleIds?.join(','),
@@ -771,7 +783,8 @@ class AdminController {
     try {
       const roles = await this.userRoleService.revokeRole(
         req.params.userId,
-        req.params.roleId
+        req.params.roleId,
+        req.user?.userId ?? req.user?.id
       );
       await auditCrud.removeRole(req, {
         userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
@@ -848,6 +861,7 @@ class AdminController {
         roleId,
         branchId,
         scopeAllBranches,
+        actorUserId: req.user?.userId ?? req.user?.id,
       });
       const displayName =
         [updated?.firstName, updated?.lastName].filter(Boolean).join(' ').trim() ||

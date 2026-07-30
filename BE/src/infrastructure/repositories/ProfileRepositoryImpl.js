@@ -88,6 +88,16 @@ class ProfileRepositoryImpl {
     return result.recordset[0] || null;
   }
 
+  async findByPhone(phone) {
+    const result = await query(
+      `SELECT id, phone
+       FROM   users
+       WHERE  phone = @p1`,
+      { p1: phone }
+    );
+    return result.recordset[0] || null;
+  }
+
   async update(userId, { email, firstName, lastName, phone }) {
     const updates = [];
     const params = {};

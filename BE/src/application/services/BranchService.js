@@ -1,19 +1,17 @@
 const ApiError = require('../../utils/ApiError');
 const BranchRepositoryImpl = require('../../infrastructure/repositories/BranchRepositoryImpl');
 const { auditCrud } = require('../../utils/auditHelper');
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^0[0-9]{9,10}$/;
+const { EMAIL_HINT, isValidEmail, isValidPhone } = require('../../utils/fieldValidation');
 
 function validateOptionalContact({ phone, email }) {
   if (phone !== undefined && phone !== null && String(phone).trim()) {
-    if (!PHONE_REGEX.test(String(phone).trim())) {
-      throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
+    if (!isValidPhone(phone)) {
+      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10–11 chữ số');
     }
   }
   if (email !== undefined && email !== null && String(email).trim()) {
-    if (!EMAIL_REGEX.test(String(email).trim())) {
-      throw new ApiError(400, 'Email khong dung dinh dang');
+    if (!isValidEmail(email)) {
+      throw new ApiError(400, EMAIL_HINT);
     }
   }
 }
