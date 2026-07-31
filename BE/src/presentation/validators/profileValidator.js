@@ -3,10 +3,8 @@ const {
   EMAIL_HINT,
   EMAIL_MAX_LENGTH,
   NAME_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
   isValidEmail,
   isValidPhone,
-  isValidPassword,
 } = require('../../utils/fieldValidation');
 
 function validateUpdateProfile(req, res, next) {
@@ -40,19 +38,4 @@ function validateUpdateProfile(req, res, next) {
   }
 }
 
-function validateChangePassword(req, res, next) {
-  try {
-    const { currentPassword, newPassword } = req.body || {};
-    if (!currentPassword || !newPassword) {
-      throw new ApiError(400, 'Mật khẩu hiện tại và mật khẩu mới không được để trống');
-    }
-    if (!isValidPassword(newPassword)) {
-      throw new ApiError(400, `Mật khẩu mới tối thiểu ${PASSWORD_MIN_LENGTH} ký tự, gồm chữ và số`);
-    }
-    next();
-  } catch (err) {
-    next(err);
-  }
-}
-
-module.exports = { validateUpdateProfile, validateChangePassword };
+module.exports = { validateUpdateProfile };

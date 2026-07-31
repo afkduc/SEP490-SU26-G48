@@ -2,7 +2,6 @@ const { success } = require('../../utils/response');
 const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
 const ProfileBranchService = require('../../application/services/ProfileBranchService');
-const ApiError = require('../../utils/ApiError');
 
 class ProfileController {
   constructor(profileService) {
@@ -11,15 +10,12 @@ class ProfileController {
     this.notificationService = new NotificationService();
     this.getMyProfile = this.getMyProfile.bind(this);
     this.updateMyProfile = this.updateMyProfile.bind(this);
-    this.changePassword = this.changePassword.bind(this);
     this.getNotificationSettings = this.getNotificationSettings.bind(this);
     this.updateNotificationSettings = this.updateNotificationSettings.bind(this);
     this.getNotifications = this.getNotifications.bind(this);
     this.markNotificationRead = this.markNotificationRead.bind(this);
     this.markAllNotificationsRead = this.markAllNotificationsRead.bind(this);
     this.getUnreadCount = this.getUnreadCount.bind(this);
-    this.listMyDevices = this.listMyDevices.bind(this);
-    this.setMyDeviceTrusted = this.setMyDeviceTrusted.bind(this);
     this.logoutAllMyDevices = this.logoutAllMyDevices.bind(this);
   }
 
@@ -69,19 +65,6 @@ class ProfileController {
         description: `Cập nhật hồ sơ cá nhân`,
       });
       return success(res, profile, 'Cập nhật thông tin thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async changePassword(req, res, next) {
-    try {
-      const { currentPassword, newPassword } = req.body;
-      await this.profileService.changePassword(req.user.userId, currentPassword, newPassword);
-      await auditCrud.changePassword(req, {
-        targetUserName: req.user.email || `ID-${req.user.userId}`,
-      });
-      return success(res, null, 'Đổi mật khẩu thành công');
     } catch (err) {
       next(err);
     }
@@ -144,42 +127,6 @@ class ProfileController {
     try {
       const count = await this.notificationService.getUnreadCount(req.user.userId);
       return success(res, { count }, 'Lấy số thông báo chưa đọc thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  // GET /profile/me/devices — thiết bị của chính mình
-  async listMyDevices(req, res, next) {
-    try {
-      const DeviceService = require('../../application/services/DeviceService');
-      const devices = await new DeviceService().listByUser(req.user.userId);
-      const currentDeviceId = req.user.deviceId != null ? Number(req.user.deviceId) : null;
-      const items = (devices || []).map((d) => ({
-        ...d,
-        isThisDevice: currentDeviceId != null && Number(d.id) === currentDeviceId,
-      }));
-      return success(res, { items, total: items.length, currentDeviceId }, 'Danh sách thiết bị của bạn');
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  // PATCH /profile/me/devices/:deviceId/trust — đánh dấu / bỏ tin cậy
-  async setMyDeviceTrusted(req, res, next) {
-    try {
-      const DeviceService = require('../../application/services/DeviceService');
-      const trusted = req.body?.trusted === true || req.body?.trusted === 1 || req.body?.trusted === 'true';
-      const device = await new DeviceService().setTrustedForOwner(
-        req.user.userId,
-        req.params.deviceId,
-        trusted
-      );
-      return success(
-        res,
-        device,
-        trusted ? 'Đã đánh dấu thiết bị tin cậy' : 'Đã bỏ tin cậy thiết bị'
-      );
     } catch (err) {
       next(err);
     }

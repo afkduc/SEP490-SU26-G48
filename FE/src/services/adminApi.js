@@ -152,10 +152,6 @@ class AdminRolesApi {
   list() {
     return httpClient.get('/admin/roles');
   }
-
-  getDetail(id) {
-    return httpClient.get(`/admin/roles/${id}`);
-  }
 }
 
 const adminRolesApi = new AdminRolesApi();
@@ -244,10 +240,9 @@ export {
 
 /**
  * Admin Devices API
- *   - list(params):     GET /api/admin/devices
+ *   - list(params): GET /api/admin/devices
  *   - listByUser(id): GET /api/admin/devices/user/:id
  *   - forceLogout(deviceId): POST /api/admin/devices/:deviceId/logout
- *   - forceLogoutOthers(userId, currentDeviceId): POST /api/admin/devices/user/:userId/others/logout
  */
 class AdminDevicesApi {
   list(params = {}) {
@@ -260,25 +255,6 @@ class AdminDevicesApi {
 
   forceLogout(deviceId) {
     return httpClient.post(`/admin/devices/${deviceId}/logout`);
-  }
-
-  /** @deprecated Tin cậy thiết bị đã tắt — BE trả 403 */
-  setTrusted(deviceId, trusted) {
-    return httpClient.patch(`/admin/devices/${deviceId}/trust`, { trusted: Boolean(trusted) });
-  }
-
-  forceLogoutOthers(userId, currentDeviceId) {
-    return httpClient.post(
-      `/admin/devices/user/${userId}/others/logout?currentDeviceId=${currentDeviceId || ''}`
-    );
-  }
-
-  /**
-   * Admin force logout ALL devices of a user (including current).
-   * POST /api/admin/devices/user/:userId/all/logout
-   */
-  forceLogoutAllDevices(userId) {
-    return httpClient.post(`/admin/devices/user/${userId}/all/logout`);
   }
 }
 
