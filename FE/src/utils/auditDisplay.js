@@ -162,8 +162,8 @@ export function humanizeRequestUrl(url) {
   if (/\/profile\/me\/devices\/logout-all/.test(path)) return 'Đăng xuất mọi thiết bị của tôi';
   if (/\/admin\/users/.test(path)) return 'Quản lý người dùng';
   if (/\/admin\/branches/.test(path)) return 'Quản lý chi nhánh';
-  if (/\/admin\/roles/.test(path)) return 'Quản lý vai trò';
-  if (/\/admin\/specialties/.test(path)) return 'Quản lý chuyên môn';
+  if (/\/admin\/roles/.test(path)) return 'Vai trò';
+  if (/\/admin\/specialties/.test(path)) return 'Chuyên môn';
   if (/\/admin\/devices/.test(path)) return 'Quản lý thiết bị đăng nhập';
   if (/\/admin\/audit|\/admin\/logs/.test(path)) return 'Nhật ký hệ thống';
   if (/\/profile\/me\/password/.test(path)) return 'Đổi mật khẩu hồ sơ';

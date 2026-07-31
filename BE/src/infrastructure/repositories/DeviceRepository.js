@@ -132,35 +132,7 @@ class DeviceRepository {
     return mapRow(result.recordset[0]);
   }
 
-  async setTrusted(deviceId, userId, trusted) {
-    await ensureTrustedSchema();
-    const flag = trusted ? 1 : 0;
-    await query(
-      `UPDATE user_devices
-       SET is_trusted = @p3,
-           trusted_at = CASE WHEN @p3 = 1 THEN SYSUTCDATETIME() ELSE NULL END
-       WHERE id = @p1 AND user_id = @p2`,
-      { p1: Number(deviceId), p2: Number(userId), p3: flag }
-    );
-    return this.findById(deviceId);
-  }
-
-  async setTrustedByAdmin(deviceId, trusted) {
-    await ensureTrustedSchema();
-    const device = await this.findById(deviceId);
-    if (!device) return null;
-    const flag = trusted ? 1 : 0;
-    await query(
-      `UPDATE user_devices
-       SET is_trusted = @p2,
-           trusted_at = CASE WHEN @p2 = 1 THEN SYSUTCDATETIME() ELSE NULL END
-       WHERE id = @p1`,
-      { p1: Number(deviceId), p2: flag }
-    );
-    return this.findById(deviceId);
-  }
-
-  async findAll({ userId, search, browser, os, isCurrent, isTrusted, dateFrom, dateTo, page = 1, pageSize = 20 }) {
+  async findAll({ userId, search, browser, os, isCurrent, dateFrom, dateTo, page = 1, pageSize = 20 }) {
     await ensureTrustedSchema();
     const conditions = ['1=1'];
     const params = {};
@@ -201,13 +173,6 @@ class DeviceRepository {
     if (isCurrent !== undefined && isCurrent !== null && String(isCurrent).trim() !== '') {
       const val = String(isCurrent).toLowerCase() === 'true' || isCurrent === true || isCurrent === '1' ? 1 : 0;
       conditions.push(`d.is_current = @p${idx}`);
-      params[`p${idx}`] = val;
-      idx++;
-    }
-
-    if (isTrusted !== undefined && isTrusted !== null && String(isTrusted).trim() !== '') {
-      const val = String(isTrusted).toLowerCase() === 'true' || isTrusted === true || isTrusted === '1' ? 1 : 0;
-      conditions.push(`d.is_trusted = @p${idx}`);
       params[`p${idx}`] = val;
       idx++;
     }

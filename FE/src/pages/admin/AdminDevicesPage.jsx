@@ -530,9 +530,6 @@ export default function AdminDevicesPage({
 
       {/* Toolbar: tìm kiếm + lọc + làm mới trên 1 khối */}
       <div className="admin-devices__toolbar">
-        <p className="admin-devices__trust-hint">
-          Admin chỉ <strong>đăng xuất</strong> thiết bị đáng ngờ. Không còn đánh dấu tin cậy thiết bị.
-        </p>
         <div className="admin-devices__toolbar-top">
           <div className="admin-devices__search-wrap">
             <span className="admin-devices__search-icon" aria-hidden="true">

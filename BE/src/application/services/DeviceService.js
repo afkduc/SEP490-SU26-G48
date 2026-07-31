@@ -12,27 +12,10 @@ class DeviceService {
     return this.deviceRepository.findByUserId(Number(userId));
   }
 
-  async listAll({ userId, search, browser, os, isCurrent, isTrusted, dateFrom, dateTo, page, pageSize }) {
+  async listAll({ userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize }) {
     return this.deviceRepository.findAll({
-      userId, search, browser, os, isCurrent, isTrusted, dateFrom, dateTo, page, pageSize,
+      userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize,
     });
-  }
-
-  async setTrustedForOwner(_userId, _deviceId, _trusted) {
-    throw new ApiError(
-      403,
-      'Chức năng đánh dấu thiết bị tin cậy đã tắt. Dùng đăng xuất thiết bị hoặc quên mật khẩu nếu nghi ngờ.'
-    );
-  }
-
-  /**
-   * @deprecated Chức năng tin cậy đã tắt.
-   */
-  async setTrustedByAdmin(_deviceId, _trusted, _actorUserId) {
-    throw new ApiError(
-      403,
-      'Chức năng đánh dấu thiết bị tin cậy đã tắt. Dùng đăng xuất thiết bị nếu nghi ngờ.'
-    );
   }
 
   async forceLogoutDevice(deviceId) {
@@ -104,20 +87,7 @@ class DeviceService {
 
   /**
    * End ALL active sessions of a given device with the given logout_reason.
-   *
-   * Dung cho 3 flow:
-   *   - forceLogoutDevice       (admin da 1 device cu the)
-   *   - forceLogoutAllDevices    (admin da toan bo device cua user)
-   *   - forceLogoutAllOtherDevices (admin da cac device khac cua user)
-   *
-   * Sau khi UPDATE login_sessions (status -> 'ended'), ghi event
-   * FORCE_LOGO vao login_session_events cho moi session bi end
-   * de audit log ro rang va admin co the theo doi realtime qua SSE.
-   *
-   * QUAN TRONG:
-   *   - Phai goi TRUOC khi xoa/revoke device vi sau khi device bi xoa,
-   *     FK tu login_sessions.device_id co the chan hoac thanh NULL.
-   *   - Tra ve so session da end de log + audit.
+   * Used by: forceLogoutDevice (admin 1 device), logoutAllMyDevices (profile).
    */
   async _endSessionsByDeviceId(deviceId, logoutReason = 'FORCE_LOGO') {
     const { query } = require('../../infrastructure/database/sqlServer');
@@ -193,76 +163,9 @@ class DeviceService {
     return total;
   }
 
-  async forceLogoutAllOtherDevices(userId, currentDeviceId) {
-    // BUG CU (off-by-one + semantic mismatch):
-    //   - count = so device ACTIVE (is_current=1) cua user
-    //   - deleteOtherDevices xoa TAT CA device khac current (ke ca is_current=0)
-    //   -> remainingCount = count - deleted cho ket qua sai
-    //      (vi count chi dem is_current=1, nhung deleted dem tat ca)
-    //
-    // FIX: Dem dong nhat theo is_current=1 (semantic "active devices").
-    // Neu user chi co 1 device (current) va khong co currentDeviceId (admin force
-    // tu trang admin khong biet current device) -> deleted = 0 vi @p2 IS NULL
-    // trong SQL -> tat ca device (kha nang ca current) bi xoa. Sau do:
-    // remainingCount = activeCountBefore - activeDeletedAfter de chinh xac.
-    const { query } = require('../../infrastructure/database/sqlServer');
-    const userNum = Number(userId);
-    const cur = currentDeviceId == null ? null : Number(currentDeviceId);
-
-    // Dem so device active TRUOC khi xoa
-    const beforeResult = await query(
-      `SELECT COUNT(*) AS c FROM user_devices WHERE user_id = @p1 AND is_current = 1`,
-      { p1: userNum }
-    );
-    const activeBefore = Number(beforeResult.recordset[0].c);
-
-    // Dem so device se bi xoa va co is_current=1 (tru current neu co)
-    const willDeleteActiveResult = await query(
-      `SELECT COUNT(*) AS c FROM user_devices
-        WHERE user_id = @p1
-          AND is_current = 1
-          AND (@p2 IS NULL OR id != @p2)`,
-      { p1: userNum, p2: cur }
-    );
-    const activeDeleted = Number(willDeleteActiveResult.recordset[0].c);
-
-    // Lay danh sach deviceId se bi XOA -> end session tuong ung TRUOC khi xoa
-    // (vi FK device_id co the NULL sau khi xoa device, va ta muon session
-    // status chuyen 'ended' ngay lap tuc).
-    const deviceIdsRes = await query(
-      `SELECT id FROM user_devices
-       WHERE user_id = @p1
-         AND (@p2 IS NULL OR id != @p2)`,
-      { p1: userNum, p2: cur }
-    );
-    const deviceIdsToDelete = (deviceIdsRes.recordset || []).map(r => r.id);
-    await this._endSessionsByDeviceIds(deviceIdsToDelete, 'FORCE_LOGO');
-
-    // Thuc su xoa (logic giu nguyen repository.deleteOtherDevices)
-    const totalDeleted = await this.deviceRepository.deleteOtherDevices(userNum, cur);
-
-    // remainingCount = so device ACTIVE con lai (is_current=1)
-    // Truong hop dat biet: neu cur==null va co it nhat 1 device is_current=1
-    // -> activeDeleted co the = activeBefore (xoa het) -> remaining = 0.
-    // Neu cur!=null -> KHONG bao gio xoa current device -> remaining >= 1.
-    const remainingCount = Math.max(0, activeBefore - activeDeleted);
-
-    return {
-      deleted: totalDeleted,
-      activeDeleted,
-      remainingCount,
-    };
-  }
-
   /**
-   * Admin force logout ALL devices of a user (including current device).
-   * Used when admin wants to completely terminate all sessions of a user.
-   *
-   * Flow:
-   * 1. Revoke all devices (set is_current = 0)
-   * 2. Increment token_version -> ALL JWTs of this user become INVALID immediately
-   * 3. Emit SSE event -> Admin login history updates real-time
-   * 4. Send notification to user
+   * Logout ALL devices of a user (including current).
+   * Used by profile "logout all my devices" only (not admin force-logout-all).
    */
   async forceLogoutAllDevices(userId) {
     const userNumId = Number(userId);
