@@ -14,7 +14,6 @@ const AuditRepository = require('../../infrastructure/repositories/AuditReposito
 const { exportUsersToExcel } = require('../../utils/excelExporter');
 const BranchService = require('../../application/services/BranchService');
 const DeviceService = require('../../application/services/DeviceService');
-const SpecialtyService = require('../../application/services/SpecialtyService');
 const SecurityAlertService = require('../../application/services/SecurityAlertService');
 const NotificationService = require('../../application/services/NotificationService');
 const { auditCrud } = require('../../utils/auditHelper');
@@ -37,7 +36,6 @@ class AdminController {
     this.auditService = new AuditService(AuditRepository);
     this.branchService = new BranchService();
     this.deviceService = new DeviceService();
-    this.specialtyService = new SpecialtyService();
     this.securityAlertService = new SecurityAlertService();
     this.notificationService = new NotificationService();
 
@@ -54,25 +52,9 @@ class AdminController {
     this.deactivateBranch = this.deactivateBranch.bind(this);
     this.reactivateBranch = this.reactivateBranch.bind(this);
     this.listRoles = this.listRoles.bind(this);
-    this.getRoleDetail = this.getRoleDetail.bind(this);
-    this.listPermissions = this.listPermissions.bind(this);
-    this.getRolePermissions = this.getRolePermissions.bind(this);
-    this.setRolePermissions = this.setRolePermissions.bind(this);
-    this.getRoleUsers = this.getRoleUsers.bind(this);
-    this.createRole = this.createRole.bind(this);
-    this.updateRole = this.updateRole.bind(this);
-    this.toggleRoleStatus = this.toggleRoleStatus.bind(this);
     this.listDevices = this.listDevices.bind(this);
     this.listUserDevices = this.listUserDevices.bind(this);
     this.forceLogoutDevice = this.forceLogoutDevice.bind(this);
-    this.forceLogoutAllOtherDevices = this.forceLogoutAllOtherDevices.bind(this);
-    this.forceLogoutAllDevices = this.forceLogoutAllDevices.bind(this);
-    this.listSpecialties = this.listSpecialties.bind(this);
-    this.createSpecialty = this.createSpecialty.bind(this);
-    this.updateSpecialty = this.updateSpecialty.bind(this);
-    this.toggleSpecialtyStatus = this.toggleSpecialtyStatus.bind(this);
-    this.getUserSpecialties = this.getUserSpecialties.bind(this);
-    this.setUserSpecialties = this.setUserSpecialties.bind(this);
     this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
     this.acknowledgeAlert = this.acknowledgeAlert.bind(this);
     this.acknowledgeAllAlerts = this.acknowledgeAllAlerts.bind(this);
@@ -273,7 +255,7 @@ class AdminController {
     }
   };
 
-  // Roles (UC-11)
+  // Roles — list only (for assign-role dropdown)
   listRoles = async (req, res, next) => {
     try {
       const result = await this.roleService.listRoles();
@@ -283,190 +265,22 @@ class AdminController {
     }
   };
 
-  // UC-11: role detail
-  getRoleDetail = async (req, res, next) => {
-    try {
-      const role = await this.roleService.getRoleDetail(req.params.id);
-      return success(res, role, 'Chi tiet role');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: list all permissions
-  listPermissions = async (req, res, next) => {
-    try {
-      const permissions = await this.roleService.listPermissions();
-      return success(res, { items: permissions, total: permissions.length }, 'Danh sach quyen');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: list roles + permissions (1 call, khong N+1)
-  listRolesWithPermissions = async (req, res, next) => {
-    try {
-      const result = await this.roleService.listRolesWithPermissions();
-      return success(res, result, 'Danh sach vai tro kem quyen');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: get permissions of a role
-  getRolePermissions = async (req, res, next) => {
-    try {
-      const permissions = await this.roleService.getRolePermissions(req.params.id);
-      return success(res, { items: permissions, total: permissions.length }, 'Quyen cua vai tro');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: set permissions for a role
-  setRolePermissions = async (req, res, next) => {
-    try {
-      const ApiError = require('../../utils/ApiError');
-      const { permissionIds } = req.body;
-      if (!Array.isArray(permissionIds)) {
-        throw new ApiError(400, 'permissionIds phai la mang');
-      }
-      // Validation chi tiet (loai bo NaN, check ton tai) lam trong RoleService.setRolePermissions
-      const permissions = await this.roleService.setRolePermissions(
-        req.params.id,
-        permissionIds
-      );
-      let roleLabel = `vai trò #${req.params.id}`;
-      let roleCode = null;
-      try {
-        const role = await this.roleService.getRoleDetail(req.params.id);
-        roleLabel = role?.role_label || role?.roleLabel || role?.role_name || role?.roleName || roleLabel;
-        roleCode = role?.role_code || role?.roleCode || null;
-      } catch (_) { /* keep fallback */ }
-      await auditCrud.update(req, {
-        tableName: 'role_permissions',
-        entityCode: roleCode || roleLabel,
-        recordId: Number(req.params.id) || null,
-        entityName: 'Phân quyền vai trò',
-        newData: { permissionIds, roleName: roleLabel, roleCode },
-        description: `Cập nhật quyền cho ${roleLabel} (${permissions.length || 0} quyền)`,
-      });
-      return success(res, { items: permissions, total: permissions.length }, 'Cap nhat quyen vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: get users having a role
-  getRoleUsers = async (req, res, next) => {
-    try {
-      const users = await this.roleService.getRoleUsers(req.params.id);
-      return success(res, { items: users, total: users.length }, 'Nguoi dung co vai tro nay');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: create role
-  createRole = async (req, res, next) => {
-    try {
-      const { roleName, roleLabel } = req.body;
-      const role = await this.roleService.createRole({ roleName, roleLabel });
-      await auditCrud.create(req, {
-        tableName: 'roles',
-        entityCode: role?.role_code || roleName || null,
-        recordId: role?.id || null,
-        entityName: 'Vai trò',
-        data: req.body,
-      });
-      await this.notificationService.notifyAdmins('ROLE_CREATED', {
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: role?.role_name || role?.roleLabel || '',
-        targetCode: role?.role_code || '',
-        userId: role?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_CREATED:', e.message));
-      return success(res, role, 'Tao vai tro thanh cong', 201);
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: update role
-  updateRole = async (req, res, next) => {
-    try {
-      const { roleLabel } = req.body;
-      const role = await this.roleService.updateRole(req.params.id, { roleLabel });
-      await auditCrud.update(req, {
-        tableName: 'roles',
-        entityCode: role?.role_code || `ID-${req.params.id}`,
-        recordId: role?.id || Number(req.params.id) || null,
-        entityName: 'Vai trò',
-        newData: { roleLabel },
-      });
-      await this.notificationService.notifyAdmins('ROLE_UPDATED', {
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: role?.role_name || `ID-${req.params.id}`,
-        targetCode: role?.role_code || '',
-        userId: role?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_UPDATED:', e.message));
-      return success(res, role, 'Cap nhat vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  toggleRoleStatus = async (req, res, next) => {
-    try {
-      const role = await this.roleService.toggleStatus(req.params.id);
-      await auditCrud.update(req, {
-        tableName: 'roles',
-        entityCode: role?.role_code || `ID-${req.params.id}`,
-        recordId: role?.id || Number(req.params.id) || null,
-        entityName: 'Vai trò',
-        newData: { isActive: role?.is_active },
-        description: `${role?.is_active ? 'Kích hoạt' : 'Vô hiệu hóa'} vai trò ${role?.role_code || req.params.id}`,
-      });
-      await this.notificationService.notifyAdmins(role?.is_active ? 'ROLE_ENABLED' : 'ROLE_DISABLED', {
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: role?.role_name || `ID-${req.params.id}`,
-        targetCode: role?.role_code || '',
-        userId: role?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins toggleRole:', e.message));
-      return success(res, role, 'Cap nhat trang thai vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
   // Devices
   listDevices = async (req, res, next) => {
     try {
-      const { userId, search, browser, os, isCurrent, isTrusted, dateFrom, dateTo, page, pageSize } = req.query;
+      const { userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize } = req.query;
       const result = await this.deviceService.listAll({
         userId,
         search,
         browser,
         os,
         isCurrent,
-        isTrusted,
         dateFrom,
         dateTo,
         page: page ? Number(page) : 1,
         pageSize: pageSize ? Number(pageSize) : 20,
       });
       return success(res, result, 'Danh sach thiet bi');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  setDeviceTrusted = async (req, res, next) => {
-    try {
-      const trusted = req.body?.trusted === true || req.body?.trusted === 1 || req.body?.trusted === 'true';
-      const actorId = req.user?.userId ?? req.user?.id;
-      // Chi cho phep tin cay thiet bi CUA CHINH minh — khong tin cay thay user khac
-      const device = await this.deviceService.setTrustedForOwner(actorId, req.params.deviceId, trusted);
-      return success(res, device, trusted ? 'Đã đánh dấu thiết bị tin cậy' : 'Đã bỏ tin cậy thiết bị');
     } catch (err) {
       next(err);
     }
@@ -489,183 +303,6 @@ class AdminController {
         reason: 'Đăng xuất thiết bị',
       });
       return success(res, result, 'Da dang xuat khoi thiet bi');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  forceLogoutAllOtherDevices = async (req, res, next) => {
-    try {
-      const { userId } = req.params;
-      const { currentDeviceId } = req.query;
-      const result = await this.deviceService.forceLogoutAllOtherDevices(userId, currentDeviceId);
-      await auditCrud.forceLogout(req, {
-        targetUserName: `user-${userId}`,
-        reason: 'Đăng xuất các thiết bị khác',
-      });
-      return success(res, result, 'Da dang xuat tat ca thiet bi khac');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  /**
-   * Admin force logout ALL devices of a user (including current).
-   * POST /api/admin/devices/user/:userId/all/logout
-   */
-  forceLogoutAllDevices = async (req, res, next) => {
-    try {
-      const { userId } = req.params;
-      if (!userId) {
-        return res.status(400).json({ message: 'userId la bat buoc' });
-      }
-      const actorId = req.user?.userId ?? req.user?.id;
-      if (actorId && Number(actorId) === Number(userId)) {
-        const ApiError = require('../../utils/ApiError');
-        throw new ApiError(
-          400,
-          'Không thể buộc đăng xuất toàn bộ thiết bị của chính mình. Dùng đăng xuất thiết bị khác hoặc nhờ admin khác.'
-        );
-      }
-      const result = await this.deviceService.forceLogoutAllDevices(userId);
-      await auditCrud.forceLogout(req, {
-        targetUserName: `user-${userId}`,
-        reason: 'Đăng xuất toàn bộ thiết bị',
-      });
-      return success(res, result, `Da dang xuat ${result.revoked} thiet bi`);
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // Specialties
-  listSpecialties = async (req, res, next) => {
-    try {
-      const specialties = await this.specialtyService.list();
-      return success(res, { items: specialties, total: specialties.length }, 'Danh sach chuyen mon');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  createSpecialty = async (req, res, next) => {
-    try {
-      const actorInfo = {
-        userId: req.user?.userId ?? req.user?.id,
-        userName: req.user?.name || req.user?.email,
-        name: req.user?.name || req.user?.email,
-      };
-      const specialty = await this.specialtyService.create(req.body, actorInfo);
-      const code = specialty?.specialtyCode || specialty?.specialty_code || specialty?.code || null;
-      const name = specialty?.specialtyName || specialty?.specialty_name || '';
-      await auditCrud.create(req, {
-        tableName: 'specialties',
-        entityCode: code,
-        recordId: specialty?.id || null,
-        entityName: 'Chuyên môn',
-        data: specialty || req.body,
-        description: `Tạo mới chuyên môn ${code || ''}${name ? ` — ${name}` : ''}`.trim(),
-      });
-      return success(res, specialty, 'Tao chuyen mon thanh cong', 201);
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  updateSpecialty = async (req, res, next) => {
-    try {
-      const actorInfo = {
-        userId: req.user?.userId ?? req.user?.id,
-        userName: req.user?.name || req.user?.email,
-        name: req.user?.name || req.user?.email,
-      };
-      const specialty = await this.specialtyService.update(req.params.id, req.body, actorInfo);
-      const code = specialty?.specialtyCode || specialty?.specialty_code || null;
-      const name = specialty?.specialtyName || specialty?.specialty_name || '';
-      const label = [code, name].filter(Boolean).join(' — ') || `chuyên môn #${req.params.id}`;
-      await auditCrud.update(req, {
-        tableName: 'specialties',
-        entityCode: code || name || String(req.params.id),
-        recordId: specialty?.id || Number(req.params.id) || null,
-        entityName: 'Chuyên môn',
-        newData: {
-          ...(specialty || req.body || {}),
-          specialtyCode: code,
-          specialtyName: name,
-        },
-        description: `Cập nhật chuyên môn ${label}`,
-      });
-      return success(res, specialty, 'Cap nhat chuyen mon thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  toggleSpecialtyStatus = async (req, res, next) => {
-    try {
-      const specialty = await this.specialtyService.toggleStatus(req.params.id);
-      const code = specialty?.specialtyCode || specialty?.specialty_code || null;
-      const name = specialty?.specialtyName || specialty?.specialty_name || '';
-      const label = [code, name].filter(Boolean).join(' — ') || `chuyên môn #${req.params.id}`;
-      const isActive = specialty?.isActive ?? specialty?.is_active;
-      await auditCrud.update(req, {
-        tableName: 'specialties',
-        entityCode: code || name || String(req.params.id),
-        recordId: specialty?.id || Number(req.params.id) || null,
-        entityName: 'Chuyên môn',
-        newData: {
-          isActive: Boolean(isActive),
-          specialtyCode: code,
-          specialtyName: name,
-        },
-        description: `${isActive ? 'Kích hoạt' : 'Vô hiệu hóa'} chuyên môn ${label}`,
-      });
-      return success(res, specialty, 'Cap nhat trang thai chuyen mon thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  getUserSpecialties = async (req, res, next) => {
-    try {
-      const specialties = await this.specialtyService.getUserSpecialties(req.params.userId);
-      return success(res, { items: specialties, total: specialties.length }, 'Chuyen mon cua nguoi dung');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  setUserSpecialties = async (req, res, next) => {
-    try {
-      const { specialtyIds } = req.body;
-      const specialties = await this.specialtyService.setUserSpecialties(
-        req.params.userId,
-        Array.isArray(specialtyIds) ? specialtyIds.map(Number) : []
-      );
-      let userLabel = `người dùng #${req.params.userId}`;
-      try {
-        const u = await this.adminUserService.getUserDetail(req.params.userId);
-        const full = [u?.firstName, u?.lastName].filter(Boolean).join(' ').trim();
-        userLabel = full || u?.name || u?.email || userLabel;
-      } catch (_) { /* keep fallback */ }
-      const specialtyNames = (specialties || [])
-        .map((s) => s.specialtyName || s.specialty_name || s.specialtyCode || s.specialty_code)
-        .filter(Boolean);
-      await auditCrud.update(req, {
-        tableName: 'user_specialty',
-        entityCode: userLabel,
-        recordId: Number(req.params.userId) || null,
-        entityName: 'Chuyên môn nhân viên',
-        newData: {
-          specialtyIds,
-          specialtyNames,
-          targetUserName: userLabel,
-        },
-        description: specialtyNames.length
-          ? `Cập nhật chuyên môn cho ${userLabel}: ${specialtyNames.join(', ')}`
-          : `Xóa toàn bộ chuyên môn của ${userLabel}`,
-      });
-      return success(res, { items: specialties, total: specialties.length }, 'Cap nhat chuyen mon nguoi dung thanh cong');
     } catch (err) {
       next(err);
     }

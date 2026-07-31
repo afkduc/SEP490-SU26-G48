@@ -11,15 +11,12 @@ const {
   validateAssignRoles,
 } = require('../validators/adminUserValidator');
 const { validateCreateBranch, validateUpdateBranch } = require('../validators/adminBranchValidator');
-const {
-  validateCreateRole,
-  validateUpdateRole,
-  validateSetPermissions,
-} = require('../validators/adminRoleValidator');
 
 /**
- * Admin routes — chỉ cần role admin (đã gỡ ma trận quyền screen:*).
- * Input validation: Presentation middleware → business rules: Service.
+ * Admin routes — role admin only.
+ * Kept: users, branches, list roles (for assign), assign/revoke, devices (single logout),
+ * security alerts, login-sessions recent.
+ * Removed: role CRUD / permission matrix, specialty, trust device, force-logout-all/others.
  */
 function buildAdminRouter() {
   const router = express.Router();
@@ -55,22 +52,8 @@ function buildAdminRouter() {
   router.patch('/branches/:id/deactivate', validateIdParam('id'), controller.deactivateBranch);
   router.patch('/branches/:id/reactivate', validateIdParam('id'), controller.reactivateBranch);
 
+  // Roles: list only (dropdown for assign). No role CRUD / permission matrix.
   router.get('/roles', controller.listRoles);
-  router.get('/roles/full', controller.listRolesWithPermissions);
-  router.get('/roles/:id', validateIdParam('id'), controller.getRoleDetail);
-  router.post('/roles', validateCreateRole, controller.createRole);
-  router.put('/roles/:id', validateIdParam('id'), validateUpdateRole, controller.updateRole);
-  router.patch('/roles/:id/toggle-status', validateIdParam('id'), controller.toggleRoleStatus);
-  router.get('/permissions', controller.listPermissions);
-  router.get('/roles/:id/permissions', validateIdParam('id'), controller.getRolePermissions);
-  router.put(
-    '/roles/:id/permissions',
-    validateIdParam('id'),
-    validateSetPermissions,
-    controller.setRolePermissions
-  );
-  router.get('/roles/:id/users', validateIdParam('id'), controller.getRoleUsers);
-
   router.get('/users/:userId/roles', validateIdParam('userId'), controller.getUserRoles);
   router.post(
     '/users/:userId/roles',
@@ -87,22 +70,10 @@ function buildAdminRouter() {
 
   router.get('/devices', controller.listDevices);
   router.get('/devices/user/:userId', validateIdParam('userId'), controller.listUserDevices);
-  router.patch('/devices/:deviceId/trust', validateIdParam('deviceId'), controller.setDeviceTrusted);
-  // POST …/logout — đăng xuất phiên thiết bị (tránh DELETE gây hiểu nhầm “xóa”)
   router.post(
     '/devices/:deviceId/logout',
     validateIdParam('deviceId'),
     controller.forceLogoutDevice
-  );
-  router.post(
-    '/devices/user/:userId/others/logout',
-    validateIdParam('userId'),
-    controller.forceLogoutAllOtherDevices
-  );
-  router.post(
-    '/devices/user/:userId/all/logout',
-    validateIdParam('userId'),
-    controller.forceLogoutAllDevices
   );
 
   router.get('/security-alerts', controller.listSecurityAlerts);
