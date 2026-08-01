@@ -189,37 +189,6 @@
   position: relative;
 }
 
-/* Online indicator */
-.navbar__online-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: #f0fdf4;
-  border: 1px solid #86efac;
-  border-radius: 20px;
-}
-
-.online-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #22c55e;
-  animation: pulse-online 2s ease-in-out infinite;
-}
-
-.online-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #16a34a;
-  letter-spacing: 0.02em;
-}
-
-@keyframes pulse-online {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.85); }
-}
-
 /* Nen trang (khac voi nen tim nhat cua ca thanh navbar) de badge vai tro noi
    ro thanh 1 khoi rieng, khong bi lan vao nen xung quanh. */
 .navbar__role-badge {
@@ -409,17 +378,12 @@
   .navbar__role-badge { display: none; }
 }
 
-/* Man dien thoai rat nho - bo bot chu "Truc tuyen", chi giu cham xanh, tranh
-   xo lech voi muc menu + avatar tren cung 1 hang. */
+/* Man dien thoai rat nho */
 @media (max-width: 420px) {
   .navbar {
     padding: 0 10px;
     gap: 8px;
   }
-  .navbar__online-indicator {
-    padding: 4px 8px;
-  }
-  .online-label { display: none; }
   .navbar__link {
     padding: 0 10px;
     font-size: 12.5px;

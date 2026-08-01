@@ -687,7 +687,7 @@ function EmployeeFormPage({ mode }) {
                   {fieldErrors.confirmPassword && <span className="form-error">{fieldErrors.confirmPassword}</span>}
                 </div>
               </div>
-              <p className="form-hint" style={{ marginTop: 8 }}>Nhân viên sẽ đổi mật khẩu lần đầu đăng nhập.</p>
+              <p className="form-hint" style={{ marginTop: 8 }}>Hãy gửi mật khẩu cho nhân viên qua kênh an toàn.</p>
             </>
           )}
 
@@ -2652,7 +2652,7 @@ function TechnicianFormPage({ mode }) {
                   {fieldErrors.confirmPassword && <span className="form-error">{fieldErrors.confirmPassword}</span>}
                 </div>
               </div>
-              <p className="form-hint" style={{ marginTop: 8 }}>Thợ máy sẽ đổi mật khẩu lần đầu đăng nhập.</p>
+              <p className="form-hint" style={{ marginTop: 8 }}>Hãy gửi mật khẩu cho thợ máy qua kênh an toàn.</p>
             </>
           )}
         </div>

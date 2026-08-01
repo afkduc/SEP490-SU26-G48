@@ -8,14 +8,12 @@ function toUserDto(user, roles, permissionKeys = []) {
     lastName: user.last_name,
     phone: user.phone,
     branchId: user.branch_id,
-    avatar: user.avatar,
     roles: roles.map((r) => r.role_name),
     roleLabels: roles.map((r) => r.role_label),
     primaryRole: roles[0]?.role_name || null,
     primaryRoleLabel: roles[0]?.role_label || null,
     permissions: permissionKeys,
-    mustChangePassword: Boolean(user.must_change_password),
-    tokenVersion: user.token_version || 1,
+    tokenVersion: user.token_version ?? 1,
   };
 }
 

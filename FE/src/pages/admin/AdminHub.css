@@ -139,6 +139,13 @@
   font-size: 0.875rem;
 }
 
+.admin-hub__focus-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .admin-hub__focus-banner-text {
   min-width: 0;
   line-height: 1.4;

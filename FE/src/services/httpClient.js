@@ -240,10 +240,15 @@ class HttpClient {
       }
 
       if (response.status === 401 && belongsToCurrentSession && !skipSessionExpired) {
-        showSessionExpired({
-          code: payload?.code || null,
-          message: (payload && payload.message) || '',
-        });
+        const msg = String((payload && payload.message) || '');
+        // Sai mật khẩu khi đổi MK (BE cũ) — không phải hết phiên
+        const isWrongCurrentPassword = /mật khẩu hiện tại không đúng/i.test(msg);
+        if (!isWrongCurrentPassword) {
+          showSessionExpired({
+            code: payload?.code || null,
+            message: msg,
+          });
+        }
       }
       const message = (payload && payload.message) || response.statusText;
       const error = new Error(message);

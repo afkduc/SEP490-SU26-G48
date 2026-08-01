@@ -57,6 +57,9 @@ class UserRoleService {
     for (const roleId of ids) {
       const role = await this.roleRepository.findById(roleId);
       if (!role) throw new ApiError(404, `Role id=${roleId} khong ton tai`);
+      if (role.isActive === false) {
+        throw new ApiError(400, `Vai trò "${role.role_name || role.roleName}" đang ngừng hoạt động`);
+      }
       await this.userRoleRepository.assignRole(Number(userId), roleId);
       assignedRoles.push(role.role_label || role.role_name);
     }

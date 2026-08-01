@@ -374,37 +374,6 @@
   color: #4338ca;
 }
 
-.admin-topbar__online-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: #f0fdf4;
-  border: 1px solid #86efac;
-  border-radius: 20px;
-}
-
-.online-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #22c55e;
-  animation: pulse-online 2s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
-.online-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #16a34a;
-  letter-spacing: 0.02em;
-}
-
-@keyframes pulse-online {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.85); }
-}
-
 .admin-topbar__user {
   display: flex;
   align-items: center;
@@ -655,14 +624,6 @@
 
   .admin-topbar__history-nav {
     margin-right: 0;
-  }
-
-  .admin-topbar__online-indicator {
-    padding: 4px 8px;
-  }
-
-  .admin-topbar__online-indicator .admin-topbar__online-label {
-    display: none;
   }
 
   .admin-topbar__right {

@@ -14,9 +14,9 @@ class AuthRepositoryImpl extends AuthRepository {
   async findUserByEmail(email) {
     const result = await query(
       `SELECT u.id, u.pseudo_id, u.user_name, u.email, u.user_password,
-              u.first_name, u.last_name, u.phone, u.branch_id, u.status, u.avatar,
+              u.first_name, u.last_name, u.phone, u.branch_id, u.status,
               b.is_active AS branch_is_active,
-              must_change_password, token_version
+              token_version
        FROM   users u
        LEFT JOIN branches b ON b.id = u.branch_id
        WHERE  LOWER(u.email) = LOWER(@email)`,
@@ -42,9 +42,9 @@ class AuthRepositoryImpl extends AuthRepository {
 
     const result = await query(
       `SELECT u.id, u.pseudo_id, u.user_name, u.email, u.user_password,
-              u.first_name, u.last_name, u.phone, u.branch_id, u.status, u.avatar,
+              u.first_name, u.last_name, u.phone, u.branch_id, u.status,
               b.is_active AS branch_is_active,
-              must_change_password, token_version
+              token_version
        FROM   users u
        LEFT JOIN branches b ON b.id = u.branch_id
        WHERE  REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(u.phone, ''), ' ', ''), '-', ''), '.', ''), '+84', '0') = @phone
@@ -85,14 +85,13 @@ class AuthRepositoryImpl extends AuthRepository {
     return result.recordset[0]?.token_version || null;
   }
 
-  async updatePassword(userId, passwordHash, { mustChangePassword = false } = {}) {
+  async updatePassword(userId, passwordHash) {
     await query(
       `UPDATE users
        SET user_password = @p1,
-           must_change_password = @p2,
            token_version = ISNULL(token_version, 0) + 1
-       WHERE id = @p3`,
-      { p1: passwordHash, p2: mustChangePassword ? 1 : 0, p3: userId }
+       WHERE id = @p2`,
+      { p1: passwordHash, p2: userId }
     );
   }
 }

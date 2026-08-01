@@ -165,17 +165,18 @@ function _sendLoginNotification(userId, browser, os, ipAddress, deviceId) {
   try {
     const NotificationService = require('../application/services/NotificationService');
     const ns = new NotificationService();
-    // notify() la async - PHAI bat .catch() vi khong await o day (fire-and-
-    // forget), neu khong reject se thanh unhandled rejection va lam crash
-    // ca process (Node moi mac dinh thoat process khi co unhandled rejection).
-    ns.notify('LOGIN_SUCCESS', {
+    const deviceLabel = [browser, os].filter(Boolean).join(' · ') || 'Thiết bị mới';
+    // Báo kiểu Facebook: login từ thiết bị/IP mới → luôn hiện in-app (skipSettings)
+    ns.notify('NEW_DEVICE', {
       userId,
       browser,
       os,
       ip: ipAddress,
       deviceId,
-    }).catch((err) => {
-      console.error('[loginSessionMiddleware] Failed to send login notification:', err.message);
+      device: deviceLabel,
+      location: ipAddress || 'vị trí không xác định',
+    }, { skipSettings: true }).catch((err) => {
+      console.error('[loginSessionMiddleware] Failed to send new-device notification:', err.message);
     });
   } catch (err) {
     console.error('[loginSessionMiddleware] Failed to send login notification:', err.message);
@@ -201,28 +202,32 @@ function _sendLoginFailedNotification(userId, reason, ipAddress, browser, os) {
   }
 }
 
-async function _writeLoginAuditLog(req, { success, userId, userName, reason, ipAddress }) {
+async function _writeLoginAuditLog(req, { success, userId, userName, reason, ipAddress, branchId = null }) {
   try {
     const { auditLog, ACTION_TYPES } = require('../utils/auditHelper');
     // Gan tam user vao req de auditLog lay dung actor (login chua co JWT)
     const prevUser = req.user;
+    const actorLabel = userName || prevUser?.name || prevUser?.email || 'unknown';
     req.user = {
       ...(prevUser || {}),
       userId: userId || prevUser?.userId || null,
       id: userId || prevUser?.id || null,
-      name: userName || prevUser?.name || userName,
-      email: userName || prevUser?.email,
+      name: actorLabel,
+      email: userName || prevUser?.email || actorLabel,
+      user_name: actorLabel,
+      phone: prevUser?.phone || null,
+      branch_id: branchId != null ? branchId : (prevUser?.branch_id ?? null),
     };
     await auditLog({
       req,
       action: success ? ACTION_TYPES.LOGIN : ACTION_TYPES.FAILED_LOGIN,
       tableName: 'login_sessions',
       entityName: success ? 'Đăng nhập thành công' : 'Đăng nhập thất bại',
-      entityCode: userName || null,
+      entityCode: actorLabel || null,
       recordId: userId || null,
       description: success
-        ? `Đăng nhập thành công${userName ? `: ${userName}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`
-        : `Đăng nhập thất bại${userName ? `: ${userName}` : ''}${reason ? ` — ${reason}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`,
+        ? `Đăng nhập thành công${actorLabel ? `: ${actorLabel}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`
+        : `Đăng nhập thất bại${actorLabel ? `: ${actorLabel}` : ''}${reason ? ` — ${reason}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`,
       responseStatus: success ? 200 : 401,
     });
     req.user = prevUser;
@@ -233,6 +238,13 @@ async function _writeLoginAuditLog(req, { success, userId, userName, reason, ipA
 
 async function trackLogin(req, user) {
   try {
+    // Dam bao cot is_trusted ton tai truoc khi upsert device
+    try {
+      await require('../infrastructure/repositories/DeviceRepository').ensureTrustedSchema();
+    } catch (schemaErr) {
+      console.warn('[trackLogin] ensureTrustedSchema:', schemaErr.message);
+    }
+
     const { ipAddress, userAgent } = getRequestMeta(req);
     const { browser, os } = parseUserAgent(userAgent);
 
@@ -253,7 +265,7 @@ async function trackLogin(req, user) {
     //   - Moi: 1 transaction de dat consistency.
     // ============================================================
     const result = await executeTransaction(async (txQuery) => {
-      const out = { sessionId: null, deviceId: null };
+      const out = { sessionId: null, deviceId: null, isNewDevice: false, isTrusted: false };
 
       // Step 1: Close stale sessions CUA USER HIEN TAI (logic single-session).
       if (userId) {
@@ -303,17 +315,24 @@ async function trackLogin(req, user) {
       out.sessionId = rawSessionId !== null && rawSessionId !== undefined ? Number(rawSessionId) : null;
 
       // Step 3: Upsert device (trong transaction)
-      if (userId && ipAddress) {
+      // - Khớp đúng IP+browser+os → tái dùng
+      // - Ngược lại tạo mới → báo thiết bị mới (không còn nhánh "tin cậy")
+      // Luôn gắn device (IP fallback) để JWT có deviceId + session active —
+      // tránh heartbeat/API đá phiên mới ngay sau login.
+      const deviceIp = ipAddress || '0.0.0.0';
+      if (userId) {
         const { deviceName } = parseUserAgent(userAgent);
         const existing = await txQuery(
           `SELECT TOP 1 id, is_current FROM user_devices
            WHERE user_id = @p1 AND ip_address = @p2 AND browser = @p3 AND os = @p4`,
-          { p1: userId, p2: ipAddress, p3: browser, p4: os }
+          { p1: userId, p2: deviceIp, p3: browser, p4: os }
         );
 
         if (existing.recordset.length > 0) {
           const existingDevice = existing.recordset[0];
           out.deviceId = existingDevice.id;
+          out.isNewDevice = false;
+          out.isTrusted = false;
           await txQuery(
             `UPDATE user_devices
              SET    is_current = 1,
@@ -325,13 +344,15 @@ async function trackLogin(req, user) {
           );
         } else {
           const insertDevice = await txQuery(
-            `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, last_login_at, last_activity_at)
-             VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+            `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, is_trusted, last_login_at, last_activity_at)
+             VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
              SELECT @@IDENTITY AS new_id;`,
-            { p1: userId, p2: deviceName, p3: browser, p4: os, p5: ipAddress, p6: userAgent }
+            { p1: userId, p2: deviceName, p3: browser, p4: os, p5: deviceIp, p6: userAgent }
           );
           const rawNewId = insertDevice.recordset?.[0]?.new_id;
           out.deviceId = rawNewId !== null && rawNewId !== undefined ? Number(rawNewId) : null;
+          out.isNewDevice = true;
+          out.isTrusted = false;
         }
       }
 
@@ -346,7 +367,7 @@ async function trackLogin(req, user) {
       return out;
     });
 
-    const { sessionId, deviceId } = result;
+    const { sessionId, deviceId, isNewDevice } = result;
 
     // Post-commit (khong can transaction): log event + SSE
     if (sessionId) {
@@ -372,7 +393,10 @@ async function trackLogin(req, user) {
         branchId,
         deviceId,
       });
-      _sendLoginNotification(userId, browser, os, ipAddress, deviceId);
+      // Báo khi thiết bị mới (IP+browser+os chưa từng ghi nhận)
+      if (isNewDevice) {
+        _sendLoginNotification(userId, browser, os, ipAddress, deviceId);
+      }
       await _writeLoginAuditLog(req, {
         success: true,
         userId,
@@ -619,6 +643,13 @@ async function trackLoginFailed(req, payload) {
         });
       }
 
+      // Soft-fail (sai chi nhánh / tài khoản khóa…): không chuông, không audit FAILED_LOGIN.
+      // AuthController cũng không gọi trackLoginFailed cho các case này; giữ guard phòng gọi khác.
+      const skipSecurityNoise = ['WRONG_BRANCH', 'BRANCH_REQUIRED', 'ACCOUNT_DISABLED', 'BRANCH_DISABLED'];
+      if (skipSecurityNoise.includes(failureReason)) {
+        return;
+      }
+
       _sendLoginFailedNotification(userId, failureReason, ipAddress, browser, os);
       await _writeLoginAuditLog(req, {
         success: false,
@@ -626,6 +657,7 @@ async function trackLoginFailed(req, payload) {
         userName,
         reason: failureReason,
         ipAddress,
+        branchId,
       });
     }
   } catch (err) {

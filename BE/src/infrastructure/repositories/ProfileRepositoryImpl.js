@@ -11,7 +11,6 @@ const PROFILE_COLUMNS = `
   u.phone,
   u.branch_id,
   u.status,
-  u.avatar,
   u.created_at,
   u.updated_at
 `;
@@ -29,7 +28,6 @@ function toProfileRow(row, branchName, assignedBranches = []) {
     branchId: row.branch_id,
     branchName: branchName || null,
     status: row.status,
-    avatar: row.avatar || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     roles: [],
@@ -90,6 +88,16 @@ class ProfileRepositoryImpl {
     return result.recordset[0] || null;
   }
 
+  async findByPhone(phone) {
+    const result = await query(
+      `SELECT id, phone
+       FROM   users
+       WHERE  phone = @p1`,
+      { p1: phone }
+    );
+    return result.recordset[0] || null;
+  }
+
   async update(userId, { email, firstName, lastName, phone }) {
     const updates = [];
     const params = {};
@@ -133,14 +141,13 @@ class ProfileRepositoryImpl {
     return this.findById(userId);
   }
 
-  async updatePassword(userId, passwordHash, mustChangePassword = false) {
+  async updatePassword(userId, passwordHash) {
     await query(
       `UPDATE users
-       SET    user_password         = @p1,
-              must_change_password  = @p2,
-              updated_at            = SYSUTCDATETIME()
-       WHERE  id = @p3`,
-      { p1: passwordHash, p2: mustChangePassword ? 1 : 0, p3: userId }
+       SET    user_password = @p1,
+              updated_at    = SYSUTCDATETIME()
+       WHERE  id = @p2`,
+      { p1: passwordHash, p2: userId }
     );
   }
 }

@@ -4,6 +4,7 @@ const { trackActivity } = require('../../middlewares');
 const ProfileController = require('../controllers/ProfileController');
 const ProfileService = require('../../application/services/ProfileService');
 const ProfileRepositoryImpl = require('../../infrastructure/repositories/ProfileRepositoryImpl');
+const { validateUpdateProfile } = require('../validators/profileValidator');
 
 function buildProfileRouter() {
   const router = express.Router();
@@ -12,37 +13,20 @@ function buildProfileRouter() {
   const service = new ProfileService(repo);
   const controller = new ProfileController(service);
 
-  // Lấy thông tin profile hiện tại (chính mình)
   router.get('/me', authenticate, trackActivity, controller.getMyProfile);
+  router.put('/me', authenticate, trackActivity, validateUpdateProfile, controller.updateMyProfile);
 
-  // Cập nhật thông tin cá nhân
-  router.put('/me', authenticate, trackActivity, controller.updateMyProfile);
+  // Change-password self-service removed — use forgot-password / admin reset.
 
-  // Đổi mật khẩu
-  router.put('/me/password', authenticate, trackActivity, controller.changePassword);
-
-  // === Notification Endpoints ===
-
-  // Lấy cài đặt thông báo
   router.get('/me/notifications/settings', authenticate, controller.getNotificationSettings);
-
-  // Cập nhật cài đặt thông báo
   router.put('/me/notifications/settings', authenticate, controller.updateNotificationSettings);
-
-  // Lấy danh sách thông báo
   router.get('/me/notifications', authenticate, controller.getNotifications);
-
-  // Đánh dấu một thông báo đã đọc
   router.patch('/me/notifications/:id/read', authenticate, controller.markNotificationRead);
-
-  // Đánh dấu tất cả thông báo đã đọc
   router.patch('/me/notifications/read-all', authenticate, controller.markAllNotificationsRead);
-
-  // Lấy số thông báo chưa đọc
   router.get('/me/notifications/unread-count', authenticate, controller.getUnreadCount);
 
-  // Avatar (chỉ xem, không upload)
-  router.get('/me/avatar', authenticate, trackActivity, controller.getMyAvatar);
+  // Device trust removed. Self logout-all kept for My account flow.
+  router.post('/me/devices/logout-all', authenticate, trackActivity, controller.logoutAllMyDevices);
 
   return router;
 }

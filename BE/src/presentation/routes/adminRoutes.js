@@ -2,10 +2,21 @@ const express = require('express');
 const AdminController = require('../controllers/AdminController');
 const { authenticate, requireAdmin } = require('../../middlewares/auth');
 const { trackActivity } = require('../../middlewares');
-const { validateListUsersQuery } = require('../validators/adminUserValidator');
+const { validateIdParam } = require('../validators/commonValidators');
+const {
+  validateListUsersQuery,
+  validateCreateUser,
+  validateUpdateUser,
+  validateResetPassword,
+  validateAssignRoles,
+} = require('../validators/adminUserValidator');
+const { validateCreateBranch, validateUpdateBranch } = require('../validators/adminBranchValidator');
 
 /**
- * Admin routes — chỉ cần role admin (đã gỡ ma trận quyền screen:*).
+ * Admin routes — role admin only.
+ * Kept: users, branches, list roles (for assign), assign/revoke, devices (single logout),
+ * security alerts, login-sessions recent.
+ * Removed: role CRUD / permission matrix, specialty, trust device, force-logout-all/others.
  */
 function buildAdminRouter() {
   const router = express.Router();
@@ -21,60 +32,58 @@ function buildAdminRouter() {
 
   router.get('/users', validateListUsersQuery, controller.listUsers);
   router.get('/users/export', controller.exportUsers);
-  router.get('/users/:id', controller.getUserDetail);
-  router.post('/users', controller.createUser);
-  router.put('/users/:id', controller.updateUser);
-  router.post('/users/:id/reset-password', controller.resetPassword);
+  router.get('/users/:id', validateIdParam('id'), controller.getUserDetail);
+  router.post('/users', validateCreateUser, controller.createUser);
+  router.put('/users/:id', validateIdParam('id'), validateUpdateUser, controller.updateUser);
+  router.post(
+    '/users/:id/reset-password',
+    validateIdParam('id'),
+    validateResetPassword,
+    controller.resetPassword
+  );
 
   router.get('/branches', controller.listBranches);
   router.get('/branches/full', controller.listBranchesFull);
   router.get('/branches/manager-candidates', controller.getManagerCandidates);
-  router.get('/branches/:id', controller.getBranchDetail);
-  router.get('/branches/:id/stats', controller.getBranchStats);
-  router.post('/branches', controller.createBranch);
-  router.put('/branches/:id', controller.updateBranch);
-  router.patch('/branches/:id/deactivate', controller.deactivateBranch);
-  router.patch('/branches/:id/reactivate', controller.reactivateBranch);
+  router.get('/branches/:id', validateIdParam('id'), controller.getBranchDetail);
+  router.get('/branches/:id/stats', validateIdParam('id'), controller.getBranchStats);
+  router.post('/branches', validateCreateBranch, controller.createBranch);
+  router.put('/branches/:id', validateIdParam('id'), validateUpdateBranch, controller.updateBranch);
+  router.patch('/branches/:id/deactivate', validateIdParam('id'), controller.deactivateBranch);
+  router.patch('/branches/:id/reactivate', validateIdParam('id'), controller.reactivateBranch);
 
+  // Roles: list only (dropdown for assign). No role CRUD / permission matrix.
   router.get('/roles', controller.listRoles);
-  router.get('/roles/full', controller.listRolesWithPermissions);
-  router.get('/roles/:id', controller.getRoleDetail);
-  router.post('/roles', controller.createRole);
-  router.put('/roles/:id', controller.updateRole);
-  router.patch('/roles/:id/toggle-status', controller.toggleRoleStatus);
-  router.get('/permissions', controller.listPermissions);
-  router.get('/roles/:id/permissions', controller.getRolePermissions);
-  router.put('/roles/:id/permissions', controller.setRolePermissions);
-  router.get('/roles/:id/users', controller.getRoleUsers);
-
-  router.get('/users/:userId/roles', controller.getUserRoles);
-  router.post('/users/:userId/roles', controller.assignRoles);
-  router.delete('/users/:userId/roles/:roleId', controller.revokeRole);
+  router.get('/users/:userId/roles', validateIdParam('userId'), controller.getUserRoles);
+  router.post(
+    '/users/:userId/roles',
+    validateIdParam('userId'),
+    validateAssignRoles,
+    controller.assignRoles
+  );
+  router.delete(
+    '/users/:userId/roles/:roleId',
+    validateIdParam('userId'),
+    validateIdParam('roleId'),
+    controller.revokeRole
+  );
 
   router.get('/devices', controller.listDevices);
-  router.get('/devices/user/:userId', controller.listUserDevices);
-  router.delete('/devices/:deviceId', controller.forceLogoutDevice);
-  router.delete('/devices/user/:userId/others', controller.forceLogoutAllOtherDevices);
-  router.delete('/devices/user/:userId/all', controller.forceLogoutAllDevices);
-
-  router.get('/specialties', controller.listSpecialties);
-  router.post('/specialties', controller.createSpecialty);
-  router.put('/specialties/:id', controller.updateSpecialty);
-  router.patch('/specialties/:id/toggle-status', controller.toggleSpecialtyStatus);
-  router.get('/users/:userId/specialties', controller.getUserSpecialties);
-  router.put('/users/:userId/specialties', controller.setUserSpecialties);
+  router.get('/devices/user/:userId', validateIdParam('userId'), controller.listUserDevices);
+  router.post(
+    '/devices/:deviceId/logout',
+    validateIdParam('deviceId'),
+    controller.forceLogoutDevice
+  );
 
   router.get('/security-alerts', controller.listSecurityAlerts);
   router.get('/security-alerts/counts', controller.acknowledgeAlertCounts);
   router.patch('/security-alerts/ack-all', controller.acknowledgeAllAlerts);
-  router.patch('/security-alerts/:id/ack', controller.acknowledgeAlert);
-
-  router.get('/vehicle-brands', controller.listVehicleBrands);
-  router.post('/vehicle-brands', controller.createVehicleBrand);
-  router.put('/vehicle-brands/:id', controller.updateVehicleBrand);
-  router.patch('/vehicle-brands/:id/toggle-status', controller.toggleVehicleBrandStatus);
-
-  router.patch('/users/:id/must-change-password', controller.setMustChangePassword);
+  router.patch(
+    '/security-alerts/:id/ack',
+    validateIdParam('id'),
+    controller.acknowledgeAlert
+  );
 
   router.post('/sessions/cleanup', controller.cleanupDuplicateSessions);
   router.get('/login-sessions/recent', controller.getRecentLoginSessions);

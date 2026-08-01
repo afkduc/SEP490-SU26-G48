@@ -1,5 +1,27 @@
 const { query } = require('../database/sqlServer');
 
+/** Auth noise — có trang Lịch sử đăng nhập riêng; mặc định ẩn khỏi nhật ký thao tác. */
+const AUTH_AUDIT_ACTIONS = [
+  'LOGIN',
+  'FAILED_LOGIN',
+  'LOGOUT',
+  'FORCE_LOGOUT',
+  'FORCE_LOGO',
+  'REFRESH_TOKEN',
+  'VERIFY_OTP',
+  'SEND_OTP',
+];
+
+function toIsoUtc(value) {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toISOString();
+  }
+  return value;
+}
+
 const AUDIT_LOG_COLUMNS = `
   al.id,
   al.user_id,
@@ -16,12 +38,37 @@ const AUDIT_LOG_COLUMNS = `
   al.request_body,
   al.response_status,
   al.duration_ms,
-  al.branch_id,
-  al.branch_name,
+  COALESCE(al.branch_id, u.branch_id) AS branch_id,
+  COALESCE(
+    b.branch_name,
+    ub.branch_name,
+    CASE
+      -- Thao tac he thong (quen mat khau cong khai, job, ...) — khong gan chi nhanh
+      WHEN al.user_id IS NULL OR LOWER(LTRIM(RTRIM(ISNULL(al.user_name, N'')))) = N'system'
+        THEN N'Hệ thống'
+      -- Admin / GD all-scope
+      WHEN u.id IS NOT NULL AND u.branch_id IS NULL THEN N'Tất cả chi nhánh'
+      ELSE NULL
+    END
+  ) AS branch_name,
   al.description,
   al.old_value,
   al.new_value,
   al.logged_at
+`;
+
+/**
+ * Chi nhánh hiển thị:
+ *  1) al.branch_id ghi lúc audit
+ *  2) fallback users.branch_id của người thao tác (log cũ thiếu branch_id)
+ *  3) actor «system» / không user → «Hệ thống»
+ *  4) admin/all-scope (users.branch_id NULL) → «Tất cả chi nhánh»
+ */
+const AUDIT_LOG_FROM = `
+  audit_logs al
+  LEFT JOIN users u ON u.id = al.user_id
+  LEFT JOIN branches b ON b.id = al.branch_id
+  LEFT JOIN branches ub ON ub.id = u.branch_id
 `;
 
 const LOGIN_SESSION_COLUMNS = `
@@ -67,7 +114,7 @@ function toAuditLogRow(row) {
     description: row.description,
     old_value: row.old_value,
     new_value: row.new_value,
-    logged_at: row.logged_at,
+    logged_at: toIsoUtc(row.logged_at),
   };
 }
 
@@ -178,7 +225,7 @@ async function insertAuditLog(logData) {
      VALUES (
        @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10,
        @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18,
-       COALESCE(@p19, GETDATE())
+       COALESCE(@p19, SYSUTCDATETIME())
      )`,
     params
   );
@@ -204,6 +251,7 @@ async function getAuditLogs(filters = {}) {
     startDate,
     endDate,
     branchId,
+    excludeAuthEvents = false,
     page = 1,
     pageSize = 20,
   } = filters;
@@ -242,6 +290,15 @@ async function getAuditLogs(filters = {}) {
     conditions.push(`al.action = @p${paramIndex}`);
     params[`p${paramIndex}`] = action;
     paramIndex++;
+  } else if (excludeAuthEvents) {
+    // An dang nhap / that bai khoi danh sach thao tac (co trang Lich su dang nhap rieng)
+    const placeholders = AUTH_AUDIT_ACTIONS.map((a, i) => {
+      const key = `p${paramIndex + i}`;
+      params[key] = a;
+      return `@${key}`;
+    });
+    conditions.push(`al.action NOT IN (${placeholders.join(', ')})`);
+    paramIndex += AUTH_AUDIT_ACTIONS.length;
   }
 
   if (tableName) {
@@ -289,7 +346,7 @@ async function getAuditLogs(filters = {}) {
   }
 
   if (branchId) {
-    conditions.push(`al.branch_id = @p${paramIndex}`);
+    conditions.push(`COALESCE(al.branch_id, u.branch_id) = @p${paramIndex}`);
     params[`p${paramIndex}`] = branchId;
     paramIndex++;
   }
@@ -314,7 +371,7 @@ async function getAuditLogs(filters = {}) {
   // Get count and stats in parallel
   const [countResult, statsResult] = await Promise.all([
     query(
-      `SELECT COUNT(*) AS total FROM v_audit_logs_with_branch al WHERE ${whereClause}`,
+      `SELECT COUNT(*) AS total FROM ${AUDIT_LOG_FROM} WHERE ${whereClause}`,
       params
     ),
     query(
@@ -323,7 +380,7 @@ async function getAuditLogs(filters = {}) {
         SUM(CASE WHEN al.action IN ('CREATE', 'INSERT') THEN 1 ELSE 0 END) AS create_count,
         SUM(CASE WHEN al.action IN ('UPDATE', 'EDIT') THEN 1 ELSE 0 END) AS update_count,
         SUM(CASE WHEN al.action IN ('DELETE', 'REMOVE') THEN 1 ELSE 0 END) AS delete_count
-       FROM v_audit_logs_with_branch al WHERE ${whereClause}`,
+       FROM ${AUDIT_LOG_FROM} WHERE ${whereClause}`,
       params
     ),
   ]);
@@ -333,7 +390,7 @@ async function getAuditLogs(filters = {}) {
 
   const dataResult = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
-     FROM   v_audit_logs_with_branch al
+     FROM   ${AUDIT_LOG_FROM}
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY`,
@@ -362,7 +419,7 @@ async function getAuditLogs(filters = {}) {
 async function getAuditLogById(id) {
   const result = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
-     FROM   v_audit_logs_with_branch al
+     FROM   ${AUDIT_LOG_FROM}
      WHERE  al.id = @p1`,
     { p1: id }
   );
@@ -389,6 +446,7 @@ async function getAuditLogsForExport(filters = {}) {
     startDate,
     endDate,
     branchId,
+    excludeAuthEvents = false,
     limit = 10000,
   } = filters;
 
@@ -423,6 +481,14 @@ async function getAuditLogsForExport(filters = {}) {
     conditions.push(`al.action = @p${paramIndex}`);
     params[`p${paramIndex}`] = action;
     paramIndex++;
+  } else if (excludeAuthEvents) {
+    const placeholders = AUTH_AUDIT_ACTIONS.map((a, i) => {
+      const key = `p${paramIndex + i}`;
+      params[key] = a;
+      return `@${key}`;
+    });
+    conditions.push(`al.action NOT IN (${placeholders.join(', ')})`);
+    paramIndex += AUTH_AUDIT_ACTIONS.length;
   }
   if (tableName) {
     conditions.push(`LOWER(al.table_name) LIKE LOWER(@p${paramIndex})`);
@@ -463,7 +529,7 @@ async function getAuditLogsForExport(filters = {}) {
     }
   }
   if (branchId) {
-    conditions.push(`al.branch_id = @p${paramIndex}`);
+    conditions.push(`COALESCE(al.branch_id, u.branch_id) = @p${paramIndex}`);
     params[`p${paramIndex}`] = branchId;
     paramIndex++;
   }
@@ -483,7 +549,7 @@ async function getAuditLogsForExport(filters = {}) {
 
   const dataResult = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
-     FROM   v_audit_logs_with_branch al
+     FROM   ${AUDIT_LOG_FROM}
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
      OFFSET 0 ROWS FETCH NEXT @p_limit ROWS ONLY`,
@@ -504,6 +570,7 @@ async function getLoginSessions(filters = {}) {
     status,
     branchId,
     ipAddress,
+    sessionId,
     page = 1,
     pageSize = 20,
   } = filters;
@@ -511,6 +578,16 @@ async function getLoginSessions(filters = {}) {
   const conditions = ['1=1'];
   const params = {};
   let paramIndex = 1;
+
+  // Exact session — dùng khi admin nhảy từ cảnh báo (kể cả phiên đã ended/offline)
+  if (sessionId != null && String(sessionId).trim() !== '') {
+    const sid = Number(sessionId);
+    if (Number.isFinite(sid) && sid > 0) {
+      conditions.push(`ls.id = @p${paramIndex}`);
+      params[`p${paramIndex}`] = sid;
+      paramIndex++;
+    }
+  }
 
   if (userName) {
     conditions.push(`LOWER(ls.user_name) LIKE LOWER(@p${paramIndex})`);
@@ -654,7 +731,7 @@ async function getAuditLogsByUser(userId, limit = 10) {
   const safeLimit = Math.max(1, parseInt(limit, 10) || 10);
   const result = await query(
     `SELECT TOP (@p2) ${AUDIT_LOG_COLUMNS}
-     FROM   v_audit_logs_with_branch al
+     FROM   ${AUDIT_LOG_FROM}
      WHERE  al.user_id = @p1
      ORDER  BY al.logged_at DESC, al.id DESC`,
     { p1: userId, p2: safeLimit }
@@ -671,4 +748,5 @@ module.exports = {
   getLoginSessionsSince,
   getEntityDefinitions,
   getAuditLogsByUser,
+  AUTH_AUDIT_ACTIONS,
 };
