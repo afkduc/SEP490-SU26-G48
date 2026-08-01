@@ -61,13 +61,18 @@ function parsePath(url) {
 function inferTableName(originalUrl) {
   const segments = parsePath(originalUrl);
   if (segments.length < 2 || segments[0] !== 'api') return null;
+  // /api/admin/users/:id → users (khong lay "admin")
+  if (segments[1] === 'admin' && segments[2]) {
+    return String(segments[2]).replace(/-/g, '_');
+  }
   return segments[1].replace(/-/g, '_');
 }
 
 function inferRecordIdFromUrl(originalUrl) {
   const segments = parsePath(originalUrl);
-  if (segments.length >= 3 && /^\d+$/.test(segments[2])) {
-    return Number(segments[2]);
+  // Tim segment so cuoi cung (vd /api/admin/users/1 → 1)
+  for (let i = segments.length - 1; i >= 2; i -= 1) {
+    if (/^\d+$/.test(segments[i])) return Number(segments[i]);
   }
   return null;
 }
@@ -240,6 +245,9 @@ function auditLogger(req, res, next) {
 
   res.on('finish', () => {
     try {
+      // Controller da goi auditHelper → khong ghi them ban trung
+      if (req._manualAuditWritten) return;
+
       // Resolve IP cùng logic với loginSessionMiddleware (getRequestMeta).
       // Đảm bảo cả login_sessions và audit_logs ghi IP theo cùng 1 quy tắc
       // nên không có trường hợp 1 bảng có IP, bảng kia lại null.
@@ -324,7 +332,7 @@ function auditLogger(req, res, next) {
            @p1, @p2, @p3, @p4, @p5,
            @p6, @p7, @p8,
            @p9, @p10, @p11, @p12,
-           @p13, @p14, @p15, @p16, @p17
+           @p13, @p14, @p15, @p16, SYSUTCDATETIME()
          )`,
         {
           p1: userId,
@@ -341,9 +349,8 @@ function auditLogger(req, res, next) {
           p12: sanitizedBody ? JSON.stringify(sanitizedBody) : null,
           p13: responseStatus,
           p14: durationMs,
-          p15: user && user.branch_id ? user.branch_id : null,
+          p15: user && (user.branch_id ?? user.branchId) ? (user.branch_id ?? user.branchId) : null,
           p16: description,
-          p17: new Date(),
         }
       ).catch((e) => console.error('[auditLogger] failed to write audit log:', e.message));
     } catch (err) {

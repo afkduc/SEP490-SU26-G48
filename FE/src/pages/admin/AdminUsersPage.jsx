@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
@@ -15,8 +15,6 @@ import UserDetailDrawer from './users/UserDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import TableSkeleton from './components/TableSkeleton';
 import './AdminUsersPage.css';
-
-const AdminRolesPage = lazy(() => import('./AdminRolesPage'));
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -135,42 +133,16 @@ export default function AdminUsersPage() {
   const [exportError, setExportError] = useState(null);
 
   const hasReadPermission = can('admin:users:read');
-  const canManageRoles = can('screen:roles:access');
-  const activeTab = searchParams.get('tab') === 'roles' && canManageRoles ? 'roles' : 'users';
 
-  const setActiveTab = useCallback((tab) => {
-    setSearchParams((prev) => {
-      const sp = new URLSearchParams(prev);
-      if (tab === 'roles') {
-        sp.set('tab', 'roles');
-        // Clear user list query noise when switching to roles catalog
-        sp.delete('search');
-        sp.delete('branchId');
-        sp.delete('status');
-        sp.delete('page');
-        sp.delete('create');
-      } else {
-        sp.delete('tab');
-      }
-      return sp;
-    }, { replace: true });
-  }, [setSearchParams]);
-
-  const handleFilterUsersByRole = useCallback((roleId) => {
+  // Xóa tab=roles cũ trên URL (màn vai trò đã bỏ)
+  useEffect(() => {
+    if (searchParams.get('tab') !== 'roles') return;
     setSearchParams((prev) => {
       const sp = new URLSearchParams(prev);
       sp.delete('tab');
-      if (roleId != null) sp.set('roleId', String(roleId));
-      else sp.delete('roleId');
-      sp.delete('page');
       return sp;
     }, { replace: true });
-    setParams((p) => ({
-      ...p,
-      roleId: roleId != null ? Number(roleId) : undefined,
-      page: 1,
-    }));
-  }, [setSearchParams, setParams]);
+  }, [searchParams, setSearchParams]);
 
   // Không gọi setState trong render — chuyển sang effect (tránh vỡ hooks / action buttons)
   useEffect(() => {
@@ -195,12 +167,8 @@ export default function AdminUsersPage() {
       return;
     }
 
-    if (activeTab !== 'users') return;
-
     const sp = new URLSearchParams(window.location.search);
-    const tab = sp.get('tab');
     const next = new URLSearchParams();
-    if (tab) next.set('tab', tab);
     if (params.search) next.set('search', params.search);
     if (params.branchId) next.set('branchId', params.branchId);
     if (params.roleId) next.set('roleId', params.roleId);
@@ -209,7 +177,7 @@ export default function AdminUsersPage() {
     const qs = next.toString();
     const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
     window.history.replaceState(null, '', newUrl);
-  }, [params.search, params.branchId, params.roleId, params.status, params.page, activeTab, location.pathname]);
+  }, [params.search, params.branchId, params.roleId, params.status, params.page, location.pathname]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -225,7 +193,7 @@ export default function AdminUsersPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, window.location.search]);
 
-  const resetFilters = useCallback(() => {
+  function resetFilters() {
     setParams(() => ({
       search: '',
       branchId: undefined,
@@ -233,7 +201,7 @@ export default function AdminUsersPage() {
       status: undefined,
       page: 1,
     }));
-  }, [setParams]);
+  }
 
   function handlePageChange(page) {
     updateParam('page', page);
@@ -292,14 +260,13 @@ export default function AdminUsersPage() {
             </svg>
           </div>
           <div className="admin-page__title-group">
-            <h1>Người dùng &amp; Vai trò</h1>
+            <h1>Người dùng</h1>
             <p className="admin-page__subtitle">
-              Quản lý tài khoản và danh mục vai trò hệ thống
+              Quản lý tài khoản và phân vai trò trên hồ sơ người dùng
             </p>
           </div>
         </div>
-        {activeTab === 'users' && (
-          <div className="admin-page__actions">
+        <div className="admin-page__actions">
             <span className="admin-page__total-badge" title="Tổng số người dùng">
               {loading ? '...' : data.total} tài khoản
             </span>
@@ -329,45 +296,13 @@ export default function AdminUsersPage() {
               </button>
             </PermissionGate>
           </div>
-        )}
-        {exportError && activeTab === 'users' && (
+        {exportError && (
           <div className="admin-users__error" style={{ marginTop: 12, width: '100%' }}>
             <strong>Xuất Excel thất bại:</strong> {exportError}
           </div>
         )}
       </div>
 
-      {canManageRoles && (
-        <nav className="admin-users__tabs" aria-label="Người dùng và vai trò">
-          <button
-            type="button"
-            className={`admin-users__tab ${activeTab === 'users' ? 'admin-users__tab--active' : ''}`}
-            onClick={() => setActiveTab('users')}
-          >
-            Người dùng
-          </button>
-          <button
-            type="button"
-            className={`admin-users__tab ${activeTab === 'roles' ? 'admin-users__tab--active' : ''}`}
-            onClick={() => setActiveTab('roles')}
-          >
-            Vai trò
-          </button>
-        </nav>
-      )}
-
-      {activeTab === 'roles' ? (
-        <Suspense
-          fallback={
-            <div className="admin-users__roles-fallback" role="status">
-              Đang tải quản lý vai trò...
-            </div>
-          }
-        >
-          <AdminRolesPage embedded onFilterUsersByRole={handleFilterUsersByRole} />
-        </Suspense>
-      ) : (
-        <>
       {/* Filters */}
       <div className="filter-card">
         <div className="filter-row">
@@ -405,7 +340,7 @@ export default function AdminUsersPage() {
               {(rolesError || rolesLoading) ? `Đang tải...` : 'Tất cả vai trò'}
             </option>
             {localRoles.map((r) => (
-              <option key={r.id} value={r.id}>{r.roleName}</option>
+              <option key={r.id} value={r.id}>{r.roleLabel || r.roleName}</option>
             ))}
           </select>
 
@@ -590,8 +525,6 @@ export default function AdminUsersPage() {
           </>
         )}
       </div>
-        </>
-      )}
 
       {showModal && (
         <UserFormModal
@@ -605,7 +538,6 @@ export default function AdminUsersPage() {
         <UserDetailDrawer
           userId={detailUserId}
           onClose={() => setDetailUserId(null)}
-          onRolesChanged={() => refresh()}
         />
       )}
     </div>

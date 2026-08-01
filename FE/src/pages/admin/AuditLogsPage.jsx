@@ -7,13 +7,17 @@ import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
 import AdminPagination from './components/AdminPagination';
 import {
-  AUDIT_ACTION_LABELS,
   AUDIT_FIELD_LABELS,
   humanizeAuditDescription,
   formatAuditFieldValue,
   summarizeAuditNewValue,
   formatAuditTime,
   parseAuditJson,
+  getAuditActionLabel,
+  getHttpMethodLabel,
+  getResponseStatusLabel,
+  formatDurationMs,
+  humanizeRequestUrl,
 } from '../../utils/auditDisplay';
 import './AuditLogsPage.css';
 
@@ -26,25 +30,14 @@ const ACTION_OPTIONS = [
   { value: 'LOGIN', label: 'Đăng nhập', color: 'purple' },
   { value: 'FAILED_LOGIN', label: 'Đăng nhập thất bại', color: 'danger' },
   { value: 'LOGOUT', label: 'Đăng xuất', color: 'gray' },
-  { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất', color: 'orange' },
+  { value: 'FORCE_LOGO', label: 'Buộc đăng xuất', color: 'orange' },
   { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu', color: 'teal' },
   { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu', color: 'cyan' },
   { value: 'ASSIGN_ROLE', label: 'Gán vai trò', color: 'indigo' },
   { value: 'REMOVE_ROLE', label: 'Xóa vai trò', color: 'rose' },
-  { value: 'GRANT_SCREEN', label: 'Cấp quyền màn hình', color: 'success' },
-  { value: 'REVOKE_SCREEN', label: 'Thu hồi quyền màn hình', color: 'danger' },
-  { value: 'BULK_TOGGLE', label: 'Cập nhật hàng loạt ma trận', color: 'info' },
-  { value: 'SAVE_SCREEN_MATRIX', label: 'Lưu ma trận màn hình', color: 'indigo' },
-  { value: 'SAVE_USER_SCREEN_PERMISSIONS', label: 'Lưu quyền riêng user', color: 'teal' },
-  { value: 'APPROVE_PERMISSION_REQUEST', label: 'Duyệt yêu cầu cấp quyền', color: 'success' },
-  { value: 'REJECT_PERMISSION_REQUEST', label: 'Từ chối yêu cầu cấp quyền', color: 'danger' },
-  { value: 'APPROVE_LOGIN_CHALLENGE', label: 'Đồng ý đăng nhập thiết bị khác', color: 'success' },
-  { value: 'REJECT_LOGIN_CHALLENGE', label: 'Từ chối đăng nhập thiết bị khác', color: 'danger' },
   { value: 'EXPORT', label: 'Xuất dữ liệu', color: 'green' },
   { value: 'IMPORT', label: 'Nhập dữ liệu', color: 'amber' },
 ];
-
-const ACTION_LABELS = AUDIT_ACTION_LABELS;
 
 const ACTION_CLASS = {
   CREATE: 'badge--success',
@@ -55,6 +48,7 @@ const ACTION_CLASS = {
   FAILED_LOGIN: 'badge--danger',
   LOGOUT: 'badge--secondary',
   FORCE_LOGOUT: 'badge--orange',
+  FORCE_LOGO: 'badge--orange',
   CHANGE_PASSWORD: 'badge--teal',
   RESET_PASSWORD: 'badge--cyan',
   ASSIGN_ROLE: 'badge--indigo',
@@ -330,6 +324,7 @@ export default function AuditLogsPage() {
       startDate: '',
       endDate: '',
       branchId: undefined,
+      excludeAuthEvents: true,
       page: 1,
       pageSize: 10,
     }));
@@ -405,6 +400,20 @@ export default function AuditLogsPage() {
               onChange={(e) => audit.updateParam('keyword', e.target.value)}
             />
           </div>
+          <label className="admin-logs__auth-toggle" title="Mặc định ẩn đăng nhập / thất bại (xem ở Lịch sử đăng nhập)">
+            <input
+              type="checkbox"
+              checked={audit.params.excludeAuthEvents !== false && audit.params.excludeAuthEvents !== 'false'}
+              onChange={(e) => {
+                audit.setParams((prev) => ({
+                  ...prev,
+                  excludeAuthEvents: e.target.checked,
+                  page: 1,
+                }));
+              }}
+            />
+            <span>Ẩn đăng nhập / thất bại</span>
+          </label>
         </div>
 
         {showFilters && (
@@ -651,8 +660,8 @@ function AuditTable({ items, onRowClick, now }) {
               </td>
               <td>
                 {item.action ? (
-                  <span className={`badge ${ACTION_CLASS[item.action] || 'badge--secondary'}`} title={item.action}>
-                    {ACTION_LABELS[item.action] || item.action}
+                  <span className={`badge ${ACTION_CLASS[item.action] || 'badge--secondary'}`}>
+                    {getAuditActionLabel(item.action)}
                   </span>
                 ) : '—'}
               </td>
@@ -662,7 +671,13 @@ function AuditTable({ items, onRowClick, now }) {
                 </span>
               </td>
               <td className="audit-logs__cell--branch">
-                {item.branch_name || item.branchId || '—'}
+                {item.branch_name
+                  || item.branchName
+                  || ((item.user_name || item.userName || '').toLowerCase() === 'system'
+                    ? 'Hệ thống'
+                    : (item.branch_id != null || item.branchId != null
+                      ? `#${item.branch_id ?? item.branchId}`
+                      : '—'))}
               </td>
               <td className="audit-logs__cell--time">
                 <div className="audit-logs__time-cell">
@@ -808,14 +823,41 @@ function DiffView({ oldValue, newValue, action }) {
   );
 }
 
+function isEmptyRequestBody(body) {
+  if (body == null || body === '') return true;
+  if (typeof body === 'string') {
+    const t = body.trim();
+    if (!t || t === '{}' || t === 'null' || t === '[]') return true;
+    try {
+      const parsed = JSON.parse(t);
+      if (parsed == null) return true;
+      if (typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length === 0) return true;
+      if (Array.isArray(parsed) && parsed.length === 0) return true;
+    } catch {
+      return false;
+    }
+    return false;
+  }
+  if (typeof body === 'object') {
+    if (Array.isArray(body)) return body.length === 0;
+    return Object.keys(body).length === 0;
+  }
+  return false;
+}
+
 function AuditLogDetailModal({ log, onClose }) {
   if (!log) return null;
   const t = formatLocal(log.logged_at);
   const userName = log.user_name || 'Hệ thống';
-  const actionLabel = ACTION_LABELS[log.action] || log.action || 'Thao tác';
-  const objectLabel = TABLE_NAME_VI[log.table_name] || log.entity_name || log.table_name || 'hệ thống';
+  const actionLabel = getAuditActionLabel(log.action);
+  const objectLabel = TABLE_NAME_VI[log.table_name] || log.entity_name || 'hệ thống';
   const summary = humanizeAuditDescription(log.description, log.action, log.new_value)
-    || `${userName} đã ${String(actionLabel).toLowerCase()} trên ${String(objectLabel).toLowerCase()}${log.entity_code ? ` (${log.entity_code})` : ''}.`;
+    || `${userName} đã ${String(actionLabel).toLowerCase()} trên ${String(objectLabel).toLowerCase()}.`;
+  const methodLabel = getHttpMethodLabel(log.request_method);
+  const statusLabel = getResponseStatusLabel(log.response_status);
+  const urlLabel = humanizeRequestUrl(log.request_url);
+  const showRequestBody = !isEmptyRequestBody(log.request_body);
+  const statusOk = String(log.response_status || '').startsWith('2');
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -825,20 +867,10 @@ function AuditLogDetailModal({ log, onClose }) {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          <div style={{
-            padding: '14px 16px',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: 12,
-            marginBottom: 16,
-            fontSize: 14,
-            lineHeight: 1.55,
-            color: '#334155',
-          }}>
+          <div className="audit-detail__summary">
             {summary}
           </div>
 
-          {/* Row 1: User + Action */}
           <div className="audit-detail__row">
             <div className="audit-detail__field">
               <label>Người thực hiện</label>
@@ -862,56 +894,49 @@ function AuditLogDetailModal({ log, onClose }) {
               <label>Đối tượng</label>
               <div className="audit-detail__value">
                 <strong>{objectLabel}</strong>
-                {log.entity_code && <code className="audit-detail__code">{log.entity_code}</code>}
               </div>
             </div>
           </div>
 
-          {/* Row 2: IP + Method + Status + Duration */}
           <div className="audit-detail__row audit-detail__row--secondary">
-            {log.ip_address && (
-              <div className="audit-detail__field">
-                <label>Địa chỉ IP</label>
-                <code className="audit-detail__ip">{log.ip_address}</code>
-              </div>
-            )}
+            <div className="audit-detail__field">
+              <label>Kết quả</label>
+              <span className={`badge ${statusOk ? 'badge--success' : 'badge--danger'}`}>
+                {statusLabel}
+              </span>
+            </div>
             {log.request_method && (
               <div className="audit-detail__field">
-                <label>Phương thức</label>
-                <span className={`badge badge--${log.request_method === 'POST' ? 'success' : log.request_method === 'PUT' || log.request_method === 'PATCH' ? 'info' : log.request_method === 'DELETE' ? 'danger' : 'secondary'}`}>
-                  {log.request_method}
-                </span>
+                <label>Loại thao tác</label>
+                <span>{methodLabel}</span>
               </div>
             )}
-            {log.request_url && (
+            {urlLabel && (
               <div className="audit-detail__field audit-detail__field--full">
-                <label>Đường dẫn yêu cầu</label>
-                <code className="audit-detail__url">{log.request_url}</code>
-              </div>
-            )}
-            {log.response_status && (
-              <div className="audit-detail__field">
-                <label>Mã phản hồi</label>
-                <span className={`badge badge--${String(log.response_status).startsWith('2') ? 'success' : String(log.response_status).startsWith('4') || String(log.response_status).startsWith('5') ? 'danger' : 'secondary'}`}>
-                  {log.response_status}
-                </span>
+                <label>Nội dung thao tác</label>
+                <span>{urlLabel}</span>
               </div>
             )}
             {log.duration_ms != null && (
               <div className="audit-detail__field">
                 <label>Thời gian xử lý</label>
-                <span className="audit-detail__duration">{log.duration_ms}ms</span>
+                <span>{formatDurationMs(log.duration_ms)}</span>
               </div>
             )}
-            {log.branch_name && (
+            {(log.branch_name || log.branchName) && (
               <div className="audit-detail__field">
                 <label>Chi nhánh</label>
-                <span>{log.branch_name}</span>
+                <span>{log.branch_name || log.branchName}</span>
+              </div>
+            )}
+            {log.ip_address && (
+              <div className="audit-detail__field">
+                <label>Địa chỉ IP</label>
+                <span>{log.ip_address}</span>
               </div>
             )}
           </div>
 
-          {/* Description */}
           {log.description && (
             <div className="audit-detail__section">
               <label>Mô tả</label>
@@ -921,28 +946,24 @@ function AuditLogDetailModal({ log, onClose }) {
             </div>
           )}
 
-          {/* Old / New value */}
           {(log.old_value || log.new_value) && (
             <div className="audit-detail__diff">
               <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#475569' }}>
-                Chi tiết thay đổi / Giá trị mới
+                Chi tiết thay đổi
               </label>
               <DiffView oldValue={log.old_value} newValue={log.new_value} action={log.action} />
             </div>
           )}
 
-          {/* Request body */}
-          {log.request_body && (
+          {showRequestBody && (
             <div className="audit-detail__section">
-              <label>Nội dung yêu cầu</label>
+              <label>Dữ liệu gửi kèm</label>
               <JsonView data={log.request_body} />
             </div>
           )}
 
-          {/* Timestamp */}
           <div className="audit-detail__timestamp">
             <span title={t.sub}>{t.main}</span>
-            {log.record_id && <span className="audit-detail__record-id">Mã bản ghi: {log.record_id}</span>}
           </div>
         </div>
       </div>

@@ -33,7 +33,7 @@ const NOTIFICATION_EVENTS = {
     severity: SEVERITY.SUCCESS,
     messageTemplates: {
       default: 'Bạn đã đăng nhập vào hệ thống.',
-      withDevice: 'Bạn đã đăng nhập từ thiết bị mới: {device}.',
+      withDevice: 'Bạn đã đăng nhập từ thiết bị mới: {device} tại {location}.',
     },
     affectsSettings: [EMAIL_ON_LOGIN, BROWSER_ON_LOGIN],
   },
@@ -58,7 +58,7 @@ const NOTIFICATION_EVENTS = {
     title: 'Đã có người đăng nhập tài khoản của bạn',
     severity: SEVERITY.CRITICAL,
     messageTemplates: {
-      default: 'Đã có người đăng nhập tài khoản của bạn từ thiết bị khác ({device}). Phiên hiện tại sẽ bị đăng xuất.',
+      default: 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.',
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
@@ -66,7 +66,7 @@ const NOTIFICATION_EVENTS = {
     title: 'Đăng nhập từ thiết bị mới',
     severity: SEVERITY.WARNING,
     messageTemplates: {
-      default: 'Phát hiện đăng nhập từ thiết bị mới: {device} từ {location}.',
+      default: 'Phát hiện đăng nhập từ thiết bị mới: {device} (IP {location}). Nếu không phải bạn, hãy đổi mật khẩu ngay.',
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
@@ -105,8 +105,16 @@ const NOTIFICATION_EVENTS = {
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
   SECURITY_NEW_DEVICE_IP: {
-    title: 'Đăng nhập từ IP mới',
+    title: 'Đăng nhập từ thiết bị mới',
     severity: SEVERITY.INFO,
+    messageTemplates: {
+      default: '{message}',
+    },
+    affectsSettings: [IN_APP_SYSTEM_ALERT],
+  },
+  SECURITY_SESSION_TAKEOVER: {
+    title: 'Đăng nhập trên thiết bị khác',
+    severity: SEVERITY.ERROR,
     messageTemplates: {
       default: '{message}',
     },
@@ -118,15 +126,6 @@ const NOTIFICATION_EVENTS = {
     messageTemplates: {
       default: 'Phiên đăng nhập của bạn đã bị kết thúc.',
       byAdmin: 'Tài khoản của bạn đã bị đăng xuất bởi quản trị viên.',
-    },
-    affectsSettings: [IN_APP_SYSTEM_ALERT],
-  },
-  SYSTEM_BROADCAST: {
-    title: 'Thông báo hệ thống',
-    severity: SEVERITY.INFO,
-    messageTemplates: {
-      default: '{message}',
-      withTitle: '{title}: {message}',
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
@@ -528,8 +527,7 @@ class NotificationService {
     let message = event.messageTemplates.default || Object.values(event.messageTemplates)[0] || event.title;
 
     // Handle different message templates based on data (trước replace placeholder)
-    if (eventType === 'SYSTEM_BROADCAST' || eventType === 'SECURITY_ALERT'
-      || eventType.startsWith('SECURITY_')) {
+    if (eventType === 'SECURITY_ALERT' || eventType.startsWith('SECURITY_')) {
       if (data.title) title = String(data.title);
       if (data.templateKey === 'withTitle' && event.messageTemplates.withTitle) {
         message = event.messageTemplates.withTitle;
@@ -599,6 +597,26 @@ class NotificationService {
     if (data.pendingId) metadata.pendingId = data.pendingId;
     if (data.ruleKey) metadata.ruleKey = data.ruleKey;
     if (data.severity) metadata.alertSeverity = data.severity;
+    if (data.newTokenVersion != null) metadata.newTokenVersion = data.newTokenVersion;
+    if (data.newSessionId != null) metadata.newSessionId = data.newSessionId;
+
+    // Ẩn bản cũ cùng loại (vd. đăng nhập thay phiên) — chỉ giữ bản sắp tạo
+    const SUPERSEDE_TYPES = new Set([
+      'SESSION_TAKEN_OVER',
+      'SECURITY_SESSION_TAKEOVER',
+      'NEW_DEVICE',
+      'SECURITY_NEW_DEVICE_IP',
+      'SECURITY_FAILED_LOGIN_BURST',
+      'SECURITY_INACTIVE_ADMIN',
+      'LOGIN_FAILED',
+    ]);
+    if (SUPERSEDE_TYPES.has(eventType)) {
+      try {
+        await this.notificationRepo.markOlderUnreadOfTypeAsRead(userId, eventType);
+      } catch (e) {
+        console.warn('[NotificationService] supersede older notifications failed:', e.message);
+      }
+    }
 
     // Create notification in DB
     const notification = await this.notificationRepo.create({
@@ -648,22 +666,6 @@ class NotificationService {
         results.push({ adminId, notification: result });
       } catch (err) {
         console.warn(`[NotificationService] Failed to notify admin ${adminId}:`, err.message);
-      }
-    }
-    return results;
-  }
-
-  /**
-   * Broadcast thong bao toi danh sach userId (dung cho Admin broadcast).
-   */
-  async notifyUsers(userIds = [], eventType, data = {}) {
-    const results = [];
-    for (const userId of userIds) {
-      try {
-        const result = await this.notify(eventType, { ...data, userId }, { skipSettings: true });
-        results.push({ userId, notification: result });
-      } catch (err) {
-        console.warn(`[NotificationService] Failed to notify user ${userId}:`, err.message);
       }
     }
     return results;

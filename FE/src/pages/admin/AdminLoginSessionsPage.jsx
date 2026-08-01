@@ -3,12 +3,12 @@ import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useAuth } from '../../contexts/AppContext';
-import UserDetailDrawer from './users/UserDetailDrawer';
 import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import { formatDateSafe } from '../../utils/dateUtils';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
+import { pickLatestSession } from './securityAlertFocus';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -237,7 +237,7 @@ function TableSkeleton({ rows }) {
 
 // ─── Session Table ─────────────────────────────────────────────────
 
-function SessionTable({ items, onViewUser, onViewSession }) {
+function SessionTable({ items, onViewSession, focusedSessionId = null }) {
   useDurationTicker(30000);
 
   const head = (
@@ -274,7 +274,11 @@ function SessionTable({ items, onViewUser, onViewSession }) {
       {head}
       <tbody>
         {items.map((item) => (
-          <tr key={item.id}>
+          <tr
+            key={item.id}
+            id={`admin-session-row-${item.id}`}
+            className={Number(focusedSessionId) === Number(item.id) ? 'admin-sessions__row--focused' : ''}
+          >
             <td>
               <span className="admin-sessions__date">{formatDate(item.login_time)}</span>
             </td>
@@ -325,19 +329,6 @@ function SessionTable({ items, onViewUser, onViewSession }) {
                   </svg>
                   <span className="admin-sessions__action-label">Chi tiết</span>
                 </button>
-                {item.user_id && onViewUser && (
-                  <button
-                    type="button"
-                    className="admin-sessions__action-btn"
-                    onClick={() => onViewUser(item.user_id)}
-                    title="Xem người dùng"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                      <circle cx="12" cy="7" r="4"/>
-                    </svg>
-                  </button>
-                )}
               </div>
             </td>
           </tr>
@@ -356,7 +347,12 @@ export default function AdminLoginSessionsPage({
   seedStartDate = '',
   seedEndDate = '',
   seedActionType = '',
+  seedSessionId = null,
+  seedFocusSessionId = null,
+  seedFocusIp = '',
+  seedFocusLoginTime = '',
   seedKey = 0,
+  onOpenDevicesToProcess,
 } = {}) {
   const sessions = useLoginSessions(
     seedKey
@@ -366,20 +362,36 @@ export default function AdminLoginSessionsPage({
           startDate: seedStartDate || '',
           endDate: seedEndDate || '',
           actionType: seedActionType || '',
+          sessionId: seedSessionId || undefined,
+          pageSize: seedSessionId ? 20 : 10,
         }
       : {}
   );
   const { branches, branchesError } = useSharedBranches();
   const { token } = useAuth();
-  const [detailUserId, setDetailUserId] = useState(null);
   const [detailSession, setDetailSession] = useState(null);
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
+  const [focusedSessionId, setFocusedSessionId] = useState(null);
+  const focusScrollPendingRef = useRef(false);
+  const focusPayloadRef = useRef({
+    sessionId: null,
+    ip: '',
+    loginTime: '',
+  });
 
   // Seed từ panel cảnh báo ("Lịch sử") — khi đổi cảnh báo trong lúc tab đang mở
   useEffect(() => {
     if (!seedKey) return;
+    focusPayloadRef.current = {
+      // Không ghim sessionId cũ — luôn chọn phiên mới nhất trong list đã lọc
+      sessionId: null,
+      ip: seedFocusIp || seedIpAddress || '',
+      loginTime: '',
+    };
+    focusScrollPendingRef.current = true;
+    setFocusedSessionId(null);
     sessions.setParams(() => ({
       userName: seedUserName || '',
       phone: '',
@@ -389,11 +401,46 @@ export default function AdminLoginSessionsPage({
       endDate: seedEndDate || '',
       branchId: undefined,
       ipAddress: seedIpAddress || '',
+      sessionId: undefined,
       page: 1,
-      pageSize: 10,
+      pageSize: 20,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedKey]);
+
+  // Sau khi seed + list load xong: highlight + scroll tới phiên MỚI NHẤT
+  useEffect(() => {
+    if (!focusScrollPendingRef.current) return;
+    if (sessions.loading) return;
+
+    const payload = focusPayloadRef.current;
+    const seeded = Boolean(
+      seedKey
+      && (seedUserName || seedIpAddress || seedFocusIp || seedFocusSessionId || seedSessionId)
+    );
+    const hasFocus = seeded || String(payload.ip || '').trim();
+    if (!hasFocus) {
+      setFocusedSessionId(null);
+      focusScrollPendingRef.current = false;
+      return;
+    }
+
+    const match = pickLatestSession(sessions.data?.items || [], { ip: '' });
+    if (!match) {
+      setFocusedSessionId(null);
+      focusScrollPendingRef.current = false;
+      return;
+    }
+
+    setFocusedSessionId(match.id);
+    requestAnimationFrame(() => {
+      document.getElementById(`admin-session-row-${match.id}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    });
+    focusScrollPendingRef.current = false;
+  }, [sessions.data?.items, sessions.loading, seedKey, seedUserName, seedIpAddress, seedFocusIp, seedFocusSessionId, seedSessionId]);
 
   // Debounce refetch SSE - gom nhieu event thanh 1 lan refetch
   // (tranh nhap nhay khi user click nhieu action cung luc)
@@ -528,6 +575,7 @@ export default function AdminLoginSessionsPage({
     sessions.params.actionType || sessions.params.status ||
     sessions.params.startDate || sessions.params.endDate ||
     sessions.params.ipAddress ||
+    sessions.params.sessionId ||
     (sessions.params.branchId != null);
 
   function resetFilters() {
@@ -540,9 +588,11 @@ export default function AdminLoginSessionsPage({
       endDate: '',
       branchId: undefined,
       ipAddress: '',
+      sessionId: undefined,
       page: 1,
       pageSize: 10,
     }));
+    setFocusedSessionId(null);
   }
 
   const headerActions = (
@@ -754,8 +804,8 @@ export default function AdminLoginSessionsPage({
             <div className="admin-sessions__table-wrapper">
               <SessionTable
                 items={sessions.data.items}
-                onViewUser={setDetailUserId}
                 onViewSession={setDetailSession}
+                focusedSessionId={focusedSessionId}
               />
             </div>
             <Pagination
@@ -769,19 +819,23 @@ export default function AdminLoginSessionsPage({
         )}
       </div>
 
-      {/* User detail drawer */}
-      {detailUserId && (
-        <UserDetailDrawer
-          userId={detailUserId}
-          onClose={() => setDetailUserId(null)}
-        />
-      )}
-
-      {/* Session detail drawer */}
       {detailSession && (
         <SessionDetailDrawer
           session={detailSession}
           onClose={() => setDetailSession(null)}
+          onOpenDevicesToProcess={
+            typeof onOpenDevicesToProcess === 'function'
+              ? () => {
+                  onOpenDevicesToProcess({
+                    userId: detailSession.user_id,
+                    userName: detailSession.user_name,
+                    ipAddress: detailSession.ip_address,
+                    loginTime: detailSession.login_time,
+                  });
+                  setDetailSession(null);
+                }
+              : undefined
+          }
         />
       )}
     </div>

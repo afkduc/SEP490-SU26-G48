@@ -10,6 +10,28 @@ const PendingLoginStore = require('./PendingLoginStore');
 const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '5', 10);
 /** Giữ flag cũ: chỉ bật Approve/Reject nếu LOGIN_CHALLENGE_ENABLED=true (mặc định tắt). */
 const LOGIN_CHALLENGE_ENABLED = process.env.LOGIN_CHALLENGE_ENABLED === 'true';
+
+/** Serialize login theo identifier — tránh 2 login cùng lúc đua token_version / is_current. */
+const loginLocks = new Map();
+
+async function withLoginLock(lockKey, fn) {
+  const key = String(lockKey || '').trim().toLowerCase() || '_anonymous';
+  const prev = loginLocks.get(key) || Promise.resolve();
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const chained = prev.then(() => gate, () => gate);
+  loginLocks.set(key, chained);
+  await prev.catch(() => {});
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (loginLocks.get(key) === chained) loginLocks.delete(key);
+  }
+}
+
 class AuthService {
   constructor(authRepository) {
     this.authRepository = authRepository;
@@ -119,25 +141,39 @@ class AuthService {
 
     if (user.status && user.status !== 'active') {
       const e = new ApiError(403, 'Tài khoản đã ngừng hoạt động');
-      e.audit = { userExists: true, user, reason: 'ACCOUNT_DISABLED' };
+      e.code = 'ACCOUNT_DISABLED';
+      e.audit = { userExists: true, user, reason: 'ACCOUNT_DISABLED', skip: true };
       throw e;
     }
 
-    if (user.branch_id && user.branch_is_active !== undefined && !Boolean(user.branch_is_active)) {
-      const e = new ApiError(403, 'Chi nhánh của tài khoản này đang bị ngưng hoạt động');
-      e.audit = { userExists: true, user, reason: 'BRANCH_DISABLED' };
-      throw e;
-    }
-
+    // Kiểm tra role trước: admin / tổng giám đốc không cần chọn chi nhánh.
     const roles = await this.authRepository.findUserRoles(user.id);
     const isBranchExempt = roles.some(
       (r) => r.role_name === 'admin' || r.role_name === 'general_director'
     );
 
-    if (user.branch_id && !isBranchExempt && String(user.branch_id) !== String(branchId)) {
-      const e = new ApiError(403, 'Tài khoản của bạn không có quyền đăng nhập vào chi nhánh này');
-      e.audit = { userExists: true, user, reason: 'WRONG_BRANCH' };
-      throw e;
+    if (!isBranchExempt) {
+      if (user.branch_id && user.branch_is_active !== undefined && !Boolean(user.branch_is_active)) {
+        const e = new ApiError(403, 'Chi nhánh của tài khoản này đang bị ngưng hoạt động');
+        e.code = 'BRANCH_DISABLED';
+        e.audit = { userExists: true, user, reason: 'BRANCH_DISABLED', skip: true };
+        throw e;
+      }
+
+      if (!branchId) {
+        const e = new ApiError(400, 'Vui lòng chọn chi nhánh trước khi đăng nhập');
+        e.code = 'BRANCH_REQUIRED';
+        // Mật khẩu đúng — chỉ thiếu chi nhánh, không tính failed login.
+        e.audit = { skip: true };
+        throw e;
+      }
+
+      if (user.branch_id && String(user.branch_id) !== String(branchId)) {
+        const e = new ApiError(403, 'Tài khoản của bạn không có quyền đăng nhập vào chi nhánh này');
+        e.code = 'WRONG_BRANCH';
+        e.audit = { userExists: true, user, reason: 'WRONG_BRANCH', skip: true };
+        throw e;
+      }
     }
 
     // Dọn session stale rồi mới xét conflict thật (heartbeat còn sống)
@@ -146,6 +182,8 @@ class AuthService {
 
     // Chính sách mới: có phiên sống thì thay thế ngay, không chờ countdown.
     // Giữ biến `force` chỉ để backward-compat với FE cũ.
+    // Thông báo SESSION_TAKEN_OVER gửi SAU trackLogin (AuthController) kèm
+    // newTokenVersion/newSessionId để phiên mới không tự đá chính mình.
     const replacedLive = Boolean(live);
     if (live) {
       await this._closeActiveSessionsForUser(user.id, 'FORCE_NEW_LOGIN');
@@ -154,11 +192,7 @@ class AuthService {
     const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
     user.token_version = newTokenVersion;
 
-    if (replacedLive) {
-      this._notifySessionTakenOver(user.id, clientMeta).catch(() => {});
-    }
-
-    return { user, pendingComplete: false };
+    return { user, pendingComplete: false, replacedLive, clientMeta };
   }
 
   async _completePendingLogin(pendingId, identifier, password) {
@@ -282,14 +316,25 @@ class AuthService {
   }
 
   /** Báo phiên cũ: đã có thiết bị khác đăng nhập (sau force takeover). */
-  async _notifySessionTakenOver(userId, clientMeta = {}) {
+  async notifySessionTakenOver(userId, clientMeta = {}) {
     try {
       const NotificationService = require('./NotificationService');
       const ns = new NotificationService();
+      const deviceLabel = [clientMeta?.browser, clientMeta?.os].filter(Boolean)
+        .join(' · ') || 'Thiết bị khác';
+      const location = clientMeta?.ip || clientMeta?.ipAddress || 'IP không xác định';
       await ns.notify(
         'SESSION_TAKEN_OVER',
         {
           userId,
+          device: deviceLabel,
+          location,
+          ip: clientMeta?.ip || clientMeta?.ipAddress,
+          browser: clientMeta?.browser,
+          os: clientMeta?.os,
+          // FE: phiên mới bỏ qua khi tokenVersion/sessionId khớp
+          newTokenVersion: clientMeta?.newTokenVersion ?? null,
+          newSessionId: clientMeta?.newSessionId ?? null,
         },
         { skipSettings: true }
       );
@@ -331,6 +376,7 @@ class AuthService {
     const effectivePermissions = Array.from(fullPermSet);
 
     const userDto = toUserDto({ ...user, token_version: user.token_version }, roles, compactKeys);
+    const remember = Boolean(options.remember);
 
     const tokenPayload = {
       userId: userDto.id,
@@ -340,6 +386,7 @@ class AuthService {
       permissions: compactKeys,
       branchId: userDto.branchId,
       tokenVersion: userDto.tokenVersion,
+      remember,
     };
 
     if (deviceId) {
@@ -349,10 +396,12 @@ class AuthService {
       tokenPayload.sessionId = user.sessionId;
     }
 
-    const token = jwt.sign(tokenPayload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+    const expiresIn = remember ? config.jwtRememberExpiresIn : config.jwtExpiresIn;
+    const token = jwt.sign(tokenPayload, config.jwtSecret, { expiresIn });
 
     return { token, user: userDto, effectivePermissions };
   }
 }
 
 module.exports = AuthService;
+module.exports.withLoginLock = withLoginLock;

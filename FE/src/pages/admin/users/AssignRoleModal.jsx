@@ -52,6 +52,10 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
 
   const handleSave = useCallback(async () => {
     if (!userId) return;
+    if (selected.size === 0) {
+      setError('Phải chọn ít nhất một vai trò');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {

@@ -20,13 +20,11 @@ class PermissionService {
 
   /**
    * Lấy toàn bộ permission keys của 1 user (từ cache hoặc DB).
-   * Bao gom Layer 1 + Layer 2b (flatten) + User Override.
-   * Day la set FULL - dung cho PermissionService.can() middleware.
+   * role_permissions + default screen:* theo role (thay ma trận DB đã gỡ).
    *
    * @param {number} userId
    * @param {object} [options]
-   * @param {boolean} [options.skipCache=false] - Bypass cache (chi moi lan load)
-   *   Dung khi admin vua thay doi permission cua user va can check ngay.
+   * @param {boolean} [options.skipCache=false]
    * @returns {Promise<Set<string>>}
    */
   async getUserPermissions(userId, options = {}) {
@@ -49,8 +47,7 @@ class PermissionService {
   }
 
   /**
-   * Lay permission keys "compact" (Layer 1 + screen:*:access, KHONG flatten Layer 2b).
-   * Dung cho JWT de tranh token qua lon (status 431).
+   * Lay permission keys compact cho JWT (cung nguon role_permissions; '*' thi chi tra ['*']).
    * Cache rieng voi key prefix 'compact:'.
    *
    * @param {number} userId

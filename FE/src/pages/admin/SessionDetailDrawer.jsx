@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import UserDetailDrawer from './users/UserDetailDrawer';
 import './components/AdminDrawer.css';
 
 const ACTION_LABELS = {
@@ -116,8 +115,7 @@ function DetailRow({ label, value, mono, multiline }) {
   );
 }
 
-export default function SessionDetailDrawer({ session, onClose }) {
-  const [showUser, setShowUser] = useState(false);
+export default function SessionDetailDrawer({ session, onClose, onOpenDevicesToProcess }) {
   // Live tick - cập nhật thời lượng real-time cho phiên đang active
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -262,24 +260,20 @@ export default function SessionDetailDrawer({ session, onClose }) {
           </dl>
         </div>
 
-        <div className="drawer__footer">
-          {session.user_id && (
-            <button className="drawer__btn-assign" onClick={() => setShowUser(true)} type="button">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-              </svg>
-              Xem người dùng
+        {session.status === 'active' && typeof onOpenDevicesToProcess === 'function' && (
+          <div className="drawer__footer" style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0' }}>
+            <p style={{ margin: '0 0 10px', fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4 }}>
+              Tab Lịch sử chỉ xem. Để đăng xuất thiết bị này, mở tab Thiết bị rồi bấm Force logout.
+            </p>
+            <button
+              type="button"
+              className="btn btn--primary btn--sm"
+              style={{ width: '100%' }}
+              onClick={onOpenDevicesToProcess}
+            >
+              Mở tab Thiết bị để đăng xuất
             </button>
-          )}
-        </div>
-
-        {showUser && session.user_id && (
-          <UserDetailDrawer
-            userId={session.user_id}
-            onClose={() => setShowUser(false)}
-            onRolesChanged={() => setShowUser(false)}
-          />
+          </div>
         )}
       </div>
     </div>

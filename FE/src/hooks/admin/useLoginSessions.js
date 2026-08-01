@@ -10,6 +10,7 @@ const DEFAULT_PARAMS = {
   endDate: '',
   branchId: undefined,
   ipAddress: '',
+  sessionId: undefined,
   page: 1,
   pageSize: 10,
 };

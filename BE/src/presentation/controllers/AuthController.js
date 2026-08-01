@@ -6,8 +6,11 @@ const PasswordResetService = require('../../application/services/PasswordResetSe
 const AuthRepositoryImpl = require('../../infrastructure/repositories/AuthRepositoryImpl');
 const NotificationService = require('../../application/services/NotificationService');
 const LoginAttemptGuard = require('../../application/services/LoginAttemptGuard');
+const AuthService = require('../../application/services/AuthService');
 const { auditCrud } = require('../../utils/auditHelper');
 const ApiError = require('../../utils/ApiError');
+
+const withLoginLock = AuthService.withLoginLock;
 
 class AuthController {
   constructor(authService) {
@@ -46,7 +49,7 @@ class AuthController {
   async login(req, res, next) {
     try {
       const identifier = req.body.identifier || req.body.email || req.body.phone;
-      const { password, branchId, force, pendingId } = req.body;
+      const { password, branchId, force, pendingId, remember } = req.body;
       const ip = this._clientIp(req);
 
       try {
@@ -62,29 +65,70 @@ class AuthController {
       const ua = req.headers['user-agent'] || '';
       const { browser, os } = parseUserAgent(ua);
 
-      const { user } = await this.authService.login(identifier, password, branchId, {
-        force: Boolean(force),
-        pendingId: pendingId || null,
-        clientMeta: { ip, userAgent: ua, browser, os },
+      // Serialize toàn bộ login + trackLogin theo tài khoản — người thứ 2 vào được,
+      // người thứ 1 bị thay phiên (không đua is_current / token_version).
+      const payload = await withLoginLock(identifier, async () => {
+        const { user, replacedLive, clientMeta } = await this.authService.login(
+          identifier,
+          password,
+          branchId,
+          {
+            force: Boolean(force),
+            pendingId: pendingId || null,
+            clientMeta: { ip, userAgent: ua, browser, os },
+          }
+        );
+
+        LoginAttemptGuard.clearFailures(identifier, ip);
+
+        const trackResult = await trackLogin(req, user);
+        const deviceId = trackResult?.deviceId || null;
+        const sessionId = trackResult?.sessionId || null;
+        user.sessionId = sessionId;
+
+        const result = await this.authService.issueTokenWithDevice(user, deviceId, {
+          remember: Boolean(remember),
+        });
+
+        if (replacedLive) {
+          this.authService
+            .notifySessionTakenOver(user.id, {
+              ...(clientMeta || { ip, userAgent: ua, browser, os }),
+              newTokenVersion: user.token_version,
+              newSessionId: sessionId,
+            })
+            .catch(() => {});
+
+          // Cảnh báo bảo mật realtime: 2 thiết bị / thay phiên (không chờ cron)
+          try {
+            const { raiseSessionTakeoverAlert } = require('../../jobs/securityAlertJob');
+            raiseSessionTakeoverAlert({
+              userId: user.id,
+              userName: user.user_name || user.name || user.email,
+              ip,
+              browser,
+              os,
+              newSessionId: sessionId,
+            }).catch((e) =>
+              console.warn('[AuthController] raiseSessionTakeoverAlert:', e.message)
+            );
+          } catch (e) {
+            console.warn('[AuthController] securityAlertJob load failed:', e.message);
+          }
+        }
+
+        return result;
       });
 
-      LoginAttemptGuard.clearFailures(identifier, ip);
-
-      const trackResult = await trackLogin(req, user);
-      const deviceId = trackResult?.deviceId || null;
-      const sessionId = trackResult?.sessionId || null;
-      user.sessionId = sessionId;
-
-      const result = await this.authService.issueTokenWithDevice(user, deviceId);
       return success(
         res,
         {
-          token: result.token,
+          token: payload.token,
           user: {
-            ...result.user,
-            permissions: result.effectivePermissions || result.user.permissions,
+            ...payload.user,
+            permissions: payload.effectivePermissions || payload.user.permissions,
           },
-          effectivePermissions: result.effectivePermissions || [],
+          effectivePermissions: payload.effectivePermissions || [],
         },
         'Đăng nhập thành công'
       );
@@ -92,8 +136,25 @@ class AuthController {
       const identifier = req.body?.identifier || req.body?.email || req.body?.phone;
       const ip = this._clientIp(req);
       const audit = err && err.audit;
+      const reason = audit?.reason || err?.code || null;
 
-      if (err?.statusCode === 401 && audit && !audit.skip) {
+      // Lỗi nghiệp vụ / thiếu bước (không phải tấn công) → không ghi audit FAILED_LOGIN.
+      const softFailReasons = new Set([
+        'BRANCH_REQUIRED',
+        'WRONG_BRANCH',
+        'BRANCH_DISABLED',
+        'ACCOUNT_DISABLED',
+        'LOGIN_LOCKED',
+        'LOGIN_PENDING',
+        'LOGIN_WAIT',
+        'LOGIN_REJECTED',
+      ]);
+      const softFail = Boolean(audit?.skip)
+        || softFailReasons.has(reason)
+        || softFailReasons.has(err?.code)
+        || err?.statusCode === 429;
+
+      if (err?.statusCode === 401 && audit && !audit.skip && !softFail) {
         const lock = LoginAttemptGuard.recordFailure(identifier, ip);
         if (lock.suggestChangePassword) {
           err.message = `${err.message} Bạn đã sai ${lock.failCount} lần — nên đổi mật khẩu. Vui lòng đợi ${lock.waitSeconds}s rồi thử lại.`;
@@ -105,30 +166,58 @@ class AuthController {
             suggestChangePassword: true,
           };
         }
+        // Cảnh báo bảo mật realtime khi ≥5 lần sai (không chờ cron)
+        if (lock.failCount >= 5) {
+          try {
+            const { raiseFailedLoginBurstAlert } = require('../../jobs/securityAlertJob');
+            raiseFailedLoginBurstAlert({
+              ipAddress: ip,
+              count: lock.failCount,
+              identifier,
+            }).catch((e) =>
+              console.warn('[AuthController] raiseFailedLoginBurstAlert:', e.message)
+            );
+          } catch (e) {
+            console.warn('[AuthController] securityAlertJob load failed:', e.message);
+          }
+        }
       }
 
-      if (audit && audit.userExists && audit.user) {
-        trackLoginFailed(req, {
-          user: audit.user,
-          reason: audit.reason || 'WRONG_PASSWORD',
-        }).catch((e) =>
-          console.error('[AuthController] trackLoginFailed error:', e.message)
-        );
-      } else if (!audit || !audit.skip) {
-        try {
-          const { auditLog, ACTION_TYPES } = require('../../utils/auditHelper');
-          const id = identifier || 'unknown';
-          await auditLog({
-            req,
-            action: ACTION_TYPES.FAILED_LOGIN,
-            tableName: 'login_sessions',
-            entityName: 'Đăng nhập thất bại',
-            entityCode: String(id).slice(0, 128),
-            description: `Đăng nhập thất bại: ${id}${audit?.reason ? ` — ${audit.reason}` : ''}`,
-            responseStatus: err.statusCode || 401,
-          });
-        } catch (auditErr) {
-          console.warn('[AuthController] failed-login audit (unknown user) failed:', auditErr.message);
+      if (!softFail) {
+        if (audit && audit.userExists && audit.user) {
+          try {
+            await trackLoginFailed(req, {
+              user: audit.user,
+              reason: audit.reason || 'WRONG_PASSWORD',
+            });
+          } catch (e) {
+            console.error('[AuthController] trackLoginFailed error:', e.message);
+          }
+        } else {
+          // User không tồn tại / lỗi không gắn audit — ghi 1 lần với actor = identifier (không dùng "system").
+          try {
+            const { auditLog, ACTION_TYPES } = require('../../utils/auditHelper');
+            const id = String(identifier || 'unknown').trim() || 'unknown';
+            const prevUser = req.user;
+            req.user = {
+              ...(prevUser || {}),
+              name: id,
+              email: id,
+              user_name: id,
+            };
+            await auditLog({
+              req,
+              action: ACTION_TYPES.FAILED_LOGIN,
+              tableName: 'login_sessions',
+              entityName: 'Đăng nhập thất bại',
+              entityCode: id.slice(0, 128),
+              description: `Đăng nhập thất bại: ${id}${reason ? ` — ${reason}` : ''}`,
+              responseStatus: err.statusCode || 401,
+            });
+            req.user = prevUser;
+          } catch (auditErr) {
+            console.warn('[AuthController] failed-login audit (unknown user) failed:', auditErr.message);
+          }
         }
       }
       next(err);
@@ -221,13 +310,29 @@ class AuthController {
 
       try {
         const { auditLog: writeAudit } = require('../../utils/auditHelper');
+        // Actor van la «system» (request cong khai, chua dang nhap).
+        // Chi nhanh: lay theo user so huu email neu co; khong co → de null (UI hien «Hệ thống»).
+        const prevUser = req.user;
+        req.user = {
+          ...(prevUser || {}),
+          name: 'system',
+          user_name: 'system',
+          userId: result.auditUserId || null,
+          id: result.auditUserId || null,
+          branch_id: result.auditBranchId ?? null,
+          branchId: result.auditBranchId ?? null,
+        };
         await writeAudit({
           req,
           action: 'UPDATE',
           tableName: 'password_reset_tokens',
+          entityName: 'Quên mật khẩu',
+          entityCode: String(email || '').slice(0, 64) || null,
+          recordId: result.auditUserId || null,
           description: `Yêu cầu quên mật khẩu: ${String(email || '').slice(0, 64)}`,
           responseStatus: 200,
         });
+        req.user = prevUser;
       } catch (_) { /* non-blocking */ }
 
       return success(res, {

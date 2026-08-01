@@ -1,8 +1,8 @@
 /**
- * Helpers: map security alert → filter seed cho tab Thiết bị / Lịch sử.
+ * Helpers: map security alert → filter seed cho tab Lịch sử / Thiết bị.
  *
- * Mục tiêu: admin bấm từ cảnh báo phải thấy đúng thiết bị + lịch sử
- * của tài khoản (hoặc của IP nếu cảnh báo không gắn user).
+ * Quy ước: luôn hướng tới bản ghi MỚI NHẤT trong tập lọc (user / IP),
+ * không ghim theo sessionId cũ trong metadata cảnh báo.
  */
 
 export function parseAlertMeta(metadata) {
@@ -15,28 +15,12 @@ export function parseAlertMeta(metadata) {
   }
 }
 
-function toYmd(value) {
-  if (!value) return '';
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function addDays(value, days) {
-  const d = value instanceof Date ? new Date(value.getTime()) : new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
 const RULE_LABEL = {
   failed_login_burst: 'Đăng nhập sai liên tiếp',
   new_admin_role: 'Gán quyền Admin',
   inactive_admin: 'Admin không hoạt động',
-  new_device_ip: 'IP/thiết bị mới',
+  session_takeover: 'Đăng nhập trên thiết bị khác',
+  new_device_ip: 'Đăng nhập từ thiết bị mới',
 };
 
 /**
@@ -55,54 +39,8 @@ export function describeAlertFocus(alert) {
 }
 
 /**
- * Seed lọc danh sách thiết bị từ 1 cảnh báo.
- *
- * - Có userId: lọc CHÍNH XÁC theo userId (không kèm displayName — tránh AND search làm rỗng kết quả).
- * - failed_login_burst: lọc theo IP.
- * - new_device_ip: userId + ưu tiên search IP để nổi thiết bị nghi vấn.
- */
-export function buildDeviceSeedFromAlert(alert) {
-  if (!alert) return null;
-  const meta = parseAlertMeta(alert.metadata);
-  const ip = String(meta.ipAddress || meta.ip || '').trim();
-  const userName = String(alert.userName || meta.userName || '').trim();
-  const rule = alert.ruleKey || '';
-
-  if (rule === 'failed_login_burst') {
-    return {
-      userId: null,
-      search: ip,
-      isCurrent: '',
-      context: describeAlertFocus(alert),
-    };
-  }
-
-  if (rule === 'new_device_ip') {
-    return {
-      userId: alert.userId || null,
-      // Chỉ search IP khi có — không dùng displayName
-      search: ip || userName,
-      isCurrent: '',
-      context: describeAlertFocus(alert),
-    };
-  }
-
-  // inactive_admin / new_admin_role / mặc định: toàn bộ thiết bị của tài khoản
-  return {
-    userId: alert.userId || null,
-    // Không set search khi đã có userId — tránh LIKE displayName làm mất kết quả
-    search: alert.userId ? '' : userName,
-    isCurrent: '',
-    context: describeAlertFocus(alert),
-  };
-}
-
-/**
  * Seed lọc lịch sử đăng nhập từ 1 cảnh báo.
- *
- * - Cảnh báo gắn tài khoản: TOÀN BỘ lịch sử của user (không cắt ngày).
- * - failed_login_burst: theo IP + LOGIN_FAILED quanh thời điểm cảnh báo.
- * - new_device_ip: toàn bộ lịch sử user (có thể kèm IP để hẹp hơn nếu cần — mặc định full account).
+ * Highlight luôn chọn phiên mới nhất trong kết quả lọc (xem pickFocusSession).
  */
 export function buildSessionSeedFromAlert(alert) {
   if (!alert) return null;
@@ -110,28 +48,117 @@ export function buildSessionSeedFromAlert(alert) {
   const ip = String(meta.ipAddress || meta.ip || '').trim();
   const userName = String(alert.userName || meta.userName || '').trim();
   const rule = alert.ruleKey || '';
-  const createdAt = alert.createdAt ? new Date(alert.createdAt) : new Date();
+  const context = describeAlertFocus(alert);
 
-  // Brute-force theo IP — không có user: lọc đúng vấn đề thông báo
-  if (rule === 'failed_login_burst') {
-    const anchor = createdAt;
+  // Không ghim sessionId cũ — để UI chọn phiên mới nhất sau khi lọc.
+  const base = {
+    sessionId: null,
+    focusSessionId: null,
+    focusIp: ip,
+    focusLoginTime: '',
+    preferLatest: true,
+    context,
+  };
+
+  if (rule === 'session_takeover') {
     return {
-      userName: '',
-      ipAddress: ip,
-      startDate: toYmd(addDays(anchor, -1)),
-      endDate: toYmd(addDays(anchor, 1)),
-      actionType: 'LOGIN_FAILED',
-      context: describeAlertFocus(alert),
+      ...base,
+      userName,
+      ipAddress: '',
+      startDate: '',
+      endDate: '',
+      actionType: 'LOGIN',
     };
   }
 
-  // Cảnh báo gắn tài khoản → toàn bộ lịch sử đăng nhập của user đó
+  if (rule === 'failed_login_burst') {
+    return {
+      ...base,
+      userName: '',
+      ipAddress: ip,
+      startDate: '',
+      endDate: '',
+      actionType: 'LOGIN_FAILED',
+    };
+  }
+
+  if (rule === 'new_device_ip') {
+    return {
+      ...base,
+      userName,
+      ipAddress: ip,
+      startDate: '',
+      endDate: '',
+      actionType: '',
+    };
+  }
+
   return {
+    ...base,
     userName,
     ipAddress: '',
     startDate: '',
     endDate: '',
     actionType: '',
-    context: describeAlertFocus(alert),
   };
+}
+
+/**
+ * Chọn phiên mới nhất trong list (theo login_time, rồi id).
+ * Có IP thì ưu tiên trong tập cùng IP; không có thì cả list đã lọc.
+ */
+export function pickLatestSession(list, { ip = '' } = {}) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const ipNorm = String(ip || '').trim();
+  const candidates = ipNorm
+    ? list.filter((s) => String(s.ip_address || s.ipAddress || '').trim() === ipNorm)
+    : list;
+  const pool = candidates.length > 0 ? candidates : list;
+
+  let best = null;
+  let bestMs = -Infinity;
+  let bestId = -Infinity;
+  for (const s of pool) {
+    const t = s.login_time || s.loginTime || s.createdAt;
+    const ms = t ? new Date(t).getTime() : NaN;
+    const id = Number(s.id) || 0;
+    const score = Number.isNaN(ms) ? 0 : ms;
+    if (score > bestMs || (score === bestMs && id > bestId)) {
+      bestMs = score;
+      bestId = id;
+      best = s;
+    }
+  }
+  return best;
+}
+
+/**
+ * Chọn thiết bị mới nhất (lastLoginAt / lastActivityAt).
+ */
+export function pickLatestDevice(list, { ip = '' } = {}) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const ipNorm = String(ip || '').trim();
+  const candidates = ipNorm
+    ? list.filter((d) => String(d.ipAddress || d.ip_address || '').trim() === ipNorm)
+    : list;
+  const pool = candidates.length > 0 ? candidates : list;
+
+  const toMs = (v) => {
+    const t = v ? new Date(v).getTime() : NaN;
+    return Number.isNaN(t) ? 0 : t;
+  };
+
+  let best = null;
+  let bestMs = -Infinity;
+  let bestId = -Infinity;
+  for (const d of pool) {
+    const ms = Math.max(toMs(d.lastLoginAt), toMs(d.lastActivityAt), toMs(d.createdAt));
+    const id = Number(d.id) || 0;
+    if (ms > bestMs || (ms === bestMs && id > bestId)) {
+      bestMs = ms;
+      bestId = id;
+      best = d;
+    }
+  }
+  return best;
 }

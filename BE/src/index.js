@@ -68,6 +68,14 @@ async function start() {
       console.warn('[BE] Failed to start background jobs:', jobErr.message);
     }
 
+    // Dam bao cot thiet bi tin cay
+    try {
+      await require('./infrastructure/repositories/DeviceRepository').ensureTrustedSchema();
+      console.log('[BE] user_devices trusted columns ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureTrustedSchema:', schemaErr.message);
+    }
+
     const server = http.createServer({ maxHeaderSize: 32768 }, app);
     server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);

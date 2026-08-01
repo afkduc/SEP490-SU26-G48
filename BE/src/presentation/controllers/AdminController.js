@@ -14,13 +14,10 @@ const AuditRepository = require('../../infrastructure/repositories/AuditReposito
 const { exportUsersToExcel } = require('../../utils/excelExporter');
 const BranchService = require('../../application/services/BranchService');
 const DeviceService = require('../../application/services/DeviceService');
-const SpecialtyService = require('../../application/services/SpecialtyService');
 const SecurityAlertService = require('../../application/services/SecurityAlertService');
 const NotificationService = require('../../application/services/NotificationService');
 const { auditCrud } = require('../../utils/auditHelper');
 const { emitPermissionChanged } = require('../../application/events/PermissionEvents');
-const PermissionGroupService = require('../../application/services/PermissionGroupService');
-const PermissionGroupRepositoryImpl = require('../../infrastructure/repositories/PermissionGroupRepositoryImpl');
 
 class AdminController {
   constructor() {
@@ -36,21 +33,11 @@ class AdminController {
     const userRepo = new UserRepositoryImpl();
     this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo, userRepository: userRepo });
 
-    // Permission Groups (Phase 3)
-    const groupRepository = new PermissionGroupRepositoryImpl();
-    this.permissionGroupService = new PermissionGroupService({
-      groupRepository,
-      permissionService,
-      roleRepository,
-    });
-
     this.auditService = new AuditService(AuditRepository);
     this.branchService = new BranchService();
     this.deviceService = new DeviceService();
-    this.specialtyService = new SpecialtyService();
     this.securityAlertService = new SecurityAlertService();
     this.notificationService = new NotificationService();
-    this.vehicleBrandRepository = new (require('../../infrastructure/repositories/VehicleBrandRepository'))();
 
     this.getDashboardStats = this.getDashboardStats.bind(this);
     this.listUsers = this.listUsers.bind(this);
@@ -65,30 +52,9 @@ class AdminController {
     this.deactivateBranch = this.deactivateBranch.bind(this);
     this.reactivateBranch = this.reactivateBranch.bind(this);
     this.listRoles = this.listRoles.bind(this);
-    this.getRoleDetail = this.getRoleDetail.bind(this);
-    this.listPermissions = this.listPermissions.bind(this);
-    this.getRolePermissions = this.getRolePermissions.bind(this);
-    this.setRolePermissions = this.setRolePermissions.bind(this);
-    this.getRoleUsers = this.getRoleUsers.bind(this);
-    this.listPermissionGroups = this.listPermissionGroups.bind(this);
-    this.getPermissionGroupDetail = this.getPermissionGroupDetail.bind(this);
-    this.getRoleGroupIds = this.getRoleGroupIds.bind(this);
-    this.setRoleGroups = this.setRoleGroups.bind(this);
-    this.setRoleGroupsMatrix = this.setRoleGroupsMatrix.bind(this);
-    this.createRole = this.createRole.bind(this);
-    this.updateRole = this.updateRole.bind(this);
-    this.toggleRoleStatus = this.toggleRoleStatus.bind(this);
     this.listDevices = this.listDevices.bind(this);
     this.listUserDevices = this.listUserDevices.bind(this);
     this.forceLogoutDevice = this.forceLogoutDevice.bind(this);
-    this.forceLogoutAllOtherDevices = this.forceLogoutAllOtherDevices.bind(this);
-    this.forceLogoutAllDevices = this.forceLogoutAllDevices.bind(this);
-    this.listSpecialties = this.listSpecialties.bind(this);
-    this.createSpecialty = this.createSpecialty.bind(this);
-    this.updateSpecialty = this.updateSpecialty.bind(this);
-    this.toggleSpecialtyStatus = this.toggleSpecialtyStatus.bind(this);
-    this.getUserSpecialties = this.getUserSpecialties.bind(this);
-    this.setUserSpecialties = this.setUserSpecialties.bind(this);
     this.listSecurityAlerts = this.listSecurityAlerts.bind(this);
     this.acknowledgeAlert = this.acknowledgeAlert.bind(this);
     this.acknowledgeAllAlerts = this.acknowledgeAllAlerts.bind(this);
@@ -289,155 +255,11 @@ class AdminController {
     }
   };
 
-  // Roles (UC-11)
+  // Roles — list only (for assign-role dropdown)
   listRoles = async (req, res, next) => {
     try {
       const result = await this.roleService.listRoles();
       return success(res, result, 'Danh sach role');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: role detail
-  getRoleDetail = async (req, res, next) => {
-    try {
-      const role = await this.roleService.getRoleDetail(req.params.id);
-      return success(res, role, 'Chi tiet role');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: list all permissions
-  listPermissions = async (req, res, next) => {
-    try {
-      const permissions = await this.roleService.listPermissions();
-      return success(res, { items: permissions, total: permissions.length }, 'Danh sach quyen');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: list roles + permissions (1 call, khong N+1)
-  listRolesWithPermissions = async (req, res, next) => {
-    try {
-      const result = await this.roleService.listRolesWithPermissions();
-      return success(res, result, 'Danh sach vai tro kem quyen');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: get permissions of a role
-  getRolePermissions = async (req, res, next) => {
-    try {
-      const permissions = await this.roleService.getRolePermissions(req.params.id);
-      return success(res, { items: permissions, total: permissions.length }, 'Quyen cua vai tro');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: set permissions for a role
-  setRolePermissions = async (req, res, next) => {
-    try {
-      const { permissionIds } = req.body;
-      // Validation chi tiet (loai bo NaN, check ton tai) lam trong RoleService.setRolePermissions
-      const permissions = await this.roleService.setRolePermissions(
-        req.params.id,
-        Array.isArray(permissionIds) ? permissionIds : []
-      );
-      await auditCrud.update(req, {
-        tableName: 'role_permissions',
-        entityCode: `ID-${req.params.id}`,
-        recordId: Number(req.params.id) || null,
-        entityName: 'Phân quyền vai trò',
-        newData: { permissionIds: Array.isArray(permissionIds) ? permissionIds : [] },
-        description: `Cập nhật quyền cho vai trò ID ${req.params.id} (${permissions.length || 0} quyền)`,
-      });
-      return success(res, { items: permissions, total: permissions.length }, 'Cap nhat quyen vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: get users having a role
-  getRoleUsers = async (req, res, next) => {
-    try {
-      const users = await this.roleService.getRoleUsers(req.params.id);
-      return success(res, { items: users, total: users.length }, 'Nguoi dung co vai tro nay');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: create role
-  createRole = async (req, res, next) => {
-    try {
-      const { roleName, roleLabel } = req.body;
-      const role = await this.roleService.createRole({ roleName, roleLabel });
-      await auditCrud.create(req, {
-        tableName: 'roles',
-        entityCode: role?.role_code || roleName || null,
-        recordId: role?.id || null,
-        entityName: 'Vai trò',
-        data: req.body,
-      });
-      await this.notificationService.notifyAdmins('ROLE_CREATED', {
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: role?.role_name || role?.roleLabel || '',
-        targetCode: role?.role_code || '',
-        userId: role?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_CREATED:', e.message));
-      return success(res, role, 'Tao vai tro thanh cong', 201);
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // UC-11: update role
-  updateRole = async (req, res, next) => {
-    try {
-      const { roleLabel } = req.body;
-      const role = await this.roleService.updateRole(req.params.id, { roleLabel });
-      await auditCrud.update(req, {
-        tableName: 'roles',
-        entityCode: role?.role_code || `ID-${req.params.id}`,
-        recordId: role?.id || Number(req.params.id) || null,
-        entityName: 'Vai trò',
-        newData: { roleLabel },
-      });
-      await this.notificationService.notifyAdmins('ROLE_UPDATED', {
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: role?.role_name || `ID-${req.params.id}`,
-        targetCode: role?.role_code || '',
-        userId: role?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins ROLE_UPDATED:', e.message));
-      return success(res, role, 'Cap nhat vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  toggleRoleStatus = async (req, res, next) => {
-    try {
-      const role = await this.roleService.toggleStatus(req.params.id);
-      await auditCrud.update(req, {
-        tableName: 'roles',
-        entityCode: role?.role_code || `ID-${req.params.id}`,
-        recordId: role?.id || Number(req.params.id) || null,
-        entityName: 'Vai trò',
-        newData: { isActive: role?.is_active },
-        description: `${role?.is_active ? 'Kích hoạt' : 'Vô hiệu hóa'} vai trò ${role?.role_code || req.params.id}`,
-      });
-      await this.notificationService.notifyAdmins(role?.is_active ? 'ROLE_ENABLED' : 'ROLE_DISABLED', {
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: role?.role_name || `ID-${req.params.id}`,
-        targetCode: role?.role_code || '',
-        userId: role?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins toggleRole:', e.message));
-      return success(res, role, 'Cap nhat trang thai vai tro thanh cong');
     } catch (err) {
       next(err);
     }
@@ -478,144 +300,9 @@ class AdminController {
       const result = await this.deviceService.forceLogoutDevice(req.params.deviceId);
       await auditCrud.forceLogout(req, {
         targetUserName: result?.userName || null,
-        reason: `Đăng xuất thiết bị ${req.params.deviceId}`,
+        reason: 'Đăng xuất thiết bị',
       });
       return success(res, result, 'Da dang xuat khoi thiet bi');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  forceLogoutAllOtherDevices = async (req, res, next) => {
-    try {
-      const { userId } = req.params;
-      const { currentDeviceId } = req.query;
-      const result = await this.deviceService.forceLogoutAllOtherDevices(userId, currentDeviceId);
-      await auditCrud.forceLogout(req, {
-        targetUserName: `user-${userId}`,
-        reason: `Đăng xuất tất cả thiết bị khác (${result?.revoked || 0} thiết bị)`,
-      });
-      return success(res, result, 'Da dang xuat tat ca thiet bi khac');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  /**
-   * Admin force logout ALL devices of a user (including current).
-   * DELETE /api/admin/devices/user/:userId/all
-   */
-  forceLogoutAllDevices = async (req, res, next) => {
-    try {
-      const { userId } = req.params;
-      if (!userId) {
-        return res.status(400).json({ message: 'userId la bat buoc' });
-      }
-      const result = await this.deviceService.forceLogoutAllDevices(userId);
-      await auditCrud.forceLogout(req, {
-        targetUserName: `user-${userId}`,
-        reason: `Buộc đăng xuất toàn bộ thiết bị của user (${result?.revoked || 0} thiết bị)`,
-      });
-      return success(res, result, `Da dang xuat ${result.revoked} thiet bi`);
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // Specialties
-  listSpecialties = async (req, res, next) => {
-    try {
-      const specialties = await this.specialtyService.list();
-      return success(res, { items: specialties, total: specialties.length }, 'Danh sach chuyen mon');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  createSpecialty = async (req, res, next) => {
-    try {
-      const actorInfo = {
-        userId: req.user?.id,
-        userName: req.user?.user_name,
-        name: req.user?.full_name || req.user?.name,
-      };
-      const specialty = await this.specialtyService.create(req.body, actorInfo);
-      await auditCrud.create(req, {
-        tableName: 'specialties',
-        entityCode: specialty?.specialty_code || specialty?.code || null,
-        recordId: specialty?.id || null,
-        entityName: 'Chuyên môn',
-        data: req.body,
-      });
-      return success(res, specialty, 'Tao chuyen mon thanh cong', 201);
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  updateSpecialty = async (req, res, next) => {
-    try {
-      const actorInfo = {
-        userId: req.user?.id,
-        userName: req.user?.user_name,
-        name: req.user?.full_name || req.user?.name,
-      };
-      const specialty = await this.specialtyService.update(req.params.id, req.body, actorInfo);
-      await auditCrud.update(req, {
-        tableName: 'specialties',
-        entityCode: specialty?.specialty_code || `ID-${req.params.id}`,
-        recordId: specialty?.id || Number(req.params.id) || null,
-        entityName: 'Chuyên môn',
-        newData: req.body,
-      });
-      return success(res, specialty, 'Cap nhat chuyen mon thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  toggleSpecialtyStatus = async (req, res, next) => {
-    try {
-      const specialty = await this.specialtyService.toggleStatus(req.params.id);
-      await auditCrud.update(req, {
-        tableName: 'specialties',
-        entityCode: specialty?.specialty_code || `ID-${req.params.id}`,
-        recordId: specialty?.id || Number(req.params.id) || null,
-        entityName: 'Chuyên môn',
-        newData: { isActive: specialty?.is_active },
-        description: `${specialty?.is_active ? 'Kích hoạt' : 'Vô hiệu hóa'} chuyên môn ${specialty?.specialty_code || req.params.id}`,
-      });
-      return success(res, specialty, 'Cap nhat trang thai chuyen mon thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  getUserSpecialties = async (req, res, next) => {
-    try {
-      const specialties = await this.specialtyService.getUserSpecialties(req.params.userId);
-      return success(res, { items: specialties, total: specialties.length }, 'Chuyen mon cua nguoi dung');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  setUserSpecialties = async (req, res, next) => {
-    try {
-      const { specialtyIds } = req.body;
-      const specialties = await this.specialtyService.setUserSpecialties(
-        req.params.userId,
-        Array.isArray(specialtyIds) ? specialtyIds.map(Number) : []
-      );
-      await auditCrud.update(req, {
-        tableName: 'user_specialty',
-        entityCode: `ID-${req.params.userId}`,
-        recordId: Number(req.params.userId) || null,
-        entityName: 'Chuyên môn nhân viên',
-        newData: { specialtyIds },
-        description: `Cập nhật chuyên môn cho user ID ${req.params.userId}`,
-      });
-      return success(res, { items: specialties, total: specialties.length }, 'Cap nhat chuyen mon nguoi dung thanh cong');
     } catch (err) {
       next(err);
     }
@@ -624,12 +311,24 @@ class AdminController {
   // Security Alerts
   listSecurityAlerts = async (req, res, next) => {
     try {
-      const { severity, isAcknowledged, page, pageSize } = req.query;
+      const { severity, isAcknowledged, page, pageSize, collapsed, ruleKey, userId, related } = req.query;
+
+      // ?related=1&ruleKey=...&userId=... → lịch sử đầy đủ nhóm (popup chi tiết)
+      if (related === '1' || related === 'true') {
+        const items = await this.securityAlertService.getRelated({
+          ruleKey,
+          userId: userId !== undefined && userId !== '' ? userId : null,
+          limit: pageSize ? Number(pageSize) : 50,
+        });
+        return success(res, { items, total: items.length }, 'Lich su canh bao lien quan');
+      }
+
       const result = await this.securityAlertService.list({
         severity,
         isAcknowledged: isAcknowledged !== undefined ? isAcknowledged === 'true' : undefined,
         page: page ? Number(page) : 1,
-        pageSize: pageSize ? Number(pageSize) : 20,
+        pageSize: pageSize ? Number(pageSize) : 10,
+        collapsed: collapsed !== 'false',
       });
       return success(res, result, 'Danh sach canh bao bao mat');
     } catch (err) {
@@ -690,7 +389,11 @@ class AdminController {
   assignRoles = async (req, res, next) => {
     try {
       const { roleIds } = req.body;
-      const roles = await this.userRoleService.assignRoles(req.params.userId, roleIds);
+      const roles = await this.userRoleService.assignRoles(
+        req.params.userId,
+        roleIds,
+        req.user?.userId ?? req.user?.id
+      );
       await auditCrud.assignRole(req, {
         userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
         roleName: roles?.[0]?.roleName || roleIds?.join(','),
@@ -717,7 +420,8 @@ class AdminController {
     try {
       const roles = await this.userRoleService.revokeRole(
         req.params.userId,
-        req.params.roleId
+        req.params.roleId,
+        req.user?.userId ?? req.user?.id
       );
       await auditCrud.removeRole(req, {
         userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
@@ -764,23 +468,26 @@ class AdminController {
 
   async updateUser(req, res, next) {
     try {
-      const { userId, firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } = req.body;
-      console.log('[AdminController] updateUser - req.body:', JSON.stringify(req.body));
-      const oldData = {};
-      if (userId) {
-        try {
-          const existing = await this.adminUserService.getUserDetail(userId);
-          if (existing) {
-            oldData.firstName = existing.firstName;
-            oldData.lastName = existing.lastName;
-            oldData.email = existing.email;
-            oldData.phone = existing.phone;
-            oldData.status = existing.status;
-            oldData.roleId = existing.roleId;
-            oldData.branchId = existing.branchId;
-          }
-        } catch (_) {}
+      const userId = Number(req.params.id);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        const ApiError = require('../../utils/ApiError');
+        throw new ApiError(400, 'ID người dùng không hợp lệ');
       }
+      const { firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } = req.body;
+      console.log('[AdminController] updateUser - params.id:', userId, 'body:', JSON.stringify(req.body));
+      const oldData = {};
+      try {
+        const existing = await this.adminUserService.getUserDetail(userId);
+        if (existing) {
+          oldData.firstName = existing.firstName;
+          oldData.lastName = existing.lastName;
+          oldData.email = existing.email;
+          oldData.phone = existing.phone;
+          oldData.status = existing.status;
+          oldData.roleId = existing.roleId;
+          oldData.branchId = existing.branchId;
+        }
+      } catch (_) {}
       const updated = await this.adminUserService.updateUser({
         userId,
         firstName,
@@ -791,30 +498,47 @@ class AdminController {
         roleId,
         branchId,
         scopeAllBranches,
+        actorUserId: req.user?.userId ?? req.user?.id,
       });
+      const displayName =
+        [updated?.firstName, updated?.lastName].filter(Boolean).join(' ').trim() ||
+        updated?.name ||
+        updated?.email ||
+        `ID-${userId}`;
       await auditCrud.update(req, {
         tableName: 'users',
-        entityCode: updated?.user_code || updated?.userName || `ID-${userId}`,
-        recordId: updated?.id || Number(userId) || null,
+        entityCode: displayName,
+        recordId: updated?.id || userId,
         entityName: 'Người dùng',
         oldData,
-        newData: { firstName, lastName, email, phone, status, roleId, branchId },
+        newData: {
+          firstName: firstName ?? updated?.firstName,
+          lastName: lastName ?? updated?.lastName,
+          email: email ?? updated?.email,
+          phone,
+          status,
+          roleId,
+          branchId,
+          scopeAllBranches,
+          name: displayName,
+        },
+        description: `Cập nhật người dùng ${displayName}`,
       });
       const eventType = status === 'inactive' ? 'USER_DISABLED' : 'USER_UPDATED';
 
       // Gui notification cho chinh admin thuc hien
       await this.notificationService.notify(eventType, {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: updated?.full_name || updated?.userName || `ID-${userId}`,
-        targetCode: updated?.user_code || '',
+        targetName: displayName,
+        targetCode: updated?.name || '',
         userId: req.user?.userId,
       }).catch((e) => console.warn('[AdminController] notify USER_UPDATE:', e.message));
 
       // Gui notification cho cac admin khac (exclude chinh minh)
       await this.notificationService.notifyAdmins(eventType, {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: updated?.full_name || updated?.userName || `ID-${userId}`,
-        targetCode: updated?.user_code || '',
+        targetName: displayName,
+        targetCode: updated?.name || '',
         userId: updated?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_UPDATE:', e.message));
 
@@ -850,12 +574,10 @@ class AdminController {
         ));
       }
 
-      const mustChangePassword = req.body?.mustChangePassword !== false;
       const newPassword = req.body?.newPassword;
 
       const result = await this.adminUserService.resetPassword({
         userId: targetUserId,
-        mustChangePassword,
         newPassword,
       });
 
@@ -910,10 +632,12 @@ class AdminController {
           permissions: permissionKeys,
           branchId: req.user.branchId,
           tokenVersion: req.user.tokenVersion,
+          remember: Boolean(req.user.remember),
           ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
+          ...(req.user.sessionId ? { sessionId: req.user.sessionId } : {}),
         },
         config.jwtSecret,
-        { expiresIn: config.jwtExpiresIn }
+        { expiresIn: req.user.remember ? config.jwtRememberExpiresIn : config.jwtExpiresIn }
       );
 
       return success(res, { token: newToken, roles: roleNames, permissions: permissionKeys }, 'Cap lai token thanh cong');
@@ -954,10 +678,12 @@ class AdminController {
           permissions: compactKeys,
           branchId: req.user.branchId,
           tokenVersion: req.user.tokenVersion,
+          remember: Boolean(req.user.remember),
           ...(req.user.deviceId ? { deviceId: req.user.deviceId } : {}),
+          ...(req.user.sessionId ? { sessionId: req.user.sessionId } : {}),
         },
         config.jwtSecret,
-        { expiresIn: config.jwtExpiresIn }
+        { expiresIn: req.user.remember ? config.jwtRememberExpiresIn : config.jwtExpiresIn }
       );
 
       return success(
@@ -1100,169 +826,6 @@ class AdminController {
     }
   };
 
-  // ============================================================
-  // PERMISSION GROUPS (Phase 3)
-  // ============================================================
-
-  listPermissionGroups = async (req, res, next) => {
-    try {
-      const result = await this.permissionGroupService.listGroups();
-      return success(res, result, 'Danh sach nhom quyen');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  getPermissionGroupDetail = async (req, res, next) => {
-    try {
-      const group = await this.permissionGroupService.getGroupDetail(req.params.id);
-      return success(res, group, 'Chi tiet nhom quyen');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  getRoleGroupIds = async (req, res, next) => {
-    try {
-      const result = await this.permissionGroupService.getRoleGroupIds(req.params.id);
-      return success(res, result, 'Danh sach nhom quyen cua vai tro');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  setRoleGroups = async (req, res, next) => {
-    try {
-      const { groupIds } = req.body;
-      const result = await this.permissionGroupService.setRoleGroups(
-        req.params.id,
-        Array.isArray(groupIds) ? groupIds : [],
-        req
-      );
-      return success(res, result, 'Cap nhat nhom quyen cho vai tro thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  setRoleGroupsMatrix = async (req, res, next) => {
-    try {
-      const { changes } = req.body;
-      const result = await this.permissionGroupService.setRoleGroupsMatrix({ changes }, req);
-      await auditCrud.update(req, {
-        tableName: 'role_permissions',
-        entityCode: 'MATRIX',
-        entityName: 'Ma tran nhom quyen',
-        newData: { roleCount: result.updatedRoles },
-        description: `Cap nhat ma tran nhom quyen (${result.updatedRoles} vai tro, ${result.affectedUserCount} user bi anh huong)`,
-      });
-      return success(res, result, 'Cap nhat ma tran nhom quyen thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  // ── Vehicle brands ───────────────────────────────────────────────
-  listVehicleBrands = async (req, res, next) => {
-    try {
-      const items = await this.vehicleBrandRepository.list({ includeInactive: true });
-      return success(res, { items, total: items.length }, 'Danh sach hang xe');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  createVehicleBrand = async (req, res, next) => {
-    try {
-      const brandName = String(req.body?.brandName || '').trim();
-      if (!brandName) {
-        const ApiError = require('../../utils/ApiError');
-        throw new ApiError(400, 'Ten hang xe la bat buoc');
-      }
-      const brandCode = req.body?.brandCode != null
-        ? String(req.body.brandCode).trim()
-        : undefined;
-      const brand = await this.vehicleBrandRepository.create({
-        brandName,
-        brandCode: brandCode || undefined,
-        warrantyYears: req.body?.warrantyYears,
-        warrantyKm: req.body?.warrantyKm,
-      });
-      await auditCrud.create(req, {
-        tableName: 'brands',
-        entityCode: brand.brandCode || brand.brandName,
-        recordId: brand.id,
-        entityName: 'Hãng xe',
-        data: brand,
-      });
-      return success(res, brand, 'Tao hang xe thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  updateVehicleBrand = async (req, res, next) => {
-    try {
-      const brand = await this.vehicleBrandRepository.update(req.params.id, {
-        brandName: req.body?.brandName != null ? String(req.body.brandName).trim() : undefined,
-        brandCode: req.body?.brandCode != null ? String(req.body.brandCode).trim() : undefined,
-        warrantyYears: req.body?.warrantyYears,
-        warrantyKm: req.body?.warrantyKm,
-      });
-      await auditCrud.update(req, {
-        tableName: 'brands',
-        entityCode: brand?.brandCode || brand?.brandName,
-        recordId: req.params.id,
-        entityName: 'Hãng xe',
-        newData: req.body,
-      });
-      return success(res, brand, 'Cap nhat hang xe thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  toggleVehicleBrandStatus = async (req, res, next) => {
-    try {
-      const brand = await this.vehicleBrandRepository.toggleStatus(req.params.id);
-      await auditCrud.update(req, {
-        tableName: 'brands',
-        entityCode: brand?.brandName,
-        recordId: req.params.id,
-        entityName: 'Hãng xe',
-        newData: { isActive: brand?.isActive },
-      });
-      return success(res, brand, 'Cap nhat trang thai hang xe thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  setMustChangePassword = async (req, res, next) => {
-    try {
-      const ApiError = require('../../utils/ApiError');
-      const userId = Number(req.params.id);
-      if (!userId) throw new ApiError(400, 'userId khong hop le');
-      const flag = req.body?.mustChangePassword !== false && req.body?.mustChangePassword !== 'false';
-      const { query } = require('../../infrastructure/database/sqlServer');
-      await query(
-        `UPDATE users SET must_change_password = @p1, updated_at = SYSUTCDATETIME() WHERE id = @p2`,
-        { p1: flag ? 1 : 0, p2: userId }
-      );
-      await auditCrud.update(req, {
-        tableName: 'users',
-        entityCode: `ID-${userId}`,
-        recordId: userId,
-        entityName: 'Người dùng',
-        newData: { mustChangePassword: flag },
-        description: flag ? 'Bật bắt buộc đổi mật khẩu' : 'Tắt bắt buộc đổi mật khẩu',
-      });
-      const user = await this.adminUserService.getUserDetail(userId);
-      return success(res, user, 'Cap nhat bat buoc doi mat khau thanh cong');
-    } catch (err) {
-      next(err);
-    }
-  };
 }
 
 module.exports = AdminController;

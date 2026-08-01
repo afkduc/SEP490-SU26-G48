@@ -1,13 +1,33 @@
 const bcrypt = require('bcryptjs');
 const ApiError = require('../../utils/ApiError');
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^(0[0-9]{9,10})$/;
-const PASSWORD_MIN_LENGTH = 6;
+const {
+  EMAIL_HINT,
+  EMAIL_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  isValidEmail,
+  isValidPhone,
+  isValidUsername,
+  isValidPassword,
+} = require('../../utils/fieldValidation');
 
 class AdminUserService {
   constructor({ adminUserRepository }) {
     this.adminUserRepository = adminUserRepository;
+  }
+
+  async assertActiveRole(roleId) {
+    const role = await this.adminUserRepository.findRoleById(roleId);
+    if (!role) throw new ApiError(400, `Vai trò id=${roleId} không tồn tại`);
+    if (!role.isActive) throw new ApiError(400, `Vai trò "${role.roleName}" đang ngừng hoạt động`);
+    return role;
+  }
+
+  async assertActiveBranch(branchId) {
+    const branch = await this.adminUserRepository.findBranchById(branchId);
+    if (!branch) throw new ApiError(400, `Chi nhánh id=${branchId} không tồn tại`);
+    if (!branch.isActive) throw new ApiError(400, `Chi nhánh "${branch.branchCode}" đang ngừng hoạt động`);
+    return branch;
   }
 
   async listUsers({ search, branchId, roleId, status, page, pageSize }) {
@@ -83,12 +103,30 @@ class AdminUserService {
     const { name, email, password, branchId, roleId, firstName, lastName, phone, scopeAllBranches } = payload;
 
     if (!name || !email || !password || !roleId) {
-      throw new ApiError(400, 'name, email, password, roleId la bat buoc');
+      throw new ApiError(400, 'name, email, password, roleId là bắt buộc');
     }
 
-    // scopeAllBranches === true -> branchId KHONG duoc set (hoac null)
-    // branchId la so duong -> gan user vao 1 chi nhanh cu the
-    // branchId undefined/'' -> reject
+    const nameTrimmed = String(name).trim();
+    const emailTrimmed = String(email).trim();
+    const lastNameTrimmed = lastName !== undefined && lastName !== null ? String(lastName).trim() : '';
+    if (!isValidUsername(nameTrimmed)) {
+      throw new ApiError(400, 'Tên đăng nhập 3–50 ký tự, chỉ gồm chữ, số, dấu chấm, gạch dưới, gạch ngang');
+    }
+    if (!lastNameTrimmed) {
+      throw new ApiError(400, 'Tên là bắt buộc');
+    }
+    if (lastNameTrimmed.length > NAME_MAX_LENGTH) {
+      throw new ApiError(400, `Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
+    }
+
+    const phoneTrimmed = phone !== undefined && phone !== null ? String(phone).trim() : '';
+    if (!phoneTrimmed) {
+      throw new ApiError(400, 'Số điện thoại là bắt buộc');
+    }
+    if (!isValidPhone(phoneTrimmed)) {
+      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10–11 chữ số');
+    }
+
     let parsedBranchId = null;
     let isScopeAllBranches = false;
     if (scopeAllBranches === true) {
@@ -96,46 +134,52 @@ class AdminUserService {
     } else if (branchId !== null && branchId !== undefined && branchId !== '') {
       parsedBranchId = Number(branchId);
       if (!Number.isInteger(parsedBranchId) || parsedBranchId <= 0) {
-        throw new ApiError(400, 'branchId khong hop le');
+        throw new ApiError(400, 'branchId không hợp lệ');
       }
     } else {
-      throw new ApiError(400, 'branchId la bat buoc (hoac chon "Tat ca chi nhanh")');
+      throw new ApiError(400, 'branchId là bắt buộc (hoặc chọn "Tất cả chi nhánh")');
     }
 
-    if (!EMAIL_REGEX.test(email)) {
-      throw new ApiError(400, 'Email khong dung dinh dang');
+    if (emailTrimmed.length > EMAIL_MAX_LENGTH || !isValidEmail(emailTrimmed)) {
+      throw new ApiError(400, EMAIL_HINT);
     }
 
-    if (typeof password !== 'string' || password.length < PASSWORD_MIN_LENGTH) {
-      throw new ApiError(400, `Mat khau phai co it nhat ${PASSWORD_MIN_LENGTH} ky tu`);
+    if (!isValidPassword(password)) {
+      throw new ApiError(400, `Mật khẩu tối thiểu ${PASSWORD_MIN_LENGTH} ký tự, gồm chữ và số`);
     }
 
-    if (phone && !PHONE_REGEX.test(phone)) {
-      throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
+    const existedEmail = await this.adminUserRepository.findByEmail(emailTrimmed);
+    if (existedEmail) {
+      throw new ApiError(409, 'Email đã tồn tại');
     }
 
-    const existed = await this.adminUserRepository.findByEmail(email);
-    if (existed) {
-      throw new ApiError(409, 'Email da ton tai');
+    const existedPhone = await this.adminUserRepository.findByPhone(phoneTrimmed);
+    if (existedPhone) {
+      throw new ApiError(409, 'Số điện thoại đã tồn tại');
+    }
+
+    await this.assertActiveRole(Number(roleId));
+    if (!isScopeAllBranches) {
+      await this.assertActiveBranch(parsedBranchId);
     }
 
     const passwordHash = bcrypt.hashSync(password, 10);
 
     try {
       const user = await this.adminUserRepository.create({
-        name,
-        email,
+        name: nameTrimmed,
+        email: emailTrimmed,
         passwordHash,
-        firstName: firstName || name,
-        lastName: lastName || '',
-        phone,
+        firstName: (firstName && String(firstName).trim()) || nameTrimmed,
+        lastName: lastNameTrimmed,
+        phone: phoneTrimmed,
         branchId: parsedBranchId,
         roleId: Number(roleId),
         scopeAllBranches: isScopeAllBranches,
       });
       return user;
     } catch (err) {
-      throw new ApiError(400, err.message || 'Tao user that bai');
+      throw new ApiError(400, err.message || 'Tạo user thất bại');
     }
   }
 
@@ -144,50 +188,93 @@ class AdminUserService {
   }
 
   async updateUser(payload) {
-    const { userId, firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } = payload;
+    const {
+      userId,
+      firstName,
+      lastName,
+      email,
+      phone,
+      status,
+      roleId,
+      branchId,
+      scopeAllBranches,
+      actorUserId,
+    } = payload;
 
     if (!userId) {
-      throw new ApiError(400, 'userId la bat buoc');
+      throw new ApiError(400, 'userId là bắt buộc');
     }
 
     const existing = await this.adminUserRepository.findById(Number(userId));
     if (!existing) {
-      throw new ApiError(404, 'Nguoi dung khong ton tai');
+      throw new ApiError(404, 'Người dùng không tồn tại');
     }
 
     const VALID_STATUSES = ['active', 'inactive'];
     if (status !== undefined && status !== null && !VALID_STATUSES.includes(status)) {
-      throw new ApiError(400, 'status khong hop le: active, inactive');
+      throw new ApiError(400, 'status không hợp lệ: active, inactive');
     }
 
-    // Validate email neu co
-    if (email !== undefined && email !== null && email !== '') {
-      const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!EMAIL_REGEX.test(email)) {
-        throw new ApiError(400, 'Email khong dung dinh dang');
+    // Không cho tự khóa / tự inactive chính mình
+    if (
+      status === 'inactive'
+      && actorUserId !== undefined
+      && actorUserId !== null
+      && Number(actorUserId) === Number(userId)
+    ) {
+      throw new ApiError(400, 'Không thể tự khóa tài khoản của chính mình');
+    }
+
+    if (email !== undefined && email !== null) {
+      const emailTrimmed = String(email).trim();
+      if (!emailTrimmed) {
+        throw new ApiError(400, 'Email không được rỗng');
+      }
+      if (emailTrimmed.length > EMAIL_MAX_LENGTH || !isValidEmail(emailTrimmed)) {
+        throw new ApiError(400, EMAIL_HINT);
+      }
+      const emailOwner = await this.adminUserRepository.findByEmail(emailTrimmed);
+      if (emailOwner && Number(emailOwner.id) !== Number(userId)) {
+        throw new ApiError(409, 'Email đã tồn tại');
+      }
+      payload.email = emailTrimmed;
+    }
+
+    if (phone !== undefined && phone !== null) {
+      const phoneTrimmed = String(phone).trim();
+      if (!phoneTrimmed) {
+        throw new ApiError(400, 'Số điện thoại là bắt buộc');
+      }
+      if (!isValidPhone(phoneTrimmed)) {
+        throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10–11 chữ số');
+      }
+      const phoneOwner = await this.adminUserRepository.findByPhone(phoneTrimmed);
+      if (phoneOwner && Number(phoneOwner.id) !== Number(userId)) {
+        throw new ApiError(409, 'Số điện thoại đã tồn tại');
+      }
+      payload.phone = phoneTrimmed;
+    }
+
+    if (lastName !== undefined && lastName !== null && !String(lastName).trim()) {
+      throw new ApiError(400, 'Tên không được rỗng');
+    }
+    if (lastName !== undefined && lastName !== null) {
+      payload.lastName = String(lastName).trim();
+      if (payload.lastName.length > NAME_MAX_LENGTH) {
+        throw new ApiError(400, `Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
+      }
+    }
+    if (firstName !== undefined && firstName !== null) {
+      payload.firstName = String(firstName).trim();
+      if (payload.firstName.length > NAME_MAX_LENGTH) {
+        throw new ApiError(400, `Họ tối đa ${NAME_MAX_LENGTH} ký tự`);
       }
     }
 
-    // Validate phone neu co
-    if (phone !== undefined && phone !== null && phone !== '') {
-      const PHONE_REGEX = /^0\d{9,10}$/;
-      if (!PHONE_REGEX.test(String(phone))) {
-        throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
-      }
-    }
-
-    // Validate branchId neu co
-    // scopeAllBranches === true (FE gui len khi admin chon "Tat ca chi nhanh"):
-    //   - branchId khong duoc set, hoac la null
-    //   - BE se assign user vao TAT CA branch active (junction user_branches)
-    //   - users.branch_id = NULL (de phan biet voi user thuong)
-    // scopeAllBranches === false + branchId la so -> gan 1 branch cu the
     let parsedBranchId;
     let shouldUpdateBranchId = false;
     let isScopeAllBranches = false;
     if (scopeAllBranches === true) {
-      // Validate quyen admin (chi role Admin moi duoc phep)
-      // TODO: sua sau khi role permission service san sang - tam thoi check role id = 7 (Admin)
       isScopeAllBranches = true;
       parsedBranchId = null;
       shouldUpdateBranchId = true;
@@ -197,18 +284,22 @@ class AdminUserService {
     } else if (branchId !== undefined && branchId !== '') {
       parsedBranchId = Number(branchId);
       if (!Number.isInteger(parsedBranchId) || parsedBranchId <= 0) {
-        throw new ApiError(400, 'branchId khong hop le');
+        throw new ApiError(400, 'branchId không hợp lệ');
       }
       shouldUpdateBranchId = true;
     }
 
-    // Validate roleId neu co
     let parsedRoleId;
     if (roleId !== undefined && roleId !== null && roleId !== '') {
       parsedRoleId = Number(roleId);
       if (!Number.isInteger(parsedRoleId) || parsedRoleId <= 0) {
-        throw new ApiError(400, 'roleId khong hop le');
+        throw new ApiError(400, 'roleId không hợp lệ');
       }
+      await this.assertActiveRole(parsedRoleId);
+    }
+
+    if (shouldUpdateBranchId && !isScopeAllBranches && parsedBranchId) {
+      await this.assertActiveBranch(parsedBranchId);
     }
 
     try {
@@ -226,7 +317,7 @@ class AdminUserService {
       });
       return updated;
     } catch (err) {
-      throw new ApiError(400, err.message || 'Cap nhat nguoi dung that bai');
+      throw new ApiError(400, err.message || 'Cập nhật người dùng thất bại');
     }
   }
 
@@ -271,11 +362,11 @@ class AdminUserService {
    */
   validateManualPassword(rawPassword) {
     if (rawPassword === undefined || rawPassword === null || rawPassword === '') {
-      throw new ApiError(400, 'Mat khau moi la bat buoc khi chon che do nhap tay');
+      throw new ApiError(400, 'Mật khẩu mới là bắt buộc khi chọn chế độ nhập tay');
     }
     const password = String(rawPassword).trim();
-    if (password.length < PASSWORD_MIN_LENGTH) {
-      throw new ApiError(400, `Mat khau phai co it nhat ${PASSWORD_MIN_LENGTH} ky tu`);
+    if (!isValidPassword(password)) {
+      throw new ApiError(400, `Mật khẩu tối thiểu ${PASSWORD_MIN_LENGTH} ký tự, gồm chữ và số`);
     }
     return password;
   }
@@ -285,10 +376,10 @@ class AdminUserService {
    * - Co 2 che do:
    *   + newPassword duoc cung cap: dung MK do (admin nhap tay)
    *   + newPassword khong cung cap: generate MK ngau nhien 12 ky tu (hoa+thuong+so+dac biet)
-   * - Hash bcrypt, luu DB, dat must_change_password theo flag
+   * - Hash bcrypt, luu DB (khong bat buoc doi MK lan sau)
    * - Tra ve MK plain text 1 lan duy nhat (controller se gui cho FE)
    */
-  async resetPassword({ userId, mustChangePassword = true, newPassword } = {}) {
+  async resetPassword({ userId, newPassword } = {}) {
     if (!userId) {
       throw new ApiError(400, 'userId la bat buoc');
     }
@@ -298,9 +389,6 @@ class AdminUserService {
     if (!existing) {
       throw new ApiError(404, 'Nguoi dung khong ton tai');
     }
-
-    // Khong reset MK cho chinh admin dang thuc hien (tranh tu khoa tai khoan)
-    // (Controller se xu ly truong hop nay neu can, o service chi check don gian)
 
     // Quyet dinh MK plain text:
     //   - newPassword undefined/empty -> random
@@ -320,8 +408,7 @@ class AdminUserService {
     // Update DB
     const ok = await this.adminUserRepository.updatePassword(
       Number(userId),
-      passwordHash,
-      mustChangePassword
+      passwordHash
     );
 
     if (!ok) {
@@ -335,11 +422,8 @@ class AdminUserService {
       userId: Number(userId),
       newPassword: plainPassword, // plain text - chi tra 1 lan
       isManual,
-      mustChangePassword: Boolean(mustChangePassword),
       message: isManual
         ? 'Mat khau moi da duoc dat theo gia tri admin nhap.'
-        : mustChangePassword
-        ? 'Mat khau da duoc dat lai. User phai doi mat khau khi dang nhap lan sau.'
         : 'Mat khau da duoc dat lai thanh cong.',
     };
   }

@@ -114,8 +114,8 @@ class VehicleBrandRepository {
       {
         p0: code,
         p1: brandName,
-        pYears: Number.isFinite(years) && years > 0 ? years : DEFAULT_WARRANTY_YEARS,
-        pKm: Number.isFinite(km) && km > 0 ? km : DEFAULT_WARRANTY_KM,
+        pYears: Number.isFinite(years) && years >= 0 ? years : DEFAULT_WARRANTY_YEARS,
+        pKm: Number.isFinite(km) && km >= 0 ? km : DEFAULT_WARRANTY_KM,
         p2: nextSortOrder,
       }
     );
@@ -139,12 +139,14 @@ class VehicleBrandRepository {
       params.pSort = Number(sortOrder) || 0;
     }
     if (warrantyYears !== undefined) {
+      const years = Number(warrantyYears);
       updates.push('warranty_years = @pYears');
-      params.pYears = Number(warrantyYears) || DEFAULT_WARRANTY_YEARS;
+      params.pYears = Number.isFinite(years) && years >= 0 ? years : DEFAULT_WARRANTY_YEARS;
     }
     if (warrantyKm !== undefined) {
+      const km = Number(warrantyKm);
       updates.push('warranty_km = @pKm');
-      params.pKm = Number(warrantyKm) || DEFAULT_WARRANTY_KM;
+      params.pKm = Number.isFinite(km) && km >= 0 ? km : DEFAULT_WARRANTY_KM;
     }
     if (!updates.length) {
       const list = await this.list();
