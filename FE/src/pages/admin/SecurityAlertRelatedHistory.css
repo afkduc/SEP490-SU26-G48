@@ -1,0 +1,139 @@
+.sec-related-hist {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 18px 12px;
+  margin-bottom: 14px;
+}
+
+.sec-related-hist__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.sec-related-hist__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sec-related-hist__sub {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.sec-related-hist__state {
+  padding: 14px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.875rem;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.sec-related-hist__state--error {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.sec-related-hist__table-wrap {
+  overflow: auto;
+  max-height: min(420px, 50vh);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.sec-related-hist__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.sec-related-hist__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.sec-related-hist__table td {
+  padding: 10px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.sec-related-hist__row--current {
+  background: #f5f3ff;
+}
+
+.sec-related-hist__time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+}
+
+.sec-related-hist__msg-title {
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+.sec-related-hist__msg {
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.sec-related-hist__sev {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sec-related-hist__sev--critical { background: #fee2e2; color: #b91c1c; }
+.sec-related-hist__sev--high { background: #ffedd5; color: #c2410c; }
+.sec-related-hist__sev--medium { background: #fef3c7; color: #a16207; }
+.sec-related-hist__sev--info { background: #e0f2fe; color: #0369a1; }
+
+.sec-related-hist__tag {
+  display: inline-flex;
+  margin: 0 4px 4px 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.sec-related-hist__tag--current {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.sec-related-hist__tag--open {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.sec-related-hist__hint {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}

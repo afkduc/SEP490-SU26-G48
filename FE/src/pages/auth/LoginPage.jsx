@@ -6,21 +6,46 @@ import httpClient from '../../services/httpClient';
 import './LoginPage.css';
 
 const WRONG_BRANCH_MESSAGE = 'Tài khoản của bạn không có quyền đăng nhập vào chi nhánh này';
+const LOGIN_REMEMBER_PREF_KEY = 'login_remember_pref';
+const LOGIN_IDENTIFIER_KEY = 'login_saved_identifier';
+
+function readRememberPref() {
+  try {
+    return localStorage.getItem(LOGIN_REMEMBER_PREF_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function readSavedIdentifier() {
+  try {
+    if (!readRememberPref()) return '';
+    return localStorage.getItem(LOGIN_IDENTIFIER_KEY) || '';
+  } catch {
+    return '';
+  }
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login, isAuthenticated, user } = useAuth();
 
-  const [form, setForm] = useState({ identifier: '', password: '', branchId: '' });
+  const [form, setForm] = useState({
+    identifier: readSavedIdentifier(),
+    password: '',
+    branchId: '',
+  });
   const [branches, setBranches] = useState([]);
+  const [branchRequired, setBranchRequired] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => readRememberPref());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showWrongBranchModal, setShowWrongBranchModal] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
   useEffect(() => {
+    if (!branchRequired) return undefined;
     let alive = true;
     httpClient
       .get('/public/branches', { omitAuth: true, skipSessionExpired: true })
@@ -31,7 +56,7 @@ export default function LoginPage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [branchRequired]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -48,18 +73,46 @@ export default function LoginPage() {
   }, [lockoutSeconds]);
 
   const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
     setError('');
+    if (name === 'identifier') {
+      // Đổi tài khoản → ẩn lại chi nhánh (role có thể khác).
+      setBranchRequired(false);
+      setForm((prev) => ({ ...prev, identifier: value, branchId: '' }));
+      return;
+    }
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const persistRememberPrefs = (remember, identifier) => {
+    try {
+      if (remember) {
+        localStorage.setItem(LOGIN_REMEMBER_PREF_KEY, '1');
+        localStorage.setItem(LOGIN_IDENTIFIER_KEY, String(identifier || '').trim());
+      } else {
+        localStorage.removeItem(LOGIN_REMEMBER_PREF_KEY);
+        localStorage.removeItem(LOGIN_IDENTIFIER_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
   const doLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await login(form.identifier, form.password, rememberMe, form.branchId);
+      const branchId = branchRequired ? form.branchId : (form.branchId || undefined);
+      const result = await login(form.identifier, form.password, rememberMe, branchId);
+      persistRememberPrefs(rememberMe, form.identifier);
       navigate(routeAfterLogin(result?.user), { replace: true });
     } catch (err) {
-      if (err.status === 403 && err.message === WRONG_BRANCH_MESSAGE) {
+      if (err.status === 400 && (err.code === 'BRANCH_REQUIRED' || err.details?.code === 'BRANCH_REQUIRED')) {
+        // Bước 2: hiện chọn chi nhánh — không báo lỗi (UI vừa mới hiện).
+        setBranchRequired(true);
+        setError('');
+      } else if (err.status === 403 && err.message === WRONG_BRANCH_MESSAGE) {
+        setBranchRequired(true);
         setShowWrongBranchModal(true);
       } else if (
         err.status === 409
@@ -68,9 +121,11 @@ export default function LoginPage() {
       ) {
         // Backward compatibility: nếu BE cũ vẫn trả 409 thì force-login ngay.
         try {
-          const result = await login(form.identifier, form.password, rememberMe, form.branchId, {
+          const branchId = branchRequired ? form.branchId : (form.branchId || undefined);
+          const result = await login(form.identifier, form.password, rememberMe, branchId, {
             force: true,
           });
+          persistRememberPrefs(rememberMe, form.identifier);
           navigate(routeAfterLogin(result?.user), { replace: true });
         } catch (forceErr) {
           setError(forceErr?.message || 'Không thể đăng nhập ngay lúc này');
@@ -94,7 +149,7 @@ export default function LoginPage() {
       setError('Vui lòng nhập đầy đủ email/số điện thoại và mật khẩu');
       return;
     }
-    if (!form.branchId) {
+    if (branchRequired && !form.branchId) {
       setError('Vui lòng chọn chi nhánh trước khi đăng nhập');
       return;
     }
@@ -175,19 +230,29 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="login-field">
-              <label htmlFor="branchId">
-                Chi nhánh <span className="required">*</span>
-              </label>
-              <select id="branchId" name="branchId" value={form.branchId} onChange={handleChange} required>
-                <option value="">Chọn chi nhánh</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {branchRequired && (
+              <div className="login-field">
+                <label htmlFor="branchId">
+                  Chi nhánh <span className="required">*</span>
+                </label>
+                <select
+                  id="branchId"
+                  name="branchId"
+                  value={form.branchId}
+                  onChange={handleChange}
+                  required
+                  autoFocus
+                >
+                  <option value="">Chọn chi nhánh</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="login-branch-hint">Tài khoản của bạn cần chọn chi nhánh để tiếp tục đăng nhập.</p>
+              </div>
+            )}
 
             {error && <p className="login-error">{error}</p>}
             {lockoutSeconds > 0 && (
@@ -211,7 +276,13 @@ export default function LoginPage() {
             </div>
 
             <button type="submit" className="login-btn" disabled={loading || lockoutSeconds > 0}>
-              {loading ? 'Đang đăng nhập...' : lockoutSeconds > 0 ? `Chờ ${lockoutSeconds}s` : 'Đăng nhập'}
+              {loading
+                ? 'Đang đăng nhập...'
+                : lockoutSeconds > 0
+                  ? `Chờ ${lockoutSeconds}s`
+                  : branchRequired
+                    ? 'Tiếp tục đăng nhập'
+                    : 'Đăng nhập'}
             </button>
           </form>
         </div>

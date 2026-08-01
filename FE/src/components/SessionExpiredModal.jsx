@@ -68,8 +68,7 @@ export default function SessionExpiredModal() {
     ? 'Đã có người đăng nhập tài khoản của bạn'
     : 'Phiên đăng nhập đã hết hạn';
   const message = replaced
-    ? (detail?.message
-      || 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại để tiếp tục.')
+    ? 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.'
     : 'Phiên đăng nhập của bạn đã hết hiệu lực. Vui lòng đăng nhập lại để tiếp tục sử dụng hệ thống.';
 
   return (

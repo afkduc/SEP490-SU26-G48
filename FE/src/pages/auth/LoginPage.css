@@ -240,6 +240,13 @@
   color: #3f6212;
 }
 
+.login-branch-hint {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
 .login-dev-link {
   margin-top: 12px;
   font-size: 0.8rem;

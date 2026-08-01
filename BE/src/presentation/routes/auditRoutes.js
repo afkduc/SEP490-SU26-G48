@@ -55,6 +55,10 @@ function buildAuditRouter() {
         startDate: req.query.startDate,
         endDate: req.query.endDate,
         branchId: req.query.branchId,
+        excludeAuthEvents:
+          req.query.excludeAuthEvents === '1' ||
+          req.query.excludeAuthEvents === 'true' ||
+          req.query.excludeAuthEvents === true,
         page: req.query.page,
         pageSize: req.query.pageSize,
       });
@@ -84,6 +88,10 @@ function buildAuditRouter() {
         startDate: req.query.startDate,
         endDate: req.query.endDate,
         branchId: req.query.branchId,
+        excludeAuthEvents:
+          req.query.excludeAuthEvents === '1' ||
+          req.query.excludeAuthEvents === 'true' ||
+          req.query.excludeAuthEvents === true,
       });
       const buffer = await exportAuditLogsToExcel(items, {
         keyword: req.query.keyword,
@@ -129,6 +137,7 @@ function buildAuditRouter() {
         status: req.query.status,
         branchId: req.query.branchId,
         ipAddress: req.query.ipAddress,
+        sessionId: req.query.sessionId,
         page: req.query.page,
         pageSize: req.query.pageSize,
       });

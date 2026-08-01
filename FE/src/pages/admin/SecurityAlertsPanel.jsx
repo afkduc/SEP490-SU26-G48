@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { adminSecurityAlertsApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
 import { parseAlertMeta } from './securityAlertFocus';
+import { emitSecurityAlertsCount } from '../../utils/securityAlertEvents';
 import './SecurityAlertsPanel.css';
 
 const RULE_LABEL = {
@@ -9,6 +10,7 @@ const RULE_LABEL = {
   new_admin_role: 'Gán quyền Admin',
   inactive_admin: 'Admin không hoạt động',
   new_device_ip: 'IP/thiết bị mới',
+  session_takeover: 'Đăng nhập trên thiết bị khác',
 };
 
 const SEVERITY_LABEL = {
@@ -33,15 +35,11 @@ function formatDateTime(value) {
   }
 }
 
-function canFocusDevice(alert) {
+function canOpenSessions(alert) {
   if (!alert) return false;
   if (alert.userId) return true;
   const meta = parseAlertMeta(alert.metadata);
   return Boolean(meta.ipAddress || meta.ip);
-}
-
-function canOpenSessions(alert) {
-  return canFocusDevice(alert);
 }
 
 /**
@@ -50,7 +48,6 @@ function canOpenSessions(alert) {
 export default function SecurityAlertsPanel({
   expanded,
   onExpandedChange,
-  onFocusDevice,
   onOpenSessions,
   onCountChange,
 }) {
@@ -64,6 +61,9 @@ export default function SecurityAlertsPanel({
   const [ackingAll, setAckingAll] = useState(false);
   const [severity, setSeverity] = useState('');
   const [priorityOnly, setPriorityOnly] = useState(true);
+  const [page, setPage] = useState(1);
+  const [listTotal, setListTotal] = useState(0);
+  const PAGE_SIZE = 8;
 
   const loadCounts = useCallback(async () => {
     try {
@@ -71,11 +71,14 @@ export default function SecurityAlertsPanel({
       const next = data || { total: 0, critical: 0, high: 0, medium: 0, info: 0 };
       setCounts(next);
       setCountsError(false);
-      onCountChange?.(Number(next.total) || 0);
+      onCountChange?.(next);
+      emitSecurityAlertsCount(next);
     } catch {
       setCountsError(true);
-      setCounts({ total: 0, critical: 0, high: 0, medium: 0, info: 0 });
-      onCountChange?.(0);
+      const empty = { total: 0, critical: 0, high: 0, medium: 0, info: 0 };
+      setCounts(empty);
+      onCountChange?.(empty);
+      emitSecurityAlertsCount(0);
     }
   }, [onCountChange]);
 
@@ -83,30 +86,73 @@ export default function SecurityAlertsPanel({
     setLoading(true);
     setError('');
     try {
-      const params = { page: 1, pageSize: 20, isAcknowledged: 'false' };
-      if (severity) params.severity = severity;
-      const data = await adminSecurityAlertsApi.list(params);
-      let list = data?.items || [];
-      if (priorityOnly && !severity) {
-        list = [...list].sort((a, b) => {
-          const rank = { critical: 0, high: 1, medium: 2, info: 3 };
-          return (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9);
+      const base = { isAcknowledged: 'false', collapsed: true };
+
+      if (severity) {
+        const data = await adminSecurityAlertsApi.list({
+          ...base,
+          severity,
+          page,
+          pageSize: PAGE_SIZE,
         });
+        setItems(Array.isArray(data?.items) ? data.items : []);
+        setListTotal(Number(data?.total) || 0);
+        return;
       }
-      setItems(list);
+
+      if (priorityOnly) {
+        const [crit, high] = await Promise.all([
+          adminSecurityAlertsApi.list({
+            ...base,
+            severity: 'critical',
+            page: 1,
+            pageSize: 100,
+          }),
+          adminSecurityAlertsApi.list({
+            ...base,
+            severity: 'high',
+            page: 1,
+            pageSize: 100,
+          }),
+        ]);
+        const merged = [...(crit?.items || []), ...(high?.items || [])].sort((a, b) => {
+          const rank = { critical: 0, high: 1 };
+          const ra = rank[a.severity] ?? 9;
+          const rb = rank[b.severity] ?? 9;
+          if (ra !== rb) return ra - rb;
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+        const start = (page - 1) * PAGE_SIZE;
+        setListTotal(merged.length);
+        setItems(merged.slice(start, start + PAGE_SIZE));
+        return;
+      }
+
+      const data = await adminSecurityAlertsApi.list({
+        ...base,
+        page,
+        pageSize: PAGE_SIZE,
+      });
+      setItems(Array.isArray(data?.items) ? data.items : []);
+      setListTotal(Number(data?.total) || 0);
     } catch (err) {
       setError(err?.message || 'Không tải được cảnh báo');
       setItems([]);
+      setListTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [severity, priorityOnly]);
+  }, [severity, priorityOnly, page]);
 
   useEffect(() => {
     loadCounts();
     const t = setInterval(loadCounts, 60_000);
     return () => clearInterval(t);
   }, [loadCounts]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [severity, priorityOnly]);
 
   useEffect(() => {
     if (expanded) loadList();
@@ -117,6 +163,15 @@ export default function SecurityAlertsPanel({
     try {
       await adminSecurityAlertsApi.ack(id);
       toast.success('Đã đánh dấu xử lý cảnh báo');
+      const item = items.find((a) => a.id === id);
+      const next = { ...counts };
+      next.total = Math.max(0, (Number(counts.total) || 0) - 1);
+      if (item?.severity && next[item.severity] != null) {
+        next[item.severity] = Math.max(0, (Number(next[item.severity]) || 0) - 1);
+      }
+      setCounts(next);
+      onCountChange?.(next);
+      emitSecurityAlertsCount(next);
       await Promise.all([loadList(), loadCounts()]);
     } catch (err) {
       toast.error(err?.message || 'Không thể xử lý cảnh báo');
@@ -136,6 +191,10 @@ export default function SecurityAlertsPanel({
       const result = await adminSecurityAlertsApi.ackAll();
       const n = result?.acknowledgedCount ?? 0;
       toast.success(n > 0 ? `Đã xử lý ${n} cảnh báo` : 'Không còn cảnh báo chưa xử lý');
+      const empty = { total: 0, critical: 0, high: 0, medium: 0, info: 0 };
+      setCounts(empty);
+      onCountChange?.(empty);
+      emitSecurityAlertsCount(empty);
       await Promise.all([loadList(), loadCounts()]);
     } catch (err) {
       toast.error(err?.message || 'Không thể xử lý hàng loạt');
@@ -144,14 +203,10 @@ export default function SecurityAlertsPanel({
     }
   }
 
-  function focusDevice(alert) {
-    onFocusDevice?.(alert);
-    onExpandedChange?.(false);
-  }
-
   function openSessions(alert) {
+    // Không thu gọn / đổi ?alerts= — AdminLayout remount theo location.search
+    // sẽ xóa state popup ngay sau khi mở.
     onOpenSessions?.(alert);
-    onExpandedChange?.(false);
   }
 
   const total = Number(counts.total) || 0;
@@ -179,8 +234,8 @@ export default function SecurityAlertsPanel({
               {countsError
                 ? 'Vui lòng bấm Làm mới hoặc kiểm tra kết nối API.'
                 : urgent > 0
-                ? `${urgent} mức Critical/High — kiểm tra rồi xử lý trên danh sách thiết bị bên dưới`
-                : 'Cảnh báo chỉ là tín hiệu; thao tác đăng xuất nằm ở bảng thiết bị'}
+                ? `${urgent} mức Critical/High — bấm Xem phiên để đối chiếu, xử lý trên bảng thiết bị`
+                : 'Medium/Info chỉ theo dõi; thao tác đăng xuất nằm ở bảng thiết bị'}
             </span>
           </div>
         </div>
@@ -214,25 +269,34 @@ export default function SecurityAlertsPanel({
                 />
                 Ưu tiên Critical/High
               </label>
-              <select
-                className="form-select sec-panel__select"
-                value={severity}
-                onChange={(e) => setSeverity(e.target.value)}
-              >
-                <option value="">Mọi mức độ</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="info">Info</option>
-              </select>
+              <div className="sec-panel__filter-row">
+                <select
+                  className="form-select sec-panel__select"
+                  value={severity}
+                  onChange={(e) => setSeverity(e.target.value)}
+                  aria-label="Lọc mức độ cảnh báo"
+                >
+                  <option value="">Mọi mức độ</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="info">Info</option>
+                </select>
+                <button
+                  type="button"
+                  className="sec-panel__refresh"
+                  onClick={() => { loadList(); loadCounts(); }}
+                  title="Làm mới"
+                  aria-label="Làm mới danh sách cảnh báo"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() => { loadList(); loadCounts(); }}
-            >
-              Làm mới
-            </button>
             {total > 0 && (
               <button
                 type="button"
@@ -271,6 +335,9 @@ export default function SecurityAlertsPanel({
                         · {alert.displayName || alert.userName || `#${alert.userId}`}
                       </span>
                     )}
+                    {Number(alert.duplicateCount) > 1 && (
+                      <span className="sec-panel__dup">· {alert.duplicateCount} lần (chỉ hiện mới nhất)</span>
+                    )}
                   </div>
                   <div className="sec-panel__item-actions">
                     <button
@@ -281,24 +348,14 @@ export default function SecurityAlertsPanel({
                     >
                       {ackingId === alert.id ? '...' : 'Đã xem'}
                     </button>
-                    {canFocusDevice(alert) && (
-                      <button
-                        type="button"
-                        className="btn btn--secondary btn--sm"
-                        onClick={() => focusDevice(alert)}
-                        title={alert.userId ? 'Xem toàn bộ thiết bị của tài khoản này' : 'Xem thiết bị theo IP cảnh báo'}
-                      >
-                        {alert.userId ? 'Thiết bị tài khoản' : 'Xem theo IP'}
-                      </button>
-                    )}
                     {canOpenSessions(alert) && onOpenSessions && (
                       <button
                         type="button"
-                        className="btn btn--ghost btn--sm"
+                        className="btn btn--secondary btn--sm"
                         onClick={() => openSessions(alert)}
-                        title={alert.userId ? 'Xem toàn bộ lịch sử đăng nhập của tài khoản' : 'Xem lịch sử đăng nhập thất bại theo IP'}
+                        title="Mở tab Lịch sử, lọc phiên liên quan"
                       >
-                        {alert.userId ? 'Lịch sử tài khoản' : 'Lịch sử theo IP'}
+                        Xem phiên
                       </button>
                     )}
                   </div>
@@ -307,10 +364,34 @@ export default function SecurityAlertsPanel({
             </ul>
           )}
 
+          {!loading && !error && listTotal > PAGE_SIZE && (
+            <div className="sec-panel__pager">
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Trước
+              </button>
+              <span>
+                Trang {page}/{Math.max(1, Math.ceil(listTotal / PAGE_SIZE))}
+              </span>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={page >= Math.ceil(listTotal / PAGE_SIZE)}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Sau →
+              </button>
+            </div>
+          )}
+
           <p className="sec-panel__hint">
-            <strong>Thiết bị tài khoản</strong> / <strong>Lịch sử tài khoản</strong> mở đúng dữ liệu
-            của user trong cảnh báo. Cảnh báo theo IP thì lọc theo IP. Muốn force logout — dùng bảng
-            thiết bị bên dưới.
+            <strong>Đã xem</strong> đánh dấu xử lý.
+            <strong> Xem phiên</strong> mở tab Lịch sử (lọc theo cảnh báo, highlight phiên mới nhất).
+            Đăng xuất thiết bị ở bảng bên dưới.
           </p>
         </div>
       )}

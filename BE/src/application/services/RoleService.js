@@ -65,8 +65,12 @@ class RoleService {
     const role = await this.roleRepository.findById(Number(roleId));
     if (!role) throw new ApiError(404, 'Role khong ton tai');
 
+    if (!Array.isArray(permissionIds)) {
+      throw new ApiError(400, 'permissionIds phai la mang');
+    }
+
     // Validate: permissionIds phai la mang number va cac ID phai ton tai
-    const ids = (permissionIds || [])
+    const ids = permissionIds
       .map((id) => Number(id))
       .filter((id) => Number.isFinite(id) && id > 0);
 

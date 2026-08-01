@@ -17,6 +17,8 @@ const DEFAULT_PARAMS = {
   startDate: '',
   endDate: '',
   branchId: undefined,
+  // An LOGIN/FAILED_LOGIN khoi danh sach thao tac (co trang Lich su dang nhap)
+  excludeAuthEvents: true,
   page: 1,
   pageSize: DEFAULT_PAGE_SIZE,
 };

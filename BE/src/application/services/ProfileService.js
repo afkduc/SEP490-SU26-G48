@@ -1,8 +1,11 @@
-const bcrypt = require('bcryptjs');
 const ApiError = require('../../utils/ApiError');
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^(0[0-9]{9,10})$/;
+const {
+  EMAIL_HINT,
+  EMAIL_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+  isValidEmail,
+  isValidPhone,
+} = require('../../utils/fieldValidation');
 
 class ProfileService {
   constructor(profileRepository) {
@@ -20,19 +23,51 @@ class ProfileService {
   async updateProfile(userId, payload) {
     const errors = [];
 
-    if (payload.email !== undefined && payload.email !== null && payload.email !== '') {
-      if (!EMAIL_REGEX.test(payload.email)) {
-        errors.push('Email không đúng định dạng');
-      }
-      const existing = await this.profileRepository.findByEmail(payload.email);
-      if (existing && Number(existing.id) !== Number(userId)) {
-        errors.push('Email đã được sử dụng bởi người khác');
+    if (payload.email !== undefined && payload.email !== null) {
+      const email = String(payload.email).trim();
+      if (!email) {
+        errors.push('Email là bắt buộc');
+      } else if (email.length > EMAIL_MAX_LENGTH || !isValidEmail(email)) {
+        errors.push(EMAIL_HINT);
+      } else {
+        const existing = await this.profileRepository.findByEmail(email);
+        if (existing && Number(existing.id) !== Number(userId)) {
+          errors.push('Email đã được sử dụng bởi người khác');
+        }
+        payload.email = email;
       }
     }
 
-    if (payload.phone !== undefined && payload.phone !== null && payload.phone !== '') {
-      if (!PHONE_REGEX.test(payload.phone)) {
+    if (payload.phone !== undefined && payload.phone !== null) {
+      const phone = String(payload.phone).trim();
+      if (!phone) {
+        errors.push('Số điện thoại là bắt buộc');
+      } else if (!isValidPhone(phone)) {
         errors.push('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+      } else {
+        const phoneOwner = await this.profileRepository.findByPhone(phone);
+        if (phoneOwner && Number(phoneOwner.id) !== Number(userId)) {
+          errors.push('Số điện thoại đã được sử dụng bởi người khác');
+        }
+        payload.phone = phone;
+      }
+    }
+
+    if (payload.firstName !== undefined && payload.firstName !== null) {
+      const firstName = String(payload.firstName).trim();
+      if (firstName.length > NAME_MAX_LENGTH) {
+        errors.push(`Họ tối đa ${NAME_MAX_LENGTH} ký tự`);
+      } else {
+        payload.firstName = firstName;
+      }
+    }
+
+    if (payload.lastName !== undefined && payload.lastName !== null) {
+      const lastName = String(payload.lastName).trim();
+      if (lastName.length > NAME_MAX_LENGTH) {
+        errors.push(`Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
+      } else {
+        payload.lastName = lastName;
       }
     }
 
@@ -54,51 +89,13 @@ class ProfileService {
     return updated;
   }
 
-  async changePassword(userId, currentPassword, newPassword) {
-    if (!currentPassword || !newPassword) {
-      throw new ApiError(400, 'Mật khẩu hiện tại và mật khẩu mới không được để trống');
-    }
-
-    if (newPassword.length < 6) {
-      throw new ApiError(400, 'Mật khẩu mới phải có ít nhất 6 ký tự');
-    }
-
-    const user = await this.profileRepository.findByIdWithPassword(userId);
-    if (!user) {
-      throw new ApiError(404, 'Không tìm thấy người dùng');
-    }
-
-    const isMatch = await this._verifyPassword(currentPassword, user.user_password);
-    if (!isMatch) {
-      throw new ApiError(401, 'Mật khẩu hiện tại không đúng');
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    // Khi user tu doi MK (force change), reset flag must_change_password = 0
-    // de lan dang nhap sau binh thuong (khong bi redirect ve trang doi MK)
-    await this.profileRepository.updatePassword(userId, passwordHash, false);
-
-    // Notify user about password change
-    this._sendPasswordChangedNotification(userId);
-
-    return true;
-  }
-
-  async _sendPasswordChangedNotification(userId) {
-    try {
-      const NotificationService = require('./NotificationService');
-      const ns = new NotificationService();
-      await ns.notify('PASSWORD_CHANGED', { userId });
-    } catch (err) {
-      console.error('[ProfileService] Failed to send password changed notification:', err.message);
-    }
-  }
-
-  async _verifyPassword(input, stored) {
-    if (stored && stored.startsWith('$2b$')) {
-      return bcrypt.compare(input, stored);
-    }
-    return input === stored;
+  async changePassword(_userId, _currentPassword, _newPassword) {
+    // Không cho tự đổi MK bằng mật khẩu cũ: ai đã biết pass cũ sẽ chiếm được tài khoản.
+    // Đặt lại chỉ qua quên mật khẩu (email OTP) hoặc admin reset.
+    throw new ApiError(
+      403,
+      'Không hỗ trợ đổi mật khẩu trong hồ sơ. Vui lòng dùng Quên mật khẩu (email) hoặc liên hệ quản trị viên.'
+    );
   }
 }
 

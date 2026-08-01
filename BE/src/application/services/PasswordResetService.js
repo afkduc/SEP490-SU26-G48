@@ -74,7 +74,7 @@ class PasswordResetService {
     const user = await this.authRepository.findUserByEmail(normalizedEmail);
     if (!user || (user.status && user.status !== 'active')) {
       // Không tiết lộ — trả success giả
-      return { message: GENERIC_MSG, sent: false };
+      return { message: GENERIC_MSG, sent: false, auditUserId: null, auditBranchId: null };
     }
 
     // Vô hiệu token cũ chưa dùng
@@ -87,7 +87,7 @@ class PasswordResetService {
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = this._hashToken(rawToken);
-    const expiresMinutes = config.passwordResetExpiresMinutes || 30;
+    const expiresMinutes = config.passwordResetExpiresMinutes || 5;
 
     await query(
       `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
@@ -121,6 +121,9 @@ class PasswordResetService {
       message: GENERIC_MSG,
       sent: Boolean(mailResult.sent),
       mode: mailResult.mode || null,
+      // Chi dung noi bo cho audit (controller khong dua ra response)
+      auditUserId: user.id,
+      auditBranchId: user.branch_id != null ? user.branch_id : null,
       // Dev helpers — không lộ token thô khi đã có preview Ethereal
       ...(config.nodeEnv !== 'production' && mailResult.previewUrl
         ? { emailPreviewUrl: mailResult.previewUrl }
@@ -161,9 +164,7 @@ class PasswordResetService {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    await this.authRepository.updatePassword(row.user_id, passwordHash, {
-      mustChangePassword: false,
-    });
+    await this.authRepository.updatePassword(row.user_id, passwordHash);
 
     await query(
       `UPDATE password_reset_tokens SET used_at = SYSUTCDATETIME() WHERE id = @p1`,

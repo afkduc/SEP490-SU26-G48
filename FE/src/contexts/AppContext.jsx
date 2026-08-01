@@ -81,9 +81,11 @@ function clearSession() {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('permissions');
+  localStorage.removeItem('auth_remember');
   sessionStorage.removeItem('token');
   sessionStorage.removeItem('user');
   sessionStorage.removeItem('permissions');
+  sessionStorage.removeItem('auth_remember');
 }
 
 /**
@@ -261,7 +263,10 @@ export function AppProvider({ children }) {
   }, []); // Run once on mount
 
   const login = useCallback(async (email, password, remember = false, branchId, options = {}) => {
-    const result = await loginApi(email, password, branchId, options);
+    const result = await loginApi(email, password, branchId, {
+      ...options,
+      remember: Boolean(remember),
+    });
 
     // QUAN TRONG: Phai save token vao storage TRUOC khi goi bat ky
     // authenticated API nao (nhu getMeApi). Vi httpClient luon doc token
@@ -278,6 +283,16 @@ export function AppProvider({ children }) {
     const storage = remember ? localStorage : sessionStorage;
     storage.setItem('token', result.token);
     storage.setItem('user', JSON.stringify(result.user));
+    // Đánh dấu remember để các chỗ refresh token biết chọn storage / TTL.
+    try {
+      if (remember) localStorage.setItem('auth_remember', '1');
+      else {
+        localStorage.removeItem('auth_remember');
+        sessionStorage.removeItem('auth_remember');
+      }
+    } catch {
+      /* ignore */
+    }
 
     // Reset anti-spam flag cua SessionExpiredModal (login moi = session moi).
     if (typeof resetSessionExpiredFlag === 'function') {
@@ -570,9 +585,23 @@ function SessionTakenOverRunner() {
   useEffect(() => {
     const onTakenOver = (e) => {
       const detail = e?.detail || {};
+      const meta = detail?.metadata || {};
+      // Bỏ qua nếu event dành cho phiên mới (chính tab vừa login)
+      try {
+        const t = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (t) {
+          const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          const metaSessionId = meta.newSessionId != null ? Number(meta.newSessionId) : null;
+          const metaVersion = meta.newTokenVersion != null ? Number(meta.newTokenVersion) : NaN;
+          if (metaSessionId && Number(payload.sessionId) === metaSessionId) return;
+          if (Number.isFinite(metaVersion) && Number(payload.tokenVersion) >= metaVersion) return;
+        }
+      } catch {
+        // ignore parse errors — vẫn hiện modal an toàn cho phiên cũ
+      }
       showSessionExpired({
         code: detail?.metadata?.code || detail?.code || 'SESSION_REPLACED',
-        message: detail?.message || 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại để tiếp tục.',
+        message: 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.',
       });
     };
     window.addEventListener('session-taken-over', onTakenOver);

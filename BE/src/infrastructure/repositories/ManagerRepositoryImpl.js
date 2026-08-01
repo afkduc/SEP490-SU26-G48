@@ -35,7 +35,6 @@ function aggregateEmployees(rows = []) {
         statusLabel: statusLabel(row.status),
         teamSize: row.team_size,
         teamMemberCount: row.team_member_count || 0,
-        avatar: row.avatar,
         notes: row.notes,
         createdAt: normalizeDate(row.created_at),
         branch: row.branch_id
@@ -214,7 +213,6 @@ class ManagerRepositoryImpl {
           u.status,
           u.team_size,
           (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count,
-          u.avatar,
           u.notes,
           u.created_at,
           u.branch_id,
@@ -261,7 +259,6 @@ class ManagerRepositoryImpl {
           u.status,
           u.team_size,
           (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count,
-          u.avatar,
           u.notes,
           u.created_at,
           u.branch_id,

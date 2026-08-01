@@ -3,6 +3,7 @@ import { adminBranchesApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
 import { useApiError } from '../../hooks/useApiError';
 import PermissionGate from '../../components/PermissionGate';
+import { EMAIL_HINT, isValidEmail, isValidPhone } from '../../utils/validation';
 import './AdminBranchesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -127,6 +128,16 @@ function BranchFormModal({ branch, onClose, onSuccess, managerCandidates }) {
       setError('Mã chi nhánh là bắt buộc');
       return;
     }
+    const phone = form.phone.trim();
+    const email = form.email.trim();
+    if (phone && !isValidPhone(phone)) {
+      setError('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+      return;
+    }
+    if (email && !isValidEmail(email)) {
+      setError(EMAIL_HINT);
+      return;
+    }
 
     setSaving(true);
     setError('');
@@ -134,8 +145,8 @@ function BranchFormModal({ branch, onClose, onSuccess, managerCandidates }) {
       const payload = {
         branchName: form.branchName.trim(),
         address: form.address.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        email: form.email.trim() || undefined,
+        phone: phone || undefined,
+        email: email || undefined,
         managerId: form.managerId ? Number(form.managerId) : null,
       };
       if (!isEdit) {

@@ -15,6 +15,7 @@ export const AUDIT_ACTION_LABELS = {
   FAILED_LOGIN: 'Đăng nhập thất bại',
   LOGOUT: 'Đăng xuất',
   FORCE_LOGOUT: 'Buộc đăng xuất',
+  FORCE_LOGO: 'Buộc đăng xuất', // DB cột action ngắn → lưu FORCE_LOGO
   CHANGE_PASSWORD: 'Đổi mật khẩu',
   RESET_PASSWORD: 'Đặt lại mật khẩu',
   ASSIGN_ROLE: 'Gán vai trò',
@@ -106,7 +107,71 @@ function getRoleLabel(roleName) {
 
 export function getAuditActionLabel(action) {
   if (!action) return 'Thao tác';
-  return AUDIT_ACTION_LABELS[action] || action;
+  return AUDIT_ACTION_LABELS[action] || 'Thao tác khác';
+}
+
+/** HTTP method → tiếng Việt (không hiện POST/DELETE thô) */
+export const HTTP_METHOD_LABELS = {
+  GET: 'Xem dữ liệu',
+  POST: 'Gửi yêu cầu',
+  PUT: 'Cập nhật',
+  PATCH: 'Cập nhật một phần',
+  DELETE: 'Xóa / kết thúc',
+  HEAD: 'Kiểm tra',
+  OPTIONS: 'Tùy chọn',
+};
+
+export function getHttpMethodLabel(method) {
+  if (!method) return '—';
+  const key = String(method).trim().toUpperCase();
+  return HTTP_METHOD_LABELS[key] || key;
+}
+
+/** Mã phản hồi HTTP → tiếng Việt */
+export function getResponseStatusLabel(status) {
+  const code = Number(status);
+  if (!Number.isFinite(code)) return status != null ? String(status) : '—';
+  if (code >= 200 && code < 300) return 'Thành công';
+  if (code === 401) return 'Chưa đăng nhập / hết phiên';
+  if (code === 403) return 'Không có quyền';
+  if (code === 404) return 'Không tìm thấy';
+  if (code === 409) return 'Xung đột dữ liệu';
+  if (code === 429) return 'Quá nhiều yêu cầu';
+  if (code >= 400 && code < 500) return 'Yêu cầu không hợp lệ';
+  if (code >= 500) return 'Lỗi hệ thống';
+  return `Mã ${code}`;
+}
+
+export function formatDurationMs(ms) {
+  if (ms == null || ms === '') return '—';
+  const n = Number(ms);
+  if (!Number.isFinite(n)) return String(ms);
+  if (n < 1000) return `${Math.round(n)} mili giây`;
+  return `${(n / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} giây`;
+}
+
+/**
+ * Đường dẫn API → câu ngắn dễ hiểu (không hiện /api/... thô cho người dùng).
+ */
+export function humanizeRequestUrl(url) {
+  if (!url) return null;
+  const path = String(url).split('?')[0].toLowerCase();
+  if (/\/devices\/[^/]+\/logout/.test(path)) return 'Đăng xuất một thiết bị đăng nhập';
+  if (/\/devices\/user\/[^/]+\/others\/logout/.test(path)) return 'Đăng xuất các thiết bị khác';
+  if (/\/devices\/user\/[^/]+\/all\/logout/.test(path)) return 'Đăng xuất toàn bộ thiết bị';
+  if (/\/profile\/me\/devices\/logout-all/.test(path)) return 'Đăng xuất mọi thiết bị của tôi';
+  if (/\/admin\/users/.test(path)) return 'Quản lý người dùng';
+  if (/\/admin\/branches/.test(path)) return 'Quản lý chi nhánh';
+  if (/\/admin\/roles/.test(path)) return 'Vai trò';
+  if (/\/admin\/specialties/.test(path)) return 'Chuyên môn';
+  if (/\/admin\/devices/.test(path)) return 'Quản lý thiết bị đăng nhập';
+  if (/\/admin\/audit|\/admin\/logs/.test(path)) return 'Nhật ký hệ thống';
+  if (/\/profile\/me\/password/.test(path)) return 'Đổi mật khẩu hồ sơ';
+  if (/\/profile\/me/.test(path)) return 'Hồ sơ cá nhân';
+  if (/\/auth\/login/.test(path)) return 'Đăng nhập';
+  if (/\/auth\/logout/.test(path)) return 'Đăng xuất';
+  if (/\/auth\/forgot|\/auth\/reset/.test(path)) return 'Quên / đặt lại mật khẩu';
+  return 'Thao tác trên hệ thống';
 }
 
 /** Parse JSON an toàn */
@@ -122,10 +187,27 @@ export function parseAuditJson(value) {
 
 /**
  * Đổi mô tả kỹ thuật (cả log cũ) sang tiếng Việt dễ đọc.
+ * @param {string} description
+ * @param {string} action
+ * @param {object|string} newValue
+ * @param {{ entityCode?: string, entityName?: string }|string} [metaOrEntityCode]
  */
-export function humanizeAuditDescription(description, action, newValue) {
+export function humanizeAuditDescription(description, action, newValue, metaOrEntityCode) {
   const details = parseAuditJson(newValue) || {};
   const actionLabel = getAuditActionLabel(action);
+  const meta = typeof metaOrEntityCode === 'string'
+    ? { entityCode: metaOrEntityCode }
+    : (metaOrEntityCode || {});
+  const entityCodeHint = meta.entityCode || details.entityCode || null;
+  const entityNameHint = meta.entityName || details.entityName || null;
+
+  // Buộc đăng xuất: không hiện ID/tên thiết bị trong danh sách
+  if (action === 'FORCE_LOGO' || action === 'FORCE_LOGOUT') {
+    const raw = String(description || '');
+    if (/toàn bộ|tat ca thiet bi|all devices/i.test(raw)) return 'Đăng xuất toàn bộ thiết bị';
+    if (/thiết bị khác|thiet bi khac|others/i.test(raw)) return 'Đăng xuất các thiết bị khác';
+    return 'Đăng xuất thiết bị';
+  }
 
   // Ưu tiên dựng lại từ details nếu có permission/screen/role
   const hasUsefulDetails =
@@ -207,7 +289,70 @@ export function humanizeAuditDescription(description, action, newValue) {
   }
 
   let text = String(description || '').trim();
-  if (!text) return actionLabel;
+
+  // Gắn tên thật từ newValue khi mô tả còn dạng kỹ thuật ID-n
+  const personLabel = [
+    details.firstName || details.first_name,
+    details.lastName || details.last_name,
+  ].filter(Boolean).join(' ').trim()
+    || details.name
+    || details.userName
+    || details.user_name
+    || details.email
+    || details.targetName
+    || null;
+  const specialtyLabel =
+    details.specialtyName || details.specialty_name
+      ? [
+        details.specialtyCode || details.specialty_code || details.code,
+        details.specialtyName || details.specialty_name,
+      ].filter(Boolean).join(' — ')
+      : (details.specialtyCode || details.specialty_code || null);
+  const roleLabel =
+    details.roleName || details.role_name || details.roleLabel || details.role || null;
+  const branchLabel =
+    details.branchName || details.branch_name || details.branchCode || details.branch_code || null;
+
+  if (!text) {
+    if (specialtyLabel || details.isActive != null || details.is_active != null) {
+      const label = specialtyLabel ? String(specialtyLabel) : '';
+      if (action === 'CREATE') return label ? `Tạo mới chuyên môn ${label}` : 'Tạo mới chuyên môn';
+      if (details.isActive === false || details.is_active === false || details.isActive === 0) {
+        return label ? `Vô hiệu hóa chuyên môn ${label}` : 'Vô hiệu hóa chuyên môn';
+      }
+      if (details.isActive === true || details.is_active === true || details.isActive === 1) {
+        return label ? `Kích hoạt chuyên môn ${label}` : 'Kích hoạt chuyên môn';
+      }
+      return label ? `Cập nhật chuyên môn ${label}` : 'Cập nhật chuyên môn';
+    }
+    if (personLabel) {
+      if (action === 'CREATE') return `Tạo mới người dùng ${personLabel}`;
+      return `Cập nhật người dùng ${personLabel}`;
+    }
+    return actionLabel;
+  }
+
+  // Thay «Người dùng ID-12» / «Chuyên môn ID-8» bằng tên nếu có trong newValue
+  text = text.replace(/\bNgười dùng\s+ID-(\d+)\b/gi, (_, id) => (
+    personLabel ? `người dùng ${personLabel}` : `người dùng #${id}`
+  ));
+  text = text.replace(/\bChuyên môn\s+ID-(\d+)\b/gi, (_, id) => (
+    specialtyLabel ? `chuyên môn ${specialtyLabel}` : `chuyên môn #${id}`
+  ));
+  text = text.replace(/\bvai trò\s+ID-(\d+)\b/gi, (_, id) => (
+    roleLabel ? `vai trò ${getRoleLabel(roleLabel)}` : `vai trò #${id}`
+  ));
+  text = text.replace(/\bchi nhánh\s+ID-(\d+)\b/gi, (_, id) => (
+    branchLabel ? `chi nhánh ${branchLabel}` : `chi nhánh #${id}`
+  ));
+  text = text.replace(/\buser\s+ID\s+(\d+)\b/gi, (_, id) => (
+    personLabel ? `người dùng ${personLabel}` : `người dùng #${id}`
+  ));
+  text = text.replace(/\bID-(\d+)\b/g, (_, id) => {
+    if (personLabel && /người dùng|user/i.test(text)) return personLabel;
+    if (specialtyLabel && /chuyên môn/i.test(text)) return specialtyLabel;
+    return `#${id}`;
+  });
 
   // Thay mã action đầu chuỗi
   Object.keys(AUDIT_ACTION_LABELS).forEach((code) => {
@@ -248,11 +393,11 @@ export function formatAuditFieldValue(key, value) {
   if (key === 'granted') return value === true || value === 1 || value === 'true' ? 'Đã cấp' : 'Thu hồi / chưa cấp';
   if (key === 'permissionKey') {
     const label = getPermissionScreenLabel(value);
-    return label && label !== '—' ? `${label} (${value})` : String(value);
+    return label && label !== '—' ? label : 'Quyền màn hình';
   }
   if (key === 'screenKey') {
     const label = getScreenLabel(value);
-    return label && label !== '—' ? `${label} (${value})` : String(value);
+    return label && label !== '—' ? label : 'Màn hình';
   }
   if (key === 'roleName' || key === 'role') return getRoleLabel(value);
   if (typeof value === 'boolean') return value ? 'Có' : 'Không';
@@ -344,6 +489,7 @@ export function formatAuditTime(value) {
   const sec = secondsSince(value, Date.now() + offset);
   let ago = '';
   if (sec == null) ago = '';
+  else if (sec < -120) ago = ''; // lech gio lon — khong hien "vừa xong" gia
   else if (sec < 0) ago = 'vừa xong';
   else if (sec < 5) ago = 'vừa xong';
   else if (sec < 60) ago = `${sec} giây trước`;

@@ -76,8 +76,8 @@ function buildAuthRouter() {
       try {
         const result = await query(
           `SELECT id, pseudo_id, user_name, email,
-                  first_name, last_name, phone, branch_id, status, avatar,
-                  must_change_password, token_version
+                  first_name, last_name, phone, branch_id, status,
+                  token_version
            FROM   users
            WHERE  id = @userId AND status = 'active'`,
           { userId }
@@ -98,7 +98,10 @@ function buildAuthRouter() {
       try {
         const deviceId = req.user.deviceId || null;
         freshUser.sessionId = req.user.sessionId || null;
-        refreshed = await service.issueTokenWithDevice(freshUser, deviceId);
+        refreshed = await service.issueTokenWithDevice(freshUser, deviceId, {
+          remember: Boolean(req.user.remember),
+          skipCache: true,
+        });
       } catch (signErr) {
         console.error('[auth.refresh-permissions] issueToken failed:', signErr?.message || signErr);
         return next(new ApiError(503, 'Khong the tao token moi'));
@@ -174,9 +177,13 @@ function buildAuthRouter() {
     try {
       const deviceId = req.user && req.user.deviceId;
       if (!deviceId) {
-        // Token khong co deviceId -> tra 401 (token cu / chua login dung flow).
-        // FE se hieu va yeu cau login lai.
-        return sendError(401, 'Thiết bị chưa đăng ký. Vui lòng đăng nhập lại.');
+        // Token moi co the chua gan device (trackLogin loi / IP thieu) —
+        // KHONG 401 de tranh da phien vua login (spinner / SessionExpired).
+        return success(
+          res,
+          { updated: false, deviceId: null, serverTime: new Date().toISOString() },
+          'Heartbeat skipped (no device)'
+        );
       }
 
       let result;

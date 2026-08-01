@@ -3,10 +3,15 @@ import {
   adminBranchesApi,
   adminRolesApi,
   adminUsersApi,
-  adminDevicesApi,
-  setUserMustChangePassword,
 } from '../../../services/adminApi';
 import { useToast } from '../../../components/common/ToastContext';
+import {
+  EMAIL_HINT,
+  isValidEmail,
+  isValidPassword,
+  isValidPhone,
+  isValidUsername,
+} from '../../../utils/validation';
 import ResetPasswordModal from './ResetPasswordModal';
 import './UserFormModal.css';
 
@@ -104,9 +109,6 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [showReset, setShowReset] = useState(false);
-  const [mustChangePassword, setMustChangePassword] = useState(false);
-  const [togglingMustChange, setTogglingMustChange] = useState(false);
-  const [forceLogoutLoading, setForceLogoutLoading] = useState(false);
 
   // Load branches + roles dropdown
   useEffect(() => {
@@ -158,7 +160,6 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       status: user.status || 'active',
       scopeAllBranches: isAllBranches,
     });
-    setMustChangePassword(Boolean(user.mustChangePassword));
     setErrors({});
     setApiError('');
   }, [user, JSON.stringify(roles)]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -166,12 +167,21 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
   function validate() {
     const errs = {};
     if (!isEdit && !form.name.trim()) errs.name = 'Tên đăng nhập là bắt buộc';
+    else if (!isEdit && !isValidUsername(form.name)) {
+      errs.name = 'Tên đăng nhập 3–50 ký tự, chỉ gồm chữ, số, ., _, -';
+    }
     if (!isEdit && !form.email.trim()) errs.email = 'Email là bắt buộc';
     if (!isEdit && !form.password) errs.password = 'Mật khẩu là bắt buộc';
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errs.email = 'Email không đúng định dạng';
+    if (!isEdit && form.password && !isValidPassword(form.password)) {
+      errs.password = 'Mật khẩu tối thiểu 6 ký tự, gồm chữ và số';
     }
-    if (form.phone && !/^0[0-9]{9,10}$/.test(form.phone)) {
+    if (!form.lastName.trim()) errs.lastName = 'Tên là bắt buộc';
+    if (form.email && !isValidEmail(form.email)) {
+      errs.email = EMAIL_HINT;
+    }
+    if (!form.phone.trim()) {
+      errs.phone = 'Số điện thoại là bắt buộc';
+    } else if (!isValidPhone(form.phone)) {
       errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
     }
     if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc (hoặc chọn "Tất cả chi nhánh")';
@@ -208,7 +218,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           firstName: form.firstName?.trim() || user.firstName || '',
           lastName: form.lastName?.trim() || user.lastName || '',
           email: form.email?.trim() || user.email,
-          phone: form.phone?.trim() || undefined,
+          phone: form.phone.trim(),
           status: form.status,
         };
         if (form.scopeAllBranches) {
@@ -228,7 +238,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           password: form.password,
           firstName: form.firstName.trim() || form.name.trim(),
           lastName: form.lastName.trim(),
-          phone: form.phone.trim() || undefined,
+          phone: form.phone.trim(),
           roleId: Number(form.roleId),
         };
         if (form.scopeAllBranches) {
@@ -245,35 +255,6 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       setApiError(err?.response?.data?.message || err.message || 'Lỗi hệ thống');
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleToggleMustChange() {
-    if (!user?.id) return;
-    setTogglingMustChange(true);
-    try {
-      const next = !mustChangePassword;
-      await setUserMustChangePassword(user.id, next);
-      setMustChangePassword(next);
-      toast.success(next ? 'Đã bật bắt buộc đổi mật khẩu' : 'Đã tắt bắt buộc đổi mật khẩu');
-    } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || 'Không thể cập nhật');
-    } finally {
-      setTogglingMustChange(false);
-    }
-  }
-
-  async function handleForceLogoutAll() {
-    if (!user?.id) return;
-    if (!window.confirm('Đăng xuất user này khỏi mọi thiết bị? Phiên đăng nhập hiện tại sẽ bị thu hồi.')) return;
-    setForceLogoutLoading(true);
-    try {
-      await adminDevicesApi.forceLogoutAllDevices(user.id);
-      toast.success('Đã đăng xuất mọi thiết bị');
-    } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || 'Không thể đăng xuất thiết bị');
-    } finally {
-      setForceLogoutLoading(false);
     }
   }
 
@@ -377,23 +358,26 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                 <div className="form__field">
                   <label className="form__label">Tên <span className="required">*</span></label>
                   <input
-                    className="input"
+                    className={`input ${errors.lastName ? 'input--error' : ''}`}
                     value={form.lastName}
                     onChange={(e) => handleChange('lastName', e.target.value)}
                     placeholder="Văn A"
                     autoComplete="off"
                   />
+                  {errors.lastName && <span className="form__err">{errors.lastName}</span>}
                 </div>
               </div>
 
               <div className="form__field">
-                <label className="form__label">Số điện thoại</label>
+                <label className="form__label">Số điện thoại <span className="required">*</span></label>
                 <input
                   className={`input ${errors.phone ? 'input--error' : ''}`}
                   value={form.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
                   placeholder="0912345678"
                   autoComplete="tel"
+                  inputMode="numeric"
+                  maxLength={11}
                 />
                 {errors.phone && <span className="form__err">{errors.phone}</span>}
               </div>
@@ -503,26 +487,6 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                     onClick={() => setShowReset(true)}
                   >
                     Đặt lại mật khẩu
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--outline"
-                    onClick={handleToggleMustChange}
-                    disabled={togglingMustChange}
-                  >
-                    {togglingMustChange
-                      ? 'Đang cập nhật...'
-                      : mustChangePassword
-                        ? 'Tắt bắt buộc đổi MK'
-                        : 'Bắt buộc đổi MK'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--danger"
-                    onClick={handleForceLogoutAll}
-                    disabled={forceLogoutLoading}
-                  >
-                    {forceLogoutLoading ? 'Đang xử lý...' : 'Đăng xuất mọi thiết bị'}
                   </button>
                 </div>
               </div>

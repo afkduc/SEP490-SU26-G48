@@ -105,6 +105,7 @@ class AuditService {
 
     return this.auditRepository.getAuditLogs({
       ...filters,
+      excludeAuthEvents: Boolean(filters.excludeAuthEvents),
       page: parsedPage,
       pageSize: parsedPageSize,
     });
@@ -139,6 +140,7 @@ class AuditService {
       startDate: filters.startDate,
       endDate: filters.endDate,
       branchId: filters.branchId,
+      excludeAuthEvents: Boolean(filters.excludeAuthEvents),
     });
   }
 
