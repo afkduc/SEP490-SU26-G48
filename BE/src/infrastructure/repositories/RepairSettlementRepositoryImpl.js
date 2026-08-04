@@ -187,15 +187,32 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
   // so HOAC so khung (xe doi bien van tra duoc bang so khung). Chi tra ve
   // thong tin toi thieu (ma phieu/ngay/trang thai/chi nhanh) - KHONG tra ten
   // khach hang, SDT, gia tien... de tranh lo thong tin nguoi khac qua bien so.
+  //
+  // Day la tra cuu LICH SU BAO DUONG (khong phai tien do sua chua/lich su sua
+  // chua noi chung) - chi tra ve phieu co it nhat 1 hang muc thuoc loai hinh
+  // "Bao duong dinh ky" (repair_category = 'PM', xem REPAIR_CATEGORY_LABELS
+  // trong DashboardRepositoryImpl.js). Phieu chi gom cac loai hinh sua chua
+  // khac (dong son, sua dong co...) se khong hien ra o day.
+  //
+  // Khong co cot "goi bao duong" rieng (chon goi luc tao phieu chi expand ra
+  // tung dong dich vu, khong luu lai ten goi goc) - nen "goi bao duong la
+  // gi" duoc tra loi bang chinh ten cac hang muc PM da lam trong phieu do
+  // (pm_items, gop bang STRING_AGG), thay vi co doan ten 1 goi trong catalog.
   async findPublicHistoryByVehicleIdentifier(identifier) {
     const result = await query(
       `SELECT so.order_code, so.status, so.intake_date, so.completed_date,
-              b.branch_name, v.license_plate, v.vehicle_model_text
+              b.branch_name, v.license_plate, v.vehicle_model_text, pm.items AS pm_items
        FROM   service_orders so
        JOIN   vehicles  v ON v.id = so.vehicle_id
        JOIN   branches  b ON b.id = so.branch_id
+       CROSS APPLY (
+         SELECT STRING_AGG(soi.item_description, ', ') AS items
+         FROM   service_order_items soi
+         WHERE  soi.service_order_id = so.id AND soi.repair_category = 'PM'
+       ) pm
        WHERE  (v.license_plate = @identifier OR v.frame_number = @identifier)
          AND  so.status <> 'cancelled'
+         AND  pm.items IS NOT NULL
        ORDER  BY so.intake_date DESC`,
       { identifier }
     );

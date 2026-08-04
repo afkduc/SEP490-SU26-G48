@@ -1,21 +1,22 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
-import TeamLeaderKiosk from './TeamLeaderKiosk';
+import TeamLeaderDashboard from './TeamLeaderDashboard';
 
-// To truong dung man hinh kiosk rieng (chon khoang xe -> nhan/lam viec) thay
-// cho man "Cong viec cua toi" + man CVDV "Phan cong" thu cong cu - xem
-// TeamLeaderKiosk.jsx. Cac role khac khong con man nao o day nua (CVDV theo
-// doi tien do qua cac tab cua Phieu quyet toan sua chua).
+// To truong (dang nhap chinh tai khoan cua ho) thay man kiosk cu bang bang
+// tin viec cho nhan realtime - xem TeamLeaderDashboard.jsx. Cac role khac
+// (neu con link/bookmark cu tro toi day) redirect ve Phieu quyet toan.
 export default function RepairOrderPage() {
   const { user } = useAuth();
-  if (user?.primaryRole === ROLES.TEAM_LEADER) {
-    return <TeamLeaderKiosk />;
-  }
+  const isTeamLeader = user?.primaryRole === ROLES.TEAM_LEADER;
+
   return (
     <Routes>
-      <Route index element={<Navigate to="/repair-settlement" replace />} />
-      <Route path="*" element={<Navigate to="/repair-settlement" replace />} />
+      <Route
+        index
+        element={isTeamLeader ? <TeamLeaderDashboard /> : <Navigate to="/repair-settlement" replace />}
+      />
+      <Route path="*" element={<Navigate to="/repair-orders" replace />} />
     </Routes>
   );
 }
