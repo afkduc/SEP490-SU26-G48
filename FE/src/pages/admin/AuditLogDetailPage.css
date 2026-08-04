@@ -1,0 +1,44 @@
+.audit-detail-page__back {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #4f46e5;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.audit-detail-page {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.audit-detail-page__card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px 24px 28px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.audit-detail-page__body {
+  width: 100%;
+}
+
+.audit-detail-page__state {
+  padding: 24px;
+  color: #64748b;
+}
+
+.audit-detail-page__state--error {
+  color: #dc2626;
+}
+
+.audit-detail-page .audit-detail__summary {
+  margin-bottom: 18px;
+}

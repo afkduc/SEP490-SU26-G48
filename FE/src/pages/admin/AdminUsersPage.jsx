@@ -10,8 +10,6 @@ import {
 import { downloadBlob } from '../../utils/downloadBlob';
 import { useToast } from '../../components/common/ToastContext';
 import PermissionGate from '../../components/PermissionGate';
-import UserFormModal from './users/UserFormModal';
-import UserDetailDrawer from './users/UserDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import TableSkeleton from './components/TableSkeleton';
 import './AdminUsersPage.css';
@@ -125,9 +123,6 @@ export default function AdminUsersPage() {
   }, [roles]);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showModal, setShowModal] = useState(false);
-  const [editUser, setEditUser] = useState(null);
-  const [detailUserId, setDetailUserId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -181,10 +176,9 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
-      setShowModal(true);
-      setEditUser(null);
+      navigate('/admin/users/new', { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   useEffect(() => {
     if (location.pathname === '/admin/users' && !window.location.search) {
@@ -214,7 +208,7 @@ export default function AdminUsersPage() {
   async function handleToggleStatus(userId, newStatus) {
     const isDeactivate = newStatus === 'inactive';
     const confirmMsg = isDeactivate
-      ? 'Khóa tài khoản này? User sẽ không thể đăng nhập.'
+      ? 'Khóa tài khoản này? User sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
       : 'Kích hoạt lại tài khoản này?';
     if (!window.confirm(confirmMsg)) return;
 
@@ -287,7 +281,7 @@ export default function AdminUsersPage() {
             <PermissionGate permission="admin:users:create">
               <button
                 className="btn btn--primary admin-page__btn-icon-text"
-                onClick={() => { setEditUser(null); setShowModal(true); }}
+                onClick={() => navigate('/admin/users/new')}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -477,7 +471,7 @@ export default function AdminUsersPage() {
                             <button
                               type="button"
                               className="btn btn--sm btn--view"
-                              onClick={() => setDetailUserId(u.id)}
+                              onClick={() => navigate(`/admin/users/${u.id}`)}
                             >
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -489,7 +483,7 @@ export default function AdminUsersPage() {
                               <button
                                 type="button"
                                 className="btn btn--sm btn--edit"
-                                onClick={() => { setEditUser(u); setShowModal(true); }}
+                                onClick={() => navigate(`/admin/users/${u.id}/edit`)}
                               >
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -501,8 +495,8 @@ export default function AdminUsersPage() {
                           </div>
                           <UserActionMenu
                             user={u}
-                            onView={() => setDetailUserId(u.id)}
-                            onEdit={() => { setEditUser(u); setShowModal(true); }}
+                            onView={() => navigate(`/admin/users/${u.id}`)}
+                            onEdit={() => navigate(`/admin/users/${u.id}/edit`)}
                           />
                         </td>
                       </tr>
@@ -525,21 +519,6 @@ export default function AdminUsersPage() {
           </>
         )}
       </div>
-
-      {showModal && (
-        <UserFormModal
-          user={editUser}
-          onClose={() => { setShowModal(false); setEditUser(null); }}
-          onSuccess={() => refresh()}
-        />
-      )}
-
-      {detailUserId && (
-        <UserDetailDrawer
-          userId={detailUserId}
-          onClose={() => setDetailUserId(null)}
-        />
-      )}
     </div>
   );
 }

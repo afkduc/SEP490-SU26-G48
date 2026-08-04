@@ -30,8 +30,13 @@ const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralD
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
+const UserFormPage = lazy(() => import('../pages/admin/users/UserFormPage'));
+const UserDetailPage = lazy(() => import('../pages/admin/users/UserDetailPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
+const AuditLogDetailPage = lazy(() => import('../pages/admin/AuditLogDetailPage'));
 const AdminCatalogPage = lazy(() => import('../pages/admin/AdminCatalogPage'));
+const BranchFormPage = lazy(() => import('../pages/admin/branches/BranchFormPage'));
+const BranchDetailPage = lazy(() => import('../pages/admin/branches/BranchDetailPage'));
 const AdminLoginSecurityPage = lazy(() =>
   import('../pages/admin/AdminLoginSecurityPage').then((m) => {
     if (!m?.default) {
@@ -205,8 +210,14 @@ function AppRoutes() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="users" element={<AdminUsersPage />} />
+          <Route path="users/new" element={<UserFormPage mode="create" />} />
+          <Route path="users/:id/edit" element={<UserFormPage mode="edit" />} />
+          <Route path="users/:id" element={<UserDetailPage />} />
           <Route path="roles" element={<Navigate to="/admin/users" replace />} />
           <Route path="catalog" element={<AdminCatalogPage />} />
+          <Route path="catalog/branches/new" element={<BranchFormPage mode="create" />} />
+          <Route path="catalog/branches/:id/edit" element={<BranchFormPage mode="edit" />} />
+          <Route path="catalog/branches/:id" element={<BranchDetailPage />} />
           <Route path="branches" element={<Navigate to="/admin/catalog" replace />} />
           <Route path="vehicle-brands" element={<Navigate to="/admin/catalog" replace />} />
           <Route path="login-security" element={<AdminLoginSecurityPage />} />
@@ -214,6 +225,7 @@ function AppRoutes() {
           <Route path="login-sessions" element={<Navigate to="/admin/login-security?tab=sessions" replace />} />
           <Route path="devices" element={<Navigate to="/admin/login-security" replace />} />
           <Route path="logs" element={<AuditLogsPage />} />
+          <Route path="logs/:id" element={<AuditLogDetailPage />} />
           <Route path="profile" element={<AdminAccountPage />} />
           <Route path="profile/edit" element={<AdminAccountPage />} />
           <Route path="profile/notifications" element={<Navigate to="/admin/profile?tab=notifications" replace />} />

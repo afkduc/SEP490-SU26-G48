@@ -22,7 +22,12 @@ async function query(queryStr, params = {}) {
   const conn = await getPool();
   const request = conn.request();
   Object.entries(params).forEach(([key, value]) => {
-    request.input(key, value);
+    // Ep Unicode string -> NVarChar de tranh VARCHAR Latin doi dau Viet thanh '?'
+    if (typeof value === 'string') {
+      request.input(key, sql.NVarChar(sql.MAX), value);
+    } else {
+      request.input(key, value);
+    }
   });
   return request.query(queryStr);
 }
@@ -43,7 +48,11 @@ async function executeTransaction(callback) {
   const txQuery = async (queryStr, params = {}) => {
     const request = tx.request();
     Object.entries(params).forEach(([key, value]) => {
-      request.input(key, value);
+      if (typeof value === 'string') {
+        request.input(key, sql.NVarChar(sql.MAX), value);
+      } else {
+        request.input(key, value);
+      }
     });
     return request.query(queryStr);
   };
