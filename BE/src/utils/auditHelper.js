@@ -167,7 +167,7 @@ async function auditLog({
 
     const desc = description || buildDescription(action, entityName || tableName, entityCode, userName);
 
-    await query(
+    const result = await query(
       `INSERT INTO audit_logs (
         user_id, user_name, phone_number, action, table_name,
         entity_name, entity_code, record_id,
@@ -204,13 +204,17 @@ async function auditLog({
         p18: newValueStr,
       }
     );
+    const insertedId = result.recordset?.[0]?.id ?? null;
     // Danh dau de auditMiddleware khong ghi trung sau khi controller da audit
     if (req && typeof req === 'object') {
       req._manualAuditWritten = true;
+      if (insertedId != null) req._lastAuditLogId = insertedId;
     }
+    return insertedId;
   } catch (err) {
     console.error('[auditHelper] Failed to write audit log:', err.message);
     // Khong throw de khong anh huong tien trinh chinh
+    return null;
   }
 }
 
@@ -219,7 +223,7 @@ async function auditLog({
  */
 const auditCrud = {
   async create(req, { tableName, entityCode, recordId, entityName, data, description }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.CREATE,
       tableName,
@@ -234,7 +238,7 @@ const auditCrud = {
   },
 
   async update(req, { tableName, entityCode, recordId, entityName, oldData, newData, description }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.UPDATE,
       tableName,
@@ -250,7 +254,7 @@ const auditCrud = {
   },
 
   async delete(req, { tableName, entityCode, recordId, entityName, oldData }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.DELETE,
       tableName,
@@ -263,7 +267,7 @@ const auditCrud = {
   },
 
   async login(req, { success = true, reason = null }) {
-    await auditLog({
+    return auditLog({
       req,
       action: success ? ACTION_TYPES.LOGIN : ACTION_TYPES.FAILED_LOGIN,
       tableName: 'login_sessions',
@@ -273,7 +277,7 @@ const auditCrud = {
   },
 
   async logout(req, { reason = null }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.LOGOUT,
       tableName: 'login_sessions',
@@ -283,7 +287,7 @@ const auditCrud = {
   },
 
   async forceLogout(req, { targetUserName, reason }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.FORCE_LOGO,
       tableName: 'login_sessions',
@@ -293,7 +297,7 @@ const auditCrud = {
   },
 
   async changePassword(req, { targetUserName }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.CHANGE_PASSWORD,
       tableName: 'users',
@@ -303,7 +307,7 @@ const auditCrud = {
   },
 
   async resetPassword(req, { targetUserName, newPassword }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.RESET_PASSWORD,
       tableName: 'users',
@@ -313,7 +317,7 @@ const auditCrud = {
   },
 
   async assignRole(req, { userName, roleName }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.ASSIGN_ROLE,
       tableName: 'user_role',
@@ -323,7 +327,7 @@ const auditCrud = {
   },
 
   async removeRole(req, { userName, roleName }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.REMOVE_ROLE,
       tableName: 'user_role',
@@ -333,7 +337,7 @@ const auditCrud = {
   },
 
   async export(req, { fileName, dataType }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.EXPORT,
       tableName: dataType || 'export',
@@ -342,7 +346,7 @@ const auditCrud = {
   },
 
   async import(req, { fileName, dataType, recordCount }) {
-    await auditLog({
+    return auditLog({
       req,
       action: ACTION_TYPES.IMPORT,
       tableName: dataType || 'import',
@@ -391,53 +395,53 @@ const ACTION_TO_NOTIFICATION_EVENT = {
  */
 const auditNotify = {
   async create(req, opts) {
-    await auditCrud.create(req, opts);
-    await _fireNotification(req, opts, 'CREATE');
+    const auditLogId = await auditCrud.create(req, opts);
+    await _fireNotification(req, opts, 'CREATE', auditLogId);
   },
 
   async update(req, opts) {
-    await auditCrud.update(req, opts);
-    await _fireNotification(req, opts, 'UPDATE');
+    const auditLogId = await auditCrud.update(req, opts);
+    await _fireNotification(req, opts, 'UPDATE', auditLogId);
   },
 
   async delete(req, opts) {
-    await auditCrud.delete(req, opts);
-    await _fireNotification(req, opts, 'DELETE');
+    const auditLogId = await auditCrud.delete(req, opts);
+    await _fireNotification(req, opts, 'DELETE', auditLogId);
   },
 
   async login(req, opts) {
-    await auditCrud.login(req, opts);
-    await _fireNotification(req, opts, opts.success === false ? 'FAILED_LOGIN' : 'LOGIN');
+    const auditLogId = await auditCrud.login(req, opts);
+    await _fireNotification(req, opts, opts.success === false ? 'FAILED_LOGIN' : 'LOGIN', auditLogId);
   },
 
   async logout(req, opts) {
-    if (auditCrud.logout) await auditCrud.logout(req, opts);
-    await _fireNotification(req, opts, 'LOGOUT');
+    const auditLogId = auditCrud.logout ? await auditCrud.logout(req, opts) : null;
+    await _fireNotification(req, opts, 'LOGOUT', auditLogId);
   },
 
   async forceLogout(req, opts) {
-    if (auditCrud.forceLogout) await auditCrud.forceLogout(req, opts);
-    await _fireNotification(req, opts, 'FORCE_LOGO');
+    const auditLogId = auditCrud.forceLogout ? await auditCrud.forceLogout(req, opts) : null;
+    await _fireNotification(req, opts, 'FORCE_LOGO', auditLogId);
   },
 
   async changePassword(req, opts) {
-    if (auditCrud.changePassword) await auditCrud.changePassword(req, opts);
-    await _fireNotification(req, opts, 'CHANGE_PASSWORD');
+    const auditLogId = auditCrud.changePassword ? await auditCrud.changePassword(req, opts) : null;
+    await _fireNotification(req, opts, 'CHANGE_PASSWORD', auditLogId);
   },
 
   async resetPassword(req, opts) {
-    if (auditCrud.resetPassword) await auditCrud.resetPassword(req, opts);
-    await _fireNotification(req, opts, 'RESET_PASSWORD');
+    const auditLogId = auditCrud.resetPassword ? await auditCrud.resetPassword(req, opts) : null;
+    await _fireNotification(req, opts, 'RESET_PASSWORD', auditLogId);
   },
 
   async assignRole(req, opts) {
-    if (auditCrud.assignRole) await auditCrud.assignRole(req, opts);
-    await _fireNotification(req, opts, 'ASSIGN_ROLE');
+    const auditLogId = auditCrud.assignRole ? await auditCrud.assignRole(req, opts) : null;
+    await _fireNotification(req, opts, 'ASSIGN_ROLE', auditLogId);
   },
 
   async removeRole(req, opts) {
-    if (auditCrud.removeRole) await auditCrud.removeRole(req, opts);
-    await _fireNotification(req, opts, 'REMOVE_ROLE');
+    const auditLogId = auditCrud.removeRole ? await auditCrud.removeRole(req, opts) : null;
+    await _fireNotification(req, opts, 'REMOVE_ROLE', auditLogId);
   },
 
   /**
@@ -446,15 +450,15 @@ const auditNotify = {
    */
   async withAction(req, { actionType, ...opts }) {
     const fn = auditCrud[actionType?.toLowerCase?.()] || auditCrud.create;
-    await fn(req, opts);
-    await _fireNotification(req, opts, actionType);
+    const auditLogId = await fn(req, opts);
+    await _fireNotification(req, opts, actionType, auditLogId);
   },
 };
 
 /**
  * Fire notification (private). Best-effort, khong throw.
  */
-async function _fireNotification(req, opts, actionType) {
+async function _fireNotification(req, opts, actionType, auditLogId = null) {
   try {
     const NotificationService = require('../application/services/NotificationService');
     const ns = new NotificationService();
@@ -478,6 +482,7 @@ async function _fireNotification(req, opts, actionType) {
       actorId: req?.user?.userId || req?.user?.id,
       targetName: opts.entityName || opts.entityCode || opts.tableName || 'unknown',
       targetCode: opts.entityCode || opts.recordId || '',
+      auditLogId: auditLogId ?? req?._lastAuditLogId ?? null,
       ...opts.details,
     };
 
