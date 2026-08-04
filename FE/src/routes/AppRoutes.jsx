@@ -8,7 +8,7 @@ import SessionTakenOverPrompt from '../components/SessionTakenOverPrompt';
 import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
-import { ROLES } from '../constants/roles';
+import { ROLES, INVENTORY_ACCESS_ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 import { BASE_PATH } from '../config';
 import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
@@ -359,9 +359,7 @@ function AppRoutes() {
         <Route
           path={ROUTES.INVENTORY}
           element={
-            <ProtectedRoute
-              roles={[ROLES.WAREHOUSE_STAFF]}
-            >
+            <ProtectedRoute roles={[...INVENTORY_ACCESS_ROLES]}>
               <AppLayout>
                 <InventoryLayout />
               </AppLayout>
@@ -375,10 +373,24 @@ function AppRoutes() {
           <Route path="parts/:id" element={<PartDetailPage />} />
           <Route path="stock" element={<StockPage />} />
           <Route path="import-requests" element={<ImportRequestListPage />} />
-          <Route path="import-requests/new" element={<ImportRequestFormPage />} />
+          <Route
+            path="import-requests/new"
+            element={
+              <ProtectedRoute permission="import_requests:create">
+                <ImportRequestFormPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="import-requests/:id" element={<ImportRequestDetailPage />} />
           <Route path="export-requests" element={<ExportRequestListPage />} />
-          <Route path="export-requests/new" element={<ExportRequestFormPage />} />
+          <Route
+            path="export-requests/new"
+            element={
+              <ProtectedRoute permission="export_requests:create">
+                <ExportRequestFormPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="export-requests/:id" element={<ExportRequestDetailPage />} />
         </Route>
 
