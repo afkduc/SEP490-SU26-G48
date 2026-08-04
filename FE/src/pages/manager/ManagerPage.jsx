@@ -148,20 +148,23 @@ function EmployeeAvatar({ employee }) {
 function EmployeeDetailModal({ employee, onClose }) {
   const [members, setMembers] = useState(null);
   const [specialties, setSpecialties] = useState(null);
+  const [bays, setBays] = useState(null);
   const isTeamLeader = employee?.roles?.includes('team_leader');
 
   useEffect(() => {
-    if (!employee?.id || !isTeamLeader) { setMembers(null); setSpecialties(null); return undefined; }
+    if (!employee?.id || !isTeamLeader) { setMembers(null); setSpecialties(null); setBays(null); return undefined; }
     let mounted = true;
     setMembers(null);
     setSpecialties(null);
+    setBays(null);
     managerApi.getEmployeeById(employee.id)
       .then((data) => {
         if (!mounted) return;
         setMembers(data?.members || []);
         setSpecialties(data?.specialties || []);
+        setBays(data?.bays || []);
       })
-      .catch(() => { if (mounted) { setMembers([]); setSpecialties([]); } });
+      .catch(() => { if (mounted) { setMembers([]); setSpecialties([]); setBays([]); } });
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee?.id, isTeamLeader]);
@@ -234,6 +237,17 @@ function EmployeeDetailModal({ employee, onClose }) {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              <div style={{ fontWeight: 700, margin: '16px 0 8px', fontSize: 13, color: 'var(--gray-700)' }}>
+                Khoang xe phụ trách ({(bays || []).length})
+              </div>
+              {bays === null && <p className="form-hint">Đang tải…</p>}
+              {bays && bays.length === 0 && <p className="form-hint">Chưa phụ trách khoang xe nào.</p>}
+              {bays && bays.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {bays.map((n) => <span key={n} className="tag">Khoang {n}</span>)}
                 </div>
               )}
             </>
@@ -475,6 +489,15 @@ function EmployeeFormPage({ mode }) {
   // tin khac cua nhan vien.
   const [changePassword, setChangePassword] = useState(false);
 
+  // To truong quan ly 1 doi tho (users.team_leader_id) + phu trach vai khoang
+  // xe (bang vehicle_bays) - chi co y nghia khi da co san mot to truong (che
+  // do sua), vi API set 2 thu nay can id cua chinh to truong.
+  const [members, setMembers] = useState([]);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberSuggestions, setMemberSuggestions] = useState([]);
+  const [bayNumbers, setBayNumbers] = useState([]);
+  const [bayNumberInput, setBayNumberInput] = useState('');
+
   useEffect(() => {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
@@ -496,6 +519,8 @@ function EmployeeFormPage({ mode }) {
             confirmPassword: '',
             specialtyIds: (data.specialties || []).map((s) => s.id),
           });
+          setMembers(data.members || []);
+          setBayNumbers(data.bays || []);
         })
         .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin nhân viên'); })
         .finally(() => { if (mounted) setLoading(false); });
@@ -523,6 +548,44 @@ function EmployeeFormPage({ mode }) {
     });
   };
 
+  // Go ten tim tho may de them vao doi - loc san nhung nguoi da co trong
+  // danh sach members hien tai, khong can bam chon xong roi lai loc tay.
+  useEffect(() => {
+    if (!isEdit || !isTeamLeaderRole || !memberSearch.trim()) { setMemberSuggestions([]); return undefined; }
+    let alive = true;
+    const timer = setTimeout(() => {
+      managerApi.getTechnicians({ search: memberSearch.trim(), status: 'active' })
+        .then((data) => {
+          if (!alive) return;
+          const memberIds = new Set(members.map((m) => m.id));
+          setMemberSuggestions((data || []).filter((t) => !memberIds.has(t.id)));
+        })
+        .catch(() => { if (alive) setMemberSuggestions([]); });
+    }, 300);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [memberSearch, isEdit, isTeamLeaderRole, members]);
+
+  const addMember = (technician) => {
+    setMembers((prev) => (prev.some((m) => m.id === technician.id) ? prev : [...prev, { id: technician.id, employeeId: technician.employeeId, fullName: technician.fullName }]));
+    setMemberSearch('');
+    setMemberSuggestions([]);
+  };
+
+  const removeMember = (memberId) => {
+    setMembers((prev) => prev.filter((m) => m.id !== memberId));
+  };
+
+  const addBayNumber = () => {
+    const n = Number(bayNumberInput);
+    if (!Number.isInteger(n) || n <= 0) return;
+    setBayNumbers((prev) => (prev.includes(n) ? prev : [...prev, n].sort((a, b) => a - b)));
+    setBayNumberInput('');
+  };
+
+  const removeBayNumber = (n) => {
+    setBayNumbers((prev) => prev.filter((x) => x !== n));
+  };
+
   const validate = () => {
     const errors = {};
     if (!form.fullName.trim()) errors.fullName = 'Vui lòng nhập họ và tên';
@@ -544,6 +607,12 @@ function EmployeeFormPage({ mode }) {
     event.preventDefault();
     setError('');
     if (!validate()) return;
+    // To truong luon phai phu trach it nhat 3 khoang de doi cua ho co du cho
+    // hoat dong - trung voi rang buoc o BE (ManagerService.setBayNumbers).
+    if (isEdit && isTeamLeaderRole && bayNumbers.length < 3) {
+      setError('Mỗi tổ trưởng phải phụ trách tối thiểu 3 khoang xe.');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -562,6 +631,10 @@ function EmployeeFormPage({ mode }) {
           payload.confirmPassword = form.confirmPassword;
         }
         await managerApi.updateEmployee(id, payload);
+        if (isTeamLeaderRole) {
+          await managerApi.setEmployeeTeamMembers(id, members.map((m) => m.id));
+          await managerApi.setEmployeeBays(id, bayNumbers);
+        }
         navigate('/manager/employees');
       } else {
         await managerApi.createEmployee({ ...payload, password: form.password, confirmPassword: form.confirmPassword });
@@ -693,6 +766,74 @@ function EmployeeFormPage({ mode }) {
                       <input type="checkbox" checked={form.specialtyIds.includes(s.id)} onChange={() => toggleSpecialty(s.id)} />
                       <span>{s.name}</span>
                     </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isTeamLeaderRole && isEdit && (
+            <div className="form-group" style={{ marginTop: 14, position: 'relative' }}>
+              <label className="form-label">Thành viên đội</label>
+              <input
+                className="form-input"
+                placeholder="Gõ tên thợ máy để tìm và thêm..."
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+              />
+              {memberSuggestions.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', maxHeight: 220, overflowY: 'auto' }}>
+                  {memberSuggestions.map((t) => (
+                    <div key={t.id} onMouseDown={() => addMember(t)}
+                      style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--gray-100)' }}>
+                      <b>{t.fullName}</b> <span style={{ color: 'var(--gray-500)' }}>({t.employeeId})</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {members.length === 0 ? (
+                <p className="form-hint">Chưa có thợ máy nào trong đội.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                  {members.map((m) => (
+                    <span key={m.id} className="tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      {m.fullName}
+                      <button type="button" onClick={() => removeMember(m.id)}
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--gray-500)', padding: 0 }}>✕</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isTeamLeaderRole && isEdit && (
+            <div className="form-group" style={{ marginTop: 14 }}>
+              <label className="form-label">Khoang xe phụ trách</label>
+              <p className="form-hint" style={{ marginTop: 0 }}>Mỗi tổ trưởng phải phụ trách tối thiểu 3 khoang xe.</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="form-input"
+                  style={{ maxWidth: 160 }}
+                  type="number"
+                  min={1}
+                  placeholder="Số khoang"
+                  value={bayNumberInput}
+                  onChange={(e) => setBayNumberInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBayNumber(); } }}
+                />
+                <button type="button" className="btn btn-secondary" onClick={addBayNumber}>+ Thêm khoang</button>
+              </div>
+              {bayNumbers.length === 0 ? (
+                <p className="form-hint">Chưa phụ trách khoang xe nào.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                  {bayNumbers.map((n) => (
+                    <span key={n} className="tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      Khoang {n}
+                      <button type="button" onClick={() => removeBayNumber(n)}
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--gray-500)', padding: 0 }}>✕</button>
+                    </span>
                   ))}
                 </div>
               )}
@@ -1028,7 +1169,7 @@ function ServiceListPage() {
 const REPAIR_CATEGORY_OPTIONS = [
   { value: '', label: '' },
   { value: 'ER', label: 'Sửa chữa động cơ' },
-  { value: 'CB', label: 'Sửa chữa gầm - phanh' },
+  { value: 'CB', label: 'Sửa chữa gầm' },
   { value: 'EE', label: 'Sửa chữa điện - điện tử' },
   { value: 'BP', label: 'Đồng sơn' },
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },

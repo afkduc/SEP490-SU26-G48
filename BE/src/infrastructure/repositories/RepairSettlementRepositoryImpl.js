@@ -166,7 +166,40 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
       { id }
     );
 
-    return RepairSettlement.fromPersistence(header, itemsResult.recordset, tasksResult.recordset);
+    // Tho thuc hien (co the nhieu tho) - dung DUNG lenh sua chua dang hien
+    // hanh (header.repair_order_id, xem HEADER_SELECT OUTER APPLY) de khop
+    // voi "To truong" hien cung tren man, tranh gop nham tho tu 1 lenh cu da huy.
+    const techniciansResult = header.repair_order_id
+      ? await query(
+          `SELECT u.id, u.user_name, u.phone
+           FROM   repair_order_technicians rot
+           JOIN   users u ON u.id = rot.technician_id
+           WHERE  rot.repair_order_id = @repairOrderId
+           ORDER  BY u.user_name ASC`,
+          { repairOrderId: header.repair_order_id }
+        )
+      : { recordset: [] };
+
+    return RepairSettlement.fromPersistence(header, itemsResult.recordset, tasksResult.recordset, techniciansResult.recordset);
+  }
+
+  // Tra cuu cong khai (khong dang nhap, xem publicRoutes.js) - khach nhap bien
+  // so HOAC so khung (xe doi bien van tra duoc bang so khung). Chi tra ve
+  // thong tin toi thieu (ma phieu/ngay/trang thai/chi nhanh) - KHONG tra ten
+  // khach hang, SDT, gia tien... de tranh lo thong tin nguoi khac qua bien so.
+  async findPublicHistoryByVehicleIdentifier(identifier) {
+    const result = await query(
+      `SELECT so.order_code, so.status, so.intake_date, so.completed_date,
+              b.branch_name, v.license_plate, v.vehicle_model_text
+       FROM   service_orders so
+       JOIN   vehicles  v ON v.id = so.vehicle_id
+       JOIN   branches  b ON b.id = so.branch_id
+       WHERE  (v.license_plate = @identifier OR v.frame_number = @identifier)
+         AND  so.status <> 'cancelled'
+       ORDER  BY so.intake_date DESC`,
+      { identifier }
+    );
+    return result.recordset;
   }
 
   // 1 khach hang + 1 xe chi duoc co TOI DA 1 phieu quyet toan dang xu ly
@@ -198,6 +231,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('customerId', sql.BigInt, data.customerId)
         .input('advisorId', sql.BigInt, advisorId)
         .input('customerRequest', sql.NVarChar(1000), data.customerRequest || null)
+        .input('note', sql.NVarChar(1000), data.note || null)
         .input('currentKm', sql.Int, data.currentKm || null)
         .input('status', sql.VarChar(30), 'waiting_repair')
         .input('subtotal', sql.Decimal(18, 2), data.subtotal || 0)
@@ -208,18 +242,24 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('total', sql.Decimal(18, 2), data.total || 0)
         .input('isWarranty', sql.Bit, isWarranty)
         .input('intakeDate', sql.DateTime, nowVN())
+        .input('intakeChecklist', sql.NVarChar(sql.MAX), JSON.stringify(data.intakeChecklist || {}))
+        .input('signatureData', sql.NVarChar(sql.MAX), data.signatureData)
+        .input('signerName', sql.NVarChar(255), data.signerName || null)
+        .input('signedAt', sql.DateTime, nowVN())
         .query(`
           INSERT INTO service_orders (
             order_code, branch_id, vehicle_id, customer_id, advisor_id,
-            customer_request, current_km, status,
+            customer_request, note, current_km, status,
             subtotal, discount_amount, after_discount, vat, free_amount, total,
-            is_warranty, intake_date
+            is_warranty, intake_date, intake_checklist,
+            signature_data, signature_signer_name, signature_signed_at
           )
           VALUES (
             '', @branchId, @vehicleId, @customerId, @advisorId,
-            @customerRequest, @currentKm, @status,
+            @customerRequest, @note, @currentKm, @status,
             @subtotal, @discountAmount, @afterDiscount, @vat, @freeAmount, @total,
-            @isWarranty, @intakeDate
+            @isWarranty, @intakeDate, @intakeChecklist,
+            @signatureData, @signerName, @signedAt
           );
           SELECT SCOPE_IDENTITY() AS id;
         `);
@@ -245,6 +285,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .request()
         .input('id', sql.BigInt, id)
         .input('customerRequest', sql.NVarChar(1000), data.customerRequest || null)
+        .input('note', sql.NVarChar(1000), data.note || null)
         .input('currentKm', sql.Int, data.currentKm || null)
         .input('subtotal', sql.Decimal(18, 2), data.subtotal || 0)
         .input('discountAmount', sql.Decimal(18, 2), data.discountAmount || 0)
@@ -253,9 +294,11 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('freeAmount', sql.Decimal(18, 2), data.freeAmount || 0)
         .input('total', sql.Decimal(18, 2), data.total || 0)
         .input('isWarranty', sql.Bit, isWarranty)
+        .input('intakeChecklist', sql.NVarChar(sql.MAX), JSON.stringify(data.intakeChecklist || {}))
         .query(`
           UPDATE service_orders SET
             customer_request = @customerRequest,
+            note = @note,
             current_km = @currentKm,
             subtotal = @subtotal,
             discount_amount = @discountAmount,
@@ -263,7 +306,8 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             vat = @vat,
             free_amount = @freeAmount,
             total = @total,
-            is_warranty = @isWarranty
+            is_warranty = @isWarranty,
+            intake_checklist = @intakeChecklist
           WHERE id = @id
         `);
 
@@ -339,6 +383,18 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
           .input('cancelReason', sql.NVarChar(500), cancelReason || null)
           .query(`UPDATE service_orders SET status = @status, cancel_reason = @cancelReason WHERE id = @id`);
+
+        // Khach huy giua chung, khi da co to truong nhan (lenh sua chua dang
+        // "inprogress") - huy luon lenh do CHO DUT DIEM (khong revert ve
+        // "waiting_repair" de nhan lai nhu truoc, vi khach da huy thi khong
+        // con gi de lam nua) - xem RepairSettlementService.updateStatus emit
+        // SSE bao rieng cho khoang dang hien lenh nay.
+        await tx.request().input('id', sql.BigInt, id).input('cancelReason', sql.NVarChar(500), cancelReason || null)
+          .query(`
+            UPDATE repair_orders
+            SET    status = 'cancelled', cancel_reason = @cancelReason
+            WHERE  service_order_id = @id AND status = 'inprogress'
+          `);
         return;
       }
 

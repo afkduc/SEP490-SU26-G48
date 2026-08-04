@@ -34,7 +34,7 @@
 }
 
 /* ── Buttons ── */
-.btn {
+.admin-notifications .btn {
   padding: 9px 16px;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -49,24 +49,62 @@
   white-space: nowrap;
 }
 
-.btn--primary {
+.admin-notifications .btn--primary {
   background: #0891b2;
   color: #fff;
   border-color: #0891b2;
 }
 
-.btn--primary:hover:not(:disabled) {
+.admin-notifications .btn--primary:hover:not(:disabled) {
   background: #0e7490;
   border-color: #0e7490;
 }
 
-.btn:disabled {
+.admin-notifications .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
+/* ── Loading / Error state ── */
+.admin-notifications .loading-state,
+.admin-notifications .error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.admin-notifications .loading-state p,
+.admin-notifications .error-state p {
+  margin: 0;
+}
+
+.admin-notifications .error-state {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+}
+
+.admin-notifications .loading-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid #e2e8f0;
+  border-top-color: #0891b2;
+  border-radius: 50%;
+  animation: admin-notifications-spin 0.7s linear infinite;
+}
+
+@keyframes admin-notifications-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── Alert ── */
-.alert-banner {
+.admin-notifications .alert-banner {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -76,13 +114,13 @@
   font-weight: 500;
 }
 
-.alert-banner--success {
+.admin-notifications .alert-banner--success {
   background: #dcfce7;
   color: #166534;
   border: 1px solid #bbf7d0;
 }
 
-.alert-banner__icon {
+.admin-notifications .alert-banner__icon {
   font-weight: 700;
   font-size: 1rem;
 }
@@ -182,7 +220,7 @@
 }
 
 /* ── Toggle Switch ── */
-.toggle {
+.admin-notifications .toggle {
   position: relative;
   display: inline-block;
   width: 40px;
@@ -190,13 +228,13 @@
   flex-shrink: 0;
 }
 
-.toggle input {
+.admin-notifications .toggle input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.toggle__slider {
+.admin-notifications .toggle__slider {
   position: absolute;
   cursor: pointer;
   top: 0;
@@ -208,7 +246,7 @@
   transition: 0.2s ease;
 }
 
-.toggle__slider::before {
+.admin-notifications .toggle__slider::before {
   position: absolute;
   content: '';
   height: 16px;
@@ -220,10 +258,10 @@
   transition: 0.2s ease;
 }
 
-.toggle input:checked + .toggle__slider {
+.admin-notifications .toggle input:checked + .toggle__slider {
   background-color: #0891b2;
 }
 
-.toggle input:checked + .toggle__slider::before {
+.admin-notifications .toggle input:checked + .toggle__slider::before {
   transform: translateX(18px);
 }
