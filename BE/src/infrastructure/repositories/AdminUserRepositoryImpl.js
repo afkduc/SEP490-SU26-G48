@@ -1,4 +1,8 @@
 const { query } = require('../database/sqlServer');
+const {
+  sqlAccentInsensitiveLike,
+  bindNormalizedLikeParam,
+} = require('../../utils/vietnamese');
 
 const ADMIN_USER_COLUMNS = `
   u.id,
@@ -71,14 +75,16 @@ class AdminUserRepositoryImpl {
     let paramIndex = 1;
 
     if (search) {
+      const key = `p${paramIndex}`;
+      bindNormalizedLikeParam(params, key, search);
       conditions.push(`(
-        LOWER(u.user_name) LIKE LOWER(@p${paramIndex})
-        OR LOWER(u.email) LIKE LOWER(@p${paramIndex})
-        OR LOWER(u.first_name) LIKE LOWER(@p${paramIndex})
-        OR LOWER(u.last_name) LIKE LOWER(@p${paramIndex})
-        OR u.phone LIKE @p${paramIndex}
+        ${sqlAccentInsensitiveLike('u.user_name', key)}
+        OR ${sqlAccentInsensitiveLike('u.email', key)}
+        OR ${sqlAccentInsensitiveLike('u.first_name', key)}
+        OR ${sqlAccentInsensitiveLike('u.last_name', key)}
+        OR ${sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
+        OR ${sqlAccentInsensitiveLike('u.phone', key)}
       )`);
-      params[`p${paramIndex}`] = `%${search}%`;
       paramIndex++;
     }
 
@@ -159,14 +165,16 @@ class AdminUserRepositoryImpl {
     let paramIndex = 1;
 
     if (search) {
+      const key = `p${paramIndex}`;
+      bindNormalizedLikeParam(params, key, search);
       conditions.push(`(
-        LOWER(u.user_name) LIKE LOWER(@p${paramIndex})
-        OR LOWER(u.email) LIKE LOWER(@p${paramIndex})
-        OR LOWER(u.first_name) LIKE LOWER(@p${paramIndex})
-        OR LOWER(u.last_name) LIKE LOWER(@p${paramIndex})
-        OR u.phone LIKE @p${paramIndex}
+        ${sqlAccentInsensitiveLike('u.user_name', key)}
+        OR ${sqlAccentInsensitiveLike('u.email', key)}
+        OR ${sqlAccentInsensitiveLike('u.first_name', key)}
+        OR ${sqlAccentInsensitiveLike('u.last_name', key)}
+        OR ${sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
+        OR ${sqlAccentInsensitiveLike('u.phone', key)}
       )`);
-      params[`p${paramIndex}`] = `%${search}%`;
       paramIndex++;
     }
 

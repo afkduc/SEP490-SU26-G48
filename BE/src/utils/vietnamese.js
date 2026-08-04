@@ -5,9 +5,27 @@
 function normalizeVietnamese(str) {
   return String(str || '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/gi, 'd')
     .toLowerCase();
 }
 
-module.exports = { normalizeVietnamese };
+/**
+ * SQL fragment: so khớp không phân biệt hoa/thường & dấu tiếng Việt.
+ * Cột DB qua dbo.RemoveVietnameseAccents; tham số đã normalizeVietnamese.
+ */
+function sqlAccentInsensitiveLike(columnExpr, paramName) {
+  return `dbo.RemoveVietnameseAccents(COALESCE(${columnExpr}, N'')) LIKE @${paramName}`;
+}
+
+/** Gán params[paramKey] = %needle% đã bỏ dấu / lower. */
+function bindNormalizedLikeParam(params, paramKey, rawValue) {
+  params[paramKey] = `%${normalizeVietnamese(rawValue)}%`;
+  return paramKey;
+}
+
+module.exports = {
+  normalizeVietnamese,
+  sqlAccentInsensitiveLike,
+  bindNormalizedLikeParam,
+};

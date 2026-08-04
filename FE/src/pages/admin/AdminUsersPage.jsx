@@ -309,7 +309,7 @@ export default function AdminUsersPage() {
           <input
             className="input input--search"
             type="text"
-            placeholder="Tìm theo tên, email, số điện thoại..."
+            placeholder="Tìm theo tên, email, SĐT (có/không dấu)..."
             value={params.search || ''}
             onChange={(e) => updateParam('search', e.target.value)}
           />

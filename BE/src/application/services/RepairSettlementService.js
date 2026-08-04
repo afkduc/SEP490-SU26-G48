@@ -180,7 +180,7 @@ class RepairSettlementService {
   // FE). Het han sau 60s (test nhanh theo yeu cau) - moi lan goi la 1
   // orderCode moi (Date.now()), khong tai su dung orderCode cu vi PayOS bat
   // buoc orderCode duy nhat.
-  async createPayosPaymentLink(id) {
+  async createPayosPaymentLink(id, req = {}) {
     const existing = await this.repairSettlementRepository.findById(id);
     if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
     if (existing.status !== 'waiting_payment') {
@@ -210,13 +210,23 @@ class RepairSettlementService {
       expiredAt: new Date(expiredAtUnix * 1000),
     });
 
+    await auditLog({
+      req,
+      action: 'CREATE',
+      tableName: 'repair_settlements',
+      entityCode: existing.code,
+      recordId: Number(id),
+      entityName: 'Phiếu quyết toán',
+      branchId: existing.branchId,
+      newValue: { orderCode, amount },
+      description: `Tạo link thanh toán PayOS ${amount.toLocaleString('vi-VN')}đ cho phiếu ${existing.code}`,
+    });
+
     return {
       qrCode: paymentLink.qrCode,
       checkoutUrl: paymentLink.checkoutUrl,
       orderCode,
       expiredAt: expiredAtUnix,
-      // Chi de audit o controller — FE khong dung field nay.
-      settlementCode: existing.code,
     };
   }
 
@@ -225,7 +235,7 @@ class RepairSettlementService {
   // qua neu khong tim thay transaction, da 'paid' roi, hoac phieu khong con
   // o 'waiting_payment' (vd CVDV da xac nhan tay truoc do) - vi PayOS co the
   // goi lai webhook nhieu lan cho cung 1 giao dich.
-  async handlePayosWebhook(rawBody) {
+  async handlePayosWebhook(rawBody, req = {}) {
     const webhookData = await getPayOS().webhooks.verify(rawBody);
 
     const tx = await this.repairSettlementRepository.findPayosTransactionByOrderCode(webhookData.orderCode);
@@ -243,21 +253,26 @@ class RepairSettlementService {
     emitRepairOrderEvent(settlement.branchId, 'invoiced', { settlementId: tx.service_order_id });
 
     // Ghi audit sau khi xuat hoa don — khong doi logic thanh toan.
-    // Webhook khong co JWT: actor = system.
+    // Webhook khong co JWT: actor = system. requestBody rut gon (khong luu chu ky PayOS).
     await auditLog({
-      req: {},
+      req,
       action: 'UPDATE',
       tableName: 'repair_settlements',
       entityName: 'Phiếu quyết toán',
       entityCode: settlement.code || `ID-${tx.service_order_id}`,
       recordId: tx.service_order_id,
+      branchId: settlement.branchId,
       newValue: {
         status: 'invoiced',
-        source: 'payos_webhook',
-        orderCode: webhookData.orderCode,
+        amount: tx.amount,
         reference: webhookData.reference || null,
       },
-      description: `Thanh toán PayOS thành công — xuất hóa đơn ${settlement.code || tx.service_order_id}`,
+      requestBody: {
+        orderCode: webhookData.orderCode,
+        amount: tx.amount,
+        reference: webhookData.reference || null,
+      },
+      description: `Khách hàng thanh toán thành công ${(Number(tx.amount) || 0).toLocaleString('vi-VN')}đ qua PayOS, hệ thống tự xuất hóa đơn cho phiếu ${settlement.code || tx.service_order_id}`,
       responseStatus: 200,
     });
   }

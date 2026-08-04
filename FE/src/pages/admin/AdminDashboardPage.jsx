@@ -270,11 +270,13 @@ function getActionBadge(action) {
 }
 
 function getResponseBadge(status) {
-  if (status == null) return null;
-  if (status >= 200 && status < 300) return { label: status, bg: '#dcfce7', color: '#15803d' };
-  if (status >= 400 && status < 500) return { label: status, bg: '#fef3c7', color: '#b45309' };
-  if (status >= 500) return { label: status, bg: '#fee2e2', color: '#dc2626' };
-  return { label: status, bg: '#f1f5f9', color: '#475569' };
+  if (status == null || status === '' || Number(status) === 0) {
+    return { label: 'Đã thực hiện', bg: '#dcfce7', color: '#15803d' };
+  }
+  if (status >= 200 && status < 300) return { label: 'Thành công', bg: '#dcfce7', color: '#15803d' };
+  if (status >= 400 && status < 500) return { label: 'Lỗi yêu cầu', bg: '#fef3c7', color: '#b45309' };
+  if (status >= 500) return { label: 'Lỗi hệ thống', bg: '#fee2e2', color: '#dc2626' };
+  return { label: `HTTP ${status}`, bg: '#f1f5f9', color: '#475569' };
 }
 
 function getStatusBadge(status) {
