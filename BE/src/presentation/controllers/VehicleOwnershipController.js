@@ -35,6 +35,7 @@ class VehicleOwnershipController {
         description: `Chuyển quyền sở hữu xe cho khách hàng ${newCustomer?.name || newCustomerId}`,
       });
       await this.notificationService.notifyAdmins('VEHICLE_OWNERSHIP_TRANSFERRED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: items?.vehicle?.license_plate || items?.vehicle?.vehicle_code || `ID-${req.params.id}`,
         targetCode: items?.vehicle?.vehicle_code || '',
