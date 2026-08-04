@@ -424,7 +424,7 @@ class ManagerRepositoryImpl {
       branchId: Number(branchId),
       search: filters.search ? `%${filters.search.trim()}%` : null,
       status: filters.status && filters.status !== 'all' ? (filters.status === 'active' ? 1 : 0) : null,
-      categoryId: filters.categoryId && filters.categoryId !== 'all' ? Number(filters.categoryId) : null,
+      repairCategory: filters.repairCategory && filters.repairCategory !== 'all' ? filters.repairCategory : null,
     };
 
     const result = await query(
@@ -434,7 +434,7 @@ class ManagerRepositoryImpl {
        LEFT JOIN service_categories c ON c.id = s.category_id
        WHERE s.branch_id = @branchId
          AND (@status IS NULL OR s.is_active = @status)
-         AND (@categoryId IS NULL OR s.category_id = @categoryId)
+         AND (@repairCategory IS NULL OR s.repair_category = @repairCategory)
          AND (
            @search IS NULL
            OR s.service_code LIKE @search
@@ -565,6 +565,7 @@ class ManagerRepositoryImpl {
       branchId: Number(branchId),
       search: filters.search ? `%${filters.search.trim()}%` : null,
       status: filters.status && filters.status !== 'all' ? (filters.status === 'active' ? 1 : 0) : null,
+      repairCategory: filters.repairCategory && filters.repairCategory !== 'all' ? filters.repairCategory : null,
     };
 
     const result = await query(
@@ -575,6 +576,7 @@ class ManagerRepositoryImpl {
        LEFT JOIN service_categories c ON c.id = sp.category_id
        WHERE sp.branch_id = @branchId
          AND (@status IS NULL OR sp.is_active = @status)
+         AND (@repairCategory IS NULL OR sp.repair_category = @repairCategory)
          AND (
            @search IS NULL
            OR sp.package_code LIKE @search
