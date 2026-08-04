@@ -8,10 +8,10 @@ import {
 import './SecurityAlertHistoryModal.css';
 
 const SEVERITY_LABEL = {
-  critical: 'Critical',
-  high: 'High',
-  medium: 'Medium',
-  info: 'Info',
+  critical: 'Nghiêm trọng',
+  high: 'Cao',
+  medium: 'Trung bình',
+  info: 'Thông tin',
 };
 
 function formatDateTime(value) {

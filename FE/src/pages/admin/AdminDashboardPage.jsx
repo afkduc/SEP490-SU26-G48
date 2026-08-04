@@ -4,7 +4,13 @@ import { useAuth } from '../../contexts/AppContext';
 import { getAdminDashboardStats, adminSecurityAlertsApi } from '../../services/adminApi';
 import { getNotifications } from '../../services/notificationApi';
 import { humanizeNotificationMessage } from '../../utils/notificationDisplay';
-import { humanizeAuditDescription, getAuditActionLabel } from '../../utils/auditDisplay';
+import {
+  humanizeAuditDescription,
+  getAuditActionLabel,
+  getAuditTableLabel,
+  getHttpMethodLabel,
+  formatDurationMs,
+} from '../../utils/auditDisplay';
 import { SECURITY_ALERTS_COUNT_EVENT } from '../../utils/securityAlertEvents';
 import './AdminDashboardPage.css';
 
@@ -281,8 +287,9 @@ function getResponseBadge(status) {
 
 function getStatusBadge(status) {
   if (!status) return { label: '—', bg: '#f1f5f9', color: '#64748b' };
-  const upper = status.toUpperCase();
-  if (upper === 'SUCCESS' || upper === 'ACTIVE') return { label: 'Thành công', bg: '#dcfce7', color: '#15803d' };
+  const upper = String(status).toUpperCase();
+  if (upper === 'SUCCESS' || upper === 'ACTIVE') return { label: 'Đang hoạt động', bg: '#dcfce7', color: '#15803d' };
+  if (upper === 'ENDED' || upper === 'LOGGED_OUT') return { label: 'Đã đăng xuất', bg: '#f1f5f9', color: '#64748b' };
   if (upper === 'FAILED' || upper === 'FAIL') return { label: 'Thất bại', bg: '#fee2e2', color: '#dc2626' };
   if (upper === 'LOCKED') return { label: 'Bị khóa', bg: '#fee2e2', color: '#dc2626' };
   if (upper === 'INACTIVE') return { label: 'Ngừng hoạt động', bg: '#f1f5f9', color: '#64748b' };
@@ -792,8 +799,10 @@ function ActivityItem({ log }) {
               {respBadge.label}
             </span>
           )}
-          {log.requestMethod && (
-            <span className="activity-item__method">{log.requestMethod}</span>
+          {(log.requestMethod || log.request_method) && (
+            <span className="activity-item__method">
+              {getHttpMethodLabel(log.requestMethod || log.request_method)}
+            </span>
           )}
         </div>
 
@@ -803,7 +812,7 @@ function ActivityItem({ log }) {
           {(log.tableName || log.table_name) && (
             <span className="activity-item__meta-item activity-item__meta-item--strong">
               <IconTerminal />
-              <span>{log.tableName || log.table_name}</span>
+              <span>{getAuditTableLabel(log.tableName || log.table_name)}</span>
             </span>
           )}
           {(log.entityCode || log.entity_code) && (
@@ -821,9 +830,9 @@ function ActivityItem({ log }) {
               <IconGlobe /> {log.ipAddress}
             </span>
           )}
-          {log.durationMs != null && (
+          {(log.durationMs != null || log.duration_ms != null) && (
             <span className="activity-item__meta-item">
-              <IconClock /> {log.durationMs}ms
+              <IconClock /> {formatDurationMs(log.durationMs ?? log.duration_ms)}
             </span>
           )}
           <span className="activity-item__meta-item">
@@ -1109,7 +1118,7 @@ export default function AdminDashboardPage() {
         </div>
         <div className="dash-header__right">
           <div className="dash-header__live-dot" />
-          <span className="dash-header__live-label">Live</span>
+          <span className="dash-header__live-label">Trực tiếp</span>
           <span className="dash-header__update">
             Cập nhật: {stats?.generatedAt ? formatDateTime(stats.generatedAt) : '...'}
           </span>
@@ -1186,7 +1195,7 @@ export default function AdminDashboardPage() {
                   Có{' '}
                   <strong>{urgent > 99 ? '99+' : urgent}</strong>
                   {' '}cảnh báo bảo mật cần xử lý
-                  {' '}(Critical {critical} · High {high})
+                  {' '}(Nghiêm trọng {critical} · Cao {high})
                 </span>
                 <span className="dash-alert-banner__link">Xem và xử lý <IconArrowRight /></span>
               </Link>

@@ -3,10 +3,10 @@ import { adminSecurityAlertsApi } from '../../services/adminApi';
 import './SecurityAlertRelatedHistory.css';
 
 const SEVERITY_LABEL = {
-  critical: 'Critical',
-  high: 'High',
-  medium: 'Medium',
-  info: 'Info',
+  critical: 'Nghiêm trọng',
+  high: 'Cao',
+  medium: 'Trung bình',
+  info: 'Thông tin',
 };
 
 function formatDateTime(value) {
@@ -142,7 +142,7 @@ export default function SecurityAlertRelatedHistory({ alert, onClear, minCount =
 
       <p className="sec-related-hist__hint">
         Đối chiếu với bảng phiên phía trên. Muốn đăng xuất thiết bị: dùng nút
-        «Xử lý trên tab Thiết bị» hoặc Chi tiết phiên → Force logout.
+        «Xử lý trên tab Thiết bị» hoặc Chi tiết phiên → Buộc đăng xuất.
       </p>
     </section>
   );

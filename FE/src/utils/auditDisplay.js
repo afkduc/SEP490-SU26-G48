@@ -214,13 +214,88 @@ export const AUDIT_FIELD_LABELS = {
   unit_price: 'Đơn giá',
   qty: 'Số lượng',
   unit: 'Đơn vị',
-  lhsc: 'Loại hình SC',
-  httt: 'Hình thức TT',
+  lhsc: 'Loại hạng mục',
+  httt: 'Hình thức thanh toán',
   repairCategory: 'Loại hình sửa chữa',
   groupId: 'Nhóm hạng mục',
   isGroupParent: 'Là dòng nhóm',
   isFree: 'Miễn phí',
 };
+
+/** Bảng → nhãn tiếng Việt (dùng chung list/detail/dashboard) */
+export const AUDIT_TABLE_LABELS = {
+  customers: 'Khách hàng',
+  vehicles: 'Phương tiện',
+  brands: 'Hãng xe',
+  branches: 'Chi nhánh',
+  users: 'Người dùng',
+  user_role: 'Phân quyền người dùng',
+  user_specialty: 'Chuyên môn nhân viên',
+  user_devices: 'Thiết bị đăng nhập',
+  user_notification_settings: 'Cài đặt thông báo',
+  roles: 'Vai trò',
+  role_permissions: 'Phân quyền theo vai trò',
+  role_screen_permissions: 'Quyền màn hình theo vai trò',
+  role_screen_matrix: 'Ma trận quyền màn hình',
+  permission_request: 'Yêu cầu cấp quyền',
+  role_security_mapping: 'Ánh xạ vai trò - bảo mật',
+  permissions: 'Phân quyền chi tiết',
+  service_categories: 'Danh mục dịch vụ',
+  services: 'Dịch vụ',
+  service_packages: 'Gói dịch vụ',
+  service_package_items: 'Hạng mục gói dịch vụ',
+  suppliers: 'Nhà cung cấp',
+  products: 'Phụ tùng / Sản phẩm',
+  inventory_transactions: 'Giao dịch kho',
+  appointments: 'Lịch hẹn',
+  work_orders: 'Phiếu sửa chữa',
+  work_order_items: 'Hạng mục phiếu sửa',
+  repair_orders: 'Lệnh sửa chữa',
+  repair_order_tasks: 'Đầu mục công việc',
+  repair_settlements: 'Phiếu quyết toán',
+  payos_transactions: 'Giao dịch thanh toán PayOS',
+  service_orders: 'Phiếu quyết toán',
+  service_order_items: 'Hạng mục phiếu quyết toán',
+  service_requests: 'Yêu cầu dịch vụ',
+  service_request_appointments: 'Lịch hẹn dịch vụ',
+  vehicle_bays: 'Khoang xe',
+  invoices: 'Hóa đơn',
+  payments: 'Thanh toán',
+  specialties: 'Chuyên môn',
+  warranty_records: 'Lịch sử bảo hành',
+  maintenance_reminders: 'Lịch nhắc bảo dưỡng',
+  vehicle_owners: 'Chủ phương tiện',
+  import_requests: 'Yêu cầu nhập kho',
+  import_request_items: 'Chi tiết nhập kho',
+  export_requests: 'Yêu cầu xuất kho',
+  export_request_items: 'Chi tiết xuất kho',
+  entity_definitions: 'Định nghĩa đối tượng',
+  login_sessions: 'Phiên đăng nhập',
+  login_session_events: 'Sự kiện phiên đăng nhập',
+  audit_logs: 'Nhật ký hệ thống',
+  notifications: 'Thông báo',
+  security_alerts: 'Cảnh báo bảo mật',
+};
+
+export function getAuditTableLabel(tableName) {
+  if (!tableName) return '—';
+  const key = String(tableName).trim();
+  return AUDIT_TABLE_LABELS[key] || AUDIT_TABLE_LABELS[key.toLowerCase()] || key;
+}
+
+/** Mức độ cảnh báo bảo mật */
+export const SECURITY_SEVERITY_LABELS = {
+  critical: 'Nghiêm trọng',
+  high: 'Cao',
+  medium: 'Trung bình',
+  info: 'Thông tin',
+};
+
+export function getSecuritySeverityLabel(severity) {
+  if (!severity) return '—';
+  const key = String(severity).trim().toLowerCase();
+  return SECURITY_SEVERITY_LABELS[key] || String(severity);
+}
 
 /** Token tiếng Anh → Việt (fallback khi chưa có trong AUDIT_FIELD_LABELS) */
 const FIELD_TOKEN_VI = {
@@ -790,6 +865,18 @@ const REPAIR_CATEGORY_LABELS = {
   PM: 'Bảo dưỡng định kỳ',
 };
 
+const LHSC_LABELS = {
+  DV: 'Dịch vụ / công thợ',
+  PT: 'Phụ tùng / vật tư',
+};
+
+const HTTT_LABELS = {
+  KHT: 'Khách hàng thanh toán',
+  BHH: 'Bảo hành hãng xe',
+  BH: 'Bảo hiểm chi trả',
+  NB: 'Nội bộ chịu phí',
+};
+
 function formatMoneyVi(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return String(value);
@@ -863,6 +950,18 @@ export function formatAuditFieldValue(key, value) {
     const raw = String(value);
     const norm = raw.toLowerCase().replace(/[\s-]+/g, '_');
     return STATUS_LABELS[norm] || STATUS_LABELS[raw.toLowerCase()] || raw;
+  }
+  if (k === 'repairCategory' || k === 'repair_category') {
+    const code = String(value).trim().toUpperCase();
+    return REPAIR_CATEGORY_LABELS[code] || String(value);
+  }
+  if (k === 'lhsc') {
+    const code = String(value).trim().toUpperCase();
+    return LHSC_LABELS[code] || String(value);
+  }
+  if (k === 'httt') {
+    const code = String(value).trim().toUpperCase();
+    return HTTT_LABELS[code] || String(value);
   }
   if (k === 'granted') return value === true || value === 1 || value === 'true' ? 'Đã cấp' : 'Thu hồi / chưa cấp';
   if (k === 'isDone' || k === 'released' || k === 'isSent' || k === 'isActive' || k === 'is_active' || k === 'isFree' || k === 'isGroupParent') {
