@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { FORBIDDEN_KEY } from '../services/httpClient';
 import { useAuth, getRoleHome } from '../contexts/AppContext';
 import { getPermissionScreenLabel } from '../utils/screenLabels';
+import { BASE_PATH } from '../config';
 
+const LOGIN_PATH = `${BASE_PATH}/login`;
 let modalShownAt = 0;
 const MIN_REDISPLAY_INTERVAL_MS = 2000;
 
@@ -25,7 +27,7 @@ export default function ForbiddenModal() {
 
   useEffect(() => {
     const handler = (event) => {
-      if (window.location.pathname === '/login') return;
+      if (window.location.pathname === LOGIN_PATH) return;
       const now = Date.now();
       if (now - modalShownAt < MIN_REDISPLAY_INTERVAL_MS) return;
       if (visibleRef.current) return;

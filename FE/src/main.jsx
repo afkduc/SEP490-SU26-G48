@@ -5,11 +5,12 @@ import App from './App';
 import { AppProvider, PermissionProvider } from './contexts';
 import { ToastProvider } from './components/common/ToastContext';
 import { GlobalErrorProvider } from './contexts/GlobalErrorContext';
+import { BASE_PATH } from './config';
 import './styles/index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={BASE_PATH}>
       {/* ToastProvider phai O NGOAI AppProvider vi PermissionEventsRunner
           (render boi AppProvider) se goi useToast() de hien toast refresh. */}
       <ToastProvider>

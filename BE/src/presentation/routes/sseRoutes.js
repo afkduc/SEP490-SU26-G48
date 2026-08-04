@@ -234,6 +234,43 @@ function buildSSERouter() {
     });
   });
 
+  /**
+   * GET /api/sse/gate?branchId=1
+   *
+   * Public (khong dang nhap) - man hinh bao ve tai cong (xem publicRoutes.js
+   * /public/gate/*). Chi bao "co gi do thay doi, tu goi lai API list" (type
+   * 'invoiced' | 'gate-exit-confirmed'), khong day du lieu khach hang qua
+   * kenh nay - giu it thong tin nhat co the tren 1 kenh khong xac thuc.
+   */
+  router.get('/gate', (req, res) => {
+    const branchId = Number(req.query.branchId);
+    if (!branchId) {
+      return res.status(400).end();
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected' })}\n\n`);
+
+    const unsubscribe = onRepairOrderEvent(branchId, (eventData) => {
+      if (eventData.type !== 'invoiced' && eventData.type !== 'gate-exit-confirmed') return;
+      res.write(`event: gate\ndata: ${JSON.stringify({ type: eventData.type })}\n\n`);
+    });
+
+    const heartbeat = setInterval(() => {
+      res.write(`: heartbeat\n\n`);
+    }, 30_000);
+
+    req.on('close', () => {
+      unsubscribe();
+      clearInterval(heartbeat);
+    });
+  });
+
   return router;
 }
 

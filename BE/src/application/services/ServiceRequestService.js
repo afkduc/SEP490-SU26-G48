@@ -21,7 +21,7 @@ class ServiceRequestService {
     const branches = await this.branchRepository.findAll();
     return branches
       .filter((b) => b.isActive)
-      .map((b) => ({ id: b.id, name: b.branchName, address: b.address, phone: b.phone }));
+      .map((b) => ({ id: b.id, code: b.branchCode, name: b.branchName, address: b.address, phone: b.phone }));
   }
 
   // Public - danh sach hang xe cho dropdown tren landing page. AutoGara chi

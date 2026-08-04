@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BASE_PATH } from '../config';
 import './SessionTakenOverPrompt.css';
 
 export const SESSION_TAKEN_OVER_PROMPT_KEY = 'SESSION_TAKEN_OVER_PROMPT';
+const LOGIN_PATH = `${BASE_PATH}/login`;
 
 export function dispatchSessionTakenOverPrompt(detail = {}) {
   if (typeof window === 'undefined') return;
@@ -46,7 +48,7 @@ export default function SessionTakenOverPrompt() {
 
   useEffect(() => {
     const handler = (e) => {
-      if (window.location.pathname === '/login') return;
+      if (window.location.pathname === LOGIN_PATH) return;
       setDetail(e?.detail || {});
       setVisible(true);
     };
