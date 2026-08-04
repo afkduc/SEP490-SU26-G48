@@ -624,7 +624,7 @@
   color: #dc2626;
 }
 
-.btn {
+.admin-profile .btn {
   height: 38px;
   display: inline-flex;
   align-items: center;
@@ -642,13 +642,13 @@
   text-decoration: none;
 }
 
-.btn:hover:not(:disabled) {
+.admin-profile .btn:hover:not(:disabled) {
   background: #f8fafc;
   border-color: #cbd5e1;
   color: #1e293b;
 }
 
-.btn:disabled {
+.admin-profile .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

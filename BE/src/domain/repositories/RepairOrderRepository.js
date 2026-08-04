@@ -15,16 +15,22 @@ class RepairOrderRepository {
     throw new Error('Method findByServiceOrderCode() must be implemented');
   }
 
-  async findTeamLeadersByBranch(branchId) {
-    throw new Error('Method findTeamLeadersByBranch() must be implemented');
-  }
-
   async findEligibleServiceOrder(serviceOrderId, branchId) {
     throw new Error('Method findEligibleServiceOrder() must be implemented');
   }
 
-  async create(data, { branchId, createdBy }) {
-    throw new Error('Method create() must be implemented');
+  // Tho tu nhan viec qua khoang xe (xem VehicleBayService) - tra ve null neu
+  // phieu vua bi khoang khac nhan truoc (thua race).
+  async claim(serviceOrderId, { branchId, teamLeaderId, bayId, createdBy }) {
+    throw new Error('Method claim() must be implemented');
+  }
+
+  async searchTechnicians(teamLeaderId, branchId, search) {
+    throw new Error('Method searchTechnicians() must be implemented');
+  }
+
+  async setTechnicians(id, teamLeaderId, branchId, technicianIds) {
+    throw new Error('Method setTechnicians() must be implemented');
   }
 
   async updateStatus(id, status) {

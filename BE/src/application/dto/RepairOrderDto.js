@@ -24,6 +24,8 @@ class RepairOrderResponseDto {
       teamLeader: entity.teamLeaderId
         ? { id: entity.teamLeaderId, fullName: entity.teamLeaderName, specialty: entity.teamLeaderSpecialty }
         : null,
+      bayId: entity.bayId,
+      technicians: entity.technicians,
       createdByName: entity.createdByName,
       customer: entity.customer,
       vehicle: entity.vehicle,

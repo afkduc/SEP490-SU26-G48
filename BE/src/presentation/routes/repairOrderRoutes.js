@@ -14,9 +14,10 @@ function buildRepairOrderRouter() {
 
   router.use(authenticate, trackActivity);
   router.get('/', controller.getAll);
-  router.get('/team-leaders', controller.getTeamLeaders);
+  router.get('/technicians/search', controller.searchTechnicians);
   router.get('/:id', controller.getById);
-  router.post('/', controller.create);
+  router.post('/claim', controller.claim);
+  router.patch('/:id/technicians', controller.setTechnicians);
   router.patch('/:id/status', controller.updateStatus);
   router.patch('/:id/tasks/:taskId', controller.updateTaskStatus);
 

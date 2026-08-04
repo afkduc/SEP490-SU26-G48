@@ -1,8 +1,9 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { makeRepairOrderService, makeServiceRequestService } = require('../../application/services');
+const { makeRepairOrderService, makeServiceRequestService, makeRepairSettlementService } = require('../../application/services');
 const RepairOrderController = require('../controllers/RepairOrderController');
 const ServiceRequestController = require('../controllers/ServiceRequestController');
+const RepairSettlementController = require('../controllers/RepairSettlementController');
 
 function makeRepairOrderController() {
   return new RepairOrderController({ repairOrderService: makeRepairOrderService() });
@@ -10,6 +11,10 @@ function makeRepairOrderController() {
 
 function makeServiceRequestController() {
   return new ServiceRequestController({ serviceRequestService: makeServiceRequestService() });
+}
+
+function makeRepairSettlementController() {
+  return new RepairSettlementController({ repairSettlementService: makeRepairSettlementService() });
 }
 
 // Endpoint nay khong yeu cau dang nhap (khach vang lai tra cuu tu landing
@@ -45,8 +50,10 @@ function buildPublicRouter() {
   const router = express.Router();
   const controller = makeRepairOrderController();
   const serviceRequestController = makeServiceRequestController();
+  const repairSettlementController = makeRepairSettlementController();
 
   router.get('/lookup/:code', lookupRateLimiter, controller.lookupPublicProgress);
+  router.get('/vehicle-history/:identifier', lookupRateLimiter, repairSettlementController.lookupPublicHistory);
   router.get('/branches', serviceRequestController.getPublicBranches);
   router.get('/vehicle-brands', serviceRequestController.getPublicVehicleBrands);
   router.get('/service-packages', serviceRequestController.getPublicServicePackages);
