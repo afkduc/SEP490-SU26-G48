@@ -136,16 +136,12 @@ class RepairOrderController {
       );
       const task = (item?.tasks || []).find((t) => String(t.id) === String(req.params.taskId));
       await auditCrud.update(req, {
-        tableName: 'repair_order_tasks',
+        tableName: 'repair_orders',
         entityCode: item?.code || `ID-${req.params.id}`,
-        recordId: Number(req.params.taskId) || null,
-        entityName: 'Đầu mục công việc',
-        newData: {
-          taskId: Number(req.params.taskId),
-          isDone: true,
-          taskName: task?.taskName || null,
-        },
-        description: `Hoàn thành đầu mục #${req.params.taskId} trên lệnh ${item?.code || req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Lệnh sửa chữa',
+        newData: { taskId: Number(req.params.taskId), isDone: true, taskName: task?.taskName || null },
+        description: `Tổ trưởng xác nhận hoàn thành đầu mục "${task?.taskName || req.params.taskId}" của lệnh ${item?.code || req.params.id}`,
       });
       return success(res, item, 'Task status updated');
     } catch (err) {

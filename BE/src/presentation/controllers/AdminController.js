@@ -167,18 +167,11 @@ class AdminController {
 
   createBranch = async (req, res, next) => {
     try {
-      const branch = await this.branchService.create(req.body);
-      await auditCrud.create(req, {
-        tableName: 'branches',
-        entityCode: branch?.branch_code || branch?.code || null,
-        recordId: branch?.id || null,
-        entityName: 'Chi nhánh',
-        data: req.body,
-      });
+      const branch = await this.branchService.create(req.body, req);
       await this.notificationService.notifyAdmins('BRANCH_CREATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: branch?.branch_name || branch?.name || '',
-        targetCode: branch?.branch_code || '',
+        targetName: branch?.branchName || branch?.branch_name || branch?.name || '',
+        targetCode: branch?.branchCode || branch?.branch_code || '',
         userId: branch?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_CREATED:', e.message));
       return success(res, branch, 'Tao chi nhanh thanh cong', 201);
@@ -189,18 +182,11 @@ class AdminController {
 
   updateBranch = async (req, res, next) => {
     try {
-      const branch = await this.branchService.update(req.params.id, req.body);
-      await auditCrud.update(req, {
-        tableName: 'branches',
-        entityCode: branch?.branch_code || `ID-${req.params.id}`,
-        recordId: branch?.id || Number(req.params.id) || null,
-        entityName: 'Chi nhánh',
-        newData: req.body,
-      });
+      const branch = await this.branchService.update(req.params.id, req.body, req);
       await this.notificationService.notifyAdmins('BRANCH_UPDATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: branch?.branch_name || '',
-        targetCode: branch?.branch_code || '',
+        targetName: branch?.branchName || branch?.branch_name || '',
+        targetCode: branch?.branchCode || branch?.branch_code || '',
         userId: branch?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_UPDATED:', e.message));
       return success(res, branch, 'Cap nhat chi nhanh thanh cong');
@@ -211,19 +197,11 @@ class AdminController {
 
   deactivateBranch = async (req, res, next) => {
     try {
-      const branch = await this.branchService.deactivate(req.params.id);
-      await auditCrud.update(req, {
-        tableName: 'branches',
-        entityCode: branch?.branch_code || `ID-${req.params.id}`,
-        recordId: branch?.id || Number(req.params.id) || null,
-        entityName: 'Chi nhánh',
-        newData: { status: 'inactive' },
-        description: `Ngừng hoạt động chi nhánh ${branch?.branch_code || req.params.id}`,
-      });
+      const branch = await this.branchService.deactivate(req.params.id, req);
       await this.notificationService.notifyAdmins('BRANCH_DEACTIVATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: branch?.branch_name || '',
-        targetCode: branch?.branch_code || '',
+        targetName: branch?.branchName || branch?.branch_name || '',
+        targetCode: branch?.branchCode || branch?.branch_code || '',
         userId: branch?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_DEACTIVATED:', e.message));
       return success(res, branch, 'Ngung hoat dong chi nhanh');
@@ -234,19 +212,11 @@ class AdminController {
 
   reactivateBranch = async (req, res, next) => {
     try {
-      const branch = await this.branchService.reactivate(req.params.id);
-      await auditCrud.update(req, {
-        tableName: 'branches',
-        entityCode: branch?.branch_code || `ID-${req.params.id}`,
-        recordId: branch?.id || Number(req.params.id) || null,
-        entityName: 'Chi nhánh',
-        newData: { status: 'active' },
-        description: `Kích hoạt lại chi nhánh ${branch?.branch_code || req.params.id}`,
-      });
+      const branch = await this.branchService.reactivate(req.params.id, req);
       await this.notificationService.notifyAdmins('BRANCH_REACTIVATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: branch?.branch_name || '',
-        targetCode: branch?.branch_code || '',
+        targetName: branch?.branchName || branch?.branch_name || '',
+        targetCode: branch?.branchCode || branch?.branch_code || '',
         userId: branch?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_REACTIVATED:', e.message));
       return success(res, branch, 'Kich hoat lai chi nhanh');

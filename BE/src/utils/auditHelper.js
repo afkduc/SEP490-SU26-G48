@@ -146,13 +146,14 @@ async function auditLog({
   responseStatus = null,
   durationMs = null,
   requestBody = null,
+  branchId: branchIdOverride = null,
 }) {
   try {
     const user = req.user || {};
     const userId = user.id ?? user.userId ?? null;
     const userName = user.user_name || user.name || user.email || 'system';
     const phoneNumber = user.phone || user.phone_number || null;
-    const branchId = await resolveActorBranchId(user);
+    const branchId = branchIdOverride ?? (await resolveActorBranchId(user));
 
     const ipAddress = getClientIp(req);
     const requestMethod = req.method || null;

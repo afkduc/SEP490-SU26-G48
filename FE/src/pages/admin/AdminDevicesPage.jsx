@@ -538,7 +538,7 @@ export default function AdminDevicesPage({
             <input
               type="text"
               className="admin-devices__search"
-              placeholder="Tìm theo tên, SĐT, IP, trình duyệt..."
+              placeholder="Tìm theo tên, email, SĐT, IP..."
               value={search}
               onChange={handleSearchChange}
             />

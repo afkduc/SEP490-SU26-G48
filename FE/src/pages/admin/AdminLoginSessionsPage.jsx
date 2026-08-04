@@ -9,6 +9,7 @@ import { formatDateSafe } from '../../utils/dateUtils';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { pickLatestSession } from './securityAlertFocus';
+import { normalizeVietnamese } from '../../utils/vietnamese';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -471,13 +472,18 @@ export default function AdminLoginSessionsPage({
 
     // Filter matching (de khong patch khi event khong thuoc filter hien tai)
     const p = paramsRef.current;
-    const filterUserName = (p.userName || '').toLowerCase().trim();
+    const filterUserName = normalizeVietnamese(p.userName || '').trim();
     const filterActionType = p.actionType || '';
     const filterStatus = p.status || '';
     const filterBranchId = p.branchId;
 
-    if (filterUserName && sessionUserName) {
-      if (!String(sessionUserName).toLowerCase().includes(filterUserName)) {
+    if (filterUserName) {
+      const haystack = normalizeVietnamese(
+        [sessionUserName, eventData?.phone, eventData?.phoneNumber, eventData?.email]
+          .filter(Boolean)
+          .join(' ')
+      );
+      if (!haystack.includes(filterUserName)) {
         return; // Khong match filter -> bo qua
       }
     }
@@ -668,11 +674,11 @@ export default function AdminLoginSessionsPage({
 
         <div className="admin-sessions__filter-body">
           <div className="filter-field">
-            <label className="filter-field__label">Tên người dùng</label>
+            <label className="filter-field__label">Người dùng</label>
             <input
               className="filter-field__input"
               type="text"
-              placeholder="Nhập tên người dùng..."
+              placeholder="Tên, email hoặc SĐT..."
               value={sessions.params.userName || ''}
               onChange={(e) => sessions.updateParam('userName', e.target.value)}
             />

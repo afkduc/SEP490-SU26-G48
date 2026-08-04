@@ -138,15 +138,7 @@ class RepairSettlementController {
 
   createPaymentLink = async (req, res, next) => {
     try {
-      const result = await this.repairSettlementService.createPayosPaymentLink(req.params.id);
-      await auditCrud.create(req, {
-        tableName: 'payos_transactions',
-        entityCode: result?.settlementCode || `ID-${req.params.id}`,
-        recordId: Number(req.params.id) || null,
-        entityName: 'Link thanh toán PayOS',
-        data: { orderCode: result?.orderCode, expiredAt: result?.expiredAt },
-        description: `Tạo link thanh toán PayOS cho phiếu ${result?.settlementCode || req.params.id}`,
-      });
+      const result = await this.repairSettlementService.createPayosPaymentLink(req.params.id, req);
       return success(res, result, 'PayOS payment link created');
     } catch (err) {
       next(err);

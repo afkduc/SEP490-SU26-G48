@@ -1,4 +1,8 @@
 const { query } = require('../database/sqlServer');
+const {
+  sqlAccentInsensitiveLike,
+  bindNormalizedLikeParam,
+} = require('../../utils/vietnamese');
 
 /** Auth noise — có trang Lịch sử đăng nhập riêng; mặc định ẩn khỏi nhật ký thao tác. */
 const AUTH_AUDIT_ACTIONS = [
@@ -11,6 +15,16 @@ const AUTH_AUDIT_ACTIONS = [
   'VERIFY_OTP',
   'SEND_OTP',
 ];
+
+function bindNormalizedLike(params, paramIndex, rawValue) {
+  const key = `p${paramIndex}`;
+  bindNormalizedLikeParam(params, key, rawValue);
+  return { key, nextIndex: paramIndex + 1 };
+}
+
+function likeAccentInsensitive(columnExpr, paramName) {
+  return sqlAccentInsensitiveLike(columnExpr, paramName);
+}
 
 function toIsoUtc(value) {
   if (value === null || value === undefined) return null;
@@ -260,24 +274,29 @@ async function getAuditLogs(filters = {}) {
   const params = {};
   let paramIndex = 1;
 
-  // Keyword search across multiple fields
+  // Keyword search — tên / SĐT / mô tả / mã… (không phân biệt hoa thường & dấu)
   if (keyword) {
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, keyword);
     conditions.push(`(
-      LOWER(al.user_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.description) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.entity_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.entity_code) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.table_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.request_url) LIKE LOWER(@p${paramIndex})
+      ${likeAccentInsensitive('al.user_name', key)} OR
+      ${likeAccentInsensitive('al.phone_number', key)} OR
+      ${likeAccentInsensitive('al.description', key)} OR
+      ${likeAccentInsensitive('al.entity_name', key)} OR
+      ${likeAccentInsensitive('al.entity_code', key)} OR
+      ${likeAccentInsensitive('al.table_name', key)} OR
+      ${likeAccentInsensitive('al.request_url', key)}
     )`);
-    params[`p${paramIndex}`] = `%${keyword}%`;
-    paramIndex++;
+    paramIndex = nextIndex;
   }
 
+  // Ô "Người dùng": khớp tên hoặc SĐT
   if (userName) {
-    conditions.push(`LOWER(al.user_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${userName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
+    conditions.push(`(
+      ${likeAccentInsensitive('al.user_name', key)} OR
+      ${likeAccentInsensitive('al.phone_number', key)}
+    )`);
+    paramIndex = nextIndex;
   }
 
   if (phone) {
@@ -308,15 +327,15 @@ async function getAuditLogs(filters = {}) {
   }
 
   if (entityName) {
-    conditions.push(`LOWER(al.entity_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${entityName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, entityName);
+    conditions.push(likeAccentInsensitive('al.entity_name', key));
+    paramIndex = nextIndex;
   }
 
   if (entityCode) {
-    conditions.push(`LOWER(al.entity_code) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${entityCode}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, entityCode);
+    conditions.push(likeAccentInsensitive('al.entity_code', key));
+    paramIndex = nextIndex;
   }
 
   if (ipAddress) {
@@ -455,22 +474,26 @@ async function getAuditLogsForExport(filters = {}) {
   let paramIndex = 1;
 
   if (keyword) {
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, keyword);
     conditions.push(`(
-      LOWER(al.user_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.description) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.entity_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.entity_code) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.table_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.request_url) LIKE LOWER(@p${paramIndex})
+      ${likeAccentInsensitive('al.user_name', key)} OR
+      ${likeAccentInsensitive('al.phone_number', key)} OR
+      ${likeAccentInsensitive('al.description', key)} OR
+      ${likeAccentInsensitive('al.entity_name', key)} OR
+      ${likeAccentInsensitive('al.entity_code', key)} OR
+      ${likeAccentInsensitive('al.table_name', key)} OR
+      ${likeAccentInsensitive('al.request_url', key)}
     )`);
-    params[`p${paramIndex}`] = `%${keyword}%`;
-    paramIndex++;
+    paramIndex = nextIndex;
   }
 
   if (userName) {
-    conditions.push(`LOWER(al.user_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${userName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
+    conditions.push(`(
+      ${likeAccentInsensitive('al.user_name', key)} OR
+      ${likeAccentInsensitive('al.phone_number', key)}
+    )`);
+    paramIndex = nextIndex;
   }
   if (phone) {
     conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
@@ -496,14 +519,14 @@ async function getAuditLogsForExport(filters = {}) {
     paramIndex++;
   }
   if (entityName) {
-    conditions.push(`LOWER(al.entity_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${entityName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, entityName);
+    conditions.push(likeAccentInsensitive('al.entity_name', key));
+    paramIndex = nextIndex;
   }
   if (entityCode) {
-    conditions.push(`LOWER(al.entity_code) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${entityCode}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, entityCode);
+    conditions.push(likeAccentInsensitive('al.entity_code', key));
+    paramIndex = nextIndex;
   }
   if (ipAddress) {
     conditions.push(`al.ip_address LIKE @p${paramIndex}`);
@@ -589,10 +612,25 @@ async function getLoginSessions(filters = {}) {
     }
   }
 
+  // Tên người dùng: khớp tên trên phiên hoặc SĐT / email / họ tên trên bảng users
   if (userName) {
-    conditions.push(`LOWER(ls.user_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${userName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
+    conditions.push(`(
+      ${likeAccentInsensitive('ls.user_name', key)}
+      OR ${likeAccentInsensitive('ls.phone', key)}
+      OR EXISTS (
+        SELECT 1 FROM users u
+        WHERE u.id = ls.user_id AND (
+          ${likeAccentInsensitive('u.email', key)}
+          OR ${likeAccentInsensitive('u.phone', key)}
+          OR ${likeAccentInsensitive('u.user_name', key)}
+          OR ${likeAccentInsensitive('u.first_name', key)}
+          OR ${likeAccentInsensitive('u.last_name', key)}
+          OR ${likeAccentInsensitive(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
+        )
+      )
+    )`);
+    paramIndex = nextIndex;
   }
 
   if (phone) {
