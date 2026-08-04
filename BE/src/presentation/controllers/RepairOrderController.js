@@ -41,6 +41,7 @@ class RepairOrderController {
         data: req.body,
       });
       await this.notificationService.notifyAdmins('REPAIR_ORDER_CREATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: item?.code || `ID-${item?.id}`,
         targetCode: item?.code || '',
@@ -67,6 +68,14 @@ class RepairOrderController {
       const item = await this.repairOrderService.setTechnicians(req.params.id, req.body.technicianIds, {
         branchId: req.user.branchId,
         teamLeaderId: req.user.userId,
+      });
+      await auditCrud.update(req, {
+        tableName: 'repair_orders',
+        entityCode: item?.code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Phiếu sửa chữa',
+        newData: { technicianIds: req.body.technicianIds },
+        description: `Phân công thợ cho lệnh sửa chữa ${item?.code || req.params.id}`,
       });
       return success(res, item, 'Technicians assigned');
     } catch (err) {

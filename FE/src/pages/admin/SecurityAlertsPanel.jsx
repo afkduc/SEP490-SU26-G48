@@ -14,10 +14,10 @@ const RULE_LABEL = {
 };
 
 const SEVERITY_LABEL = {
-  critical: 'Critical',
-  high: 'High',
-  medium: 'Medium',
-  info: 'Info',
+  critical: 'Nghiêm trọng',
+  high: 'Cao',
+  medium: 'Trung bình',
+  info: 'Thông tin',
 };
 
 function formatDateTime(value) {
@@ -234,17 +234,17 @@ export default function SecurityAlertsPanel({
               {countsError
                 ? 'Vui lòng bấm Làm mới hoặc kiểm tra kết nối API.'
                 : urgent > 0
-                ? `${urgent} mức Critical/High — bấm Xem phiên để đối chiếu, xử lý trên bảng thiết bị`
-                : 'Medium/Info chỉ theo dõi; thao tác đăng xuất nằm ở bảng thiết bị'}
+                ? `${urgent} mức Nghiêm trọng/Cao — bấm Xem phiên để đối chiếu, xử lý trên bảng thiết bị`
+                : 'Mức Trung bình/Thông tin chỉ theo dõi; thao tác đăng xuất nằm ở bảng thiết bị'}
             </span>
           </div>
         </div>
 
         <div className="sec-panel__chips" aria-label="Thống kê mức độ">
-          <span className="sec-panel__chip sec-panel__chip--critical">Critical {counts.critical || 0}</span>
-          <span className="sec-panel__chip sec-panel__chip--high">High {counts.high || 0}</span>
-          <span className="sec-panel__chip sec-panel__chip--medium">Medium {counts.medium || 0}</span>
-          <span className="sec-panel__chip sec-panel__chip--info">Info {counts.info || 0}</span>
+          <span className="sec-panel__chip sec-panel__chip--critical">Nghiêm trọng {counts.critical || 0}</span>
+          <span className="sec-panel__chip sec-panel__chip--high">Cao {counts.high || 0}</span>
+          <span className="sec-panel__chip sec-panel__chip--medium">Trung bình {counts.medium || 0}</span>
+          <span className="sec-panel__chip sec-panel__chip--info">Thông tin {counts.info || 0}</span>
         </div>
 
         <button
@@ -267,7 +267,7 @@ export default function SecurityAlertsPanel({
                   checked={priorityOnly}
                   onChange={(e) => setPriorityOnly(e.target.checked)}
                 />
-                Ưu tiên Critical/High
+                Ưu tiên Nghiêm trọng/Cao
               </label>
               <div className="sec-panel__filter-row">
                 <select
@@ -277,10 +277,10 @@ export default function SecurityAlertsPanel({
                   aria-label="Lọc mức độ cảnh báo"
                 >
                   <option value="">Mọi mức độ</option>
-                  <option value="critical">Critical</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="info">Info</option>
+                  <option value="critical">Nghiêm trọng</option>
+                  <option value="high">Cao</option>
+                  <option value="medium">Trung bình</option>
+                  <option value="info">Thông tin</option>
                 </select>
                 <button
                   type="button"

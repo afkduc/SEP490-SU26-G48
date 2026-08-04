@@ -9,10 +9,17 @@ export const ROUTES = Object.freeze({
 
 
   ADMIN_USERS: '/admin/users',
+  ADMIN_USERS_NEW: '/admin/users/new',
+  ADMIN_USER_DETAIL: '/admin/users/:id',
+  ADMIN_USER_EDIT: '/admin/users/:id/edit',
   ADMIN_LOGS: '/admin/logs',
+  ADMIN_LOG_DETAIL: '/admin/logs/:id',
   ADMIN_LOGIN_SECURITY: '/admin/login-security',
   ADMIN_LOGIN_SESSIONS: '/admin/login-security?tab=sessions',
   ADMIN_CATALOG: '/admin/catalog',
+  ADMIN_BRANCH_NEW: '/admin/catalog/branches/new',
+  ADMIN_BRANCH_DETAIL: '/admin/catalog/branches/:id',
+  ADMIN_BRANCH_EDIT: '/admin/catalog/branches/:id/edit',
   ADMIN_PROFILE: '/admin/profile',
 
   MANAGER_PROFILE: '/manager/profile',

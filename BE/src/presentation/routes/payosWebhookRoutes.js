@@ -12,7 +12,7 @@ function buildPayosWebhookRouter() {
 
   router.post('/webhook', async (req, res) => {
     try {
-      await repairSettlementService.handlePayosWebhook(req.body);
+      await repairSettlementService.handlePayosWebhook(req.body, req);
     } catch (err) {
       console.warn('[payos webhook]', err.message);
     }
