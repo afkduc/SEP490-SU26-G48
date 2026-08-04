@@ -657,7 +657,7 @@ export default function AdminDevicesPage({
                   <td>
                     <div className="admin-devices__cell-stack">
                       <span className="admin-devices__cell-title">
-                        {getBrowserIcon(device.browser)} {device.deviceName || 'Unknown Device'}
+                        {getBrowserIcon(device.browser)} {device.deviceName || 'Thiết bị không xác định'}
                       </span>
                       <span className="admin-devices__cell-sub">{device.browser} · {device.os}</span>
                     </div>

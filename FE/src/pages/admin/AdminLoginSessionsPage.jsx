@@ -16,10 +16,22 @@ const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
   { value: 'LOGIN', label: 'Đăng nhập' },
   { value: 'LOGIN_FAILED', label: 'Đăng nhập thất bại' },
+  { value: 'LOGOUT', label: 'Đăng xuất' },
+  { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất' },
 ];
 
-const ACTION_CLASS = { LOGIN: 'badge--success', LOGIN_FAILED: 'badge--danger' };
-const ACTION_LABEL = { LOGIN: 'Đăng nhập', LOGIN_FAILED: 'Thất bại' };
+const ACTION_CLASS = {
+  LOGIN: 'badge--success',
+  LOGIN_FAILED: 'badge--danger',
+  LOGOUT: 'badge--secondary',
+  FORCE_LOGOUT: 'badge--orange',
+};
+const ACTION_LABEL = {
+  LOGIN: 'Đăng nhập',
+  LOGIN_FAILED: 'Đăng nhập thất bại',
+  LOGOUT: 'Đăng xuất',
+  FORCE_LOGOUT: 'Buộc đăng xuất',
+};
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },

@@ -5,6 +5,7 @@ const ACTION_LABELS = {
   LOGIN: 'Đăng nhập',
   LOGIN_FAILED: 'Đăng nhập thất bại',
   LOGOUT: 'Đăng xuất',
+  FORCE_LOGOUT: 'Buộc đăng xuất',
 };
 
 const STATUS_LABELS = {
@@ -50,7 +51,7 @@ function parseBrowser(ua) {
     const m = ua.match(re);
     if (m) return { name, version: m[1], full: ua };
   }
-  return { name: 'Unknown', version: '', full: ua };
+  return { name: 'Không xác định', version: '', full: ua };
 }
 
 function parseOs(ua) {
@@ -79,7 +80,7 @@ function parseOs(ua) {
 function parseDevice(ua) {
   if (!ua) return '—';
   if (/Mobile|Android|iPhone|iPad/.test(ua)) {
-    if (/iPad/.test(ua)) return 'Tablet (iPad)';
+    if (/iPad/.test(ua)) return 'Máy tính bảng (iPad)';
     return 'Điện thoại';
   }
   return 'Máy tính';
@@ -88,10 +89,10 @@ function parseDevice(ua) {
 function ActionBadge({ action }) {
   if (!action) return null;
   const upper = String(action).toUpperCase();
-  if (upper.includes('FAILED')) return <span className="badge badge--danger">{ACTION_LABELS.LOGIN_FAILED}</span>;
+  if (upper.includes('FORCE')) return <span className="badge badge--orange">{ACTION_LABELS.FORCE_LOGOUT}</span>;
   if (upper.includes('LOGOUT') || upper.includes('SIGNOUT')) return <span className="badge badge--secondary">{ACTION_LABELS.LOGOUT}</span>;
   if (upper.includes('LOGIN')) return <span className="badge badge--success">{ACTION_LABELS.LOGIN}</span>;
-  return <span className="badge badge--secondary">{action}</span>;
+  return <span className="badge badge--secondary">{ACTION_LABELS[upper] || 'Thao tác khác'}</span>;
 }
 
 function StatusBadge({ status }) {
@@ -101,7 +102,7 @@ function StatusBadge({ status }) {
     status === 'ended' ? 'badge--secondary' :
     status === 'failed' ? 'badge--danger' :
     'badge--secondary';
-  return <span className={`badge ${cls}`}>{STATUS_LABELS[status] || status}</span>;
+  return <span className={`badge ${cls}`}>{STATUS_LABELS[status] || 'Không xác định'}</span>;
 }
 
 function DetailRow({ label, value, mono, multiline }) {
@@ -219,7 +220,7 @@ export default function SessionDetailDrawer({ session, onClose, onOpenDevicesToP
             <div className="detail-list__group">
               <DetailRow label="Họ tên" value={fullName} />
               <DetailRow label="Số điện thoại" value={phone} />
-              <DetailRow label="User ID" value={session.user_id != null ? `#${session.user_id}` : null} mono />
+              <DetailRow label="Mã người dùng" value={session.user_id != null ? `#${session.user_id}` : null} mono />
               <DetailRow label="Chi nhánh" value={session.branch_name || (session.branch_id ? `Chi nhánh #${session.branch_id}` : null)} />
             </div>
 
@@ -231,7 +232,7 @@ export default function SessionDetailDrawer({ session, onClose, onOpenDevicesToP
               <DetailRow label="Thiết bị" value={device} />
               <DetailRow label="Hệ điều hành" value={os} />
               <DetailRow label="Trình duyệt" value={browser.version ? `${browser.name} ${browser.version}` : browser.name} />
-              <DetailRow label="User Agent" value={session.user_agent} mono multiline />
+              <DetailRow label="Thông tin trình duyệt" value={session.user_agent} mono multiline />
             </div>
 
             {session.failure_reason && (
@@ -263,7 +264,7 @@ export default function SessionDetailDrawer({ session, onClose, onOpenDevicesToP
         {session.status === 'active' && typeof onOpenDevicesToProcess === 'function' && (
           <div className="drawer__footer" style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0' }}>
             <p style={{ margin: '0 0 10px', fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4 }}>
-              Tab Lịch sử chỉ xem. Để đăng xuất thiết bị này, mở tab Thiết bị rồi bấm Force logout.
+              Tab Lịch sử chỉ xem. Để đăng xuất thiết bị này, mở tab Thiết bị rồi bấm Buộc đăng xuất.
             </p>
             <button
               type="button"
