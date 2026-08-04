@@ -32,6 +32,15 @@ class RepairSettlement {
     this.deliveryDate = data.deliveryDate ?? null;
     this.paidAt = data.paidAt ?? null;
     this.cancelReason = data.cancelReason ?? null;
+    // Phieu tiep nhan va ban giao xe (kiem tra noi that/ngoai that/khoang dong
+    // co...) - luu nguyen 1 khoi JSON, xem shape trong IntakeChecklistSection.jsx.
+    this.intakeChecklist = data.intakeChecklist ?? null;
+    this.note = data.note ?? null;
+    // Chu ky dien tu tai cho (nguoi lien he ky truc tiep khi tao phieu) - xem
+    // RepairSettlementService._assertSignaturePresent.
+    this.signatureData = data.signatureData ?? null;
+    this.signerName = data.signerName ?? null;
+    this.signedAt = data.signedAt ?? null;
 
     this.customer = data.customer ?? null; // { id, fullName, phone, address, taxCode, cccd, email, contactPerson, contactPhone }
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel, frameNumber, engineNumber, purchaseDate, currentKm }
@@ -40,9 +49,12 @@ class RepairSettlement {
     // Chi co du lieu khi phieu da duoc gan to truong (co repair_order) - dung
     // de co van xem tien do tung dau viec To truong da tich (xem [{ id, taskName, taskType, isDone }]).
     this.tasks = data.tasks ?? [];
+    // Tho thuc hien lenh sua chua (repair_order_technicians, co the nhieu tho) -
+    // chi co khi da gan to truong, xem [{ id, fullName, phone }].
+    this.technicians = data.technicians ?? [];
   }
 
-  static fromPersistence(headerRow, itemRows = [], taskRows = []) {
+  static fromPersistence(headerRow, itemRows = [], taskRows = [], technicianRows = []) {
     if (!headerRow) return null;
     return new RepairSettlement({
       id: headerRow.id,
@@ -70,6 +82,11 @@ class RepairSettlement {
       deliveryDate: headerRow.delivery_date,
       paidAt: headerRow.invoice_issued_at,
       cancelReason: headerRow.cancel_reason,
+      intakeChecklist: headerRow.intake_checklist ? JSON.parse(headerRow.intake_checklist) : null,
+      note: headerRow.note ?? null,
+      signatureData: headerRow.signature_data ?? null,
+      signerName: headerRow.signature_signer_name ?? null,
+      signedAt: headerRow.signature_signed_at ?? null,
       customer: {
         id: headerRow.customer_id,
         fullName: headerRow.customer_full_name,
@@ -116,6 +133,11 @@ class RepairSettlement {
         taskName: r.task_name,
         taskType: r.task_type,
         isDone: Boolean(r.is_done),
+      })),
+      technicians: technicianRows.map((r) => ({
+        id: r.id,
+        fullName: r.user_name,
+        phone: r.phone,
       })),
     });
   }
