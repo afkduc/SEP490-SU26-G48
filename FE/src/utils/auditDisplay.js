@@ -51,19 +51,34 @@ const ROLE_LABELS = {
 };
 
 export const AUDIT_FIELD_LABELS = {
+  // Người dùng / phân quyền
   status: 'Trạng thái',
   branchId: 'Mã chi nhánh',
+  branch_id: 'Mã chi nhánh',
   branchName: 'Chi nhánh',
+  branch_name: 'Chi nhánh',
+  branchCode: 'Mã chi nhánh',
   roleId: 'Mã vai trò',
+  role_id: 'Mã vai trò',
   roleName: 'Vai trò',
+  role_name: 'Vai trò',
   role: 'Vai trò',
   phone: 'Số điện thoại',
+  phoneNumber: 'Số điện thoại',
+  phone_number: 'Số điện thoại',
   firstName: 'Họ',
+  first_name: 'Họ',
   lastName: 'Tên',
+  last_name: 'Tên',
   fullName: 'Họ và tên',
+  full_name: 'Họ và tên',
   email: 'Email',
   userName: 'Tên đăng nhập',
+  user_name: 'Tên đăng nhập',
   specialtyId: 'Chuyên môn',
+  specialty_id: 'Chuyên môn',
+  specialtyName: 'Tên chuyên môn',
+  specialtyCode: 'Mã chuyên môn',
   name: 'Tên',
   permissionKey: 'Quyền (mã hệ thống)',
   screenKey: 'Màn hình',
@@ -74,21 +89,273 @@ export const AUDIT_FIELD_LABELS = {
   l1Granted: 'Số quyền truy cập mới được cấp',
   l1Revoked: 'Số quyền truy cập bị thu hồi',
   count: 'Số lượng',
+  quantity: 'Số lượng',
   entityCode: 'Mã đối tượng',
+  entityName: 'Tên đối tượng',
   recordId: 'Mã bản ghi',
   targetUserId: 'Người nhận (ID)',
   targetUserName: 'Người nhận',
   targetEmail: 'Email người nhận',
+  targetName: 'Đối tượng',
   newTokenVersion: 'Phiên bản phiên đăng nhập',
   reason: 'Lý do',
+  rejectReason: 'Lý do từ chối',
   pendingId: 'Mã yêu cầu đăng nhập',
   browser: 'Trình duyệt',
   os: 'Hệ điều hành',
   ip: 'Địa chỉ IP',
   device: 'Thiết bị',
+  deviceId: 'Mã thiết bị',
   userId: 'Mã người dùng',
+  user_id: 'Mã người dùng',
   actorId: 'Người thực hiện (ID)',
+  isActive: 'Đang hoạt động',
+  is_active: 'Đang hoạt động',
+  password: 'Mật khẩu',
+  newPassword: 'Mật khẩu mới',
+  notes: 'Ghi chú',
+  description: 'Mô tả',
+  code: 'Mã',
+  id: 'Mã hệ thống',
+
+  // Lệnh sửa chữa / yêu cầu dịch vụ / khoang
+  serviceOrderId: 'Mã phiếu tiếp nhận',
+  service_order_id: 'Mã phiếu tiếp nhận',
+  serviceRequestId: 'Mã yêu cầu dịch vụ',
+  service_request_id: 'Mã yêu cầu dịch vụ',
+  repairOrderId: 'Mã lệnh sửa chữa',
+  repair_order_id: 'Mã lệnh sửa chữa',
+  repairOrderCode: 'Mã lệnh sửa chữa',
+  bayId: 'Mã khoang',
+  bay_id: 'Mã khoang',
+  bayNumber: 'Số khoang',
+  bay_number: 'Số khoang',
+  bayNumbers: 'Danh sách số khoang',
+  technicianIds: 'Danh sách thợ (ID)',
+  technicianId: 'Mã thợ',
+  memberIds: 'Danh sách thành viên (ID)',
+  teamLeaderId: 'Mã tổ trưởng',
+  taskId: 'Mã đầu mục công việc',
+  taskName: 'Tên đầu mục công việc',
+  isDone: 'Đã hoàn thành',
+  occupiedByDeviceId: 'Thiết bị đang chiếm khoang',
+  occupiedByUserId: 'Người đang chiếm khoang',
+  released: 'Đã nhả khoang',
+  appointmentDate: 'Ngày hẹn',
+  appointmentTime: 'Giờ hẹn',
+  scheduledAt: 'Thời gian hẹn',
+  customerId: 'Mã khách hàng',
+  customer_id: 'Mã khách hàng',
+  customerName: 'Tên khách hàng',
+  newCustomerId: 'Mã khách hàng mới',
+  vehicleId: 'Mã xe',
+  vehicle_id: 'Mã xe',
+  licensePlate: 'Biển số xe',
+  plateNumber: 'Biển số xe',
+  plate_number: 'Biển số xe',
+  vin: 'Số khung (VIN)',
+  brandId: 'Mã hãng xe',
+  brandName: 'Hãng xe',
+  model: 'Dòng xe',
+  year: 'Năm sản xuất',
+  transferDate: 'Ngày chuyển chủ',
+  isSent: 'Đã gửi nhắc',
+  productId: 'Mã sản phẩm / phụ tùng',
+  product_id: 'Mã sản phẩm / phụ tùng',
+  productName: 'Tên sản phẩm',
+  orderCode: 'Mã đơn thanh toán',
+  expiredAt: 'Hết hạn lúc',
+  amount: 'Số tiền',
+  totalAmount: 'Tổng tiền',
+  paymentMethod: 'Phương thức thanh toán',
+  packageId: 'Mã gói dịch vụ',
+  serviceId: 'Mã dịch vụ',
+  serviceName: 'Tên dịch vụ',
+  categoryId: 'Mã danh mục',
+  supplierId: 'Mã nhà cung cấp',
+  createdAt: 'Thời gian tạo',
+  updatedAt: 'Thời gian cập nhật',
+  startedAt: 'Thời gian bắt đầu',
+  completedAt: 'Thời gian hoàn thành',
+  address: 'Địa chỉ',
+  city: 'Thành phố',
+  district: 'Quận / huyện',
+  ward: 'Phường / xã',
+  gender: 'Giới tính',
+  dateOfBirth: 'Ngày sinh',
+  dob: 'Ngày sinh',
+
+  // Phiếu quyết toán / tiếp nhận xe
+  customerRequest: 'Yêu cầu khách hàng',
+  customer_request: 'Yêu cầu khách hàng',
+  note: 'Ghi chú',
+  currentKm: 'Số km hiện tại',
+  current_km: 'Số km hiện tại',
+  items: 'Hạng mục dịch vụ / phụ tùng',
+  subtotal: 'Tổng trước giảm giá',
+  discountAmount: 'Số tiền giảm giá',
+  discount_amount: 'Số tiền giảm giá',
+  discount: 'Giảm giá',
+  afterDiscount: 'Tổng sau giảm giá',
+  after_discount: 'Tổng sau giảm giá',
+  vat: 'Thuế VAT (8%)',
+  freeAmount: 'Số tiền miễn phí',
+  free_amount: 'Số tiền miễn phí',
+  exemptedAmount: 'Số tiền được miễn',
+  exempted_amount: 'Số tiền được miễn',
+  total: 'Tổng thanh toán',
+  signatureData: 'Chữ ký khách hàng',
+  signature_data: 'Chữ ký khách hàng',
+  signerName: 'Người ký',
+  signer_name: 'Người ký',
+  signedAt: 'Thời điểm ký',
+  signed_at: 'Thời điểm ký',
+  unitPrice: 'Đơn giá',
+  unit_price: 'Đơn giá',
+  qty: 'Số lượng',
+  unit: 'Đơn vị',
+  lhsc: 'Loại hình SC',
+  httt: 'Hình thức TT',
+  repairCategory: 'Hạng mục sửa chữa',
+  groupId: 'Nhóm hạng mục',
+  isGroupParent: 'Là dòng nhóm',
+  isFree: 'Miễn phí',
 };
+
+/** Token tiếng Anh → Việt (fallback khi chưa có trong AUDIT_FIELD_LABELS) */
+const FIELD_TOKEN_VI = {
+  id: 'mã',
+  ids: 'danh sách mã',
+  code: 'mã',
+  name: 'tên',
+  status: 'trạng thái',
+  type: 'loại',
+  date: 'ngày',
+  time: 'giờ',
+  at: 'lúc',
+  by: 'bởi',
+  user: 'người dùng',
+  actor: 'người thực hiện',
+  target: 'đối tượng',
+  branch: 'chi nhánh',
+  role: 'vai trò',
+  phone: 'số điện thoại',
+  email: 'email',
+  device: 'thiết bị',
+  browser: 'trình duyệt',
+  os: 'hệ điều hành',
+  ip: 'địa chỉ IP',
+  reason: 'lý do',
+  note: 'ghi chú',
+  notes: 'ghi chú',
+  description: 'mô tả',
+  quantity: 'số lượng',
+  count: 'số lượng',
+  amount: 'số tiền',
+  total: 'tổng',
+  price: 'giá',
+  service: 'dịch vụ',
+  order: 'lệnh / phiếu',
+  repair: 'sửa chữa',
+  request: 'yêu cầu',
+  settlement: 'quyết toán',
+  bay: 'khoang',
+  number: 'số',
+  numbers: 'danh sách số',
+  technician: 'thợ',
+  technicians: 'danh sách thợ',
+  member: 'thành viên',
+  members: 'danh sách thành viên',
+  team: 'tổ',
+  leader: 'trưởng',
+  task: 'đầu mục',
+  customer: 'khách hàng',
+  vehicle: 'xe',
+  plate: 'biển số',
+  license: 'biển số',
+  product: 'sản phẩm',
+  package: 'gói',
+  category: 'danh mục',
+  supplier: 'nhà cung cấp',
+  brand: 'hãng',
+  model: 'dòng',
+  year: 'năm',
+  payment: 'thanh toán',
+  method: 'phương thức',
+  appointment: 'lịch hẹn',
+  scheduled: 'đã hẹn',
+  occupied: 'đang chiếm',
+  released: 'đã nhả',
+  active: 'hoạt động',
+  done: 'hoàn thành',
+  sent: 'đã gửi',
+  granted: 'đã cấp',
+  expired: 'hết hạn',
+  created: 'tạo',
+  updated: 'cập nhật',
+  started: 'bắt đầu',
+  completed: 'hoàn thành',
+  transfer: 'chuyển',
+  new: 'mới',
+  old: 'cũ',
+  first: 'họ',
+  last: 'tên',
+  full: 'họ và',
+  address: 'địa chỉ',
+  city: 'thành phố',
+  district: 'quận huyện',
+  ward: 'phường xã',
+  gender: 'giới tính',
+  password: 'mật khẩu',
+  specialty: 'chuyên môn',
+  permission: 'quyền',
+  screen: 'màn hình',
+  pending: 'chờ duyệt',
+  reject: 'từ chối',
+  is: '',
+  current: 'hiện tại',
+  km: 'km',
+  subtotal: 'tạm tính',
+  discount: 'giảm giá',
+  after: 'sau',
+  vat: 'thuế VAT',
+  free: 'miễn phí',
+  exempted: 'được miễn',
+  signature: 'chữ ký',
+  signer: 'người ký',
+  signed: 'đã ký',
+  items: 'hạng mục',
+  qty: 'số lượng',
+  unit: 'đơn vị',
+};
+
+/**
+ * Nhãn tiếng Việt cho khóa field trong nhật ký (ưu tiên từ điển, có fallback dễ đọc).
+ */
+export function getAuditFieldLabel(key) {
+  if (key == null || key === '') return '—';
+  const raw = String(key).trim();
+  if (AUDIT_FIELD_LABELS[raw]) return AUDIT_FIELD_LABELS[raw];
+
+  const camel = raw.replace(/_([a-z])/gi, (_, c) => c.toUpperCase());
+  if (AUDIT_FIELD_LABELS[camel]) return AUDIT_FIELD_LABELS[camel];
+
+  const snake = raw
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[-\s]+/g, '_')
+    .toLowerCase();
+  if (AUDIT_FIELD_LABELS[snake]) return AUDIT_FIELD_LABELS[snake];
+  if (AUDIT_FIELD_LABELS[raw.toLowerCase()]) return AUDIT_FIELD_LABELS[raw.toLowerCase()];
+
+  const parts = snake.split('_').filter(Boolean);
+  if (!parts.length) return raw;
+  const viParts = parts
+    .map((p) => (Object.prototype.hasOwnProperty.call(FIELD_TOKEN_VI, p) ? FIELD_TOKEN_VI[p] : p))
+    .filter((p) => p !== '');
+  if (!viParts.length) return raw;
+  const label = viParts.join(' ').replace(/\s+/g, ' ').trim();
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : raw;
+}
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
@@ -97,6 +364,24 @@ const STATUS_LABELS = {
   pending: 'Đang chờ',
   approved: 'Đã duyệt',
   rejected: 'Từ chối',
+  // Trạng thái lệnh / phiếu xưởng
+  completed: 'Hoàn thành',
+  in_progress: 'Đang sửa chữa',
+  inprogress: 'Đang sửa chữa',
+  waiting_repair: 'Chờ sửa chữa',
+  waitingrepair: 'Chờ sửa chữa',
+  waiting_payment: 'Chờ thanh toán',
+  waitingpayment: 'Chờ thanh toán',
+  invoiced: 'Đã xuất hóa đơn',
+  cancelled: 'Đã hủy',
+  canceled: 'Đã hủy',
+  accepted: 'Đã tiếp nhận',
+  occupied: 'Đang chiếm',
+  free: 'Trống',
+  available: 'Sẵn sàng',
+  paid: 'Đã thanh toán',
+  unpaid: 'Chưa thanh toán',
+  expired: 'Hết hạn',
 };
 
 function getRoleLabel(roleName) {
@@ -127,10 +412,14 @@ export function getHttpMethodLabel(method) {
   return HTTP_METHOD_LABELS[key] || key;
 }
 
-/** Mã phản hồi HTTP → tiếng Việt */
+/** Mã phản hồi HTTP → tiếng Việt ngắn gọn (không hiện dạng "Mã 0") */
 export function getResponseStatusLabel(status) {
+  // Manual audit thường không gắn HTTP status → DB lưu null/0
+  if (status == null || status === '' || Number(status) === 0) {
+    return 'Thành công';
+  }
   const code = Number(status);
-  if (!Number.isFinite(code)) return status != null ? String(status) : '—';
+  if (!Number.isFinite(code)) return String(status);
   if (code >= 200 && code < 300) return 'Thành công';
   if (code === 401) return 'Chưa đăng nhập / hết phiên';
   if (code === 403) return 'Không có quyền';
@@ -139,7 +428,74 @@ export function getResponseStatusLabel(status) {
   if (code === 429) return 'Quá nhiều yêu cầu';
   if (code >= 400 && code < 500) return 'Yêu cầu không hợp lệ';
   if (code >= 500) return 'Lỗi hệ thống';
-  return `Mã ${code}`;
+  return `Phản hồi HTTP ${code}`;
+}
+
+/** Giải thích thêm (tooltip) — tách khỏi nhãn ngắn để tránh vỡ layout */
+export function getResponseStatusDetail(status) {
+  if (status == null || status === '' || Number(status) === 0) {
+    return 'Thao tác đã được ghi nhận. Nhật ký thủ công không kèm mã phản hồi HTTP.';
+  }
+  const code = Number(status);
+  if (!Number.isFinite(code)) return String(status);
+  if (code >= 200 && code < 300) return `HTTP ${code} — máy chủ xử lý thành công.`;
+  if (code === 401) return 'HTTP 401 — chưa đăng nhập hoặc phiên đã hết hạn.';
+  if (code === 403) return 'HTTP 403 — tài khoản không có quyền thực hiện.';
+  if (code === 404) return 'HTTP 404 — không tìm thấy dữ liệu yêu cầu.';
+  if (code === 409) return 'HTTP 409 — xung đột trạng thái / dữ liệu.';
+  if (code === 429) return 'HTTP 429 — gửi quá nhiều yêu cầu trong thời gian ngắn.';
+  if (code >= 400 && code < 500) return `HTTP ${code} — yêu cầu không hợp lệ.`;
+  if (code >= 500) return `HTTP ${code} — lỗi phía máy chủ.`;
+  return `HTTP ${code}`;
+}
+
+/** Tone badge cho kết quả: success | danger | neutral */
+export function getResponseStatusTone(status) {
+  if (status == null || status === '') return 'neutral';
+  const code = Number(status);
+  if (!Number.isFinite(code) || code === 0) return 'success'; // 0 = manual audit sau khi thành công
+  if (code >= 200 && code < 300) return 'success';
+  if (code >= 400) return 'danger';
+  return 'neutral';
+}
+
+/**
+ * Gắn nhãn rõ cho mã nghiệp vụ (LSC / YCDV / ...) để người dùng hiểu,
+ * thay vì chỉ hiện chuỗi thô.
+ */
+export function formatEntityCodeDisplay(entityCode, tableName, entityName) {
+  if (entityCode == null || entityCode === '') return null;
+  const code = String(entityCode).trim();
+  if (!code) return null;
+
+  const table = String(tableName || '').toLowerCase();
+  const name = String(entityName || '').toLowerCase();
+
+  if (/^LSC-/i.test(code) || table === 'repair_orders' || table === 'repair_order_tasks' || /sửa chữa|lệnh/.test(name)) {
+    return { label: 'Mã lệnh sửa chữa', value: code, hint: 'Mã định danh lệnh sửa chữa trên hệ thống' };
+  }
+  if (/^YCDV-/i.test(code) || table.includes('service_request') || /yêu cầu dịch vụ/.test(name)) {
+    return { label: 'Mã yêu cầu dịch vụ', value: code, hint: 'Mã yêu cầu khách gửi / CVDV tiếp nhận' };
+  }
+  if (table.includes('repair_settlement') || table === 'service_orders' || /quyết toán/.test(name)) {
+    return { label: 'Mã phiếu quyết toán', value: code, hint: 'Mã phiếu quyết toán / tiếp nhận xe' };
+  }
+  if (table.includes('payos') || /thanh toán|payos/.test(name)) {
+    return { label: 'Mã phiếu thanh toán', value: code, hint: 'Liên kết với phiếu quyết toán được thanh toán' };
+  }
+  if (/^BAY-/i.test(code) || table === 'vehicle_bays' || /khoang/.test(name)) {
+    return { label: 'Mã khoang xe', value: code, hint: 'Khoang / bàn làm việc tại xưởng' };
+  }
+  if (/^NHAC-/i.test(code) || table.includes('maintenance_reminder')) {
+    return { label: 'Mã nhắc bảo dưỡng', value: code, hint: 'Nhắc nhở bảo dưỡng theo biển số / ID' };
+  }
+  if (table === 'users' || /nhân viên|thợ/.test(name)) {
+    return { label: 'Mã nhân sự', value: code, hint: 'Mã nhân viên / thợ trên hệ thống' };
+  }
+  if (table === 'services' || table === 'service_packages') {
+    return { label: 'Mã danh mục dịch vụ', value: code, hint: 'Mã dịch vụ hoặc gói dịch vụ' };
+  }
+  return { label: 'Mã đối tượng', value: code, hint: 'Mã định danh bản ghi liên quan' };
 }
 
 export function formatDurationMs(ms) {
@@ -171,6 +527,11 @@ export function humanizeRequestUrl(url) {
   if (/\/auth\/login/.test(path)) return 'Đăng nhập';
   if (/\/auth\/logout/.test(path)) return 'Đăng xuất';
   if (/\/auth\/forgot|\/auth\/reset/.test(path)) return 'Quên / đặt lại mật khẩu';
+  if (/\/repair-orders|\/repairorders/.test(path)) return 'Thao tác lệnh sửa chữa';
+  if (/\/repair-settlements|\/service-orders/.test(path)) return 'Thao tác phiếu quyết toán';
+  if (/\/service-requests/.test(path)) return 'Thao tác yêu cầu dịch vụ';
+  if (/\/vehicle-bays/.test(path)) return 'Thao tác khoang xe';
+  if (/\/payos/.test(path)) return 'Thanh toán PayOS';
   return 'Thao tác trên hệ thống';
 }
 
@@ -383,23 +744,137 @@ export function humanizeAuditDescription(description, action, newValue, metaOrEn
     .replace(/\bscreenKey\b/gi, 'màn hình')
     .replace(/\bitemCount\b/gi, 'số mục');
 
+  // Làm rõ mã nghiệp vụ (LSC / YCDV / ...) trong câu mô tả
+  text = text.replace(/\b(Phiếu|Lệnh)\s+sửa\s+chữa\s+(LSC-[A-Z0-9-]+)\b/gi, 'lệnh sửa chữa số $2');
+  text = text.replace(/\b(LSC-[A-Z0-9-]+)\b/g, (m) => (text.includes(`số ${m}`) ? m : `số ${m}`));
+  // Tránh "số số"
+  text = text.replace(/\bsố\s+số\s+/gi, 'số ');
+
+  // Nếu mô tả chưa có mã nhưng meta có entityCode → bổ sung
+  const codeHint = entityCodeHint || null;
+  if (codeHint && !text.includes(String(codeHint))) {
+    const display = formatEntityCodeDisplay(codeHint, null, entityNameHint);
+    if (display) {
+      text = `${text} (${display.label}: ${display.value})`;
+    }
+  }
+
   return text || actionLabel;
+}
+
+const MONEY_FIELD_KEYS = new Set([
+  'subtotal',
+  'discountAmount',
+  'discount_amount',
+  'discount',
+  'afterDiscount',
+  'after_discount',
+  'vat',
+  'freeAmount',
+  'free_amount',
+  'exemptedAmount',
+  'exempted_amount',
+  'total',
+  'totalAmount',
+  'amount',
+  'unitPrice',
+  'unit_price',
+]);
+
+function formatMoneyVi(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return `${n.toLocaleString('vi-VN')} ₫`;
+}
+
+function formatKmVi(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return `${n.toLocaleString('vi-VN')} km`;
+}
+
+/** Tóm tắt 1 dòng hạng mục phiếu quyết toán */
+function formatSettlementItemLine(item, index) {
+  if (!item || typeof item !== 'object') return `${index + 1}. ${String(item)}`;
+  const name = item.description || item.name || item.code || `Hạng mục ${index + 1}`;
+  const qty = item.qty != null ? Number(item.qty) : null;
+  const unit = item.unit || '';
+  const price = item.unitPrice != null ? Number(item.unitPrice) : null;
+  const lineTotal = item.total != null ? Number(item.total) : null;
+  const parts = [`${index + 1}. ${name}`];
+  if (item.code) parts.push(`(mã ${item.code})`);
+  if (qty != null) parts.push(`— SL: ${qty}${unit ? ` ${unit}` : ''}`);
+  if (price != null && price > 0) parts.push(`× ${formatMoneyVi(price)}`);
+  if (lineTotal != null) parts.push(`= ${formatMoneyVi(lineTotal)}`);
+  if (item.isFree) parts.push('(miễn phí)');
+  return parts.join(' ');
+}
+
+export function formatSettlementItems(items) {
+  const list = Array.isArray(items) ? items : parseAuditJson(items);
+  if (!Array.isArray(list) || !list.length) return '—';
+  return list.map((item, i) => formatSettlementItemLine(item, i)).join('\n');
+}
+
+export function isAuditSignatureValue(value) {
+  if (value == null) return false;
+  const s = String(value);
+  return s.startsWith('data:image/') || (s.length > 200 && /^[A-Za-z0-9+/=]+$/.test(s.slice(0, 80)));
+}
+
+/**
+ * Phân loại hiển thị field (UI render theo kind).
+ * @returns {'text'|'money'|'km'|'items'|'signature'}
+ */
+export function getAuditFieldDisplayKind(key, value) {
+  const k = String(key || '');
+  if (/signatureData|signature_data/i.test(k) && isAuditSignatureValue(value)) return 'signature';
+  if ((k === 'items' || k === 'Items') && (Array.isArray(value) || typeof value === 'string')) {
+    const parsed = Array.isArray(value) ? value : parseAuditJson(value);
+    if (Array.isArray(parsed) && parsed.some((x) => x && typeof x === 'object')) return 'items';
+  }
+  if (MONEY_FIELD_KEYS.has(k)) return 'money';
+  if (k === 'currentKm' || k === 'current_km') return 'km';
+  return 'text';
 }
 
 /** Format 1 giá trị field cho DiffView */
 export function formatAuditFieldValue(key, value) {
   if (value === null || value === undefined || value === '') return '—';
-  if (key === 'status') return STATUS_LABELS[value] || String(value);
-  if (key === 'granted') return value === true || value === 1 || value === 'true' ? 'Đã cấp' : 'Thu hồi / chưa cấp';
-  if (key === 'permissionKey') {
+  const k = String(key || '');
+  const kind = getAuditFieldDisplayKind(k, value);
+
+  if (/password/i.test(k)) return '••••••••';
+  if (kind === 'signature') return 'Đã ký (có ảnh chữ ký)';
+  if (kind === 'items') return formatSettlementItems(value);
+  if (kind === 'money') return formatMoneyVi(value);
+  if (kind === 'km') return formatKmVi(value);
+
+  if (k === 'status') {
+    const raw = String(value);
+    const norm = raw.toLowerCase().replace(/[\s-]+/g, '_');
+    return STATUS_LABELS[norm] || STATUS_LABELS[raw.toLowerCase()] || raw;
+  }
+  if (k === 'granted') return value === true || value === 1 || value === 'true' ? 'Đã cấp' : 'Thu hồi / chưa cấp';
+  if (k === 'isDone' || k === 'released' || k === 'isSent' || k === 'isActive' || k === 'is_active' || k === 'isFree' || k === 'isGroupParent') {
+    return value === true || value === 1 || value === 'true' ? 'Có' : 'Không';
+  }
+  if (k === 'permissionKey') {
     const label = getPermissionScreenLabel(value);
     return label && label !== '—' ? label : 'Quyền màn hình';
   }
-  if (key === 'screenKey') {
+  if (k === 'screenKey') {
     const label = getScreenLabel(value);
     return label && label !== '—' ? label : 'Màn hình';
   }
-  if (key === 'roleName' || key === 'role') return getRoleLabel(value);
+  if (k === 'roleName' || k === 'role' || k === 'role_name') return getRoleLabel(value);
+  if (Array.isArray(value)) {
+    if (!value.length) return '—';
+    if (value.every((v) => typeof v !== 'object' || v == null)) {
+      return value.map((v) => String(v)).join(', ');
+    }
+    return formatSettlementItems(value);
+  }
   if (typeof value === 'boolean') return value ? 'Có' : 'Không';
   if (typeof value === 'object') {
     try {
@@ -409,18 +884,69 @@ export function formatAuditFieldValue(key, value) {
     }
   }
   const s = String(value);
-  return s.length > 80 ? `${s.slice(0, 80)}…` : s;
+  if (s.startsWith('data:image/')) return 'Đã ký (có ảnh chữ ký)';
+  const statusHit = STATUS_LABELS[s.toLowerCase()];
+  if (statusHit && /status|trạng thái/i.test(k)) return statusHit;
+  // Không cắt ngắn số / mã ngắn; chỉ cắt chuỗi rất dài (không phải chữ ký — đã xử lý)
+  if (s.length > 200) return `${s.slice(0, 120)}…`;
+  return s;
 }
 
-/**
- * Tóm tắt "giá trị mới" dạng danh sách dễ đọc (không dump JSON thô mặc định).
- * @returns {{ rows: Array<{label,value}>, summary: string } | null}
- */
-export function summarizeAuditNewValue(newValue, action) {
-  const obj = parseAuditJson(newValue);
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+const SETTLEMENT_PREFERRED_KEYS = [
+  'customerId',
+  'customerName',
+  'vehicleId',
+  'licensePlate',
+  'plateNumber',
+  'customerRequest',
+  'note',
+  'notes',
+  'currentKm',
+  'items',
+  'subtotal',
+  'discountAmount',
+  'afterDiscount',
+  'vat',
+  'freeAmount',
+  'exemptedAmount',
+  'total',
+  'signerName',
+  'signatureData',
+  'signedAt',
+  'status',
+];
 
-  const preferredKeys = [
+/**
+ * Dựng danh sách dòng hiển thị từ object audit (nhãn Việt + kind).
+ * @returns {Array<{key,label,value,kind,raw}>}
+ */
+export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
+  const obj = parseAuditJson(data);
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return [];
+
+  const preferred = [
+    ...SETTLEMENT_PREFERRED_KEYS,
+    'serviceOrderId',
+    'service_order_id',
+    'repairOrderId',
+    'repairOrderCode',
+    'bayId',
+    'bayNumber',
+    'bayNumbers',
+    'technicianIds',
+    'taskId',
+    'taskName',
+    'isDone',
+    'productId',
+    'quantity',
+    'orderCode',
+    'amount',
+    'totalAmount',
+    'occupiedByDeviceId',
+    'occupiedByUserId',
+    'released',
+    'deviceId',
+    'memberIds',
     'permissionKey',
     'screenKey',
     'roleName',
@@ -434,11 +960,11 @@ export function summarizeAuditNewValue(newValue, action) {
     'l1Granted',
     'l1Revoked',
     'reason',
+    'rejectReason',
     'browser',
     'os',
     'ip',
     'device',
-    'status',
     'email',
     'phone',
     'firstName',
@@ -446,37 +972,72 @@ export function summarizeAuditNewValue(newValue, action) {
     'userName',
     'branchName',
     'name',
+    'isSent',
   ];
 
   const rows = [];
   const used = new Set();
 
-  preferredKeys.forEach((key) => {
+  const pushKey = (key) => {
+    if (used.has(key)) return;
     if (obj[key] === undefined || obj[key] === null || obj[key] === '') return;
     if ((key === 'l1Granted' || key === 'l1Revoked') && Number(obj[key]) === 0) return;
+    const raw = obj[key];
+    // Bỏ object lồng nhau phức tạp (không phải mảng hạng mục)
+    if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) return;
     used.add(key);
     rows.push({
-      label: AUDIT_FIELD_LABELS[key] || key,
-      value: formatAuditFieldValue(key, obj[key]),
+      key,
+      label: getAuditFieldLabel(key),
+      value: formatAuditFieldValue(key, raw),
+      kind: getAuditFieldDisplayKind(key, raw),
+      raw,
     });
-  });
+  };
 
-  // Thêm vài field còn lại nếu object nhỏ
+  preferred.forEach(pushKey);
   Object.keys(obj).forEach((key) => {
-    if (used.has(key)) return;
-    if (typeof obj[key] === 'object') return; // bỏ matrix lớn
-    if (rows.length >= 12) return;
-    used.add(key);
-    rows.push({
-      label: AUDIT_FIELD_LABELS[key] || key,
-      value: formatAuditFieldValue(key, obj[key]),
-    });
+    if (rows.length >= maxRows) return;
+    pushKey(key);
   });
 
+  return rows;
+}
+
+/**
+ * Tóm tắt "giá trị mới" dạng danh sách dễ đọc (không dump JSON thô mặc định).
+ * @returns {{ rows: Array<{key,label,value,kind,raw}>, summary: string } | null}
+ */
+export function summarizeAuditNewValue(newValue, action) {
+  const rows = buildAuditDisplayRows(newValue);
   if (!rows.length) return null;
 
-  const summary = humanizeAuditDescription('', action, obj);
-  return { rows, summary };
+  const summary = humanizeAuditDescription('', action, newValue);
+  const actionLabel = getAuditActionLabel(action);
+  // Không lặp lại nhãn hành động trần (vd. chỉ "Tạo mới") ngay trên bảng
+  const cleanSummary = summary && summary !== actionLabel ? summary : '';
+  return { rows, summary: cleanSummary };
+}
+
+/**
+ * Đưa object phẳng thành bảng nhãn Việt (dùng cho "Dữ liệu gửi kèm").
+ */
+export function summarizeAuditObjectRows(data) {
+  const rows = buildAuditDisplayRows(data);
+  return rows.length ? rows : null;
+}
+
+/** So sánh 2 payload audit (bỏ qua khác biệt serialize) */
+export function isSameAuditPayload(a, b) {
+  const oa = parseAuditJson(a);
+  const ob = parseAuditJson(b);
+  if (!oa && !ob) return true;
+  if (!oa || !ob) return false;
+  try {
+    return JSON.stringify(oa) === JSON.stringify(ob);
+  } catch {
+    return false;
+  }
 }
 
 export function formatAuditTime(value) {

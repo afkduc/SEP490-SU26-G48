@@ -108,7 +108,7 @@ class ServiceRequestController {
         recordId: item?.id || Number(req.params.id) || null,
         entityName: 'Yêu cầu dịch vụ',
         newData: { status: item?.status || 'accepted' },
-        description: `Tiếp nhận yêu cầu dịch vụ ${serviceRequestCode(item) || req.params.id}`,
+        description: `Cố vấn tiếp nhận yêu cầu dịch vụ của ${item?.fullName || 'khách'} - ${item?.phone || 'không có SĐT'}`,
       });
       return success(res, item, 'Service request accepted');
     } catch (err) {
@@ -122,13 +122,14 @@ class ServiceRequestController {
         userId: req.user.userId,
         branchId: req.user.branchId,
       });
+      const appointmentAt = req.body?.appointmentAt || item?.appointment?.appointmentAt || null;
       await auditCrud.create(req, {
         tableName: 'service_request_appointments',
         entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
         recordId: item?.appointment?.id || item?.id || Number(req.params.id) || null,
         entityName: 'Lịch hẹn dịch vụ',
         data: req.body,
-        description: `Tạo lịch hẹn cho yêu cầu ${serviceRequestCode(item) || req.params.id}`,
+        description: `Cố vấn tạo lịch hẹn${appointmentAt ? ` lúc ${appointmentAt}` : ''} cho yêu cầu của ${item?.fullName || 'khách'} (${serviceRequestCode(item) || req.params.id})`,
       });
       return success(res, item, 'Appointment created', 201);
     } catch (err) {
@@ -144,13 +145,14 @@ class ServiceRequestController {
         req.body,
         { userId: req.user.userId, branchId: req.user.branchId }
       );
+      const appointmentAt = req.body?.appointmentAt || item?.appointment?.appointmentAt || null;
       await auditCrud.update(req, {
         tableName: 'service_request_appointments',
         entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
         recordId: Number(req.params.appointmentId) || item?.appointment?.id || null,
         entityName: 'Lịch hẹn dịch vụ',
         newData: req.body,
-        description: `Cập nhật lịch hẹn #${req.params.appointmentId} của yêu cầu ${serviceRequestCode(item) || req.params.id}`,
+        description: `Cố vấn cập nhật lịch hẹn${appointmentAt ? ` sang ${appointmentAt}` : ''} của yêu cầu ${serviceRequestCode(item) || req.params.id}`,
       });
       return success(res, item, 'Appointment updated');
     } catch (err) {
@@ -171,8 +173,8 @@ class ServiceRequestController {
         entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
         recordId: Number(req.params.appointmentId) || item?.appointment?.id || null,
         entityName: 'Lịch hẹn dịch vụ',
-        newData: { status: 'cancelled', reason: req.body.reason },
-        description: `Hủy lịch hẹn #${req.params.appointmentId} của yêu cầu ${serviceRequestCode(item) || req.params.id}`,
+        newData: { cancelled: true, reason: req.body.reason },
+        description: `Cố vấn hủy lịch hẹn của yêu cầu ${serviceRequestCode(item) || req.params.id}${req.body.reason ? ` — lý do: ${req.body.reason}` : ''}`,
       });
       return success(res, item, 'Appointment cancelled');
     } catch (err) {
