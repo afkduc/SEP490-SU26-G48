@@ -80,6 +80,9 @@ const AVATAR_COLORS = ['#2563EB', '#059669', '#D97706', '#DB2777', '#7C3AED', '#
 const PAGE_SIZE = 10;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^0[0-9]{9,10}$/;
+// Email nhan vien moi luon thuoc domain cong ty - chi cho nhap phan ten,
+// duoi @autogara.com duoc tu dong gan vao khi tao moi.
+const EMPLOYEE_EMAIL_DOMAIN = '@autogara.com';
 
 function statusBadge(status) {
   return STATUS_BADGE[status] || { label: status || 'Không rõ', className: 'badge-inactive' };
@@ -619,7 +622,31 @@ function EmployeeFormPage({ mode }) {
 
             <div className="form-group">
               <label className="form-label required">Email</label>
-              <input className="form-input" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="email@autogara.vn" />
+              {isEdit ? (
+                <input className="form-input" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="email@autogara.com" />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                  <input
+                    className="form-input"
+                    style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+                    value={form.email.split('@')[0]}
+                    onChange={(e) => {
+                      const local = e.target.value.split('@')[0];
+                      setField('email', local ? `${local}${EMPLOYEE_EMAIL_DOMAIN}` : '');
+                    }}
+                    placeholder="nguyenvana"
+                  />
+                  <span
+                    style={{
+                      display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 14, color: 'var(--gray-600, #4b5563)',
+                      background: 'var(--gray-100, #f3f4f6)', border: '1px solid var(--gray-300, #d1d5db)', borderLeft: 'none',
+                      borderTopRightRadius: 'var(--radius-sm, 6px)', borderBottomRightRadius: 'var(--radius-sm, 6px)', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {EMPLOYEE_EMAIL_DOMAIN}
+                  </span>
+                </div>
+              )}
               {fieldErrors.email && <span className="form-error">{fieldErrors.email}</span>}
             </div>
 
