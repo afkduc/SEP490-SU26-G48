@@ -216,7 +216,7 @@ export const AUDIT_FIELD_LABELS = {
   unit: 'Đơn vị',
   lhsc: 'Loại hình SC',
   httt: 'Hình thức TT',
-  repairCategory: 'Hạng mục sửa chữa',
+  repairCategory: 'Loại hình sửa chữa',
   groupId: 'Nhóm hạng mục',
   isGroupParent: 'Là dòng nhóm',
   isFree: 'Miễn phí',
@@ -780,6 +780,15 @@ const MONEY_FIELD_KEYS = new Set([
   'unitPrice',
   'unit_price',
 ]);
+
+/** Đồng bộ với ManagerPage / RepairSettlement — mã loại hình sửa chữa */
+const REPAIR_CATEGORY_LABELS = {
+  ER: 'Sửa chữa động cơ',
+  CB: 'Sửa chữa gầm',
+  EE: 'Sửa chữa điện - điện tử',
+  BP: 'Đồng sơn',
+  PM: 'Bảo dưỡng định kỳ',
+};
 
 function formatMoneyVi(value) {
   const n = Number(value);
