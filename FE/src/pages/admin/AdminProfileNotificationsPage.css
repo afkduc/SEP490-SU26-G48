@@ -34,7 +34,7 @@
 }
 
 /* ── Buttons ── */
-.btn {
+.admin-notifications .btn {
   padding: 9px 16px;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -60,7 +60,7 @@
   border-color: #0e7490;
 }
 
-.btn:disabled {
+.admin-notifications .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
