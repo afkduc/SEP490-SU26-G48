@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useInventoryBranch } from './InventoryLayout';
 import { useStock } from '../../hooks/inventory/useStock';
 import './StockPage.css';
 
@@ -12,8 +12,7 @@ function formatVND(value) {
 }
 
 export default function StockPage() {
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
   const {
     stockList, lowStock, summary, loading, error, categories,
     params, setSearch, setCategory, setLowStockOnly, setPage, refetch,
@@ -22,7 +21,7 @@ export default function StockPage() {
   if (!branchId) {
     return (
       <div className="stock-page__error">
-        Tài khoản chưa được gán chi nhánh - liên hệ admin để được cập nhật.
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để xem tồn kho.')}
       </div>
     );
   }

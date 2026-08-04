@@ -58,6 +58,15 @@ class PublicBayBoardController {
         Boolean(req.body.isDone),
         { userId: bay.teamLeaderId, branchId: bay.branchId }
       );
+      const task = (item?.tasks || []).find((t) => String(t.id) === String(req.params.taskId));
+      await auditCrud.update(req, {
+        tableName: 'repair_orders',
+        entityCode: item?.code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Lệnh sửa chữa',
+        newData: { taskId: Number(req.params.taskId), isDone: true, taskName: task?.taskName || null },
+        description: `Khoang ${bay.bayNumber} xác nhận hoàn thành đầu mục "${task?.taskName || req.params.taskId}" của lệnh ${item?.code || req.params.id}`,
+      });
       return success(res, item, 'Task status updated');
     } catch (err) {
       next(err);
@@ -78,6 +87,7 @@ class PublicBayBoardController {
         newData: { status: req.body.status },
       });
       await this.notificationService.notifyAdmins('REPAIR_ORDER_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: bay.teamLeaderName ? `Tổ trưởng ${bay.teamLeaderName} (Khoang ${bay.bayNumber})` : `Khoang ${bay.bayNumber}`,
         targetName: item?.code || `ID-${req.params.id}`,
         targetCode: item?.code || '',

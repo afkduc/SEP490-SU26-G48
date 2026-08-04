@@ -78,6 +78,13 @@ async function start() {
       console.warn('[BE] ensureTrustedSchema:', schemaErr.message);
     }
 
+    try {
+      await require('./infrastructure/database/ensureAuditLogsUnicode').ensureAuditLogsUnicodeColumns();
+      console.log('[BE] audit_logs unicode columns ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureAuditLogsUnicodeColumns:', schemaErr.message);
+    }
+
     const server = http.createServer({ maxHeaderSize: 32768 }, app);
     server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);

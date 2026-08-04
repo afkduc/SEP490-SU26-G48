@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { usePermission } from '../../contexts/PermissionContext';
-import { formatCurrency, formatDate } from '../../utils';
+import { formatCurrency, formatDate, formatDateTime } from '../../utils';
 import managerApi from '../../services/managerApi';
 import { PermissionGate } from '../../components/PermissionGate';
 import ManagerImportRequestListPage from './ManagerImportRequestListPage';
@@ -30,6 +30,7 @@ const SETTLEMENT_STATUS_TABS = [
   { value: 'inprogress', label: 'Đang sửa chữa' },
   { value: 'waiting_payment', label: 'Chờ thanh toán' },
   { value: 'invoiced', label: 'Đã xuất hóa đơn' },
+  { value: 'cancelled', label: 'Đã hủy' },
 ];
 
 const SETTLEMENT_STATUS_META = {
@@ -37,10 +38,84 @@ const SETTLEMENT_STATUS_META = {
   inprogress: { label: 'Đang sửa chữa', color: '#1565C0', background: '#E3F2FD' },
   waiting_payment: { label: 'Chờ thanh toán', color: '#2E7D32', background: '#E8F5E9' },
   invoiced: { label: 'Đã xuất hóa đơn', color: '#424242', background: '#F5F5F5' },
+  cancelled: { label: 'Đã hủy', color: '#B91C1C', background: '#FEF2F2' },
 };
 
 function settlementStatusBadge(status) {
   return SETTLEMENT_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
+}
+
+// Ngoai "Ngay tiep nhan" (luon loc duoc o moi tab tru "Tat ca"), moi tab con
+// co the loc them theo 1 moc thoi gian rieng phan anh dung y nghia cua tab do -
+// "Cho sua chua"/"Dang sua chua" chi co ngay tiep nhan nen khong co field thu 2.
+const SETTLEMENT_SECONDARY_DATE_FIELD_BY_TAB = {
+  waiting_payment: { key: 'completedDate', label: 'Ngày hoàn thành' },
+  invoiced: { key: 'paidAt', label: 'Ngày xuất hóa đơn' },
+  cancelled: { key: 'cancelledAt', label: 'Ngày hủy' },
+};
+
+// day/month/year rong ('') = khong loc theo phan do (vd chi chon Thang + Nam
+// -> loc theo ca thang, khong can biet dung ngay nao).
+function settlementDateMatches(value, day, month, year) {
+  if (!day && !month && !year) return true;
+  if (!value) return false;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return false;
+  if (day && d.getDate() !== Number(day)) return false;
+  if (month && d.getMonth() + 1 !== Number(month)) return false;
+  if (year && d.getFullYear() !== Number(year)) return false;
+  return true;
+}
+
+// Luon hien co dinh 5 nam gan nhat (nam hien tai va 4 nam truoc do), khong
+// phu thuoc du lieu dang tai co hay khong - de nguoi dung luon chon duoc nam
+// truoc do de tim, kho phai vi chua co ban ghi nao trong nam do ma dropdown
+// bi thieu lua chon.
+function settlementRecentYears() {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, i) => currentYear - i);
+}
+
+// 3 dropdown Ngay/Thang/Nam dung chung cho 1 moc thoi gian.
+// minDay/minMonth/minYear (tuy chon): "moc toi thieu" - dung cho cac moc
+// Ngay hoan thanh/Ngay xuat hoa don/Ngay huy vi ve logic chung KHONG THE som
+// hon Ngay tiep nhan da chon o filter ben canh - an bot lua chon nam/thang/
+// ngay som hon moc do de nguoi dung khong the lam ra 1 bo loc vo ly (khong
+// bao gio co ket qua).
+function DateDropdownFilter({ label, day, month, year, years, onDayChange, onMonthChange, onYearChange, minDay, minMonth, minYear }) {
+  const yearOptions = minYear ? years.filter((y) => y >= Number(minYear)) : years;
+  const sameYearAsMin = !!(minYear && year && Number(year) === Number(minYear));
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1)
+    .filter((m) => !(sameYearAsMin && minMonth) || m >= Number(minMonth));
+  const sameMonthAsMin = sameYearAsMin && !!(minMonth && month && Number(month) === Number(minMonth));
+  const dayOptions = Array.from({ length: 31 }, (_, i) => i + 1)
+    .filter((d) => !(sameMonthAsMin && minDay) || d >= Number(minDay));
+
+  return (
+    <div className="form-group" style={{ marginBottom: 0 }}>
+      <label className="form-label" style={{ fontSize: 11 }}>{label}</label>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <select className="form-select" value={day} onChange={(e) => onDayChange(e.target.value)} style={{ minWidth: 80 }}>
+          <option value="">Ngày</option>
+          {dayOptions.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <select className="form-select" value={month} onChange={(e) => onMonthChange(e.target.value)} style={{ minWidth: 90 }}>
+          <option value="">Tháng</option>
+          {monthOptions.map((m) => (
+            <option key={m} value={m}>Tháng {m}</option>
+          ))}
+        </select>
+        <select className="form-select" value={year} onChange={(e) => onYearChange(e.target.value)} style={{ minWidth: 90 }}>
+          <option value="">Năm</option>
+          {yearOptions.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
 }
 
 function DetailRow({ label, value }) {
@@ -80,6 +155,9 @@ const AVATAR_COLORS = ['#2563EB', '#059669', '#D97706', '#DB2777', '#7C3AED', '#
 const PAGE_SIZE = 10;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^0[0-9]{9,10}$/;
+// Email nhan vien moi luon thuoc domain cong ty - chi cho nhap phan ten,
+// duoi @autogara.com duoc tu dong gan vao khi tao moi.
+const EMPLOYEE_EMAIL_DOMAIN = '@autogara.com';
 
 function statusBadge(status) {
   return STATUS_BADGE[status] || { label: status || 'Không rõ', className: 'badge-inactive' };
@@ -692,7 +770,31 @@ function EmployeeFormPage({ mode }) {
 
             <div className="form-group">
               <label className="form-label required">Email</label>
-              <input className="form-input" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="email@autogara.vn" />
+              {isEdit ? (
+                <input className="form-input" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="email@autogara.com" />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                  <input
+                    className="form-input"
+                    style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+                    value={form.email.split('@')[0]}
+                    onChange={(e) => {
+                      const local = e.target.value.split('@')[0];
+                      setField('email', local ? `${local}${EMPLOYEE_EMAIL_DOMAIN}` : '');
+                    }}
+                    placeholder="nguyenvana"
+                  />
+                  <span
+                    style={{
+                      display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 14, color: 'var(--gray-600, #4b5563)',
+                      background: 'var(--gray-100, #f3f4f6)', border: '1px solid var(--gray-300, #d1d5db)', borderLeft: 'none',
+                      borderTopRightRadius: 'var(--radius-sm, 6px)', borderBottomRightRadius: 'var(--radius-sm, 6px)', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {EMPLOYEE_EMAIL_DOMAIN}
+                  </span>
+                </div>
+              )}
               {fieldErrors.email && <span className="form-error">{fieldErrors.email}</span>}
             </div>
 
@@ -908,7 +1010,7 @@ function ServiceDetailModal({ service, onClose }) {
           </div>
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
             <div className="detail-row"><div className="detail-label">Mã dịch vụ</div><div className="detail-value">{service.code}</div></div>
-            <div className="detail-row"><div className="detail-label">Danh mục</div><div className="detail-value">{service.categoryName || '—'}</div></div>
+            <div className="detail-row"><div className="detail-label">Loại hình sửa chữa</div><div className="detail-value">{repairCategoryLabel(service.repairCategory)}</div></div>
             <div className="detail-row"><div className="detail-label">Đơn giá</div><div className="detail-value">{formatCurrency(service.unitPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Thời gian thực hiện</div><div className="detail-value">{service.durationMin ? `${service.durationMin} phút` : '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{service.description || '—'}</div></div>
@@ -948,9 +1050,8 @@ function ServiceDetailModal({ service, onClose }) {
 function ServiceListPage() {
   const navigate = useNavigate();
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
-  const [categoryId, setCategoryId] = useState('all');
+  const [repairCategory, setRepairCategory] = useState('all');
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -959,18 +1060,12 @@ function ServiceListPage() {
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
-  useEffect(() => {
-    let mounted = true;
-    managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
-    return () => { mounted = false; };
-  }, []);
-
   const reload = () => {
     const seq = ++requestSeq.current;
     setLoading(true);
     setError('');
     managerApi
-      .getServices({ search: search.trim(), categoryId, status })
+      .getServices({ search: search.trim(), repairCategory, status })
       .then((data) => {
         if (seq !== requestSeq.current) return;
         setServices(data || []);
@@ -991,11 +1086,11 @@ function ServiceListPage() {
     searchTimer.current = setTimeout(reload, 300);
     return () => clearTimeout(searchTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, categoryId, status]);
+  }, [search, repairCategory, status]);
 
   const clearFilters = () => {
     setSearch('');
-    setCategoryId('all');
+    setRepairCategory('all');
     setStatus('all');
   };
 
@@ -1016,8 +1111,8 @@ function ServiceListPage() {
               className="btn btn-secondary"
               onClick={() => exportCsv(
                 'danh-sach-dich-vu.csv',
-                ['Mã DV', 'Tên dịch vụ', 'Danh mục', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
-                services.map((s) => [s.code, s.name, s.categoryName, s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
+                ['Mã DV', 'Tên dịch vụ', 'Loại hình sửa chữa', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
+                services.map((s) => [s.code, s.name, repairCategoryLabel(s.repairCategory), s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
               )}
             >
               📊 Xuất Excel
@@ -1037,10 +1132,10 @@ function ServiceListPage() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã DV, tên dịch vụ..." />
         </div>
 
-        <select className="filter-select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="all">Tất cả danh mục</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+        <select className="filter-select" value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)}>
+          <option value="all">Tất cả loại hình sửa chữa</option>
+          {REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
 
@@ -1072,7 +1167,7 @@ function ServiceListPage() {
             <tr>
               <th>Mã DV</th>
               <th>Tên dịch vụ</th>
-              <th>Danh mục</th>
+              <th>Loại hình sửa chữa</th>
               <th>Đơn giá</th>
               <th>Thời gian</th>
               <th>Trạng thái</th>
@@ -1105,7 +1200,7 @@ function ServiceListPage() {
                 <tr key={service.id}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{service.code}</td>
                   <td style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{service.name}</td>
-                  <td>{service.categoryName || '—'}</td>
+                  <td>{repairCategoryLabel(service.repairCategory)}</td>
                   <td>{formatCurrency(service.unitPrice)}</td>
                   <td>{service.durationMin ? `${service.durationMin} phút` : '—'}</td>
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
@@ -1155,6 +1250,10 @@ const REPAIR_CATEGORY_OPTIONS = [
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
 ];
 
+function repairCategoryLabel(code) {
+  return REPAIR_CATEGORY_OPTIONS.find((o) => o.value === code)?.label || '—';
+}
+
 function ServiceFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -1165,10 +1264,9 @@ function ServiceFormPage({ mode }) {
     : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
-  const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
-    serviceName: '', categoryId: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
+    serviceName: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
   });
   const [parts, setParts] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -1180,7 +1278,6 @@ function ServiceFormPage({ mode }) {
   useEffect(() => {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
-    managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
     managerApi.getProducts().then((data) => { if (mounted) setProducts(data || []); }).catch(() => {});
 
     if (isEdit && id) {
@@ -1190,7 +1287,6 @@ function ServiceFormPage({ mode }) {
           if (!mounted || !data) return;
           setForm({
             serviceName: data.name || '',
-            categoryId: data.categoryId ? String(data.categoryId) : '',
             unitPrice: data.unitPrice ?? '',
             durationMin: data.durationMin ?? '',
             description: data.description || '',
@@ -1221,7 +1317,6 @@ function ServiceFormPage({ mode }) {
   const validate = () => {
     const errors = {};
     if (!form.serviceName.trim()) errors.serviceName = 'Vui lòng nhập tên dịch vụ';
-    if (!form.categoryId) errors.categoryId = 'Vui lòng chọn danh mục';
     if (form.unitPrice === '' || Number.isNaN(Number(form.unitPrice)) || Number(form.unitPrice) < 0) {
       errors.unitPrice = 'Đơn giá không hợp lệ';
     }
@@ -1249,7 +1344,6 @@ function ServiceFormPage({ mode }) {
     try {
       const payload = {
         serviceName: form.serviceName.trim(),
-        categoryId: Number(form.categoryId),
         unitPrice: Number(form.unitPrice),
         durationMin: form.durationMin === '' ? null : Number(form.durationMin),
         description: form.description.trim(),
@@ -1363,17 +1457,6 @@ function ServiceFormPage({ mode }) {
             </div>
 
             <div className="form-group">
-              <label className="form-label required">Danh mục</label>
-              <select className="form-select" value={form.categoryId} onChange={(e) => setField('categoryId', e.target.value)}>
-                <option value="">-- Chọn danh mục --</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {fieldErrors.categoryId && <span className="form-error">{fieldErrors.categoryId}</span>}
-            </div>
-
-            <div className="form-group">
               <label className="form-label required">Đơn giá (VND)</label>
               <input type="number" min="0" className="form-input" value={form.unitPrice} onChange={(e) => setField('unitPrice', e.target.value)} placeholder="0" />
               {fieldErrors.unitPrice && <span className="form-error">{fieldErrors.unitPrice}</span>}
@@ -1482,7 +1565,7 @@ function ServicePackageDetailModal({ pkg, onClose }) {
           </div>
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 16 }}>
             <div className="detail-row"><div className="detail-label">Mã gói</div><div className="detail-value">{pkg.code}</div></div>
-            <div className="detail-row"><div className="detail-label">Danh mục</div><div className="detail-value">{pkg.categoryName || '—'}</div></div>
+            <div className="detail-row"><div className="detail-label">Loại hình sửa chữa</div><div className="detail-value">{repairCategoryLabel(pkg.repairCategory)}</div></div>
             <div className="detail-row"><div className="detail-label">Giá gói</div><div className="detail-value">{formatCurrency(pkg.totalPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{pkg.description || '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Giải thích chi tiết</div><div className="detail-value">{pkg.purpose || '—'}</div></div>
@@ -1521,6 +1604,7 @@ function ServicePackageListPage() {
   const navigate = useNavigate();
   const [packages, setPackages] = useState([]);
   const [search, setSearch] = useState('');
+  const [repairCategory, setRepairCategory] = useState('all');
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1535,7 +1619,7 @@ function ServicePackageListPage() {
     setLoading(true);
     setError('');
     managerApi
-      .getServicePackages({ search: search.trim(), status })
+      .getServicePackages({ search: search.trim(), repairCategory, status })
       .then((data) => {
         if (seq !== requestSeq.current) return;
         setPackages(data || []);
@@ -1556,10 +1640,11 @@ function ServicePackageListPage() {
     searchTimer.current = setTimeout(reload, 300);
     return () => clearTimeout(searchTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status]);
+  }, [search, repairCategory, status]);
 
   const clearFilters = () => {
     setSearch('');
+    setRepairCategory('all');
     setStatus('all');
   };
 
@@ -1589,8 +1674,8 @@ function ServicePackageListPage() {
               className="btn btn-secondary"
               onClick={() => exportCsv(
                 'danh-sach-goi-dich-vu.csv',
-                ['Mã gói', 'Tên gói', 'Danh mục', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
-                packages.map((p) => [p.code, p.name, p.categoryName, p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
+                ['Mã gói', 'Tên gói', 'Loại hình sửa chữa', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
+                packages.map((p) => [p.code, p.name, repairCategoryLabel(p.repairCategory), p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
               )}
             >
               📊 Xuất Excel
@@ -1609,6 +1694,13 @@ function ServicePackageListPage() {
           <span className="search-icon">🔍</span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã gói, tên gói..." />
         </div>
+
+        <select className="filter-select" value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)}>
+          <option value="all">Tất cả loại hình sửa chữa</option>
+          {REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
 
         <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
           {SERVICE_STATUS_OPTIONS.map((option) => (
@@ -1638,7 +1730,7 @@ function ServicePackageListPage() {
             <tr>
               <th>Mã gói</th>
               <th>Tên gói</th>
-              <th>Danh mục</th>
+              <th>Loại hình sửa chữa</th>
               <th>Số dịch vụ</th>
               <th>Giá gói</th>
               <th>Trạng thái</th>
@@ -1671,7 +1763,7 @@ function ServicePackageListPage() {
                 <tr key={pkg.id}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{pkg.code}</td>
                   <td style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{pkg.name}</td>
-                  <td>{pkg.categoryName || '—'}</td>
+                  <td>{repairCategoryLabel(pkg.repairCategory)}</td>
                   <td>{pkg.itemCount}</td>
                   <td>{formatCurrency(pkg.totalPrice)}</td>
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
@@ -1718,11 +1810,10 @@ function ServicePackageFormPage({ mode }) {
     : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
-  const [categories, setCategories] = useState([]);
   const [availableServices, setAvailableServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [form, setForm] = useState({
-    packageName: '', categoryId: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [],
+    packageName: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [],
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1732,7 +1823,6 @@ function ServicePackageFormPage({ mode }) {
   useEffect(() => {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
-    managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
     managerApi.getServices({ status: 'all' }).then((data) => { if (mounted) setAvailableServices(data || []); }).catch(() => {});
 
     if (isEdit && id) {
@@ -1742,7 +1832,6 @@ function ServicePackageFormPage({ mode }) {
           if (!mounted || !data) return;
           setForm({
             packageName: data.name || '',
-            categoryId: data.categoryId ? String(data.categoryId) : '',
             totalPrice: data.totalPrice ?? '',
             description: data.description || '',
             purpose: data.purpose || '',
@@ -1778,7 +1867,6 @@ function ServicePackageFormPage({ mode }) {
   const validate = () => {
     const errors = {};
     if (!form.packageName.trim()) errors.packageName = 'Vui lòng nhập tên gói';
-    if (!form.categoryId) errors.categoryId = 'Vui lòng chọn danh mục';
     if (form.totalPrice === '' || Number.isNaN(Number(form.totalPrice)) || Number(form.totalPrice) < 0) {
       errors.totalPrice = 'Giá gói không hợp lệ';
     }
@@ -1796,7 +1884,6 @@ function ServicePackageFormPage({ mode }) {
     try {
       const payload = {
         packageName: form.packageName.trim(),
-        categoryId: Number(form.categoryId),
         totalPrice: Number(form.totalPrice),
         description: form.description.trim(),
         purpose: form.purpose.trim(),
@@ -1873,17 +1960,6 @@ function ServicePackageFormPage({ mode }) {
               <label className="form-label required">Tên gói dịch vụ</label>
               <input className="form-input" value={form.packageName} onChange={(e) => setField('packageName', e.target.value)} placeholder="Nhập tên gói dịch vụ" />
               {fieldErrors.packageName && <span className="form-error">{fieldErrors.packageName}</span>}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label required">Danh mục</label>
-              <select className="form-select" value={form.categoryId} onChange={(e) => setField('categoryId', e.target.value)}>
-                <option value="">-- Chọn danh mục --</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {fieldErrors.categoryId && <span className="form-error">{fieldErrors.categoryId}</span>}
             </div>
 
             <div className="form-group">
@@ -2017,8 +2093,24 @@ function SettlementDetailModal({ report, onClose }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, marginBottom: 18 }}>
             <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin phiếu</div>
-              <DetailRow label="Ngày tiếp nhận" value={formatDate(report.intakeDate)} />
-              <DetailRow label="Ngày hoàn thành" value={formatDate(report.completedDate)} />
+              <DetailRow label="Ngày tiếp nhận" value={formatDateTime(report.intakeDate)} />
+              {report.status === 'cancelled' ? (
+                <DetailRow label="Ngày hủy" value={report.cancelledAt ? formatDateTime(report.cancelledAt) : 'Không có dữ liệu'} />
+              ) : (
+                <>
+                  <DetailRow label="Ngày hoàn thành" value={formatDateTime(report.completedDate)} />
+                  <DetailRow
+                    label="Ngày thanh toán"
+                    value={
+                      report.paidAt
+                        ? formatDateTime(report.paidAt)
+                        : report.status === 'invoiced'
+                          ? 'Không có dữ liệu hóa đơn'
+                          : 'Chưa thanh toán'
+                    }
+                  />
+                </>
+              )}
               <DetailRow label="Tư vấn dịch vụ" value={`${report.advisor?.name || '—'}${report.advisor?.phone ? ` · ${report.advisor.phone}` : ''}`} />
               <DetailRow label="Tổ trưởng" value={report.teamLeader?.name || 'Chưa gán'} />
               <DetailRow label="Yêu cầu khách hàng" value={report.customerRequest} />
@@ -2108,6 +2200,12 @@ function SettlementReportsPage() {
   const [reports, setReports] = useState([]);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [intakeDay, setIntakeDay] = useState('');
+  const [intakeMonth, setIntakeMonth] = useState('');
+  const [intakeYear, setIntakeYear] = useState('');
+  const [secondaryDay, setSecondaryDay] = useState('');
+  const [secondaryMonth, setSecondaryMonth] = useState('');
+  const [secondaryYear, setSecondaryYear] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeReport, setActiveReport] = useState(null);
@@ -2115,6 +2213,7 @@ function SettlementReportsPage() {
   const [detailError, setDetailError] = useState('');
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
+  const secondaryDateField = SETTLEMENT_SECONDARY_DATE_FIELD_BY_TAB[activeTab] || null;
 
   const reload = () => {
     const seq = ++requestSeq.current;
@@ -2143,6 +2242,20 @@ function SettlementReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  useEffect(() => {
+    setIntakeDay(''); setIntakeMonth(''); setIntakeYear('');
+    setSecondaryDay(''); setSecondaryMonth(''); setSecondaryYear('');
+  }, [activeTab]);
+
+  // Doi lai "Ngay tiep nhan" thi bo chon moc con lai (Ngay hoan thanh/Ngay
+  // xuat hoa don/Ngay huy) luon - vi khoang cho phep chon cua no thay doi
+  // theo, giu nguyen lua chon cu de tranh ket qua "trong qua khu" khong
+  // hop le.
+  useEffect(() => {
+    setSecondaryDay(''); setSecondaryMonth(''); setSecondaryYear('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intakeDay, intakeMonth, intakeYear]);
+
   const counts = reports.reduce(
     (acc, r) => {
       acc.all += 1;
@@ -2152,7 +2265,16 @@ function SettlementReportsPage() {
     { all: 0 }
   );
 
-  const filteredReports = activeTab === 'all' ? reports : reports.filter((r) => r.status === activeTab);
+  const dateFilterYears = settlementRecentYears();
+
+  const filteredReports = reports.filter((r) => {
+    if (activeTab !== 'all' && r.status !== activeTab) return false;
+    if (activeTab !== 'all') {
+      if (!settlementDateMatches(r.intakeDate, intakeDay, intakeMonth, intakeYear)) return false;
+      if (secondaryDateField && !settlementDateMatches(r[secondaryDateField.key], secondaryDay, secondaryMonth, secondaryYear)) return false;
+    }
+    return true;
+  });
 
   const openDetail = (report) => {
     setActiveReport(report);
@@ -2198,6 +2320,40 @@ function SettlementReportsPage() {
         ))}
       </div>
 
+      {activeTab !== 'all' && (
+        <div className="filter-bar" style={{ marginTop: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <DateDropdownFilter
+            label="Ngày tiếp nhận"
+            day={intakeDay} month={intakeMonth} year={intakeYear}
+            years={dateFilterYears}
+            onDayChange={setIntakeDay} onMonthChange={setIntakeMonth} onYearChange={setIntakeYear}
+          />
+
+          {secondaryDateField && (
+            <DateDropdownFilter
+              label={secondaryDateField.label}
+              day={secondaryDay} month={secondaryMonth} year={secondaryYear}
+              years={dateFilterYears}
+              onDayChange={setSecondaryDay} onMonthChange={setSecondaryMonth} onYearChange={setSecondaryYear}
+              minDay={intakeDay} minMonth={intakeMonth} minYear={intakeYear}
+            />
+          )}
+
+          {(intakeDay || intakeMonth || intakeYear || secondaryDay || secondaryMonth || secondaryYear) && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setIntakeDay(''); setIntakeMonth(''); setIntakeYear('');
+                setSecondaryDay(''); setSecondaryMonth(''); setSecondaryYear('');
+              }}
+            >
+              ✕ Xóa lọc ngày
+            </button>
+          )}
+        </div>
+      )}
+
       {error && (
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
@@ -2214,7 +2370,7 @@ function SettlementReportsPage() {
               <th>Khách hàng</th>
               <th>Tư vấn</th>
               <th>Tiếp nhận</th>
-              <th>Hoàn thành</th>
+              {activeTab !== 'cancelled' && <th>Hoàn thành</th>}
               <th>Chi phí</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
@@ -2222,7 +2378,7 @@ function SettlementReportsPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9}>
+              <tr><td colSpan={activeTab === 'cancelled' ? 8 : 9}>
                 <div className="empty-state">
                   <div className="empty-state-icon">⏳</div>
                   <h3>Đang tải danh sách phiếu quyết toán</h3>
@@ -2231,7 +2387,7 @@ function SettlementReportsPage() {
             )}
 
             {!loading && filteredReports.length === 0 && !error && (
-              <tr><td colSpan={9}>
+              <tr><td colSpan={activeTab === 'cancelled' ? 8 : 9}>
                 <div className="empty-state">
                   <div className="empty-state-icon">📭</div>
                   <h3>Không có phiếu quyết toán phù hợp</h3>
@@ -2260,7 +2416,7 @@ function SettlementReportsPage() {
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{report.advisor?.phone || ''}</div>
                   </td>
                   <td style={{ fontSize: 12 }}>{formatDate(report.intakeDate)}</td>
-                  <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>
+                  {activeTab !== 'cancelled' && <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>}
                   <td style={{ fontWeight: 800, color: '#C62828' }}>{formatCurrency(report.total)}</td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>

@@ -60,6 +60,7 @@ class ProductController {
         data: req.body,
       });
       await this.notificationService.notifyAdmins('PRODUCT_CREATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: formatEntityName(
           product?.name || product?.product_name,
@@ -86,6 +87,7 @@ class ProductController {
         newData: req.body,
       });
       await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: formatEntityName(
           product?.name || product?.product_name,
@@ -113,6 +115,7 @@ class ProductController {
         newData: { status: 'inactive' },
       });
       await this.notificationService.notifyAdmins('PRODUCT_DISABLED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: formatEntityName(
           product?.name || product?.product_name,
@@ -139,6 +142,7 @@ class ProductController {
         newData: { status: 'active' },
       });
       await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: formatEntityName(
           product?.name || product?.product_name,

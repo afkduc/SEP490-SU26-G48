@@ -33,7 +33,7 @@ class ImportRequestRepository {
    * @param {number} id
    * @returns {Promise<{ request: ImportRequest, items: ImportRequestItem[] }|null>}
    */
-  async findById(id) {
+  async findById(id, options = {}) {
     throw new Error('Method findById() must be implemented');
   }
 
@@ -52,7 +52,7 @@ class ImportRequestRepository {
    * @param {Date} date
    * @returns {Promise<string>}
    */
-  async getNextRequestCode(branchId, date) {
+  async getNextRequestCode(branchId, date, tx = null) {
     throw new Error('Method getNextRequestCode() must be implemented');
   }
 
@@ -80,7 +80,7 @@ class ImportRequestRepository {
    * @returns {Promise<{ request: ImportRequest, items: ImportRequestItem[] }>}
    *   request + items de service sinh transaction_code + INSERT logs
    */
-  async approve(tx, id, approvedBy, importDate) {
+  async approve(tx, id, approvedBy, importDate, options = {}) {
     throw new Error('Method approve() must be implemented');
   }
 
@@ -92,7 +92,7 @@ class ImportRequestRepository {
    * @param {string} rejectReason
    * @returns {Promise<boolean>} true neu thanh cong, false neu khong o trang thai pending
    */
-  async reject(tx, id, rejectedBy, rejectReason) {
+  async reject(tx, id, rejectedBy, rejectReason, options = {}) {
     throw new Error('Method reject() must be implemented');
   }
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
@@ -7,17 +7,9 @@ import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
 import AdminPagination from './components/AdminPagination';
 import {
-  AUDIT_FIELD_LABELS,
   humanizeAuditDescription,
-  formatAuditFieldValue,
-  summarizeAuditNewValue,
   formatAuditTime,
-  parseAuditJson,
   getAuditActionLabel,
-  getHttpMethodLabel,
-  getResponseStatusLabel,
-  formatDurationMs,
-  humanizeRequestUrl,
 } from '../../utils/auditDisplay';
 import './AuditLogsPage.css';
 
@@ -34,9 +26,14 @@ const ACTION_OPTIONS = [
   { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu', color: 'teal' },
   { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu', color: 'cyan' },
   { value: 'ASSIGN_ROLE', label: 'Gán vai trò', color: 'indigo' },
-  { value: 'REMOVE_ROLE', label: 'Xóa vai trò', color: 'rose' },
+  { value: 'REMOVE_ROLE', label: 'Thu hồi vai trò', color: 'rose' },
   { value: 'EXPORT', label: 'Xuất dữ liệu', color: 'green' },
   { value: 'IMPORT', label: 'Nhập dữ liệu', color: 'amber' },
+  { value: 'GRANT_SCREEN', label: 'Cấp quyền màn hình', color: 'success' },
+  { value: 'REVOKE_SCREEN', label: 'Thu hồi quyền màn hình', color: 'danger' },
+  { value: 'SAVE_SCREEN_MATRIX', label: 'Lưu ma trận quyền', color: 'indigo' },
+  { value: 'APPROVE_PERMISSION_REQUEST', label: 'Duyệt yêu cầu quyền', color: 'success' },
+  { value: 'REJECT_PERMISSION_REQUEST', label: 'Từ chối yêu cầu quyền', color: 'danger' },
 ];
 
 const ACTION_CLASS = {
@@ -69,63 +66,10 @@ const ACTION_CLASS = {
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
-  { value: '2xx', label: '2xx - Thành công' },
-  { value: '4xx', label: '4xx - Lỗi client' },
-  { value: '5xx', label: '5xx - Lỗi server' },
+  { value: '2xx', label: 'Thành công' },
+  { value: '4xx', label: 'Lỗi phía người dùng' },
+  { value: '5xx', label: 'Lỗi máy chủ' },
 ];
-
-/**
- * Map tên bảng (table_name) sang tên tiếng Việt cho dễ hiểu.
- * BE vẫn giữ table_name là key chuẩn (customers, users, ...).
- * Đây chỉ là lớp ánh xạ hiển thị ở frontend.
- */
-const TABLE_NAME_VI = {
-  customers: 'Khách hàng',
-  vehicles: 'Phương tiện',
-  brands: 'Hãng xe',
-  branches: 'Chi nhánh',
-  users: 'Người dùng',
-  user_role: 'Phân quyền người dùng',
-  user_specialty: 'Chuyên môn nhân viên',
-  user_devices: 'Thiết bị đăng nhập',
-  user_notification_settings: 'Cài đặt thông báo',
-  roles: 'Vai trò',
-  role_permissions: 'Phân quyền theo vai trò',
-  role_screen_permissions: 'Quyền màn hình theo vai trò',
-  role_screen_matrix: 'Ma trận quyền màn hình',
-  permission_request: 'Yêu cầu cấp quyền',
-  role_security_mapping: 'Ánh xạ vai trò - bảo mật',
-  permissions: 'Phân quyền chi tiết',
-  service_categories: 'Danh mục dịch vụ',
-  services: 'Dịch vụ',
-  service_packages: 'Gói dịch vụ',
-  service_package_items: 'Hạng mục gói dịch vụ',
-  suppliers: 'Nhà cung cấp',
-  products: 'Phụ tùng / Sản phẩm',
-  inventory_transactions: 'Giao dịch kho',
-  appointments: 'Lịch hẹn',
-  work_orders: 'Phiếu sửa chữa',
-  work_order_items: 'Hạng mục phiếu sửa',
-  repair_orders: 'Phiếu sửa chữa (Repair Order)',
-  repair_order_tasks: 'Công việc sửa chữa',
-  service_orders: 'Đơn dịch vụ',
-  service_order_items: 'Hạng mục đơn dịch vụ',
-  invoices: 'Hóa đơn',
-  payments: 'Thanh toán',
-  specialties: 'Chuyên môn',
-  warranty_records: 'Lịch sử bảo hành',
-  maintenance_reminders: 'Lịch nhắc bảo dưỡng',
-  vehicle_owners: 'Chủ phương tiện',
-  import_requests: 'Yêu cầu nhập kho',
-  import_request_items: 'Chi tiết nhập kho',
-  export_requests: 'Yêu cầu xuất kho',
-  export_request_items: 'Chi tiết xuất kho',
-  entity_definitions: 'Định nghĩa đối tượng',
-  login_sessions: 'Phiên đăng nhập',
-  login_session_events: 'Sự kiện phiên đăng nhập',
-  audit_logs: 'Nhật ký hệ thống',
-  notifications: 'Thông báo',
-};
 
 function formatLocal(value) {
   return formatAuditTime(value);
@@ -260,22 +204,35 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
 
 export default function AuditLogsPage() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialUserName = searchParams.get('userName') || '';
-  const audit = useAuditLogs(initialUserName ? { userName: initialUserName } : {});
+  const initialEntityCode = searchParams.get('entityCode') || '';
+  const audit = useAuditLogs({
+    ...(initialUserName ? { userName: initialUserName } : {}),
+    ...(initialEntityCode ? { entityCode: initialEntityCode } : {}),
+  });
   const { branches, branchesError } = useSharedBranches();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [now, setNow] = useState(() => Date.now());
-  const [showFilters, setShowFilters] = useState(Boolean(initialUserName));
-  const [selectedLog, setSelectedLog] = useState(null);
+  const [showFilters, setShowFilters] = useState(Boolean(initialUserName || initialEntityCode));
+
+  const openDetail = useCallback((item) => {
+    if (!item?.id) return;
+    navigate(`/admin/logs/${item.id}`, {
+      state: { fromListSearch: window.location.search },
+    });
+  }, [navigate]);
 
   useEffect(() => {
     const fromUrl = searchParams.get('userName') || '';
-    if (!fromUrl) return;
+    const codeFromUrl = searchParams.get('entityCode') || '';
+    if (!fromUrl && !codeFromUrl) return;
     audit.setParams((p) => ({
       ...p,
-      userName: fromUrl,
+      ...(fromUrl ? { userName: fromUrl } : {}),
+      ...(codeFromUrl ? { entityCode: codeFromUrl } : {}),
       page: 1,
     }));
     setShowFilters(true);
@@ -395,7 +352,7 @@ export default function AuditLogsPage() {
             <input
               className="filter-field__input"
               type="text"
-              placeholder="Tìm kiếm nhanh (tên, mã, mô tả, URL...)"
+              placeholder="Tìm nhanh (tên, SĐT, mã, mô tả...)"
               value={audit.params.keyword || ''}
               onChange={(e) => audit.updateParam('keyword', e.target.value)}
             />
@@ -419,11 +376,11 @@ export default function AuditLogsPage() {
         {showFilters && (
           <div className="admin-logs__filter-body">
             <div className="filter-field">
-              <label className="filter-field__label">Tên người dùng</label>
+              <label className="filter-field__label">Người dùng</label>
               <input
                 className="filter-field__input"
                 type="text"
-                placeholder="Nhập tên người dùng..."
+                placeholder="Tên hoặc SĐT (có/không dấu)..."
                 value={audit.params.userName || ''}
                 onChange={(e) => audit.updateParam('userName', e.target.value)}
               />
@@ -437,6 +394,17 @@ export default function AuditLogsPage() {
                 placeholder="Nhập SĐT..."
                 value={audit.params.phone || ''}
                 onChange={(e) => audit.updateParam('phone', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Mã phiếu</label>
+              <input
+                className="filter-field__input"
+                type="text"
+                placeholder="VD: RO-2026-080, LSC-..., YCDV-..."
+                value={audit.params.entityCode || ''}
+                onChange={(e) => audit.updateParam('entityCode', e.target.value)}
               />
             </div>
 
@@ -541,7 +509,7 @@ export default function AuditLogsPage() {
         ) : (
           <>
             <div className="admin-logs__table-wrapper">
-              <AuditTable items={audit.data.items} onRowClick={setSelectedLog} now={now} />
+              <AuditTable items={audit.data.items} onRowClick={openDetail} now={now} />
             </div>
             <Pagination
               currentPage={audit.data.page || 1}
@@ -553,11 +521,6 @@ export default function AuditLogsPage() {
           </>
         )}
       </div>
-
-      {/* Detail Modal */}
-      {selectedLog && (
-        <AuditLogDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />
-      )}
 
     </div>
   );
@@ -646,7 +609,8 @@ function AuditTable({ items, onRowClick, now }) {
           const description = humanizeAuditDescription(
             item.description,
             item.action,
-            item.new_value
+            item.new_value,
+            { entityCode: item.entity_code, entityName: item.entity_name }
           );
           return (
             <tr key={item.id} onClick={() => onRowClick && onRowClick(item)} style={{ cursor: 'pointer' }} title="Nhấp để xem chi tiết">
@@ -690,283 +654,5 @@ function AuditTable({ items, onRowClick, now }) {
         })}
       </tbody>
     </table>
-  );
-}
-
-// ─── Detail Modal ────────────────────────────────────────────────────
-
-function JsonView({ data }) {
-  if (!data) return <span className="audit-detail__json-empty">—</span>;
-  try {
-    const obj = typeof data === 'string' ? JSON.parse(data) : data;
-    return (
-      <pre className="audit-detail__json">{JSON.stringify(obj, null, 2)}</pre>
-    );
-  } catch {
-    return <span className="audit-detail__json-empty">{String(data)}</span>;
-  }
-}
-
-/**
- * Format old/new value thành dạng human-readable
- */
-function DiffView({ oldValue, newValue, action }) {
-  const oldObj = parseAuditJson(oldValue);
-  const newObj = parseAuditJson(newValue);
-  const summary = summarizeAuditNewValue(newValue, action);
-
-  if (!oldObj && !newObj) return <span className="audit-detail__json-empty">—</span>;
-
-  // Ưu tiên bảng tóm tắt dễ đọc cho giá trị mới
-  if (summary?.rows?.length) {
-    return (
-      <div className="audit-detail__diff-table">
-        {summary.summary && (
-          <p className="audit-detail__diff-summary" style={{ margin: '0 0 12px', color: '#334155', fontSize: 14 }}>
-            {summary.summary}
-          </p>
-        )}
-        <table>
-          <thead>
-            <tr>
-              <th>Thông tin</th>
-              <th>Giá trị</th>
-            </tr>
-          </thead>
-          <tbody>
-            {summary.rows.map((row) => (
-              <tr key={row.label}>
-                <td className="diff-label">{row.label}</td>
-                <td className="diff-new">{row.value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {oldObj && (
-          <details style={{ marginTop: 12 }}>
-            <summary style={{ cursor: 'pointer', color: '#64748b', fontSize: 13 }}>Xem giá trị cũ (chi tiết kỹ thuật)</summary>
-            <JsonView data={oldValue} />
-          </details>
-        )}
-      </div>
-    );
-  }
-
-  const isSimpleObject = (obj) => obj && typeof obj === 'object' && !Array.isArray(obj) &&
-    Object.keys(obj).length <= 10;
-
-  if (isSimpleObject(oldObj) && isSimpleObject(newObj)) {
-    const allKeys = [...new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})])];
-    const changes = allKeys.filter((k) => oldObj?.[k] !== newObj?.[k]);
-
-    if (changes.length > 0) {
-      return (
-        <div className="audit-detail__diff-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Trường</th>
-                <th>Giá trị cũ</th>
-                <th>Giá trị mới</th>
-              </tr>
-            </thead>
-            <tbody>
-              {changes.map((key) => {
-                const label = AUDIT_FIELD_LABELS[key] || key;
-                return (
-                  <tr key={key}>
-                    <td className="diff-label">{label}</td>
-                    <td className="diff-old">{formatAuditFieldValue(key, oldObj?.[key])}</td>
-                    <td className="diff-new">{formatAuditFieldValue(key, newObj?.[key])}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-
-    if (Object.keys(newObj || {}).length > 0) {
-      return (
-        <div className="audit-detail__diff-table">
-          <table>
-            <tbody>
-              {Object.entries(newObj).map(([key, value]) => (
-                <tr key={key}>
-                  <td className="diff-label">{AUDIT_FIELD_LABELS[key] || key}</td>
-                  <td colSpan={2}>{formatAuditFieldValue(key, value)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-  }
-
-  return (
-    <div className="audit-detail__diff-raw">
-      {oldObj && (
-        <div className="audit-detail__diff-col">
-          <label>Giá trị cũ</label>
-          <JsonView data={oldValue} />
-        </div>
-      )}
-      {newObj && (
-        <div className="audit-detail__diff-col">
-          <label>Giá trị mới</label>
-          <JsonView data={newValue} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function isEmptyRequestBody(body) {
-  if (body == null || body === '') return true;
-  if (typeof body === 'string') {
-    const t = body.trim();
-    if (!t || t === '{}' || t === 'null' || t === '[]') return true;
-    try {
-      const parsed = JSON.parse(t);
-      if (parsed == null) return true;
-      if (typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length === 0) return true;
-      if (Array.isArray(parsed) && parsed.length === 0) return true;
-    } catch {
-      return false;
-    }
-    return false;
-  }
-  if (typeof body === 'object') {
-    if (Array.isArray(body)) return body.length === 0;
-    return Object.keys(body).length === 0;
-  }
-  return false;
-}
-
-function AuditLogDetailModal({ log, onClose }) {
-  if (!log) return null;
-  const t = formatLocal(log.logged_at);
-  const userName = log.user_name || 'Hệ thống';
-  const actionLabel = getAuditActionLabel(log.action);
-  const objectLabel = TABLE_NAME_VI[log.table_name] || log.entity_name || 'hệ thống';
-  const summary = humanizeAuditDescription(log.description, log.action, log.new_value)
-    || `${userName} đã ${String(actionLabel).toLowerCase()} trên ${String(objectLabel).toLowerCase()}.`;
-  const methodLabel = getHttpMethodLabel(log.request_method);
-  const statusLabel = getResponseStatusLabel(log.response_status);
-  const urlLabel = humanizeRequestUrl(log.request_url);
-  const showRequestBody = !isEmptyRequestBody(log.request_body);
-  const statusOk = String(log.response_status || '').startsWith('2');
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content audit-detail-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>Chi tiết nhật ký</h3>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-        <div className="modal-body">
-          <div className="audit-detail__summary">
-            {summary}
-          </div>
-
-          <div className="audit-detail__row">
-            <div className="audit-detail__field">
-              <label>Người thực hiện</label>
-              <div className="audit-detail__value">
-                <span className="audit-detail__avatar">
-                  {(userName || '?').split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase()}
-                </span>
-                <strong>{userName}</strong>
-                {log.phone_number && <span className="audit-detail__phone">{log.phone_number}</span>}
-              </div>
-            </div>
-            <div className="audit-detail__field">
-              <label>Hành động</label>
-              <div className="audit-detail__value">
-                <span className={`badge ${ACTION_CLASS[log.action] || 'badge--secondary'}`}>
-                  {actionLabel}
-                </span>
-              </div>
-            </div>
-            <div className="audit-detail__field">
-              <label>Đối tượng</label>
-              <div className="audit-detail__value">
-                <strong>{objectLabel}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="audit-detail__row audit-detail__row--secondary">
-            <div className="audit-detail__field">
-              <label>Kết quả</label>
-              <span className={`badge ${statusOk ? 'badge--success' : 'badge--danger'}`}>
-                {statusLabel}
-              </span>
-            </div>
-            {log.request_method && (
-              <div className="audit-detail__field">
-                <label>Loại thao tác</label>
-                <span>{methodLabel}</span>
-              </div>
-            )}
-            {urlLabel && (
-              <div className="audit-detail__field audit-detail__field--full">
-                <label>Nội dung thao tác</label>
-                <span>{urlLabel}</span>
-              </div>
-            )}
-            {log.duration_ms != null && (
-              <div className="audit-detail__field">
-                <label>Thời gian xử lý</label>
-                <span>{formatDurationMs(log.duration_ms)}</span>
-              </div>
-            )}
-            {(log.branch_name || log.branchName) && (
-              <div className="audit-detail__field">
-                <label>Chi nhánh</label>
-                <span>{log.branch_name || log.branchName}</span>
-              </div>
-            )}
-            {log.ip_address && (
-              <div className="audit-detail__field">
-                <label>Địa chỉ IP</label>
-                <span>{log.ip_address}</span>
-              </div>
-            )}
-          </div>
-
-          {log.description && (
-            <div className="audit-detail__section">
-              <label>Mô tả</label>
-              <p className="audit-detail__description">
-                {humanizeAuditDescription(log.description, log.action, log.new_value)}
-              </p>
-            </div>
-          )}
-
-          {(log.old_value || log.new_value) && (
-            <div className="audit-detail__diff">
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#475569' }}>
-                Chi tiết thay đổi
-              </label>
-              <DiffView oldValue={log.old_value} newValue={log.new_value} action={log.action} />
-            </div>
-          )}
-
-          {showRequestBody && (
-            <div className="audit-detail__section">
-              <label>Dữ liệu gửi kèm</label>
-              <JsonView data={log.request_body} />
-            </div>
-          )}
-
-          <div className="audit-detail__timestamp">
-            <span title={t.sub}>{t.main}</span>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }

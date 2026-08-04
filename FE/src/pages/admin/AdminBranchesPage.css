@@ -628,7 +628,7 @@
 }
 
 /* ── Confirm Modal ─────────────────────────────────────────────── */
-.confirm-modal-overlay {
+.admin-branches .confirm-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.5);
@@ -641,7 +641,7 @@
   animation: overlayIn 0.18s ease-out;
 }
 
-.confirm-modal {
+.admin-branches .confirm-modal {
   background: #fff;
   border-radius: 14px;
   padding: 24px;
@@ -654,7 +654,7 @@
   animation: modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.confirm-modal__icon {
+.admin-branches .confirm-modal__icon {
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -666,12 +666,12 @@
   align-self: center;
 }
 
-.confirm-modal__icon--warning {
+.admin-branches .confirm-modal__icon--warning {
   background: #fffbeb;
   color: #d97706;
 }
 
-.confirm-modal__title {
+.admin-branches .confirm-modal__title {
   font-size: 1rem;
   font-weight: 700;
   color: #0f172a;
@@ -679,7 +679,7 @@
   text-align: center;
 }
 
-.confirm-modal__body {
+.admin-branches .confirm-modal__body {
   font-size: 0.875rem;
   color: #475569;
   text-align: center;
@@ -687,7 +687,7 @@
   line-height: 1.5;
 }
 
-.confirm-modal__footer {
+.admin-branches .confirm-modal__footer {
   display: flex;
   gap: 10px;
   justify-content: flex-end;

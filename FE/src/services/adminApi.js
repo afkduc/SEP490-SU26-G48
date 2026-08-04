@@ -9,8 +9,8 @@ import { fetchBlob } from '../utils/downloadBlob';
  * tra ve thang phan data (object). Nen KHONG goi them .data o day.
  * Tuong tu cho listAdminUsers.
  */
-export async function getAdminDashboardStats() {
-  return httpClient.get('/admin/dashboard');
+export async function getAdminDashboardStats(params = {}) {
+  return httpClient.get(`/admin/dashboard${buildQuery(params)}`);
 }
 
 export async function listAdminUsers() {

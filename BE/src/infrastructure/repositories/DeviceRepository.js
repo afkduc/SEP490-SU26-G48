@@ -1,4 +1,8 @@
 const { query } = require('../database/sqlServer');
+const {
+  sqlAccentInsensitiveLike,
+  bindNormalizedLikeParam,
+} = require('../../utils/vietnamese');
 
 /**
  * Chuyen gia tri Date tu mssql thanh ISO8601 UTC string ('...Z').
@@ -145,16 +149,20 @@ class DeviceRepository {
     }
 
     if (search) {
+      const key = `p${idx}`;
+      bindNormalizedLikeParam(params, key, search);
       conditions.push(`(
-        LOWER(u.user_name) LIKE LOWER(@p${idx})
-        OR LOWER(u.first_name) LIKE LOWER(@p${idx})
-        OR LOWER(u.last_name) LIKE LOWER(@p${idx})
-        OR LOWER(d.device_name) LIKE LOWER(@p${idx})
-        OR d.ip_address LIKE @p${idx}
-        OR LOWER(d.browser) LIKE LOWER(@p${idx})
-        OR LOWER(d.os) LIKE LOWER(@p${idx})
+        ${sqlAccentInsensitiveLike('u.user_name', key)}
+        OR ${sqlAccentInsensitiveLike('u.email', key)}
+        OR ${sqlAccentInsensitiveLike('u.first_name', key)}
+        OR ${sqlAccentInsensitiveLike('u.last_name', key)}
+        OR ${sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
+        OR ${sqlAccentInsensitiveLike('u.phone', key)}
+        OR ${sqlAccentInsensitiveLike('d.device_name', key)}
+        OR d.ip_address LIKE @${key}
+        OR ${sqlAccentInsensitiveLike('d.browser', key)}
+        OR ${sqlAccentInsensitiveLike('d.os', key)}
       )`);
-      params[`p${idx}`] = `%${search}%`;
       idx++;
     }
 
