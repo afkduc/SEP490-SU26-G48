@@ -4,6 +4,7 @@ const config = require('../../config');
 const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
 const { PublicVehicleHistoryDto } = RepairSettlementResponseDto;
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
+const { auditLog } = require('../../utils/auditHelper');
 
 let payosClient = null;
 function getPayOS() {
@@ -209,7 +210,14 @@ class RepairSettlementService {
       expiredAt: new Date(expiredAtUnix * 1000),
     });
 
-    return { qrCode: paymentLink.qrCode, checkoutUrl: paymentLink.checkoutUrl, orderCode, expiredAt: expiredAtUnix };
+    return {
+      qrCode: paymentLink.qrCode,
+      checkoutUrl: paymentLink.checkoutUrl,
+      orderCode,
+      expiredAt: expiredAtUnix,
+      // Chi de audit o controller — FE khong dung field nay.
+      settlementCode: existing.code,
+    };
   }
 
   // Webhook PayOS bao da nhan tien - TU DONG xuat hoa don luon (khong doi
@@ -233,6 +241,25 @@ class RepairSettlementService {
 
     await this.repairSettlementRepository.updateStatus(tx.service_order_id, 'invoiced', { issuedBy: settlement.advisorId });
     emitRepairOrderEvent(settlement.branchId, 'invoiced', { settlementId: tx.service_order_id });
+
+    // Ghi audit sau khi xuat hoa don — khong doi logic thanh toan.
+    // Webhook khong co JWT: actor = system.
+    await auditLog({
+      req: {},
+      action: 'UPDATE',
+      tableName: 'repair_settlements',
+      entityName: 'Phiếu quyết toán',
+      entityCode: settlement.code || `ID-${tx.service_order_id}`,
+      recordId: tx.service_order_id,
+      newValue: {
+        status: 'invoiced',
+        source: 'payos_webhook',
+        orderCode: webhookData.orderCode,
+        reference: webhookData.reference || null,
+      },
+      description: `Thanh toán PayOS thành công — xuất hóa đơn ${settlement.code || tx.service_order_id}`,
+      responseStatus: 200,
+    });
   }
 
   _validateAndNormalize(payload) {
