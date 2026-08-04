@@ -5,3 +5,27 @@
   min-height: calc(100vh - 64px);
   background: #f9fafb;
 }
+
+.inv-layout__branch-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px 0;
+  flex-wrap: wrap;
+}
+
+.inv-layout__branch-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.inv-layout__branch-select {
+  min-width: 260px;
+  max-width: 420px;
+}
+
+.inv-layout__branch-error {
+  font-size: 0.9rem;
+  color: #b91c1c;
+}
