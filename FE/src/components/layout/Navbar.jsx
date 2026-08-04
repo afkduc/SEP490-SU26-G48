@@ -27,7 +27,6 @@ const ADMIN_NAV = [
 
 // ===== Service Advisor =====
 const SERVICE_ADVISOR_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard' },
   { label: 'Yêu cầu', path: '/service-requests' },
   {
     label: 'Quyết toán sửa chữa',
@@ -89,7 +88,7 @@ const GENERAL_DIRECTOR_NAV = [
 // ===== Team Leader =====
 const TEAM_LEADER_NAV = [
   { label: 'Bảng điều khiển', path: '/dashboard' },
-  { label: 'Công việc của tôi', path: '/repair-orders', end: true },
+  { label: 'Nhận việc', path: '/repair-orders', end: true },
 ];
 
 // ===== Technician (Kỹ thuật viên) =====
