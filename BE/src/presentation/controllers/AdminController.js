@@ -75,7 +75,10 @@ class AdminController {
 
   getDashboardStats = async (req, res, next) => {
     try {
-      const stats = await this.adminUserService.getDashboardStats();
+      const stats = await this.adminUserService.getDashboardStats({
+        fromDate: req.query.fromDate || req.query.from || undefined,
+        toDate: req.query.toDate || req.query.to || undefined,
+      });
       return success(
         res,
         {
@@ -169,6 +172,7 @@ class AdminController {
     try {
       const branch = await this.branchService.create(req.body, req);
       await this.notificationService.notifyAdmins('BRANCH_CREATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: branch?.branchName || branch?.branch_name || branch?.name || '',
         targetCode: branch?.branchCode || branch?.branch_code || '',
@@ -184,6 +188,7 @@ class AdminController {
     try {
       const branch = await this.branchService.update(req.params.id, req.body, req);
       await this.notificationService.notifyAdmins('BRANCH_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: branch?.branchName || branch?.branch_name || '',
         targetCode: branch?.branchCode || branch?.branch_code || '',
@@ -199,6 +204,7 @@ class AdminController {
     try {
       const branch = await this.branchService.deactivate(req.params.id, req);
       await this.notificationService.notifyAdmins('BRANCH_DEACTIVATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: branch?.branchName || branch?.branch_name || '',
         targetCode: branch?.branchCode || branch?.branch_code || '',
@@ -214,6 +220,7 @@ class AdminController {
     try {
       const branch = await this.branchService.reactivate(req.params.id, req);
       await this.notificationService.notifyAdmins('BRANCH_REACTIVATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: branch?.branchName || branch?.branch_name || '',
         targetCode: branch?.branchCode || branch?.branch_code || '',
@@ -425,6 +432,7 @@ class AdminController {
         data: req.body,
       });
       await this.notificationService.notifyAdmins('USER_CREATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: user?.full_name || user?.userName || '',
         targetCode: user?.user_code || '',
@@ -506,6 +514,7 @@ class AdminController {
 
       // Gui notification cho cac admin khac (exclude chinh minh)
       await this.notificationService.notifyAdmins(eventType, {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: displayName,
         targetCode: updated?.name || '',
@@ -555,6 +564,7 @@ class AdminController {
         targetUserName: result?.userName || result?.user_code || `ID-${targetUserId}`,
       });
       await this.notificationService.notifyAdmins('USER_PASSWORD_RESET', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: result?.full_name || result?.userName || '',
         targetCode: result?.user_code || '',
