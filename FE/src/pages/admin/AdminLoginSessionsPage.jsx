@@ -628,7 +628,7 @@ export default function AdminLoginSessionsPage({
   );
 
   return (
-    <div className={`admin-page${embedded ? ' admin-page--embedded' : ''}`}>
+    <div className={`admin-page admin-sessions${embedded ? ' admin-page--embedded' : ''}`}>
       {!embedded && (
         <div className="admin-page__header">
           <div className="admin-page__title-block">

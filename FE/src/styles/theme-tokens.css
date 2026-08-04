@@ -1,11 +1,9 @@
 /**
- * AutoGara Design Tokens — Light / Dark
+ * AutoGara Design Tokens
  * Mục tiêu: WCAG AA, màu đủ “đậm” để dễ nhìn, vẫn dịu mắt (không neon).
  */
 
-:root,
-[data-theme='light'],
-.admin-shell:not(.admin-shell--dark) {
+:root {
   /* Surfaces — nền cool có chiều sâu, tránh tím nhạt phẳng */
   --ag-bg: #e8eef8;
   --ag-surface: #ffffff;
@@ -90,81 +88,6 @@
   --ag-radius-sm: 8px;
   --ag-radius-md: 12px;
   --ag-radius-lg: 14px;
-}
-
-.admin-shell--dark,
-[data-theme='dark'] {
-  /* Nền đen ấm hơn một chút, card tách khối rõ */
-  --ag-bg: #07090f;
-  --ag-surface: #12161f;
-  --ag-surface-2: #1a2030;
-  --ag-card: #10141c;
-  --ag-card-hover: #1c2433;
-
-  --ag-text-primary: #f8fafc;
-  --ag-text-secondary: #e2e8f0;
-  --ag-text-muted: #94a3b8;
-  --ag-text-disabled: #64748b;
-  --ag-text-inverse: #0b1220;
-
-  --ag-primary: #818cf8;
-  --ag-primary-hover: #a5b4fc;
-  --ag-primary-soft: rgba(129, 140, 248, 0.22);
-  --ag-primary-text: #0b1220;
-  --ag-accent: #22d3ee;
-  --ag-accent-soft: rgba(34, 211, 238, 0.16);
-
-  --ag-success: #34d399;
-  --ag-success-bg: rgba(52, 211, 153, 0.16);
-  --ag-success-border: #34d399;
-  --ag-warning: #fbbf24;
-  --ag-warning-bg: rgba(251, 191, 36, 0.16);
-  --ag-warning-border: #fbbf24;
-  --ag-danger: #fb7185;
-  --ag-danger-bg: rgba(251, 113, 133, 0.16);
-  --ag-danger-border: #fb7185;
-  --ag-info: #60a5fa;
-  --ag-info-bg: rgba(96, 165, 250, 0.16);
-  --ag-info-border: #60a5fa;
-
-  --ag-pending: #fbbf24;
-  --ag-pending-bg: rgba(251, 191, 36, 0.16);
-  --ag-draft: #cbd5e1;
-  --ag-draft-bg: rgba(148, 163, 184, 0.14);
-  --ag-inactive: #94a3b8;
-  --ag-inactive-bg: rgba(148, 163, 184, 0.12);
-  --ag-approved: #34d399;
-  --ag-approved-bg: rgba(52, 211, 153, 0.16);
-  --ag-rejected: #fb7185;
-  --ag-rejected-bg: rgba(251, 113, 133, 0.16);
-  --ag-cancelled: #94a3b8;
-  --ag-cancelled-bg: rgba(148, 163, 184, 0.12);
-
-  --ag-border: #2a3344;
-  --ag-divider: #222a38;
-  --ag-focus-ring: rgba(129, 140, 248, 0.4);
-  --ag-overlay: rgba(0, 0, 0, 0.72);
-
-  --ag-sidebar-bg: #05070c;
-  --ag-sidebar-text: #e2e8f0;
-  --ag-sidebar-muted: #94a3b8;
-  --ag-sidebar-active-bg: rgba(129, 140, 248, 0.32);
-  --ag-sidebar-active-text: #ffffff;
-  --ag-sidebar-hover: rgba(255, 255, 255, 0.08);
-  --ag-sidebar-border: #1e2636;
-
-  --ag-topbar-bg: rgba(7, 9, 15, 0.92);
-  --ag-input-bg: #0a0e16;
-  --ag-input-border: #334155;
-  --ag-input-placeholder: #64748b;
-  --ag-table-header-bg: #0c1018;
-  --ag-table-row-hover: #1a2230;
-  --ag-table-row-alt: #0e121a;
-  --ag-table-border: #2a3344;
-
-  --ag-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --ag-shadow-md: 0 12px 32px rgba(0, 0, 0, 0.5);
-  --ag-shadow-lg: 0 20px 52px rgba(0, 0, 0, 0.6);
 }
 
 /* Focus ring dùng chung */
