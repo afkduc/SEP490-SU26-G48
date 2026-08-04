@@ -13,6 +13,7 @@ import { ROUTES } from '../constants/routes';
 import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
 import { SharedDataProvider } from '../contexts/SharedDataContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
+import { useAuth } from '../contexts/AppContext';
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
@@ -20,6 +21,7 @@ const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
+const ActiveBaysPage = lazy(() => import('../pages/repairorder/ActiveBaysPage'));
 const CustomerHistoryPage = lazy(() => import('../pages/customer/CustomerHistoryPage'));
 const CustomerCarePage = lazy(() => import('../pages/customercare/CustomerCarePage'));
 const ServiceRequestsPage = lazy(() => import('../pages/servicerequests/ServiceRequestsPage'));
@@ -133,6 +135,21 @@ function ProfilePageLayout() {
   return (
     <AppLayout>
       <Outlet />
+    </AppLayout>
+  );
+}
+
+// To truong dung man hinh cam ung gan tuong (kiosk chon khoang xe/nhan viec) -
+// bo ca navbar lan menu ho so mac dinh - TeamLeaderKiosk tu ve nut "Dang
+// xuat" rieng (nha khoang truoc khi dang xuat, xem TeamLeaderKiosk.jsx) de
+// tranh co 2 duong dang xuat khac hanh vi nhau. Cac role khac (CVDV, Quan
+// ly...) van dung navbar binh thuong nhu cu.
+function RepairOrderRouteLayout() {
+  const { user } = useAuth();
+  const isTeamLeaderKiosk = user?.primaryRole === ROLES.TEAM_LEADER;
+  return (
+    <AppLayout showNavbar={!isTeamLeaderKiosk} hideProfileMenu={isTeamLeaderKiosk}>
+      <RepairOrderPage />
     </AppLayout>
   );
 }
@@ -281,9 +298,7 @@ function AppRoutes() {
           path="/repair-orders/*"
           element={
             <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.TEAM_LEADER, ROLES.TECHNICIAN, ROLES.MANAGER, ROLES.ADMIN]}>
-              <AppLayout>
-                <RepairOrderPage />
-              </AppLayout>
+              <RepairOrderRouteLayout />
             </ProtectedRoute>
           }
         />
@@ -307,6 +322,18 @@ function AppRoutes() {
             <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
               <AppLayout>
                 <ServiceRequestsPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* CVDV - xem khoang xe cua to truong nao dang hoat dong, dang lam xe gi */}
+        <Route
+          path="/active-bays"
+          element={
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
+              <AppLayout>
+                <ActiveBaysPage />
               </AppLayout>
             </ProtectedRoute>
           }

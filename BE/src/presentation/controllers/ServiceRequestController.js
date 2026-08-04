@@ -1,4 +1,10 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
+
+function serviceRequestCode(itemOrId) {
+  const id = typeof itemOrId === 'object' ? itemOrId?.id : itemOrId;
+  return id != null ? `YCDV-${id}` : null;
+}
 
 class ServiceRequestController {
   constructor({ serviceRequestService }) {
@@ -45,6 +51,14 @@ class ServiceRequestController {
   createPublic = async (req, res, next) => {
     try {
       const result = await this.serviceRequestService.createPublic(req.body);
+      await auditCrud.create(req, {
+        tableName: 'service_requests',
+        entityCode: serviceRequestCode(result),
+        recordId: result?.id || null,
+        entityName: 'Yêu cầu dịch vụ',
+        data: req.body,
+        description: `Khách tạo yêu cầu dịch vụ ${serviceRequestCode(result) || ''}`.trim(),
+      });
       return success(res, result, 'Service request created', 201);
     } catch (err) {
       next(err);
@@ -88,6 +102,14 @@ class ServiceRequestController {
         userName: req.user.name,
         branchId: req.user.branchId,
       });
+      await auditCrud.update(req, {
+        tableName: 'service_requests',
+        entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Yêu cầu dịch vụ',
+        newData: { status: item?.status || 'accepted' },
+        description: `Tiếp nhận yêu cầu dịch vụ ${serviceRequestCode(item) || req.params.id}`,
+      });
       return success(res, item, 'Service request accepted');
     } catch (err) {
       next(err);
@@ -99,6 +121,14 @@ class ServiceRequestController {
       const item = await this.serviceRequestService.createAppointment(req.params.id, req.body, {
         userId: req.user.userId,
         branchId: req.user.branchId,
+      });
+      await auditCrud.create(req, {
+        tableName: 'service_request_appointments',
+        entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
+        recordId: item?.appointment?.id || item?.id || Number(req.params.id) || null,
+        entityName: 'Lịch hẹn dịch vụ',
+        data: req.body,
+        description: `Tạo lịch hẹn cho yêu cầu ${serviceRequestCode(item) || req.params.id}`,
       });
       return success(res, item, 'Appointment created', 201);
     } catch (err) {
@@ -114,6 +144,14 @@ class ServiceRequestController {
         req.body,
         { userId: req.user.userId, branchId: req.user.branchId }
       );
+      await auditCrud.update(req, {
+        tableName: 'service_request_appointments',
+        entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
+        recordId: Number(req.params.appointmentId) || item?.appointment?.id || null,
+        entityName: 'Lịch hẹn dịch vụ',
+        newData: req.body,
+        description: `Cập nhật lịch hẹn #${req.params.appointmentId} của yêu cầu ${serviceRequestCode(item) || req.params.id}`,
+      });
       return success(res, item, 'Appointment updated');
     } catch (err) {
       next(err);
@@ -128,6 +166,14 @@ class ServiceRequestController {
         req.body.reason,
         { userId: req.user.userId, branchId: req.user.branchId }
       );
+      await auditCrud.update(req, {
+        tableName: 'service_request_appointments',
+        entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
+        recordId: Number(req.params.appointmentId) || item?.appointment?.id || null,
+        entityName: 'Lịch hẹn dịch vụ',
+        newData: { status: 'cancelled', reason: req.body.reason },
+        description: `Hủy lịch hẹn #${req.params.appointmentId} của yêu cầu ${serviceRequestCode(item) || req.params.id}`,
+      });
       return success(res, item, 'Appointment cancelled');
     } catch (err) {
       next(err);

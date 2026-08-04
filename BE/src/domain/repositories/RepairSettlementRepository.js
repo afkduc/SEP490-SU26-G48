@@ -15,6 +15,10 @@ class RepairSettlementRepository {
     throw new Error('Method findActiveByCustomerVehicle() must be implemented');
   }
 
+  async findPublicHistoryByVehicleIdentifier(identifier) {
+    throw new Error('Method findPublicHistoryByVehicleIdentifier() must be implemented');
+  }
+
   async create(data, { branchId, advisorId }) {
     throw new Error('Method create() must be implemented');
   }
