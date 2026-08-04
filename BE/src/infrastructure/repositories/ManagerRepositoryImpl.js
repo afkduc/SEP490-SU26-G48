@@ -80,6 +80,8 @@ function mapSettlementRow(row) {
     status: row.status,
     intakeDate: normalizeDate(row.intake_date),
     completedDate: normalizeDate(row.completed_date),
+    cancelledAt: normalizeDate(row.cancelled_at),
+    paidAt: normalizeDate(row.invoice_issued_at),
     total: Number(row.total || 0),
     subtotal: Number(row.subtotal || 0),
     discountAmount: Number(row.discount_amount || 0),
@@ -735,13 +737,21 @@ class ManagerRepositoryImpl {
           so.free_amount,
           so.total,
           so.intake_date,
-          so.completed_date
+          so.completed_date,
+          so.cancelled_at,
+          inv.issued_at AS invoice_issued_at
        FROM service_orders so
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
        INNER JOIN users advisor ON advisor.id = so.advisor_id
        LEFT JOIN users leader ON leader.id = so.team_leader_id
+       OUTER APPLY (
+           SELECT TOP 1 i.issued_at
+           FROM   invoices i
+           WHERE  i.service_order_id = so.id
+           ORDER  BY i.issued_at DESC
+       ) inv
        WHERE so.branch_id = @branchId
          AND (@status IS NULL OR so.status = @status)
          AND (
@@ -792,13 +802,21 @@ class ManagerRepositoryImpl {
           so.free_amount,
           so.total,
           so.intake_date,
-          so.completed_date
+          so.completed_date,
+          so.cancelled_at,
+          inv.issued_at AS invoice_issued_at
        FROM service_orders so
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
        INNER JOIN users advisor ON advisor.id = so.advisor_id
        LEFT JOIN users leader ON leader.id = so.team_leader_id
+       OUTER APPLY (
+           SELECT TOP 1 i.issued_at
+           FROM   invoices i
+           WHERE  i.service_order_id = so.id
+           ORDER  BY i.issued_at DESC
+       ) inv
        WHERE so.id = @id AND so.branch_id = @branchId`,
       { id: Number(id), branchId: Number(branchId) }
     );
