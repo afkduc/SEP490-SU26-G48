@@ -537,7 +537,19 @@ class AdminUserRepositoryImpl {
    * Lay thong ke dashboard tong quan
    * Tra ve counts theo status cua users, so branches, so roles
    */
-  async getDashboardStats() {
+  async getDashboardStats(filters = {}) {
+    const fromDate = filters.fromDate ? new Date(filters.fromDate) : null;
+    const toDate = filters.toDate ? new Date(filters.toDate) : null;
+    const hasRange = fromDate && !Number.isNaN(fromDate.getTime())
+      && toDate && !Number.isNaN(toDate.getTime());
+
+    // Inclusive end-of-day when client sends date-only (YYYY-MM-DD)
+    let rangeEnd = toDate;
+    if (hasRange && typeof filters.toDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(filters.toDate)) {
+      rangeEnd = new Date(filters.toDate);
+      rangeEnd.setHours(23, 59, 59, 999);
+    }
+
     const [userStats, branchCount, roleCount] = await Promise.all([
       query(`
         SELECT
@@ -552,31 +564,36 @@ class AdminUserRepositoryImpl {
     
     const users = userStats.recordset[0];
 
-    // Recent audit logs (general activity)
+    // Recent audit logs (general activity) — ưu tiên trong khoảng lọc
     let recentLogs = [];
+    let periodAuditCount = 0;
     try {
-      const logsResult = await query(`
+      const logsResult = await query(
+        hasRange
+          ? `
         SELECT TOP 20
-          al.id,
-          al.action,
-          al.user_name,
-          al.table_name,
-          al.entity_name,
-          al.entity_code,
-          al.record_id,
-          al.description,
-          al.old_value,
-          al.new_value,
-          al.ip_address,
-          al.response_status,
-          al.logged_at
+          al.id, al.action, al.user_name, al.table_name, al.entity_name, al.entity_code,
+          al.record_id, al.description, al.old_value, al.new_value, al.ip_address,
+          al.response_status, al.logged_at
+        FROM audit_logs al
+        WHERE al.logged_at >= @p1 AND al.logged_at <= @p2
+        ORDER BY al.logged_at DESC
+      `
+          : `
+        SELECT TOP 20
+          al.id, al.action, al.user_name, al.table_name, al.entity_name, al.entity_code,
+          al.record_id, al.description, al.old_value, al.new_value, al.ip_address,
+          al.response_status, al.logged_at
         FROM audit_logs al
         ORDER BY al.logged_at DESC
-      `);
+      `,
+        hasRange ? { p1: fromDate, p2: rangeEnd } : {}
+      );
       recentLogs = logsResult.recordset.map((row) => ({
         id: row.id,
         action: row.action,
         actorName: row.user_name,
+        tableName: row.table_name,
         targetType: row.table_name,
         entityName: row.entity_name,
         entityCode: row.entity_code,
@@ -588,30 +605,42 @@ class AdminUserRepositoryImpl {
         responseStatus: row.response_status,
         createdAt: row.logged_at,
       }));
+
+      if (hasRange) {
+        const auditCountRes = await query(
+          `SELECT COUNT(*) AS total FROM audit_logs WHERE logged_at >= @p1 AND logged_at <= @p2`,
+          { p1: fromDate, p2: rangeEnd }
+        );
+        periodAuditCount = Number(auditCountRes.recordset[0].total) || 0;
+      }
     } catch (_) {
       recentLogs = [];
     }
 
-    // Login sessions (recent logins)
     let recentLogins = [];
     let todayLogins = 0;
     let failedLogins = 0;
     let recentFailedLogins = 0;
     try {
-      const loginResult = await query(`
+      const loginResult = await query(
+        hasRange
+          ? `
         SELECT TOP 24
-          ls.id,
-          ls.user_name,
-          ls.action_type,
-          ls.ip_address,
-          ls.user_agent,
-          ls.login_time,
-          ls.logout_time,
-          ls.session_duration_seconds,
-          ls.status
+          ls.id, ls.user_name, ls.action_type, ls.ip_address, ls.user_agent,
+          ls.login_time, ls.logout_time, ls.session_duration_seconds, ls.status
+        FROM login_sessions ls
+        WHERE ls.login_time >= @p1 AND ls.login_time <= @p2
+        ORDER BY ls.login_time DESC
+      `
+          : `
+        SELECT TOP 24
+          ls.id, ls.user_name, ls.action_type, ls.ip_address, ls.user_agent,
+          ls.login_time, ls.logout_time, ls.session_duration_seconds, ls.status
         FROM login_sessions ls
         ORDER BY ls.login_time DESC
-      `);
+      `,
+        hasRange ? { p1: fromDate, p2: rangeEnd } : {}
+      );
       recentLogins = loginResult.recordset.map((row) => ({
         id: row.id,
         userName: row.user_name,
@@ -624,28 +653,27 @@ class AdminUserRepositoryImpl {
         status: row.status,
       }));
 
-      // Today's successful login count
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
+      const periodStart = hasRange
+        ? fromDate
+        : (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+      const periodEnd = hasRange ? rangeEnd : new Date();
+
       const todayResult = await query(`
         SELECT COUNT(*) AS total
         FROM login_sessions
         WHERE action_type = 'LOGIN'
-          AND login_time >= @p1
-      `, { p1: todayStart });
+          AND login_time >= @p1 AND login_time <= @p2
+      `, { p1: periodStart, p2: periodEnd });
       todayLogins = Number(todayResult.recordset[0].total);
 
-      // Failed logins count — today only (same time boundary as todayLogins)
       const failedResult = await query(`
         SELECT COUNT(*) AS total
         FROM login_sessions
         WHERE action_type = 'LOGIN_FAILED'
-          AND login_time >= @p1
-      `, { p1: todayStart });
+          AND login_time >= @p1 AND login_time <= @p2
+      `, { p1: periodStart, p2: periodEnd });
       failedLogins = Number(failedResult.recordset[0].total);
 
-      // Chi dung cua so 15 phut cho canh bao bao mat. failedLogins o tren
-      // van la thong ke lich su trong ngay de hien thi tai card dashboard.
       const recentFailedResult = await query(`
         SELECT COUNT(*) AS total
         FROM login_sessions
@@ -657,11 +685,37 @@ class AdminUserRepositoryImpl {
       recentLogins = [];
     }
 
-    // System alerts — preview (TOP 5 đã gom) + counts đã gom (cùng logic panel)
     let alerts = [];
     let alertCounts = { total: 0, critical: 0, high: 0, medium: 0, info: 0 };
     try {
-      const alertsResult = await query(`
+      const alertsResult = await query(
+        hasRange
+          ? `
+        SELECT TOP 5
+          id, severity, title, message, user_id, created_at, rule_key
+        FROM (
+          SELECT
+            id, severity, title, message, user_id, created_at, rule_key,
+            ROW_NUMBER() OVER (
+              PARTITION BY ISNULL(rule_key, N''),
+                CASE WHEN user_id IS NULL THEN 0 ELSE user_id END
+              ORDER BY created_at DESC
+            ) AS rn
+          FROM security_alerts
+          WHERE is_acknowledged = 0
+            AND created_at >= @p1 AND created_at <= @p2
+        ) ranked
+        WHERE rn = 1
+        ORDER BY
+          CASE severity
+            WHEN 'critical' THEN 1
+            WHEN 'high'     THEN 2
+            WHEN 'medium'   THEN 3
+            WHEN 'info'     THEN 4
+          END ASC,
+          created_at DESC
+      `
+          : `
         SELECT TOP 5
           id, severity, title, message, user_id, created_at, rule_key
         FROM (
@@ -684,7 +738,9 @@ class AdminUserRepositoryImpl {
             WHEN 'info'     THEN 4
           END ASC,
           created_at DESC
-      `);
+      `,
+        hasRange ? { p1: fromDate, p2: rangeEnd } : {}
+      );
       alerts = alertsResult.recordset.map((row) => ({
         id: String(row.id),
         type: row.severity === 'critical' ? 'danger' : row.severity === 'high' ? 'danger' : row.severity === 'medium' ? 'warning' : 'info',
@@ -700,8 +756,29 @@ class AdminUserRepositoryImpl {
         alertId: row.id,
       }));
 
-      // Đếm đã gom (1 nhóm rule+user = 1) — khớp /security-alerts/counts
-      const countsResult = await query(`
+      const countsResult = await query(
+        hasRange
+          ? `
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN t.severity = 'critical' THEN 1 ELSE 0 END) AS criticalCount,
+          SUM(CASE WHEN t.severity = 'high' THEN 1 ELSE 0 END) AS highCount,
+          SUM(CASE WHEN t.severity = 'medium' THEN 1 ELSE 0 END) AS mediumCount,
+          SUM(CASE WHEN t.severity = 'info' THEN 1 ELSE 0 END) AS infoCount
+        FROM (
+          SELECT severity,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY ISNULL(rule_key, N''),
+                     CASE WHEN user_id IS NULL THEN 0 ELSE user_id END
+                   ORDER BY created_at DESC
+                 ) AS rn
+          FROM security_alerts
+          WHERE is_acknowledged = 0
+            AND created_at >= @p1 AND created_at <= @p2
+        ) t
+        WHERE t.rn = 1
+      `
+          : `
         SELECT
           COUNT(*) AS total,
           SUM(CASE WHEN t.severity = 'critical' THEN 1 ELSE 0 END) AS criticalCount,
@@ -719,7 +796,9 @@ class AdminUserRepositoryImpl {
           WHERE is_acknowledged = 0
         ) t
         WHERE t.rn = 1
-      `);
+      `,
+        hasRange ? { p1: fromDate, p2: rangeEnd } : {}
+      );
       const c = countsResult.recordset[0] || {};
       alertCounts = {
         total: Number(c.total) || 0,
@@ -737,9 +816,6 @@ class AdminUserRepositoryImpl {
       totalUsers: Number(users.total),
       activeUsers: Number(users.activeCount),
       inactiveUsers: Number(users.inactiveCount),
-      // Bo field lockedUsers (status 'locked' da bi goop vao 'inactive').
-      // Giu lai key cu voi gia tri 0 de FE Dashboard cu (neu co) khong crash
-      // khi truy cap object[key].
       lockedUsers: 0,
       totalBranches: Number(branchCount.recordset[0].total),
       totalRoles: Number(roleCount.recordset[0].total),
@@ -748,6 +824,10 @@ class AdminUserRepositoryImpl {
       todayLogins,
       failedLogins,
       recentFailedLogins,
+      periodAuditCount,
+      period: hasRange
+        ? { fromDate: fromDate.toISOString(), toDate: rangeEnd.toISOString() }
+        : { fromDate: null, toDate: null, preset: 'today' },
       alerts,
       alertCounts,
     };

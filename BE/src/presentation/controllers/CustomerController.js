@@ -39,6 +39,7 @@ class CustomerController {
         newData: req.body,
       });
       await this.notificationService.notifyAdmins('CUSTOMER_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: item?.name || item?.full_name || `ID-${req.params.id}`,
         targetCode: item?.customer_code || '',
