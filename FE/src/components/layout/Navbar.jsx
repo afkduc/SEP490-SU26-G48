@@ -10,6 +10,7 @@ import './Navbar.css';
 // ===== Admin =====
 const ADMIN_NAV = [
   { label: 'Bảng điều khiển', path: '/admin/dashboard' },
+  { label: 'Kho', path: '/inventory' },
   {
     label: 'Người dùng',
     children: [
@@ -44,7 +45,8 @@ const SERVICE_ADVISOR_NAV = [
 // ===== Manager =====
 const MANAGER_NAV = [
   { label: 'Dashboard', path: '/manager/dashboard' },
-  { label: 'Kho', path: '/manager/inventory' },
+  { label: 'Kho chi nhánh', path: '/manager/inventory' },
+  { label: 'Màn kho', path: '/inventory' },
   { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests' },
   { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests' },
   {
@@ -78,6 +80,7 @@ const WAREHOUSE_STAFF_NAV = [
 // ===== General Director =====
 const GENERAL_DIRECTOR_NAV = [
   { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Kho', path: '/inventory' },
   { label: 'Báo cáo doanh thu', path: '/general-director/reports/revenue' },
   { label: 'Báo cáo quyết toán', path: '/general-director/reports/settlements' },
   { label: 'Chi nhánh', path: '/general-director/branch-managers' },

@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { PermissionGate } from '../../components/PermissionGate';
+import { useInventoryBranch } from './InventoryLayout';
 import { useImportRequests } from '../../hooks/inventory/useImportRequests';
 import './ImportRequestListPage.css';
 
 const STATUS_META = {
-  pending: { label: 'Chờ duyệt', className: 'badge--warning' },
-  approved: { label: 'Đã duyệt', className: 'badge--success' },
+  pending: { label: 'Chờ duyệt (phiếu cũ)', className: 'badge--warning' },
+  approved: { label: 'Đã nhập kho', className: 'badge--success' },
   rejected: { label: 'Từ chối', className: 'badge--danger' },
 };
 
 const STATUS_TABS = [
   { value: '', label: 'Tất cả' },
-  { value: 'pending', label: 'Chờ duyệt' },
-  { value: 'approved', label: 'Đã duyệt' },
+  { value: 'pending', label: 'Chờ duyệt (phiếu cũ)' },
+  { value: 'approved', label: 'Đã nhập kho' },
   { value: 'rejected', label: 'Từ chối' },
 ];
 
@@ -29,8 +30,7 @@ function formatDateTime(d) {
 }
 
 export default function ImportRequestListPage() {
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
   const {
     requests, total, page, limit, loading, error,
@@ -58,18 +58,28 @@ export default function ImportRequestListPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
+  if (!branchId) {
+    return (
+      <div className="ir-list__error">
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để xem phiếu nhập.')}
+      </div>
+    );
+  }
+
   return (
     <div className="ir-list">
       <div className="ir-list__header">
         <div>
           <h1 className="ir-list__title">Phiếu nhập kho</h1>
           <p className="ir-list__subtitle">
-            Tạo, duyệt và từ chối phiếu nhập phụ tùng từ nhà cung cấp.
+            Phiếu nhập mới sẽ cộng tồn kho ngay sau khi tạo; chỉ các phiếu cũ ở trạng thái pending mới cần duyệt.
           </p>
         </div>
-        <Link to="/inventory/import-requests/new" className="btn btn--primary">
-          + Tạo phiếu nhập
-        </Link>
+        <PermissionGate permission="import_requests:create">
+          <Link to="/inventory/import-requests/new" className="btn btn--primary">
+            + Tạo phiếu nhập
+          </Link>
+        </PermissionGate>
       </div>
 
       {/* Tabs theo status */}

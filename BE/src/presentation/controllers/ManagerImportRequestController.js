@@ -2,6 +2,25 @@ const { success } = require('../../utils/response');
 const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
 
+function getManagerBranchScope(user) {
+  const roles = Array.isArray(user?.roles) && user.roles.length
+    ? user.roles
+    : [user?.primaryRole].filter(Boolean);
+  if (roles.includes('admin')) return null;
+  const branchId = user?.branchId == null ? null : Number(user.branchId);
+  return Number.isFinite(branchId) && branchId > 0 ? branchId : null;
+}
+
+function resolveManagerBranchId(user, requestedBranchId) {
+  const branchScope = getManagerBranchScope(user);
+  if (branchScope) return branchScope;
+
+  const explicitBranchId = requestedBranchId == null || requestedBranchId === ''
+    ? null
+    : Number(requestedBranchId);
+  return Number.isFinite(explicitBranchId) && explicitBranchId > 0 ? explicitBranchId : null;
+}
+
 /**
  * Controller rieng cho Manager xem & duyet phieu nhap kho.
  * Usecase: Manager truy cap /manager/import-requests ... de duyet phieu
@@ -23,10 +42,8 @@ class ManagerImportRequestController {
   list = async (req, res, next) => {
     try {
       const { branchId, status, supplierId, fromDate, toDate, search, page, limit } = req.query;
-      // Manager chi xem cua chi nhanh minh quan ly; admin duoc phep truyen branchId tu frontend.
-      const branchIdToUse = branchId
-        ? Number(branchId)
-        : (req.user?.roles?.includes('admin') ? req.user?.branchId : req.user?.branchId);
+      // Manager chi xem cua chi nhanh minh quan ly; admin duoc phep chon branch de xem.
+      const branchIdToUse = resolveManagerBranchId(req.user, branchId);
       if (!branchIdToUse) {
         return success(res, { items: [], total: 0, page: 1, limit: 20 }, 'No branch context');
       }
@@ -42,7 +59,9 @@ class ManagerImportRequestController {
 
   getById = async (req, res, next) => {
     try {
-      const data = await this.importRequestService.getById(req.params.id);
+      const data = await this.importRequestService.getById(req.params.id, {
+        branchId: getManagerBranchScope(req.user),
+      });
       return success(res, data, 'Lay chi tiet phieu nhap thanh cong');
     } catch (err) {
       next(err);
@@ -59,19 +78,22 @@ class ManagerImportRequestController {
       if (!approvedBy) {
         return res.status(401).json({ success: false, message: 'Khong xac dinh user' });
       }
-      const data = await this.importRequestService.approve(req.params.id, { approvedBy });
+      const data = await this.importRequestService.approve(req.params.id, {
+        approvedBy,
+        branchId: getManagerBranchScope(req.user),
+      });
       await auditCrud.update(req, {
         tableName: 'import_requests',
-        entityCode: data?.request_code || `ID-${req.params.id}`,
+        entityCode: data?.requestCode || `ID-${req.params.id}`,
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Phiếu nhập kho',
         newData: { status: 'approved' },
-        description: `Duyệt phiếu nhập kho ${data?.request_code || req.params.id} (Manager)`,
+        description: `Duyệt phiếu nhập kho ${data?.requestCode || req.params.id} (Manager)`,
       });
       await this.notificationService.notifyAdmins('IMPORT_REQUEST_APPROVED', {
         actorName: req.user?.name || req.user?.email || 'Manager',
-        targetName: data?.request_code || `ID-${req.params.id}`,
-        targetCode: data?.request_code || '',
+        targetName: data?.requestCode || `ID-${req.params.id}`,
+        targetCode: data?.requestCode || '',
         userId: data?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ManagerImportRequestController] notifyAdmins:', e.message));
       return success(res, data, 'Duyet phieu nhap thanh cong');
@@ -93,20 +115,23 @@ class ManagerImportRequestController {
       const data = await this.importRequestService.reject(
         req.params.id,
         req.body,
-        { rejectedBy },
+        {
+          rejectedBy,
+          branchId: getManagerBranchScope(req.user),
+        },
       );
       await auditCrud.update(req, {
         tableName: 'import_requests',
-        entityCode: data?.request_code || `ID-${req.params.id}`,
+        entityCode: data?.requestCode || `ID-${req.params.id}`,
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Phiếu nhập kho',
         newData: { status: 'rejected', reason: req.body?.rejectReason },
-        description: `Từ chối phiếu nhập kho ${data?.request_code || req.params.id} (Manager)`,
+        description: `Từ chối phiếu nhập kho ${data?.requestCode || req.params.id} (Manager)`,
       });
       await this.notificationService.notifyAdmins('IMPORT_REQUEST_REJECTED', {
         actorName: req.user?.name || req.user?.email || 'Manager',
-        targetName: data?.request_code || `ID-${req.params.id}`,
-        targetCode: data?.request_code || '',
+        targetName: data?.requestCode || `ID-${req.params.id}`,
+        targetCode: data?.requestCode || '',
         userId: data?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ManagerImportRequestController] notifyAdmins:', e.message));
       return success(res, data, 'Tu choi phieu nhap thanh cong');

@@ -7,8 +7,8 @@ import { useImportRequestApproval } from '../../hooks/inventory/useImportRequest
 import './ImportRequestDetailPage.css';
 
 const STATUS_META = {
-  pending: { label: 'Chờ duyệt', className: 'badge--warning' },
-  approved: { label: 'Đã duyệt', className: 'badge--success' },
+  pending: { label: 'Chờ duyệt (phiếu cũ)', className: 'badge--warning' },
+  approved: { label: 'Đã nhập kho', className: 'badge--success' },
   rejected: { label: 'Từ chối', className: 'badge--danger' },
 };
 
@@ -182,8 +182,13 @@ export default function ImportRequestDetailPage() {
 
         {data.status === 'approved' && (
           <div className="ir-detail__notice ir-detail__notice--success">
-            Phiếu đã được duyệt. Tồn kho cho các phụ tùng trên đã được cộng và hệ thống
+            Phiếu đã được nhập kho. Tồn kho cho các phụ tùng trên đã được cộng và hệ thống
             đã ghi log vào <code>inventory_transactions</code>.
+          </div>
+        )}
+        {data.status === 'pending' && (
+          <div className="ir-detail__notice ir-detail__notice--warning">
+            Đây là phiếu cũ vẫn còn chờ quản lý chi nhánh duyệt trước khi cộng tồn kho.
           </div>
         )}
         {data.status === 'rejected' && (
