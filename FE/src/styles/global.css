@@ -317,6 +317,7 @@ body {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .data-table { width: 100%; border-collapse: collapse; }
@@ -446,6 +447,15 @@ body {
 .modal-md { max-width: 640px; }
 .modal-lg { max-width: 900px; }
 .modal-xl { max-width: 1100px; }
+
+/* An thanh cuon (doc/ngang) nhung van cuon duoc binh thuong bang chuot/touch/
+   ban phim - dung cho cap modal xem chi tiet + xem tinh trang xe ban dau canh nhau. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 
 @keyframes modalIn {
   from { opacity: 0; transform: scale(0.95) translateY(-10px); }

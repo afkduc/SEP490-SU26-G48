@@ -35,6 +35,16 @@ class RepairSettlementController {
     }
   };
 
+  // Public - khong dang nhap (xem publicRoutes.js), khong duoc dung req.user o day.
+  lookupPublicHistory = async (req, res, next) => {
+    try {
+      const result = await this.repairSettlementService.getPublicHistoryByPlateOrFrame(req.params.identifier);
+      return success(res, result, 'Vehicle history retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   checkDuplicate = async (req, res, next) => {
     try {
       const { customerId, vehicleId, excludeId } = req.query;

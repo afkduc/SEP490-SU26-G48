@@ -13,6 +13,7 @@ class RepairOrder {
     this.teamLeaderId = data.teamLeaderId ?? null;
     this.teamLeaderName = data.teamLeaderName ?? null;
     this.teamLeaderSpecialty = data.teamLeaderSpecialty ?? null;
+    this.bayId = data.bayId ?? null;
     this.vehicleId = data.vehicleId ?? null;
     this.createdBy = data.createdBy ?? null;
     this.createdByName = data.createdByName ?? null;
@@ -26,9 +27,10 @@ class RepairOrder {
     this.customer = data.customer ?? null; // { id, fullName }
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel }
     this.tasks = data.tasks ?? []; // [{ id, taskName, taskType, productId, quantity, unitPrice, isDone }]
+    this.technicians = data.technicians ?? []; // [{ id, fullName, phone }] - repair_order_technicians (nhieu tho cung sua 1 xe)
   }
 
-  static fromPersistence(headerRow, taskRows = []) {
+  static fromPersistence(headerRow, taskRows = [], technicianRows = []) {
     if (!headerRow) return null;
     return new RepairOrder({
       id: headerRow.id,
@@ -39,6 +41,7 @@ class RepairOrder {
       teamLeaderId: headerRow.team_leader_id,
       teamLeaderName: headerRow.team_leader_name,
       teamLeaderSpecialty: headerRow.team_leader_specialty,
+      bayId: headerRow.bay_id,
       vehicleId: headerRow.vehicle_id,
       createdBy: headerRow.created_by,
       createdByName: headerRow.created_by_name,
@@ -65,6 +68,12 @@ class RepairOrder {
         quantity: r.quantity,
         unitPrice: r.unit_price,
         isDone: Boolean(r.is_done),
+      })),
+      technicians: technicianRows.map((r) => ({
+        id: r.id,
+        fullName: r.user_name,
+        phone: r.phone,
+        sameTeam: String(r.team_leader_id) === String(headerRow.team_leader_id),
       })),
     });
   }
