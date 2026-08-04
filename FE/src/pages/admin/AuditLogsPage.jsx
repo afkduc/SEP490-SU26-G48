@@ -24,6 +24,7 @@ import {
   humanizeRequestUrl,
   isSameAuditPayload,
   isAuditSignatureValue,
+  AUDIT_TABLE_LABELS,
 } from '../../utils/auditDisplay';
 import './AuditLogsPage.css';
 
@@ -40,9 +41,14 @@ const ACTION_OPTIONS = [
   { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu', color: 'teal' },
   { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu', color: 'cyan' },
   { value: 'ASSIGN_ROLE', label: 'Gán vai trò', color: 'indigo' },
-  { value: 'REMOVE_ROLE', label: 'Xóa vai trò', color: 'rose' },
+  { value: 'REMOVE_ROLE', label: 'Thu hồi vai trò', color: 'rose' },
   { value: 'EXPORT', label: 'Xuất dữ liệu', color: 'green' },
   { value: 'IMPORT', label: 'Nhập dữ liệu', color: 'amber' },
+  { value: 'GRANT_SCREEN', label: 'Cấp quyền màn hình', color: 'success' },
+  { value: 'REVOKE_SCREEN', label: 'Thu hồi quyền màn hình', color: 'danger' },
+  { value: 'SAVE_SCREEN_MATRIX', label: 'Lưu ma trận quyền', color: 'indigo' },
+  { value: 'APPROVE_PERMISSION_REQUEST', label: 'Duyệt yêu cầu quyền', color: 'success' },
+  { value: 'REJECT_PERMISSION_REQUEST', label: 'Từ chối yêu cầu quyền', color: 'danger' },
 ];
 
 const ACTION_CLASS = {
@@ -75,68 +81,13 @@ const ACTION_CLASS = {
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
-  { value: '2xx', label: '2xx - Thành công' },
-  { value: '4xx', label: '4xx - Lỗi client' },
-  { value: '5xx', label: '5xx - Lỗi server' },
+  { value: '2xx', label: 'Thành công' },
+  { value: '4xx', label: 'Lỗi phía người dùng' },
+  { value: '5xx', label: 'Lỗi máy chủ' },
 ];
 
-/**
- * Map tên bảng (table_name) sang tên tiếng Việt cho dễ hiểu.
- * BE vẫn giữ table_name là key chuẩn (customers, users, ...).
- * Đây chỉ là lớp ánh xạ hiển thị ở frontend.
- */
-const TABLE_NAME_VI = {
-  customers: 'Khách hàng',
-  vehicles: 'Phương tiện',
-  brands: 'Hãng xe',
-  branches: 'Chi nhánh',
-  users: 'Người dùng',
-  user_role: 'Phân quyền người dùng',
-  user_specialty: 'Chuyên môn nhân viên',
-  user_devices: 'Thiết bị đăng nhập',
-  user_notification_settings: 'Cài đặt thông báo',
-  roles: 'Vai trò',
-  role_permissions: 'Phân quyền theo vai trò',
-  role_screen_permissions: 'Quyền màn hình theo vai trò',
-  role_screen_matrix: 'Ma trận quyền màn hình',
-  permission_request: 'Yêu cầu cấp quyền',
-  role_security_mapping: 'Ánh xạ vai trò - bảo mật',
-  permissions: 'Phân quyền chi tiết',
-  service_categories: 'Danh mục dịch vụ',
-  services: 'Dịch vụ',
-  service_packages: 'Gói dịch vụ',
-  service_package_items: 'Hạng mục gói dịch vụ',
-  suppliers: 'Nhà cung cấp',
-  products: 'Phụ tùng / Sản phẩm',
-  inventory_transactions: 'Giao dịch kho',
-  appointments: 'Lịch hẹn',
-  work_orders: 'Phiếu sửa chữa',
-  work_order_items: 'Hạng mục phiếu sửa',
-  repair_orders: 'Lệnh sửa chữa',
-  repair_order_tasks: 'Đầu mục công việc',
-  repair_settlements: 'Phiếu quyết toán',
-  payos_transactions: 'Giao dịch thanh toán PayOS',
-  service_orders: 'Phiếu quyết toán',
-  service_order_items: 'Hạng mục phiếu quyết toán',
-  service_requests: 'Yêu cầu dịch vụ',
-  service_request_appointments: 'Lịch hẹn dịch vụ',
-  vehicle_bays: 'Khoang xe',
-  invoices: 'Hóa đơn',
-  payments: 'Thanh toán',
-  specialties: 'Chuyên môn',
-  warranty_records: 'Lịch sử bảo hành',
-  maintenance_reminders: 'Lịch nhắc bảo dưỡng',
-  vehicle_owners: 'Chủ phương tiện',
-  import_requests: 'Yêu cầu nhập kho',
-  import_request_items: 'Chi tiết nhập kho',
-  export_requests: 'Yêu cầu xuất kho',
-  export_request_items: 'Chi tiết xuất kho',
-  entity_definitions: 'Định nghĩa đối tượng',
-  login_sessions: 'Phiên đăng nhập',
-  login_session_events: 'Sự kiện phiên đăng nhập',
-  audit_logs: 'Nhật ký hệ thống',
-  notifications: 'Thông báo',
-};
+/** Map table_name → tiếng Việt (dùng chung từ auditDisplay) */
+const TABLE_NAME_VI = AUDIT_TABLE_LABELS;
 
 function formatLocal(value) {
   return formatAuditTime(value);
