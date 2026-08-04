@@ -2,6 +2,7 @@ const sql = require('mssql');
 const ImportRequestRepository = require('../../domain/repositories/ImportRequestRepository');
 const ImportRequest = require('../../domain/entities/ImportRequest');
 const ImportRequestItem = require('../../domain/entities/ImportRequestItem');
+const ApiError = require('../../utils/ApiError');
 const { query } = require('../database/sqlServer');
 
 /**
@@ -102,7 +103,7 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
     return result.recordset[0].total;
   }
 
-  async findById(id) {
+  async findById(id, { branchId } = {}) {
     const headerResult = await query(
       `SELECT
          ir.*,
@@ -113,8 +114,9 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
        LEFT JOIN suppliers s ON s.id = ir.supplier_id
        LEFT JOIN users u_req ON u_req.id = ir.requested_by
        LEFT JOIN users u_apv ON u_apv.id = ir.approved_by
-       WHERE ir.id = @id`,
-      { id }
+       WHERE ir.id = @id
+         AND (@branchId IS NULL OR ir.branch_id = @branchId)`,
+      { id, branchId: branchId == null ? null : Number(branchId) }
     );
     const headerRow = headerResult.recordset[0];
     if (!headerRow) return null;
@@ -140,7 +142,7 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
    * Sinh ma phieu: IRB-{branchId}-{YYYYMMDD}-{sequence:4}.
    * Sequence dem so phieu cung branch cung ngay.
    */
-  async getNextRequestCode(branchId, date) {
+  async getNextRequestCode(branchId, date, tx = null) {
     const d = date instanceof Date ? date : new Date();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -148,13 +150,25 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
     const dateKey = `${yyyy}${mm}${dd}`;
     const prefix = `IRB-${branchId}-${dateKey}-`;
 
-    const result = await query(
-      `SELECT TOP 1 request_code
-       FROM import_requests
-       WHERE request_code LIKE @pattern
-       ORDER BY request_code DESC`,
-      { pattern: `${prefix}%` }
-    );
+    let result;
+    if (tx) {
+      result = await tx.request()
+        .input('pattern', sql.VarChar(40), `${prefix}%`)
+        .query(`
+          SELECT TOP 1 request_code
+          FROM import_requests WITH (UPDLOCK, HOLDLOCK)
+          WHERE request_code LIKE @pattern
+          ORDER BY request_code DESC
+        `);
+    } else {
+      result = await query(
+        `SELECT TOP 1 request_code
+         FROM import_requests
+         WHERE request_code LIKE @pattern
+         ORDER BY request_code DESC`,
+        { pattern: `${prefix}%` }
+      );
+    }
     let sequence = 1;
     if (result.recordset[0]) {
       const lastCode = result.recordset[0].request_code;
@@ -212,17 +226,19 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
    * Service phai goi trong runInTransaction().
    * Tra ve request + items (de service sinh transaction_code rieng).
    */
-  async approve(tx, id, approvedBy, importDate) {
+  async approve(tx, id, approvedBy, importDate, { branchId } = {}) {
+    const branchScopeSql = branchId == null ? '' : ' AND branch_id = @branch_id';
     const updateResult = await tx.request()
       .input('id', sql.BigInt, id)
       .input('approved_by', sql.BigInt, approvedBy)
       .input('import_date', sql.Date, importDate ?? new Date())
+      .input('branch_id', sql.BigInt, branchId == null ? null : Number(branchId))
       .query(`
         UPDATE import_requests
         SET status = 'approved',
             approved_by = @approved_by,
             import_date = @import_date
-        WHERE id = @id AND status = 'pending'
+        WHERE id = @id AND status = 'pending'${branchScopeSql}
       `);
     if (updateResult.rowsAffected[0] !== 1) {
       return null;
@@ -241,16 +257,16 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
       `);
     const items = itemsResult.recordset.map((r) => ImportRequestItem.fromPersistence(r));
 
-    const branchId = headerRow.branch_id;
+    const requestBranchId = headerRow.branch_id;
     const dateKey = (importDate ?? new Date()).toISOString().slice(0, 10).replace(/-/g, '');
-    const txPrefix = `IT-${branchId}-${dateKey}-`;
+    const txPrefix = `IT-${requestBranchId}-${dateKey}-`;
 
     // Lay sequence tiep theo de sinh transaction_code.
     const seqRow = (await tx.request()
       .input('pattern', sql.VarChar(40), `${txPrefix}%`)
       .query(`
         SELECT TOP 1 transaction_code
-        FROM inventory_transactions
+        FROM inventory_transactions WITH (UPDLOCK, HOLDLOCK)
         WHERE transaction_code LIKE @pattern
         ORDER BY transaction_code DESC
       `)).recordset[0];
@@ -262,20 +278,27 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
 
     for (let i = 0; i < items.length; i += 1) {
       const item = items[i];
-      await tx.request()
+      if (!Number.isFinite(Number(item.productId)) || Number(item.productId) <= 0) {
+        throw new ApiError(400, `Phieu nhap ${headerRow.request_code} co dong khong hop le`);
+      }
+
+      const stockUpdate = await tx.request()
         .input('product_id', sql.BigInt, item.productId)
-        .input('branch_id', sql.BigInt, branchId)
+        .input('branch_id', sql.BigInt, requestBranchId)
         .input('quantity', sql.Int, item.quantity)
         .query(`
           UPDATE products
           SET stock_quantity = stock_quantity + @quantity
           WHERE id = @product_id AND branch_id = @branch_id
         `);
+      if (stockUpdate.rowsAffected[0] !== 1) {
+        throw new ApiError(409, `Khong tim thay phu tung ${item.productCode} trong chi nhanh ${requestBranchId}`);
+      }
 
       const txCode = `${txPrefix}${String(nextSeq + i).padStart(4, '0')}`;
       await tx.request()
         .input('transaction_code', sql.VarChar(30), txCode)
-        .input('branch_id', sql.BigInt, branchId)
+        .input('branch_id', sql.BigInt, requestBranchId)
         .input('product_id', sql.BigInt, item.productId)
         .input('quantity', sql.Int, item.quantity)
         .input('import_request_id', sql.BigInt, id)
@@ -302,15 +325,17 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
     };
   }
 
-  async reject(tx, id, _rejectedBy, rejectReason) {
+  async reject(tx, id, _rejectedBy, rejectReason, { branchId } = {}) {
+    const branchScopeSql = branchId == null ? '' : ' AND branch_id = @branch_id';
     const result = await tx.request()
       .input('id', sql.BigInt, id)
+      .input('branch_id', sql.BigInt, branchId == null ? null : Number(branchId))
       .input('reject_reason', sql.NVarChar(500), rejectReason)
       .query(`
         UPDATE import_requests
         SET status = 'rejected',
             reject_reason = @reject_reason
-        WHERE id = @id AND status = 'pending'
+        WHERE id = @id AND status = 'pending'${branchScopeSql}
       `);
     return result.rowsAffected[0] === 1;
   }

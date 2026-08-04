@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useInventoryBranch } from './InventoryLayout';
 import { useExportRequestForm } from '../../hooks/inventory/useExportRequestForm';
 import { productApi } from '../../services';
 import { PermissionGate } from '../../components/PermissionGate';
@@ -25,8 +25,7 @@ function buildItemFromRo(roTask) {
 
 export default function ExportRequestFormPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
   const {
     nextCode, codeDate, loadingCode, codeError, refetchCode,
@@ -65,7 +64,7 @@ export default function ExportRequestFormPage() {
     const handle = setTimeout(async () => {
       setSearchingProducts(true);
       try {
-        const res = await productApi.searchProductsApi(term);
+        const res = await productApi.searchProductsApi(term, branchId);
         const list = Array.isArray(res) ? res : (res?.items || []);
         setProductSearchResults(list.slice(0, 20));
       } catch (_) {
@@ -75,7 +74,7 @@ export default function ExportRequestFormPage() {
       }
     }, 300);
     return () => clearTimeout(handle);
-  }, [productSearchTerm]);
+  }, [productSearchTerm, branchId]);
 
   async function handlePickRo(ro) {
     setFormError('');
@@ -189,6 +188,14 @@ export default function ExportRequestFormPage() {
     (sum, it) => sum + (Number(it.quantity) || 0),
     0,
   );
+
+  if (!branchId) {
+    return (
+      <div className="er-form__error">
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để tạo phiếu xuất.')}
+      </div>
+    );
+  }
 
   return (
     <div className="er-form">
