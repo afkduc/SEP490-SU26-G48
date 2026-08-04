@@ -184,11 +184,14 @@ class ManagerService {
     const normalized = {
       search: (filters.search || '').trim(),
       status: filters.status || 'all',
-      categoryId: filters.categoryId || 'all',
+      repairCategory: filters.repairCategory || 'all',
     };
 
     if (normalized.status !== 'all' && !VALID_STATUSES.includes(normalized.status)) {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+    if (normalized.repairCategory !== 'all' && !REPAIR_CATEGORY_VALUES.includes(normalized.repairCategory)) {
+      throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
     }
 
     return this.managerRepository.listServices(branchId, normalized);
@@ -236,10 +239,10 @@ class ManagerService {
   }
 
   async _validateServicePayload(payload) {
-    const { serviceName, categoryId, unitPrice, durationMin } = payload;
+    const { serviceName, unitPrice, durationMin } = payload;
 
-    if (!serviceName || !categoryId || unitPrice === undefined || unitPrice === null || unitPrice === '') {
-      throw new ApiError(400, 'Tên dịch vụ, danh mục và đơn giá là bắt buộc');
+    if (!serviceName || unitPrice === undefined || unitPrice === null || unitPrice === '') {
+      throw new ApiError(400, 'Tên dịch vụ và đơn giá là bắt buộc');
     }
 
     const price = Number(unitPrice);
@@ -259,11 +262,6 @@ class ManagerService {
       throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
     }
 
-    const categories = await this.managerRepository.listServiceCategories();
-    if (!categories.some((c) => Number(c.id) === Number(categoryId))) {
-      throw new ApiError(400, 'Danh mục không hợp lệ');
-    }
-
     return { price, duration };
   }
 
@@ -278,7 +276,7 @@ class ManagerService {
       branchId,
       serviceCode,
       serviceName: payload.serviceName.trim(),
-      categoryId: Number(payload.categoryId),
+      categoryId: payload.categoryId ? Number(payload.categoryId) : null,
       unitPrice: price,
       durationMin: duration,
       description: (payload.description || '').trim() || null,
@@ -300,7 +298,7 @@ class ManagerService {
 
     const updated = await this.managerRepository.updateService(branchId, id, {
       serviceName: payload.serviceName.trim(),
-      categoryId: Number(payload.categoryId),
+      categoryId: payload.categoryId ? Number(payload.categoryId) : null,
       unitPrice: price,
       durationMin: duration,
       description: (payload.description || '').trim() || null,
@@ -323,10 +321,14 @@ class ManagerService {
     const normalized = {
       search: (filters.search || '').trim(),
       status: filters.status || 'all',
+      repairCategory: filters.repairCategory || 'all',
     };
 
     if (normalized.status !== 'all' && !VALID_STATUSES.includes(normalized.status)) {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+    if (normalized.repairCategory !== 'all' && !REPAIR_CATEGORY_VALUES.includes(normalized.repairCategory)) {
+      throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
     }
 
     return this.managerRepository.listServicePackages(branchId, normalized);
@@ -342,10 +344,10 @@ class ManagerService {
   }
 
   async _validateServicePackagePayload(branchId, payload, { requireServiceIds }) {
-    const { packageName, categoryId, totalPrice, serviceIds } = payload;
+    const { packageName, totalPrice, serviceIds } = payload;
 
-    if (!packageName || !categoryId || totalPrice === undefined || totalPrice === null || totalPrice === '') {
-      throw new ApiError(400, 'Tên gói, danh mục và giá gói là bắt buộc');
+    if (!packageName || totalPrice === undefined || totalPrice === null || totalPrice === '') {
+      throw new ApiError(400, 'Tên gói và giá gói là bắt buộc');
     }
 
     const price = Number(totalPrice);
@@ -355,11 +357,6 @@ class ManagerService {
 
     if (payload.repairCategory && !REPAIR_CATEGORY_VALUES.includes(payload.repairCategory)) {
       throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
-    }
-
-    const categories = await this.managerRepository.listServiceCategories();
-    if (!categories.some((c) => Number(c.id) === Number(categoryId))) {
-      throw new ApiError(400, 'Danh mục không hợp lệ');
     }
 
     let normalizedServiceIds;
@@ -390,7 +387,7 @@ class ManagerService {
       branchId,
       packageCode,
       packageName: payload.packageName.trim(),
-      categoryId: Number(payload.categoryId),
+      categoryId: payload.categoryId ? Number(payload.categoryId) : null,
       totalPrice: price,
       description: (payload.description || '').trim() || null,
       purpose: (payload.purpose || '').trim() || null,
@@ -412,7 +409,7 @@ class ManagerService {
 
     return this.managerRepository.updateServicePackage(branchId, id, {
       packageName: payload.packageName.trim(),
-      categoryId: Number(payload.categoryId),
+      categoryId: payload.categoryId ? Number(payload.categoryId) : null,
       totalPrice: price,
       description: (payload.description || '').trim() || null,
       purpose: (payload.purpose || '').trim() || null,
