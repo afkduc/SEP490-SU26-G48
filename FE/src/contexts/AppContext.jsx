@@ -9,7 +9,7 @@ import { useHeartbeat } from '../hooks/useHeartbeat';
 import { usePermissionEventsSSE } from '../hooks/admin/usePermissionEventsSSE';
 import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../components/common/ToastContext';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, BASE_PATH } from '../config';
 import LoginChallengeModal from '../components/LoginChallengeModal';
 import {
   resetSessionExpiredFlag,
@@ -423,7 +423,7 @@ export function AppProvider({ children }) {
     // strict mode double-effect, navigate bi block) khong clear duoc state
     // -> user van thay trang admin. Reload toan trang la cach an toan nhat.
     if (typeof window !== 'undefined' && window.location) {
-      window.location.assign('/login');
+      window.location.assign(`${BASE_PATH}/login`);
     }
   }, []);
 

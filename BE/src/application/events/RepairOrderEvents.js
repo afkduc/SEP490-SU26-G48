@@ -18,6 +18,11 @@
  *   - 'bay-occupied'/'bay-released' : 1 khoang xe vua co/mat tablet dang chiem -
  *                           xem VehicleBayService, dung cho man CVDV "Khoang xe
  *                           dang hoat dong".
+ *   - 'order-cancelled'   : CVDV huy phieu (tu waiting_repair hoac inprogress) -
+ *                           xem RepairSettlementService.updateStatus.
+ *   - 'gate-exit-confirmed' : Bao ve xac nhan xe da ra cong (man hinh cong,
+ *                           public khong dang nhap) - xem publicRoutes.js
+ *                           /public/gate/*, sseRoutes.js /sse/gate.
  */
 
 const { EventEmitter } = require('events');

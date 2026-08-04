@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
+  // He thong quan ly noi bo dat duoi "/crm" tren domain that khi BUILD
+  // production (Landing chiem goc domain, xem docker-compose.yml +
+  // FE/nginx.conf) - phai khop voi BrowserRouter basename (main.jsx, xem
+  // BASE_PATH trong src/config/index.js) va location /crm trong nginx.conf.
+  // Giu nguyen "/" luc "npm run dev" de khong doi thoi quen chay local hien tai.
+  base: command === 'build' ? '/crm/' : '/',
   server: {
     port: 3000,
     // HMR SU DUNG PORT rieng (khong di qua proxy) de tranh 431 Request Header
@@ -44,4 +50,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

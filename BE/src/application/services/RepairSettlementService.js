@@ -174,6 +174,28 @@ class RepairSettlementService {
     return RepairSettlementResponseDto.fromEntity(entity);
   }
 
+  // ─── Man hinh bao ve tai cong (public, khong dang nhap) ───────────
+  // Thay the "In phieu xe ra" giay - xe da xuat hoa don (status='invoiced')
+  // ma chua xac nhan ra cong (delivery_date con NULL) thi hien o day cho
+  // bao ve doi chieu roi bam xac nhan.
+  async getGatePending(branchId) {
+    const rows = await this.repairSettlementRepository.findGatePending(branchId);
+    return rows.map((r) => ({
+      id: r.id,
+      code: r.order_code,
+      customerName: r.customer_full_name,
+      vehiclePlate: r.vehicle_license_plate,
+      vehicleModel: r.vehicle_model_text,
+    }));
+  }
+
+  async confirmGateExit(id, branchId) {
+    const ok = await this.repairSettlementRepository.confirmGateExit(id, branchId);
+    if (!ok) throw new ApiError(409, 'Phiếu không tồn tại, không thuộc chi nhánh này, hoặc đã được xác nhận ra cổng trước đó');
+    emitRepairOrderEvent(branchId, 'gate-exit-confirmed', { settlementId: Number(id) });
+    return { id: Number(id) };
+  }
+
   // ─── PayOS ───────────────────────────────────────────────────────
   // Tao link/QR dong cho phieu dang cho thanh toan - goi tu dong ngay khi
   // CVDV mo modal "In phieu va xuat hoa don" (xem SettlementPreviewModal o

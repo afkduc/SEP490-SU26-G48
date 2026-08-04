@@ -1,4 +1,6 @@
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, BASE_PATH } from '../config';
+
+const LOGIN_PATH = `${BASE_PATH}/login`;
 
 export const SESSION_EXPIRED_KEY = 'SESSION_EXPIRED';
 export const FORBIDDEN_KEY = 'FORBIDDEN_DENIED';
@@ -107,7 +109,7 @@ export function cancelAllPendingRequests() {
 
 export function showSessionExpired(detail = {}) {
   // Bo qua neu user da o trang login (modal khong can hien).
-  if (typeof window !== 'undefined' && window.location.pathname === '/login') {
+  if (typeof window !== 'undefined' && window.location.pathname === LOGIN_PATH) {
     return;
   }
   // Bo qua neu modal da duoc dispatch trong vong 1 phut (tranh spam tu nhieu
