@@ -113,6 +113,7 @@ class ExportRequestController {
         data: req.body,
       });
       await this.notificationService.notifyAdmins('EXPORT_REQUEST_CREATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: created?.request_code || created?.code || `ID-${created?.id}`,
         targetCode: created?.request_code || created?.code || '',

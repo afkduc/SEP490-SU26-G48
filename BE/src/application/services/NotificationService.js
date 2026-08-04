@@ -599,6 +599,7 @@ class NotificationService {
     if (data.severity) metadata.alertSeverity = data.severity;
     if (data.newTokenVersion != null) metadata.newTokenVersion = data.newTokenVersion;
     if (data.newSessionId != null) metadata.newSessionId = data.newSessionId;
+    if (data.auditLogId != null) metadata.auditLogId = data.auditLogId;
 
     // Ẩn bản cũ cùng loại (vd. đăng nhập thay phiên) — chỉ giữ bản sắp tạo
     const SUPERSEDE_TYPES = new Set([

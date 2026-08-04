@@ -37,6 +37,7 @@ class UserController {
         data: req.body,
       });
       await this.notificationService.notifyAdmins('USER_CREATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Quản lý',
         targetName: user?.full_name || user?.userName || '',
         targetCode: user?.user_code || '',
@@ -59,6 +60,7 @@ class UserController {
         newData: req.body,
       });
       await this.notificationService.notifyAdmins('USER_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Quản lý',
         targetName: user?.full_name || user?.userName || `ID-${req.params.id}`,
         targetCode: user?.user_code || '',
