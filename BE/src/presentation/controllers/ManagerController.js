@@ -168,7 +168,7 @@ class ManagerController {
       const data = await this.managerService.listServices(req.user.branchId, {
         search: req.query.search || req.query.q || '',
         status: req.query.status || 'all',
-        categoryId: req.query.categoryId || 'all',
+        repairCategory: req.query.repairCategory || 'all',
       });
       return success(res, data, 'Lấy danh sách dịch vụ thành công');
     } catch (err) {
@@ -224,6 +224,7 @@ class ManagerController {
       const data = await this.managerService.listServicePackages(req.user.branchId, {
         search: req.query.search || req.query.q || '',
         status: req.query.status || 'all',
+        repairCategory: req.query.repairCategory || 'all',
       });
       return success(res, data, 'Lấy danh sách gói dịch vụ thành công');
     } catch (err) {
