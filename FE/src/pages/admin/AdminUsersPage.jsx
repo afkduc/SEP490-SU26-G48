@@ -247,7 +247,7 @@ export default function AdminUsersPage() {
   const currentPage = data.page || 1;
 
   return (
-    <div className="admin-page">
+    <div className="admin-page admin-users">
       {/* Header */}
       <div className="admin-page__header">
         <div className="admin-page__title-block">
