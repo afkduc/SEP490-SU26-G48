@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SESSION_EXPIRED_KEY, SESSION_LOGGED_OUT_EVENT } from '../services/httpClient';
 import { useAuth } from '../contexts/AppContext';
+import { BASE_PATH } from '../config';
+
+const LOGIN_PATH = `${BASE_PATH}/login`;
 
 // Module-level flag da chong spam DUNG ROI giua cac instance StrictMode/HMR.
 let modalShownAt = 0;
@@ -15,7 +18,7 @@ export default function SessionExpiredModal() {
 
   useEffect(() => {
     const handler = (event) => {
-      if (window.location.pathname === '/login') return;
+      if (window.location.pathname === LOGIN_PATH) return;
       const now = Date.now();
       if (now - modalShownAt < MIN_REDISPLAY_INTERVAL_MS) {
         return;
@@ -55,8 +58,8 @@ export default function SessionExpiredModal() {
       sessionStorage.removeItem('permissions');
       window.dispatchEvent(new CustomEvent(SESSION_LOGGED_OUT_EVENT));
       navigate('/login', { replace: true });
-      if (window.location.pathname !== '/login') {
-        window.location.replace('/login');
+      if (window.location.pathname !== LOGIN_PATH) {
+        window.location.replace(LOGIN_PATH);
       }
     }
   }

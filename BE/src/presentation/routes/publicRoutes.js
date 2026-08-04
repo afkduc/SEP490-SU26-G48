@@ -46,6 +46,20 @@ const serviceRequestRateLimiter = rateLimit({
   },
 });
 
+// Man hinh bao ve tai cong - 1 thiet bi co dinh, poll/xac nhan lien tuc ca
+// ngay nen can han muc rong hon lookup thong thuong.
+const gateRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút.',
+    errors: null,
+  },
+});
+
 function buildPublicRouter() {
   const router = express.Router();
   const controller = makeRepairOrderController();
@@ -59,6 +73,8 @@ function buildPublicRouter() {
   router.get('/service-packages', serviceRequestController.getPublicServicePackages);
   router.get('/service-packages/:code', serviceRequestController.getPublicServicePackageByCode);
   router.post('/service-requests', serviceRequestRateLimiter, serviceRequestController.createPublic);
+  router.get('/gate/pending', gateRateLimiter, repairSettlementController.getGatePending);
+  router.post('/gate/:id/confirm-exit', gateRateLimiter, repairSettlementController.confirmGateExit);
 
   return router;
 }

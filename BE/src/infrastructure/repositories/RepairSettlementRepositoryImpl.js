@@ -431,6 +431,37 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return this.findById(id);
   }
 
+  // Man hinh bao ve tai cong (public, khong dang nhap) - xe da xuat hoa don
+  // nhung chua duoc xac nhan ra cong (delivery_date con NULL). Chi lay du
+  // thong tin de doi chieu xe/khach, khong lo so dien thoai/tong tien.
+  async findGatePending(branchId) {
+    const result = await query(
+      `SELECT so.id, so.order_code,
+              c.full_name AS customer_full_name,
+              v.license_plate AS vehicle_license_plate, v.vehicle_model_text
+       FROM   service_orders so
+       JOIN   customers c ON c.id = so.customer_id
+       JOIN   vehicles  v ON v.id = so.vehicle_id
+       WHERE  so.branch_id = @branchId AND so.status = 'invoiced' AND so.delivery_date IS NULL
+       ORDER  BY so.id DESC`,
+      { branchId }
+    );
+    return result.recordset;
+  }
+
+  // Bao ve bam xac nhan xe da ra cong - set delivery_date, dieu kien du
+  // status='invoiced' VA branch khop (chan sua phieu chi nhanh khac) VA
+  // chua xac nhan lan nao (tranh bam 2 lan/2 man hinh cung luc).
+  async confirmGateExit(id, branchId) {
+    const result = await query(
+      `UPDATE service_orders
+       SET    delivery_date = CAST(GETDATE() AS DATE)
+       WHERE  id = @id AND branch_id = @branchId AND status = 'invoiced' AND delivery_date IS NULL`,
+      { id, branchId }
+    );
+    return result.rowsAffected[0] > 0;
+  }
+
   async _insertItems(tx, serviceOrderId, items) {
     for (const item of items) {
       await tx
