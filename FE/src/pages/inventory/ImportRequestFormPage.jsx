@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useInventoryBranch } from './InventoryLayout';
 import { useImportRequestForm } from '../../hooks/inventory/useImportRequestForm';
 import { getSuppliersApi } from '../../services/supplierApi';
 import { PermissionGate } from '../../components/PermissionGate';
@@ -29,8 +29,7 @@ function todayIso() {
 
 export default function ImportRequestFormPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
   const {
     nextCode, codeDate, loadingCode, codeError, refetchCode,
@@ -82,7 +81,7 @@ export default function ImportRequestFormPage() {
     ));
     debounceTimers[rowKey] = setTimeout(async () => {
       try {
-        const res = await searchProductsApi(term.trim());
+        const res = await searchProductsApi(term.trim(), branchId);
         setItems((prev) => prev.map((it) =>
           it.rowKey === rowKey
             ? { ...it, searchResults: res || [], searching: false }
@@ -94,7 +93,7 @@ export default function ImportRequestFormPage() {
         ));
       }
     }, 300);
-  }, []);
+  }, [branchId]);
 
   function updateItem(rowKey, patch) {
     setItems((prev) => prev.map((it) => (it.rowKey === rowKey ? { ...it, ...patch } : it)));
@@ -182,14 +181,22 @@ export default function ImportRequestFormPage() {
     0,
   );
 
+  if (!branchId) {
+    return (
+      <div className="ir-form__error">
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để tạo phiếu nhập.')}
+      </div>
+    );
+  }
+
   return (
     <div className="ir-form">
       <div className="ir-form__header">
         <div>
           <h1 className="ir-form__title">Tạo phiếu nhập kho</h1>
           <p className="ir-form__subtitle">
-            Mã phiếu sẽ được sinh tự động khi lưu. Phiếu lưu ở trạng thái
-            &quot;Chờ duyệt&quot; và cần Manager duyệt để cộng tồn kho.
+            Mã phiếu sẽ được sinh tự động khi lưu. Phiếu nhập mới sẽ được cập nhật tồn kho ngay sau khi tạo,
+            không cần chờ quản lý chi nhánh duyệt.
           </p>
         </div>
         <Link to="/inventory/import-requests" className="btn btn--ghost">
