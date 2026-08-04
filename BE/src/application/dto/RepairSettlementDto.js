@@ -88,6 +88,7 @@ class PublicVehicleHistoryDto {
       intakeDate: toDDMMYYYY(row.intake_date),
       completedDate: row.completed_date ? toDDMMYYYY(row.completed_date) : null,
       branchName: row.branch_name,
+      maintenanceItems: row.pm_items,
     };
   }
 

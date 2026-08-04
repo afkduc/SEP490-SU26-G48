@@ -1018,10 +1018,6 @@ function RepairSettlementList() {
     setView(await fetchFullOrder(o));
   };
 
-  const handlePrintWorkList = async (o) => {
-    printWorkList(await fetchFullOrder(o));
-  };
-
   const handlePreview = async (o) => {
     setPreviewOrder(await fetchFullOrder(o));
   };
@@ -1141,12 +1137,9 @@ function RepairSettlementList() {
                         <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'settlement', id: o.id, code: o.code })}>Hủy</button>
                       )}
 
-                      {o.status === 'inprogress' && (<>
-                        <button className="btn btn-sm" style={{ fontSize: 11, background: '#00897B', color: '#fff' }} onClick={() => handlePrintWorkList(o)}>In danh sách CV</button>
-                        {o.repairOrderId && (
-                          <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'repair_order', id: o.id, code: o.code })}>Hủy</button>
-                        )}
-                      </>)}
+                      {o.status === 'inprogress' && o.repairOrderId && (
+                        <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'repair_order', id: o.id, code: o.code })}>Hủy</button>
+                      )}
 
                       {o.status === 'waiting_payment' && (
                         <button className="btn btn-primary btn-sm" style={{ fontSize: 11, background: '#2E7D32', borderColor: '#2E7D32' }}

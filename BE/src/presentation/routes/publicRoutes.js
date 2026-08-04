@@ -1,9 +1,11 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { makeRepairOrderService, makeServiceRequestService, makeRepairSettlementService } = require('../../application/services');
+const VehicleBayRepositoryImpl = require('../../infrastructure/repositories/VehicleBayRepositoryImpl');
 const RepairOrderController = require('../controllers/RepairOrderController');
 const ServiceRequestController = require('../controllers/ServiceRequestController');
 const RepairSettlementController = require('../controllers/RepairSettlementController');
+const PublicBayBoardController = require('../controllers/PublicBayBoardController');
 
 function makeRepairOrderController() {
   return new RepairOrderController({ repairOrderService: makeRepairOrderService() });
@@ -15,6 +17,13 @@ function makeServiceRequestController() {
 
 function makeRepairSettlementController() {
   return new RepairSettlementController({ repairSettlementService: makeRepairSettlementService() });
+}
+
+function makeBayBoardController() {
+  return new PublicBayBoardController({
+    vehicleBayRepository: new VehicleBayRepositoryImpl(),
+    repairOrderService: makeRepairOrderService(),
+  });
 }
 
 // Endpoint nay khong yeu cau dang nhap (khach vang lai tra cuu tu landing
@@ -46,8 +55,10 @@ const serviceRequestRateLimiter = rateLimit({
   },
 });
 
-// Man hinh bao ve tai cong - 1 thiet bi co dinh, poll/xac nhan lien tuc ca
-// ngay nen can han muc rong hon lookup thong thuong.
+// Man hinh bao ve tai cong / khoang xe - 1 thiet bi co dinh, poll/xac nhan
+// lien tuc ca ngay nen can han muc rong hon lookup thong thuong. Dung chung
+// cho ca 2 man (khong lien quan gi nhau ve nghiep vu, chi giong nhau ve
+// "thiet bi co dinh, khong dang nhap").
 const gateRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 60,
@@ -65,6 +76,7 @@ function buildPublicRouter() {
   const controller = makeRepairOrderController();
   const serviceRequestController = makeServiceRequestController();
   const repairSettlementController = makeRepairSettlementController();
+  const bayBoardController = makeBayBoardController();
 
   router.get('/lookup/:code', lookupRateLimiter, controller.lookupPublicProgress);
   router.get('/vehicle-history/:identifier', lookupRateLimiter, repairSettlementController.lookupPublicHistory);
@@ -75,6 +87,15 @@ function buildPublicRouter() {
   router.post('/service-requests', serviceRequestRateLimiter, serviceRequestController.createPublic);
   router.get('/gate/pending', gateRateLimiter, repairSettlementController.getGatePending);
   router.post('/gate/:id/confirm-exit', gateRateLimiter, repairSettlementController.confirmGateExit);
+
+  // Man khoang xe cong khai (khong dang nhap) - "/khoang/<chi nhanh>/<so
+  // khoang>" tren Landing, xem PublicBayBoardController.js. Chi con "lam
+  // viec tai khoang" (xem/tick/hoan thanh) - "nhan viec" va "lich su" da
+  // chuyen ve tai khoan cua chinh to truong (xem repairOrderRoutes.js, authenticated).
+  router.get('/bays', gateRateLimiter, bayBoardController.listBays);
+  router.get('/bays/:bayId/active-order', gateRateLimiter, bayBoardController.getActiveOrder);
+  router.patch('/repair-orders/:id/tasks/:taskId', gateRateLimiter, bayBoardController.updateTaskStatus);
+  router.patch('/repair-orders/:id/status', gateRateLimiter, bayBoardController.updateStatus);
 
   return router;
 }

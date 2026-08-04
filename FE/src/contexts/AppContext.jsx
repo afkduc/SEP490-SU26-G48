@@ -134,7 +134,7 @@ export function getRoleHome(user) {
   if (role === ROLES.ADMIN) return '/admin/dashboard';
   if (role === ROLES.GENERAL_DIRECTOR) return '/general-director';
   if (role === ROLES.MANAGER) return '/manager';
-  if (role === ROLES.SERVICE_ADVISOR) return '/dashboard';
+  if (role === ROLES.SERVICE_ADVISOR) return '/repair-settlement';
   if (role === ROLES.TEAM_LEADER) return '/repair-orders';
   if (role === ROLES.TECHNICIAN) return '/repair-orders';
   if (role === ROLES.WAREHOUSE_STAFF) return '/inventory';
@@ -390,7 +390,12 @@ export function AppProvider({ children }) {
       if (tokenNow) {
         // fetch keepalive KHÔNG await - fire-and-forget. Browser sẽ đảm bảo
         // request được gửi dù page reload/navigate ngay sau đó.
-        fetch(`${API_BASE_URL}/api/auth/logout`, {
+        // API_BASE_URL da bao gom san "/api" (vd https://api.autogara.site/api) -
+        // KHONG duoc them "/api" nua o day, keo bi lap thanh "/api/api/..." va
+        // 404 am tham (fetch keepalive nay khong await nen loi bi nuot mat,
+        // hau qua la BE khong bao gio nhan duoc logout, login_sessions o lai
+        // "active" mai - dung trieu chung ma comment o tren mo ta tung sua).
+        fetch(`${API_BASE_URL}/auth/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
