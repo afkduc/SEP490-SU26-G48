@@ -10,7 +10,11 @@ import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
+import { BASE_PATH } from '../config';
 import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
+
+const LOGIN_PATH = `${BASE_PATH}/login`;
+const UNAUTHORIZED_PATH = `${BASE_PATH}/unauthorized`;
 import { SharedDataProvider } from '../contexts/SharedDataContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
 import { useAuth } from '../contexts/AppContext';
@@ -83,7 +87,7 @@ function ErrorHandler() {
     if (!globalError) return;
 
     const handlePopState = () => {
-      if (window.location.pathname !== '/unauthorized') {
+      if (window.location.pathname !== UNAUTHORIZED_PATH) {
         clearError();
       }
     };
@@ -100,7 +104,7 @@ function ErrorHandler() {
   // render binh thuong.
   useEffect(() => {
     if (!globalError) return;
-    if (window.location.pathname === '/login') {
+    if (window.location.pathname === LOGIN_PATH) {
       clearError();
     }
   }, [globalError, clearError]);

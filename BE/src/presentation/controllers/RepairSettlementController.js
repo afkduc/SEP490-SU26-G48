@@ -1,6 +1,7 @@
 const { success } = require('../../utils/response');
 const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
+const ApiError = require('../../utils/ApiError');
 
 class RepairSettlementController {
   constructor({ repairSettlementService }) {
@@ -40,6 +41,29 @@ class RepairSettlementController {
     try {
       const result = await this.repairSettlementService.getPublicHistoryByPlateOrFrame(req.params.identifier);
       return success(res, result, 'Vehicle history retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Public (khong dang nhap) - man hinh bao ve tai cong, xem publicRoutes.js.
+  getGatePending = async (req, res, next) => {
+    try {
+      const branchId = Number(req.query.branchId);
+      if (!branchId) throw new ApiError(400, 'Thiếu chi nhánh');
+      const result = await this.repairSettlementService.getGatePending(branchId);
+      return success(res, result, 'Gate pending list retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  confirmGateExit = async (req, res, next) => {
+    try {
+      const branchId = Number(req.body.branchId);
+      if (!branchId) throw new ApiError(400, 'Thiếu chi nhánh');
+      const result = await this.repairSettlementService.confirmGateExit(req.params.id, branchId);
+      return success(res, result, 'Gate exit confirmed');
     } catch (err) {
       next(err);
     }
