@@ -4,14 +4,20 @@
  * chi nhanh moi can biet cac thay doi nay.
  *
  * Event types:
- *   - 'assigned'         : CVDV vua tao lenh sua chua, gan cho 1 to truong
- *                           (payload co teamLeaderId de FE loc dung nguoi)
+ *   - 'new-pending'       : co phieu quyet toan moi o trang thai waiting_repair
+ *                           (vua tao, hoac lenh sua chua bi huy giua chung) -
+ *                           bang tin cac khoang xe tu them dong moi.
+ *   - 'claimed'           : 1 khoang xe vua nhan 1 phieu (payload co bayId de
+ *                           cac khoang khac biet phieu nay het con, tu go dong).
  *   - 'task-updated'      : to truong vua tich hoan thanh 1 dau muc cong viec
  *   - 'order-completed'   : to truong vua hoan thanh toan bo lenh sua chua
  *                           (phieu quyet toan goc chuyen sang "Cho thanh toan")
  *   - 'invoiced'          : PayOS webhook bao da nhan tien -> phieu tu dong
  *                           chuyen sang "Da xuat hoa don" (RepairSettlementService
  *                           .handlePayosWebhook), khong can CVDV bam xac nhan.
+ *   - 'bay-occupied'/'bay-released' : 1 khoang xe vua co/mat tablet dang chiem -
+ *                           xem VehicleBayService, dung cho man CVDV "Khoang xe
+ *                           dang hoat dong".
  */
 
 const { EventEmitter } = require('events');
