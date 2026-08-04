@@ -431,102 +431,6 @@ function printSettlement(order, payosQrCode) {
   w.onload = () => w.print();
 }
 
-// ─── In phiếu xe ra ("Giấy xe khách ra cổng") ─────────────────────────
-// Mau in khi giao xe lai cho khach o phieu DA XUAT HOA DON - thay cho nut
-// "Xem/In lại" (von chi mo lai phieu quyet toan, khong lien quan den buoc
-// giao xe). Bo cuc tham khao mau giay ra cong thuc te cua dai ly xe hoi, dung
-// logo/ten AutoGara thay logo hang xe, va "Cố vấn dịch vụ" thay "Tư vấn dịch
-// vụ" cho dung thuat ngu he thong nay dang dung.
-function printVehicleOutSlip(order) {
-  const today = new Date();
-  const todayStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-
-  const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
-<title>Giấy xe ra cổng ${order.code}</title>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 12px; margin: 10mm 15mm; color:#000; }
-  .center { text-align:center; } .bold { font-weight:bold; }
-  .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:8px; margin-bottom:10px; }
-  .header-left { display:flex; gap:10px; align-items:center; }
-  .header-left img { width:52px; height:52px; object-fit:contain; }
-  .header-left .company { font-size:11px; line-height:1.5; }
-  .header-right { text-align:right; font-size:11px; line-height:1.8; }
-  .title { font-size:18px; font-weight:800; letter-spacing:1px; margin:10px 0 2px; }
-  .subtitle { font-size:12px; color:#333; margin-bottom:14px; }
-  .field-row { display:flex; gap:30px; margin-bottom:14px; font-size:13px; }
-  .field-row span.lbl { font-weight:bold; }
-  .field-row span.val { border-bottom:1px solid #000; padding:0 6px; min-width:160px; display:inline-block; }
-  .checklist { border:1px solid #333; border-radius:4px; padding:12px 16px; margin-bottom:14px; }
-  .checklist-row { display:flex; align-items:center; gap:8px; padding:4px 0; font-size:12.5px; }
-  .checkbox { width:14px; height:14px; border:1.5px solid #000; flex-shrink:0; display:inline-block; }
-  .total-row { display:flex; justify-content:space-between; align-items:center; border:1px solid #333; border-radius:4px; padding:10px 16px; margin-bottom:16px; font-size:14px; }
-  .total-row b { color:#C62828; font-size:16px; }
-  .confirm-note { font-size:11.5px; font-style:italic; border-top:1px solid #ccc; padding-top:6px; margin-bottom:26px; }
-  .sign-row { display:flex; justify-content:space-between; }
-  .sign-box { text-align:center; width:19%; }
-  .sign-line { margin-top:44px; border-top:1px solid #000; padding-top:3px; font-size:10px; }
-  @media print { body { margin:8mm 12mm; } }
-</style></head><body>
-
-<div class="header">
-  <div class="header-left">
-    <img src="/AutoGaraLogo-Photoroom.png" alt="AutoGara" />
-    <div class="company">
-      <b>CÔNG TY TNHH AUTOGARA</b><br>
-      Chi nhánh: ${order.branch || MOCK_BRANCH}<br>
-      Cố vấn dịch vụ: ${order.advisor || ''}
-    </div>
-  </div>
-  <div class="header-right">
-    <div><b>RO:</b> ${order.code}</div>
-    <div><b>Ngày vào xưởng:</b> ${order.date || ''}</div>
-    <div><b>Ngày xe ra:</b> ${order.paidDate || todayStr}</div>
-  </div>
-</div>
-
-<div class="center title">GIẤY XE KHÁCH RA CỔNG</div>
-<div class="center subtitle">Bộ phận dịch vụ sau bán hàng</div>
-
-<div class="field-row">
-  <div><span class="lbl">Biển số xe:</span> <span class="val">${order.vehicle?.licensePlate || ''}</span></div>
-  <div><span class="lbl">Loại xe:</span> <span class="val">${order.vehicle?.vehicleModel || ''}</span></div>
-</div>
-
-<div class="checklist">
-  <div class="checklist-row"><span class="checkbox"></span>(1) Kiểm tra sửa chữa miễn phí</div>
-  <div class="checklist-row"><span class="checkbox"></span>(2) Sửa chữa bảo hành</div>
-  <div class="checklist-row"><span class="checkbox"></span>(3) Bán lẻ phụ tùng</div>
-  <div class="checklist-row"><span class="checkbox"></span>(4) Tạm xuất xưởng, vận tải</div>
-  <div class="checklist-row"><span class="checkbox"></span>(5) Giao xe Showroom, vận tải</div>
-  <div class="checklist-row"><span class="checkbox"></span>(6) Khách hàng thanh toán</div>
-  <div class="checklist-row"><span class="checkbox"></span>(7) Bảo hiểm thanh toán</div>
-  <div class="checklist-row"><span class="checkbox"></span>(8) Mục đích khác, ghi rõ lý do: …………………………………………</div>
-</div>
-
-<div class="total-row">
-  <span>Tổng giá trị thanh toán:</span>
-  <b>${(order.total || 0).toLocaleString('vi-VN')} VNĐ</b>
-</div>
-
-<div class="confirm-note">
-  Xe đã hoàn tất thủ tục và được giao lại đúng cho khách hàng hoặc đại diện khách hàng.<br>
-  Ghi chú: .....................................................................................................................
-</div>
-
-<div class="sign-row">
-  <div class="sign-box"><div class="bold">Khách hàng</div><div class="sign-line">${order.customer?.fullName || ''}</div></div>
-  <div class="sign-box"><div class="bold">Cố vấn dịch vụ</div><div class="sign-line">${order.advisor || ''}</div></div>
-  <div class="sign-box"><div class="bold">Kế toán</div><div class="sign-line"></div></div>
-  <div class="sign-box"><div class="bold">GĐ/TP Dịch vụ</div><div class="sign-line"></div></div>
-  <div class="sign-box"><div class="bold">Bảo vệ</div><div class="sign-line"></div></div>
-</div>
-</body></html>`;
-  const w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  w.onload = () => w.print();
-}
-
 // ─── Modal xem trước & xuất phiếu quyết toán ────────────────────────
 function SettlementPreviewModal({ order, onClose }) {
   // Chi con dung de doi chu nut in ("In phieu" vs "In lai phieu") - khong con
@@ -1005,7 +909,6 @@ function RepairSettlementList() {
   const [previewOrder, setPreviewOrder] = useState(null);
   const [page, setPage] = useState(1);
   const [cancelTarget, setCancelTarget] = useState(null);
-  const [completedPopupOrder, setCompletedPopupOrder] = useState(null);
   const PAGE_SIZE = 10;
 
   // silent=true dung cho auto-refresh nen (poll/focus lai tab) - khong bat
@@ -1045,9 +948,8 @@ function RepairSettlementList() {
   //   - 'task-updated': nap lai dung phieu dang xem de tien do hien thi ngay.
   //   - 'order-completed': phieu goc da tu chuyen "Cho thanh toan" (xem
   //     RepairOrderRepositoryImpl.updateStatus) -> nap lai danh sach; neu
-  //     dang mo dung modal chi tiet phieu do thi hien popup thong bao, doi
-  //     CVDV bam X moi chuyen sang tab "Cho thanh toan" (khong tu dong nhay
-  //     ngang khi ho dang doc do).
+  //     dang mo dung modal chi tiet phieu do thi tu dong dong modal va nhay
+  //     thang sang tab "Cho thanh toan" luon, khong can popup xac nhan rieng.
   //   - 'invoiced': PayOS webhook bao da nhan tien -> phieu tu dong xuat hoa
   //     don (RepairSettlementService.handlePayosWebhook) - nap lai danh sach;
   //     neu dang mo dung modal xem/in phieu nay thi dong modal va nhay thang
@@ -1059,7 +961,8 @@ function RepairSettlementList() {
     if (event.type === 'order-completed') {
       loadAll({ silent: true });
       if (view && String(view.id) === String(event.settlementId)) {
-        setCompletedPopupOrder(view);
+        setView(null);
+        setTab('waiting_payment');
       }
     }
     if (event.type === 'invoiced') {
@@ -1075,12 +978,6 @@ function RepairSettlementList() {
     }
   };
   useRepairOrderEventsSSE(handleRepairOrderEvent, true);
-
-  const handleCloseCompletedPopup = () => {
-    setCompletedPopupOrder(null);
-    setView(null);
-    setTab('waiting_payment');
-  };
 
   const counts = {
     waiting_repair: orders.filter((o) => o.status === 'waiting_repair').length,
@@ -1127,13 +1024,6 @@ function RepairSettlementList() {
 
   const handlePreview = async (o) => {
     setPreviewOrder(await fetchFullOrder(o));
-  };
-
-  // Phieu xe ra chi can thong tin dau phieu (khach hang, xe, ngay, tong tien)
-  // - da co san ngay trong dong tom tat cua danh sach, khong can goi lai
-  // fetchFullOrder (von chi de bo sung "items" day du).
-  const handlePrintVehicleOut = (o) => {
-    printVehicleOutSlip(o);
   };
 
   // Huy phieu quyet toan la MOT chieu du dang o trang thai nao (chua nhan
@@ -1265,10 +1155,6 @@ function RepairSettlementList() {
                         </button>
                       )}
 
-                      {o.status === 'invoiced' && (
-                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => handlePrintVehicleOut(o)}>In phiếu xe ra</button>
-                      )}
-
                       {canManage && o.status !== 'invoiced' && o.status !== 'waiting_payment' && o.status !== 'cancelled' && (
                         // Khong truyen state={{ order: o }} - dong o lay tu danh sach KHONG co
                         // items day du (xem fetchFullOrder), truyen thang vao se lam form luu
@@ -1296,29 +1182,12 @@ function RepairSettlementList() {
         </div>
       )}
 
-      {view && !completedPopupOrder && (
+      {view && (
         <DetailModal
           order={view}
           onClose={() => setView(null)}
           onPreview={setPreviewOrder}
         />
-      )}
-
-      {completedPopupOrder && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal modal-sm" style={{ textAlign: 'center' }}>
-            <div className="modal-header" style={{ justifyContent: 'flex-end', border: 'none', paddingBottom: 0 }}>
-              <button className="modal-close" onClick={handleCloseCompletedPopup}>✕</button>
-            </div>
-            <div className="modal-body" style={{ paddingTop: 0 }}>
-              <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
-              <h3 style={{ margin: '0 0 6px', fontSize: 16 }}>Phiếu sửa chữa này đã hoàn thành</h3>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--gray-600)' }}>
-                {completedPopupOrder.code} — tổ trưởng đã hoàn thành toàn bộ công việc. Phiếu đã chuyển sang <b>Chờ thanh toán</b>.
-              </p>
-            </div>
-          </div>
-        </div>
       )}
 
       {previewOrder && (

@@ -31,6 +31,14 @@ class RepairSettlementRepository {
     throw new Error('Method updateStatus() must be implemented');
   }
 
+  async findGatePending(branchId) {
+    throw new Error('Method findGatePending() must be implemented');
+  }
+
+  async confirmGateExit(id, branchId) {
+    throw new Error('Method confirmGateExit() must be implemented');
+  }
+
   async createPayosTransaction(serviceOrderId, { orderCode, paymentLinkId, qrCode, checkoutUrl, amount, expiredAt }) {
     throw new Error('Method createPayosTransaction() must be implemented');
   }
