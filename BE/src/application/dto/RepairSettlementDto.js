@@ -43,6 +43,10 @@ class RepairSettlementResponseDto {
       customer: entity.customer,
       vehicle: entity.vehicle ? { ...entity.vehicle, purchaseDate: toISODate(entity.vehicle.purchaseDate) } : null,
       customerRequest: entity.customerRequest,
+      note: entity.note,
+      signatureData: entity.signatureData,
+      signerName: entity.signerName,
+      signedAt: entity.signedAt ? toDDMMYYYYHHmm(entity.signedAt) : null,
       items: entity.items,
       tasks: entity.tasks,
       subtotal: entity.subtotal,
@@ -53,9 +57,11 @@ class RepairSettlementResponseDto {
       total: entity.total,
       isWarranty: entity.isWarranty,
       teamLeader: entity.teamLeaderName,
+      technicians: entity.technicians,
       repairOrderId: entity.repairOrderId,
       status: entity.status,
       cancelReason: entity.cancelReason,
+      intakeChecklist: entity.intakeChecklist,
     };
   }
 
@@ -64,4 +70,38 @@ class RepairSettlementResponseDto {
   }
 }
 
+const PUBLIC_STATUS_LABELS = {
+  waiting_repair: 'Chờ sửa chữa',
+  inprogress: 'Đang sửa chữa',
+  waiting_payment: 'Chờ thanh toán',
+  invoiced: 'Đã hoàn thành',
+};
+
+// Dung cho man tra cuu cong khai (Landing, khong dang nhap) - chi lay cac
+// truong toi thieu, KHONG bao gom ten/SDT khach hang hay gia tien.
+class PublicVehicleHistoryDto {
+  static fromRow(row) {
+    return {
+      code: row.order_code,
+      status: row.status,
+      statusLabel: PUBLIC_STATUS_LABELS[row.status] || row.status,
+      intakeDate: toDDMMYYYY(row.intake_date),
+      completedDate: row.completed_date ? toDDMMYYYY(row.completed_date) : null,
+      branchName: row.branch_name,
+    };
+  }
+
+  static fromRows(rows) {
+    if (!rows.length) return null;
+    return {
+      vehicle: {
+        licensePlate: rows[0].license_plate,
+        vehicleModel: rows[0].vehicle_model_text,
+      },
+      history: rows.map((r) => PublicVehicleHistoryDto.fromRow(r)),
+    };
+  }
+}
+
 module.exports = RepairSettlementResponseDto;
+module.exports.PublicVehicleHistoryDto = PublicVehicleHistoryDto;

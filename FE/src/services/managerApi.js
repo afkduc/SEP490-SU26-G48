@@ -26,6 +26,14 @@ class ManagerApi {
     return httpClient.put(`/manager/employees/${id}`, payload);
   }
 
+  setEmployeeTeamMembers(id, memberIds) {
+    return httpClient.put(`/manager/employees/${id}/team-members`, { memberIds });
+  }
+
+  setEmployeeBays(id, bayNumbers) {
+    return httpClient.put(`/manager/employees/${id}/bays`, { bayNumbers });
+  }
+
   getServiceCategories() {
     return httpClient.get('/manager/service-categories');
   }

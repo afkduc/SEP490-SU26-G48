@@ -17,8 +17,10 @@ import {
   updateRepairSettlementStatusApi,
   createPayosPaymentLinkApi,
 } from '../../services/repairSettlementApi';
-import { updateRepairOrderStatusApi } from '../../services/repairOrderApi';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
+import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
+import IntakeChecklistView from './IntakeChecklistView';
+import SignaturePad from './SignaturePad';
 import './RepairSettlementPage.css';
 
 // item.lhsc ('DV'/'PT') la LOAI HANG MUC (dong nay la cong tho hay vat tu) -
@@ -31,7 +33,7 @@ import './RepairSettlementPage.css';
 // theo loại hình. Rút gọn còn 5 nhóm lớn theo hệ thống xe.
 const REPAIR_CATEGORY_OPTIONS = [
   { value: 'ER', label: 'Sửa chữa động cơ' },
-  { value: 'CB', label: 'Sửa chữa gầm - phanh' },
+  { value: 'CB', label: 'Sửa chữa gầm' },
   { value: 'EE', label: 'Sửa chữa điện - điện tử' },
   { value: 'BP', label: 'Đồng sơn' },
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
@@ -81,6 +83,7 @@ const TABS = [
   { key: 'inprogress', label: 'Đang sửa chữa' },
   { key: 'waiting_payment', label: 'Chờ thanh toán' },
   { key: 'invoiced', label: 'Đã xuất hóa đơn' },
+  { key: 'cancelled', label: 'Đã hủy' },
 ];
 // Mau dong nhat cho tab dang duoc chon - de khi doi tab, tat ca deu chuyen
 // sang cung 1 mau (cam) thay vi moi tab co mau active rieng.
@@ -731,9 +734,19 @@ function SettlementPreviewModal({ order, onClose }) {
 // ─── Modal xem chi tiết phiếu ────────────────────────────────────────
 function DetailModal({ order, onClose, onPreview }) {
   const st = STATUS_LABELS[order.status];
+  const [showIntake, setShowIntake] = useState(false);
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-xl" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900 }}>
+    <div className="modal-overlay" style={{ gap: 16 }} onClick={onClose}>
+      <div
+        className="modal modal-xl no-scrollbar"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: showIntake ? 'min(680px, 54vw)' : 900,
+          transition: 'max-width 0.25s ease',
+          borderRadius: 14,
+          overflowX: 'hidden',
+        }}
+      >
         <div className="modal-header">
           <h3 className="modal-title">Quyết toán sửa chữa – {order.code}</h3>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -743,7 +756,7 @@ function DetailModal({ order, onClose, onPreview }) {
         </div>
         <div className="modal-body">
           <div className="responsive-2col" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 16 }}>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div className="form-section-title">Thông tin khách hàng</div>
               {[
                 ['Họ tên', order.customer?.fullName],
@@ -758,7 +771,7 @@ function DetailModal({ order, onClose, onPreview }) {
                 </div>
               ))}
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div className="form-section-title">Thông tin xe</div>
               {[
                 ['Biển số xe', order.vehicle?.licensePlate],
@@ -780,6 +793,15 @@ function DetailModal({ order, onClose, onPreview }) {
           <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
             {order.customerRequest}
           </div>
+
+          {order.cancelReason && (
+            <>
+              <div className="form-section-title">Lý do hủy</div>
+              <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#C62828' }}>
+                {order.cancelReason}
+              </div>
+            </>
+          )}
 
           <div className="form-section-title">Hạng mục công việc</div>
           <div className="table-wrapper" style={{ marginBottom: 0 }}>
@@ -855,8 +877,13 @@ function DetailModal({ order, onClose, onPreview }) {
             return (
               <div style={{ marginTop: 16 }}>
                 <div className="form-section-title">
-                  Tiến độ công việc (Tổ trưởng) ({doneCount}/{serviceTasks.length})
+                  Tiến độ công việc ({doneCount}/{serviceTasks.length})
                 </div>
+                {order.technicians?.length > 0 && (
+                  <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
+                    Thợ thực hiện: <b>{order.technicians.map((t) => t.fullName).join(', ')}</b>
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {serviceTasks.map((t) => (
                     <label
@@ -864,11 +891,11 @@ function DetailModal({ order, onClose, onPreview }) {
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
                         background: t.isDone ? '#E8F5E9' : 'var(--gray-50)', borderRadius: 6,
-                        fontSize: 13, textDecoration: t.isDone ? 'line-through' : 'none',
+                        fontSize: 13,
                         color: t.isDone ? '#2E7D32' : 'var(--gray-900)',
                       }}
                     >
-                      <input type="checkbox" checked={t.isDone} disabled readOnly />
+                      <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#2E7D32' }} />
                       <span>{t.taskName}</span>
                     </label>
                   ))}
@@ -877,7 +904,35 @@ function DetailModal({ order, onClose, onPreview }) {
             );
           })()}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
+            {order.signatureData ? (
+              <div className="card" style={{ flex: '1 1 280px', maxWidth: 360 }}>
+                <div className="card-body">
+                  <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                    Xác nhận đồng ý phiếu quyết toán
+                  </div>
+                  <img
+                    src={order.signatureData}
+                    alt="Chữ ký xác nhận"
+                    style={{ display: 'block', margin: '0 auto', height: 90, border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
+                  />
+                  {order.signerName && (
+                    <div style={{
+                      textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 10,
+                      borderTop: '1px solid var(--gray-200)', paddingTop: 8,
+                    }}>
+                      {order.signerName}
+                    </div>
+                  )}
+                  {order.signedAt && (
+                    <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
+                      Ký lúc: {order.signedAt}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : <div />}
+
             <div className="summary-box" style={{ minWidth: 300 }}>
               {[
                 ['Tổng trước giảm giá', order.subtotal],
@@ -892,10 +947,10 @@ function DetailModal({ order, onClose, onPreview }) {
           </div>
         </div>
         <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={() => setShowIntake((s) => !s)}>
+            {showIntake ? 'Ẩn xem tình trạng xe ban đầu' : 'Xem tình trạng xe ban đầu'}
+          </button>
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
-          {order.status === 'inprogress' && (
-            <button className="btn btn-secondary" onClick={() => { onClose(); printWorkList(order); }}>In danh sách công việc</button>
-          )}
           {(order.status === 'waiting_payment' || order.status === 'invoiced') && (
             <button className="btn btn-primary" style={{ background: '#2E7D32', borderColor: '#2E7D32' }}
               onClick={() => { onClose(); onPreview(order); }}>
@@ -904,6 +959,29 @@ function DetailModal({ order, onClose, onPreview }) {
           )}
         </div>
       </div>
+
+      {showIntake && (
+        <div
+          className="modal modal-xl no-scrollbar"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            maxWidth: 'min(440px, 38vw)',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: 14,
+            overflowX: 'hidden',
+          }}
+        >
+          <div className="modal-header">
+            <h3 className="modal-title">Phiếu tiếp nhận và bàn giao xe</h3>
+            <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
+          </div>
+          <div className="modal-body">
+            <IntakeChecklistView value={order.intakeChecklist} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -992,6 +1070,9 @@ function RepairSettlementList() {
         setTab('invoiced');
       }
     }
+    if (event.type === 'order-cancelled') {
+      loadAll({ silent: true });
+    }
   };
   useRepairOrderEventsSSE(handleRepairOrderEvent, true);
 
@@ -1006,6 +1087,7 @@ function RepairSettlementList() {
     inprogress: orders.filter((o) => o.status === 'inprogress').length,
     waiting_payment: orders.filter((o) => o.status === 'waiting_payment').length,
     invoiced: orders.filter((o) => o.status === 'invoiced').length,
+    cancelled: orders.filter((o) => o.status === 'cancelled').length,
   };
 
   const filtered = orders.filter((o) =>
@@ -1054,24 +1136,14 @@ function RepairSettlementList() {
     printVehicleOutSlip(o);
   };
 
+  // Huy phieu quyet toan la MOT chieu du dang o trang thai nao (chua nhan
+  // hay dang sua chua deu duoc) - BE tu cascade huy luon lenh sua chua neu
+  // da co (xem RepairSettlementRepositoryImpl.updateStatus), khong con quay
+  // ve "Cho sua chua" de nhan lai nhu truoc nua.
   const handleConfirmCancel = async (reason) => {
-    if (cancelTarget.kind === 'repair_order') {
-      await updateRepairOrderStatusApi(cancelTarget.repairOrderId, 'cancelled', reason);
-      // Huy lenh sua chua se tu dong lam phieu quyet toan goc quay ve "Cho
-      // sua chua" (xem RepairOrderRepositoryImpl.updateStatus) - nap lai ca
-      // danh sach cho chinh xac thay vi tu suy doan trang thai moi.
-      await loadAll();
-    } else {
-      const updated = await updateRepairSettlementStatusApi(cancelTarget.id, 'cancelled', reason);
-      setOrders((prev) => prev.filter((o) => o.id !== updated.id));
-    }
+    const updated = await updateRepairSettlementStatusApi(cancelTarget.id, 'cancelled', reason);
+    setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
     setCancelTarget(null);
-  };
-
-  // Chuyển tiếp nhanh sang màn "Lệnh sửa chữa" để gán tổ trưởng, khỏi phải tự
-  // chuyển trang rồi tìm lại đúng phiếu này trong danh sách.
-  const handleAssign = (settlementId) => {
-    navigate('/repair-orders/create', { state: { settlementId } });
   };
 
   return (
@@ -1175,15 +1247,14 @@ function RepairSettlementList() {
                     <div className="table-actions">
                       <button className="btn btn-info btn-sm" style={{ fontSize: 11 }} onClick={() => handleViewDetail(o)}>Xem chi tiết</button>
 
-                      {o.status === 'waiting_repair' && (<>
-                        <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => handleAssign(o.id)}>Phân công</button>
+                      {o.status === 'waiting_repair' && (
                         <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'settlement', id: o.id, code: o.code })}>Hủy</button>
-                      </>)}
+                      )}
 
                       {o.status === 'inprogress' && (<>
                         <button className="btn btn-sm" style={{ fontSize: 11, background: '#00897B', color: '#fff' }} onClick={() => handlePrintWorkList(o)}>In danh sách CV</button>
                         {o.repairOrderId && (
-                          <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'repair_order', repairOrderId: o.repairOrderId, code: o.code })}>Hủy</button>
+                          <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'repair_order', id: o.id, code: o.code })}>Hủy</button>
                         )}
                       </>)}
 
@@ -1198,7 +1269,7 @@ function RepairSettlementList() {
                         <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => handlePrintVehicleOut(o)}>In phiếu xe ra</button>
                       )}
 
-                      {canManage && o.status !== 'invoiced' && o.status !== 'waiting_payment' && (
+                      {canManage && o.status !== 'invoiced' && o.status !== 'waiting_payment' && o.status !== 'cancelled' && (
                         // Khong truyen state={{ order: o }} - dong o lay tu danh sach KHONG co
                         // items day du (xem fetchFullOrder), truyen thang vao se lam form luu
                         // ghi de mat het hang muc cong viec cua phieu. De trang Chinh sua tu
@@ -1260,7 +1331,7 @@ function RepairSettlementList() {
       {cancelTarget && (
         <CancelReasonModal
           title={cancelTarget.kind === 'repair_order'
-            ? `Hủy lệnh sửa chữa ${cancelTarget.code}`
+            ? `Hủy phiếu quyết toán ${cancelTarget.code} (đang sửa chữa - tổ đang làm sẽ dừng ngay)`
             : `Hủy phiếu quyết toán ${cancelTarget.code}`}
           onConfirm={handleConfirmCancel}
           onClose={() => setCancelTarget(null)}
@@ -1270,7 +1341,9 @@ function RepairSettlementList() {
   );
 }
 
-// ─── Modal nhập lý do hủy phiếu (chỉ áp dụng khi phiếu đang Chờ sửa chữa) ──
+// ─── Modal nhap ly do huy phieu - cho phep huy ca khi dang "Cho sua chua"
+// lan "Dang sua chua" (BE cascade huy luon lenh sua chua neu da co, xem
+// RepairSettlementService.updateStatus) ──
 function CancelReasonModal({ title, onConfirm, onClose }) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -1375,6 +1448,23 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   });
 
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
+  const [note, setNote] = useState(existingOrder?.note || '');
+  const [intakeChecklist, setIntakeChecklist] = useState(existingOrder?.intakeChecklist || DEFAULT_INTAKE_CHECKLIST);
+
+  // Chu ky dien tu tai cho - bat buoc luc tao phieu moi (khong ap dung khi sua
+  // phieu da co, chu ky goc khong doi lai). signerName auto-fill theo nguoi
+  // lien he - phai dong bo lai moi khi customerInfo doi (vd sau khi CVDV tra
+  // cuu/chon khach hang, KHONG chi luc mount form vi luc do chua chon khach),
+  // nhung ngung auto-fill ngay khi CVDV tu tay sua ten nguoi ky.
+  const signaturePadRef = useRef(null);
+  const [signerName, setSignerName] = useState(existingOrder?.signerName || '');
+  const signerNameEditedRef = useRef(Boolean(existingOrder?.signerName));
+  useEffect(() => {
+    if (!signerNameEditedRef.current) {
+      setSignerName(customerInfo.contactPerson || customerInfo.fullName || '');
+    }
+  }, [customerInfo.contactPerson, customerInfo.fullName]);
+  const [signatureEmpty, setSignatureEmpty] = useState(true);
   // Bo dem chung sinh groupId - dung ca luc tai du lieu cu (assignGroupIds)
   // lan luc chon dich vu/goi moi trong phien lam viec nay (xem selectCatalog*).
   const catalogGroupSeq = useRef(0);
@@ -1841,6 +1931,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   };
 
   const totals = calcTotals(items);
+  const signatureDate = new Date();
 
   // Bắt buộc phải chọn khách hàng/xe từ gợi ý tra cứu (có id thật trong DB)
   // trước khi cho lưu — không tự tạo khách hàng/xe mới ở phiếu này.
@@ -1850,9 +1941,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     customerId: customerInfo.id,
     vehicleId: vehicleInfo.id,
     customerRequest,
+    note,
     currentKm: vehicleInfo.currentKm || null,
     items,
     ...totals,
+    intakeChecklist,
+    signatureData: signaturePadRef.current && !signaturePadRef.current.isEmpty()
+      ? signaturePadRef.current.toDataURL()
+      : null,
+    signerName,
   });
 
   const handleSave = async () => {
@@ -1866,6 +1963,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     }
     if (!customerRequest.trim()) {
       setSaveError('Vui lòng nhập mô tả yêu cầu của khách hàng trước khi lưu.');
+      return;
+    }
+    if (!isEdit && !isIntakeChecklistComplete(intakeChecklist)) {
+      setSaveError('Vui lòng hoàn thành tất cả các mục trong Phiếu tiếp nhận và bàn giao xe (trừ các ô nhập văn bản) trước khi lưu.');
+      return;
+    }
+    if (!isEdit && signatureEmpty) {
+      setSaveError('Vui lòng ký xác nhận trước khi lưu phiếu.');
       return;
     }
     setSaving(true);
@@ -2121,8 +2226,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             <label className="form-label required">Yêu cầu của khách hàng</label>
             <textarea className="form-textarea" rows={2} value={customerRequest} onChange={(e) => setCustomerRequest(e.target.value)} placeholder="Mô tả tình trạng xe / yêu cầu sửa chữa của khách hàng..." />
           </div>
+
+          <div className="form-group" style={{ marginTop: 16 }}>
+            <label className="form-label">Ghi chú</label>
+            <textarea className="form-textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú thêm (nếu có)..." />
+          </div>
         </div>
       </div>
+
+      {/* SECTION 1b: Phiếu tiếp nhận và bàn giao xe */}
+      <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist} />
 
       {/* SECTION 2: Hạng mục công việc */}
       <div className="card" style={{ marginBottom: 16 }}>
@@ -2310,7 +2423,29 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        {!isEdit && !savedOrder && (
+          <div className="card" style={{ flex: '1 1 360px', maxWidth: 460 }}>
+            <div className="card-body">
+              <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--gray-600)', marginBottom: 10 }}>
+                Ngày {signatureDate.getDate()} tháng {signatureDate.getMonth() + 1} năm {signatureDate.getFullYear()}
+              </div>
+              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 14 }}>
+                Xác nhận đồng ý phiếu quyết toán
+              </div>
+              <SignaturePad ref={signaturePadRef} onChange={setSignatureEmpty} />
+              <input className="form-input"
+                style={{
+                  width: '100%', textAlign: 'center', fontWeight: 600, marginTop: 10,
+                  border: 'none', borderTop: '1px solid var(--gray-200)', borderRadius: 0, paddingTop: 10,
+                }}
+                placeholder="Tên người ký"
+                value={signerName}
+                onChange={(e) => { signerNameEditedRef.current = true; setSignerName(e.target.value); }} />
+            </div>
+          </div>
+        )}
+
         {/* Tổng kết */}
         <div className="card" style={{ width: '100%', maxWidth: 340, position: 'sticky', top: 70, alignSelf: 'start' }}>
           <div className="card-header"><span className="card-title">Tổng kết thanh toán</span></div>
@@ -2352,7 +2487,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             ) : (
               <>
                 <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
-                  disabled={!canSave || saving}
+                  disabled={!canSave || saving || (!isEdit && signatureEmpty)}
                   onClick={handleSave}>
                   {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
                 </button>

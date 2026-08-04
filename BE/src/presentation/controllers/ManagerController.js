@@ -27,6 +27,8 @@ class ManagerController {
     this.getTechnicianById = this.getTechnicianById.bind(this);
     this.createTechnician = this.createTechnician.bind(this);
     this.updateTechnician = this.updateTechnician.bind(this);
+    this.setEmployeeTeamMembers = this.setEmployeeTeamMembers.bind(this);
+    this.setEmployeeBays = this.setEmployeeBays.bind(this);
   }
 
   async getBranch(req, res, next) {
@@ -82,6 +84,29 @@ class ManagerController {
     try {
       const data = await this.managerService.updateEmployee(req.user.branchId, req.params.id, req.body);
       return success(res, data, 'Cập nhật nhân viên thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // To truong (isTeamLeaderRole) - dong bo danh sach tho may minh quan ly
+  // (users.team_leader_id), goi tu khoi "Thanh vien doi" tren man Chinh sua
+  // nhan vien - xem EmployeeFormPage.jsx.
+  async setEmployeeTeamMembers(req, res, next) {
+    try {
+      const data = await this.managerService.setTeamMembers(req.user.branchId, req.params.id, req.body.memberIds || []);
+      return success(res, data, 'Cập nhật thành viên đội thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // To truong - dong bo danh sach so khoang xe minh phu trach (bang moi
+  // vehicle_bays) - goi tu khoi "Khoang xe phu trach".
+  async setEmployeeBays(req, res, next) {
+    try {
+      const data = await this.managerService.setBayNumbers(req.user.branchId, req.params.id, req.body.bayNumbers || []);
+      return success(res, data, 'Cập nhật khoang xe phụ trách thành công');
     } catch (err) {
       next(err);
     }

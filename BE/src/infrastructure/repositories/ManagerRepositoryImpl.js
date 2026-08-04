@@ -1,4 +1,5 @@
-const { query } = require('../database/sqlServer');
+const { query, sql } = require('../database/sqlServer');
+const { runInTransaction } = require('../../utils/sqlTransaction');
 
 // Tổ trưởng đã gộp vào module Nhân viên (dùng chung listEmployees/createEmployee/...),
 // nên phải nằm trong EMPLOYEE_ROLES để hiện ra trong danh sách/tìm kiếm nhân viên.
@@ -294,6 +295,12 @@ class ManagerRepositoryImpl {
 
       const specialtiesByUser = await this._fetchSpecialtiesByUserIds([Number(id)]);
       employee.specialties = specialtiesByUser.get(Number(id)) || [];
+
+      const baysResult = await query(
+        `SELECT bay_number FROM vehicle_bays WHERE team_leader_id = @id ORDER BY bay_number ASC`,
+        { id: Number(id) }
+      );
+      employee.bays = baysResult.recordset.map((r) => r.bay_number);
     }
 
     return employee;
@@ -1015,6 +1022,45 @@ class ManagerRepositoryImpl {
     return this.getTechnicianById(branchId, id);
   }
 
+  // Dong bo lai toan bo thanh vien doi cua 1 to truong - go those khong con
+  // trong memberIds, gan those moi (chi ap dung user role technician, cung
+  // chi nhanh) - xem ManagerService.setTeamMembers.
+  async setTeamMembers(branchId, teamLeaderId, memberIds) {
+    await runInTransaction(async (tx) => {
+      if (memberIds.length > 0) {
+        const inClause = memberIds.map((_, i) => `@m${i}`).join(',');
+        const unsetReq = tx.request()
+          .input('teamLeaderId', sql.BigInt, teamLeaderId)
+          .input('branchId', sql.BigInt, branchId);
+        memberIds.forEach((mid, i) => unsetReq.input(`m${i}`, sql.BigInt, mid));
+        await unsetReq.query(
+          `UPDATE users SET team_leader_id = NULL
+           WHERE team_leader_id = @teamLeaderId AND branch_id = @branchId AND id NOT IN (${inClause})`
+        );
+
+        const setReq = tx.request()
+          .input('teamLeaderId', sql.BigInt, teamLeaderId)
+          .input('branchId', sql.BigInt, branchId);
+        memberIds.forEach((mid, i) => setReq.input(`m${i}`, sql.BigInt, mid));
+        await setReq.query(`
+          UPDATE u SET u.team_leader_id = @teamLeaderId
+          FROM   users u
+          WHERE  u.id IN (${inClause}) AND u.branch_id = @branchId
+            AND  EXISTS (
+              SELECT 1 FROM user_role ur JOIN roles r ON r.id = ur.role_id
+              WHERE ur.user_id = u.id AND r.role_name = '${TECHNICIAN_ROLE}'
+            )
+        `);
+      } else {
+        await tx.request()
+          .input('teamLeaderId', sql.BigInt, teamLeaderId)
+          .input('branchId', sql.BigInt, branchId)
+          .query('UPDATE users SET team_leader_id = NULL WHERE team_leader_id = @teamLeaderId AND branch_id = @branchId');
+      }
+    });
+
+    return this.getEmployeeById(branchId, teamLeaderId);
+  }
 }
 
 module.exports = ManagerRepositoryImpl;

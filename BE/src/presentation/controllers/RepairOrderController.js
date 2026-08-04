@@ -43,35 +43,52 @@ class RepairOrderController {
     }
   };
 
-  getTeamLeaders = async (req, res, next) => {
+  // Tho tu nhan viec qua khoang xe (thay cho man "Phan cong" thu cong cu cua
+  // CVDV) - teamLeaderId/branchId lay tu chinh nguoi dang dang nhap, bayId do
+  // FE truyen (khoang tablet nay dang chiem, xem vehicleBayRoutes.js).
+  claim = async (req, res, next) => {
     try {
-      const items = await this.repairOrderService.getTeamLeaders(req.user.branchId);
-      return success(res, items, 'Team leaders retrieved');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  create = async (req, res, next) => {
-    try {
-      const item = await this.repairOrderService.create(req.body, {
+      const item = await this.repairOrderService.claim(req.body.serviceOrderId, {
         branchId: req.user.branchId,
-        createdBy: req.user.userId,
+        teamLeaderId: req.user.userId,
+        bayId: req.body.bayId,
+        bayNumber: req.body.bayNumber,
       });
       await auditCrud.create(req, {
         tableName: 'repair_orders',
-        entityCode: item?.code || item?.repair_order_code || null,
+        entityCode: item?.code || null,
         recordId: item?.id || null,
         entityName: 'Phiếu sửa chữa',
         data: req.body,
       });
       await this.notificationService.notifyAdmins('REPAIR_ORDER_CREATED', {
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: item?.code || item?.repair_order_code || `ID-${item?.id}`,
-        targetCode: item?.code || item?.repair_order_code || '',
+        targetName: item?.code || `ID-${item?.id}`,
+        targetCode: item?.code || '',
         userId: item?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
-      return success(res, item, 'Repair order created', 201);
+      return success(res, item, 'Repair order claimed', 201);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  searchTechnicians = async (req, res, next) => {
+    try {
+      const items = await this.repairOrderService.searchTechnicians(req.user.userId, req.user.branchId, req.query.q);
+      return success(res, items, 'Technicians retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setTechnicians = async (req, res, next) => {
+    try {
+      const item = await this.repairOrderService.setTechnicians(req.params.id, req.body.technicianIds, {
+        branchId: req.user.branchId,
+        teamLeaderId: req.user.userId,
+      });
+      return success(res, item, 'Technicians assigned');
     } catch (err) {
       next(err);
     }
@@ -81,7 +98,6 @@ class RepairOrderController {
     try {
       const item = await this.repairOrderService.updateStatus(req.params.id, req.body.status, {
         branchId: req.user.branchId,
-        cancelReason: req.body.reason,
       });
       await auditCrud.update(req, {
         tableName: 'repair_orders',
