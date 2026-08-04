@@ -238,83 +238,81 @@
   outline-offset: 2px;
 }
 
-.btn--primary {
+/* Cac modifier phai cung do uu tien voi '.admin-shell .btn' (0,2,0), neu de
+   '.btn--x' (0,1,0) thi base se ghi de mau/padding cua chung. */
+.admin-shell .btn--primary {
   background: linear-gradient(135deg, var(--ag-primary) 0%, #6366f1 100%);
-  color: var(--ag-text-inverse);
+  color: #fff;
   border-color: transparent;
   box-shadow: 0 6px 16px rgba(67, 56, 202, 0.28);
 }
 
-.admin-shell .btn--primary {
-  color: #fff;
-}
-
-.btn--primary:hover:not(:disabled) {
+.admin-shell .btn--primary:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--ag-primary-hover) 0%, var(--ag-primary) 100%);
   box-shadow: 0 8px 22px rgba(67, 56, 202, 0.35);
   filter: brightness(1.03);
 }
 
-.btn--secondary,
-.btn--outline {
+.admin-shell .btn--secondary,
+.admin-shell .btn--outline {
   background: var(--ag-surface);
   color: var(--ag-text-secondary);
   border-color: var(--ag-border);
 }
 
-.btn--secondary:hover:not(:disabled),
-.btn--outline:hover:not(:disabled) {
+.admin-shell .btn--secondary:hover:not(:disabled),
+.admin-shell .btn--outline:hover:not(:disabled) {
   background: var(--ag-card-hover);
   color: var(--ag-text-primary);
   border-color: var(--ag-primary);
 }
 
-.btn--ghost {
+.admin-shell .btn--ghost {
   background: transparent;
   color: var(--ag-text-secondary);
   border-color: var(--ag-border);
 }
 
-.btn--ghost:hover:not(:disabled) {
+.admin-shell .btn--ghost:hover:not(:disabled) {
   background: var(--ag-surface-2);
   color: var(--ag-text-primary);
 }
 
-.btn--sm {
+.admin-shell .btn--sm {
   padding: 6px 12px;
   font-size: 0.8rem;
 }
 
-.btn--danger {
+.admin-shell .btn--danger {
   background: transparent;
   color: var(--ag-danger);
   border-color: var(--ag-danger-border);
 }
 
-.btn--danger:hover:not(:disabled) {
+.admin-shell .btn--danger:hover:not(:disabled) {
   background: var(--ag-danger-bg);
   border-color: var(--ag-danger);
 }
 
-.btn--success,
-.btn--success-outline {
+.admin-shell .btn--success,
+.admin-shell .btn--success-outline {
   background: transparent;
   color: var(--ag-success);
   border-color: var(--ag-success-border);
 }
 
-.btn--success:hover:not(:disabled),
-.btn--success-outline:hover:not(:disabled) {
+.admin-shell .btn--success:hover:not(:disabled),
+.admin-shell .btn--success-outline:hover:not(:disabled) {
   background: var(--ag-success-bg);
 }
 
-.btn--warning {
+.admin-shell .btn--warning {
   background: transparent;
   color: var(--ag-warning);
   border-color: var(--ag-warning-border);
 }
 
-.btn--warning:hover:not(:disabled) {
+.admin-shell .btn--warning:hover:not(:disabled) {
   background: var(--ag-warning-bg);
 }
 
