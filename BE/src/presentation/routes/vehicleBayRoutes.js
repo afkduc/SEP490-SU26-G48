@@ -11,12 +11,12 @@ function buildVehicleBayRouter() {
     vehicleBayService: new VehicleBayService({ vehicleBayRepository: new VehicleBayRepositoryImpl() }),
   });
 
+  // occupy/release/heartbeat da bo han (khong con khai niem thiet bi giu
+  // khoang nua). "mine" phuc vu to truong chon khoang cua minh khi gan viec
+  // vua nhan (xem RepairOrderController.claim) - "branch-status" cho CVDV.
   router.use(authenticate, trackActivity);
   router.get('/mine', controller.listMine);
   router.get('/branch-status', controller.listByBranch);
-  router.post('/:id/occupy', controller.occupy);
-  router.post('/:id/release', controller.release);
-  router.post('/:id/heartbeat', controller.heartbeat);
 
   return router;
 }
