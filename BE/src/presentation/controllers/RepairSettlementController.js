@@ -78,6 +78,7 @@ class RepairSettlementController {
         data: req.body,
       });
       await this.notificationService.notifyAdmins('SETTLEMENT_CREATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: item?.code || `ID-${item?.id}`,
         targetCode: item?.code || '',
@@ -100,6 +101,7 @@ class RepairSettlementController {
         newData: req.body,
       });
       await this.notificationService.notifyAdmins('SETTLEMENT_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: item?.code || `ID-${req.params.id}`,
         targetCode: item?.code || '',
@@ -125,6 +127,7 @@ class RepairSettlementController {
         newData: { status: req.body.status, reason: req.body.reason },
       });
       await this.notificationService.notifyAdmins('SETTLEMENT_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: item?.code || `ID-${req.params.id}`,
         targetCode: item?.code || '',

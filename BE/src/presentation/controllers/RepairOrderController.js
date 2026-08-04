@@ -62,6 +62,7 @@ class RepairOrderController {
         data: req.body,
       });
       await this.notificationService.notifyAdmins('REPAIR_ORDER_CREATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: item?.code || `ID-${item?.id}`,
         targetCode: item?.code || '',
@@ -115,6 +116,7 @@ class RepairOrderController {
         newData: { status: req.body.status, reason: req.body.reason },
       });
       await this.notificationService.notifyAdmins('REPAIR_ORDER_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
         targetName: item?.code || item?.repair_order_code || `ID-${req.params.id}`,
         targetCode: item?.code || item?.repair_order_code || '',
