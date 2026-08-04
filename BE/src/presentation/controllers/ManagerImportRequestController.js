@@ -91,6 +91,7 @@ class ManagerImportRequestController {
         description: `Duyệt phiếu nhập kho ${data?.requestCode || req.params.id} (Manager)`,
       });
       await this.notificationService.notifyAdmins('IMPORT_REQUEST_APPROVED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Manager',
         targetName: data?.requestCode || `ID-${req.params.id}`,
         targetCode: data?.requestCode || '',
@@ -129,6 +130,7 @@ class ManagerImportRequestController {
         description: `Từ chối phiếu nhập kho ${data?.requestCode || req.params.id} (Manager)`,
       });
       await this.notificationService.notifyAdmins('IMPORT_REQUEST_REJECTED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Manager',
         targetName: data?.requestCode || `ID-${req.params.id}`,
         targetCode: data?.requestCode || '',

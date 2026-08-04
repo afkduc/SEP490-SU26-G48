@@ -1245,7 +1245,7 @@
 }
 
 .activity-item__meta-item--code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: inherit;
   padding: 1px 6px;
   background: #eef2ff;
   color: #4338ca;

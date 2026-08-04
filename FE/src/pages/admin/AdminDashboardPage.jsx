@@ -768,6 +768,8 @@ function collapseDashboardAlerts(list) {
 function ActivityItem({ log }) {
   const badge = getActionBadge(log.action);
   const respBadge = getResponseBadge(log.responseStatus ?? log.response_status);
+  const actionUpper = String(log.action || '').toUpperCase();
+  const isAuthAction = ['LOGIN', 'FAILED_LOGIN', 'LOGOUT', 'FORCE_LOGO', 'FORCE_LOGOUT'].includes(actionUpper);
 
   // Lay ten actor voi fallback an toan
   const actor =
@@ -781,6 +783,16 @@ function ActivityItem({ log }) {
     ) ||
     buildActivityDetails(log) ||
     (log.ipAddress || log.ip_address ? `Từ IP ${log.ipAddress || log.ip_address}` : null);
+
+  const tableKey = log.tableName || log.table_name || log.targetType;
+  const rawEntityCode = String(log.entityCode || log.entity_code || '').trim();
+  // entity_code từng lưu VARCHAR → tiếng Việt thành "Tr?n..."; ẩn khi lỗi / trùng tên actor / sự kiện auth
+  const showEntityCode = Boolean(
+    rawEntityCode
+    && !isAuthAction
+    && rawEntityCode !== actor
+    && !/\?/.test(rawEntityCode),
+  );
 
   return (
     <div className="activity-item">
@@ -809,25 +821,25 @@ function ActivityItem({ log }) {
         {details && <div className="activity-item__details">{details}</div>}
 
         <div className="activity-item__meta">
-          {(log.tableName || log.table_name) && (
+          {tableKey && (
             <span className="activity-item__meta-item activity-item__meta-item--strong">
               <IconTerminal />
-              <span>{getAuditTableLabel(log.tableName || log.table_name)}</span>
+              <span>{getAuditTableLabel(tableKey)}</span>
             </span>
           )}
-          {(log.entityCode || log.entity_code) && (
+          {showEntityCode && (
             <span className="activity-item__meta-item activity-item__meta-item--code">
-              {log.entityCode || log.entity_code}
+              {rawEntityCode}
             </span>
           )}
-          {!log.entityCode && !log.entity_code && (log.recordId ?? log.record_id) != null && (
+          {!showEntityCode && !rawEntityCode && (log.recordId ?? log.record_id ?? log.targetId) != null && (
             <span className="activity-item__meta-item activity-item__meta-item--code">
-              #{log.recordId ?? log.record_id}
+              #{log.recordId ?? log.record_id ?? log.targetId}
             </span>
           )}
-          {log.ipAddress && (
+          {(log.ipAddress || log.ip_address) && (
             <span className="activity-item__meta-item">
-              <IconGlobe /> {log.ipAddress}
+              <IconGlobe /> {log.ipAddress || log.ip_address}
             </span>
           )}
           {(log.durationMs != null || log.duration_ms != null) && (
@@ -930,6 +942,41 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
+  const [periodPreset, setPeriodPreset] = useState('today');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  function resolvePeriodRange(preset, fromVal, toVal) {
+    const today = new Date();
+    const yyyyMmDd = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    if (preset === 'custom') {
+      return { fromDate: fromVal || undefined, toDate: toVal || undefined };
+    }
+    if (preset === 'month') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { fromDate: yyyyMmDd(start), toDate: yyyyMmDd(today) };
+    }
+    if (preset === 'year') {
+      const start = new Date(today.getFullYear(), 0, 1);
+      return { fromDate: yyyyMmDd(start), toDate: yyyyMmDd(today) };
+    }
+    // today
+    const d = yyyyMmDd(today);
+    return { fromDate: d, toDate: d };
+  }
+
+  const periodLabel = (() => {
+    if (periodPreset === 'today') return 'Hôm nay';
+    if (periodPreset === 'month') return 'Tháng này';
+    if (periodPreset === 'year') return 'Năm nay';
+    if (customFrom && customTo) return `${customFrom} → ${customTo}`;
+    return 'Tùy chọn';
+  })();
 
   useEffect(() => {
     let cancelled = false;
@@ -937,7 +984,12 @@ export default function AdminDashboardPage() {
 
     (async () => {
       try {
-        const statsData = await getAdminDashboardStats();
+        const range = resolvePeriodRange(periodPreset, customFrom, customTo);
+        if (periodPreset === 'custom' && (!range.fromDate || !range.toDate)) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
+        const statsData = await getAdminDashboardStats(range);
         if (cancelled) return;
         setStats(statsData);
         setError(null);
@@ -948,7 +1000,6 @@ export default function AdminDashboardPage() {
         }
         setError(err.message || 'Không thể tải thống kê');
       } finally {
-        // Luôn tắt spinner trên instance còn sống — tránh kẹt "Đang tải..." khi remount
         if (!cancelled) setLoading(false);
       }
     })();
@@ -956,7 +1007,7 @@ export default function AdminDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [periodPreset, customFrom, customTo]);
 
   // Fetch notifications CRUD gan day (poll 60s de dashboard cap nhat realtime-like)
   useEffect(() => {
@@ -987,19 +1038,9 @@ export default function AdminDashboardPage() {
 
     const applyCounts = (counts) => {
       if (cancelled || !counts) return;
-      setStats((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          alertCounts: {
-            total: Number(counts.total) || 0,
-            critical: Number(counts.critical) || 0,
-            high: Number(counts.high) || 0,
-            medium: Number(counts.medium) || 0,
-            info: Number(counts.info) || 0,
-          },
-        };
-      });
+      // Không ghi đè số cảnh báo theo khoảng lọc trên dashboard (B1).
+      // Counts toàn cục vẫn xem tại tab Bảo mật đăng nhập.
+      void counts;
     };
 
     const refreshCounts = async () => {
@@ -1125,6 +1166,42 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      <div className="dash-period-bar" style={{
+        display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+        marginBottom: 16, padding: '12px 16px', background: '#fff',
+        border: '1px solid #e2e8f0', borderRadius: 12,
+      }}>
+        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+          Thống kê IAM / bảo mật — khoảng:
+        </span>
+        {[
+          { id: 'today', label: 'Hôm nay' },
+          { id: 'month', label: 'Tháng này' },
+          { id: 'year', label: 'Năm nay' },
+          { id: 'custom', label: 'Tùy chọn' },
+        ].map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className={`btn btn--sm ${periodPreset === p.id ? 'btn--primary' : 'btn--ghost'}`}
+            onClick={() => setPeriodPreset(p.id)}
+          >
+            {p.label}
+          </button>
+        ))}
+        {periodPreset === 'custom' && (
+          <>
+            <input type="date" className="input" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+            <span>→</span>
+            <input type="date" className="input" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+          </>
+        )}
+        <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#64748b' }}>
+          Đang xem: <strong>{periodLabel}</strong>
+          {stats?.periodAuditCount != null ? ` · ${stats.periodAuditCount} nhật ký` : ''}
+        </span>
+      </div>
+
       {/* ── Loading / Error ─────────────────────────────────────── */}
       {loading && (
         <div className="dash-loading">
@@ -1176,9 +1253,9 @@ export default function AdminDashboardPage() {
             <StatCard
               accent="#0891b2"
               icon={<IconLogin />}
-              label="Đăng nhập hôm nay"
+              label={`Đăng nhập (${periodLabel})`}
               value={stats.todayLogins}
-              sub={`${stats.failedLogins} lần thất bại`}
+              sub={`${stats.failedLogins} lần thất bại trong khoảng`}
             />
           </div>
 
