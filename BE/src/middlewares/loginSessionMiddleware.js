@@ -268,7 +268,10 @@ async function trackLogin(req, user) {
       const out = { sessionId: null, deviceId: null, isNewDevice: false, isTrusted: false };
 
       // Step 1: Close stale sessions CUA USER HIEN TAI (logic single-session).
-      if (userId) {
+      // Bo qua rieng cho team_leader - tai khoan dung chung cho nhieu khoang
+      // xe/tablet cung luc, khong duoc dong session cua tablet khac (xem
+      // AuthService.login()).
+      if (userId && !user?.isTeamLeader) {
         const closeSessions = await txQuery(
           `UPDATE login_sessions
            SET    logout_time              = SYSUTCDATETIME(),

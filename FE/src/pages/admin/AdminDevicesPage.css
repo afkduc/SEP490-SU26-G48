@@ -431,18 +431,18 @@
   gap: 10px;
 }
 
-.pagination-info {
+.admin-devices .pagination-info {
   font-size: 0.8rem;
   color: #64748b;
 }
 
-.pagination-controls {
+.admin-devices .pagination-controls {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.pagination-btn {
+.admin-devices .pagination-btn {
   width: 32px;
   height: 32px;
   display: flex;
@@ -458,12 +458,12 @@
   transition: all 0.15s;
 }
 
-.pagination-btn:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
-.pagination-btn--active { background: #0891b2; color: #fff; border-color: #0891b2; }
-.pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.admin-devices .pagination-btn:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
+.admin-devices .pagination-btn--active { background: #0891b2; color: #fff; border-color: #0891b2; }
+.admin-devices .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ── Confirm Modal ────────────────────────────────────────────── */
-.confirm-modal-overlay {
+.admin-devices .confirm-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.5);
@@ -481,7 +481,7 @@
   to { opacity: 1; }
 }
 
-.confirm-modal {
+.admin-devices .confirm-modal {
   background: #fff;
   border-radius: 14px;
   padding: 24px;
@@ -499,7 +499,7 @@
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-.confirm-modal__icon {
+.admin-devices .confirm-modal__icon {
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -511,12 +511,12 @@
   align-self: center;
 }
 
-.confirm-modal__icon--warning {
+.admin-devices .confirm-modal__icon--warning {
   background: #fffbeb;
   color: #d97706;
 }
 
-.confirm-modal__title {
+.admin-devices .confirm-modal__title {
   font-size: 1rem;
   font-weight: 700;
   color: #0f172a;
@@ -524,7 +524,7 @@
   text-align: center;
 }
 
-.confirm-modal__body {
+.admin-devices .confirm-modal__body {
   font-size: 0.875rem;
   color: #475569;
   text-align: center;
@@ -532,7 +532,7 @@
   line-height: 1.5;
 }
 
-.confirm-modal__footer {
+.admin-devices .confirm-modal__footer {
   display: flex;
   gap: 10px;
   justify-content: flex-end;

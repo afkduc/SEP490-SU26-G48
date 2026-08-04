@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import AdminProfilePage from './AdminProfilePage';
 import AdminProfileNotificationsPage from './AdminProfileNotificationsPage';
 import './AdminHub.css';
@@ -26,18 +26,26 @@ function resolveTab(raw) {
 
 export default function AdminAccountPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isEditMode = location.pathname.endsWith('/edit');
   const activeTab = isEditMode ? 'profile' : resolveTab(searchParams.get('tab'));
 
   const setActiveTab = useCallback((tab) => {
+    if (tab === activeTab) return;
+    // Route /admin/profile/edit không đọc query 'tab', nên phải rời route này
+    // trước, nếu không tab vừa chọn sẽ không hiển thị.
+    if (isEditMode) {
+      navigate(tab === 'notifications' ? '/admin/profile?tab=notifications' : '/admin/profile');
+      return;
+    }
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (tab === 'profile') next.delete('tab');
       else next.set('tab', tab);
       return next;
     });
-  }, [setSearchParams]);
+  }, [activeTab, isEditMode, navigate, setSearchParams]);
 
   return (
     <div className="admin-page admin-hub">
@@ -53,20 +61,18 @@ export default function AdminAccountPage() {
         </div>
       </div>
 
-      {!isEditMode && (
-        <nav className="admin-hub__tabs" aria-label="Tài khoản của tôi">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`admin-hub__tab${activeTab === tab.id ? ' admin-hub__tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      )}
+      <nav className="admin-hub__tabs" aria-label="Tài khoản của tôi">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`admin-hub__tab${activeTab === tab.id ? ' admin-hub__tab--active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
 
       <div className="admin-hub__body">
         {activeTab === 'notifications' ? (

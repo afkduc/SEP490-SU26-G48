@@ -9,9 +9,53 @@ const VALID_STATUSES = ['active', 'inactive'];
 // quyet toan tu dong dien theo, khong phai chon tay tung lan.
 const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
 
+let vehicleBayRepository = null;
+function getVehicleBayRepository() {
+  if (!vehicleBayRepository) {
+    const VehicleBayRepositoryImpl = require('../../infrastructure/repositories/VehicleBayRepositoryImpl');
+    vehicleBayRepository = new VehicleBayRepositoryImpl();
+  }
+  return vehicleBayRepository;
+}
+
 class ManagerService {
   constructor(managerRepository) {
     this.managerRepository = managerRepository;
+  }
+
+  // To truong quan ly 1 doi tho (users.team_leader_id) - dong bo lai toan bo
+  // danh sach thanh vien theo memberIds truyen len (id nao khong con trong
+  // danh sach thi bi go khoi doi). Chi ap dung cho user role technician,
+  // cung chi nhanh voi to truong nay.
+  async setTeamMembers(branchId, id, memberIds) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    const employee = await this.managerRepository.getEmployeeById(branchId, id);
+    if (!employee) throw new ApiError(404, 'Không tìm thấy nhân viên');
+    if (!Array.isArray(memberIds)) throw new ApiError(400, 'Danh sách thành viên không hợp lệ');
+
+    const normalized = memberIds.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    return this.managerRepository.setTeamMembers(branchId, Number(id), normalized);
+  }
+
+  // To truong phu trach nhieu khoang xe (bang vehicle_bays.team_leader_id) -
+  // dong bo lai toan bo danh sach so khoang theo bayNumbers truyen len.
+  async setBayNumbers(branchId, id, bayNumbers) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    const employee = await this.managerRepository.getEmployeeById(branchId, id);
+    if (!employee) throw new ApiError(404, 'Không tìm thấy nhân viên');
+    if (!Array.isArray(bayNumbers)) throw new ApiError(400, 'Danh sách khoang xe không hợp lệ');
+
+    const normalized = bayNumbers.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    if (new Set(normalized).size !== normalized.length) {
+      throw new ApiError(400, 'Không được nhập trùng số khoang');
+    }
+    // Thuc te 1 to truong luon phai co it nhat vai khoang de doi cua ho hoat
+    // dong (khong the chi phu trach 1-2 khoang).
+    if (normalized.length < 3) {
+      throw new ApiError(400, 'Mỗi tổ trưởng phải phụ trách tối thiểu 3 khoang xe');
+    }
+    await getVehicleBayRepository().setBayNumbers(branchId, Number(id), normalized);
+    return getVehicleBayRepository().findByTeamLeader(Number(id));
   }
 
   async getBranch(branchId) {

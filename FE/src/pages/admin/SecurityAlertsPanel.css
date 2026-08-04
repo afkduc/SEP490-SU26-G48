@@ -179,6 +179,10 @@
   font-size: 0.8rem;
   color: #64748b;
 }
+
+.sec-panel__loading,
+.sec-panel__empty,
+.sec-panel__error {
   padding: 16px;
   text-align: center;
   font-size: 0.875rem;

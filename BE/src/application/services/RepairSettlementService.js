@@ -2,7 +2,9 @@ const { PayOS } = require('@payos/node');
 const ApiError = require('../../utils/ApiError');
 const config = require('../../config');
 const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
+const { PublicVehicleHistoryDto } = RepairSettlementResponseDto;
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
+const { auditLog } = require('../../utils/auditHelper');
 
 let payosClient = null;
 function getPayOS() {
@@ -59,10 +61,41 @@ class RepairSettlementService {
     return RepairSettlementResponseDto.fromEntity(entity);
   }
 
+  // Public - khong dang nhap (xem publicRoutes.js), khong duoc dung req.user o
+  // day. Khach nhap bien so HOAC so khung - xe doi bien van tra duoc bang so
+  // khung. Tra ve null (khong phai loi) neu khong tim thay, de FE hien "khong
+  // co ket qua" thay vi phan biet "sai bien so" hay "chua tung sua o day" -
+  // tranh lo viec 1 bien so co ton tai trong he thong hay khong.
+  async getPublicHistoryByPlateOrFrame(identifier) {
+    const trimmed = (identifier || '').trim();
+    if (!trimmed) throw new ApiError(400, 'Vui lòng nhập biển số xe hoặc số khung');
+
+    const rows = await this.repairSettlementRepository.findPublicHistoryByVehicleIdentifier(trimmed);
+    return PublicVehicleHistoryDto.fromRows(rows);
+  }
+
+  // Chu ky dien tu tai cho (nguoi lien he ky truc tiep len man hinh CVDV luc
+  // chot phieu) - bang chung xac nhan dong y, chi bat buoc luc TAO phieu, sua
+  // phieu sau do khong doi lai chu ky goc.
+  _assertSignaturePresent(signatureData) {
+    if (!(signatureData || '').startsWith('data:image/png;base64,')) {
+      throw new ApiError(400, 'Vui lòng ký xác nhận trước khi lưu phiếu');
+    }
+  }
+
   async create(payload, { branchId, advisorId }) {
+    this._assertSignaturePresent(payload.signatureData);
     const data = this._validateAndNormalize(payload);
+    data.signatureData = payload.signatureData;
+    data.signerName = (payload.signerName || '').trim() || null;
     await this._assertNoActiveDuplicate(data.customerId, data.vehicleId);
     const entity = await this.repairSettlementRepository.create(data, { branchId, advisorId });
+
+    // Realtime: phieu moi luon o trang thai waiting_repair luc vua tao - bao
+    // ngay cho bang tin cac khoang xe trong chi nhanh (xem VehicleBayService),
+    // khong can cho poll/F5.
+    emitRepairOrderEvent(branchId, 'new-pending', { settlementId: entity.id });
+
     return RepairSettlementResponseDto.fromEntity(entity);
   }
 
@@ -113,8 +146,8 @@ class RepairSettlementService {
       throw new ApiError(409, 'Phiếu đã xuất hóa đơn, không thể đổi trạng thái');
     }
     if (status === 'cancelled') {
-      if (existing.status !== 'waiting_repair') {
-        throw new ApiError(409, 'Chỉ có thể hủy phiếu khi đang ở trạng thái chờ sửa chữa (chưa phân công tổ trưởng)');
+      if (!['waiting_repair', 'inprogress'].includes(existing.status)) {
+        throw new ApiError(409, 'Chỉ có thể hủy phiếu khi đang ở trạng thái chờ sửa chữa hoặc đang sửa chữa');
       }
       if (!(cancelReason || '').trim()) {
         throw new ApiError(400, 'Phải nhập lý do hủy');
@@ -122,6 +155,22 @@ class RepairSettlementService {
     }
 
     const entity = await this.repairSettlementRepository.updateStatus(id, status, { issuedBy, cancelReason });
+
+    // Huy giua chung - neu da co to truong nhan (existing.repairOrderId), BE
+    // da tu dong huy luon lenh sua chua cascade (xem
+    // RepairSettlementRepositoryImpl.updateStatus) thay vi tra ve "waiting_repair"
+    // de nhan lai nhu truoc. Luon bao realtime toan chi nhanh: khoang dang
+    // hien DUNG lenh nay (orderId khop) hien ngay banner huy kem ly do, con
+    // cac khoang dang hien no trong bang tin "Viec moi" (chua ai nhan) thi tu
+    // xoa dong tuong ung - xem TeamLeaderKiosk.jsx handleEvent 'order-cancelled'.
+    if (status === 'cancelled') {
+      emitRepairOrderEvent(existing.branchId, 'order-cancelled', {
+        orderId: existing.repairOrderId || null,
+        settlementId: entity.id,
+        cancelReason,
+      });
+    }
+
     return RepairSettlementResponseDto.fromEntity(entity);
   }
 
@@ -161,7 +210,14 @@ class RepairSettlementService {
       expiredAt: new Date(expiredAtUnix * 1000),
     });
 
-    return { qrCode: paymentLink.qrCode, checkoutUrl: paymentLink.checkoutUrl, orderCode, expiredAt: expiredAtUnix };
+    return {
+      qrCode: paymentLink.qrCode,
+      checkoutUrl: paymentLink.checkoutUrl,
+      orderCode,
+      expiredAt: expiredAtUnix,
+      // Chi de audit o controller — FE khong dung field nay.
+      settlementCode: existing.code,
+    };
   }
 
   // Webhook PayOS bao da nhan tien - TU DONG xuat hoa don luon (khong doi
@@ -185,6 +241,25 @@ class RepairSettlementService {
 
     await this.repairSettlementRepository.updateStatus(tx.service_order_id, 'invoiced', { issuedBy: settlement.advisorId });
     emitRepairOrderEvent(settlement.branchId, 'invoiced', { settlementId: tx.service_order_id });
+
+    // Ghi audit sau khi xuat hoa don — khong doi logic thanh toan.
+    // Webhook khong co JWT: actor = system.
+    await auditLog({
+      req: {},
+      action: 'UPDATE',
+      tableName: 'repair_settlements',
+      entityName: 'Phiếu quyết toán',
+      entityCode: settlement.code || `ID-${tx.service_order_id}`,
+      recordId: tx.service_order_id,
+      newValue: {
+        status: 'invoiced',
+        source: 'payos_webhook',
+        orderCode: webhookData.orderCode,
+        reference: webhookData.reference || null,
+      },
+      description: `Thanh toán PayOS thành công — xuất hóa đơn ${settlement.code || tx.service_order_id}`,
+      responseStatus: 200,
+    });
   }
 
   _validateAndNormalize(payload) {
@@ -221,6 +296,7 @@ class RepairSettlementService {
       customerId: payload.customerId,
       vehicleId: payload.vehicleId,
       customerRequest: payload.customerRequest || null,
+      note: payload.note || null,
       currentKm: payload.currentKm ? Number(payload.currentKm) : null,
       subtotal: payload.subtotal,
       discountAmount: payload.discountAmount,
@@ -229,6 +305,7 @@ class RepairSettlementService {
       freeAmount: payload.freeAmount,
       total: payload.total,
       items,
+      intakeChecklist: payload.intakeChecklist || null,
     };
   }
 }
