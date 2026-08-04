@@ -935,7 +935,7 @@ function ServiceDetailModal({ service, onClose }) {
           </div>
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
             <div className="detail-row"><div className="detail-label">Mã dịch vụ</div><div className="detail-value">{service.code}</div></div>
-            <div className="detail-row"><div className="detail-label">Danh mục</div><div className="detail-value">{service.categoryName || '—'}</div></div>
+            <div className="detail-row"><div className="detail-label">Loại hình sửa chữa</div><div className="detail-value">{repairCategoryLabel(service.repairCategory)}</div></div>
             <div className="detail-row"><div className="detail-label">Đơn giá</div><div className="detail-value">{formatCurrency(service.unitPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Thời gian thực hiện</div><div className="detail-value">{service.durationMin ? `${service.durationMin} phút` : '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{service.description || '—'}</div></div>
@@ -975,9 +975,8 @@ function ServiceDetailModal({ service, onClose }) {
 function ServiceListPage() {
   const navigate = useNavigate();
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
-  const [categoryId, setCategoryId] = useState('all');
+  const [repairCategory, setRepairCategory] = useState('all');
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -986,18 +985,12 @@ function ServiceListPage() {
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
-  useEffect(() => {
-    let mounted = true;
-    managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
-    return () => { mounted = false; };
-  }, []);
-
   const reload = () => {
     const seq = ++requestSeq.current;
     setLoading(true);
     setError('');
     managerApi
-      .getServices({ search: search.trim(), categoryId, status })
+      .getServices({ search: search.trim(), repairCategory, status })
       .then((data) => {
         if (seq !== requestSeq.current) return;
         setServices(data || []);
@@ -1018,11 +1011,11 @@ function ServiceListPage() {
     searchTimer.current = setTimeout(reload, 300);
     return () => clearTimeout(searchTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, categoryId, status]);
+  }, [search, repairCategory, status]);
 
   const clearFilters = () => {
     setSearch('');
-    setCategoryId('all');
+    setRepairCategory('all');
     setStatus('all');
   };
 
@@ -1043,8 +1036,8 @@ function ServiceListPage() {
               className="btn btn-secondary"
               onClick={() => exportCsv(
                 'danh-sach-dich-vu.csv',
-                ['Mã DV', 'Tên dịch vụ', 'Danh mục', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
-                services.map((s) => [s.code, s.name, s.categoryName, s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
+                ['Mã DV', 'Tên dịch vụ', 'Loại hình sửa chữa', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
+                services.map((s) => [s.code, s.name, repairCategoryLabel(s.repairCategory), s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
               )}
             >
               📊 Xuất Excel
@@ -1064,10 +1057,10 @@ function ServiceListPage() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã DV, tên dịch vụ..." />
         </div>
 
-        <select className="filter-select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="all">Tất cả danh mục</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+        <select className="filter-select" value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)}>
+          <option value="all">Tất cả loại hình sửa chữa</option>
+          {REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
 
@@ -1099,7 +1092,7 @@ function ServiceListPage() {
             <tr>
               <th>Mã DV</th>
               <th>Tên dịch vụ</th>
-              <th>Danh mục</th>
+              <th>Loại hình sửa chữa</th>
               <th>Đơn giá</th>
               <th>Thời gian</th>
               <th>Trạng thái</th>
@@ -1132,7 +1125,7 @@ function ServiceListPage() {
                 <tr key={service.id}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{service.code}</td>
                   <td style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{service.name}</td>
-                  <td>{service.categoryName || '—'}</td>
+                  <td>{repairCategoryLabel(service.repairCategory)}</td>
                   <td>{formatCurrency(service.unitPrice)}</td>
                   <td>{service.durationMin ? `${service.durationMin} phút` : '—'}</td>
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
@@ -1182,6 +1175,10 @@ const REPAIR_CATEGORY_OPTIONS = [
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
 ];
 
+function repairCategoryLabel(code) {
+  return REPAIR_CATEGORY_OPTIONS.find((o) => o.value === code)?.label || '—';
+}
+
 function ServiceFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -1192,10 +1189,9 @@ function ServiceFormPage({ mode }) {
     : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
-  const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
-    serviceName: '', categoryId: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
+    serviceName: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
   });
   const [parts, setParts] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -1207,7 +1203,6 @@ function ServiceFormPage({ mode }) {
   useEffect(() => {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
-    managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
     managerApi.getProducts().then((data) => { if (mounted) setProducts(data || []); }).catch(() => {});
 
     if (isEdit && id) {
@@ -1217,7 +1212,6 @@ function ServiceFormPage({ mode }) {
           if (!mounted || !data) return;
           setForm({
             serviceName: data.name || '',
-            categoryId: data.categoryId ? String(data.categoryId) : '',
             unitPrice: data.unitPrice ?? '',
             durationMin: data.durationMin ?? '',
             description: data.description || '',
@@ -1248,7 +1242,6 @@ function ServiceFormPage({ mode }) {
   const validate = () => {
     const errors = {};
     if (!form.serviceName.trim()) errors.serviceName = 'Vui lòng nhập tên dịch vụ';
-    if (!form.categoryId) errors.categoryId = 'Vui lòng chọn danh mục';
     if (form.unitPrice === '' || Number.isNaN(Number(form.unitPrice)) || Number(form.unitPrice) < 0) {
       errors.unitPrice = 'Đơn giá không hợp lệ';
     }
@@ -1276,7 +1269,6 @@ function ServiceFormPage({ mode }) {
     try {
       const payload = {
         serviceName: form.serviceName.trim(),
-        categoryId: Number(form.categoryId),
         unitPrice: Number(form.unitPrice),
         durationMin: form.durationMin === '' ? null : Number(form.durationMin),
         description: form.description.trim(),
@@ -1390,17 +1382,6 @@ function ServiceFormPage({ mode }) {
             </div>
 
             <div className="form-group">
-              <label className="form-label required">Danh mục</label>
-              <select className="form-select" value={form.categoryId} onChange={(e) => setField('categoryId', e.target.value)}>
-                <option value="">-- Chọn danh mục --</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {fieldErrors.categoryId && <span className="form-error">{fieldErrors.categoryId}</span>}
-            </div>
-
-            <div className="form-group">
               <label className="form-label required">Đơn giá (VND)</label>
               <input type="number" min="0" className="form-input" value={form.unitPrice} onChange={(e) => setField('unitPrice', e.target.value)} placeholder="0" />
               {fieldErrors.unitPrice && <span className="form-error">{fieldErrors.unitPrice}</span>}
@@ -1509,7 +1490,7 @@ function ServicePackageDetailModal({ pkg, onClose }) {
           </div>
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 16 }}>
             <div className="detail-row"><div className="detail-label">Mã gói</div><div className="detail-value">{pkg.code}</div></div>
-            <div className="detail-row"><div className="detail-label">Danh mục</div><div className="detail-value">{pkg.categoryName || '—'}</div></div>
+            <div className="detail-row"><div className="detail-label">Loại hình sửa chữa</div><div className="detail-value">{repairCategoryLabel(pkg.repairCategory)}</div></div>
             <div className="detail-row"><div className="detail-label">Giá gói</div><div className="detail-value">{formatCurrency(pkg.totalPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{pkg.description || '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Giải thích chi tiết</div><div className="detail-value">{pkg.purpose || '—'}</div></div>
@@ -1548,6 +1529,7 @@ function ServicePackageListPage() {
   const navigate = useNavigate();
   const [packages, setPackages] = useState([]);
   const [search, setSearch] = useState('');
+  const [repairCategory, setRepairCategory] = useState('all');
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1562,7 +1544,7 @@ function ServicePackageListPage() {
     setLoading(true);
     setError('');
     managerApi
-      .getServicePackages({ search: search.trim(), status })
+      .getServicePackages({ search: search.trim(), repairCategory, status })
       .then((data) => {
         if (seq !== requestSeq.current) return;
         setPackages(data || []);
@@ -1583,10 +1565,11 @@ function ServicePackageListPage() {
     searchTimer.current = setTimeout(reload, 300);
     return () => clearTimeout(searchTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status]);
+  }, [search, repairCategory, status]);
 
   const clearFilters = () => {
     setSearch('');
+    setRepairCategory('all');
     setStatus('all');
   };
 
@@ -1616,8 +1599,8 @@ function ServicePackageListPage() {
               className="btn btn-secondary"
               onClick={() => exportCsv(
                 'danh-sach-goi-dich-vu.csv',
-                ['Mã gói', 'Tên gói', 'Danh mục', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
-                packages.map((p) => [p.code, p.name, p.categoryName, p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
+                ['Mã gói', 'Tên gói', 'Loại hình sửa chữa', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
+                packages.map((p) => [p.code, p.name, repairCategoryLabel(p.repairCategory), p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
               )}
             >
               📊 Xuất Excel
@@ -1636,6 +1619,13 @@ function ServicePackageListPage() {
           <span className="search-icon">🔍</span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã gói, tên gói..." />
         </div>
+
+        <select className="filter-select" value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)}>
+          <option value="all">Tất cả loại hình sửa chữa</option>
+          {REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
 
         <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
           {SERVICE_STATUS_OPTIONS.map((option) => (
@@ -1665,7 +1655,7 @@ function ServicePackageListPage() {
             <tr>
               <th>Mã gói</th>
               <th>Tên gói</th>
-              <th>Danh mục</th>
+              <th>Loại hình sửa chữa</th>
               <th>Số dịch vụ</th>
               <th>Giá gói</th>
               <th>Trạng thái</th>
@@ -1698,7 +1688,7 @@ function ServicePackageListPage() {
                 <tr key={pkg.id}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{pkg.code}</td>
                   <td style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{pkg.name}</td>
-                  <td>{pkg.categoryName || '—'}</td>
+                  <td>{repairCategoryLabel(pkg.repairCategory)}</td>
                   <td>{pkg.itemCount}</td>
                   <td>{formatCurrency(pkg.totalPrice)}</td>
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
@@ -1745,11 +1735,10 @@ function ServicePackageFormPage({ mode }) {
     : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
-  const [categories, setCategories] = useState([]);
   const [availableServices, setAvailableServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [form, setForm] = useState({
-    packageName: '', categoryId: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [],
+    packageName: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [],
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1759,7 +1748,6 @@ function ServicePackageFormPage({ mode }) {
   useEffect(() => {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
-    managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
     managerApi.getServices({ status: 'all' }).then((data) => { if (mounted) setAvailableServices(data || []); }).catch(() => {});
 
     if (isEdit && id) {
@@ -1769,7 +1757,6 @@ function ServicePackageFormPage({ mode }) {
           if (!mounted || !data) return;
           setForm({
             packageName: data.name || '',
-            categoryId: data.categoryId ? String(data.categoryId) : '',
             totalPrice: data.totalPrice ?? '',
             description: data.description || '',
             purpose: data.purpose || '',
@@ -1805,7 +1792,6 @@ function ServicePackageFormPage({ mode }) {
   const validate = () => {
     const errors = {};
     if (!form.packageName.trim()) errors.packageName = 'Vui lòng nhập tên gói';
-    if (!form.categoryId) errors.categoryId = 'Vui lòng chọn danh mục';
     if (form.totalPrice === '' || Number.isNaN(Number(form.totalPrice)) || Number(form.totalPrice) < 0) {
       errors.totalPrice = 'Giá gói không hợp lệ';
     }
@@ -1823,7 +1809,6 @@ function ServicePackageFormPage({ mode }) {
     try {
       const payload = {
         packageName: form.packageName.trim(),
-        categoryId: Number(form.categoryId),
         totalPrice: Number(form.totalPrice),
         description: form.description.trim(),
         purpose: form.purpose.trim(),
@@ -1900,17 +1885,6 @@ function ServicePackageFormPage({ mode }) {
               <label className="form-label required">Tên gói dịch vụ</label>
               <input className="form-input" value={form.packageName} onChange={(e) => setField('packageName', e.target.value)} placeholder="Nhập tên gói dịch vụ" />
               {fieldErrors.packageName && <span className="form-error">{fieldErrors.packageName}</span>}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label required">Danh mục</label>
-              <select className="form-select" value={form.categoryId} onChange={(e) => setField('categoryId', e.target.value)}>
-                <option value="">-- Chọn danh mục --</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {fieldErrors.categoryId && <span className="form-error">{fieldErrors.categoryId}</span>}
             </div>
 
             <div className="form-group">
