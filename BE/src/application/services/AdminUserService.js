@@ -183,8 +183,8 @@ class AdminUserService {
     }
   }
 
-  async getDashboardStats() {
-    return this.adminUserRepository.getDashboardStats();
+  async getDashboardStats(filters = {}) {
+    return this.adminUserRepository.getDashboardStats(filters);
   }
 
   async updateUser(payload) {

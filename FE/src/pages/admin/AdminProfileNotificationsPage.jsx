@@ -186,12 +186,16 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
       )}
 
       <div className="notifications-card">
-        <div className="notifications-card__section">
-          <div className="notifications-card__section-title">Thông báo email</div>
+          <div className="notifications-card__section">
+          <div className="notifications-card__section-title">Kênh thông báo bảo mật</div>
+          <p className="notifications-card__section-hint" style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 12px' }}>
+            Các tùy chọn bên dưới bật/tắt thông báo <strong>trong hệ thống</strong> (chuông / danh sách).
+            Hiện chưa gửi email SMTP riêng cho các sự kiện này.
+          </p>
           <label className="notification-row">
             <span className="notification-row__label">
-              <span className="notification-row__title">Thông báo đăng nhập thành công</span>
-              <span className="notification-row__description">Gửi email khi có đăng nhập mới vào hệ thống</span>
+              <span className="notification-row__title">Đăng nhập thành công</span>
+              <span className="notification-row__description">Nhận thông báo trong hệ thống khi có đăng nhập mới</span>
             </span>
             <input
               type="checkbox"
@@ -201,8 +205,8 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
           </label>
           <label className="notification-row">
             <span className="notification-row__label">
-              <span className="notification-row__title">Cảnh báo đăng nhập thất bại</span>
-              <span className="notification-row__description">Gửi email khi phát hiện đăng nhập không thành công</span>
+              <span className="notification-row__title">Đăng nhập thất bại</span>
+              <span className="notification-row__description">Nhận thông báo khi phát hiện đăng nhập không thành công</span>
             </span>
             <input
               type="checkbox"
@@ -212,8 +216,8 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
           </label>
           <label className="notification-row">
             <span className="notification-row__label">
-              <span className="notification-row__title">Thông báo thay đổi phân quyền</span>
-              <span className="notification-row__description">Gửi email khi vai trò hoặc quyền truy cập thay đổi</span>
+              <span className="notification-row__title">Thay đổi phân quyền</span>
+              <span className="notification-row__description">Nhận thông báo khi vai trò hoặc quyền truy cập thay đổi</span>
             </span>
             <input
               type="checkbox"
@@ -224,16 +228,8 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
         </div>
 
         <div className="notifications-card__section">
-          <div className="notifications-card__section-title">Thông báo trong hệ thống</div>
+          <div className="notifications-card__section-title">Thông báo trên giao diện</div>
 
-          {/* schema thuc te DB chi co 1 cot in-app + 1 cot browser.
-              4 checkbox FE cu (inAppLogin, inAppSecurityAlert, inAppRoleChange,
-              emailOnPasswordChange) KHONG ton tai trong DB -> save bi drop
-              ngam va BE NotificationService doc key undefined -> khong gui
-              notification (Bug #8).
-              Fix: map 6 checkbox FE -> 4 column DB that su (NotificationService).
-              3 checkbox inApp cu (in-app login, security, role change) gop vao
-              'inAppOnSystemAlert' (vi BE tuy theo event se check affectsSettings). */}
           <label className="notification-row">
             <span className="notification-row__label">
               <span className="notification-row__title">Thông báo đăng nhập</span>
