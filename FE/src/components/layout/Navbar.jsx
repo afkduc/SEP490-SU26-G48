@@ -36,6 +36,7 @@ const SERVICE_ADVISOR_NAV = [
       { label: 'Tạo quyết toán', path: '/repair-settlement/create' },
     ],
   },
+  { label: 'Khoang xe đang hoạt động', path: '/active-bays' },
   { label: 'Chăm sóc khách hàng', path: '/customer-care' },
   { label: 'Khách hàng', path: '/customers' },
 ];

@@ -209,7 +209,7 @@
 }
 
 /* ── Buttons ──────────────────────────────────────────────── */
-.btn {
+.admin-shell .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -228,12 +228,12 @@
   background: var(--ag-surface-2);
 }
 
-.btn:disabled {
+.admin-shell .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.btn:focus-visible {
+.admin-shell .btn:focus-visible {
   outline: 2px solid var(--ag-primary);
   outline-offset: 2px;
 }

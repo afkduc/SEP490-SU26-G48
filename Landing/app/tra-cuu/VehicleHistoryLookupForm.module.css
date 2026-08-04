@@ -1,0 +1,68 @@
+.hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: left;
+  margin-top: 4px;
+}
+
+.vehicleHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.plate {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.model {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.historyItem {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--bg-alt);
+}
+
+.historyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.historyCode {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.historyBadge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(51, 209, 122, 0.16);
+  color: var(--success);
+}
+
+.historyMeta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-muted);
+}

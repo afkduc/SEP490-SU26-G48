@@ -10,7 +10,7 @@ const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoi
 const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'OTHER'];
 const REPAIR_CATEGORY_LABELS = {
   ER: 'Sửa chữa động cơ',
-  CB: 'Sửa chữa gầm - phanh',
+  CB: 'Sửa chữa gầm',
   EE: 'Sửa chữa điện - điện tử',
   BP: 'Đồng sơn',
   PM: 'Bảo dưỡng định kỳ',

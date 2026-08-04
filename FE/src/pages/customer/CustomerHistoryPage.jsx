@@ -4,6 +4,7 @@ import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services
 import { listCustomersApi, getCustomerApi, updateCustomerApi, importCustomersApi } from '../../services/customerApi';
 import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi } from '../../services/vehicleApi';
 import { STATUS_LABELS } from '../repairsettlement/mockData';
+import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
 import { useAuth } from '../../contexts';
 import { normalizeRoles } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
@@ -15,6 +16,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [showIntake, setShowIntake] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -29,8 +31,17 @@ function SettlementDetailModal({ settlementId, onClose }) {
   const st = detail && (STATUS_LABELS[detail.status] || { label: detail.status, badge: 'badge-inactive' });
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" style={{ gap: 16 }} onClick={onClose}>
+      <div
+        className="modal modal-lg no-scrollbar"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: showIntake ? 'min(680px, 54vw)' : 900,
+          transition: 'max-width 0.25s ease',
+          borderRadius: 14,
+          overflowX: 'hidden',
+        }}
+      >
         <div className="modal-header">
           <h3 className="modal-title">Phiếu quyết toán {detail?.code || ''}</h3>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -120,7 +131,69 @@ function SettlementDetailModal({ settlementId, onClose }) {
                 </table>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              {(() => {
+                const serviceTasks = (detail.tasks || []).filter((t) => t.taskType === 'service');
+                if (serviceTasks.length === 0) return null;
+                const doneCount = serviceTasks.filter((t) => t.isDone).length;
+                return (
+                  <div style={{ marginTop: 4, marginBottom: 16 }}>
+                    <div className="form-section-title">
+                      Tiến độ công việc ({doneCount}/{serviceTasks.length})
+                    </div>
+                    {detail.technicians?.length > 0 && (
+                      <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
+                        Thợ thực hiện: <b>{detail.technicians.map((t) => t.fullName).join(', ')}</b>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {serviceTasks.map((t) => (
+                        <label
+                          key={t.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                            background: t.isDone ? '#E8F5E9' : 'var(--gray-50)', borderRadius: 6,
+                            fontSize: 13,
+                            color: t.isDone ? '#2E7D32' : 'var(--gray-900)',
+                          }}
+                        >
+                          <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#2E7D32' }} />
+                          <span>{t.taskName}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+                {detail.signatureData ? (
+                  <div className="card" style={{ flex: '1 1 280px', maxWidth: 360 }}>
+                    <div className="card-body">
+                      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                        Xác nhận đồng ý phiếu quyết toán
+                      </div>
+                      <img
+                        src={detail.signatureData}
+                        alt="Chữ ký xác nhận"
+                        style={{ display: 'block', margin: '0 auto', height: 90, border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
+                      />
+                      {detail.signerName && (
+                        <div style={{
+                          textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 10,
+                          borderTop: '1px solid var(--gray-200)', paddingTop: 8,
+                        }}>
+                          {detail.signerName}
+                        </div>
+                      )}
+                      {detail.signedAt && (
+                        <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
+                          Ký lúc: {detail.signedAt}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : <div />}
+
                 <div className="summary-box" style={{ minWidth: 260 }}>
                   <div className="summary-row total"><span>Tổng cộng:</span><span>{formatCurrency(detail.total)}</span></div>
                 </div>
@@ -129,9 +202,37 @@ function SettlementDetailModal({ settlementId, onClose }) {
           )}
         </div>
         <div className="modal-footer">
+          {detail && (
+            <button className="btn btn-secondary" onClick={() => setShowIntake((s) => !s)}>
+              {showIntake ? 'Ẩn xem tình trạng xe ban đầu' : 'Xem tình trạng xe ban đầu'}
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
         </div>
       </div>
+
+      {showIntake && detail && (
+        <div
+          className="modal modal-lg no-scrollbar"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            maxWidth: 'min(440px, 38vw)',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: 14,
+            overflowX: 'hidden',
+          }}
+        >
+          <div className="modal-header">
+            <h3 className="modal-title">Phiếu tiếp nhận và bàn giao xe</h3>
+            <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
+          </div>
+          <div className="modal-body">
+            <IntakeChecklistView value={detail.intakeChecklist} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -403,13 +504,13 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
             {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
             <div className="table-wrapper">
               <table className="data-table">
-                <thead><tr><th>Số phiếu</th><th>Chi nhánh</th><th>Ngày</th><th>Khách hàng</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
+                <thead><tr><th>Số phiếu</th><th>Chi nhánh</th><th>Ngày</th><th>Khách hàng</th><th>Trạng thái</th><th></th></tr></thead>
                 <tbody>
                   {loading && (
-                    <tr><td colSpan={7}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
+                    <tr><td colSpan={6}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
                   )}
                   {!loading && history.length === 0 && (
-                    <tr><td colSpan={7}>
+                    <tr><td colSpan={6}>
                       <div className="empty-state">
                         <h3>Chưa có lịch sử</h3>
                       </div>
@@ -423,7 +524,6 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
                         <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{h.branch || '—'}</td>
                         <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{h.date}</td>
                         <td style={{ fontSize: 12 }}>{h.customer?.fullName || '—'}</td>
-                        <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(h.total)}</td>
                         <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
                         <td><button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setViewId(h.id)}>Xem chi tiết</button></td>
                       </tr>
@@ -723,13 +823,13 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
 
                 <div className="table-wrapper">
                   <table className="data-table">
-                    <thead><tr><th>Số phiếu</th><th>Chi nhánh</th><th>Ngày</th><th>Xe</th><th>Tổng tiền</th><th>Trạng thái</th><th></th></tr></thead>
+                    <thead><tr><th>Số phiếu</th><th>Chi nhánh</th><th>Ngày</th><th>Xe</th><th>Trạng thái</th><th></th></tr></thead>
                     <tbody>
                       {loadingHistory && (
-                        <tr><td colSpan={7}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
+                        <tr><td colSpan={6}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
                       )}
                       {!loadingHistory && history.length === 0 && (
-                        <tr><td colSpan={7}>
+                        <tr><td colSpan={6}>
                           <div className="empty-state">
                             <h3>Chưa có lịch sử dịch vụ</h3>
                             {hasHistoryFilters && <p>Không có phiếu nào khớp bộ lọc đang chọn.</p>}
@@ -747,7 +847,6 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                               <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{h.vehicle?.licensePlate}</div>
                               <div style={{ fontSize: 11, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>{h.vehicle?.vehicleModel}</div>
                             </td>
-                            <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(h.total)}</td>
                             <td><span className={`badge ${st.badge}`}>{st.label}</span></td>
                             <td><button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setViewSettlementId(h.id)}>Xem chi tiết</button></td>
                           </tr>
