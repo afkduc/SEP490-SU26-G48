@@ -1,12 +1,12 @@
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import LookupForm from "./LookupForm";
+import TraCuuTabs from "./TraCuuTabs";
 import styles from "./page.module.css";
 
 export const metadata = {
   title: "Tra cứu tiến độ sửa chữa",
   description:
-    "Nhập mã sửa chữa để xem tiến độ sửa chữa xe của bạn tại AutoGara.",
+    "Nhập mã sửa chữa hoặc biển số/số khung xe để tra cứu tiến độ và lịch sử bảo dưỡng tại AutoGara.",
 };
 
 export default function LookupPage() {
@@ -16,12 +16,13 @@ export default function LookupPage() {
       <main className={styles.main}>
         <div className={`container ${styles.inner}`}>
           <span className={styles.eyebrow}>Tra cứu trực tuyến</span>
-          <h1>Tra cứu tiến độ sửa chữa</h1>
+          <h1>Tra cứu sửa chữa &amp; bảo dưỡng</h1>
           <p className={styles.desc}>
             Nhập mã sửa chữa được nhân viên gara cung cấp khi tiếp nhận xe để
-            xem tình trạng sửa chữa mới nhất.
+            xem tiến độ, hoặc tra cứu theo biển số/số khung để xem lại lịch sử
+            bảo dưỡng xe của bạn.
           </p>
-          <LookupForm />
+          <TraCuuTabs />
         </div>
       </main>
       <Footer />

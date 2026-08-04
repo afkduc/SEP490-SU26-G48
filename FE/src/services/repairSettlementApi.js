@@ -39,3 +39,4 @@ export async function updateRepairSettlementStatusApi(id, status, reason) {
 export async function createPayosPaymentLinkApi(id) {
   return httpClient.post(`/repair-settlements/${id}/payos/create-payment-link`);
 }
+
