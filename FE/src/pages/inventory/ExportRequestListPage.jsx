@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { PermissionGate } from '../../components/PermissionGate';
+import { useInventoryBranch } from './InventoryLayout';
 import { useExportRequests } from '../../hooks/inventory/useExportRequests';
 import './ExportRequestListPage.css';
 
@@ -27,8 +28,7 @@ function formatDateTime(d) {
 }
 
 export default function ExportRequestListPage() {
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
   const {
     requests, total, page, limit, loading, error,
@@ -56,6 +56,14 @@ export default function ExportRequestListPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
+  if (!branchId) {
+    return (
+      <div className="er-list__error">
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để xem phiếu xuất.')}
+      </div>
+    );
+  }
+
   return (
     <div className="er-list">
       <div className="er-list__header">
@@ -65,9 +73,11 @@ export default function ExportRequestListPage() {
             Xuất phụ tùng theo phiếu sửa chữa (Service Order). NV kho tự xuất - không cần Manager duyệt.
           </p>
         </div>
-        <Link to="/inventory/export-requests/new" className="btn btn--primary">
-          + Tạo phiếu xuất
-        </Link>
+        <PermissionGate permission="export_requests:create">
+          <Link to="/inventory/export-requests/new" className="btn btn--primary">
+            + Tạo phiếu xuất
+          </Link>
+        </PermissionGate>
       </div>
 
       {/* Tabs theo status */}
