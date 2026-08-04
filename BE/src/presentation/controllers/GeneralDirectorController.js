@@ -144,6 +144,7 @@ class GeneralDirectorController {
         data: req.body,
       });
       await this.notificationService.notifyAdmins('BRANCH_MANAGER_CREATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Giám đốc',
         targetName: data?.full_name || data?.userName || '',
         targetCode: data?.user_code || '',
@@ -166,6 +167,7 @@ class GeneralDirectorController {
         newData: req.body,
       });
       await this.notificationService.notifyAdmins('BRANCH_MANAGER_UPDATED', {
+        auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Giám đốc',
         targetName: data?.full_name || data?.userName || `ID-${req.params.id}`,
         targetCode: data?.user_code || '',

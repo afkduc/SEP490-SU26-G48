@@ -9,8 +9,9 @@ const { runInTransaction } = require('../../utils/sqlTransaction');
  * transaction khi approve.
  */
 class ImportRequestService {
-  constructor({ importRequestRepository }) {
+  constructor({ importRequestRepository, transactionRunner = runInTransaction }) {
     this.importRequestRepository = importRequestRepository;
+    this.transactionRunner = transactionRunner;
   }
 
   async list({ branchId, status, supplierId, fromDate, toDate, search, page, limit } = {}) {
@@ -37,12 +38,13 @@ class ImportRequestService {
     };
   }
 
-  async getById(id) {
+  async getById(id, { branchId } = {}) {
     const numId = Number(id);
     if (!Number.isFinite(numId) || numId <= 0) {
       throw new ApiError(400, 'id khong hop le');
     }
-    const result = await this.importRequestRepository.findById(numId);
+    const scopedBranchId = branchId == null ? undefined : Number(branchId);
+    const result = await this.importRequestRepository.findById(numId, { branchId: scopedBranchId });
     if (!result) throw new ApiError(404, 'Khong tim thay phieu nhap');
     return ImportRequestResponseDto.fromEntity(result.request, result.items);
   }
@@ -56,23 +58,45 @@ class ImportRequestService {
   }
 
   /**
-   * Tao phieu moi (status='pending'). Toan bo trong 1 transaction.
+   * Tao phieu moi. Warehouse staff co the duoc hoan tat ngay trong cung transaction.
    */
-  async create(payload) {
+  async create(payload, { autoApprove = false, approvedBy } = {}) {
     const data = validateCreateImportRequest(payload);
-    const requestCode = await this.importRequestRepository.getNextRequestCode(
-      data.branch_id,
-      data.import_date,
-    );
 
-    const newId = await runInTransaction(async (tx) => {
-      return this.importRequestRepository.create(tx, {
+    const newId = await this.transactionRunner(async (tx) => {
+      const requestCode = await this.importRequestRepository.getNextRequestCode(
+        data.branch_id,
+        data.import_date,
+        tx,
+      );
+
+      const id = await this.importRequestRepository.create(tx, {
         ...data,
         request_code: requestCode,
       }, data.items);
+
+      if (autoApprove) {
+        const approverId = Number(approvedBy);
+        if (!Number.isFinite(approverId) || approverId <= 0) {
+          throw new ApiError(400, 'approvedBy is required');
+        }
+
+        const completed = await this.importRequestRepository.approve(
+          tx,
+          id,
+          approverId,
+          data.import_date,
+          { branchId: data.branch_id },
+        );
+        if (!completed) {
+          throw new ApiError(409, 'Khong the hoan tat phieu nhap vua tao');
+        }
+      }
+
+      return id;
     });
 
-    return this.getById(newId);
+    return this.getById(newId, { branchId: data.branch_id });
   }
 
   /**
@@ -82,7 +106,7 @@ class ImportRequestService {
    *   3) INSERT 1 dong inventory_transactions (type='import') cho moi item
    * Neu loi o buoc nao -> rollback toan bo.
    */
-  async approve(id, { approvedBy }) {
+  async approve(id, { approvedBy, branchId } = {}) {
     const numId = Number(id);
     if (!Number.isFinite(numId) || numId <= 0) {
       throw new ApiError(400, 'id khong hop le');
@@ -91,33 +115,45 @@ class ImportRequestService {
       throw new ApiError(400, 'approvedBy is required');
     }
 
-    const approved = await runInTransaction(async (tx) => {
-      return this.importRequestRepository.approve(tx, numId, Number(approvedBy), new Date());
+    const approved = await this.transactionRunner(async (tx) => {
+      return this.importRequestRepository.approve(
+        tx,
+        numId,
+        Number(approvedBy),
+        new Date(),
+        { branchId: branchId == null ? undefined : Number(branchId) },
+      );
     });
     if (!approved) {
       throw new ApiError(409, 'Phieu khong o trang thai pending hoac khong ton tai');
     }
 
-    return this.getById(numId);
+    return this.getById(numId, { branchId });
   }
 
   /**
    * Tu choi phieu (khoa trang thai pending).
    */
-  async reject(id, payload, { rejectedBy: _rejectedBy } = {}) {
+  async reject(id, payload, { rejectedBy: _rejectedBy, branchId } = {}) {
     const numId = Number(id);
     if (!Number.isFinite(numId) || numId <= 0) {
       throw new ApiError(400, 'id khong hop le');
     }
     const reason = validateReject(payload);
 
-    const ok = await runInTransaction(async (tx) => {
-      return this.importRequestRepository.reject(tx, numId, null, reason);
+    const ok = await this.transactionRunner(async (tx) => {
+      return this.importRequestRepository.reject(
+        tx,
+        numId,
+        null,
+        reason,
+        { branchId: branchId == null ? undefined : Number(branchId) },
+      );
     });
     if (!ok) {
       throw new ApiError(409, 'Phieu khong o trang thai pending hoac khong ton tai');
     }
-    return this.getById(numId);
+    return this.getById(numId, { branchId });
   }
 }
 

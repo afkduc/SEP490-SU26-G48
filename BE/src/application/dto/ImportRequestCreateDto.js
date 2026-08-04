@@ -77,8 +77,13 @@ function validateCreateImportRequest(payload) {
       throw new ApiError(400, `Dong ${idx + 1}: quantity phai la so nguyen duong`);
     }
 
+    const normalizedProductId = Number(productId);
+    if (!Number.isFinite(normalizedProductId) || normalizedProductId <= 0) {
+      throw new ApiError(400, `Dong ${idx + 1}: productId khong hop le`);
+    }
+
     return {
-      product_id: productId != null ? Number(productId) : null,
+      product_id: normalizedProductId,
       product_code: productCode,
       product_name: productName,
       unit: raw.unit ?? null,

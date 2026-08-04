@@ -5,6 +5,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { formatDateSafe } from '../utils/dateUtils';
 import { humanizeNotificationMessage } from '../utils/notificationDisplay';
 import { dispatchLoginChallenge } from '../services/authApi';
+import { auditApi } from '../services/auditApi';
 import { dispatchSessionTakenOverPrompt } from './SessionTakenOverPrompt';
 import { ROLES } from '../constants/roles';
 import './NotificationBell.css';
@@ -52,6 +53,95 @@ function isNewDeviceNotif(type, metadata = {}) {
 function isAdminSecurityNotif(type) {
   const t = String(type || '').toUpperCase();
   return t.startsWith('SECURITY_');
+}
+
+/** Thông báo nghiệp vụ CRUD — bấm vào mở nhật ký audit tương ứng */
+function isCrudAuditLinkable(type) {
+  const t = String(type || '').toUpperCase();
+  if (!t || t.startsWith('SECURITY_')) return false;
+  if ([
+    'LOGIN_CHALLENGE',
+    'LOGIN_SUCCESS',
+    'LOGIN_FAILED',
+    'NEW_DEVICE',
+    'SESSION_TAKEN_OVER',
+    'FORCE_LOGOUT',
+    'FORCE_LOGO',
+  ].includes(t)) {
+    return false;
+  }
+  return (
+    /_(CREATED|UPDATED|DISABLED|ENABLED|DEACTIVATED|REACTIVATED|APPROVED|REJECTED|TRANSFERRED)$/.test(t)
+    || /^(REPAIR_ORDER|SETTLEMENT|PRODUCT|USER|BRANCH|CUSTOMER|IMPORT_REQUEST|EXPORT_REQUEST|VEHICLE_OWNERSHIP|BRANCH_MANAGER)_/.test(t)
+    || t === 'USER_PASSWORD_RESET'
+  );
+}
+
+function preferredAuditAction(type) {
+  const t = String(type || '').toUpperCase();
+  if (/_CREATED$|_APPROVED$/.test(t)) return 'CREATE';
+  if (/_(UPDATED|DISABLED|ENABLED|DEACTIVATED|REACTIVATED|REJECTED|TRANSFERRED|PASSWORD_RESET)$/.test(t)) {
+    return 'UPDATE';
+  }
+  return undefined;
+}
+
+function extractEntityCode(metadata = {}, message = '') {
+  const direct = metadata.targetCode || metadata.entityCode;
+  if (direct != null && String(direct).trim()) return String(direct).trim();
+  const m = String(message || '').match(/\b([A-Z]{2,}(?:-[A-Z0-9]+)*-\d{4}-\d+)\b/);
+  return m ? m[1] : '';
+}
+
+async function resolveAuditLogPath(notif, metadata = {}) {
+  const type = notifTypeOf(notif, metadata);
+  const directId = metadata.auditLogId || metadata.audit_log_id;
+  if (directId != null && String(directId).trim()) {
+    return `/admin/logs/${directId}`;
+  }
+
+  const code = extractEntityCode(metadata, notif.message || metadata.message);
+  if (!code || !isCrudAuditLinkable(type)) return null;
+
+  const action = preferredAuditAction(type);
+  try {
+    const res = await auditApi.getAuditLogs({
+      entityCode: code,
+      ...(action ? { action } : {}),
+      page: 1,
+      pageSize: 10,
+    });
+    const items = res?.items || [];
+    if (items.length === 0 && action) {
+      const fallback = await auditApi.getAuditLogs({
+        entityCode: code,
+        page: 1,
+        pageSize: 5,
+      });
+      const any = fallback?.items?.[0];
+      if (any?.id) return `/admin/logs/${any.id}`;
+    } else if (items[0]?.id) {
+      // Ưu tiên bản ghi gần thời điểm thông báo nhất
+      const notifTs = Date.parse(notif.createdAt || notif.timestamp || metadata.timestamp || '') || 0;
+      let best = items[0];
+      if (notifTs) {
+        let bestDiff = Infinity;
+        for (const item of items) {
+          const ts = Date.parse(item.logged_at || item.loggedAt || '') || 0;
+          const diff = Math.abs(ts - notifTs);
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            best = item;
+          }
+        }
+      }
+      return `/admin/logs/${best.id}`;
+    }
+  } catch (_) {
+    /* fallback list below */
+  }
+
+  return `/admin/logs?entityCode=${encodeURIComponent(code)}`;
 }
 
 function buildLoginSecurityPath(metadata = {}, { tab = 'devices' } = {}) {
@@ -302,7 +392,7 @@ export default function NotificationBell() {
     return () => document.removeEventListener('keydown', handler);
   }, [open]);
 
-  const handleItemClick = useCallback((notif) => {
+  const handleItemClick = useCallback(async (notif) => {
     if (!notif.isRead && !notif.readAt) {
       markRead(notif.id);
     }
@@ -393,6 +483,16 @@ export default function NotificationBell() {
         deviceId: metadata?.deviceId || metadata?.device_id || null,
       });
       setOpen(false);
+      return;
+    }
+
+    // 6) Thông báo nghiệp vụ (phiếu sửa, quyết toán, user, …) → chi tiết nhật ký
+    if (isCrudAuditLinkable(type)) {
+      const path = await resolveAuditLogPath(notif, metadata);
+      if (path) {
+        navigate(path);
+        setOpen(false);
+      }
     }
   }, [markRead, navigate, canOpenLoginSecurity, user]);
 

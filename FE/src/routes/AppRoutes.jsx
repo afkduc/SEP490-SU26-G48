@@ -8,7 +8,7 @@ import SessionTakenOverPrompt from '../components/SessionTakenOverPrompt';
 import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
-import { ROLES } from '../constants/roles';
+import { ROLES, INVENTORY_ACCESS_ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 import { BASE_PATH } from '../config';
 import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
@@ -34,8 +34,13 @@ const GeneralDirectorPage = lazy(() => import('../pages/generalDirector/GeneralD
 const ManagerPage = lazy(() => import('../pages/manager/ManagerPage'));
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
+const UserFormPage = lazy(() => import('../pages/admin/users/UserFormPage'));
+const UserDetailPage = lazy(() => import('../pages/admin/users/UserDetailPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
+const AuditLogDetailPage = lazy(() => import('../pages/admin/AuditLogDetailPage'));
 const AdminCatalogPage = lazy(() => import('../pages/admin/AdminCatalogPage'));
+const BranchFormPage = lazy(() => import('../pages/admin/branches/BranchFormPage'));
+const BranchDetailPage = lazy(() => import('../pages/admin/branches/BranchDetailPage'));
 const AdminLoginSecurityPage = lazy(() =>
   import('../pages/admin/AdminLoginSecurityPage').then((m) => {
     if (!m?.default) {
@@ -193,8 +198,14 @@ function AppRoutes() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="users" element={<AdminUsersPage />} />
+          <Route path="users/new" element={<UserFormPage mode="create" />} />
+          <Route path="users/:id/edit" element={<UserFormPage mode="edit" />} />
+          <Route path="users/:id" element={<UserDetailPage />} />
           <Route path="roles" element={<Navigate to="/admin/users" replace />} />
           <Route path="catalog" element={<AdminCatalogPage />} />
+          <Route path="catalog/branches/new" element={<BranchFormPage mode="create" />} />
+          <Route path="catalog/branches/:id/edit" element={<BranchFormPage mode="edit" />} />
+          <Route path="catalog/branches/:id" element={<BranchDetailPage />} />
           <Route path="branches" element={<Navigate to="/admin/catalog" replace />} />
           <Route path="vehicle-brands" element={<Navigate to="/admin/catalog" replace />} />
           <Route path="login-security" element={<AdminLoginSecurityPage />} />
@@ -202,6 +213,7 @@ function AppRoutes() {
           <Route path="login-sessions" element={<Navigate to="/admin/login-security?tab=sessions" replace />} />
           <Route path="devices" element={<Navigate to="/admin/login-security" replace />} />
           <Route path="logs" element={<AuditLogsPage />} />
+          <Route path="logs/:id" element={<AuditLogDetailPage />} />
           <Route path="profile" element={<AdminAccountPage />} />
           <Route path="profile/edit" element={<AdminAccountPage />} />
           <Route path="profile/notifications" element={<Navigate to="/admin/profile?tab=notifications" replace />} />
@@ -345,9 +357,7 @@ function AppRoutes() {
         <Route
           path={ROUTES.INVENTORY}
           element={
-            <ProtectedRoute
-              roles={[ROLES.WAREHOUSE_STAFF]}
-            >
+            <ProtectedRoute roles={[...INVENTORY_ACCESS_ROLES]}>
               <AppLayout>
                 <InventoryLayout />
               </AppLayout>
@@ -361,10 +371,24 @@ function AppRoutes() {
           <Route path="parts/:id" element={<PartDetailPage />} />
           <Route path="stock" element={<StockPage />} />
           <Route path="import-requests" element={<ImportRequestListPage />} />
-          <Route path="import-requests/new" element={<ImportRequestFormPage />} />
+          <Route
+            path="import-requests/new"
+            element={
+              <ProtectedRoute permission="import_requests:create">
+                <ImportRequestFormPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="import-requests/:id" element={<ImportRequestDetailPage />} />
           <Route path="export-requests" element={<ExportRequestListPage />} />
-          <Route path="export-requests/new" element={<ExportRequestFormPage />} />
+          <Route
+            path="export-requests/new"
+            element={
+              <ProtectedRoute permission="export_requests:create">
+                <ExportRequestFormPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="export-requests/:id" element={<ExportRequestDetailPage />} />
         </Route>
 

@@ -399,7 +399,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
       if (status === 'cancelled') {
         await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
           .input('cancelReason', sql.NVarChar(500), cancelReason || null)
-          .query(`UPDATE service_orders SET status = @status, cancel_reason = @cancelReason WHERE id = @id`);
+          .query(`UPDATE service_orders SET status = @status, cancel_reason = @cancelReason, cancelled_at = GETDATE() WHERE id = @id`);
 
         // Khach huy giua chung, khi da co to truong nhan (lenh sua chua dang
         // "inprogress") - huy luon lenh do CHO DUT DIEM (khong revert ve
