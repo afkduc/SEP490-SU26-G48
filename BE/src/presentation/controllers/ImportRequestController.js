@@ -82,14 +82,13 @@ class ImportRequestController {
 
   getNextCode = async (req, res, next) => {
     try {
-      const { branchId, date } = req.query;
+      const { branchId } = req.query;
       const branchIdToUse = resolveRequestedBranchId(req.user, branchId);
       if (!branchIdToUse) {
         throw new ApiError(400, 'branchId is required');
       }
       const data = await this.importRequestService.getNextRequestCode({
         branchId: branchIdToUse,
-        date,
       });
       return success(res, data, 'Next request code generated');
     } catch (err) {
