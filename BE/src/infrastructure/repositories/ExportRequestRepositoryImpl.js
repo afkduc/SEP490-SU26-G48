@@ -43,7 +43,7 @@ function buildExportRequestFilters({
     params.fromDate = fromDate;
   }
   if (toDate) {
-    where.push('er.created_at <= @toDate');
+    where.push('er.created_at < DATEADD(day, 1, CAST(@toDate AS date))');
     params.toDate = toDate;
   }
   if (search) {
@@ -85,7 +85,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         so.order_code AS service_order_code,
         c.full_name AS customer_name,
         v.license_plate AS vehicle_plate,
-        u_perf.pseudo_id AS performed_by_name,
+        COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.first_name, N'') + N' ' + ISNULL(u_perf.last_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name,
         (SELECT COUNT(*) FROM export_request_items i WHERE i.export_request_id = er.id) AS item_count,
         (SELECT ISNULL(SUM(quantity), 0)
            FROM export_request_items i WHERE i.export_request_id = er.id) AS total_quantity
@@ -129,7 +129,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          so.order_code AS service_order_code,
          c.full_name AS customer_name,
          v.license_plate AS vehicle_plate,
-         u_perf.pseudo_id AS performed_by_name
+         COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.first_name, N'') + N' ' + ISNULL(u_perf.last_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name
        FROM export_requests er
        LEFT JOIN repair_orders ro ON ro.id = er.repair_order_id
        LEFT JOIN service_orders so ON so.id = er.service_order_id OR so.id = ro.service_order_id
@@ -150,10 +150,17 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
 
   async findItemsByRequestId(exportRequestId) {
     const result = await query(
-      `SELECT id, export_request_id, product_id, product_code, product_name, unit, quantity
-       FROM export_request_items
-       WHERE export_request_id = @exportRequestId
-       ORDER BY id ASC`,
+      `SELECT eri.id, eri.export_request_id, eri.product_id, eri.product_code,
+              eri.product_name,
+              CASE WHEN eri.unit IS NULL OR eri.unit LIKE N'%?%'
+                   THEN COALESCE(NULLIF(u.unit_name, N''), eri.unit)
+                   ELSE eri.unit END AS unit,
+              eri.quantity
+       FROM export_request_items eri
+       LEFT JOIN products p ON p.id = eri.product_id
+       LEFT JOIN units u ON u.id = p.unit_id
+       WHERE eri.export_request_id = @exportRequestId
+       ORDER BY eri.id ASC`,
       { exportRequestId }
     );
     return result.recordset.map((r) => ExportRequestItem.fromPersistence(r));
@@ -199,6 +206,12 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const where = [
       `ro.branch_id = @branchId`,
       `ro.status <> 'cancelled'`,
+      `NOT EXISTS (
+        SELECT 1 FROM export_requests er
+        WHERE (er.repair_order_id = ro.id
+          OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+          AND er.status = 'completed'
+      )`,
     ];
     const params = { branchId };
     if (search) {
@@ -233,10 +246,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
             AND rot.task_type = 'product'
             AND rot.product_id IS NOT NULL
         ) AS total_part_quantity,
-        CASE WHEN EXISTS (
-          SELECT 1 FROM export_requests er
-          WHERE er.repair_order_id = ro.id
-        ) THEN 1 ELSE 0 END AS already_exported
+        CAST(0 AS bit) AS already_exported
       FROM repair_orders ro
       LEFT JOIN service_orders so ON so.id = ro.service_order_id
       LEFT JOIN customers c ON c.id = so.customer_id
@@ -266,6 +276,12 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const where = [
       `ro.branch_id = @branchId`,
       `ro.status <> 'cancelled'`,
+      `NOT EXISTS (
+        SELECT 1 FROM export_requests er
+        WHERE (er.repair_order_id = ro.id
+          OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+          AND er.status = 'completed'
+      )`,
     ];
     const params = { branchId };
     if (search) {
@@ -301,10 +317,12 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          c.full_name AS customer_name,
          v.license_plate AS vehicle_plate,
          tl.user_name AS team_leader_name,
-         CASE WHEN EXISTS (
-           SELECT 1 FROM export_requests er
-           WHERE er.repair_order_id = ro.id
-         ) THEN 1 ELSE 0 END AS already_exported
+        CASE WHEN EXISTS (
+          SELECT 1 FROM export_requests er
+          WHERE (er.repair_order_id = ro.id
+            OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+            AND er.status = 'completed'
+        ) THEN 1 ELSE 0 END AS already_exported
        FROM repair_orders ro
        LEFT JOIN service_orders so ON so.id = ro.service_order_id
        LEFT JOIN customers c ON c.id = so.customer_id
@@ -370,6 +388,20 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
    * Tra ve { request, items } de service sinh response DTO.
    */
   async create(tx, requestData, items) {
+    const existingExport = await tx.request()
+      .input('repair_order_id', sql.BigInt, requestData.repair_order_id)
+      .query(`
+        SELECT TOP 1 er.id
+        FROM export_requests er WITH (UPDLOCK, HOLDLOCK)
+        JOIN repair_orders ro ON ro.id = @repair_order_id
+        WHERE (er.repair_order_id = @repair_order_id
+          OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+          AND er.status = 'completed'
+      `);
+    if (existingExport.recordset.length > 0) {
+      throw new ApiError(409, 'Lenh sua chua nay da duoc xuat kho');
+    }
+
     // 1) Insert header (repair_order_id, khong con service_order_id)
     const insertReq = await tx.request()
       .input('request_code', sql.VarChar(30), requestData.request_code)
@@ -399,7 +431,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         .input('product_id', sql.BigInt, item.product_id ?? null)
         .input('product_code', sql.VarChar(30), item.product_code)
         .input('product_name', sql.NVarChar(200), item.product_name)
-        .input('unit', sql.VarChar(20), item.unit ?? null)
+        .input('unit', sql.NVarChar(20), item.unit ?? null)
         .input('quantity', sql.Int, item.quantity)
         .query(`
           INSERT INTO export_request_items (

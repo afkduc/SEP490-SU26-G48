@@ -3,6 +3,13 @@ const { auditCrud } = require('../../utils/auditHelper');
 const ApiError = require('../../utils/ApiError');
 const NotificationService = require('../../application/services/NotificationService');
 
+function hasRole(user, roleName) {
+  const roles = Array.isArray(user?.roles) && user.roles.length
+    ? user.roles
+    : [user?.primaryRole].filter(Boolean);
+  return roles.includes(roleName);
+}
+
 /**
  * Controller cho NV Kho (Warehouse Staff) xu ly phieu xuat kho.
  * Khac ImportRequest:
@@ -26,7 +33,8 @@ class ExportRequestController {
       }
       const result = await this.exportRequestService.list({
         branchId: branchIdToUse,
-        status, repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit,
+        status: hasRole(req.user, 'warehouse_staff') ? 'completed' : status,
+        repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit,
       });
       return success(res, result, 'Export requests retrieved');
     } catch (err) {
@@ -45,14 +53,13 @@ class ExportRequestController {
 
   getNextCode = async (req, res, next) => {
     try {
-      const { branchId, date } = req.query;
+      const { branchId } = req.query;
       const branchIdToUse = branchId ? Number(branchId) : req.user?.branchId;
       if (!branchIdToUse) {
         throw new ApiError(400, 'branchId is required');
       }
       const data = await this.exportRequestService.getNextRequestCode({
         branchId: branchIdToUse,
-        date,
       });
       return success(res, data, 'Next request code generated');
     } catch (err) {

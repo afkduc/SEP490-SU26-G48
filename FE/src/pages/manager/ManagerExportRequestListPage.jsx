@@ -15,11 +15,6 @@ const STATUS_TABS = [
   { value: 'cancelled', label: 'Hủy' },
 ];
 
-function formatDate(d) {
-  if (!d) return '—';
-  return String(d).slice(0, 10);
-}
-
 function formatDateTime(d) {
   if (!d) return '—';
   const s = String(d);
@@ -120,20 +115,18 @@ export default function ManagerExportRequestListPage() {
               <tr>
                 <th>Mã phiếu</th>
                 <th>Ngày tạo</th>
-                <th>Ngày xuất</th>
                 <th>Phiếu sửa chữa</th>
                 <th>Khách hàng</th>
                 <th>Số dòng</th>
                 <th>Tổng SL</th>
                 <th>Trạng thái</th>
-                <th>Người xuất</th>
                 <th style={{ width: 90 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="table__empty">
+                  <td colSpan={8} className="table__empty">
                     Không có phiếu xuất nào trong chi nhánh của bạn
                   </td>
                 </tr>
@@ -144,7 +137,6 @@ export default function ManagerExportRequestListPage() {
                     <tr key={r.id}>
                       <td><span className="font-mono">{r.requestCode}</span></td>
                       <td>{formatDateTime(r.createdAt)}</td>
-                      <td>{formatDate(r.exportDate)}</td>
                       <td><span className="font-mono">{r.serviceOrderCode || '—'}</span></td>
                       <td>{r.customerName || '—'}</td>
                       <td className="text-right">{r.itemCount ?? 0}</td>
@@ -152,7 +144,6 @@ export default function ManagerExportRequestListPage() {
                       <td>
                         <span className={`badge ${meta.className}`}>{meta.label}</span>
                       </td>
-                      <td>{r.performedByName || '—'}</td>
                       <td className="table__actions">
                         <Link
                           to={`/manager/export-requests/${r.id}`}
