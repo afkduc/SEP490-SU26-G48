@@ -9,11 +9,6 @@ const STATUS_META = {
   rejected: { label: 'Từ chối', className: 'badge--danger' },
 };
 
-function formatDate(d) {
-  if (!d) return '—';
-  return String(d).slice(0, 10);
-}
-
 function formatDateTime(d) {
   if (!d) return '—';
   const s = String(d);
@@ -119,9 +114,8 @@ export default function ManagerImportRequestDetailPage() {
             <InfoRow label="Mã phiếu" value={data.requestCode} />
             <InfoRow label="Nhà cung cấp" value={data.supplierName} />
             <InfoRow label="Số hóa đơn NCC" value={data.supplierInvoiceNo} />
-            <InfoRow label="Ngày nhập" value={formatDate(data.importDate)} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
-            <InfoRow label="Người tạo" value={data.requestedByName} />
+            <InfoRow label="Người nhập" value={data.requestedByName} />
             <InfoRow label="Người duyệt" value={data.approvedByName} />
             <InfoRow label="Lý do từ chối" value={data.rejectReason} />
             <InfoRow label="Ghi chú" value={data.notes} />
