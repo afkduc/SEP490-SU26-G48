@@ -25,7 +25,6 @@ const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
-const ActiveBaysPage = lazy(() => import('../pages/repairorder/ActiveBaysPage'));
 const CustomerHistoryPage = lazy(() => import('../pages/customer/CustomerHistoryPage'));
 const CustomerCarePage = lazy(() => import('../pages/customercare/CustomerCarePage'));
 const ServiceRequestsPage = lazy(() => import('../pages/servicerequests/ServiceRequestsPage'));
@@ -324,18 +323,6 @@ function AppRoutes() {
             <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
               <AppLayout>
                 <ServiceRequestsPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* CVDV - xem khoang xe cua to truong nao dang hoat dong, dang lam xe gi */}
-        <Route
-          path="/active-bays"
-          element={
-            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
-              <AppLayout>
-                <ActiveBaysPage />
               </AppLayout>
             </ProtectedRoute>
           }
