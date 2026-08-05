@@ -6,10 +6,6 @@ import { productApi } from '../../services';
 import { PermissionGate } from '../../components/PermissionGate';
 import './ExportRequestFormPage.css';
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function buildItemFromRo(roTask) {
   return {
     rowKey: `r_${roTask.repairTaskId}_${Math.random().toString(36).slice(2, 6)}`,
@@ -34,7 +30,6 @@ export default function ExportRequestFormPage() {
     loadRepairOrder, loadingRoDetail,
   } = useExportRequestForm(branchId);
 
-  const [exportDate, setExportDate] = useState(todayIso());
   const [notes, setNotes] = useState('');
   const [selectedRo, setSelectedRo] = useState(null);
   const [items, setItems] = useState([]);
@@ -142,7 +137,6 @@ export default function ExportRequestFormPage() {
 
   function validate() {
     if (!selectedRo) return 'Vui lòng chọn lệnh sửa chữa';
-    if (!exportDate) return 'Vui lòng chọn ngày xuất';
     if (items.length === 0) return 'Phiếu xuất phải có ít nhất 1 dòng phụ tùng';
     for (let i = 0; i < items.length; i += 1) {
       const it = items[i];
@@ -168,7 +162,6 @@ export default function ExportRequestFormPage() {
     try {
       const created = await submit({
         repairOrderId: selectedRo.id,
-        exportDate,
         notes: notes || undefined,
         items: items.map((it) => ({
           productId: it.productId,
@@ -221,7 +214,7 @@ export default function ExportRequestFormPage() {
               <input
                 className="input"
                 type="text"
-                placeholder="Tìm theo mã LSC, mã RO, tên khách, biển số xe..."
+                placeholder="Tìm theo mã RO, tên khách, biển số xe..."
                 value={roSearchTerm}
                 onChange={(e) => setRoSearchTerm(e.target.value)}
               />
@@ -234,11 +227,9 @@ export default function ExportRequestFormPage() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Mã LSC</th>
                         <th>Mã RO</th>
                         <th>Khách hàng</th>
                         <th>Xe</th>
-                        <th>Trạng thái</th>
                         <th className="text-right">Số PT</th>
                         <th></th>
                       </tr>
@@ -246,23 +237,14 @@ export default function ExportRequestFormPage() {
                     <tbody>
                       {repairOrders.map((ro) => (
                         <tr key={ro.id}>
-                          <td><span className="font-mono">{ro.repairOrderCode}</span></td>
                           <td><span className="font-mono">{ro.serviceOrderCode || '—'}</span></td>
                           <td>{ro.customerName || '—'}</td>
                           <td>{ro.vehiclePlate || '—'}</td>
-                          <td>
-                            {ro.alreadyExported ? (
-                              <span className="badge badge--danger">Đã xuất</span>
-                            ) : (
-                              <span className="badge badge--success">Chưa xuất</span>
-                            )}
-                          </td>
                           <td className="text-right">{ro.partTaskCount ?? 0}</td>
                           <td>
                             <button
                               type="button"
                               className="btn btn--primary btn--sm"
-                              disabled={ro.alreadyExported}
                               onClick={() => handlePickRo(ro)}
                             >
                               Chọn
@@ -278,7 +260,6 @@ export default function ExportRequestFormPage() {
           ) : (
             <div className="er-form__so-summary">
               <div className="er-form__info-grid">
-                <div><strong>Mã LSC:</strong> <span className="font-mono">{selectedRo.repairOrderCode}</span></div>
                 <div><strong>Mã RO:</strong> <span className="font-mono">{selectedRo.serviceOrderCode || '—'}</span></div>
                 <div><strong>Khách hàng:</strong> {selectedRo.customerName || '—'}</div>
                 <div><strong>Xe:</strong> {selectedRo.vehiclePlate || '—'}</div>
@@ -306,27 +287,8 @@ export default function ExportRequestFormPage() {
                     placeholder="EXB-{branchId}-{YYYYMMDD}-{seq}"
                   />
                   {codeError && <div className="er-form__hint er-form__hint--error">{codeError}</div>}
-                  {!loadingCode && !codeError && (
-                    <div className="er-form__hint">
-                      Ngày sinh mã: <strong>{codeDate || '—'}</strong>
-                      &nbsp;
-                      <button type="button" className="btn btn--ghost btn--sm" onClick={refetchCode}>
-                        Sinh lại
-                      </button>
-                    </div>
-                  )}
                 </div>
 
-                <div className="er-form__field">
-                  <label className="er-form__label">Ngày xuất *</label>
-                  <input
-                    className="input"
-                    type="date"
-                    value={exportDate}
-                    onChange={(e) => setExportDate(e.target.value)}
-                    required
-                  />
-                </div>
               </div>
 
               <div className="er-form__field">
