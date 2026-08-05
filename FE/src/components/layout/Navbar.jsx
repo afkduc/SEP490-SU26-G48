@@ -37,7 +37,6 @@ const SERVICE_ADVISOR_NAV = [
       { label: 'Tạo quyết toán', path: '/repair-settlement/create' },
     ],
   },
-  { label: 'Khoang xe đang hoạt động', path: '/active-bays' },
   { label: 'Chăm sóc khách hàng', path: '/customer-care' },
   { label: 'Khách hàng', path: '/customers' },
 ];
@@ -90,10 +89,10 @@ const GENERAL_DIRECTOR_NAV = [
 ];
 
 // ===== Team Leader =====
-const TEAM_LEADER_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard' },
-  { label: 'Nhận việc', path: '/repair-orders', end: true },
-];
+// To truong khong can Bang dieu khien - va sau khi bo di thi chi con "Nhan
+// viec" (man duy nhat cua ho, la trang mac dinh sau dang nhap) nen khong can
+// muc nao tren navbar nua (coi nhu khong co dropdown/nav item gi ca).
+const TEAM_LEADER_NAV = [];
 
 // ===== Technician (Kỹ thuật viên) =====
 const TECHNICIAN_NAV = [

@@ -6,6 +6,7 @@
 }
 
 .tld-tab {
+  position: relative;
   border: none;
   background: none;
   padding: 10px 16px;
@@ -24,6 +25,26 @@
 .tld-tab--active {
   color: var(--primary-dark);
   border-bottom-color: var(--primary);
+}
+
+/* So do goc phai - bao co thay doi/viec moi chua xem, giong badge thong bao
+   chuong o navbar (xem Navbar.css .navbar__badge) - bien mat khi bam vao tab. */
+.tld-tab-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .tld-error {
@@ -312,9 +333,21 @@
   cursor: default;
 }
 
+/* Tich xanh binh thuong khi hoan thanh - KHONG gach ngang, gach ngang danh
+   rieng cho truong hop khach huy hang muc (xem HistorySettlementPage.jsx). */
 .tld-task--done {
+  color: #2E7D32;
+}
+
+.tld-task--done input {
+  accent-color: #2E7D32;
+}
+
+/* Gach ngang - danh rieng cho hang muc bi khach huy giua chung. */
+/* text-decoration KHONG dat o day - de rieng cho span ten trong TaskNameLabel
+   (TeamLeaderDashboard.jsx), tranh gach ngang lan qua ca phan "(Khách hủy)". */
+.tld-task--cancelled {
   color: var(--gray-400);
-  text-decoration: line-through;
 }
 
 /* Tab "Lich su" */

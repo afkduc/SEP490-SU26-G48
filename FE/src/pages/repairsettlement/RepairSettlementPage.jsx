@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { ROLES } from '../../constants/roles';
 import { formatCurrency } from '../../utils';
-import { searchVehiclesApi } from '../../services/vehicleApi';
+import { searchVehiclesApi, listVehicleBrandsApi } from '../../services/vehicleApi';
 import { searchCatalogApi } from '../../services/catalogApi';
 import { searchProductsApi } from '../../services/productApi';
 import {
@@ -23,6 +23,11 @@ import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComp
 import IntakeChecklistView from './IntakeChecklistView';
 import SignaturePad from './SignaturePad';
 import './RepairSettlementPage.css';
+
+// Poll du phong 15s cho cac vung can realtime trong file nay - phong khi mat
+// ket noi SSE tam thoi, cung nguong voi cac man khac da dung pattern nay
+// (TeamLeaderDashboard.jsx, Landing BayScreen.jsx).
+const POLL_INTERVAL_MS = 15000;
 
 // item.lhsc ('DV'/'PT') la LOAI HANG MUC (dong nay la cong tho hay vat tu) -
 // khong con chon tay qua dropdown nua (tu dong theo nut "Thêm dịch vụ"/"Thêm
@@ -49,7 +54,13 @@ const HTTT_OPTIONS = [
   { value: 'BH', label: 'Bảo hiểm chi trả' },
   { value: 'NB', label: 'Nội bộ chịu phí' },
 ];
-const HTTT_LABEL_BY_VALUE = Object.fromEntries(HTTT_OPTIONS.map((o) => [o.value, o.label]));
+// "Khách hủy" - khach dang sua nua chung thi keu huy 1 hang muc (khong phai
+// huy ca phieu). KHONG nam trong HTTT_OPTIONS (danh sach chon binh thuong) vi
+// chi duoc phep chon khi: dang o man Chinh sua phieu "dang sua chua" VA hang
+// muc do CHUA duoc to truong/tho tick hoan thanh - xem canCancelItemHttt().
+const HTTT_CANCELLED_VALUE = 'HUY';
+const HTTT_CANCELLED_OPTION = { value: HTTT_CANCELLED_VALUE, label: 'Khách hủy' };
+const HTTT_LABEL_BY_VALUE = Object.fromEntries([...HTTT_OPTIONS, HTTT_CANCELLED_OPTION].map((o) => [o.value, o.label]));
 // ĐVT thường gặp cho gara ô tô (chỉ áp dụng cho dòng phụ tùng - dòng dịch vụ
 // luôn cố định đơn vị "Công", không cho sửa).
 const UNIT_OPTIONS = ['Cái', 'Bộ', 'Lít', 'Chai', 'Bình'];
@@ -199,19 +210,59 @@ function recalcItem(item) {
   return { ...item, total: (item.isFree || isExemptFromCustomerBilling(item)) ? 0 : rawTotal };
 }
 
-// Hạng mục có HTTT = Bảo hành hãng xe / Bảo hiểm chi trả / Nội bộ chịu phí ->
-// khách không phải trả (hãng xe/bảo hiểm/gara tự xử lý ngoài hệ thống), nên
-// loại khỏi số tiền thu khách.
+// Hạng mục có HTTT = Bảo hành hãng xe / Bảo hiểm chi trả / Nội bộ chịu phí /
+// Khách hủy -> khách không phải trả, nên loại khỏi số tiền thu khách.
 function isExemptFromCustomerBilling(item) {
-  return item.httt === 'BHH' || item.httt === 'BH' || item.httt === 'NB';
+  return item.httt === 'BHH' || item.httt === 'BH' || item.httt === 'NB' || item.httt === HTTT_CANCELLED_VALUE;
 }
 
 // Nhan ngan gon hien ben canh so 0 o cot "Thanh tien" cho dong duoc mien thu
 // khach (vd "0 (Bảo hành)") - de co van biet ngay VI SAO dong nay la 0 ma
 // khong can doi chieu qua cot HTTT.
-const EXEMPTION_SHORT_LABEL = { BHH: 'Bảo hành', BH: 'Bảo hiểm', NB: 'Nội bộ' };
+const EXEMPTION_SHORT_LABEL = { BHH: 'Bảo hành', BH: 'Bảo hiểm', NB: 'Nội bộ', [HTTT_CANCELLED_VALUE]: 'Khách hủy' };
 function exemptionShortLabel(item) {
   return EXEMPTION_SHORT_LABEL[item.httt] || null;
+}
+
+// Phu tung da giam so luong so voi luc luu truoc do (khach hoan tra bot/het
+// hang - vd thao lai phu tung da lap vi khach doi y, xem handleGroupQtyChange)
+// - ghi chu ben canh so tien de co van biet ngay vi sao Thanh tien thap hon
+// don gia*so luong ban dau, khong nham voi cac dong bi mien thu qua HTTT.
+function isQuantityReturned(item) {
+  return item.lhsc === 'PT' && item.originalQty != null && Number(item.qty) < Number(item.originalQty);
+}
+
+// Nhan hien thi 1 tho trong "Thợ thực hiện" - kem "(Điều động)" neu tho nay
+// khong cung to voi to truong dang phu trach lenh sua chua (dieu dong tu to
+// khac sang giup, xem RepairOrder.sameTeam/RepairSettlement.technicians[].sameTeam).
+function formatTechnicianLabel(t) {
+  return t.sameTeam === false ? `${t.fullName} (Điều động)` : t.fullName;
+}
+
+// Hien thi 1 dau muc trong "Tien do cong viec" - hang muc bi khach huy giua
+// chung (isCancelled) hoac moi duoc CVDV them vao SAU luc to truong da nhan
+// viec (isAddedLater) deu can ghi ro o cuoi ten, xem
+// repairOrderTaskBuilder.js/computeDesiredTasks. Tach rieng ten (co the gach
+// ngang neu huy) voi phan mo ngoac o cuoi ("(Khách hủy)"/"(Khách thêm)"...)
+// LUON KHONG gach ngang - CSS text-decoration cua phan tu cha se "xuyen qua"
+// ca span con dau du span con tu dat text-decoration:none (dac thu cua
+// text-decoration, khong giong color), nen phai tach thanh 2 <span> ANH EM
+// (khong long nhau) thay vi dua het vao 1 chuoi roi gach ngang ca the
+// <label>/div cha.
+function TaskNameLabel({ t }) {
+  const suffix = t.isCancelled
+    ? ' (Khách hủy)'
+    : t.isQtyIncreased
+      ? ` (Khách thêm số lượng, tổng là: ${t.quantity})`
+      : t.isAddedLater
+        ? ' (Khách thêm)'
+        : '';
+  return (
+    <>
+      <span style={{ textDecoration: t.isCancelled ? 'line-through' : 'none' }}>{t.taskName}</span>
+      {suffix && <span style={{ textDecoration: 'none' }}>{suffix}</span>}
+    </>
+  );
 }
 
 function calcTotals(items) {
@@ -375,7 +426,7 @@ function printSettlement(order, payosQrCode) {
   <tr>
     <td width="30%"><b>Tên khách hàng:</b> ${order.customer?.fullName}</td>
     <td width="20%"><b>Biển số xe:</b> ${order.vehicle?.licensePlate}</td>
-    <td width="30%"><b>Loại xe:</b> ${order.vehicle?.vehicleModel}</td>
+    <td width="30%"><b>Tên xe:</b> ${order.vehicle?.vehicleModel}</td>
   </tr>
   <tr>
     <td><b>Địa chỉ:</b> ${order.customer?.address}</td>
@@ -517,7 +568,7 @@ function SettlementPreviewModal({ order, onClose }) {
                 <tr>
                   <td className="detail-cell"><b>Tên khách hàng:</b> {order.customer?.fullName}</td>
                   <td className="detail-cell"><b>Biển số xe:</b> {order.vehicle?.licensePlate}</td>
-                  <td className="detail-cell"><b>Loại xe:</b> {order.vehicle?.vehicleModel}</td>
+                  <td className="detail-cell"><b>Tên xe:</b> {order.vehicle?.vehicleModel}</td>
                 </tr>
                 <tr>
                   <td className="detail-cell"><b>Địa chỉ:</b> {order.customer?.address || '—'}</td>
@@ -687,7 +738,7 @@ function DetailModal({ order, onClose, onPreview }) {
               <div className="form-section-title">Thông tin xe</div>
               {[
                 ['Biển số xe', order.vehicle?.licensePlate],
-                ['Loại xe', order.vehicle?.vehicleModel],
+                ['Tên xe', order.vehicle?.vehicleModel],
                 ['Số khung', order.vehicle?.frameNumber],
                 ['Số máy', order.vehicle?.engineNumber],
                 ['Số Km', `${(order.vehicle?.currentKm || 0).toLocaleString()} km`],
@@ -785,15 +836,18 @@ function DetailModal({ order, onClose, onPreview }) {
           {(() => {
             const serviceTasks = (order.tasks || []).filter((t) => t.taskType === 'service');
             if (serviceTasks.length === 0) return null;
-            const doneCount = serviceTasks.filter((t) => t.isDone).length;
+            const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
+            const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
             return (
               <div style={{ marginTop: 16 }}>
                 <div className="form-section-title">
-                  Tiến độ công việc ({doneCount}/{serviceTasks.length})
+                  Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
                 </div>
-                {order.technicians?.length > 0 && (
+                {(order.bayNumber || order.technicians?.length > 0) && (
                   <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
-                    Thợ thực hiện: <b>{order.technicians.map((t) => t.fullName).join(', ')}</b>
+                    {order.bayNumber && <>Khoang đang thực hiện: <b>{order.bayNumber}</b></>}
+                    {order.bayNumber && order.technicians?.length > 0 && '  ·  '}
+                    {order.technicians?.length > 0 && <>Thợ thực hiện: <b>{order.technicians.map(formatTechnicianLabel).join(', ')}</b></>}
                   </div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -802,13 +856,13 @@ function DetailModal({ order, onClose, onPreview }) {
                       key={t.id}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                        background: t.isDone ? '#E8F5E9' : 'var(--gray-50)', borderRadius: 6,
+                        background: t.isCancelled ? 'var(--gray-50)' : (t.isDone ? '#E8F5E9' : 'var(--gray-50)'), borderRadius: 6,
                         fontSize: 13,
-                        color: t.isDone ? '#2E7D32' : 'var(--gray-900)',
+                        color: t.isCancelled ? 'var(--gray-400)' : (t.isDone ? '#2E7D32' : 'var(--gray-900)'),
                       }}
                     >
                       <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#2E7D32' }} />
-                      <span>{t.taskName}</span>
+                      <TaskNameLabel t={t} />
                     </label>
                   ))}
                 </div>
@@ -962,9 +1016,25 @@ function RepairSettlementList() {
   //     don (RepairSettlementService.handlePayosWebhook) - nap lai danh sach;
   //     neu dang mo dung modal xem/in phieu nay thi dong modal va nhay thang
   //     sang tab "Da xuat hoa don" luon, khong can CVDV thao tac gi them.
+  //   - 'claimed': 1 to truong vua nhan phieu (chuyen "Cho sua chua" ->
+  //     "Dang sua chua") -> nap lai danh sach ngay, khong cho toi vong poll
+  //     20s moi thay doi tab; neu dang mo dung modal xem chi tiet phieu do
+  //     thi nap lai luon de thay to truong/khoang vua duoc gan.
+  //   - 'new-pending': co phieu quyet toan moi (CVDV khac trong cung chi
+  //     nhanh vua tao) -> nap lai danh sach ngay, tranh phai doi poll/F5 moi
+  //     thay phieu moi.
   const handleRepairOrderEvent = (event) => {
     if (event.type === 'task-updated' && view && String(view.id) === String(event.settlementId)) {
-      getRepairSettlementApi(view.id).then(setView).catch(() => {});
+      getRepairSettlementApi(view.id).then(setView).catch(() => { });
+    }
+    if (event.type === 'new-pending') {
+      loadAll({ silent: true });
+    }
+    if (event.type === 'claimed') {
+      loadAll({ silent: true });
+      if (view && String(view.id) === String(event.settlementId)) {
+        getRepairSettlementApi(view.id).then(setView).catch(() => { });
+      }
     }
     if (event.type === 'order-completed') {
       loadAll({ silent: true });
@@ -1145,7 +1215,7 @@ function RepairSettlementList() {
                         <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'settlement', id: o.id, code: o.code })}>Hủy</button>
                       )}
 
-                      {o.status === 'inprogress' && o.repairOrderId && (
+                      {o.status === 'inprogress' && o.repairOrderId && !o.hasCompletedTask && (
                         <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'repair_order', id: o.id, code: o.code })}>Hủy</button>
                       )}
 
@@ -1314,8 +1384,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   });
   const [vehicleInfo, setVehicleInfo] = useState(existingOrder?.vehicle || {
     licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '',
-    warrantyEndDate: '', warrantyKmLimit: null,
+    warrantyEndDate: '', warrantyKmLimit: null, brandId: null,
   });
+  // Hang xe (Kia/Mazda) cho dropdown "Hãng xe" khi tao xe MOI (khong tu tra
+  // cuu) - xem listVehicleBrandsApi. Khong can cho man Sua (isEdit luon khoa
+  // toan bo vung khach hang/xe, xem readOnly={isFromLookup || isEdit}).
+  const [vehicleBrands, setVehicleBrands] = useState([]);
+  useEffect(() => {
+    if (isEdit) return;
+    listVehicleBrandsApi().then(setVehicleBrands).catch(() => {});
+  }, [isEdit]);
 
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
   const [note, setNote] = useState(existingOrder?.note || '');
@@ -1339,8 +1417,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // lan luc chon dich vu/goi moi trong phien lam viec nay (xem selectCatalog*).
   const catalogGroupSeq = useRef(0);
   const nextGroupId = () => ++catalogGroupSeq.current;
+  // originalQty = so luong da LUU tu lan truoc (chi dong da co san khi mo
+  // man Chinh sua, dong moi them trong phien nay khong co) - dung de: (1)
+  // chi cho GIAM so luong phu tung (khach hoan tra hang/huy bot), khong cho
+  // tang truc tiep qua o so luong nay - muon dung THEM phai them dong moi
+  // qua "Thêm phụ tùng"/chon lai tu catalog; (2) hien chu thich "(Khách hoàn
+  // trả hàng)" khi da giam - xem handleGroupQtyChange/isQuantityReturned.
   const [items, setItems] = useState(() => assignGroupIds(
-    existingOrder?.items?.length ? existingOrder.items : [emptyItem()],
+    existingOrder?.items?.length
+      ? existingOrder.items.map((it) => ({ ...it, originalQty: it.qty }))
+      : [emptyItem()],
     nextGroupId
   ));
   // Tra cứu hạng mục công việc / gói combo thật trong DB khi gõ ô "Mã hạng mục".
@@ -1358,6 +1444,40 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // bản ghi vừa lưu để cho in lại ngay tại chỗ, không bắt quay về danh sách
   // rồi tìm lại phiếu để in.
   const [savedOrder, setSavedOrder] = useState(null);
+  // Vua luu thanh cong trong phien nay (chua bam "Chinh sua lai phieu") -
+  // khoa toan bo form lai, tranh go them ma khong con nut Luu nao de bam nua
+  // (xem fieldset disabled ben duoi va nut trong Tong ket thanh toan).
+  const locked = Boolean(savedOrder);
+
+  // Tien do (tasks/thợ/khoang) cua lenh sua chua - tach RIENG khoi
+  // existingOrder (prop bat dong, chi nap 1 lan luc mount) vi to
+  // truong/tho co the tick/hoan thanh NGAY LUC CVDV dang mo trang nay -
+  // phai nap lai realtime, khong thi cac kiem tra "da hoan thanh chua"
+  // (canOfferCancel/canRemoveGroup) se dung du lieu cu, cho phep Huy/Xoa
+  // nham 1 hang muc vua duoc tick that ra ngoai doi.
+  const [liveOrderInfo, setLiveOrderInfo] = useState({
+    tasks: existingOrder?.tasks || [],
+    technicians: existingOrder?.technicians || [],
+    bayNumber: existingOrder?.bayNumber || null,
+  });
+  const refreshLiveOrderInfo = useCallback(() => {
+    if (!isEdit || !existingOrder?.id) return;
+    getRepairSettlementApi(existingOrder.id)
+      .then((o) => setLiveOrderInfo({ tasks: o.tasks || [], technicians: o.technicians || [], bayNumber: o.bayNumber || null }))
+      .catch(() => {});
+  }, [isEdit, existingOrder?.id]);
+  useEffect(() => {
+    if (!isEdit) return undefined;
+    const intervalId = setInterval(refreshLiveOrderInfo, POLL_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [isEdit, refreshLiveOrderInfo]);
+  const handleOrderInfoSSE = useCallback((event) => {
+    if (!existingOrder?.repairOrderId) return;
+    if (event.type === 'task-updated' && Number(event.orderId) === Number(existingOrder.repairOrderId)) {
+      refreshLiveOrderInfo();
+    }
+  }, [existingOrder?.repairOrderId, refreshLiveOrderInfo]);
+  useRepairOrderEventsSSE(handleOrderInfoSSE, isEdit);
 
   // Lỗi lưu phiếu hiện giữa màn hình dạng mockup, tự ẩn sau ~4s (không cần
   // đóng tay) - thay cho banner cố định trên đầu trang như trước.
@@ -1470,7 +1590,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // khi autofill nen khong the sua tay duoc nua.
   const resetLookup = () => {
     setCustomerInfo({ fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' });
-    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null });
+    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, brandId: null });
     setCustomerQuery('');
     setPlateQuery('');
     setIsFromLookup(false);
@@ -1504,6 +1624,44 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // ca dau nhom (se keo theo ty le lam sai cac phu tung khac cung nhom).
   const isChildRow = (it) => Boolean(it.groupId) && !it.isGroupParent;
 
+  // Dong PT (phu tung) nay dang "di kem" dich vu con nao trong cung nhom -
+  // luc chen (selectCatalogPackage/selectCatalogService) da chen NGAY SAU
+  // dung dich vu tao ra no, nen chi can lui ve dong DV gan nhat CUNG groupId.
+  // Tra ve -1 neu khong tim thay (phu tung roi, tu them tay qua "Thêm phụ tùng").
+  function findOwningServiceIdx(arr, partIdx) {
+    const groupId = arr[partIdx]?.groupId;
+    if (!groupId) return -1;
+    for (let j = partIdx - 1; j >= 0; j -= 1) {
+      if (arr[j].groupId !== groupId) return -1;
+      if (arr[j].lhsc === 'DV') return j;
+    }
+    return -1;
+  }
+
+  // Task (dau muc trong "Tien do cong viec") ung voi dong nay - khop dung
+  // key ma BE dung de dong bo checklist khi luu (xem repairOrderTaskBuilder
+  // .js computeDesiredTasks): (taskType, taskName=description, productId).
+  // Dich vu con nam trong 1 goi combo con nguyen (chua vo) cung khop dung vi
+  // task cua no duoc BE sinh tu ten dich vu trong catalog, giong het
+  // description da luu tren dong (xem selectCatalogPackage).
+  function findTaskForItem(tasks, item) {
+    const taskType = item.lhsc === 'PT' ? 'product' : 'service';
+    const productId = taskType === 'product' ? (item.productId ?? null) : null;
+    return (tasks || []).find((t) => t.taskType === taskType && t.taskName === item.description && (t.productId ?? null) === productId);
+  }
+
+  // Dong nay (hoac, neu la dau goi combo, BAT KY dich vu con nao trong no) da
+  // duoc tick hoan thanh chua - dung de khoa lua chon "Khách hủy" (dau goi
+  // khong co task rieng, phai gop tu cac dich vu con - xem repairOrderTaskBuilder.js).
+  function isItemOrGroupDone(item, arr, tasks) {
+    if (!tasks || tasks.length === 0) return false;
+    const isPackageHead = item.isGroupParent && item.lhsc === 'DV' && !item.serviceId && Boolean(item.groupId);
+    if (isPackageHead) {
+      return arr.some((it) => it.groupId === item.groupId && it.lhsc === 'DV' && !it.isGroupParent && findTaskForItem(tasks, it)?.isDone);
+    }
+    return Boolean(findTaskForItem(tasks, item)?.isDone);
+  }
+
   // Doi Hinh thuc thanh toan tren dong dau nhom (dich vu/goi chinh) -> tu
   // dong ap dung luon cho tat ca cac dong con cung nhom (dich vu con, phu
   // tung) - vi thuc te ca nhom luon thanh toan chung 1 hinh thuc, khong ai
@@ -1525,6 +1683,159 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         }
       }
       return next;
+    });
+  };
+
+  // Chi cho chon "Khách hủy" khi: dang o man Chinh sua phieu "dang sua chua"
+  // (co lenh sua chua/tasks that de doi chieu), VA hang muc (hoac ca goi neu
+  // la dau goi) CHUA duoc tick hoan thanh, VA chua bi huy tu truoc.
+  const canOfferCancel = (item) => {
+    if (!isEdit || existingOrder?.status !== 'inprogress') return false;
+    if (item.httt === HTTT_CANCELLED_VALUE) return false;
+    return !isItemOrGroupDone(item, items, liveOrderInfo.tasks);
+  };
+
+  // Nut "Xoa" (xoa han khoi phieu, khong de lai vet gi) chi cho phep voi
+  // dong CHUA TUNG duoc luu lan nao (item.id rong - vua them trong phien
+  // dang sua nay, chua bam Luu) - xoa luc nay an toan vi chua tung ton tai
+  // thanh 1 ban ghi that. Dong DA CO id (tuc da it nhat 1 lan duoc luu thanh
+  // cong, xem handleSave nap lai items tu result.items sau moi lan Luu) thi
+  // coi nhu da la 1 ban ghi chinh thuc trong he thong - bat buoc phai di qua
+  // "Huy" (giu lai lam ho so, van tinh tien cong da lam neu co) thay vi xoa
+  // trang, KE CA khi dong do van chua co viec lam gi (chua tick hoan thanh).
+  const canRemoveGroup = (item) => {
+    if (item.id) return false;
+    if (item.httt === HTTT_CANCELLED_VALUE) return false;
+    if (item.lhsc !== 'DV' || !item.isGroupParent || !item.groupId) return true;
+    return !isItemOrGroupDone(item, items, liveOrderInfo.tasks);
+  };
+
+  // Huy 1 hang muc giua chung - 3 truong hop:
+  // 1) Dau goi combo (chua dich vu con nao lam) -> huy CA GOI, ca nhom (dich
+  //    vu con + phu tung) chuyen "Khách hủy" theo.
+  // 2) Dich vu con NAM TRONG 1 goi combo con nguyen -> "vo goi" (xem
+  //    breakApartCombo): tach rieng, lo gia le cho cac dich vu con khac.
+  // 3) Dich vu le (khong phai combo, hoac phu tung doc lap) -> huy don gian,
+  //    phu tung di kem no (cung nhom, dung ngay sau) huy theo.
+  const handleCancelItem = (idx) => {
+    const target = items[idx];
+    if (!target) return;
+    const isPackageHead = target.isGroupParent && target.lhsc === 'DV' && !target.serviceId && Boolean(target.groupId);
+    const isComboChildService = isChildRow(target) && target.lhsc === 'DV';
+
+    if (isComboChildService) {
+      breakApartCombo(target.groupId, idx);
+      return;
+    }
+
+    setItems((prev) => {
+      // Huy tu (khong lam nua/chua dung toi) -> so luong ve 0 luon, khop dung
+      // thuc te "chua tung xuat kho/chua lam" (khac voi "Khách hoàn trả
+      // hàng" - truong hop DA dung mot phan roi tra lai bot).
+      if (isPackageHead) {
+        return prev.map((it) => (it.groupId === target.groupId ? recalcItem({ ...it, httt: HTTT_CANCELLED_VALUE, qty: 0 }) : it));
+      }
+      const next = prev.map((it, i) => (i === idx ? recalcItem({ ...it, httt: HTTT_CANCELLED_VALUE, qty: 0 }) : it));
+      if (target.lhsc === 'DV' && target.groupId) {
+        for (let j = idx + 1; j < next.length && next[j].groupId === target.groupId && next[j].lhsc === 'PT'; j += 1) {
+          next[j] = recalcItem({ ...next[j], httt: HTTT_CANCELLED_VALUE, qty: 0 });
+        }
+      }
+      return next;
+    });
+  };
+
+  // "Vo goi": huy rieng 1 dich vu con giua 1 goi combo con nguyen. Dich vu bi
+  // huy (+ phu tung di kem no) chuyen "Khách hủy"; cac dich vu con CON LAI
+  // (ke ca da tick hoan thanh) lo gia le THAT (tra lai catalog dung theo ma
+  // goi - dong dang luu unitPrice=0 vi gop trong gia goi, can gia goc tung
+  // dich vu rieng); dong dau goi (gia tron goi) bi xoa vi khong con y nghia
+  // mot khi gia da tach rieng tung dich vu - moi dich vu con (ke ca dich vu
+  // bi huy) tro thanh 1 nhom doc lap moi (groupId rieng, isGroupParent),
+  // hanh xu y het 1 dich vu le duoc chon rieng.
+  //
+  // Phu tung nao "di kem" dich vu nao XAC DINH QUA DINH MUC THAT trong
+  // catalog (pkg.items[].parts[].productId), KHONG dua vao vi tri dong ke
+  // nhau trong bang - vi phieu tao TRUOC khi doi sang chen xen ke (hoac loi
+  // xay ra khac) van con luu phu tung gop chung o cuoi, vi tri khong dang tin.
+  // findOwningServiceIdx (vi tri) chi con la fallback khi phu tung khong con
+  // trong dinh muc catalog nua (hiem, vd danh muc da doi sau khi tao phieu).
+  const breakApartCombo = async (groupId, cancelledIdx) => {
+    const headRow = items.find((it) => it.groupId === groupId && it.isGroupParent);
+    if (!headRow) return;
+
+    let priceByServiceId = new Map();
+    let serviceIdByProductId = new Map();
+    try {
+      const result = await searchCatalogApi(headRow.code);
+      const pkg = (result.packages || []).find((p) => p.code === headRow.code);
+      if (pkg) {
+        priceByServiceId = new Map(pkg.items.map((it) => [String(it.serviceId), it.unitPrice]));
+        for (const svc of pkg.items) {
+          for (const part of svc.parts || []) {
+            serviceIdByProductId.set(String(part.productId), String(svc.serviceId));
+          }
+        }
+      }
+    } catch {
+      /* Tra catalog loi - cac dich vu con con lai tam giu gia 0, co van tu sua tay sau. */
+    }
+
+    setItems((prev) => {
+      const groupIdxSet = new Set(prev.map((it, i) => (it.groupId === groupId ? i : -1)).filter((i) => i !== -1));
+      if (!groupIdxSet.has(cancelledIdx)) return prev; // du lieu da doi khac trong luc cho tra catalog
+
+      const sortedGroupIdxs = [...groupIdxSet].sort((a, b) => a - b);
+      const newGroupIdByOwnerIdx = new Map(); // idx dich vu con (trong prev cu) -> groupId rieng moi
+      const idxByServiceId = new Map(); // serviceId dich vu con -> idx (trong prev) - de tra tu productId ra dung idx
+      for (const i of sortedGroupIdxs) {
+        const it = prev[i];
+        if (it.lhsc === 'DV' && !it.isGroupParent && it.serviceId != null) idxByServiceId.set(String(it.serviceId), i);
+      }
+
+      const replacement = [];
+      for (const i of sortedGroupIdxs) {
+        const it = prev[i];
+        if (it.isGroupParent) continue; // bo dong dau goi
+
+        if (it.lhsc === 'DV') {
+          const newGid = nextGroupId();
+          newGroupIdByOwnerIdx.set(i, newGid);
+          if (i === cancelledIdx) {
+            // Huy tu (chua lam) -> so luong ve 0 luon.
+            replacement.push(recalcItem({ ...it, httt: HTTT_CANCELLED_VALUE, qty: 0, groupId: newGid, isGroupParent: true }));
+          } else {
+            const price = priceByServiceId.get(String(it.serviceId));
+            replacement.push(recalcItem({ ...it, unitPrice: price != null ? price : it.unitPrice, groupId: newGid, isGroupParent: true }));
+          }
+          continue;
+        }
+
+        // Phu tung - uu tien tra dung dich vu so huu qua dinh muc catalog
+        // (productId), chi lui ve doan vi tri ke nhau neu khong tim thay
+        // (fallback cho truong hop hiem catalog da doi/thieu du lieu).
+        const ownerServiceId = serviceIdByProductId.get(String(it.productId));
+        const ownerIdx = ownerServiceId != null && idxByServiceId.has(ownerServiceId)
+          ? idxByServiceId.get(ownerServiceId)
+          : findOwningServiceIdx(prev, i);
+        const ownerNewGid = newGroupIdByOwnerIdx.get(ownerIdx);
+        const cancelled = ownerIdx === cancelledIdx;
+        replacement.push(recalcItem({ ...it, groupId: ownerNewGid ?? it.groupId, httt: cancelled ? HTTT_CANCELLED_VALUE : it.httt, qty: cancelled ? 0 : it.qty }));
+      }
+
+      const result = [];
+      let inserted = false;
+      prev.forEach((it, i) => {
+        if (groupIdxSet.has(i)) {
+          if (!inserted) {
+            result.push(...replacement);
+            inserted = true;
+          }
+          return;
+        }
+        result.push(it);
+      });
+      return result;
     });
   };
 
@@ -1550,7 +1861,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       const target = next[idx];
       const isEmpty = rawValue === '';
       const parsed = Number(rawValue);
-      const newQty = isEmpty || Number.isNaN(parsed) ? '' : parsed;
+      let newQty = isEmpty || Number.isNaN(parsed) ? '' : parsed;
+      // Phu tung DA TUNG LUU (originalQty) chi duoc GIAM (khach hoan tra
+      // hang/dung it hon du kien), khong cho tang truc tiep qua o nay vuot
+      // qua so da tung dat ban dau - muon dung THEM phai them 1 dong moi
+      // (qua "Thêm phụ tùng"/chon lai tu catalog), khong sua thang dong cu.
+      if (target.lhsc === 'PT' && typeof newQty === 'number' && target.originalQty != null && newQty > target.originalQty) {
+        newQty = target.originalQty;
+      }
       const oldQty = target.qtyBasis || target.qty || 1;
       const updatedHead = recalcItem({ ...target, qty: newQty });
       if (typeof newQty === 'number' && newQty > 0) {
@@ -1562,7 +1880,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         for (let j = 0; j < next.length; j += 1) {
           if (j !== idx && next[j].groupId === target.groupId) {
             const scaledQty = Math.max(1, Math.round((next[j].qty || 1) * ratio));
-            next[j] = recalcItem({ ...next[j], qty: scaledQty });
+            const scaled = recalcItem({ ...next[j], qty: scaledQty });
+            // Phu tung nay vua duoc co gian THEO dich vu cha (khong phai tu
+            // tay sua rieng dong nay) - coi scaledQty la moc "da tung dat"
+            // MOI, cho giam tiep tu day binh thuong o lan sua sau, thay vi
+            // van bi ep ve moc originalQty CU (tu truoc khi co gian) khien
+            // giam 1 nac nhay thang ve moc cu roi ve 0.
+            if (scaled.lhsc === 'PT' && scaled.originalQty != null) {
+              scaled.originalQty = scaledQty;
+            }
+            next[j] = scaled;
           }
         }
       }
@@ -1582,6 +1909,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const removeItem = (idx) => setItems((prev) => {
     if (prev.length <= 1) return prev;
     const target = prev[idx];
+    if (!canRemoveGroup(target)) return prev;
     const remaining = (target?.isGroupParent && target.groupId)
       ? prev.filter((it, i) => i !== idx && it.groupId !== target.groupId)
       : prev.filter((_, i) => i !== idx);
@@ -1616,23 +1944,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       httt: 'KHT',
       repairCategory: repairCategory || '',
     }));
-  }
-
-  // Gop dinh muc phu tung cua TAT CA dich vu con trong 1 goi combo - neu 2
-  // dich vu trong goi cung dung 1 phu tung thì cộng dồn số lượng, tránh liệt
-  // kê trùng 2 dòng cho cùng 1 phụ tùng.
-  function mergePackageParts(pkg) {
-    const map = new Map();
-    for (const it of pkg.items || []) {
-      for (const p of it.parts || []) {
-        if (map.has(p.productId)) {
-          map.get(p.productId).quantity += p.quantity;
-        } else {
-          map.set(p.productId, { ...p });
-        }
-      }
-    }
-    return Array.from(map.values());
   }
 
   const closeCatalogSuggestions = (idx) => {
@@ -1714,8 +2025,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // "BẢO DƯỠNG CẤP 3" 1 dòng có Thành tiền), CHÈN THÊM ngay dưới các dòng
   // dịch vụ con (gói đơn) chỉ để liệt kê công việc đã bao gồm - không có giá
   // riêng (đơn giá/thành tiền = 0, không cộng thêm vào tổng vì gộp trong giá
-  // gói rồi), rồi chèn tiếp các dòng phụ tùng gộp từ định mức của TẤT CẢ dịch
-  // vụ con trong gói.
+  // gói rồi). Phụ tùng của MỖI dịch vụ con chèn NGAY SAU dịch vụ đó (không
+  // gộp chung 1 cục ở cuối như trước) - để biết đúng phụ tùng nào "đi kèm"
+  // dịch vụ con nào, phục vụ tình huống hủy riêng 1 dịch vụ con giữa chừng
+  // (xem findOwningServiceIdx/handleCancelItem) - có thể trùng phụ tùng
+  // giữa 2 dịch vụ con (mỗi dịch vụ giữ dòng riêng), chấp nhận đánh đổi này.
   const selectCatalogPackage = (idx, pkg) => {
     // Uu tien Loai hinh sua chua khai bao rieng cho GOI; neu goi chua khai
     // bao thi lay tam theo dich vu con dau tien co khai bao - van tot hon
@@ -1744,21 +2058,24 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         groupId,
         isGroupParent: true,
       });
-      const subServiceRows = pkg.items.map((it) => recalcItem({
-        ...emptyItem(),
-        code: it.serviceCode,
-        serviceId: it.serviceId,
-        description: it.serviceName,
-        unitPrice: 0,
-        unit: 'Công',
-        qty: 1,
-        lhsc: 'DV',
-        httt: 'KHT',
-        repairCategory,
-        groupId,
-      }));
-      const partRows = buildPartRows(mergePackageParts(pkg), repairCategory).map((r) => ({ ...r, groupId }));
-      next.splice(idx + 1, 0, ...subServiceRows, ...partRows);
+      const rows = [];
+      for (const it of pkg.items) {
+        rows.push(recalcItem({
+          ...emptyItem(),
+          code: it.serviceCode,
+          serviceId: it.serviceId,
+          description: it.serviceName,
+          unitPrice: 0,
+          unit: 'Công',
+          qty: 1,
+          lhsc: 'DV',
+          httt: 'KHT',
+          repairCategory,
+          groupId,
+        }));
+        rows.push(...buildPartRows(it.parts, repairCategory).map((r) => ({ ...r, groupId })));
+      }
+      next.splice(idx + 1, 0, ...rows);
       return next;
     });
     closeCatalogSuggestions(idx);
@@ -1803,13 +2120,30 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const totals = calcTotals(items);
   const signatureDate = new Date();
 
-  // Bắt buộc phải chọn khách hàng/xe từ gợi ý tra cứu (có id thật trong DB)
-  // trước khi cho lưu — không tự tạo khách hàng/xe mới ở phiếu này.
-  const canSave = Boolean(customerInfo.id) && Boolean(vehicleInfo.id);
+  // Neu chon tu goi y tra cuu (co id that trong DB) thi luon du dieu kien Luu.
+  // Neu KHONG chon tu tra cuu (khach hang/xe hoan toan moi, chi luc TAO phieu
+  // moi) - van cho Luu binh thuong, khong bat buoc phai co san trong DB nua:
+  // BE se tu tim-hoac-tao khach hang (theo SDT) va xe (theo bien so) that,
+  // xem RepairSettlementService._resolveCustomerAndVehicle - chi can du cac o
+  // bat buoc toi thieu de tao duoc 1 ban ghi hop le.
+  const canSave = isFromLookup
+    ? Boolean(customerInfo.id) && Boolean(vehicleInfo.id)
+    : (!isEdit
+      && Boolean((customerInfo.fullName || '').trim())
+      && Boolean((customerInfo.phone || '').trim())
+      && Boolean((vehicleInfo.licensePlate || '').trim())
+      && Boolean(vehicleInfo.brandId)
+      && Boolean((vehicleInfo.vehicleModel || '').trim()));
 
   const buildPayload = () => ({
-    customerId: customerInfo.id,
-    vehicleId: vehicleInfo.id,
+    customerId: customerInfo.id || null,
+    vehicleId: vehicleInfo.id || null,
+    // Chi thuc su can khi customerId/vehicleId con trong (khach hang/xe MOI,
+    // chua chon tu tra cuu) - BE tu tim-hoac-tao that trong DB tu 2 khoi nay,
+    // xem RepairSettlementService._resolveCustomerAndVehicle. Gui kem luon ca
+    // khi da co id cung khong sao (BE bo qua neu da co id).
+    customer: customerInfo,
+    vehicle: vehicleInfo,
     customerRequest,
     note,
     currentKm: vehicleInfo.currentKm || null,
@@ -1824,7 +2158,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
   const handleSave = async () => {
     if (!canSave) {
-      setSaveError('Vui lòng chọn khách hàng và xe từ gợi ý tra cứu trước khi lưu.');
+      setSaveError(isFromLookup
+        ? 'Vui lòng chọn khách hàng và xe từ gợi ý tra cứu trước khi lưu.'
+        : 'Vui lòng nhập đủ tên khách hàng, số điện thoại, biển số xe, hãng xe và tên xe trước khi lưu.');
       return;
     }
     if (vehicleInfo.currentKm === '' || vehicleInfo.currentKm == null) {
@@ -1852,6 +2188,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         setSaving(false);
         setSaved(true);
         setSavedOrder(result);
+        // BE xoa het + ghi lai toan bo service_order_items moi lan luu (xem
+        // RepairSettlementService.update) nen result.items co id THAT moi -
+        // nap lai items local theo id nay de "Xoa" tu dong khoa lai (chi con
+        // "Huy") cho MOI dong, ke ca dong vua moi them trong phien nay -
+        // xem canRemoveGroup.
+        setItems(assignGroupIds(
+          (result.items || []).map((it) => ({ ...it, originalQty: it.qty })),
+          nextGroupId
+        ));
         return;
       }
       await createRepairSettlementApi(payload);
@@ -1890,6 +2235,20 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         </div>
       )}
 
+      {locked && (
+        <div style={{ background: '#FFF7E6', border: '1px solid #FFE0A3', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#8A6100' }}>
+          Phiếu đã lưu - đang ở chế độ chỉ xem. Bấm "Chỉnh sửa lại phiếu" nếu muốn sửa thêm.
+        </div>
+      )}
+
+      {/* locked=true (vua luu xong trong phien nay) khoa toan bo vung nhap
+          lieu - tranh go them roi tuong da luu nhung thuc ra khong con nut
+          Luu nao de bam nua (chi co the sua tiep sau khi bam "Chinh sua lai
+          phieu", xem nut trong Tong ket thanh toan ben duoi). disabled tren
+          fieldset tu dong lan xuong moi input/select/button/textarea con,
+          khong can sua tung o rieng le. */}
+      <fieldset disabled={locked} style={{ border: 'none', margin: 0, padding: 0, minWidth: 0 }}>
+
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
           { label: 'Cố vấn dịch vụ', value: user?.name || 'Cố vấn dịch vụ' },
@@ -1907,7 +2266,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
           <span className="card-title">Thông tin khách hàng & xe</span>
-          {isFromLookup && (
+          {isFromLookup && !isEdit && (
             <button className="btn btn-secondary btn-sm" onClick={resetLookup}>Chọn lại khách hàng</button>
           )}
         </div>
@@ -1918,9 +2277,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 <label className="form-label required">Tên khách hàng</label>
                 <input className="form-input"
                   value={customerQuery}
-                  readOnly={isFromLookup}
+                  readOnly={isFromLookup || isEdit}
                   onChange={(e) => { setCustomerQuery(e.target.value); cInfoSet('fullName', e.target.value); setIsFromLookup(false); setActiveField('customer'); setShowSuggestions(true); }}
-                  onFocus={() => { if (!isFromLookup) { setActiveField('customer'); setShowSuggestions(true); } }}
+                  onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('customer'); setShowSuggestions(true); } }}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
                   placeholder="Nhập tên" />
                 {activeField === 'customer' && showSuggestions && suggestions.length > 0 && (
@@ -1938,16 +2297,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
               <div className="form-group" style={{ marginBottom: 12 }}>
                 <label className="form-label">Địa chỉ</label>
-                <input className="form-input" value={customerInfo.address} readOnly={isFromLookup} onChange={(e) => cInfoSet('address', e.target.value)} placeholder="Địa chỉ khách hàng" />
+                <input className="form-input" value={customerInfo.address} readOnly={isFromLookup || isEdit} onChange={(e) => cInfoSet('address', e.target.value)} placeholder="Địa chỉ khách hàng" />
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label required">Điện thoại</label>
                   <input className="form-input"
                     value={customerInfo.phone}
-                    readOnly={isFromLookup}
+                    readOnly={isFromLookup || isEdit}
                     onChange={(e) => { cInfoSet('phone', e.target.value); setIsFromLookup(false); setActiveField('phone'); setShowSuggestions(true); }}
-                    onFocus={() => { if (!isFromLookup) { setActiveField('phone'); setShowSuggestions(true); } }}
+                    onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('phone'); setShowSuggestions(true); } }}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
                     placeholder="0912345678" />
                   {activeField === 'phone' && showSuggestions && suggestions.length > 0 && (
@@ -1964,7 +2323,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Mã Số Thuế</label>
-                  <input className="form-input" value={customerInfo.taxCode} readOnly={isFromLookup} onChange={(e) => cInfoSet('taxCode', e.target.value)} placeholder="Mã số thuế" />
+                  <input className="form-input" value={customerInfo.taxCode} readOnly={isFromLookup || isEdit} onChange={(e) => cInfoSet('taxCode', e.target.value)} placeholder="Mã số thuế" />
                 </div>
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
@@ -1972,7 +2331,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   <label className="form-label">CCCD</label>
                   <input className="form-input"
                     value={customerInfo.cccd}
-                    readOnly={isFromLookup}
+                    readOnly={isFromLookup || isEdit}
                     onChange={(e) => { cInfoSet('cccd', e.target.value); setIsFromLookup(false); }}
                     placeholder="Số CCCD / CMND" />
                 </div>
@@ -1980,7 +2339,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   <label className="form-label">Email</label>
                   <input className="form-input"
                     value={customerInfo.email}
-                    readOnly={isFromLookup}
+                    readOnly={isFromLookup || isEdit}
                     onChange={(e) => { cInfoSet('email', e.target.value); setIsFromLookup(false); }}
                     placeholder="email@example.com" />
                 </div>
@@ -2002,9 +2361,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 <label className="form-label required">Biển số xe</label>
                 <input className="form-input"
                   value={plateQuery}
-                  readOnly={isFromLookup}
+                  readOnly={isFromLookup || isEdit}
                   onChange={(e) => { setPlateQuery(e.target.value); vInfoSet('licensePlate', e.target.value); setIsFromLookup(false); setActiveField('plate'); setShowSuggestions(true); }}
-                  onFocus={() => { if (!isFromLookup) { setActiveField('plate'); setShowSuggestions(true); } }}
+                  onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('plate'); setShowSuggestions(true); } }}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
                   placeholder="Nhập biển số xe" />
                 {activeField === 'plate' && showSuggestions && suggestions.length > 0 && (
@@ -2020,17 +2379,26 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 )}
               </div>
 
+              {!isFromLookup && !isEdit && (
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label required">Hãng xe</label>
+                  <select className="form-select" value={vehicleInfo.brandId || ''} onChange={(e) => vInfoSet('brandId', e.target.value ? Number(e.target.value) : null)}>
+                    <option value="">-- Chọn hãng xe --</option>
+                    {vehicleBrands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Loại xe</label>
-                <input className="form-input" value={vehicleInfo.vehicleModel} readOnly={isFromLookup} onChange={(e) => vInfoSet('vehicleModel', e.target.value)} placeholder=" " />
+                <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Tên xe</label>
+                <input className="form-input" value={vehicleInfo.vehicleModel} readOnly={isFromLookup || isEdit} onChange={(e) => vInfoSet('vehicleModel', e.target.value)} placeholder={isFromLookup || isEdit ? ' ' : 'VD: K3 1.6 Deluxe 2024'} />
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Số khung</label>
                   <input className="form-input" value={vehicleInfo.frameNumber}
-                    readOnly={isFromLookup}
+                    readOnly={isFromLookup || isEdit}
                     onChange={(e) => { vInfoSet('frameNumber', e.target.value); setIsFromLookup(false); setActiveField('frame'); setShowSuggestions(true); }}
-                    onFocus={() => { if (!isFromLookup) { setActiveField('frame'); setShowSuggestions(true); } }}
+                    onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('frame'); setShowSuggestions(true); } }}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 180)} />
                   {activeField === 'frame' && showSuggestions && suggestions.length > 0 && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
@@ -2047,9 +2415,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Số máy</label>
                   <input className="form-input" value={vehicleInfo.engineNumber}
-                    readOnly={isFromLookup}
+                    readOnly={isFromLookup || isEdit}
                     onChange={(e) => { vInfoSet('engineNumber', e.target.value); setIsFromLookup(false); setActiveField('engine'); setShowSuggestions(true); }}
-                    onFocus={() => { if (!isFromLookup) { setActiveField('engine'); setShowSuggestions(true); } }}
+                    onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('engine'); setShowSuggestions(true); } }}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 180)} />
                   {activeField === 'engine' && showSuggestions && suggestions.length > 0 && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
@@ -2067,7 +2435,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               <div className="form-grid form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Ngày mua</label>
-                  <input className="form-input" type="date" value={vehicleInfo.purchaseDate} readOnly={isFromLookup} onChange={(e) => vInfoSet('purchaseDate', e.target.value)} />
+                  <input className="form-input" type="date" value={vehicleInfo.purchaseDate} readOnly={isFromLookup || isEdit} onChange={(e) => vInfoSet('purchaseDate', e.target.value)} />
                 </div>
                 <div className="form-group">
                   <label className="form-label required">Số Km hiện tại</label>
@@ -2153,107 +2521,131 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         : (suggestion.packages?.length > 0 || suggestion.services?.length > 0)
                     );
                     return (
-                    <tr key={idx} style={{ background: rowColorForGroup(item.groupId) }}>
-                      <td>
-                        <input className="form-input" style={{ fontSize: 11, fontFamily: 'monospace', background: 'transparent' }} value={item.code || ''} readOnly />
-                      </td>
-                      <td style={{ position: 'relative' }}>
-                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.description} disabled={!canSave} readOnly={isChild}
-                          onChange={(e) => handleItemDescription(idx, e.target.value)}
-                          onFocus={(e) => !isChild && openCatalogDropdown(idx, e.target)}
-                          onBlur={() => setTimeout(() => closeCatalogSuggestions(idx), 180)}
-                          placeholder={canSave ? (isPartRow ? 'Nhập tên/mã phụ tùng trong kho...' : 'Nhập tên dịch vụ / gói combo...') : 'Vui lòng chọn khách hàng và xe trước'} />
-                        {hasSuggestions && catalogDropdownRect && createPortal(
-                          <div style={{ position: 'fixed', top: catalogDropdownRect.top, left: catalogDropdownRect.left, width: 440, maxHeight: 420, overflowY: 'auto', background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000 }}>
-                            {suggestion.type === 'product' && suggestion.products?.length > 0 && (
-                              <div>
-                                <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Phụ tùng trong kho</div>
-                                {suggestion.products.map((p) => (
-                                  <div key={`prod-${p.id}`} onMouseDown={() => selectProduct(idx, p)}
-                                    style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
-                                    <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
-                                    <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>
-                                      {formatCurrency(p.unitPrice)} / {p.unitName} · Tồn: {p.stockQuantity}
-                                      {p.isLowStock && <span style={{ color: '#C62828', fontWeight: 600 }}> (sắp hết)</span>}
+                      <tr key={idx} style={{ background: rowColorForGroup(item.groupId) }}>
+                        <td>
+                          <input className="form-input" style={{ fontSize: 11, fontFamily: 'monospace', background: 'transparent' }} value={item.code || ''} readOnly />
+                        </td>
+                        <td style={{ position: 'relative' }}>
+                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.description} disabled={!canSave} readOnly={isChild}
+                            onChange={(e) => handleItemDescription(idx, e.target.value)}
+                            onFocus={(e) => !isChild && openCatalogDropdown(idx, e.target)}
+                            onBlur={() => setTimeout(() => closeCatalogSuggestions(idx), 180)}
+                            placeholder={canSave ? (isPartRow ? 'Nhập tên/mã phụ tùng trong kho...' : 'Nhập tên dịch vụ / gói combo...') : 'Vui lòng chọn khách hàng và xe trước'} />
+                          {hasSuggestions && catalogDropdownRect && createPortal(
+                            <div style={{ position: 'fixed', top: catalogDropdownRect.top, left: catalogDropdownRect.left, width: 440, maxHeight: 420, overflowY: 'auto', background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000 }}>
+                              {suggestion.type === 'product' && suggestion.products?.length > 0 && (
+                                <div>
+                                  <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Phụ tùng trong kho</div>
+                                  {suggestion.products.map((p) => (
+                                    <div key={`prod-${p.id}`} onMouseDown={() => selectProduct(idx, p)}
+                                      style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
+                                      <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
+                                      <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>
+                                        {formatCurrency(p.unitPrice)} / {p.unitName} · Tồn: {p.stockQuantity}
+                                        {p.isLowStock && <span style={{ color: '#C62828', fontWeight: 600 }}> (sắp hết)</span>}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {suggestion.type === 'catalog' && suggestion.packages?.length > 0 && (
-                              <div>
-                                <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Gói combo</div>
-                                {suggestion.packages.map((pkg) => (
-                                  <div key={`pkg-${pkg.id}`} onMouseDown={() => selectCatalogPackage(idx, pkg)}
-                                    style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
-                                    <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pkg.name} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({pkg.items.length} hạng mục)</span></div>
-                                    <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{formatCurrency(pkg.totalPrice)}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {suggestion.type === 'catalog' && suggestion.services?.length > 0 && (
-                              <div>
-                                <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Hạng mục đơn lẻ</div>
-                                {suggestion.services.map((svc) => (
-                                  <div key={`svc-${svc.id}`} onMouseDown={() => selectCatalogService(idx, svc)}
-                                    style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
-                                    <b>{svc.name}</b> <span style={{ color: 'var(--gray-500)' }}>({formatCurrency(svc.unitPrice)})</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>,
-                          document.body
-                        )}
-                      </td>
-                      <td>
-                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }}
-                          value={REPAIR_CATEGORY_LABEL_BY_VALUE[item.repairCategory] || ''} readOnly
-                          title="Loại hình sửa chữa lấy tự động theo dịch vụ/gói đã chọn, không chỉnh sửa trực tiếp trên form" />
-                      </td>
-                      <td>
-                        {isChild ? (
-                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={HTTT_LABEL_BY_VALUE[item.httt] || ''} readOnly />
-                        ) : (
-                          <select className="form-select" style={{ fontSize: 12, background: 'transparent' }} value={item.httt} onChange={(e) => handleHtttChange(idx, e.target.value)}>
-                            <option value=""></option>
-                            {HTTT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        {item.lhsc === 'DV' ? (
-                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value="Công" readOnly />
-                        ) : isChild ? (
-                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.unit} readOnly />
-                        ) : (
-                          <select className="form-select" style={{ fontSize: 12, background: 'transparent' }} value={item.unit} onChange={(e) => setItem(idx, 'unit', e.target.value)}>
-                            {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} type="number" min={1} value={item.qty} readOnly={isChild && item.lhsc !== 'PT' && !item.manualQtyUnlock} onChange={(e) => handleGroupQtyChange(idx, e.target.value)} />
-                      </td>
-                      <td>
-                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }}
-                          value={(item.unitPrice || 0).toLocaleString('vi-VN')} readOnly
-                          title="Đơn giá lấy theo catalog/kho phụ tùng, không chỉnh sửa trực tiếp trên form" />
-                      </td>
-                      <td>
-                        <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} type="number" min={0} max={100} value={item.discount} readOnly={isChild} onChange={(e) => setItem(idx, 'discount', Number(e.target.value))} />
-                      </td>
-                      <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        {(item.total || 0).toLocaleString('vi-VN')}
-                        {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
-                      </td>
-                      <td>
-                        {!isChild && (
-                          <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => removeItem(idx)}>Xóa</button>
-                        )}
-                      </td>
-                    </tr>
+                                  ))}
+                                </div>
+                              )}
+                              {suggestion.type === 'catalog' && suggestion.packages?.length > 0 && (
+                                <div>
+                                  <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Gói combo</div>
+                                  {suggestion.packages.map((pkg) => (
+                                    <div key={`pkg-${pkg.id}`} onMouseDown={() => selectCatalogPackage(idx, pkg)}
+                                      style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
+                                      <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pkg.name} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({pkg.items.length} hạng mục)</span></div>
+                                      <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{formatCurrency(pkg.totalPrice)}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {suggestion.type === 'catalog' && suggestion.services?.length > 0 && (
+                                <div>
+                                  <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Hạng mục đơn lẻ</div>
+                                  {suggestion.services.map((svc) => (
+                                    <div key={`svc-${svc.id}`} onMouseDown={() => selectCatalogService(idx, svc)}
+                                      style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
+                                      <b>{svc.name}</b> <span style={{ color: 'var(--gray-500)' }}>({formatCurrency(svc.unitPrice)})</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>,
+                            document.body
+                          )}
+                        </td>
+                        <td>
+                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }}
+                            value={REPAIR_CATEGORY_LABEL_BY_VALUE[item.repairCategory] || ''} readOnly
+                            title="Loại hình sửa chữa lấy tự động theo dịch vụ/gói đã chọn, không chỉnh sửa trực tiếp trên form" />
+                        </td>
+                        <td>
+                          {isChild ? (
+                            <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={HTTT_LABEL_BY_VALUE[item.httt] || ''} readOnly />
+                          ) : (
+                            <select className="form-select" style={{ fontSize: 12, background: 'transparent' }} value={item.httt}
+                              onChange={(e) => (e.target.value === HTTT_CANCELLED_VALUE ? handleCancelItem(idx) : handleHtttChange(idx, e.target.value))}>
+                              <option value=""></option>
+                              {HTTT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              {(item.httt === HTTT_CANCELLED_VALUE || canOfferCancel(item)) && (
+                                <option value={HTTT_CANCELLED_VALUE}>{HTTT_CANCELLED_OPTION.label}</option>
+                              )}
+                            </select>
+                          )}
+                        </td>
+                        <td>
+                          {item.lhsc === 'DV' ? (
+                            <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value="Công" readOnly />
+                          ) : isChild ? (
+                            <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.unit} readOnly />
+                          ) : (
+                            <select className="form-select" style={{ fontSize: 12, background: 'transparent' }} value={item.unit} onChange={(e) => setItem(idx, 'unit', e.target.value)}>
+                              {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                          )}
+                        </td>
+                        <td>
+                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} type="number" min={item.lhsc === 'PT' ? 0 : 1}
+                            title={item.lhsc === 'PT' ? 'Có thể chỉnh về 0 nếu phụ tùng được hoàn trả lại kho (vd: đã lắp nhưng khách hủy, tháo trả lại) mà không ảnh hưởng tiền công đã tính' : undefined}
+                            value={item.qty} readOnly={isChild && item.lhsc !== 'PT' && !item.manualQtyUnlock} onChange={(e) => handleGroupQtyChange(idx, e.target.value)} />
+                        </td>
+                        <td>
+                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }}
+                            value={(item.unitPrice || 0).toLocaleString('vi-VN')} readOnly
+                            title="Đơn giá lấy theo catalog/kho phụ tùng, không chỉnh sửa trực tiếp trên form" />
+                        </td>
+                        <td>
+                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} type="number" min={0} max={100} value={item.discount} readOnly={isChild} onChange={(e) => setItem(idx, 'discount', Number(e.target.value))} />
+                        </td>
+                        <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                          {(item.total || 0).toLocaleString('vi-VN')}
+                          {exemptionShortLabel(item) ? (
+                            <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>
+                          ) : isQuantityReturned(item) && (
+                            <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> (Khách hoàn trả hàng SL x {item.originalQty - item.qty})</span>
+                          )}
+                        </td>
+                        <td>
+                          {!isChild && canRemoveGroup(item) && (
+                            <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => removeItem(idx)}>Xóa</button>
+                          )}
+                          {/* Dong dau nhom/dich vu le DA la ban ghi that (canRemoveGroup=false vi
+                              da co id) nen khong con nut Xoa - phai co nut Hủy rieng o day, khong
+                              the chi trong vao lua chon "Khách hủy" an trong dropdown HTTT (de bi
+                              bo sot, xem phan hoi CVDV). */}
+                          {!isChild && !canRemoveGroup(item) && canOfferCancel(item) && (
+                            <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => handleCancelItem(idx)} title="Khách hủy dịch vụ/gói này">
+                              Hủy
+                            </button>
+                          )}
+                          {isChild && item.lhsc === 'DV' && canOfferCancel(item) && (
+                            <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => handleCancelItem(idx)} title="Khách hủy riêng dịch vụ này, tách khỏi giá gói combo">
+                              Hủy
+                            </button>
+                          )}
+                        </td>
+                      </tr>
                     );
                   };
 
@@ -2293,6 +2685,45 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         </div>
       </div>
 
+      {isEdit && (() => {
+        const serviceTasks = (liveOrderInfo.tasks || []).filter((t) => t.taskType === 'service');
+        if (serviceTasks.length === 0) return null;
+        const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
+        const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
+        return (
+          <div style={{ marginTop: 16 }}>
+            <div className="form-section-title">
+              Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
+            </div>
+            {(liveOrderInfo.bayNumber || liveOrderInfo.technicians?.length > 0) && (
+              <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
+                {liveOrderInfo.bayNumber && <>Khoang đang thực hiện: <b>{liveOrderInfo.bayNumber}</b></>}
+                {liveOrderInfo.bayNumber && liveOrderInfo.technicians?.length > 0 && '  ·  '}
+                {liveOrderInfo.technicians?.length > 0 && <>Thợ thực hiện: <b>{liveOrderInfo.technicians.map(formatTechnicianLabel).join(', ')}</b></>}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {serviceTasks.map((t) => (
+                <label
+                  key={t.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                    background: t.isCancelled ? 'var(--gray-50)' : (t.isDone ? '#E8F5E9' : 'var(--gray-50)'), borderRadius: 6,
+                    fontSize: 13,
+                    color: t.isCancelled ? 'var(--gray-400)' : (t.isDone ? '#2E7D32' : 'var(--gray-900)'),
+                  }}
+                >
+                  <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#2E7D32' }} />
+                  <TaskNameLabel t={t} />
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      </fieldset>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         {!isEdit && !savedOrder && (
           <div className="card" style={{ flex: '1 1 360px', maxWidth: 460 }}>
@@ -2316,6 +2747,34 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           </div>
         )}
 
+        {isEdit && (existingOrder?.signatureData ? (
+          <div className="card" style={{ flex: '1 1 280px', maxWidth: 360 }}>
+            <div className="card-body">
+              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                Xác nhận đồng ý phiếu quyết toán
+              </div>
+              <img
+                src={existingOrder.signatureData}
+                alt="Chữ ký xác nhận"
+                style={{ display: 'block', margin: '0 auto', height: 90, border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
+              />
+              {existingOrder.signerName && (
+                <div style={{
+                  textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 10,
+                  borderTop: '1px solid var(--gray-200)', paddingTop: 8,
+                }}>
+                  {existingOrder.signerName}
+                </div>
+              )}
+              {existingOrder.signedAt && (
+                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
+                  Ký lúc: {existingOrder.signedAt}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : <div />)}
+
         {/* Tổng kết */}
         <div className="card" style={{ width: '100%', maxWidth: 340, position: 'sticky', top: 70, alignSelf: 'start' }}>
           <div className="card-header"><span className="card-title">Tổng kết thanh toán</span></div>
@@ -2335,19 +2794,17 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
             {!canSave && (
               <div style={{ fontSize: 12, color: '#E65100', marginBottom: 8 }}>
-                Vui lòng chọn khách hàng và xe từ gợi ý tra cứu để có thể lưu.
+                {isFromLookup
+                  ? 'Vui lòng chọn khách hàng và xe từ gợi ý tra cứu để có thể lưu.'
+                  : 'Vui lòng nhập đủ tên khách hàng, số điện thoại, biển số xe, hãng xe và tên xe để có thể lưu.'}
               </div>
             )}
 
             {savedOrder ? (
               <>
                 <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
-                  onClick={() => printSettlement(savedOrder)}>
-                  In lại phiếu quyết toán
-                </button>
-                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
-                  onClick={() => printWorkList(savedOrder)}>
-                  In danh sách công việc
+                  onClick={() => setSavedOrder(null)}>
+                  Chỉnh sửa lại phiếu
                 </button>
                 <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}
                   onClick={() => navigate('/repair-settlement')}>
