@@ -5,32 +5,32 @@
 }
 
 :root {
-  /* ── Design tokens – unified indigo system ── */
-  --color-primary: #4f46e5;
-  --color-primary-dark: #4338ca;
-  --color-primary-light: #6366f1;
-  --color-primary-very-light: #eef2ff;
+  /* ── Design tokens – grayscale mockup ── */
+  --color-primary: #18181b;
+  --color-primary-dark: #09090b;
+  --color-primary-light: #3f3f46;
+  --color-primary-very-light: #e4e4e7;
 
-  --color-bg: #f8fafc;
+  --color-bg: #f4f4f5;
   --color-bg-card: #ffffff;
-  --color-text: #0f172a;
-  --color-text-muted: #64748b;
-  --color-text-subtle: #94a3b8;
-  --color-border: #e2e8f0;
-  --color-border-light: #f1f5f9;
+  --color-text: #111111;
+  --color-text-muted: #71717a;
+  --color-text-subtle: #a1a1aa;
+  --color-border: #e4e4e7;
+  --color-border-light: #f4f4f5;
 
-  --color-success: #16a34a;
-  --color-success-bg: #dcfce7;
-  --color-success-border: #bbf7d0;
-  --color-danger: #dc2626;
-  --color-danger-bg: #fef2f2;
-  --color-danger-border: #fecaca;
-  --color-warning: #d97706;
-  --color-warning-bg: #fef9c3;
-  --color-warning-border: #fde68a;
-  --color-info: #2563eb;
-  --color-info-bg: #dbeafe;
-  --color-info-border: #bfdbfe;
+  --color-success: #3f3f46;
+  --color-success-bg: #e4e4e7;
+  --color-success-border: #a1a1aa;
+  --color-danger: #27272a;
+  --color-danger-bg: #e4e4e7;
+  --color-danger-border: #a1a1aa;
+  --color-warning: #52525b;
+  --color-warning-bg: #f4f4f5;
+  --color-warning-border: #d4d4d8;
+  --color-info: #52525b;
+  --color-info-bg: #f4f4f5;
+  --color-info-border: #d4d4d8;
 
   --radius-sm: 6px;
   --radius: 10px;
@@ -38,36 +38,36 @@
   --radius-xl: 20px;
   --radius-full: 9999px;
 
-  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-sm: 0 1px 4px rgba(15, 23, 42, 0.06);
-  --shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.12);
-  --shadow-xl: 0 20px 60px rgba(15, 23, 42, 0.16);
+  --shadow-xs: 0 1px 2px rgba(9, 9, 11, 0.04);
+  --shadow-sm: 0 1px 4px rgba(9, 9, 11, 0.06);
+  --shadow: 0 4px 12px rgba(9, 9, 11, 0.08);
+  --shadow-lg: 0 10px 30px rgba(9, 9, 11, 0.12);
+  --shadow-xl: 0 20px 60px rgba(9, 9, 11, 0.16);
 
   /* Legacy aliases – keep for backward compat */
-  --primary: #4f46e5;
-  --primary-dark: #4338ca;
-  --primary-light: #6366f1;
-  --primary-very-light: #eef2ff;
+  --primary: #18181b;
+  --primary-dark: #09090b;
+  --primary-light: #3f3f46;
+  --primary-very-light: #e4e4e7;
   --white: #ffffff;
-  --gray-50: #f8fafc;
-  --gray-100: #f1f5f9;
-  --gray-200: #e2e8f0;
-  --gray-300: #cbd5e1;
-  --gray-400: #94a3b8;
-  --gray-500: #64748b;
-  --gray-600: #475569;
-  --gray-700: #374151;
-  --gray-800: #1e293b;
-  --gray-900: #0f172a;
-  --red: #dc2626;
-  --red-light: #fef2f2;
-  --orange: #f57c00;
-  --orange-light: #fff3e0;
-  --blue: #2563eb;
-  --blue-light: #dbeafe;
-  --yellow: #f9a825;
-  --yellow-light: #fffde7;
+  --gray-50: #fafafa;
+  --gray-100: #f4f4f5;
+  --gray-200: #e4e4e7;
+  --gray-300: #d4d4d8;
+  --gray-400: #a1a1aa;
+  --gray-500: #71717a;
+  --gray-600: #52525b;
+  --gray-700: #3f3f46;
+  --gray-800: #27272a;
+  --gray-900: #18181b;
+  --red: #27272a;
+  --red-light: #e4e4e7;
+  --orange: #52525b;
+  --orange-light: #f4f4f5;
+  --blue: #3f3f46;
+  --blue-light: #e4e4e7;
+  --yellow: #71717a;
+  --yellow-light: #f4f4f5;
 }
 
 body {
@@ -91,7 +91,7 @@ body {
   justify-content: space-between;
   padding: 16px 24px;
   background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e4e4e7;
 }
 
 .layout-header__brand {
@@ -117,14 +117,14 @@ body {
   padding: 16px 24px;
   text-align: center;
   color: var(--color-muted);
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #e4e4e7;
   background: #ffffff;
 }
 
 .card {
   background: #ffffff;
   border-radius: var(--radius);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 3px rgba(9, 9, 11, 0.06);
 }
 
 .card--boxed {
@@ -158,7 +158,7 @@ body {
 }
 
 .btn--secondary {
-  background: #e2e8f0;
+  background: #e4e4e7;
   color: var(--color-text);
 }
 
@@ -235,13 +235,13 @@ body {
 .btn-secondary:hover { background-color: var(--gray-100); }
 
 .btn-danger { background-color: var(--red); color: white; }
-.btn-danger:hover { background-color: #c62828; }
+.btn-danger:hover { background-color: #09090b; }
 
 .btn-warning { background-color: var(--orange); color: white; }
-.btn-warning:hover { background-color: #e65100; }
+.btn-warning:hover { background-color: #3f3f46; }
 
 .btn-info { background-color: var(--blue); color: white; }
-.btn-info:hover { background-color: #1565c0; }
+.btn-info:hover { background-color: #27272a; }
 
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-lg { padding: 10px 22px; font-size: 15px; }
@@ -366,13 +366,13 @@ body {
   font-weight: 700;
 }
 
-.badge-active    { background: #e8f5e9; color: #2e7d32; }
-.badge-inactive  { background: #fafafa; color: #757575; }
-.badge-pending   { background: #fff3e0; color: #e65100; }
-.badge-approved  { background: #e3f2fd; color: #1565c0; }
-.badge-completed { background: #e8f5e9; color: #1b5e20; }
-.badge-cancelled { background: #ffebee; color: #c62828; }
-.badge-inprogress{ background: #fff8e1; color: #f57f17; }
+.badge-active    { background: #e4e4e7; color: #3f3f46; }
+.badge-inactive  { background: #fafafa; color: #71717a; }
+.badge-pending   { background: #f4f4f5; color: #52525b; }
+.badge-approved  { background: #e4e4e7; color: #27272a; }
+.badge-completed { background: #e4e4e7; color: #18181b; }
+.badge-cancelled { background: #f4f4f5; color: #52525b; }
+.badge-inprogress{ background: #f4f4f5; color: #3f3f46; }
 
 .form-grid { display: grid; gap: 20px; }
 .form-grid-2 { grid-template-columns: 1fr 1fr; }
@@ -584,11 +584,11 @@ body {
 
 /* ── Utility ── */
 .text-right { text-align: right; }
-.text-success { color: #065f46; font-weight: 600; }
-.text-danger { color: #991b1b; font-weight: 600; }
-.font-mono { font-family: 'Courier New', monospace; font-size: 13px; color: #4338ca; }
+.text-success { color: #3f3f46; font-weight: 600; }
+.text-danger { color: #27272a; font-weight: 600; }
+.font-mono { font-family: 'Courier New', monospace; font-size: 13px; color: #18181b; }
 .table__actions { display: flex; gap: 4px; align-items: center; }
-.table__empty { text-align: center; color: #9ca3af; padding: 40px 12px !important; }
+.table__empty { text-align: center; color: #a1a1aa; padding: 40px 12px !important; }
 
 /* Class dung chung cho cac luoi 2 cot thong tin (kieu "Thong tin khach hang" /
    "Thong tin xe" canh nhau) dung inline style rai rac o nhieu trang (modal chi

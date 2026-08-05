@@ -1,6 +1,6 @@
 .App {
   text-align: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3f3f46 0%, #3f3f46 100%);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -38,7 +38,7 @@
 }
 
 .demo-section button {
-  background-color: #667eea;
+  background-color: #3f3f46;
   color: white;
   border: none;
   padding: 12px 30px;
@@ -49,7 +49,7 @@
 }
 
 .demo-section button:hover:not(:disabled) {
-  background-color: #764ba2;
+  background-color: #3f3f46;
 }
 
 .demo-section button:disabled {
@@ -60,13 +60,13 @@
 .message-box {
   margin-top: 20px;
   padding: 15px;
-  background-color: #e8f5e9;
-  border-left: 4px solid #4caf50;
+  background-color: #e4e4e7;
+  border-left: 4px solid #3f3f46;
   border-radius: 4px;
 }
 
 .message-box p {
-  color: #2e7d32;
+  color: #3f3f46;
   margin: 0;
   font-weight: 500;
 }
@@ -96,5 +96,5 @@
 }
 
 .info-section strong {
-  color: #667eea;
+  color: #3f3f46;
 }

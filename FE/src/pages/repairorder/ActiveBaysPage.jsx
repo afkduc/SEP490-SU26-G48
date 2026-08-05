@@ -36,7 +36,7 @@ export default function ActiveBaysPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
           {error}
         </div>
       )}

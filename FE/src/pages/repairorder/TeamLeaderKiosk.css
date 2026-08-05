@@ -24,9 +24,9 @@
 }
 
 .kiosk-error {
-  background: #FEF2F2;
-  border: 1px solid #FECACA;
-  color: #B91C1C;
+  background: #e4e4e7;
+  border: 1px solid #a1a1aa;
+  color: #27272a;
   border-radius: 10px;
   padding: 12px 16px;
   font-size: 14px;
@@ -108,7 +108,7 @@
 .kiosk-board__bay-label {
   font-size: 40px;
   font-weight: 800;
-  color: #D32F2F;
+  color: #27272a;
 }
 
 .kiosk-board__tabs {
@@ -129,15 +129,15 @@
 }
 
 .kiosk-tab--active {
-  border-color: #E65100;
-  background: #E65100;
+  border-color: #52525b;
+  background: #52525b;
   color: #fff;
 }
 
 .kiosk-tab--logout {
-  border-color: #FECACA;
-  background: #FEF2F2;
-  color: #B91C1C;
+  border-color: #a1a1aa;
+  background: #e4e4e7;
+  color: #27272a;
 }
 
 .kiosk-pending-grid {
@@ -312,13 +312,13 @@
 
 .kiosk-tech-suggestions__other-team,
 .kiosk-tech-chip__other-team {
-  color: #E65100;
+  color: #52525b;
   font-weight: 600;
   font-size: 13px;
 }
 
 .kiosk-tech-suggestions__busy {
-  color: #B91C1C;
+  color: #27272a;
   font-weight: 600;
   font-size: 13px;
 }
@@ -358,12 +358,12 @@
 .kiosk-task input {
   width: 22px;
   height: 22px;
-  accent-color: #2E7D32;
+  accent-color: #3f3f46;
 }
 
 .kiosk-task--done {
-  background: #E8F5E9;
-  color: #2E7D32;
+  background: #e4e4e7;
+  color: #3f3f46;
 }
 
 .kiosk-job__partlist {

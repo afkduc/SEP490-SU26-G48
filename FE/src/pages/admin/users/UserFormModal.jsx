@@ -401,9 +401,9 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                 <div
                   className="form__warning"
                   style={{
-                    background: '#fef3c7',
-                    border: '1px solid #fde68a',
-                    color: '#92400e',
+                    background: '#f4f4f5',
+                    border: '1px solid #d4d4d8',
+                    color: '#52525b',
                     padding: '10px 12px',
                     borderRadius: 6,
                     fontSize: 13,

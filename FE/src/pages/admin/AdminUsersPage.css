@@ -21,7 +21,7 @@
 
 .user-name-cell__main {
   font-weight: 600;
-  color: #0f172a;
+  color: #18181b;
   white-space: normal;
   word-break: break-word;
   line-height: 1.3;
@@ -29,7 +29,7 @@
 
 .user-name-cell__sub {
   font-size: 0.78rem;
-  color: #94a3b8;
+  color: #a1a1aa;
   white-space: normal;
   word-break: break-word;
   line-height: 1.3;
@@ -37,7 +37,7 @@
 
 .user-name-cell__email {
   font-size: 0.78rem;
-  color: #64748b;
+  color: #71717a;
   line-height: 1.35;
   white-space: nowrap;
   overflow: visible;
@@ -48,7 +48,7 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, #3f3f46, #3f3f46);
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -69,21 +69,21 @@
 }
 
 .user-status-cell .badge--success {
-  background: #dcfce7;
-  color: #15803d;
-  border-color: #86efac;
+  background: #e4e4e7;
+  color: #3f3f46;
+  border-color: #a1a1aa;
 }
 
 .user-status-cell .badge--danger,
 .user-status-cell .badge--inactive {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fca5a5;
+  background: #e4e4e7;
+  color: #27272a;
+  border-color: #a1a1aa;
 }
 
 .admin-users__date {
   font-size: 0.8rem;
-  color: #64748b;
+  color: #71717a;
 }
 
 /* Branch pills — cùng kiểu cho “Tất cả chi nhánh” và chi nhánh cụ thể */
@@ -91,7 +91,7 @@
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  background: linear-gradient(135deg, #3f3f46, #3f3f46);
   color: #fff;
   font-size: 0.7rem;
   font-weight: 600;
@@ -133,15 +133,15 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e4e4e7;
   background: #fff;
-  color: #475569;
+  color: #52525b;
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .user-action-menu__trigger:hover {
-  background: #f1f5f9;
+  background: #f4f4f5;
 }
 
 .user-action-menu__dropdown {
@@ -149,9 +149,9 @@
   right: 0;
   top: calc(100% + 6px);
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e4e4e7;
   border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 30px rgba(9, 9, 11, 0.12), 0 2px 6px rgba(9, 9, 11, 0.06);
   min-width: 160px;
   padding: 6px;
   z-index: 30;
@@ -173,19 +173,19 @@
   background: none;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #1e293b;
+  color: #27272a;
   cursor: pointer;
   border-radius: 6px;
   text-align: left;
 }
 
 .user-action-menu__dropdown button:hover {
-  background: #f1f5f9;
+  background: #f4f4f5;
 }
 
 .user-action-menu__dropdown svg {
   flex-shrink: 0;
-  color: #64748b;
+  color: #71717a;
 }
 
 /* ── Table card header ── */
@@ -194,14 +194,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  background: #fafbff;
+  border-bottom: 1px solid #f4f4f5;
+  background: #f4f4f5;
 }
 
 .admin-users .table-card__title {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #475569;
+  color: #52525b;
 }
 
 /* ── Error banner ── */
@@ -286,7 +286,7 @@
 .table-scroll > .table.admin-users__table td:nth-child(5) { width: 18%; }
 
 .user-table__empty {
-  color: #cbd5e1;
+  color: #d4d4d8;
   font-size: 0.8rem;
 }
 
@@ -403,21 +403,21 @@ button.badge.admin-users__toggle-badge:disabled {
 }
 
 button.badge.admin-users__toggle-badge.badge--danger {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fca5a5;
+  background: #e4e4e7;
+  color: #27272a;
+  border-color: #a1a1aa;
 }
 
 button.badge.admin-users__toggle-badge.badge--success {
-  background: #dcfce7;
-  color: #15803d;
-  border-color: #86efac;
+  background: #e4e4e7;
+  color: #3f3f46;
+  border-color: #a1a1aa;
 }
 
 .admin-users__roles-fallback {
   padding: 28px 16px;
   text-align: center;
-  color: #64748b;
+  color: #71717a;
   font-size: 0.9rem;
   font-weight: 500;
 }
@@ -425,52 +425,52 @@ button.badge.admin-users__toggle-badge.badge--success {
 /* ── Buttons color ── */
 .admin-users .btn--view,
 .action-btns .btn--view {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1.5px solid #bfdbfe;
+  background: #f4f4f5;
+  color: #3f3f46;
+  border: 1.5px solid #d4d4d8;
 }
 
 .admin-users .btn--view:hover:not(:disabled),
 .action-btns .btn--view:hover:not(:disabled) {
-  background: #dbeafe;
+  background: #f4f4f5;
 }
 
 .admin-users .btn--edit,
 .action-btns .btn--edit {
-  background: #f0fdf4;
-  color: #16a34a;
-  border: 1.5px solid #bbf7d0;
+  background: #f4f4f5;
+  color: #3f3f46;
+  border: 1.5px solid #a1a1aa;
 }
 
 .admin-users .btn--edit:hover:not(:disabled),
 .action-btns .btn--edit:hover:not(:disabled) {
-  background: #dcfce7;
+  background: #e4e4e7;
 }
 
 .admin-users .btn--success-ghost {
   background: #fff;
-  border-color: #22c55e;
-  color: #16a34a;
+  border-color: #3f3f46;
+  color: #3f3f46;
 }
 
 .admin-users .btn--success-ghost:hover:not(:disabled) {
-  background: #f0fdf4;
+  background: #f4f4f5;
 }
 
 .admin-users .btn--danger-ghost {
   background: #fff;
-  border-color: #f87171;
-  color: #dc2626;
+  border-color: #52525b;
+  color: #27272a;
 }
 
 .admin-users .btn--danger-ghost:hover:not(:disabled) {
-  background: #fef2f2;
+  background: #e4e4e7;
 }
 
 .admin-users .font-mono {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.8rem;
-  color: #64748b;
+  color: #71717a;
 }
 
 .admin-users .filter-row__reset {
@@ -499,7 +499,7 @@ button.badge.admin-users__toggle-badge.badge--success {
     display: flex;
     flex-direction: column;
     padding: 12px 14px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #e4e4e7;
     border-radius: 10px;
     margin-bottom: 10px;
     background: #fff;
@@ -519,7 +519,7 @@ button.badge.admin-users__toggle-badge.badge--success {
     content: attr(data-label);
     font-size: 0.72rem;
     font-weight: 600;
-    color: #94a3b8;
+    color: #a1a1aa;
     text-transform: uppercase;
     letter-spacing: 0.3px;
     flex-shrink: 0;
@@ -527,7 +527,7 @@ button.badge.admin-users__toggle-badge.badge--success {
 
   .admin-users .table-card .table tbody td:last-child {
     padding-top: 10px;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid #f4f4f5;
     justify-content: center;
     flex-wrap: nowrap;
     gap: 8px;
@@ -569,7 +569,7 @@ button.badge.admin-users__toggle-badge.badge--success {
   align-items: center;
   gap: 4px;
   padding: 4px;
-  background: #e2e8f0;
+  background: #e4e4e7;
   border-radius: 12px;
   width: fit-content;
   margin-bottom: 4px;
@@ -579,7 +579,7 @@ button.badge.admin-users__toggle-badge.badge--success {
   appearance: none;
   border: none;
   background: transparent;
-  color: #475569;
+  color: #52525b;
   font-size: 0.875rem;
   font-weight: 600;
   padding: 8px 16px;
@@ -589,12 +589,12 @@ button.badge.admin-users__toggle-badge.badge--success {
 }
 
 .admin-users__tab:hover {
-  color: #0f172a;
+  color: #18181b;
   background: rgba(255, 255, 255, 0.55);
 }
 
 .admin-users__tab--active {
   background: #fff;
-  color: #312e81;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  color: #18181b;
+  box-shadow: 0 1px 3px rgba(9, 9, 11, 0.12);
 }

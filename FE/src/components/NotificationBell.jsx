@@ -196,27 +196,27 @@ function notifDisplayMessage(notif, metadata = {}) {
 }
 
 const ICON_COLORS = {
-  LOGIN_SUCCESS: '#10b981',
-  LOGIN_FAILED: '#ef4444',
-  NEW_DEVICE: '#f59e0b',
-  FORCE_LOGOUT: '#ef4444',
-  SESSION_TAKEN_OVER: '#dc2626',
-  PASSWORD_CHANGED: '#3b82f6',
-  ROLE_CHANGED: '#8b5cf6',
-  SECURITY_ALERT: '#ef4444',
-  SECURITY_FAILED_LOGIN_BURST: '#ef4444',
-  SECURITY_NEW_ADMIN_ROLE: '#dc2626',
-  SECURITY_INACTIVE_ADMIN: '#f59e0b',
-  SECURITY_NEW_DEVICE_IP: '#3b82f6',
-  SECURITY_SESSION_TAKEOVER: '#dc2626',
+  LOGIN_SUCCESS: '#3f3f46',
+  LOGIN_FAILED: '#52525b',
+  NEW_DEVICE: '#52525b',
+  FORCE_LOGOUT: '#52525b',
+  SESSION_TAKEN_OVER: '#27272a',
+  PASSWORD_CHANGED: '#3f3f46',
+  ROLE_CHANGED: '#3f3f46',
+  SECURITY_ALERT: '#52525b',
+  SECURITY_FAILED_LOGIN_BURST: '#52525b',
+  SECURITY_NEW_ADMIN_ROLE: '#27272a',
+  SECURITY_INACTIVE_ADMIN: '#52525b',
+  SECURITY_NEW_DEVICE_IP: '#3f3f46',
+  SECURITY_SESSION_TAKEOVER: '#27272a',
 };
 
 const SEVERITY_COLORS = {
-  success:  '#10b981',
-  info:     '#3b82f6',
-  warning:  '#f59e0b',
-  error:    '#ef4444',
-  critical: '#dc2626',
+  success:  '#3f3f46',
+  info:     '#3f3f46',
+  warning:  '#52525b',
+  error:    '#52525b',
+  critical: '#27272a',
 };
 
 const ICON_LABELS = {
@@ -334,7 +334,7 @@ function NotifTypeIcon({ type }) {
 }
 
 function getIcon(notif) {
-  const color = SEVERITY_COLORS[notif.severity] || ICON_COLORS[notif.type] || '#64748b';
+  const color = SEVERITY_COLORS[notif.severity] || ICON_COLORS[notif.type] || '#71717a';
   return (
     <span
       className="notif-bell__item-icon"

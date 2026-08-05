@@ -6,7 +6,7 @@
   padding: 0;
   border: none;
   background: none;
-  color: #4f46e5;
+  color: #18181b;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -21,7 +21,7 @@
 
 .admin-user-form-page__card {
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e4e4e7;
   border-radius: 16px;
   padding: 24px 28px;
   width: 100%;
@@ -32,18 +32,18 @@
 .admin-user-form-page__state,
 .admin-user-detail-page__state {
   padding: 24px;
-  color: #64748b;
+  color: #71717a;
 }
 
 .admin-user-form-page__state--error,
 .admin-user-detail-page__state--error {
-  color: #dc2626;
+  color: #27272a;
 }
 
 .admin-user-form-page .form__section {
   margin-bottom: 22px;
   padding-bottom: 18px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f4f4f5;
 }
 
 .admin-user-form-page .form__section:last-of-type {
@@ -55,7 +55,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #64748b;
+  color: #71717a;
   margin-bottom: 14px;
 }
 
@@ -79,31 +79,31 @@
   display: block;
   font-size: 0.84rem;
   font-weight: 600;
-  color: #334155;
+  color: #3f3f46;
   margin-bottom: 6px;
 }
 
 .admin-user-form-page .required {
-  color: #dc2626;
+  color: #27272a;
 }
 
 .admin-user-form-page .form__err {
   display: block;
   margin-top: 4px;
   font-size: 0.78rem;
-  color: #dc2626;
+  color: #27272a;
 }
 
 .admin-user-form-page .form__hint {
   margin: 6px 0 0;
   font-size: 0.78rem;
-  color: #64748b;
+  color: #71717a;
 }
 
 .admin-user-form-page .form__warning {
-  background: #fef3c7;
-  border: 1px solid #fde68a;
-  color: #92400e;
+  background: #f4f4f5;
+  border: 1px solid #d4d4d8;
+  color: #52525b;
   padding: 10px 12px;
   border-radius: 6px;
   font-size: 13px;
@@ -114,9 +114,9 @@
 .admin-user-form-page .form-error {
   margin-bottom: 14px;
   padding: 10px 14px;
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
+  background: #e4e4e7;
+  color: #27272a;
+  border: 1px solid #a1a1aa;
   border-radius: 8px;
   font-size: 0.84rem;
 }
@@ -124,29 +124,29 @@
 .admin-user-form-page .input {
   width: 100%;
   padding: 9px 12px;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid #e4e4e7;
   border-radius: 8px;
   font-size: 0.875rem;
   box-sizing: border-box;
   background: #fff;
-  color: #1e293b;
+  color: #27272a;
   outline: none;
   font-family: inherit;
 }
 
 .admin-user-form-page .input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  border-color: #3f3f46;
+  box-shadow: 0 0 0 3px rgba(63, 63, 70, 0.12);
 }
 
 .admin-user-form-page .input:disabled {
-  background-color: #f8fafc;
+  background-color: #fafafa;
   cursor: not-allowed;
   opacity: 0.7;
 }
 
 .admin-user-form-page .input--error {
-  border-color: #dc2626;
+  border-color: #27272a;
 }
 
 .admin-user-form-page .input--select {
@@ -169,5 +169,5 @@
   gap: 10px;
   margin-top: 8px;
   padding-top: 18px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #f4f4f5;
 }

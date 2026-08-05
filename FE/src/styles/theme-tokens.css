@@ -1,88 +1,88 @@
 /**
- * AutoGara Design Tokens
- * Mục tiêu: WCAG AA, màu đủ “đậm” để dễ nhìn, vẫn dịu mắt (không neon).
+ * AutoGara Design Tokens — grayscale mockup palette
+ * Trắng / đen / xám cho chụp mockup đồ án.
  */
 
 :root {
-  /* Surfaces — nền cool có chiều sâu, tránh tím nhạt phẳng */
-  --ag-bg: #e8eef8;
+  /* Surfaces */
+  --ag-bg: #f4f4f5;
   --ag-surface: #ffffff;
-  --ag-surface-2: #f0f5fc;
+  --ag-surface-2: #f4f4f5;
   --ag-card: #ffffff;
-  --ag-card-hover: #eef4fb;
+  --ag-card-hover: #f4f4f5;
 
-  /* Text — tương phản rõ hơn */
-  --ag-text-primary: #0b1220;
-  --ag-text-secondary: #334155;
-  --ag-text-muted: #52657a;
-  --ag-text-disabled: #94a3b8;
+  /* Text */
+  --ag-text-primary: #111111;
+  --ag-text-secondary: #3f3f46;
+  --ag-text-muted: #71717a;
+  --ag-text-disabled: #a1a1aa;
   --ag-text-inverse: #ffffff;
 
-  /* Brand — indigo đậm + soft rõ */
-  --ag-primary: #4338ca;
-  --ag-primary-hover: #3730a3;
-  --ag-primary-soft: #e0e7ff;
+  /* Brand */
+  --ag-primary: #18181b;
+  --ag-primary-hover: #09090b;
+  --ag-primary-soft: #e4e4e7;
   --ag-primary-text: #ffffff;
-  --ag-accent: #0891b2;
-  --ag-accent-soft: #cffafe;
+  --ag-accent: #3f3f46;
+  --ag-accent-soft: #e4e4e7;
 
-  /* Semantic — bão hòa vừa phải, dễ phân biệt */
-  --ag-success: #047857;
-  --ag-success-bg: #d1fae5;
-  --ag-success-border: #6ee7b7;
-  --ag-warning: #b45309;
-  --ag-warning-bg: #ffedd5;
-  --ag-warning-border: #fdba74;
-  --ag-danger: #be123c;
-  --ag-danger-bg: #ffe4e6;
-  --ag-danger-border: #fda4af;
-  --ag-info: #1d4ed8;
-  --ag-info-bg: #dbeafe;
-  --ag-info-border: #93c5fd;
+  /* Semantic — phân biệt bằng độ xám */
+  --ag-success: #3f3f46;
+  --ag-success-bg: #e4e4e7;
+  --ag-success-border: #a1a1aa;
+  --ag-warning: #52525b;
+  --ag-warning-bg: #f4f4f5;
+  --ag-warning-border: #d4d4d8;
+  --ag-danger: #27272a;
+  --ag-danger-bg: #e4e4e7;
+  --ag-danger-border: #a1a1aa;
+  --ag-info: #52525b;
+  --ag-info-bg: #f4f4f5;
+  --ag-info-border: #d4d4d8;
 
   /* Status extras */
-  --ag-pending: #b45309;
-  --ag-pending-bg: #ffedd5;
-  --ag-draft: #475569;
-  --ag-draft-bg: #e2e8f0;
-  --ag-inactive: #64748b;
-  --ag-inactive-bg: #f1f5f9;
-  --ag-approved: #047857;
-  --ag-approved-bg: #d1fae5;
-  --ag-rejected: #be123c;
-  --ag-rejected-bg: #ffe4e6;
-  --ag-cancelled: #64748b;
-  --ag-cancelled-bg: #e2e8f0;
+  --ag-pending: #52525b;
+  --ag-pending-bg: #f4f4f5;
+  --ag-draft: #71717a;
+  --ag-draft-bg: #e4e4e7;
+  --ag-inactive: #71717a;
+  --ag-inactive-bg: #f4f4f5;
+  --ag-approved: #3f3f46;
+  --ag-approved-bg: #e4e4e7;
+  --ag-rejected: #27272a;
+  --ag-rejected-bg: #e4e4e7;
+  --ag-cancelled: #71717a;
+  --ag-cancelled-bg: #e4e4e7;
 
   /* Chrome */
-  --ag-border: #c7d5ea;
-  --ag-divider: #d8e0ec;
-  --ag-focus-ring: rgba(67, 56, 202, 0.28);
-  --ag-overlay: rgba(15, 23, 42, 0.5);
+  --ag-border: #d4d4d8;
+  --ag-divider: #e4e4e7;
+  --ag-focus-ring: rgba(24, 24, 27, 0.28);
+  --ag-overlay: rgba(9, 9, 11, 0.5);
 
-  /* Sidebar — navy sâu, active sáng hơn */
-  --ag-sidebar-bg: #12163a;
-  --ag-sidebar-text: #c7d2fe;
-  --ag-sidebar-muted: #a5b4fc;
-  --ag-sidebar-active-bg: rgba(99, 102, 241, 0.42);
+  /* Sidebar */
+  --ag-sidebar-bg: #18181b;
+  --ag-sidebar-text: #d4d4d8;
+  --ag-sidebar-muted: #a1a1aa;
+  --ag-sidebar-active-bg: rgba(255, 255, 255, 0.14);
   --ag-sidebar-active-text: #ffffff;
-  --ag-sidebar-hover: rgba(255, 255, 255, 0.1);
-  --ag-sidebar-border: rgba(165, 180, 252, 0.18);
+  --ag-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --ag-sidebar-border: rgba(255, 255, 255, 0.12);
 
   /* Topbar / content */
   --ag-topbar-bg: rgba(255, 255, 255, 0.92);
   --ag-input-bg: #ffffff;
-  --ag-input-border: #b8c7e0;
-  --ag-input-placeholder: #94a3b8;
-  --ag-table-header-bg: #e4ebf8;
-  --ag-table-row-hover: #e0e7ff;
-  --ag-table-row-alt: #f5f8fc;
-  --ag-table-border: #d5dee9;
+  --ag-input-border: #d4d4d8;
+  --ag-input-placeholder: #a1a1aa;
+  --ag-table-header-bg: #e4e4e7;
+  --ag-table-row-hover: #f4f4f5;
+  --ag-table-row-alt: #fafafa;
+  --ag-table-border: #e4e4e7;
 
-  /* Shadow — có chút tint indigo */
-  --ag-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.07), 0 1px 2px rgba(67, 56, 202, 0.04);
-  --ag-shadow-md: 0 10px 28px rgba(15, 23, 42, 0.1), 0 4px 10px rgba(67, 56, 202, 0.06);
-  --ag-shadow-lg: 0 20px 48px rgba(15, 23, 42, 0.14), 0 8px 16px rgba(67, 56, 202, 0.08);
+  /* Shadow */
+  --ag-shadow-sm: 0 1px 3px rgba(9, 9, 11, 0.07), 0 1px 2px rgba(9, 9, 11, 0.04);
+  --ag-shadow-md: 0 10px 28px rgba(9, 9, 11, 0.1), 0 4px 10px rgba(9, 9, 11, 0.06);
+  --ag-shadow-lg: 0 20px 48px rgba(9, 9, 11, 0.14), 0 8px 16px rgba(9, 9, 11, 0.08);
 
   /* Radius */
   --ag-radius-sm: 8px;

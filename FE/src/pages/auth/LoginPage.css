@@ -5,7 +5,7 @@
   justify-content: center;
   padding: 24px;
   background:
-    linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.55)),
+    linear-gradient(rgba(9, 9, 11, 0.45), rgba(9, 9, 11, 0.55)),
     url('/KTVsuaxe4.png');
   background-size: cover;
   background-position: center;
@@ -35,6 +35,15 @@
   text-align: center;
 }
 
+.login-panel-brand {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+  margin-bottom: 20px;
+  line-height: 1.1;
+}
+
 .login-panel-logo {
   width: 320px;
   max-width: 100%;
@@ -46,7 +55,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #f87171;
+  color: #52525b;
   margin-bottom: 10px;
 }
 
@@ -77,7 +86,7 @@
 
 .login-subtitle {
   font-size: 13px;
-  color: #6b7280;
+  color: #71717a;
   margin: 4px 0 24px;
 }
 
@@ -97,16 +106,16 @@
 .login-field label {
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: #3f3f46;
 }
 
 .required {
-  color: #ef4444;
+  color: #52525b;
 }
 
 .login-field input,
 .login-field select {
-  border: 1px solid #d1d5db;
+  border: 1px solid #d4d4d8;
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 14px;
@@ -123,7 +132,7 @@
 
 .login-field input:focus,
 .login-field select:focus {
-  border-color: #22c55e;
+  border-color: #3f3f46;
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.15);
 }
 
@@ -142,7 +151,7 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #9ca3af;
+  color: #a1a1aa;
   pointer-events: none;
   font-size: 16px;
 }
@@ -159,19 +168,19 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  color: #9ca3af;
+  color: #a1a1aa;
   transition: color 0.15s;
 }
 
 .login-eye:hover {
-  color: #4b5563;
+  color: #52525b;
 }
 
 .login-error {
   font-size: 13px;
-  color: #ef4444;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  color: #52525b;
+  background: #e4e4e7;
+  border: 1px solid #a1a1aa;
   border-radius: 8px;
   padding: 8px 12px;
   margin: 0;
@@ -188,7 +197,7 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #374151;
+  color: #3f3f46;
   cursor: pointer;
 }
 
@@ -209,25 +218,25 @@
 }
 
 .login-success-box {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
+  background: #f4f4f5;
+  border: 1px solid #a1a1aa;
   border-radius: 12px;
   padding: 16px 18px;
-  color: #166534;
+  color: #3f3f46;
   font-size: 0.92rem;
   line-height: 1.5;
 }
 
 .login-success-box--warn {
-  background: #fffbeb;
-  border-color: #fcd34d;
-  color: #92400e;
+  background: #f4f4f5;
+  border-color: #a1a1aa;
+  color: #52525b;
 }
 
 .login-next-steps {
   margin: 12px 0 0;
   padding-left: 1.25rem;
-  color: #166534;
+  color: #3f3f46;
 }
 
 .login-next-steps li {
@@ -237,25 +246,25 @@
 .login-hint {
   margin: 12px 0 0;
   font-size: 0.85rem;
-  color: #3f6212;
+  color: #3f3f46;
 }
 
 .login-branch-hint {
   margin: 8px 0 0;
   font-size: 0.85rem;
-  color: #64748b;
+  color: #71717a;
   line-height: 1.4;
 }
 
 .login-dev-link {
   margin-top: 12px;
   font-size: 0.8rem;
-  color: #92400e;
+  color: #52525b;
   word-break: break-all;
 }
 
 .login-dev-link a {
-  color: #b45309;
+  color: #52525b;
 }
 
 .login-back-link {
@@ -265,7 +274,7 @@
 }
 
 .login-back-link a {
-  color: #4f46e5;
+  color: #18181b;
   text-decoration: none;
   font-weight: 600;
 }
@@ -310,8 +319,8 @@
     padding: 32px 28px;
   }
 
-  .login-panel-logo {
-    width: 220px;
+  .login-panel-brand {
+    font-size: 32px;
     margin-bottom: 16px;
   }
 
@@ -326,7 +335,7 @@
 .login-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(9, 9, 11, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -348,8 +357,8 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: #fef2f2;
-  color: #dc2626;
+  background: #e4e4e7;
+  color: #27272a;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -365,14 +374,14 @@
 
 .login-modal-message {
   font-size: 14px;
-  color: #6b7280;
+  color: #71717a;
   line-height: 1.6;
   margin: 0 0 24px;
 }
 
 .login-modal-btn {
   padding: 10px 28px;
-  background: #22c55e;
+  background: #3f3f46;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -383,5 +392,5 @@
 }
 
 .login-modal-btn:hover {
-  background: #16a34a;
+  background: #3f3f46;
 }

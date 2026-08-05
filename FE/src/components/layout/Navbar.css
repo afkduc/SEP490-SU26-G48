@@ -8,8 +8,8 @@
   /* Nen tim nhat (theo tong mau primary indigo cua he thong) de logo (co san
      chu "AutoGara" trong anh) noi bat len - khong con hien chu "AutoGara"
      rieng ben canh nua vi anh logo da du thuong hieu. */
-  background: #e0e7ff;
-  border-bottom: 1px solid #c7d2fe;
+  background: #f4f4f5;
+  border-bottom: 1px solid #d4d4d8;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -23,6 +23,14 @@
   text-decoration: none;
   flex-shrink: 0;
   min-width: 180px;
+}
+
+.navbar__brand-text {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #18181b;
+  line-height: 1;
 }
 
 .navbar__logo {
@@ -106,7 +114,7 @@
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 999px;
-  background: #dc2626;
+  background: #27272a;
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -214,7 +222,7 @@
 }
 
 .navbar__user:hover {
-  background: rgba(79, 70, 229, 0.08);
+  background: rgba(24, 24, 27, 0.08);
 }
 
 .navbar__avatar {

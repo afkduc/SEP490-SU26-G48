@@ -81,8 +81,8 @@ export default function ForbiddenModal() {
             display: 'inline-block',
             padding: '2px 10px',
             borderRadius: 999,
-            background: '#fee2e2',
-            color: '#b91c1c',
+            background: '#e4e4e7',
+            color: '#27272a',
             fontSize: 12,
             fontWeight: 700,
             marginBottom: 8,
@@ -98,26 +98,26 @@ export default function ForbiddenModal() {
       </div>
       <style>{`
         .modal-overlay {
-          position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+          position: fixed; inset: 0; background: rgba(9,9,11,0.45);
           display: flex; align-items: center; justify-content: center; z-index: 9998;
         }
         .modal-box {
           background: #fff; border-radius: 16px; padding: 28px 28px 24px;
-          box-shadow: 0 24px 60px rgba(15,23,42,0.22); width: 90%;
+          box-shadow: 0 24px 60px rgba(9,9,11,0.22); width: 90%;
         }
         .modal-icon {
           display: inline-flex; align-items: center; justify-content: center;
           width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 12px;
         }
-        .modal-icon--danger { background: #fee2e2; color: #dc2626; }
-        .modal-title { margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #0f172a; text-align: center; }
-        .modal-message { margin: 0 0 16px; font-size: 14px; color: #475569; line-height: 1.5; text-align: center; }
+        .modal-icon--danger { background: #e4e4e7; color: #27272a; }
+        .modal-title { margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #18181b; text-align: center; }
+        .modal-message { margin: 0 0 16px; font-size: 14px; color: #52525b; line-height: 1.5; text-align: center; }
         .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .btn {
           padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 600;
           border: 1px solid transparent; cursor: pointer;
         }
-        .btn--secondary { background: #fff; color: #334155; border-color: #e2e8f0; }
+        .btn--secondary { background: #fff; color: #3f3f46; border-color: #e4e4e7; }
       `}</style>
     </div>
   );

@@ -289,7 +289,7 @@ export default function AdminBranchesPage({ embedded = false } = {}) {
 
       {loading && (
         <div className="admin-branches__loading">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
           </svg>
           <span>Đang tải danh sách chi nhánh...</span>

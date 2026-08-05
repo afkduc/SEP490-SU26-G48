@@ -73,7 +73,7 @@ const SignaturePad = forwardRef(function SignaturePad({ onChange }, ref) {
             <div style={{ border: '1px dashed var(--gray-300)', borderRadius: 8, touchAction: 'none', width: 'fit-content' }}>
               <SignatureCanvas
                 ref={sigRef}
-                penColor="#111827"
+                penColor="#18181b"
                 backgroundColor="#ffffff"
                 canvasProps={{ width: canvasSize.width, height: canvasSize.height }}
                 onEnd={syncFromCanvas}

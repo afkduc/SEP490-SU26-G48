@@ -9,7 +9,7 @@
   justify-content: flex-end;
   padding: 10px 20px;
   background: #fff;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e4e4e7;
 }
 
 .user-profile-menu__trigger {
@@ -24,14 +24,14 @@
 }
 
 .user-profile-menu__trigger:hover {
-  background: #f8fafc;
+  background: #fafafa;
 }
 
 .user-profile-menu__avatar {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, #18181b, #3f3f46);
   color: #fff;
   display: flex;
   align-items: center;
@@ -57,7 +57,7 @@
 .user-profile-menu__name {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #0f172a;
+  color: #18181b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -66,14 +66,14 @@
 
 .user-profile-menu__role {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: #a1a1aa;
   font-weight: 500;
   white-space: nowrap;
 }
 
 .user-profile-menu__caret {
   flex-shrink: 0;
-  color: #94a3b8;
+  color: #a1a1aa;
 }
 
 .user-profile-menu__dropdown {
@@ -82,9 +82,9 @@
   right: 0;
   min-width: 260px;
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e4e4e7;
   border-radius: 14px;
-  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 8px 30px rgba(9, 9, 11, 0.12), 0 2px 8px rgba(9, 9, 11, 0.06);
   animation: user-profile-dropdown-in 0.15s ease-out;
   overflow: hidden;
   z-index: 300;
@@ -100,14 +100,14 @@
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  background: #f8fafc;
+  background: #fafafa;
 }
 
 .user-profile-menu__dropdown-avatar {
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, #18181b, #3f3f46);
   color: #fff;
   display: flex;
   align-items: center;
@@ -121,19 +121,19 @@
 .user-profile-menu__dropdown-name {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #0f172a;
+  color: #18181b;
 }
 
 .user-profile-menu__dropdown-email {
   font-size: 0.75rem;
-  color: #64748b;
+  color: #71717a;
   margin-top: 2px;
   word-break: break-all;
 }
 
 .user-profile-menu__divider {
   height: 1px;
-  background: #e2e8f0;
+  background: #e4e4e7;
 }
 
 .user-profile-menu__item {
@@ -146,22 +146,22 @@
   background: none;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #334155;
+  color: #3f3f46;
   cursor: pointer;
   text-align: left;
   transition: background 0.12s;
 }
 
 .user-profile-menu__item:hover {
-  background: #f1f5f9;
+  background: #f4f4f5;
 }
 
 .user-profile-menu__item--danger {
-  color: #dc2626;
+  color: #27272a;
 }
 
 .user-profile-menu__item--danger:hover {
-  background: #fef2f2;
+  background: #e4e4e7;
 }
 
 @media (max-width: 768px) {

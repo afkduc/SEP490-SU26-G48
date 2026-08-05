@@ -183,12 +183,6 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd
     <aside className={`admin-sidebar${isMobileOpen ? ' admin-sidebar--mobile-open' : ''}`}>
       {/* Brand */}
       <div className="admin-sidebar__brand">
-        <div className="admin-sidebar__logo">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C1.4 11.3 1 12.1 1 13v3c0 .6.4 1 1 1h2"/>
-            <circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>
-          </svg>
-        </div>
         <div className="admin-sidebar__brand-text">
           <span className="admin-sidebar__brand-name">AutoGara</span>
           <span className="admin-sidebar__brand-role">{user?.role || 'Quản trị hệ thống'}</span>
@@ -427,8 +421,8 @@ export default function AdminLayout({ children }) {
               width: 36,
               height: 36,
               borderRadius: '50%',
-              border: '3px solid #c7d2fe',
-              borderTopColor: '#4f46e5',
+              border: '3px solid #d4d4d8',
+              borderTopColor: '#18181b',
               animation: 'admin-nav-spin 0.7s linear infinite',
             }}
           />
