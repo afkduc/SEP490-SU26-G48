@@ -50,10 +50,9 @@ class ImportRequestService {
     return ImportRequestResponseDto.fromEntity(result.request, result.items);
   }
 
-  async getNextRequestCode({ branchId, date }) {
+  async getNextRequestCode({ branchId }) {
     if (!branchId) throw new ApiError(400, 'branchId is required');
-    const d = date ? new Date(date) : new Date();
-    if (Number.isNaN(d.getTime())) throw new ApiError(400, 'date khong hop le');
+    const d = new Date();
     const code = await this.importRequestRepository.getNextRequestCode(Number(branchId), d);
     return { requestCode: code, date: d.toISOString().slice(0, 10) };
   }

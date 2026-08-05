@@ -53,14 +53,13 @@ class ExportRequestController {
 
   getNextCode = async (req, res, next) => {
     try {
-      const { branchId, date } = req.query;
+      const { branchId } = req.query;
       const branchIdToUse = branchId ? Number(branchId) : req.user?.branchId;
       if (!branchIdToUse) {
         throw new ApiError(400, 'branchId is required');
       }
       const data = await this.exportRequestService.getNextRequestCode({
         branchId: branchIdToUse,
-        date,
       });
       return success(res, data, 'Next request code generated');
     } catch (err) {
