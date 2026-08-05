@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { resetPasswordApi } from '../../services/authApi';
+import { BASE_PATH } from '../../config';
 import './LoginPage.css';
 
 export default function ResetPasswordPage() {
@@ -46,7 +47,7 @@ export default function ResetPasswordPage() {
     <div className="login-bg">
       <div className="login-shell login-shell--narrow">
         <div className="login-panel-left">
-          <img className="login-panel-logo" src="/AutoGaraLogo-Photoroom.png" alt="AutoGara" />
+          <img className="login-panel-logo" src={`${BASE_PATH}/AutoGaraLogo-Photoroom.png`} alt="AutoGara" />
           <span className="login-panel-eyebrow">Bảo mật tài khoản</span>
           <h2 className="login-panel-headline">Tạo mật khẩu mới cho tài khoản của bạn</h2>
         </div>
