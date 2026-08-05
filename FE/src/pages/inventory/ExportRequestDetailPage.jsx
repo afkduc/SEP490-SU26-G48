@@ -6,11 +6,6 @@ const STATUS_META = {
   completed: { label: 'Đã xuất', className: 'badge--success' },
 };
 
-function formatDate(d) {
-  if (!d) return '—';
-  return String(d).slice(0, 10);
-}
-
 function formatDateTime(d) {
   if (!d) return '—';
   const s = String(d);
@@ -63,7 +58,6 @@ export default function ExportRequestDetailPage() {
             <InfoRow label="Phiếu sửa chữa" value={data.serviceOrderCode} />
             <InfoRow label="Khách hàng" value={data.customerName} />
             <InfoRow label="Xe" value={data.vehiclePlate} />
-            <InfoRow label="Ngày xuất" value={formatDate(data.exportDate)} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
             <InfoRow label="Người xuất" value={data.performedByName} />
             <InfoRow label="Ghi chú" value={data.notes} />
