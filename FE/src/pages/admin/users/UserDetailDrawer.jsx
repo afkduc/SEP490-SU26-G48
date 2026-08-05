@@ -152,7 +152,7 @@ export default function UserDetailDrawer({ userId, onClose }) {
                 <div className="detail-list__group">
                   <DetailRow label="Họ" value={user.firstName || '—'} />
                   <DetailRow label="Tên" value={user.lastName || '—'} />
-                  <DetailRow label="Số điện thoại" value={user.phone || '—'} />
+                  <DetailRow label="Số điện thoại" value={user.phone ? formatPhoneDisplay(user.phone) : '—'} />
                 </div>
 
                 <div className="detail-list__group">
