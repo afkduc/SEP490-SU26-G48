@@ -3,6 +3,7 @@
  */
 import { getPermissionScreenLabel, getScreenLabel } from './screenLabels';
 import { formatDateSafeWithOffset, secondsSince, getClockOffsetMs } from './dateUtils';
+import { formatPhoneDisplay } from './validation';
 
 export const AUDIT_ACTION_LABELS = {
   CREATE: 'Tạo mới',
@@ -972,6 +973,10 @@ export function formatAuditFieldValue(key, value) {
   const kind = getAuditFieldDisplayKind(k, value);
 
   if (/password/i.test(k)) return '••••••••';
+  if (k === 'phone' || k === 'phoneNumber' || k === 'phone_number' || k === 'customerPhone') {
+    const formatted = formatPhoneDisplay(value);
+    return formatted || '—';
+  }
   if (kind === 'signature') return 'Đã ký (có ảnh chữ ký)';
   if (kind === 'items') return formatSettlementItems(value);
   if (kind === 'money') return formatMoneyVi(value);

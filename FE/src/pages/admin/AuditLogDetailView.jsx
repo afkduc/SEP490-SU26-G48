@@ -19,6 +19,7 @@ import {
   getLifecycleSteps,
   AUDIT_TABLE_LABELS,
 } from '../../utils/auditDisplay';
+import { formatPhoneDisplay } from '../../utils/validation';
 
 const TABLE_NAME_VI = AUDIT_TABLE_LABELS;
 
@@ -385,7 +386,7 @@ export function AuditLogDetailContent({ log }) {
               {(userName || '?').split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase()}
             </span>
             <strong>{userName}</strong>
-            {log.phone_number && <span className="audit-detail__phone">{log.phone_number}</span>}
+            {log.phone_number && <span className="audit-detail__phone">{formatPhoneDisplay(log.phone_number)}</span>}
           </div>
         </div>
         <div className="audit-detail__field">
