@@ -164,7 +164,7 @@ export default function LoginPage() {
     <div className="login-bg">
       <div className="login-shell">
         <div className="login-panel-left">
-          <img className="login-panel-logo" src="/AutoGaraLogo-Photoroom.png" alt="AutoGara" />
+          <div className="login-panel-brand">AutoGara</div>
           <span className="login-panel-eyebrow">Hệ thống quản lý</span>
           <h2 className="login-panel-headline">Sửa chữa/Bảo dưỡng ô tô chuyên nghiệp</h2>
         </div>
@@ -256,7 +256,7 @@ export default function LoginPage() {
 
             {error && <p className="login-error">{error}</p>}
             {lockoutSeconds > 0 && (
-              <p className="login-error" style={{ color: '#b45309' }}>
+              <p className="login-error" style={{ color: '#52525b' }}>
                 Thử lại sau <strong>{lockoutSeconds}s</strong>. Nếu không phải bạn, hãy đổi mật khẩu.
               </p>
             )}

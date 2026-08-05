@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: #f3f4f6;
+  background: #f4f4f5;
 }
 
 .app-layout__main {

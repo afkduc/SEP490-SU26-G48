@@ -320,7 +320,7 @@ function SessionTable({ items, onViewSession, focusedSessionId = null }) {
             <td>
               <span className="admin-sessions__duration">
                 {item.status === 'active' ? (
-                  <span style={{ color: '#0891b2', fontWeight: 600 }}>
+                  <span style={{ color: '#3f3f46', fontWeight: 600 }}>
                     {formatDuration(liveDurationSeconds(item.login_time)) || '—'}
                   </span>
                 ) : (
@@ -615,7 +615,7 @@ export default function AdminLoginSessionsPage({
 
   const headerActions = (
     <div className="admin-page__header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#52525b', cursor: 'pointer' }}>
         <input
           type="checkbox"
           checked={realtimeEnabled}
@@ -650,7 +650,7 @@ export default function AdminLoginSessionsPage({
       {!embedded && (
         <div className="admin-page__header">
           <div className="admin-page__title-block">
-            <div className="admin-page__title-icon" style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)', boxShadow: '0 6px 20px rgba(8, 145, 178, 0.35)' }}>
+            <div className="admin-page__title-icon" style={{ background: 'linear-gradient(135deg, #3f3f46, #3f3f46)', boxShadow: '0 6px 20px rgba(63, 63, 70, 0.35)' }}>
               <IconSession />
             </div>
             <div className="admin-page__title-group">

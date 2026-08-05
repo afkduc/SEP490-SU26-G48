@@ -5,7 +5,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%);
+  background: linear-gradient(135deg, #f4f4f5 0%, #f4f4f5 50%, #f4f4f5 100%);
   position: relative;
   overflow: hidden;
 }
@@ -27,7 +27,7 @@
 .error-page__shape--1 {
   width: 400px;
   height: 400px;
-  background: #3b82f6;
+  background: #3f3f46;
   top: -100px;
   right: -100px;
   animation: float 8s ease-in-out infinite;
@@ -36,7 +36,7 @@
 .error-page__shape--2 {
   width: 300px;
   height: 300px;
-  background: #10b981;
+  background: #3f3f46;
   bottom: -80px;
   left: -80px;
   animation: float 10s ease-in-out infinite reverse;
@@ -45,7 +45,7 @@
 .error-page__shape--3 {
   width: 200px;
   height: 200px;
-  background: #8b5cf6;
+  background: #3f3f46;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -85,12 +85,12 @@
   width: 100px;
   height: 100px;
   margin: 0 auto 24px;
-  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  background: linear-gradient(135deg, #e4e4e7, #e4e4e7);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ef4444;
+  color: #52525b;
 }
 
 .error-card__status {
@@ -98,12 +98,12 @@
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: #ef4444;
-  background: #fef2f2;
+  color: #52525b;
+  background: #e4e4e7;
   padding: 4px 16px;
   border-radius: 100px;
   margin-bottom: 16px;
-  border: 1px solid #fecaca;
+  border: 1px solid #a1a1aa;
 }
 
 /* ── Text ──────────────────────────────────────────────── */
@@ -111,7 +111,7 @@
   margin: 0 0 12px;
   font-size: 26px;
   font-weight: 700;
-  color: #111827;
+  color: #18181b;
   letter-spacing: -0.3px;
 }
 
@@ -119,7 +119,7 @@
   margin: 0 0 28px;
   font-size: 15px;
   line-height: 1.65;
-  color: #6b7280;
+  color: #71717a;
 }
 
 /* ── Actions ───────────────────────────────────────────── */
@@ -150,25 +150,25 @@
 }
 
 .error-card__btn--primary {
-  background: #1e40af;
+  background: #3f3f46;
   color: #ffffff;
 }
 
 .error-card__btn--primary:hover {
-  background: #1e3a8a;
+  background: #18181b;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
 }
 
 .error-card__btn--secondary {
   background: #ffffff;
-  color: #374151;
-  border: 1px solid #e5e7eb;
+  color: #3f3f46;
+  border: 1px solid #e4e4e7;
 }
 
 .error-card__btn--secondary:hover {
   background: #f9fafb;
-  border-color: #d1d5db;
+  border-color: #d4d4d8;
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
@@ -183,7 +183,7 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 20px;
-  color: #9ca3af;
+  color: #a1a1aa;
   font-size: 13px;
 }
 
@@ -192,20 +192,20 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: #e5e7eb;
+  background: #e4e4e7;
 }
 
 .error-card__request-label {
   margin: 0 0 12px;
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: #3f3f46;
 }
 
 .error-card__textarea {
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e4e4e7;
   border-radius: 10px;
   font-size: 14px;
   font-family: inherit;
@@ -216,22 +216,22 @@
 }
 
 .error-card__textarea:focus {
-  border-color: #3b82f6;
+  border-color: #3f3f46;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .error-card__btn--request {
   width: 100%;
   margin-top: 12px;
-  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #f4f4f5, #f4f4f5);
+  color: #3f3f46;
+  border: 1px solid #d4d4d8;
   justify-content: center;
 }
 
 .error-card__btn--request:hover:not(:disabled) {
-  background: linear-gradient(135deg, #e0f2fe, #bae6fd);
-  border-color: #93c5fd;
+  background: linear-gradient(135deg, #f4f4f5, #e4e4e7);
+  border-color: #d4d4d8;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
@@ -244,16 +244,16 @@
 .error-card__request-hint {
   margin: 10px 0 0;
   font-size: 12px;
-  color: #9ca3af;
+  color: #a1a1aa;
 }
 
 .error-card__request-hint code {
-  background: #f3f4f6;
+  background: #f4f4f5;
   padding: 2px 6px;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
   font-size: 11px;
-  color: #4b5563;
+  color: #52525b;
 }
 
 /* ── Success State ─────────────────────────────────────── */
@@ -263,10 +263,10 @@
   justify-content: center;
   gap: 8px;
   padding: 14px;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  background: #f4f4f5;
+  border: 1px solid #e4e4e7;
   border-radius: 10px;
-  color: #059669;
+  color: #3f3f46;
   font-size: 14px;
   font-weight: 600;
 }

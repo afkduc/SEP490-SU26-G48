@@ -402,7 +402,7 @@ function AppRoutes() {
             element={
               <ProtectedRoute>
                 <AppLayout>
-                  <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
+                  <div style={{ padding: 32, textAlign: 'center', color: '#71717a' }}>
                     Trang đang phát triển...
                   </div>
                 </AppLayout>

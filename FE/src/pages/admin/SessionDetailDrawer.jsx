@@ -110,7 +110,7 @@ function DetailRow({ label, value, mono, multiline }) {
     <div className="detail-list__item">
       <dt>{label}</dt>
       <dd className={mono ? 'font-mono' : ''} style={multiline ? { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } : undefined}>
-        {value || <span style={{ color: '#cbd5e1' }}>—</span>}
+        {value || <span style={{ color: '#d4d4d8' }}>—</span>}
       </dd>
     </div>
   );
@@ -204,7 +204,7 @@ export default function SessionDetailDrawer({ session, onClose, onOpenDevicesToP
                 label="Thời lượng"
                 value={
                   isLive ? (
-                    <span style={{ color: '#0891b2', fontWeight: 600 }}>
+                    <span style={{ color: '#3f3f46', fontWeight: 600 }}>
                       {durationText} <span style={{ fontSize: '0.7rem', fontWeight: 500, marginLeft: 4 }}>(đang chạy…)</span>
                     </span>
                   ) : durationText
@@ -249,10 +249,10 @@ export default function SessionDetailDrawer({ session, onClose, onOpenDevicesToP
             {warnings.length > 0 && (
               <>
                 <div className="detail-list__group">
-                  <div className="detail-list__group-title" style={{ color: '#b91c1c' }}>Cảnh báo bất thường</div>
+                  <div className="detail-list__group-title" style={{ color: '#27272a' }}>Cảnh báo bất thường</div>
                 </div>
                 <div className="detail-list__group">
-                  <ul style={{ margin: 0, paddingLeft: 18, color: '#b91c1c', fontSize: '0.85rem' }}>
+                  <ul style={{ margin: 0, paddingLeft: 18, color: '#27272a', fontSize: '0.85rem' }}>
                     {warnings.map((w) => (<li key={w}>{w}</li>))}
                   </ul>
                 </div>
@@ -262,8 +262,8 @@ export default function SessionDetailDrawer({ session, onClose, onOpenDevicesToP
         </div>
 
         {session.status === 'active' && typeof onOpenDevicesToProcess === 'function' && (
-          <div className="drawer__footer" style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0' }}>
-            <p style={{ margin: '0 0 10px', fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4 }}>
+          <div className="drawer__footer" style={{ padding: '12px 16px', borderTop: '1px solid #e4e4e7' }}>
+            <p style={{ margin: '0 0 10px', fontSize: '0.8rem', color: '#71717a', lineHeight: 1.4 }}>
               Tab Lịch sử chỉ xem. Để đăng xuất thiết bị này, mở tab Thiết bị rồi bấm Buộc đăng xuất.
             </p>
             <button

@@ -45,8 +45,8 @@ const SERVICE_ADVISOR_NAV = [
 const MANAGER_NAV = [
   { label: 'Dashboard', path: '/manager/dashboard' },
   { label: 'Kho', path: '/manager/inventory' },
-  { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests' },
-  { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests' },
+  { label: 'Phiếu nhập', path: '/manager/import-requests' },
+  { label: 'Phiếu xuất', path: '/manager/export-requests' },
   {
     label: 'Nhân viên',
     children: [
@@ -255,9 +255,9 @@ export default function Navbar() {
 
   return (
     <header className="navbar">
-      <div className="navbar__brand">
-        <img className="navbar__logo" src="/AutoGaraLogo-Photoroom.png" alt="AutoGara" />
-      </div>
+        <div className="navbar__brand">
+          <span className="navbar__brand-text">AutoGara</span>
+        </div>
 
       <button
         type="button"

@@ -28,9 +28,9 @@
   color: var(--gray-600);
 }
 
-.sr-stat--pending { border-left-color: #e65100; }
-.sr-stat--accepted { border-left-color: #1b5e20; }
-.sr-stat--cancelled { border-left-color: #c62828; }
+.sr-stat--pending { border-left-color: #52525b; }
+.sr-stat--accepted { border-left-color: #3f3f46; }
+.sr-stat--cancelled { border-left-color: #27272a; }
 
 @media (max-width: 720px) {
   .sr-stats {
@@ -99,8 +99,8 @@
   padding: 10px 14px;
   font-size: 13px;
   margin-bottom: 12px;
-  background: #eff6ff;
-  color: #1e40af;
+  background: #f4f4f5;
+  color: #3f3f46;
 }
 
 .sr-appt p {
@@ -108,8 +108,8 @@
 }
 
 .sr-appt--cancelled {
-  background: #fef2f2;
-  color: #991b1b;
+  background: #e4e4e7;
+  color: #27272a;
 }
 
 .sr-appt__cancel-reason {
@@ -123,7 +123,7 @@
 }
 
 .sr-btn-success {
-  background-color: #16a34a;
+  background-color: #3f3f46;
   color: #fff;
 }
 

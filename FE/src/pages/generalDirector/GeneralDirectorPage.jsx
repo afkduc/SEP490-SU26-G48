@@ -6,31 +6,77 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
 
+/** SVG đen/xám cho mockup — tránh emoji có màu sẵn */
+const ic = {
+  stroke: 'currentColor',
+  fill: 'none',
+  strokeWidth: 2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  width: 18,
+  height: 18,
+  viewBox: '0 0 24 24',
+};
+
+const IconDoc = () => (
+  <svg {...ic}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+);
+const IconChart = () => (
+  <svg {...ic}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
+);
+const IconUsers = () => (
+  <svg {...ic}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+);
+const IconTool = () => (
+  <svg {...ic}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
+);
+const IconBuilding = () => (
+  <svg {...ic}><rect x="4" y="2" width="16" height="20" rx="2" /><line x1="9" y1="6" x2="9" y2="6.01" /><line x1="15" y1="6" x2="15" y2="6.01" /><line x1="9" y1="10" x2="9" y2="10.01" /><line x1="15" y1="10" x2="15" y2="10.01" /><line x1="9" y1="14" x2="9" y2="14.01" /><line x1="15" y1="14" x2="15" y2="14.01" /><path d="M10 22v-4h4v4" /></svg>
+);
+const IconUser = () => (
+  <svg {...ic} width={14} height={14}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+);
+const IconSearch = () => (
+  <svg {...ic} width={14} height={14}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+);
+const IconEmpty = () => (
+  <svg {...ic} width={28} height={28} style={{ color: '#a1a1aa' }}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M8 13h2" /></svg>
+);
+const IconWait = () => (
+  <svg {...ic} width={28} height={28} style={{ color: '#a1a1aa' }}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+);
+const IconDown = () => (
+  <svg {...ic} width={28} height={28} style={{ color: '#a1a1aa' }}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" /><polyline points="17 18 23 18 23 12" /></svg>
+);
+const IconBlock = () => (
+  <svg {...ic} width={28} height={28} style={{ color: '#a1a1aa' }}><rect x="3" y="11" width="18" height="10" rx="1" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+);
+
 const GENERAL_DIRECTOR_ACTIONS = [
   {
     label: 'Phiếu quyết toán',
     path: '/general-director/reports/settlements',
-    icon: '📑',
+    icon: <IconDoc />,
   },
   {
     label: 'Doanh thu',
     path: '/general-director/reports/revenue',
-    icon: '📈',
+    icon: <IconChart />,
   },
   {
     label: 'Nhân sự vận hành',
     path: '/general-director/employees',
-    icon: '👥',
+    icon: <IconUsers />,
   },
   {
     label: 'Kỹ thuật viên',
     path: '/general-director/technicians',
-    icon: '🛠️',
+    icon: <IconTool />,
   },
   {
     label: 'DS giám đốc chi nhánh',
     path: '/general-director/branch-managers',
-    icon: '🏢',
+    icon: <IconBuilding />,
   },
 ];
 
@@ -40,11 +86,11 @@ const QUICK_LINK_STYLES = {
   gap: 10,
   padding: '12px 14px',
   borderRadius: 14,
-  border: '1px solid #E5E7EB',
+  border: '1px solid #e4e4e7',
   background: 'white',
-  color: '#111827',
+  color: '#18181b',
   textDecoration: 'none',
-  boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
+  boxShadow: '0 10px 24px rgba(9, 9, 11, 0.05)',
 };
 
 const STATUS_OPTIONS = [
@@ -56,10 +102,10 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_META = {
-  waiting_repair: { label: 'Chờ sửa chữa', color: '#E65100', background: '#FFF3E0' },
-  inprogress: { label: 'Đang sửa chữa', color: '#1565C0', background: '#E3F2FD' },
-  waiting_payment: { label: 'Chờ thanh toán', color: '#2E7D32', background: '#E8F5E9' },
-  invoiced: { label: 'Đã xuất hóa đơn', color: '#424242', background: '#F5F5F5' },
+  waiting_repair: { label: 'Chờ sửa chữa', color: '#52525b', background: '#f4f4f5' },
+  inprogress: { label: 'Đang sửa chữa', color: '#3f3f46', background: '#f4f4f5' },
+  waiting_payment: { label: 'Chờ thanh toán', color: '#3f3f46', background: '#e4e4e7' },
+  invoiced: { label: 'Đã xuất hóa đơn', color: '#3f3f46', background: '#F5F5F5' },
 };
 
 const EMPLOYEE_STATUS_OPTIONS = [
@@ -87,8 +133,8 @@ const TECHNICIAN_SKILL_OPTIONS = [
 ];
 
 const EMPLOYEE_STATUS_META = {
-  active: { label: 'Đang làm', color: '#0F766E', background: '#ECFDF5' },
-  inactive: { label: 'Nghỉ', color: '#B91C1C', background: '#FEF2F2' },
+  active: { label: 'Đang làm', color: '#3f3f46', background: '#f4f4f5' },
+  inactive: { label: 'Nghỉ', color: '#27272a', background: '#e4e4e7' },
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -116,7 +162,7 @@ function currency(value) {
 }
 
 function employeeStatusBadge(status) {
-  return EMPLOYEE_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
+  return EMPLOYEE_STATUS_META[status] || { label: status || 'Không rõ', color: '#3f3f46', background: '#f4f4f5' };
 }
 
 function repairStatusLabel(status) {
@@ -210,7 +256,7 @@ function DataPagination({ total, page, pageSize, onPageChange, onPageSizeChange,
 
         {buildPageItems(currentPage, totalPages).map((item, index) => (
           item === '...'
-            ? <span key={`ellipsis-${index}`} style={{ color: '#94A3B8' }}>...</span>
+            ? <span key={`ellipsis-${index}`} style={{ color: '#a1a1aa' }}>...</span>
             : (
               <button
                 key={item}
@@ -240,17 +286,17 @@ function DataPagination({ total, page, pageSize, onPageChange, onPageSizeChange,
 function BranchBadge({ branch }) {
   if (!branch) return null;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: '#F3F4F6', color: '#374151', fontSize: 12, fontWeight: 600 }}>
-      🏢 {branch.name}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: '#f4f4f5', color: '#3f3f46', fontSize: 12, fontWeight: 600 }}>
+      <span style={{display:"inline-flex",alignItems:"center",gap:6}}><IconBuilding />{branch.name}</span>
     </span>
   );
 }
 
 function DetailRow({ label, value }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 8, padding: '7px 0', borderBottom: '1px solid #ECEFF1' }}>
-      <div style={{ color: '#6B7280', fontSize: 12, fontWeight: 600 }}>{label}</div>
-      <div style={{ fontSize: 13, color: '#111827' }}>{value || '—'}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 8, padding: '7px 0', borderBottom: '1px solid #f4f4f5' }}>
+      <div style={{ color: '#71717a', fontSize: 12, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 13, color: '#18181b' }}>{value || '—'}</div>
     </div>
   );
 }
@@ -269,26 +315,26 @@ function DetailModal({ report, onClose }) {
 
         <div className="modal-body" style={{ maxHeight: '80vh', overflow: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
-            <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
-              <div style={{ fontSize: 12, color: '#54708A' }}>Mã phiếu</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{report.code}</div>
+            <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 12, color: '#52525b' }}>Mã phiếu</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#18181b', marginTop: 4 }}>{report.code}</div>
             </div>
-            <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
-              <div style={{ fontSize: 12, color: '#6B7280' }}>Chi nhánh</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{report.branch?.name || '—'}</div>
+            <div style={{ background: '#F7F7F8', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 12, color: '#71717a' }}>Chi nhánh</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#18181b', marginTop: 4 }}>{report.branch?.name || '—'}</div>
             </div>
             <div style={{ background: badge.background, border: `1px solid ${badge.color}33`, borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 12, color: badge.color }}>Trạng thái</div>
               <div style={{ fontSize: 15, fontWeight: 800, color: badge.color, marginTop: 4 }}>{badge.label}</div>
             </div>
-            <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 12, padding: 14 }}>
-              <div style={{ fontSize: 12, color: '#9A3412' }}>Tổng thanh toán</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#C2410C', marginTop: 4 }}>{currency(report.total)}</div>
+            <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 12, color: '#52525b' }}>Tổng thanh toán</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#52525b', marginTop: 4 }}>{currency(report.total)}</div>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, marginBottom: 18 }}>
-            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+            <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin phiếu</div>
               <DetailRow label="Loại dịch vụ" value={report.serviceType} />
               <DetailRow label="Ngày tiếp nhận" value={formatDate(report.intakeDate)} />
@@ -298,7 +344,7 @@ function DetailModal({ report, onClose }) {
               <DetailRow label="Yêu cầu khách hàng" value={report.customerRequest} />
             </div>
 
-            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+            <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 10 }}>Khách hàng & xe</div>
               <DetailRow label="Khách hàng" value={report.customer?.fullName} />
               <DetailRow label="Điện thoại" value={report.customer?.phone} />
@@ -309,7 +355,7 @@ function DetailModal({ report, onClose }) {
             </div>
           </div>
 
-          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+          <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16, marginBottom: 16 }}>
             <div style={{ fontWeight: 800, marginBottom: 10 }}>Bảng hạng mục</div>
             <div className="table-wrapper" style={{ boxShadow: 'none', marginBottom: 0 }}>
               <table className="data-table">
@@ -332,7 +378,7 @@ function DetailModal({ report, onClose }) {
                     <tr>
                       <td colSpan={10}>
                         <div className="empty-state" style={{ minHeight: 160 }}>
-                          <div className="empty-state-icon">📭</div>
+                          <div className="empty-state-icon"><IconEmpty /></div>
                           <h3>Không có hạng mục</h3>
                         </div>
                       </td>
@@ -358,7 +404,7 @@ function DetailModal({ report, onClose }) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
-            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+            <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 10 }}>Tổng hợp tài chính</div>
               <DetailRow label="Tổng trước giảm giá" value={currency(report.subtotal)} />
               <DetailRow label="Tổng giảm giá" value={currency(report.discountAmount)} />
@@ -366,7 +412,7 @@ function DetailModal({ report, onClose }) {
               <DetailRow label="Thuế GTGT" value={currency(report.vat)} />
               <DetailRow label="Miễn phí" value={currency(report.freeAmount)} />
             </div>
-            <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', borderRadius: 12, padding: 16, color: 'white' }}>
+            <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', borderRadius: 12, padding: 16, color: 'white' }}>
               <div style={{ fontSize: 13, opacity: 0.8 }}>Tổng thanh toán</div>
               <div style={{ fontSize: 28, fontWeight: 900, margin: '8px 0 6px' }}>{currency(report.total)}</div>
               <div style={{ fontSize: 12, opacity: 0.75 }}>Tổng giá trị thanh toán của phiếu.</div>
@@ -388,12 +434,12 @@ function ModuleActionBar() {
             to={item.path}
             style={({ isActive }) => ({
               ...QUICK_LINK_STYLES,
-              border: isActive ? '1px solid #0F766E' : QUICK_LINK_STYLES.border,
-              background: isActive ? 'linear-gradient(135deg, #ECFEFF 0%, #F0FDFA 100%)' : QUICK_LINK_STYLES.background,
-              boxShadow: isActive ? '0 14px 28px rgba(15, 118, 110, 0.12)' : QUICK_LINK_STYLES.boxShadow,
+              border: isActive ? '1px solid #3f3f46' : QUICK_LINK_STYLES.border,
+              background: isActive ? 'linear-gradient(135deg, #f4f4f5 0%, #f4f4f5 100%)' : QUICK_LINK_STYLES.background,
+              boxShadow: isActive ? '0 14px 28px rgba(9, 9, 11, 0.12)' : QUICK_LINK_STYLES.boxShadow,
             })}
           >
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: '#F3F4F6', display: 'grid', placeItems: 'center', fontSize: 18 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: '#f4f4f5', color: '#18181b', display: 'grid', placeItems: 'center' }}>
               {item.icon}
             </div>
             <div>
@@ -418,7 +464,7 @@ function PlaceholderPanel({ title, uc, description, actions, children }) {
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
           <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>{title}</div>
         <h2 style={{ margin: '8px 0', fontSize: 28, lineHeight: 1.15 }}>{title}</h2>
         <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.82)' }}>{description}</p>
@@ -440,7 +486,7 @@ function PlaceholderPanel({ title, uc, description, actions, children }) {
       {children || (
         <div className="table-wrapper">
           <div className="empty-state" style={{ minHeight: 280 }}>
-            <div className="empty-state-icon">🚧</div>
+            <div className="empty-state-icon"><IconBlock /></div>
             <h3>Chưa cài nghiệp vụ cho màn hình này</h3>
             <p>Route và action điều hướng đã sẵn sàng để tiếp tục code chức năng ở bước sau.</p>
           </div>
@@ -551,13 +597,13 @@ function RevenueOverviewPage() {
           <div className="breadcrumb">General Director / Báo cáo doanh thu</div>
         </div>
         <div className="page-header-right">
-          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
+          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><IconUser />{user?.name || 'General Director'}</span></span>
         </div>
       </div>
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Tổng quan tài chính theo doanh thu đã chốt hóa đơn</h2>
@@ -584,7 +630,7 @@ function RevenueOverviewPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => loadRevenueReport(branchId)}>
             ↻ Tải lại
@@ -597,24 +643,24 @@ function RevenueOverviewPage() {
           {
             label: `Tổng doanh thu tháng ${summary.currentMonthLabel || ''}`.trim(),
             value: currency(summary.currentMonthTotalRevenue),
-            color: '#0F766E',
-            background: '#ECFEFF',
+            color: '#3f3f46',
+            background: '#f4f4f5',
           },
           {
             label: 'Doanh thu dịch vụ',
             value: currency(summary.currentMonthServiceRevenue),
-            color: '#1D4ED8',
-            background: '#EFF6FF',
+            color: '#3f3f46',
+            background: '#f4f4f5',
           },
           {
             label: 'Công nợ phải thu',
             value: currency(summary.outstandingReceivables),
-            color: '#B45309',
-            background: '#FFFBEB',
+            color: '#52525b',
+            background: '#f4f4f5',
           },
         ].map((card) => (
-          <div key={card.label} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16, boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)' }}>
-            <div style={{ fontSize: 12, color: '#6B7280' }}>{card.label}</div>
+          <div key={card.label} style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16, boxShadow: '0 8px 24px rgba(9, 9, 11, 0.04)' }}>
+            <div style={{ fontSize: 12, color: '#71717a' }}>{card.label}</div>
             <div style={{ fontSize: 24, fontWeight: 900, marginTop: 8, color: card.color }}>{loading ? '...' : card.value}</div>
             <div style={{ height: 4, width: '100%', marginTop: 12, borderRadius: 999, background: card.background }} />
           </div>
@@ -622,22 +668,22 @@ function RevenueOverviewPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, marginBottom: 16 }}>
-        <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+        <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
             <div style={{ fontWeight: 800, fontSize: 16 }}>Doanh thu theo tháng</div>
-            <div style={{ fontSize: 12, color: '#6B7280' }}>Từ các phiếu đã xuất hóa đơn</div>
+            <div style={{ fontSize: 12, color: '#71717a' }}>Từ các phiếu đã xuất hóa đơn</div>
           </div>
 
           {loading && (
             <div className="empty-state" style={{ minHeight: 220 }}>
-              <div className="empty-state-icon">⏳</div>
+              <div className="empty-state-icon"><IconWait /></div>
               <h3>Đang tải biểu đồ</h3>
             </div>
           )}
 
           {!loading && monthlyTrend.length === 0 && (
             <div className="empty-state" style={{ minHeight: 220 }}>
-              <div className="empty-state-icon">📉</div>
+              <div className="empty-state-icon"><IconDown /></div>
               <h3>Chưa có dữ liệu biểu đồ</h3>
             </div>
           )}
@@ -648,7 +694,7 @@ function RevenueOverviewPage() {
                 const barHeight = maxRevenue > 0 ? Math.max(12, Math.round((Number(item.totalRevenue || 0) / maxRevenue) * 180)) : 12;
                 return (
                   <div key={item.month || item.label} style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: '#6B7280', marginBottom: 6 }}>{currency(item.totalRevenue)}</div>
+                    <div style={{ fontSize: 11, color: '#71717a', marginBottom: 6 }}>{currency(item.totalRevenue)}</div>
                     <div style={{ height: 190, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                       <div
                         title={`${item.label}: ${currency(item.totalRevenue)}`}
@@ -656,12 +702,12 @@ function RevenueOverviewPage() {
                           width: 32,
                           height: barHeight,
                           borderRadius: '10px 10px 4px 4px',
-                          background: 'linear-gradient(180deg, #0EA5E9 0%, #0284C7 100%)',
+                          background: 'linear-gradient(180deg, #3f3f46 0%, #27272a 100%)',
                           boxShadow: '0 8px 14px rgba(3, 105, 161, 0.25)',
                         }}
                       />
                     </div>
-                    <div style={{ fontSize: 11, color: '#475569', marginTop: 6, fontWeight: 700 }}>{item.label}</div>
+                    <div style={{ fontSize: 11, color: '#52525b', marginTop: 6, fontWeight: 700 }}>{item.label}</div>
                   </div>
                 );
               })}
@@ -669,20 +715,20 @@ function RevenueOverviewPage() {
           )}
         </div>
 
-        <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+        <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16 }}>
           <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>Theo chi nhánh (tháng hiện tại)</div>
-          <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 10 }}>Service revenue, tổng doanh thu và tỷ trọng đóng góp.</div>
+          <div style={{ fontSize: 12, color: '#71717a', marginBottom: 10 }}>Service revenue, tổng doanh thu và tỷ trọng đóng góp.</div>
 
           {loading && (
             <div className="empty-state" style={{ minHeight: 220 }}>
-              <div className="empty-state-icon">⏳</div>
+              <div className="empty-state-icon"><IconWait /></div>
               <h3>Đang tải thống kê chi nhánh</h3>
             </div>
           )}
 
           {!loading && branchStats.length === 0 && (
             <div className="empty-state" style={{ minHeight: 220 }}>
-              <div className="empty-state-icon">📭</div>
+              <div className="empty-state-icon"><IconEmpty /></div>
               <h3>Không có dữ liệu chi nhánh</h3>
             </div>
           )}
@@ -707,8 +753,8 @@ function RevenueOverviewPage() {
                       <td>
                         <div style={{ minWidth: 110 }}>
                           <div style={{ fontWeight: 700 }}>{percent(row.percentage)}</div>
-                          <div style={{ marginTop: 4, height: 6, borderRadius: 999, background: '#E5E7EB', overflow: 'hidden' }}>
-                            <div style={{ width: `${Math.min(100, Math.max(0, Number(row.percentage || 0)))}%`, height: '100%', background: '#0EA5E9' }} />
+                          <div style={{ marginTop: 4, height: 6, borderRadius: 999, background: '#e4e4e7', overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.min(100, Math.max(0, Number(row.percentage || 0)))}%`, height: '100%', background: '#3f3f46' }} />
                           </div>
                         </div>
                       </td>
@@ -852,13 +898,13 @@ function EmployeeListPage() {
           <div className="breadcrumb">General Director / Danh sách nhân sự</div>
         </div>
         <div className="page-header-right">
-          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
+          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><IconUser />{user?.name || 'General Director'}</span></span>
         </div>
       </div>
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Danh sách nhân sự toàn hệ thống</h2>
@@ -877,7 +923,7 @@ function EmployeeListPage() {
 
       <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -937,7 +983,7 @@ function EmployeeListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
           {error}
         </div>
       )}
@@ -960,7 +1006,7 @@ function EmployeeListPage() {
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
-                    <div className="empty-state-icon">⏳</div>
+                    <div className="empty-state-icon"><IconWait /></div>
                     <h3>Đang tải danh sách nhân sự</h3>
                     <p>Vui lòng chờ trong giây lát.</p>
                   </div>
@@ -972,7 +1018,7 @@ function EmployeeListPage() {
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state">
-                    <div className="empty-state-icon">📭</div>
+                    <div className="empty-state-icon"><IconEmpty /></div>
                     <h3>Không có dữ liệu nhân sự</h3>
                     <p>Không tìm thấy nhân sự phù hợp với từ khóa hoặc bộ lọc hiện tại.</p>
                   </div>
@@ -1033,13 +1079,13 @@ function EmployeeListPage() {
             <div className="modal-body" style={{ maxHeight: '78vh', overflow: 'auto' }}>
               {detailLoading && (
                 <div className="empty-state" style={{ minHeight: 220 }}>
-                  <div className="empty-state-icon">⏳</div>
+                  <div className="empty-state-icon"><IconWait /></div>
                   <h3>Đang tải hồ sơ nhân sự</h3>
                 </div>
               )}
 
               {!detailLoading && detailError && (
-                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px' }}>
                   {detailError}
                 </div>
               )}
@@ -1047,13 +1093,13 @@ function EmployeeListPage() {
               {!detailLoading && !detailError && activeEmployee && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
-                    <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeEmployee.employeeId || '—'}</div>
+                    <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#52525b' }}>Mã nhân sự</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#18181b', marginTop: 4 }}>{activeEmployee.employeeId || '—'}</div>
                     </div>
-                    <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#6B7280' }}>Chức vụ chính</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{activeEmployee.primaryRoleLabel || '—'}</div>
+                    <div style={{ background: '#F7F7F8', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#71717a' }}>Chức vụ chính</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#18181b', marginTop: 4 }}>{activeEmployee.primaryRoleLabel || '—'}</div>
                     </div>
                     <div style={{ background: detailBadge.background, border: `1px solid ${detailBadge.color}33`, borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: detailBadge.color }}>Trạng thái</div>
@@ -1061,7 +1107,7 @@ function EmployeeListPage() {
                     </div>
                   </div>
 
-                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+                  <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16 }}>
                     <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin hồ sơ</div>
                     <DetailRow label="Họ và tên" value={activeEmployee.fullName} />
                     <DetailRow label="Email" value={activeEmployee.email} />
@@ -1217,13 +1263,13 @@ function TechnicianListPage() {
           <div className="breadcrumb">General Director / Danh sách kỹ thuật viên</div>
         </div>
         <div className="page-header-right">
-          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
+          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><IconUser />{user?.name || 'General Director'}</span></span>
         </div>
       </div>
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Điều phối kỹ thuật viên toàn hệ thống</h2>
@@ -1242,7 +1288,7 @@ function TechnicianListPage() {
 
       <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -1292,12 +1338,12 @@ function TechnicianListPage() {
         </button>
       </div>
 
-      <div style={{ marginBottom: 12, fontSize: 12, color: '#64748B' }}>
+      <div style={{ marginBottom: 12, fontSize: 12, color: '#71717a' }}>
         Đang lọc: {selectedBranchName} · {selectedSkillName}
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reloadTechnicians}>
             ↻ Tải lại
@@ -1324,7 +1370,7 @@ function TechnicianListPage() {
               <tr>
                 <td colSpan={8}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
-                    <div className="empty-state-icon">⏳</div>
+                    <div className="empty-state-icon"><IconWait /></div>
                     <h3>Đang tải danh sách kỹ thuật viên</h3>
                     <p>Vui lòng chờ trong giây lát.</p>
                   </div>
@@ -1336,7 +1382,7 @@ function TechnicianListPage() {
               <tr>
                 <td colSpan={8}>
                   <div className="empty-state">
-                    <div className="empty-state-icon">📭</div>
+                    <div className="empty-state-icon"><IconEmpty /></div>
                     <h3>Không có dữ liệu kỹ thuật viên</h3>
                     <p>Không tìm thấy kỹ thuật viên phù hợp với bộ lọc chi nhánh và kỹ năng.</p>
                   </div>
@@ -1355,7 +1401,7 @@ function TechnicianListPage() {
                   </td>
                   <td><BranchBadge branch={technician.branch} /></td>
                   <td>{technician.specialty || '—'}</td>
-                  <td style={{ fontWeight: 800, color: '#0F766E' }}>{technician.activeAssignments || 0}</td>
+                  <td style={{ fontWeight: 800, color: '#3f3f46' }}>{technician.activeAssignments || 0}</td>
                   <td style={{ fontWeight: 700 }}>{technician.totalRepairs || 0}</td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
@@ -1398,13 +1444,13 @@ function TechnicianListPage() {
             <div className="modal-body" style={{ maxHeight: '80vh', overflow: 'auto' }}>
               {detailLoading && (
                 <div className="empty-state" style={{ minHeight: 220 }}>
-                  <div className="empty-state-icon">⏳</div>
+                  <div className="empty-state-icon"><IconWait /></div>
                   <h3>Đang tải hồ sơ kỹ thuật viên</h3>
                 </div>
               )}
 
               {!detailLoading && detailError && (
-                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px' }}>
                   {detailError}
                 </div>
               )}
@@ -1412,17 +1458,17 @@ function TechnicianListPage() {
               {!detailLoading && !detailError && activeTechnician && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
-                    <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeTechnician.employeeId || '—'}</div>
+                    <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#52525b' }}>Mã nhân sự</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#18181b', marginTop: 4 }}>{activeTechnician.employeeId || '—'}</div>
                     </div>
-                    <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#6B7280' }}>Chi nhánh</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{activeTechnician.branch?.name || '—'}</div>
+                    <div style={{ background: '#F7F7F8', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#71717a' }}>Chi nhánh</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#18181b', marginTop: 4 }}>{activeTechnician.branch?.name || '—'}</div>
                     </div>
                   </div>
 
-                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                  <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16, marginBottom: 16 }}>
                     <div style={{ fontWeight: 800, marginBottom: 10 }}>Hồ sơ kỹ thuật viên</div>
                     <DetailRow label="Họ và tên" value={activeTechnician.fullName} />
                     <DetailRow label="Email" value={activeTechnician.email} />
@@ -1434,7 +1480,7 @@ function TechnicianListPage() {
                     <DetailRow label="Ghi chú" value={activeTechnician.notes} />
                   </div>
 
-                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
+                  <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16 }}>
                     <div style={{ fontWeight: 800, marginBottom: 10 }}>Lịch sử sửa chữa</div>
                     <div className="table-wrapper" style={{ boxShadow: 'none', marginBottom: 0 }}>
                       <table className="data-table">
@@ -1454,7 +1500,7 @@ function TechnicianListPage() {
                             <tr>
                               <td colSpan={7}>
                                 <div className="empty-state" style={{ minHeight: 180 }}>
-                                  <div className="empty-state-icon">📭</div>
+                                  <div className="empty-state-icon"><IconEmpty /></div>
                                   <h3>Chưa có lịch sử sửa chữa</h3>
                                 </div>
                               </td>
@@ -1467,7 +1513,7 @@ function TechnicianListPage() {
                               <td style={{ fontFamily: 'monospace' }}>{item.orderCode || '—'}</td>
                               <td>
                                 <div style={{ fontWeight: 700 }}>{item.vehicle?.licensePlate || '—'}</div>
-                                <div style={{ fontSize: 11, color: '#6B7280' }}>{item.vehicle?.model || ''}</div>
+                                <div style={{ fontSize: 11, color: '#71717a' }}>{item.vehicle?.model || ''}</div>
                               </td>
                               <td>{item.customerName || '—'}</td>
                               <td>{repairStatusLabel(item.repairStatus)}</td>
@@ -1627,7 +1673,7 @@ function BranchManagerListPage() {
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Danh sách giám đốc chi nhánh toàn hệ thống</h2>
@@ -1642,12 +1688,12 @@ function BranchManagerListPage() {
             <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{filteredManagers.filter((item) => item.status === 'active').length}</div>
           </div>
         </div>
-        <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>👤 {user?.name || 'General Director'}</div>
+        <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><IconUser />{user?.name || 'General Director'}</span></div>
       </div>
 
       <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo mã, tên, email, điện thoại..." />
         </div>
 
@@ -1699,7 +1745,7 @@ function BranchManagerListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
           {error}
         </div>
       )}
@@ -1722,7 +1768,7 @@ function BranchManagerListPage() {
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
-                    <div className="empty-state-icon">⏳</div>
+                    <div className="empty-state-icon"><IconWait /></div>
                     <h3>Đang tải danh sách giám đốc chi nhánh</h3>
                     <p>Vui lòng chờ trong giây lát.</p>
                   </div>
@@ -1734,7 +1780,7 @@ function BranchManagerListPage() {
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state">
-                    <div className="empty-state-icon">📭</div>
+                    <div className="empty-state-icon"><IconEmpty /></div>
                     <h3>Không có dữ liệu giám đốc chi nhánh</h3>
                     <p>Không tìm thấy dữ liệu phù hợp với bộ lọc hiện tại.</p>
                   </div>
@@ -1752,7 +1798,7 @@ function BranchManagerListPage() {
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <BranchBadge branch={row.branch} />
-                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: isBranchActive ? '#ECFDF5' : '#FEF2F2', color: isBranchActive ? '#0F766E' : '#B91C1C', fontSize: 11, fontWeight: 800 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: isBranchActive ? '#f4f4f5' : '#e4e4e7', color: isBranchActive ? '#3f3f46' : '#27272a', fontSize: 11, fontWeight: 800 }}>
                         {isBranchActive ? 'CN hoạt động' : 'CN bị khóa'}
                       </span>
                     </div>
@@ -1869,35 +1915,35 @@ function BranchManagerDetailPage() {
       <ModuleActionBar />
 
       {loading && (
-        <div className="empty-state" style={{ minHeight: 280, background: 'white', borderRadius: 16, border: '1px solid #E5E7EB' }}>
-          <div className="empty-state-icon">⏳</div>
+        <div className="empty-state" style={{ minHeight: 280, background: 'white', borderRadius: 16, border: '1px solid #e4e4e7' }}>
+          <div className="empty-state-icon"><IconWait /></div>
           <h3>Đang tải hồ sơ giám đốc chi nhánh</h3>
         </div>
       )}
 
       {!loading && error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px' }}>
           {error}
         </div>
       )}
 
       {!loading && !error && manager && (
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 16 }}>
-          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+          <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16 }}>
             <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin cá nhân</div>
             <DetailRow label="Mã quản lý" value={manager.managerId} />
             <DetailRow label="Họ tên" value={manager.fullName} />
             <DetailRow label="Email" value={manager.email} />
             <DetailRow label="Số điện thoại" value={manager.phone} />
           </div>
-          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+          <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16 }}>
             <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin công việc</div>
             <DetailRow label="Chức vụ" value={manager.role?.label || 'Giám đốc chi nhánh'} />
             <DetailRow label="Chi nhánh" value={manager.branch?.name || '—'} />
             <DetailRow label="Trạng thái" value={employeeStatusBadge(manager.status).label} />
             <DetailRow label="Ngày tạo tài khoản" value={formatDate(manager.createdAt)} />
           </div>
-          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
+          <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16 }}>
             <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin tài khoản</div>
             <DetailRow label="Email đăng nhập" value={manager.email} />
             <DetailRow label="Vai trò" value={manager.role?.label || 'Giám đốc chi nhánh'} />
@@ -1991,10 +2037,10 @@ function BranchManagerCreatePage() {
 
       <ModuleActionBar />
 
-      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
-        <div style={{ fontSize: 13, color: '#475569', marginBottom: 14 }}>Tài khoản đăng nhập của giám đốc chi nhánh sử dụng email trong hệ thống hiện tại.</div>
+      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 18 }}>
+        <div style={{ fontSize: 13, color: '#52525b', marginBottom: 14 }}>Tài khoản đăng nhập của giám đốc chi nhánh sử dụng email trong hệ thống hiện tại.</div>
         {error && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
             {error}
           </div>
         )}
@@ -2139,9 +2185,9 @@ function BranchManagerEditPage() {
 
       <ModuleActionBar />
 
-      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
+      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 18 }}>
         {error && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
             {error}
           </div>
         )}
@@ -2319,7 +2365,7 @@ function SettlementReportsPage() {
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>General Director</div>
@@ -2339,13 +2385,13 @@ function SettlementReportsPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
         {[
-          { label: 'Tổng phiếu', value: stats.total, background: '#EEF2FF', color: '#4338CA' },
-          { label: 'Chờ sửa chữa', value: stats.waiting_repair, background: '#FFF3E0', color: '#E65100' },
-          { label: 'Đang sửa chữa', value: stats.inprogress, background: '#E3F2FD', color: '#1565C0' },
-          { label: 'Chờ thanh toán', value: stats.waiting_payment, background: '#E8F5E9', color: '#2E7D32' },
+          { label: 'Tổng phiếu', value: stats.total, background: '#e4e4e7', color: '#18181b' },
+          { label: 'Chờ sửa chữa', value: stats.waiting_repair, background: '#f4f4f5', color: '#52525b' },
+          { label: 'Đang sửa chữa', value: stats.inprogress, background: '#f4f4f5', color: '#3f3f46' },
+          { label: 'Chờ thanh toán', value: stats.waiting_payment, background: '#e4e4e7', color: '#3f3f46' },
         ].map((item) => (
-          <div key={item.label} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16, boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)' }}>
-            <div style={{ fontSize: 12, color: '#6B7280' }}>{item.label}</div>
+          <div key={item.label} style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16, boxShadow: '0 8px 24px rgba(9, 9, 11, 0.04)' }}>
+            <div style={{ fontSize: 12, color: '#71717a' }}>{item.label}</div>
             <div style={{ fontSize: 24, fontWeight: 900, marginTop: 6, color: item.color }}>{item.value}</div>
             <div style={{ height: 4, width: '100%', marginTop: 12, borderRadius: 999, background: item.background }} />
           </div>
@@ -2354,7 +2400,7 @@ function SettlementReportsPage() {
 
       <div style={{ ...FILTER_ROW_STYLE, marginBottom: 14 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -2425,7 +2471,7 @@ function SettlementReportsPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
           {error}
         </div>
       )}
@@ -2452,7 +2498,7 @@ function SettlementReportsPage() {
               <tr>
                 <td colSpan={11}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
-                    <div className="empty-state-icon">⏳</div>
+                    <div className="empty-state-icon"><IconWait /></div>
                     <h3>Đang tải dữ liệu</h3>
                     <p>Vui lòng chờ trong giây lát.</p>
                   </div>
@@ -2464,7 +2510,7 @@ function SettlementReportsPage() {
               <tr>
                 <td colSpan={11}>
                   <div className="empty-state">
-                    <div className="empty-state-icon">📭</div>
+                    <div className="empty-state-icon"><IconEmpty /></div>
                     <h3>Không tìm thấy phiếu quyết toán</h3>
                     <p>Không có dữ liệu khớp với từ khóa hoặc bộ lọc hiện tại.</p>
                   </div>
@@ -2495,7 +2541,7 @@ function SettlementReportsPage() {
                   </td>
                   <td style={{ fontSize: 12 }}>{formatDate(report.intakeDate)}</td>
                   <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>
-                  <td style={{ fontWeight: 800, color: '#C62828' }}>{currency(report.total)}</td>
+                  <td style={{ fontWeight: 800, color: '#27272a' }}>{currency(report.total)}</td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
                       {badge.label}
@@ -2527,13 +2573,13 @@ function SettlementReportsPage() {
       </div>
 
       {detailError && (
-        <div style={{ marginTop: 12, background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ marginTop: 12, background: '#f4f4f5', border: '1px solid #e4e4e7', color: '#52525b', borderRadius: 10, padding: '12px 14px' }}>
           {detailError}
         </div>
       )}
 
       {loadingDetail && (
-        <div style={{ marginTop: 12, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#334155', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ marginTop: 12, background: '#fafafa', border: '1px solid #e4e4e7', color: '#3f3f46', borderRadius: 10, padding: '12px 14px' }}>
           Đang tải chi tiết phiếu quyết toán...
         </div>
       )}

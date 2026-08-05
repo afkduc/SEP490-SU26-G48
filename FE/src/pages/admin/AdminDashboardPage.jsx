@@ -149,27 +149,27 @@ function formatDuration(seconds) {
 }
 
 const ACTION_COLORS = {
-  CREATE: '#059669',
-  UPDATE: '#4f46e5',
-  DELETE: '#dc2626',
-  LOGIN: '#0891b2',
-  LOGIN_FAILED: '#ef4444',
-  LOGOUT: '#6b7280',
-  ASSIGN: '#7c3aed',
-  REVOKE: '#d97706',
-  CHANGE_PASSWORD: '#db2777',
-  ACTIVE: '#10b981',
-  INACTIVE: '#94a3b8',
-  LOCKED: '#ef4444',
+  CREATE: '#3f3f46',
+  UPDATE: '#18181b',
+  DELETE: '#27272a',
+  LOGIN: '#3f3f46',
+  LOGIN_FAILED: '#52525b',
+  LOGOUT: '#71717a',
+  ASSIGN: '#3f3f46',
+  REVOKE: '#52525b',
+  CHANGE_PASSWORD: '#52525b',
+  ACTIVE: '#3f3f46',
+  INACTIVE: '#a1a1aa',
+  LOCKED: '#52525b',
 };
 
 function getActionColor(action) {
-  if (!action) return '#6b7280';
+  if (!action) return '#71717a';
   const upper = action.toUpperCase();
   for (const [key, color] of Object.entries(ACTION_COLORS)) {
     if (upper.includes(key)) return color;
   }
-  return '#6b7280';
+  return '#71717a';
 }
 
 function formatActionLabel(action) {
@@ -185,115 +185,115 @@ function formatActionLabel(action) {
 
 function getActionBadge(action) {
   const fallbackLabel = getAuditActionLabel(action) || 'Thao tác';
-  if (!action) return { label: 'Thao tác', bg: '#f1f5f9', color: '#64748b' };
+  if (!action) return { label: 'Thao tác', bg: '#f4f4f5', color: '#71717a' };
 
   const upper = String(action).toUpperCase();
 
   // Tao moi / Insert
   if (upper.includes('CREATE') || upper.includes('INSERT') || upper.includes('ADD')) {
-    return { label: 'Tạo mới', bg: '#dcfce7', color: '#15803d' };
+    return { label: 'Tạo mới', bg: '#e4e4e7', color: '#3f3f46' };
   }
   // Cap nhat / Edit
   if (upper.includes('UPDATE') || upper.includes('EDIT') || upper.includes('MODIFY') || upper.includes('PATCH')) {
-    return { label: 'Cập nhật', bg: '#eef2ff', color: '#4338ca' };
+    return { label: 'Cập nhật', bg: '#e4e4e7', color: '#18181b' };
   }
   // Xoa
   if (upper.includes('DELETE') || upper.includes('REMOVE')) {
-    return { label: 'Xóa', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'Xóa', bg: '#e4e4e7', color: '#27272a' };
   }
   // Dang nhap that bai
   if (upper.includes('LOGIN_FAILED') || upper.includes('LOGINFAIL') || upper.includes('LOGIN FAIL')) {
-    return { label: 'Đăng nhập thất bại', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'Đăng nhập thất bại', bg: '#e4e4e7', color: '#27272a' };
   }
   // Dang nhap / Dang xuat
   if (upper.includes('LOGOUT') || upper.includes('SIGNOUT')) {
-    return { label: 'ĐĂNG XUẤT', bg: '#e0f2fe', color: '#0369a1' };
+    return { label: 'ĐĂNG XUẤT', bg: '#f4f4f5', color: '#3f3f46' };
   }
   if (upper.includes('LOGIN')) {
-    return { label: 'ĐĂNG NHẬP', bg: '#e0f2fe', color: '#0369a1' };
+    return { label: 'ĐĂNG NHẬP', bg: '#f4f4f5', color: '#3f3f46' };
   }
   // Phan quyen
   if (upper.includes('ASSIGN') || upper.includes('GRANT')) {
-    return { label: 'GÁN QUYỀN', bg: '#f3e8ff', color: '#7c3aed' };
+    return { label: 'GÁN QUYỀN', bg: '#e4e4e7', color: '#3f3f46' };
   }
   if (upper.includes('REVOKE') || upper.includes('UNASSIGN')) {
-    return { label: 'THU HỒI', bg: '#fef3c7', color: '#b45309' };
+    return { label: 'THU HỒI', bg: '#f4f4f5', color: '#52525b' };
   }
   // Mat khau
   if (upper.includes('PASSWORD') || upper.includes('RESET_PASS')) {
-    return { label: 'ĐỔI MK', bg: '#fce7f3', color: '#be185d' };
+    return { label: 'ĐỔI MK', bg: '#f4f4f5', color: '#52525b' };
   }
   // Trang thai (active/lock/toggle)
   if (upper.includes('ACTIVATE') || upper.includes('ENABLE')) {
-    return { label: 'KÍCH HOẠT', bg: '#dcfce7', color: '#15803d' };
+    return { label: 'KÍCH HOẠT', bg: '#e4e4e7', color: '#3f3f46' };
   }
   if (upper.includes('DEACTIVATE') || upper.includes('DISABLE')) {
-    return { label: 'NGỪNG HOẠT ĐỘNG', bg: '#f1f5f9', color: '#64748b' };
+    return { label: 'NGỪNG HOẠT ĐỘNG', bg: '#f4f4f5', color: '#71717a' };
   }
   if (upper.includes('LOCK')) {
-    return { label: 'KHÓA', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'KHÓA', bg: '#e4e4e7', color: '#27272a' };
   }
   if (upper.includes('UNLOCK')) {
-    return { label: 'MỞ KHÓA', bg: '#dcfce7', color: '#15803d' };
+    return { label: 'MỞ KHÓA', bg: '#e4e4e7', color: '#3f3f46' };
   }
   if (upper.includes('TOGGLE') || upper.includes('SWITCH') || upper.includes('STATUS')) {
-    return { label: 'ĐỔI TRẠNG THÁI', bg: '#eef2ff', color: '#4338ca' };
+    return { label: 'ĐỔI TRẠNG THÁI', bg: '#e4e4e7', color: '#18181b' };
   }
   // Import / Export
   if (upper.includes('IMPORT')) {
-    return { label: 'NHẬP', bg: '#dbeafe', color: '#1d4ed8' };
+    return { label: 'NHẬP', bg: '#f4f4f5', color: '#3f3f46' };
   }
   if (upper.includes('EXPORT')) {
-    return { label: 'XUẤT', bg: '#dbeafe', color: '#1d4ed8' };
+    return { label: 'XUẤT', bg: '#f4f4f5', color: '#3f3f46' };
   }
   // Upload / Download
   if (upper.includes('UPLOAD')) {
-    return { label: 'TẢI LÊN', bg: '#fef3c7', color: '#b45309' };
+    return { label: 'TẢI LÊN', bg: '#f4f4f5', color: '#52525b' };
   }
   if (upper.includes('DOWNLOAD')) {
-    return { label: 'TẢI XUỐNG', bg: '#fef3c7', color: '#b45309' };
+    return { label: 'TẢI XUỐNG', bg: '#f4f4f5', color: '#52525b' };
   }
   // Approve / Reject
   if (upper.includes('APPROVE')) {
-    return { label: 'DUYỆT', bg: '#dcfce7', color: '#15803d' };
+    return { label: 'DUYỆT', bg: '#e4e4e7', color: '#3f3f46' };
   }
   if (upper.includes('REJECT')) {
-    return { label: 'TỪ CHỐI', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'TỪ CHỐI', bg: '#e4e4e7', color: '#27272a' };
   }
   // Cancel / Complete
   if (upper.includes('CANCEL')) {
-    return { label: 'HỦY', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'HỦY', bg: '#e4e4e7', color: '#27272a' };
   }
   if (upper.includes('COMPLETE') || upper.includes('FINISH') || upper.includes('DONE')) {
-    return { label: 'HOÀN TẤT', bg: '#dcfce7', color: '#15803d' };
+    return { label: 'HOÀN TẤT', bg: '#e4e4e7', color: '#3f3f46' };
   }
   // View / Read
   if (upper.includes('VIEW') || upper.includes('READ')) {
-    return { label: 'XEM', bg: '#e0e7ff', color: '#4338ca' };
+    return { label: 'XEM', bg: '#e4e4e7', color: '#18181b' };
   }
   // Fallback: hien thi goc (viet hoa, thay _ -> space) thay vi "UNKNOWN"
-  return { label: fallbackLabel, bg: '#f1f5f9', color: '#475569' };
+  return { label: fallbackLabel, bg: '#f4f4f5', color: '#52525b' };
 }
 
 function getResponseBadge(status) {
   if (status == null || status === '' || Number(status) === 0) {
-    return { label: 'Đã thực hiện', bg: '#dcfce7', color: '#15803d' };
+    return { label: 'Đã thực hiện', bg: '#e4e4e7', color: '#3f3f46' };
   }
-  if (status >= 200 && status < 300) return { label: 'Thành công', bg: '#dcfce7', color: '#15803d' };
-  if (status >= 400 && status < 500) return { label: 'Lỗi yêu cầu', bg: '#fef3c7', color: '#b45309' };
-  if (status >= 500) return { label: 'Lỗi hệ thống', bg: '#fee2e2', color: '#dc2626' };
-  return { label: `HTTP ${status}`, bg: '#f1f5f9', color: '#475569' };
+  if (status >= 200 && status < 300) return { label: 'Thành công', bg: '#e4e4e7', color: '#3f3f46' };
+  if (status >= 400 && status < 500) return { label: 'Lỗi yêu cầu', bg: '#f4f4f5', color: '#52525b' };
+  if (status >= 500) return { label: 'Lỗi hệ thống', bg: '#e4e4e7', color: '#27272a' };
+  return { label: `HTTP ${status}`, bg: '#f4f4f5', color: '#52525b' };
 }
 
 function getStatusBadge(status) {
-  if (!status) return { label: '—', bg: '#f1f5f9', color: '#64748b' };
+  if (!status) return { label: '—', bg: '#f4f4f5', color: '#71717a' };
   const upper = String(status).toUpperCase();
-  if (upper === 'SUCCESS' || upper === 'ACTIVE') return { label: 'Đang hoạt động', bg: '#dcfce7', color: '#15803d' };
-  if (upper === 'ENDED' || upper === 'LOGGED_OUT') return { label: 'Đã đăng xuất', bg: '#f1f5f9', color: '#64748b' };
-  if (upper === 'FAILED' || upper === 'FAIL') return { label: 'Thất bại', bg: '#fee2e2', color: '#dc2626' };
-  if (upper === 'LOCKED') return { label: 'Bị khóa', bg: '#fee2e2', color: '#dc2626' };
-  if (upper === 'INACTIVE') return { label: 'Ngừng hoạt động', bg: '#f1f5f9', color: '#64748b' };
-  return { label: status, bg: '#f1f5f9', color: '#475569' };
+  if (upper === 'SUCCESS' || upper === 'ACTIVE') return { label: 'Đang hoạt động', bg: '#e4e4e7', color: '#3f3f46' };
+  if (upper === 'ENDED' || upper === 'LOGGED_OUT') return { label: 'Đã đăng xuất', bg: '#f4f4f5', color: '#71717a' };
+  if (upper === 'FAILED' || upper === 'FAIL') return { label: 'Thất bại', bg: '#e4e4e7', color: '#27272a' };
+  if (upper === 'LOCKED') return { label: 'Bị khóa', bg: '#e4e4e7', color: '#27272a' };
+  if (upper === 'INACTIVE') return { label: 'Ngừng hoạt động', bg: '#f4f4f5', color: '#71717a' };
+  return { label: status, bg: '#f4f4f5', color: '#52525b' };
 }
 
 function getAlertIcon(iconType) {
@@ -327,8 +327,8 @@ function getAlertStyle(alert) {
     || raw.includes('đăng nhập')
   ) {
     return dark
-      ? { bg: 'rgba(34,197,94,0.12)', border: '#166534', color: '#86efac', iconBg: 'rgba(34,197,94,0.22)' }
-      : { bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a', iconBg: '#dcfce7' };
+      ? { bg: 'rgba(34,197,94,0.12)', border: '#3f3f46', color: '#a1a1aa', iconBg: 'rgba(34,197,94,0.22)' }
+      : { bg: '#f4f4f5', border: '#a1a1aa', color: '#3f3f46', iconBg: '#e4e4e7' };
   }
   if (
     raw === 'danger'
@@ -342,8 +342,8 @@ function getAlertStyle(alert) {
     || raw.includes('vô hiệu')
   ) {
     return dark
-      ? { bg: 'rgba(239,68,68,0.12)', border: '#991b1b', color: '#fca5a5', iconBg: 'rgba(239,68,68,0.22)' }
-      : { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', iconBg: '#fee2e2' };
+      ? { bg: 'rgba(239,68,68,0.12)', border: '#27272a', color: '#a1a1aa', iconBg: 'rgba(239,68,68,0.22)' }
+      : { bg: '#e4e4e7', border: '#a1a1aa', color: '#27272a', iconBg: '#e4e4e7' };
   }
   if (
     raw === 'warning'
@@ -353,12 +353,12 @@ function getAlertStyle(alert) {
     || raw.includes('sửa')
   ) {
     return dark
-      ? { bg: 'rgba(245,158,11,0.12)', border: '#92400e', color: '#fcd34d', iconBg: 'rgba(245,158,11,0.22)' }
-      : { bg: '#fffbeb', border: '#fde68a', color: '#d97706', iconBg: '#fef3c7' };
+      ? { bg: 'rgba(82, 82, 91,0.12)', border: '#52525b', color: '#a1a1aa', iconBg: 'rgba(82, 82, 91,0.22)' }
+      : { bg: '#f4f4f5', border: '#d4d4d8', color: '#52525b', iconBg: '#f4f4f5' };
   }
   return dark
-    ? { bg: '#162032', border: '#334155', color: '#cbd5e1', iconBg: '#1e293b' }
-    : { bg: '#f8fafc', border: '#e2e8f0', color: '#475569', iconBg: '#f1f5f9' };
+    ? { bg: '#18181b', border: '#3f3f46', color: '#d4d4d8', iconBg: '#27272a' }
+    : { bg: '#fafafa', border: '#e4e4e7', color: '#52525b', iconBg: '#f4f4f5' };
 }
 
 // Severity: danh gia muc do nghiem trong cua canh bao
@@ -369,14 +369,14 @@ const SEVERITY_LABELS = {
   low: 'Thấp',
 };
 const SEVERITY_STYLES = {
-  critical: { label: 'Nghiêm trọng', bg: '#991b1b', color: '#ffffff' },
-  high:     { label: 'Cao',         bg: '#dc2626', color: '#ffffff' },
-  medium:   { label: 'Trung bình',  bg: '#eab308', color: '#1f2937' },
-  low:      { label: 'Thấp',        bg: '#10b981', color: '#ffffff' },
-  success:  { label: 'Thành công',  bg: '#16a34a', color: '#ffffff' },
-  info:     { label: 'Thông tin',   bg: '#2563eb', color: '#ffffff' },
-  warning:  { label: 'Cảnh báo',    bg: '#d97706', color: '#ffffff' },
-  error:    { label: 'Lỗi',         bg: '#dc2626', color: '#ffffff' },
+  critical: { label: 'Nghiêm trọng', bg: '#27272a', color: '#ffffff' },
+  high:     { label: 'Cao',         bg: '#27272a', color: '#ffffff' },
+  medium:   { label: 'Trung bình',  bg: '#71717a', color: '#27272a' },
+  low:      { label: 'Thấp',        bg: '#3f3f46', color: '#ffffff' },
+  success:  { label: 'Thành công',  bg: '#3f3f46', color: '#ffffff' },
+  info:     { label: 'Thông tin',   bg: '#3f3f46', color: '#ffffff' },
+  warning:  { label: 'Cảnh báo',    bg: '#52525b', color: '#ffffff' },
+  error:    { label: 'Lỗi',         bg: '#27272a', color: '#ffffff' },
 };
 
 // Category: phan loai canh bao
@@ -874,9 +874,9 @@ function LoginItem({ item }) {
 
   // Color cho status dot (xanh = active/thanh cong, do = fail, xam = ended)
   const loginStatusDot = (() => {
-    if (item.actionType === 'LOGIN_FAILED' || item.status === 'failed') return '#ef4444';
-    if (item.status === 'ended' || item.logoutTime || item.logout_time) return '#94a3b8';
-    return '#10b981';
+    if (item.actionType === 'LOGIN_FAILED' || item.status === 'failed') return '#52525b';
+    if (item.status === 'ended' || item.logoutTime || item.logout_time) return '#a1a1aa';
+    return '#3f3f46';
   })();
 
   return (
@@ -929,11 +929,11 @@ function QuickAction({ to, icon, label, desc, accent }) {
 // ─── Main component ─────────────────────────────────────────────────────────
 
 const QUICK_ACTIONS = [
-  { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem, chỉnh sửa & phân quyền', accent: '#4f46e5' },
-  { to: '/admin/login-security', icon: <IconAlert />, label: 'Bảo mật đăng nhập', desc: 'Thiết bị + tín hiệu cảnh báo', accent: '#ef4444' },
-  { to: '/admin/logs', icon: <IconLog />, label: 'Nhật ký hoạt động', desc: 'Lịch sử thao tác', accent: '#d97706' },
-  { to: '/admin/catalog', icon: <IconLogin />, label: 'Danh mục hệ thống', desc: 'Chi nhánh', accent: '#0891b2' },
-  { to: '/admin/profile', icon: <IconTerminal />, label: 'Tài khoản của tôi', desc: 'Hồ sơ & thông báo', accent: '#db2777' },
+  { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem, chỉnh sửa & phân quyền', accent: '#18181b' },
+  { to: '/admin/login-security', icon: <IconAlert />, label: 'Bảo mật đăng nhập', desc: 'Thiết bị + tín hiệu cảnh báo', accent: '#52525b' },
+  { to: '/admin/logs', icon: <IconLog />, label: 'Nhật ký hoạt động', desc: 'Lịch sử thao tác', accent: '#52525b' },
+  { to: '/admin/catalog', icon: <IconLogin />, label: 'Danh mục hệ thống', desc: 'Chi nhánh', accent: '#3f3f46' },
+  { to: '/admin/profile', icon: <IconTerminal />, label: 'Tài khoản của tôi', desc: 'Hồ sơ & thông báo', accent: '#52525b' },
 ];
 
 export default function AdminDashboardPage() {
@@ -1169,9 +1169,9 @@ export default function AdminDashboardPage() {
       <div className="dash-period-bar" style={{
         display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
         marginBottom: 16, padding: '12px 16px', background: '#fff',
-        border: '1px solid #e2e8f0', borderRadius: 12,
+        border: '1px solid #e4e4e7', borderRadius: 12,
       }}>
-        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#52525b' }}>
           Thống kê IAM / bảo mật — khoảng:
         </span>
         {[
@@ -1196,7 +1196,7 @@ export default function AdminDashboardPage() {
             <input type="date" className="input" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
           </>
         )}
-        <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#64748b' }}>
+        <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#71717a' }}>
           Đang xem: <strong>{periodLabel}</strong>
           {stats?.periodAuditCount != null ? ` · ${stats.periodAuditCount} nhật ký` : ''}
         </span>
@@ -1222,7 +1222,7 @@ export default function AdminDashboardPage() {
           {/* ── Row 1: Stats cards ────────────────────────────── */}
           <div className="dash-stats-grid">
             <StatCard
-              accent="#4f46e5"
+              accent="#18181b"
               icon={<IconUsers />}
               label="Tổng người dùng"
               value={stats.totalUsers}
@@ -1237,21 +1237,21 @@ export default function AdminDashboardPage() {
               }
             />
             <StatCard
-              accent="#059669"
+              accent="#3f3f46"
               icon={<IconBranch />}
               label="Chi nhánh"
               value={stats.totalBranches}
               sub="Đang hoạt động"
             />
             <StatCard
-              accent="#7c3aed"
+              accent="#3f3f46"
               icon={<IconRole />}
               label="Vai trò"
               value={stats.totalRoles}
               sub="Vai trò hiện có"
             />
             <StatCard
-              accent="#0891b2"
+              accent="#3f3f46"
               icon={<IconLogin />}
               label={`Đăng nhập (${periodLabel})`}
               value={stats.todayLogins}
@@ -1284,7 +1284,7 @@ export default function AdminDashboardPage() {
             {/* Alerts widget */}
             <div className="dash-widget">
               <SectionHeader
-                dot="linear-gradient(135deg, #ef4444, #f97316)"
+                dot="linear-gradient(135deg, #52525b, #52525b)"
                 title="Thông báo hệ thống"
                 badge={derivedAlerts.length}
                 link="/admin/login-security?alerts=1"
@@ -1297,7 +1297,7 @@ export default function AdminDashboardPage() {
                   ))
                 ) : (
                   <div className="empty-state">
-                    <div className="empty-state__icon" style={{ color: '#10b981' }}>
+                    <div className="empty-state__icon" style={{ color: '#3f3f46' }}>
                       <IconCheck />
                     </div>
                     <p>Tất cả hoạt động bình thường</p>
@@ -1342,7 +1342,7 @@ export default function AdminDashboardPage() {
                       ))
                     ) : (
                       <div className="empty-state">
-                        <div className="empty-state__icon" style={{ color: '#94a3b8' }}>
+                        <div className="empty-state__icon" style={{ color: '#a1a1aa' }}>
                           <IconLog />
                         </div>
                         <p>Chưa có hoạt động nào được ghi nhận</p>
@@ -1361,7 +1361,7 @@ export default function AdminDashboardPage() {
           <div className="dash-row-2">
             <div className="dash-widget dash-widget--span-2">
               <SectionHeader
-                dot="linear-gradient(135deg, #4f46e5, #7c3aed)"
+                dot="linear-gradient(135deg, #18181b, #3f3f46)"
                 title="Thao tác nhanh"
                 badge={QUICK_ACTIONS.length}
               />

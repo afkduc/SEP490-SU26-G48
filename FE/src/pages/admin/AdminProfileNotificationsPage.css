@@ -3,7 +3,7 @@
 .admin-notifications {
   padding: 28px 32px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #1e293b;
+  color: #27272a;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -22,14 +22,14 @@
 .admin-notifications__title-block h1 {
   font-size: 1.35rem;
   font-weight: 700;
-  color: #0f172a;
+  color: #18181b;
   margin: 0 0 2px;
   letter-spacing: -0.2px;
 }
 
 .admin-notifications__subtitle {
   font-size: 0.82rem;
-  color: #64748b;
+  color: #71717a;
   margin: 0;
 }
 
@@ -50,14 +50,14 @@
 }
 
 .admin-notifications .btn--primary {
-  background: #0891b2;
+  background: #3f3f46;
   color: #fff;
-  border-color: #0891b2;
+  border-color: #3f3f46;
 }
 
 .admin-notifications .btn--primary:hover:not(:disabled) {
-  background: #0e7490;
-  border-color: #0e7490;
+  background: #3f3f46;
+  border-color: #3f3f46;
 }
 
 .admin-notifications .btn:disabled {
@@ -74,7 +74,7 @@
   justify-content: center;
   gap: 12px;
   padding: 48px 24px;
-  color: #64748b;
+  color: #71717a;
   font-size: 0.9rem;
 }
 
@@ -84,17 +84,17 @@
 }
 
 .admin-notifications .error-state {
-  color: #b91c1c;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  color: #27272a;
+  background: #e4e4e7;
+  border: 1px solid #a1a1aa;
   border-radius: 10px;
 }
 
 .admin-notifications .loading-spinner {
   width: 22px;
   height: 22px;
-  border: 2.5px solid #e2e8f0;
-  border-top-color: #0891b2;
+  border: 2.5px solid #e4e4e7;
+  border-top-color: #3f3f46;
   border-radius: 50%;
   animation: admin-notifications-spin 0.7s linear infinite;
 }
@@ -115,9 +115,9 @@
 }
 
 .admin-notifications .alert-banner--success {
-  background: #dcfce7;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background: #e4e4e7;
+  color: #3f3f46;
+  border: 1px solid #a1a1aa;
 }
 
 .admin-notifications .alert-banner__icon {
@@ -128,15 +128,15 @@
 /* ── Card ── */
 .notifications-card {
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e4e4e7;
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px rgba(9, 9, 11, 0.04);
 }
 
 .notifications-card__section {
   padding: 20px 24px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f4f4f5;
 }
 
 .notifications-card__section:last-child {
@@ -146,7 +146,7 @@
 .notifications-card__section-title {
   font-size: 0.78rem;
   font-weight: 700;
-  color: #475569;
+  color: #52525b;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 14px;
@@ -163,7 +163,7 @@
 }
 
 .notification-row + .notification-row {
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #f4f4f5;
 }
 
 .notification-row__label {
@@ -176,12 +176,12 @@
 .notification-row__title {
   font-size: 0.92rem;
   font-weight: 600;
-  color: #0f172a;
+  color: #18181b;
 }
 
 .notification-row__description {
   font-size: 0.8rem;
-  color: #64748b;
+  color: #71717a;
 }
 
 /* ── Toggle Switch (checkbox styled as switch) ── */
@@ -191,7 +191,7 @@
   position: relative;
   width: 40px;
   height: 22px;
-  background: #cbd5e1;
+  background: #d4d4d8;
   border-radius: 22px;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -212,7 +212,7 @@
 }
 
 .notification-row input[type='checkbox']:checked {
-  background: #0891b2;
+  background: #3f3f46;
 }
 
 .notification-row input[type='checkbox']:checked::before {
@@ -241,7 +241,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #cbd5e1;
+  background-color: #d4d4d8;
   border-radius: 22px;
   transition: 0.2s ease;
 }
@@ -259,7 +259,7 @@
 }
 
 .admin-notifications .toggle input:checked + .toggle__slider {
-  background-color: #0891b2;
+  background-color: #3f3f46;
 }
 
 .admin-notifications .toggle input:checked + .toggle__slider::before {

@@ -188,7 +188,7 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
       <div className="notifications-card">
           <div className="notifications-card__section">
           <div className="notifications-card__section-title">Kênh thông báo bảo mật</div>
-          <p className="notifications-card__section-hint" style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 12px' }}>
+          <p className="notifications-card__section-hint" style={{ fontSize: '0.8rem', color: '#71717a', margin: '0 0 12px' }}>
             Các tùy chọn bên dưới bật/tắt thông báo <strong>trong hệ thống</strong> (chuông / danh sách).
             Hiện chưa gửi email SMTP riêng cho các sự kiện này.
           </p>

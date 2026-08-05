@@ -44,7 +44,7 @@ function DetailRow({ label, value, badge }) {
         {badge ? (
           <span className={`badge ${badge}`}>{value}</span>
         ) : (
-          value || <span style={{ color: '#cbd5e1' }}>—</span>
+          value || <span style={{ color: '#d4d4d8' }}>—</span>
         )}
       </dd>
     </div>

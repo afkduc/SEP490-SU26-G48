@@ -214,7 +214,7 @@ function DiffView({ oldValue, newValue, action }) {
         <AuditRowsView rows={summary.rows} summary={summary.summary} />
         {oldObj && (
           <details style={{ marginTop: 12 }}>
-            <summary style={{ cursor: 'pointer', color: '#64748b', fontSize: 13 }}>Xem giá trị cũ</summary>
+            <summary style={{ cursor: 'pointer', color: '#71717a', fontSize: 13 }}>Xem giá trị cũ</summary>
             <HumanizedDataView data={oldValue} />
           </details>
         )}
@@ -436,7 +436,7 @@ export function AuditLogDetailContent({ log }) {
 
       {(log.old_value || log.new_value) && (
         <div className="audit-detail__diff">
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#475569' }}>
+          <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#52525b' }}>
             Chi tiết thay đổi
           </label>
           <DiffView oldValue={log.old_value} newValue={log.new_value} action={log.action} />

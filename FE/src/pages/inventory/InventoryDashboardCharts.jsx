@@ -7,8 +7,8 @@ import { useState } from 'react';
 
 // Bang mau hang (brand) - tai su dung bang mau CATEGORY_HUES cua Dashboard
 // CVD de dong bo phong cach mau giua cac trang thong ke.
-export const BRAND_HUES = ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7', '#e34948', '#e87ba4', '#eb6834'];
-export const OTHER_HUE = '#94a3b8';
+export const BRAND_HUES = ['#18181b', '#3f3f46', '#52525b', '#71717a', '#27272a', '#a1a1aa', '#09090b', '#d4d4d8'];
+export const OTHER_HUE = '#a1a1aa';
 
 export function brandColor(index) {
   return index < BRAND_HUES.length ? BRAND_HUES[index] : OTHER_HUE;

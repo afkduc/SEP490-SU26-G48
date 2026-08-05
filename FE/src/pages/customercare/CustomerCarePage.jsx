@@ -43,10 +43,10 @@ function dueDateMeta(dueDate) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diffDays = Math.round((d - today) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return { color: '#C62828', label: 'Quá hạn' };
-  if (diffDays === 0) return { color: '#C62828', label: 'Hôm nay' };
-  if (diffDays === 1) return { color: '#E65100', label: 'Còn 1 ngày' };
-  if (diffDays === 2) return { color: '#E65100', label: 'Còn 2 ngày' };
+  if (diffDays < 0) return { color: '#27272a', label: 'Quá hạn' };
+  if (diffDays === 0) return { color: '#27272a', label: 'Hôm nay' };
+  if (diffDays === 1) return { color: '#52525b', label: 'Còn 1 ngày' };
+  if (diffDays === 2) return { color: '#52525b', label: 'Còn 2 ngày' };
   return {};
 }
 
@@ -169,7 +169,7 @@ export default function CustomerCarePage() {
       </div>
 
       {(loadError || actionError) && (
-        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#27272a' }}>
           {loadError || actionError}
         </div>
       )}
@@ -240,7 +240,7 @@ export default function CustomerCarePage() {
                         <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => setConfirmTarget(r)}>Xác nhận lịch hẹn</button>
                       )}
                       {r.isConfirmed && (
-                        <span style={{ fontSize: 11, color: '#2E7D32', fontWeight: 700 }}>Hẹn ngày {r.confirmedDate}</span>
+                        <span style={{ fontSize: 11, color: '#3f3f46', fontWeight: 700 }}>Hẹn ngày {r.confirmedDate}</span>
                       )}
                     </div>
                   </td>

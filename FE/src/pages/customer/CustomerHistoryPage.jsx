@@ -51,7 +51,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
         </div>
         <div className="modal-body">
           {loading && <p>Đang tải…</p>}
-          {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
+          {loadError && <p style={{ color: '#27272a' }}>{loadError}</p>}
           {detail && (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
@@ -105,7 +105,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
               {detail.cancelReason && (
                 <>
                   <div className="form-section-title">Lý do hủy</div>
-                  <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#C62828' }}>
+                  <div style={{ background: '#e4e4e7', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#27272a' }}>
                     {detail.cancelReason}
                   </div>
                 </>
@@ -151,12 +151,12 @@ function SettlementDetailModal({ settlementId, onClose }) {
                           key={t.id}
                           style={{
                             display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                            background: t.isDone ? '#E8F5E9' : 'var(--gray-50)', borderRadius: 6,
+                            background: t.isDone ? '#e4e4e7' : 'var(--gray-50)', borderRadius: 6,
                             fontSize: 13,
-                            color: t.isDone ? '#2E7D32' : 'var(--gray-900)',
+                            color: t.isDone ? '#3f3f46' : 'var(--gray-900)',
                           }}
                         >
-                          <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#2E7D32' }} />
+                          <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#3f3f46' }} />
                           <span>{t.taskName}</span>
                         </label>
                       ))}
@@ -300,7 +300,7 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
     <div style={{ border: '1px solid var(--primary-light)', background: 'var(--primary-very-light)', borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>
       <div style={{ fontWeight: 700, marginBottom: 10, color: 'var(--primary-dark)' }}>Chuyển nhượng xe cho khách hàng khác</div>
       {error && (
-        <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#C62828' }}>{error}</div>
+        <div style={{ background: '#e4e4e7', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#27272a' }}>{error}</div>
       )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -501,7 +501,7 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
             </div>
 
             <div className="form-section-title">Lịch sử bảo dưỡng &amp; sửa chữa</div>
-            {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
+            {loadError && <p style={{ color: '#27272a' }}>{loadError}</p>}
             <div className="table-wrapper">
               <table className="data-table">
                 <thead><tr><th>Số phiếu</th><th>Chi nhánh</th><th>Ngày</th><th>Khách hàng</th><th>Trạng thái</th><th></th></tr></thead>
@@ -690,7 +690,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
 
           <div className="modal-body">
             {loading && <p>Đang tải…</p>}
-            {loadError && <p style={{ color: '#C62828' }}>{loadError}</p>}
+            {loadError && <p style={{ color: '#27272a' }}>{loadError}</p>}
 
             {customer && tab === 'info' && !editing && (
               <div>
@@ -736,7 +736,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
             {customer && tab === 'info' && editing && form && (
               <div>
                 {saveError && (
-                  <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
+                  <div style={{ background: '#e4e4e7', borderRadius: 6, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#27272a' }}>
                     {saveError}
                   </div>
                 )}
@@ -967,7 +967,7 @@ function ImportCustomersModal({ onClose, onImported }) {
           </div>
 
           {error && (
-            <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#C62828' }}>
+            <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#27272a' }}>
               {error}
             </div>
           )}
@@ -975,21 +975,21 @@ function ImportCustomersModal({ onClose, onImported }) {
           {result && (
             <div style={{ marginTop: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 12 }}>
-                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#047857' }}>{result.customersCreated}</div>
-                  <div style={{ fontSize: 11, color: '#047857' }}>KH mới</div>
+                <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#3f3f46' }}>{result.customersCreated}</div>
+                  <div style={{ fontSize: 11, color: '#3f3f46' }}>KH mới</div>
                 </div>
-                <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#1D4ED8' }}>{result.customersReused}</div>
-                  <div style={{ fontSize: 11, color: '#1D4ED8' }}>KH đã có</div>
+                <div style={{ background: '#f4f4f5', border: '1px solid #d4d4d8', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#3f3f46' }}>{result.customersReused}</div>
+                  <div style={{ fontSize: 11, color: '#3f3f46' }}>KH đã có</div>
                 </div>
-                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#047857' }}>{result.vehiclesCreated}</div>
-                  <div style={{ fontSize: 11, color: '#047857' }}>Xe mới</div>
+                <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#3f3f46' }}>{result.vehiclesCreated}</div>
+                  <div style={{ fontSize: 11, color: '#3f3f46' }}>Xe mới</div>
                 </div>
-                <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#C2410C' }}>{result.errors.length}</div>
-                  <div style={{ fontSize: 11, color: '#C2410C' }}>Dòng lỗi/bỏ qua</div>
+                <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#52525b' }}>{result.errors.length}</div>
+                  <div style={{ fontSize: 11, color: '#52525b' }}>Dòng lỗi/bỏ qua</div>
                 </div>
               </div>
 
@@ -1001,7 +1001,7 @@ function ImportCustomersModal({ onClose, onImported }) {
                       {result.errors.map((e, i) => (
                         <tr key={i}>
                           <td>{e.row}</td>
-                          <td style={{ color: '#C62828', fontSize: 12 }}>{e.reason}</td>
+                          <td style={{ color: '#27272a', fontSize: 12 }}>{e.reason}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1104,7 +1104,7 @@ function CustomerList() {
       </div>
 
       {loadError && (
-        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#27272a' }}>
           {loadError}
         </div>
       )}

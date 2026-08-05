@@ -89,10 +89,10 @@ export function isIntakeChecklistComplete(v) {
 }
 
 const TOGGLE_STYLES = {
-  OK: { active: '#16a34a', activeBg: '#16a34a', hoverBg: '#ecfdf5' },
-  NG: { active: '#dc2626', activeBg: '#dc2626', hoverBg: '#fef2f2' },
-  CO: { active: '#16a34a', activeBg: '#16a34a', hoverBg: '#ecfdf5' },
-  KHONG: { active: '#64748b', activeBg: '#64748b', hoverBg: '#f1f5f9' },
+  OK: { active: '#3f3f46', activeBg: '#3f3f46', hoverBg: '#f4f4f5' },
+  NG: { active: '#27272a', activeBg: '#27272a', hoverBg: '#e4e4e7' },
+  CO: { active: '#3f3f46', activeBg: '#3f3f46', hoverBg: '#f4f4f5' },
+  KHONG: { active: '#71717a', activeBg: '#71717a', hoverBg: '#f4f4f5' },
 };
 
 function PillToggle({ styleKey, text, active, onClick }) {
@@ -113,7 +113,7 @@ function PillToggle({ styleKey, text, active, onClick }) {
         cursor: 'pointer',
         transition: 'background-color 0.15s, color 0.15s, border-color 0.15s',
         background: active ? c.activeBg : '#fff',
-        color: active ? '#fff' : '#64748b',
+        color: active ? '#fff' : '#71717a',
       }}
       onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
       onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = '#fff'; }}
@@ -126,7 +126,7 @@ function PillToggle({ styleKey, text, active, onClick }) {
 function OkNgField({ label, value, onSet }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--gray-100)' }}>
-      <span style={{ fontSize: 12.5, color: '#334155' }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: '#3f3f46' }}>{label}</span>
       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
         <PillToggle styleKey="OK" text="OK" active={value === 'OK'} onClick={() => onSet(value === 'OK' ? null : 'OK')} />
         <PillToggle styleKey="NG" text="NG" active={value === 'NG'} onClick={() => onSet(value === 'NG' ? null : 'NG')} />
@@ -138,7 +138,7 @@ function OkNgField({ label, value, onSet }) {
 function CoKhongField({ label, value, onSet }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--gray-100)' }}>
-      <span style={{ fontSize: 12.5, color: '#334155' }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: '#3f3f46' }}>{label}</span>
       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
         <PillToggle styleKey="CO" text="Có" active={value === true} onClick={() => onSet(value === true ? null : true)} />
         <PillToggle styleKey="KHONG" text="K" active={value === false} onClick={() => onSet(value === false ? null : false)} />
@@ -192,7 +192,7 @@ function FuelGauge({ value, onChange }) {
               transform: i === 0 ? 'translateX(0)' : i === n - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
               fontSize: 12,
               fontWeight: value === o ? 700 : 500,
-              color: value === o ? '#334155' : '#64748b',
+              color: value === o ? '#3f3f46' : '#71717a',
             }}
           >
             {o}
@@ -206,7 +206,7 @@ function FuelGauge({ value, onChange }) {
           position: 'relative',
           height: 14,
           marginBottom: 40,
-          background: 'linear-gradient(180deg, #f8fafc, #e2e8f0)',
+          background: 'linear-gradient(180deg, #fafafa, #e4e4e7)',
           border: '1px solid var(--gray-400)',
           borderRadius: 3,
           cursor: 'pointer',
@@ -250,7 +250,7 @@ function FuelGauge({ value, onChange }) {
                 height: 0,
                 borderLeft: '11px solid transparent',
                 borderRight: '11px solid transparent',
-                borderBottom: '16px solid #334155',
+                borderBottom: '16px solid #3f3f46',
                 filter: 'drop-shadow(0 -1px 2px rgba(0,0,0,0.25))',
               }}
             />
@@ -266,7 +266,7 @@ function CheckField({ label, checked, onToggle }) {
     <label
       style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 12.5, cursor: 'pointer',
-        borderBottom: '1px solid var(--gray-100)', color: '#334155',
+        borderBottom: '1px solid var(--gray-100)', color: '#3f3f46',
       }}
     >
       <input type="checkbox" checked={Boolean(checked)} onChange={() => onToggle(!checked)} />
