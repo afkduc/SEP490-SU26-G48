@@ -212,7 +212,6 @@
   max-width: 640px;
 }
 .jobHeader { margin-bottom: 12px; }
-.jobCode { font-family: monospace; font-weight: 700; color: var(--accent); font-size: 15px; }
 .jobCustomer { font-weight: 700; font-size: 17px; margin-top: 2px; }
 .jobVehicle { font-size: 13px; color: var(--text-muted); }
 .jobTechnician { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
@@ -278,6 +277,9 @@
 }
 .task input { width: 22px; height: 22px; accent-color: var(--success); }
 .taskDone { background: #e6f4ea; color: var(--success); }
+/* text-decoration KHONG dat o day - de rieng cho span ten trong TaskNameLabel
+   (BayScreen.jsx), tranh gach ngang lan qua ca phan "(Khách hủy)". */
+.taskCancelled { color: var(--text-muted); }
 
 .jobPartlist { display: flex; flex-direction: column; gap: 6px; }
 .partRow {
