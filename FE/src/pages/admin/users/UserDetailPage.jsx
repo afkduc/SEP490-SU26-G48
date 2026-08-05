@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { adminUsersApi } from '../../../services/adminApi';
 import PermissionGate from '../../../components/PermissionGate';
 import { useToast } from '../../../components/common/ToastContext';
+import { formatPhoneDisplay } from '../../../utils/validation';
 import './UserDetailPage.css';
 
 const STATUS_LABELS = {
@@ -171,7 +172,7 @@ export default function UserDetailPage() {
                 <h2 className="user-detail-hero__name">{fullName}</h2>
                 <p className="user-detail-hero__sub">
                   @{user.name}
-                  {user.phone ? ` · ${user.phone}` : ''}
+                  {user.phone ? ` · ${formatPhoneDisplay(user.phone)}` : ''}
                 </p>
                 {user.roles?.length > 0 && (
                   <div className="user-detail-hero__roles">
@@ -214,7 +215,7 @@ export default function UserDetailPage() {
                 <div className="user-detail-grid">
                   <Field label="Họ" value={user.firstName || '—'} />
                   <Field label="Tên" value={user.lastName || '—'} />
-                  <Field label="Số điện thoại" value={user.phone || '—'} />
+                  <Field label="Số điện thoại" value={user.phone ? formatPhoneDisplay(user.phone) : '—'} />
                 </div>
               </section>
 

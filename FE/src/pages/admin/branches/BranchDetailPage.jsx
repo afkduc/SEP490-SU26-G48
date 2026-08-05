@@ -4,6 +4,7 @@ import { adminBranchesApi } from '../../../services/adminApi';
 import { useToast } from '../../../components/common/ToastContext';
 import { useApiError } from '../../../hooks/useApiError';
 import PermissionGate from '../../../components/PermissionGate';
+import { formatPhoneDisplay } from '../../../utils/validation';
 import '../AdminBranchesPage.css';
 import './BranchPages.css';
 
@@ -161,7 +162,7 @@ export default function BranchDetailPage() {
 
             <dl className="branch-detail__list">
               <div><dt>Địa chỉ</dt><dd>{branch.address || '—'}</dd></div>
-              <div><dt>Điện thoại</dt><dd>{branch.phone || '—'}</dd></div>
+              <div><dt>Điện thoại</dt><dd>{branch.phone ? formatPhoneDisplay(branch.phone) : '—'}</dd></div>
               <div>
                 <dt>Email</dt>
                 <dd>

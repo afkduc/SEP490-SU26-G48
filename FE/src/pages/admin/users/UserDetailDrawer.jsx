@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminUsersApi } from '../../../services/adminApi';
+import { formatPhoneDisplay } from '../../../utils/validation';
 import '../components/AdminDrawer.css';
 
 const STATUS_LABELS = {
@@ -114,7 +115,7 @@ export default function UserDetailDrawer({ userId, onClose }) {
                 <h3 className="user-info-card__name">{fullName}</h3>
                 <p className="user-info-card__username">
                   @{user.name}
-                  {user.phone ? ` · ${user.phone}` : ''}
+                  {user.phone ? ` · ${formatPhoneDisplay(user.phone)}` : ''}
                 </p>
                 {user.roles?.length > 0 && (
                   <div className="user-info-card__roles">

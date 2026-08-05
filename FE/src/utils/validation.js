@@ -26,6 +26,13 @@ export function formatPhoneInput(value) {
   return `${d.slice(0, 4)}-${d.slice(4, 7)}-${d.slice(7)}`;
 }
 
+/** Hiển thị SĐT từ DB (chuẩn hóa dấu cũ 0236-3333-3333 → 0236-333-3333). */
+export function formatPhoneDisplay(value) {
+  const d = phoneDigitsOnly(value);
+  if (!d) return '';
+  return formatPhoneInput(d);
+}
+
 export function isValidEmail(value) {
   if (value == null) return false;
   const email = String(value).trim();

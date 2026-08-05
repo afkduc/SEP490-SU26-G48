@@ -8,6 +8,7 @@ import {
   adminUsersApi,
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
+import { formatPhoneDisplay } from '../../utils/validation';
 import { useToast } from '../../components/common/ToastContext';
 import PermissionGate from '../../components/PermissionGate';
 import AdminPagination from './components/AdminPagination';
@@ -405,7 +406,7 @@ export default function AdminUsersPage() {
                               </span>
                               <span className="user-name-cell__sub">
                                 <span className="font-mono">@{u.name}</span>
-                                {u.phone ? ` · ${u.phone}` : ''}
+                                {u.phone ? ` · ${formatPhoneDisplay(u.phone)}` : ''}
                               </span>
                               {u.email ? (
                                 <span className="user-name-cell__email" title={u.email}>
