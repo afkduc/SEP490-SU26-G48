@@ -9,11 +9,6 @@ const STATUS_META = {
   approved: { label: 'Đã nhập kho', className: 'badge--success' },
 };
 
-function formatDate(d) {
-  if (!d) return '—';
-  return String(d).slice(0, 10);
-}
-
 function formatDateTime(d) {
   if (!d) return '—';
   const s = String(d);
@@ -123,19 +118,17 @@ export default function ImportRequestListPage() {
               <tr>
                 <th>Mã phiếu</th>
                 <th>Ngày tạo</th>
-                <th>Ngày nhập</th>
                 <th>Nhà cung cấp</th>
                 <th>Số dòng</th>
                 <th>Tổng SL</th>
                 <th>Trạng thái</th>
-                <th>Người tạo</th>
                 <th style={{ width: 110 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="table__empty">
+                  <td colSpan={7} className="table__empty">
                     Không có phiếu nhập nào
                   </td>
                 </tr>
@@ -146,14 +139,12 @@ export default function ImportRequestListPage() {
                     <tr key={r.id}>
                       <td><span className="font-mono">{r.requestCode}</span></td>
                       <td>{formatDateTime(r.createdAt)}</td>
-                      <td>{formatDate(r.importDate)}</td>
                       <td>{r.supplierName || '—'}</td>
                       <td className="text-right">{r.itemCount ?? 0}</td>
                       <td className="text-right">{r.totalQuantity ?? 0}</td>
                       <td>
                         <span className={`badge ${meta.className}`}>{meta.label}</span>
                       </td>
-                      <td>{r.requestedByName || '—'}</td>
                       <td className="table__actions">
                         <Link
                           to={`/inventory/import-requests/${r.id}`}
