@@ -27,26 +27,14 @@ class RepairOrderController {
   // luon cho 1 khoang cua chinh minh (bayId chon tu GET /vehicle-bays/mine).
   claim = async (req, res, next) => {
     try {
+      // Chưa ghi audit ở bước chọn khoang — đợi tổ trưởng xác nhận phân công thợ
+      // (setTechnicians) rồi mới ghi 1 dòng tổng hợp để tránh spam nhật ký.
       const item = await this.repairOrderService.claim(req.body.serviceOrderId, {
         branchId: req.user.branchId,
         teamLeaderId: req.user.userId,
         bayId: req.body.bayId,
         bayNumber: req.body.bayNumber,
       });
-      await auditCrud.create(req, {
-        tableName: 'repair_orders',
-        entityCode: item?.code || null,
-        recordId: item?.id || null,
-        entityName: 'Phiếu sửa chữa',
-        data: req.body,
-      });
-      await this.notificationService.notifyAdmins('REPAIR_ORDER_CREATED', {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: item?.code || `ID-${item?.id}`,
-        targetCode: item?.code || '',
-        userId: item?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
       return success(res, item, 'Repair order claimed', 201);
     } catch (err) {
       next(err);
@@ -65,18 +53,50 @@ class RepairOrderController {
 
   setTechnicians = async (req, res, next) => {
     try {
+      const before = await this.repairOrderService.getById(req.params.id);
+      const hadTechnicians = Array.isArray(before?.technicians) && before.technicians.length > 0;
       const item = await this.repairOrderService.setTechnicians(req.params.id, req.body.technicianIds, {
         branchId: req.user.branchId,
         teamLeaderId: req.user.userId,
       });
-      await auditCrud.update(req, {
+      const entityCode = item?.code || `ID-${req.params.id}`;
+      const recordId = item?.id || Number(req.params.id) || null;
+      const { repairOrderSnapshot } = require('../../utils/auditSnapshots');
+      const techNames = (item?.technicians || [])
+        .map((t) => t.fullName || t.name || t.technicianName)
+        .filter(Boolean)
+        .join(', ');
+      const stepLabel = hadTechnicians ? 'Cập nhật phân công thợ' : 'Nhận việc & phân công thợ';
+      await auditCrud.lifecycle(req, {
         tableName: 'repair_orders',
-        entityCode: item?.code || `ID-${req.params.id}`,
-        recordId: item?.id || Number(req.params.id) || null,
-        entityName: 'Phiếu sửa chữa',
-        newData: { technicianIds: req.body.technicianIds },
-        description: `Phân công thợ cho lệnh sửa chữa ${item?.code || req.params.id}`,
+        entityCode,
+        recordId,
+        entityName: 'Lệnh sửa chữa',
+        step: hadTechnicians ? 'reassigned' : 'assigned',
+        stepLabel,
+        action: hadTechnicians ? 'UPDATE' : 'CREATE',
+        description: `${stepLabel} cho lệnh ${entityCode}`
+          + (item?.bayNumber != null ? ` — Khoang ${item.bayNumber}` : '')
+          + (techNames ? ` — Thợ: ${techNames}` : ''),
+        snapshot: repairOrderSnapshot(item),
       });
+      if (!hadTechnicians) {
+        await this.notificationService.notifyAdmins('REPAIR_ORDER_CREATED', {
+          auditLogId: req._lastAuditLogId,
+          actorName: req.user?.name || req.user?.email || 'Admin',
+          targetName: entityCode,
+          targetCode: item?.code || '',
+          userId: item?.id,
+        }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
+      } else {
+        await this.notificationService.notifyAdmins('REPAIR_ORDER_UPDATED', {
+          auditLogId: req._lastAuditLogId,
+          actorName: req.user?.name || req.user?.email || 'Admin',
+          targetName: entityCode,
+          targetCode: item?.code || '',
+          userId: item?.id,
+        }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
+      }
       return success(res, item, 'Technicians assigned');
     } catch (err) {
       next(err);

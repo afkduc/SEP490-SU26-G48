@@ -777,6 +777,80 @@ async function getAuditLogsByUser(userId, limit = 10) {
   return result.recordset.map(toAuditLogRow);
 }
 
+/**
+ * Tim ban ghi lifecycle (1 log / 1 phieu) theo table_name + record_id.
+ * Uu tien dong co marker "lifecycle":true; neu chua co thi lay dong dau tien.
+ */
+async function findLifecycleAuditLog(tableName, recordId) {
+  if (!tableName || recordId == null || recordId === '') return null;
+  const result = await query(
+    `SELECT TOP 1 id, action, description, new_value, entity_code, logged_at
+     FROM audit_logs
+     WHERE table_name = @p1 AND record_id = @p2
+       AND (
+         new_value LIKE '%"lifecycle":true%'
+         OR new_value LIKE '%"lifecycle": true%'
+       )
+     ORDER BY id ASC`,
+    { p1: String(tableName).slice(0, 50), p2: Number(recordId) || recordId }
+  );
+  if (result.recordset?.[0]) return result.recordset[0];
+
+  const fallback = await query(
+    `SELECT TOP 1 id, action, description, new_value, entity_code, logged_at
+     FROM audit_logs
+     WHERE table_name = @p1 AND record_id = @p2
+     ORDER BY id ASC`,
+    { p1: String(tableName).slice(0, 50), p2: Number(recordId) || recordId }
+  );
+  return fallback.recordset?.[0] || null;
+}
+
+/** Cap nhat ban ghi lifecycle + bump logged_at de len dau danh sach. */
+async function updateAuditLog(id, fields = {}) {
+  if (!id) return null;
+  const result = await query(
+    `UPDATE audit_logs SET
+       user_id = @p2,
+       user_name = @p3,
+       phone_number = @p4,
+       action = @p5,
+       entity_name = COALESCE(@p6, entity_name),
+       entity_code = COALESCE(@p7, entity_code),
+       old_value = @p8,
+       new_value = @p9,
+       ip_address = @p10,
+       request_method = @p11,
+       request_url = @p12,
+       request_body = @p13,
+       response_status = @p14,
+       branch_id = COALESCE(@p15, branch_id),
+       description = @p16,
+       logged_at = SYSUTCDATETIME()
+     WHERE id = @p1;
+     SELECT @p1 AS id;`,
+    {
+      p1: Number(id),
+      p2: fields.user_id ?? null,
+      p3: fields.user_name != null ? String(fields.user_name).slice(0, 128) : null,
+      p4: fields.phone_number ?? null,
+      p5: fields.action,
+      p6: fields.entity_name ?? null,
+      p7: fields.entity_code ?? null,
+      p8: fields.old_value ?? null,
+      p9: fields.new_value ?? null,
+      p10: fields.ip_address ?? null,
+      p11: fields.request_method ?? null,
+      p12: fields.request_url ?? null,
+      p13: fields.request_body ?? null,
+      p14: fields.response_status ?? null,
+      p15: fields.branch_id ?? null,
+      p16: fields.description ?? null,
+    }
+  );
+  return result.recordset?.[0]?.id ?? Number(id);
+}
+
 module.exports = {
   insertAuditLog,
   getAuditLogs,
@@ -786,5 +860,7 @@ module.exports = {
   getLoginSessionsSince,
   getEntityDefinitions,
   getAuditLogsByUser,
+  findLifecycleAuditLog,
+  updateAuditLog,
   AUTH_AUDIT_ACTIONS,
 };

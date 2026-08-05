@@ -58,15 +58,7 @@ class PublicBayBoardController {
         Boolean(req.body.isDone),
         { userId: bay.teamLeaderId, branchId: bay.branchId }
       );
-      const task = (item?.tasks || []).find((t) => String(t.id) === String(req.params.taskId));
-      await auditCrud.update(req, {
-        tableName: 'repair_orders',
-        entityCode: item?.code || `ID-${req.params.id}`,
-        recordId: item?.id || Number(req.params.id) || null,
-        entityName: 'Lệnh sửa chữa',
-        newData: { taskId: Number(req.params.taskId), isDone: true, taskName: task?.taskName || null },
-        description: `Khoang ${bay.bayNumber} xác nhận hoàn thành đầu mục "${task?.taskName || req.params.taskId}" của lệnh ${item?.code || req.params.id}`,
-      });
+      // Không ghi audit từng đầu mục — chỉ ghi khi bấm Hoàn thành (updateStatus)
       return success(res, item, 'Task status updated');
     } catch (err) {
       next(err);
@@ -79,12 +71,26 @@ class PublicBayBoardController {
       const item = await this.repairOrderService.updateStatus(req.params.id, req.body.status, {
         branchId: bay.branchId,
       });
-      await auditCrud.update(req, {
+      const doneTasks = (item?.tasks || []).filter((t) => t.isDone || t.is_done);
+      const isCompleted = String(req.body.status || '').toLowerCase() === 'completed';
+      const statusLabel = isCompleted ? 'Hoàn thành sửa chữa' : `Cập nhật trạng thái (${req.body.status})`;
+      const { repairOrderSnapshot } = require('../../utils/auditSnapshots');
+      await auditCrud.lifecycle(req, {
         tableName: 'repair_orders',
         entityCode: item?.code || `ID-${req.params.id}`,
         recordId: item?.id || Number(req.params.id) || null,
-        entityName: 'Phiếu sửa chữa',
-        newData: { status: req.body.status },
+        entityName: 'Lệnh sửa chữa',
+        step: isCompleted ? 'completed' : 'status',
+        stepLabel: statusLabel,
+        action: 'UPDATE',
+        description: `${statusLabel} lệnh ${item?.code || req.params.id} — Khoang ${bay.bayNumber}`
+          + (doneTasks.length ? ` (${doneTasks.length} đầu mục)` : ''),
+        snapshot: repairOrderSnapshot(item, {
+          status: req.body.status,
+          completedTaskCount: doneTasks.length,
+          taskNames: doneTasks.map((t) => t.taskName || t.task_name).filter(Boolean),
+          bayNumber: bay.bayNumber,
+        }),
       });
       await this.notificationService.notifyAdmins('REPAIR_ORDER_UPDATED', {
         auditLogId: req._lastAuditLogId,
