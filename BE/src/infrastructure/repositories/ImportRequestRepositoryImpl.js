@@ -37,7 +37,7 @@ function buildImportRequestFilters({
     params.fromDate = fromDate;
   }
   if (toDate) {
-    where.push('ir.created_at <= @toDate');
+    where.push('ir.created_at < DATEADD(day, 1, CAST(@toDate AS date))');
     params.toDate = toDate;
   }
   if (search) {

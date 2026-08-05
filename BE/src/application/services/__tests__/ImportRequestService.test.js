@@ -6,8 +6,9 @@ function buildPayload() {
   return {
     branchId: 1,
     supplierId: 2,
+    supplierInvoiceNo: 'INV-2026-001',
     requestedBy: 7,
-    importDate: '2026-08-04',
+    importDate: '2000-01-01',
     items: [
       {
         productId: 11,
@@ -64,7 +65,15 @@ function buildRepository(callLog, status = 'pending') {
       return 'IRB-1-20260804-0001';
     },
     async create(tx, requestData, items) {
-      callLog.push(['create', tx, requestData.request_code, requestData.branch_id, items.length]);
+      callLog.push([
+        'create',
+        tx,
+        requestData.request_code,
+        requestData.branch_id,
+        items.length,
+        requestData.supplier_invoice_no,
+        requestData.import_date,
+      ]);
       return 101;
     },
     async approve(tx, id, approvedBy, importDate, options = {}) {
@@ -100,11 +109,39 @@ test('create auto-approves warehouse import in the same transaction', async () =
   ]);
   assert.equal(calls[0][1], 1);
   assert.equal(calls[1][1], tx);
+  assert.equal(calls[1][5], 'INV-2026-001');
+  assert.ok(calls[1][6] instanceof Date);
+  assert.notEqual(calls[1][6].toISOString().slice(0, 10), '2000-01-01');
   assert.equal(calls[2][1], tx);
   assert.equal(calls[2][2], 101);
   assert.equal(calls[2][3], 7);
   assert.deepEqual(calls[2][5], { branchId: 1 });
   assert.deepEqual(calls[3][2], { branchId: 1 });
+});
+
+test('create requires supplier invoice number', async () => {
+  const payload = buildPayload();
+  delete payload.supplierInvoiceNo;
+  const service = new ImportRequestService({
+    importRequestRepository: buildRepository([]),
+    transactionRunner: async (callback) => callback({ id: 'tx' }),
+  });
+
+  await assert.rejects(
+    () => service.create(payload, { autoApprove: true, approvedBy: 7 }),
+    (err) => err.statusCode === 400 && /hoa don/i.test(err.message),
+  );
+});
+
+test('list rejects a reversed date range', async () => {
+  const service = new ImportRequestService({
+    importRequestRepository: buildRepository([]),
+  });
+
+  await assert.rejects(
+    () => service.list({ branchId: 1, fromDate: '2026-08-05', toDate: '2026-08-01' }),
+    (err) => err.statusCode === 400 && /Ngày bắt đầu/.test(err.message),
+  );
 });
 
 test('create keeps pending flow when auto-approve is disabled', async () => {

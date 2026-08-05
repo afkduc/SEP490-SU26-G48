@@ -2,6 +2,7 @@ const ApiError = require('../../utils/ApiError');
 const ExportRequestResponseDto = require('../dto/ExportRequestResponseDto');
 const { validateCreateExportRequest } = require('../dto/ExportRequestCreateDto');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const { normalizeDateRange } = require('../../utils/dateRange');
 
 /**
  * Service cho Export Request (Phieu xuat kho).
@@ -17,6 +18,7 @@ class ExportRequestService {
 
   async list({ branchId, status, repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit } = {}) {
     if (!branchId) throw new ApiError(400, 'branchId is required');
+    const dateRange = normalizeDateRange(fromDate, toDate);
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const filters = {
@@ -24,8 +26,7 @@ class ExportRequestService {
       status: status || undefined,
       repairOrderId: repairOrderId ? Number(repairOrderId) : undefined,
       serviceOrderId: serviceOrderId ? Number(serviceOrderId) : undefined,
-      fromDate: fromDate ? new Date(fromDate) : undefined,
-      toDate: toDate ? new Date(toDate) : undefined,
+      ...dateRange,
       search: search || undefined,
     };
     const [items, total] = await Promise.all([
@@ -95,6 +96,9 @@ class ExportRequestService {
     }
     const data = await this.exportRequestRepository.findRepairOrderForExport(numId);
     if (!data) throw new ApiError(404, 'Khong tim thay lenh sua chua');
+    if (data.alreadyExported) {
+      throw new ApiError(409, 'Lenh sua chua nay da duoc xuat kho');
+    }
     return data;
   }
 
