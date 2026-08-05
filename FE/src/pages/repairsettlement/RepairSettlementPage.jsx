@@ -15,6 +15,7 @@ import {
   createRepairSettlementApi,
   updateRepairSettlementApi,
   updateRepairSettlementStatusApi,
+  logRepairSettlementPrintApi,
   createPayosPaymentLinkApi,
 } from '../../services/repairSettlementApi';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
@@ -233,10 +234,16 @@ function calcTotals(items) {
   };
 }
 
+function logPrintBestEffort(order, kind) {
+  if (!order?.id) return;
+  logRepairSettlementPrintApi(order.id, kind).catch(() => {});
+}
+
 // ─── In danh sách công việc (cho KTV) ────────────────────────────────
 // Export de dung chung o man Lenh sua chua (RepairOrderPage) - in danh sach
 // cong viec cho to truong sau khi phan cong xong, cung 1 mau in nhu o day.
 export function printWorkList(order) {
+  logPrintBestEffort(order, 'worklist');
   const rows = (order.items || []).map((item, i) => `
     <tr>
       <td style="border:1px solid #ccc;padding:4px 7px;text-align:center">${i + 1}</td>
@@ -286,6 +293,7 @@ export function printWorkList(order) {
 // truoc luc phieu dang "cho thanh toan") - khong truyen thi khong hien QR
 // gi ca (vd in luc vua tao phieu, hoac in lai phieu da xuat hoa don roi).
 function printSettlement(order, payosQrCode) {
+  logPrintBestEffort(order, 'settlement');
   // Tach 2 nhom "Cong viec can thuc hien" / "Phu tung, vat tu" khi in - giong
   // cach hien thi ben form tao/sua phieu va modal Xem chi tiet (giu nguyen so
   // thu tu goc trong mang items, khong danh lai tu 1 cho tung nhom).
@@ -1016,10 +1024,6 @@ function RepairSettlementList() {
   const handleViewDetail = async (o) => {
     setView(o);
     setView(await fetchFullOrder(o));
-  };
-
-  const handlePrintWorkList = async (o) => {
-    printWorkList(await fetchFullOrder(o));
   };
 
   const handlePreview = async (o) => {

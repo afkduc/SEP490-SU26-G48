@@ -10,6 +10,7 @@ import './Navbar.css';
 // ===== Admin =====
 const ADMIN_NAV = [
   { label: 'Bảng điều khiển', path: '/admin/dashboard' },
+  { label: 'Kho', path: '/inventory' },
   {
     label: 'Người dùng',
     children: [
@@ -27,7 +28,6 @@ const ADMIN_NAV = [
 
 // ===== Service Advisor =====
 const SERVICE_ADVISOR_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard' },
   { label: 'Yêu cầu', path: '/service-requests' },
   {
     label: 'Quyết toán sửa chữa',
@@ -44,7 +44,8 @@ const SERVICE_ADVISOR_NAV = [
 // ===== Manager =====
 const MANAGER_NAV = [
   { label: 'Dashboard', path: '/manager/dashboard' },
-  { label: 'Kho', path: '/manager/inventory' },
+  { label: 'Kho chi nhánh', path: '/manager/inventory' },
+  { label: 'Màn kho', path: '/inventory' },
   { label: 'Phiếu nhập', path: '/manager/import-requests' },
   { label: 'Phiếu xuất', path: '/manager/export-requests' },
   {
@@ -78,6 +79,7 @@ const WAREHOUSE_STAFF_NAV = [
 // ===== General Director =====
 const GENERAL_DIRECTOR_NAV = [
   { label: 'Bảng điều khiển', path: '/dashboard' },
+  { label: 'Kho', path: '/inventory' },
   { label: 'Báo cáo doanh thu', path: '/general-director/reports/revenue' },
   { label: 'Báo cáo quyết toán', path: '/general-director/reports/settlements' },
   { label: 'Chi nhánh', path: '/general-director/branch-managers' },
@@ -89,7 +91,7 @@ const GENERAL_DIRECTOR_NAV = [
 // ===== Team Leader =====
 const TEAM_LEADER_NAV = [
   { label: 'Bảng điều khiển', path: '/dashboard' },
-  { label: 'Công việc của tôi', path: '/repair-orders', end: true },
+  { label: 'Nhận việc', path: '/repair-orders', end: true },
 ];
 
 // ===== Technician (Kỹ thuật viên) =====

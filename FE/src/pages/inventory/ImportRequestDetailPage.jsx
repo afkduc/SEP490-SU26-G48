@@ -1,21 +1,10 @@
-import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
-import { ROLES } from '../../constants/roles';
+import { useParams, Link } from 'react-router-dom';
 import { useImportRequestDetail } from '../../hooks/inventory/useImportRequestDetail';
-import { useImportRequestApproval } from '../../hooks/inventory/useImportRequestApproval';
 import './ImportRequestDetailPage.css';
 
 const STATUS_META = {
-  pending: { label: 'Chờ duyệt', className: 'badge--warning' },
-  approved: { label: 'Đã duyệt', className: 'badge--success' },
-  rejected: { label: 'Từ chối', className: 'badge--danger' },
+  approved: { label: 'Đã nhập kho', className: 'badge--success' },
 };
-
-function formatDate(d) {
-  if (!d) return '—';
-  return String(d).slice(0, 10);
-}
 
 function formatDateTime(d) {
   if (!d) return '—';
@@ -34,45 +23,7 @@ function InfoRow({ label, value }) {
 
 export default function ImportRequestDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { data, loading, error, refetch, setData } = useImportRequestDetail(id);
-
-  const canApprove = user?.roles?.includes(ROLES.MANAGER) || user?.roles?.includes(ROLES.ADMIN);
-
-  const { approve, reject, approving, rejecting, error: actionError } = useImportRequestApproval(
-    (updated) => setData(updated),
-  );
-
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [rejectSubmitError, setRejectSubmitError] = useState('');
-  const [approveError, setApproveError] = useState('');
-
-  async function handleApprove() {
-    setApproveError('');
-    try {
-      await approve(id);
-    } catch (err) {
-      setApproveError(err.message || 'Duyệt thất bại');
-    }
-  }
-
-  async function handleRejectSubmit(e) {
-    e.preventDefault();
-    setRejectSubmitError('');
-    if (!rejectReason.trim()) {
-      setRejectSubmitError('Vui lòng nhập lý do từ chối');
-      return;
-    }
-    try {
-      await reject(id, rejectReason.trim());
-      setShowRejectModal(false);
-      setRejectReason('');
-    } catch (err) {
-      setRejectSubmitError(err.message || 'Từ chối thất bại');
-    }
-  }
+  const { data, loading, error } = useImportRequestDetail(id);
 
   if (loading) return <div className="ir-detail__loading">Đang tải...</div>;
   if (error) return <div className="ir-detail__error">Lỗi: {error}</div>;
@@ -81,8 +32,6 @@ export default function ImportRequestDetailPage() {
   const meta = STATUS_META[data.status] || { label: data.status, className: '' };
   const items = data.items || [];
   const totalQty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
-  const isPending = data.status === 'pending';
-
   return (
     <div className="ir-detail">
       <div className="ir-detail__header">
@@ -98,30 +47,7 @@ export default function ImportRequestDetailPage() {
           </div>
         </div>
 
-        {canApprove && isPending && (
-          <div className="ir-detail__actions">
-            <button
-              type="button"
-              className="btn btn--danger"
-              onClick={() => setShowRejectModal(true)}
-              disabled={approving || rejecting}
-            >
-              Từ chối
-            </button>
-            <button
-              type="button"
-              className="btn btn--success"
-              onClick={handleApprove}
-              disabled={approving || rejecting}
-            >
-              {approving ? 'Đang duyệt...' : 'Duyệt phiếu'}
-            </button>
-          </div>
-        )}
       </div>
-
-      {approveError && <div className="ir-detail__alert">{approveError}</div>}
-      {actionError && <div className="ir-detail__alert">{actionError}</div>}
 
       <div className="ir-detail__body">
         <div className="ir-detail__section">
@@ -130,12 +56,8 @@ export default function ImportRequestDetailPage() {
             <InfoRow label="Mã phiếu" value={data.requestCode} />
             <InfoRow label="Nhà cung cấp" value={data.supplierName} />
             <InfoRow label="Số hóa đơn NCC" value={data.supplierInvoiceNo} />
-            <InfoRow label="Ngày nhập" value={formatDate(data.importDate)} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
-            <InfoRow label="Người tạo" value={data.requestedByName} />
-            <InfoRow label="Người duyệt" value={data.approvedByName} />
-            <InfoRow label="Ngày duyệt" value={formatDateTime(data.approvedBy ? data.importDate : null)} />
-            <InfoRow label="Lý do từ chối" value={data.rejectReason} />
+            <InfoRow label="Người nhập" value={data.requestedByName} />
             <InfoRow label="Ghi chú" value={data.notes} />
           </dl>
         </div>
@@ -182,60 +104,10 @@ export default function ImportRequestDetailPage() {
 
         {data.status === 'approved' && (
           <div className="ir-detail__notice ir-detail__notice--success">
-            Phiếu đã được duyệt. Tồn kho cho các phụ tùng trên đã được cộng và hệ thống
-            đã ghi log vào <code>inventory_transactions</code>.
-          </div>
-        )}
-        {data.status === 'rejected' && (
-          <div className="ir-detail__notice ir-detail__notice--danger">
-            Phiếu đã bị từ chối và không cộng tồn kho.
-          </div>
+            Phiếu đã được nhập kho.
+            </div>
         )}
       </div>
-
-      {/* Modal từ chối */}
-      {showRejectModal && (
-        <div className="ir-detail__modal-backdrop" onClick={() => setShowRejectModal(false)}>
-          <div className="ir-detail__modal" onClick={(e) => e.stopPropagation()}>
-            <h3 className="ir-detail__modal-title">Từ chối phiếu nhập</h3>
-            <p className="ir-detail__modal-desc">
-              Vui lòng nhập lý do từ chối. Phiếu sẽ chuyển sang trạng thái
-              &quot;Từ chối&quot; và không cộng tồn kho.
-            </p>
-            <form onSubmit={handleRejectSubmit}>
-              <textarea
-                className="input"
-                rows={4}
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="VD: Số lượng không khớp với hóa đơn..."
-                maxLength={500}
-                required
-              />
-              {rejectSubmitError && (
-                <div className="ir-detail__alert">{rejectSubmitError}</div>
-              )}
-              <div className="ir-detail__modal-actions">
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() => setShowRejectModal(false)}
-                  disabled={rejecting}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn--danger"
-                  disabled={rejecting}
-                >
-                  {rejecting ? 'Đang gửi...' : 'Xác nhận từ chối'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

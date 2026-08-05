@@ -9,7 +9,7 @@ import { getExportRequestsApi } from '../../services/exportRequestApi';
 export function useExportRequests(initialBranchId) {
   const [params, setParams] = useState({
     branchId: initialBranchId,
-    status: '',
+    status: 'completed',
     serviceOrderId: '',
     fromDate: '',
     toDate: '',
@@ -23,6 +23,14 @@ export function useExportRequests(initialBranchId) {
   const [error, setError] = useState(null);
 
   const { branchId, status, serviceOrderId, fromDate, toDate, search, page, limit } = params;
+
+  useEffect(() => {
+    setParams((current) => (
+      current.branchId === initialBranchId
+        ? current
+        : { ...current, branchId: initialBranchId, page: 1 }
+    ));
+  }, [initialBranchId]);
 
   const fetchAll = useCallback(async () => {
     if (!branchId) {

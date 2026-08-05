@@ -1,4 +1,5 @@
 const { query } = require('../infrastructure/database/sqlServer');
+const AuditRepository = require('../infrastructure/repositories/AuditRepository');
 
 const ACTION_TYPES = {
   CREATE: 'CREATE',
@@ -219,9 +220,231 @@ async function auditLog({
 }
 
 /**
+ * Rut gon payload audit: bo chu ky base64, flatten customer/vehicle de log de doc.
+ */
+function sanitizeAuditSnapshot(data) {
+  if (data == null) return null;
+  if (typeof data !== 'object') return data;
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeAuditSnapshot(item));
+  }
+  const out = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) continue;
+    if (key === 'signatureData' || key === 'signature_data') {
+      if (value) out.hasSignature = true;
+      continue;
+    }
+    if (key === 'customer' && value && typeof value === 'object') {
+      out.customerName = value.fullName || value.name || value.customerName || null;
+      out.customerPhone = value.phone || value.phoneNumber || null;
+      continue;
+    }
+    if (key === 'vehicle' && value && typeof value === 'object') {
+      out.licensePlate = value.licensePlate || value.plateNumber || null;
+      out.vehicleModel = value.vehicleModel || value.model || null;
+      out.currentKm = value.currentKm != null ? value.currentKm : out.currentKm;
+      continue;
+    }
+    if (key === 'items' && Array.isArray(value)) {
+      out.items = value.map((it, index) => {
+        if (!it || typeof it !== 'object') return it;
+        return {
+          code: it.code || it.productCode || it.product_code || null,
+          description: it.description || it.productName || it.product_name || it.name || `Hạng mục ${index + 1}`,
+          name: it.name || it.productName || it.product_name || it.description || null,
+          qty: it.qty != null ? it.qty : it.quantity,
+          unit: it.unit || null,
+          unitPrice: it.unitPrice != null ? it.unitPrice : it.unit_price,
+          total: it.total != null ? it.total : it.lineTotal,
+          isFree: it.isFree || false,
+        };
+      });
+      continue;
+    }
+    if (key === 'technicians' && Array.isArray(value)) {
+      out.technicians = value.map((t) => ({
+        id: t.id || t.technicianId,
+        name: t.fullName || t.name || t.technicianName || `#${t.id || t.technicianId}`,
+        phone: t.phone || null,
+      }));
+      out.technicianNames = out.technicians.map((t) => t.name).filter(Boolean).join(', ');
+      continue;
+    }
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      // Bo object long (tru khi da xu ly o tren)
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * 1 log / 1 phieu (lifecycle): tao moi neu chua co, con lai UPDATE cung dong + bump logged_at len dau list.
+ *
+ * @param {object} req
+ * @param {object} opts
+ * @param {string} opts.tableName
+ * @param {number|string} opts.recordId
+ * @param {string} [opts.entityCode]
+ * @param {string} [opts.entityName]
+ * @param {string} opts.step - ma buoc: created|updated|signed|paid|printed|assigned|completed|...
+ * @param {string} [opts.stepLabel] - nhan Viet
+ * @param {string} [opts.action] - CREATE|UPDATE|EXPORT...
+ * @param {string} [opts.description]
+ * @param {object} [opts.snapshot] - trang thai day du hien tai cua phieu
+ * @param {object} [opts.meta] - them vao snapshot (status, amount,...)
+ */
+async function auditLifecycle(req, opts = {}) {
+  const {
+    tableName,
+    recordId,
+    entityCode = null,
+    entityName = null,
+    step = 'updated',
+    stepLabel = null,
+    action = null,
+    description = null,
+    snapshot = null,
+    meta = null,
+    responseStatus = 200,
+    branchId: branchIdOverride = null,
+  } = opts;
+
+  if (!tableName || recordId == null) {
+    return auditLog({
+      req,
+      action: action || ACTION_TYPES.UPDATE,
+      tableName: tableName || 'unknown',
+      entityCode,
+      recordId,
+      entityName,
+      newValue: sanitizeAuditSnapshot(snapshot || meta),
+      description,
+      responseStatus,
+      branchId: branchIdOverride,
+    });
+  }
+
+  try {
+    const user = req?.user || {};
+    const userId = user.id ?? user.userId ?? null;
+    const userName = user.user_name || user.name || user.email || 'system';
+    const phoneNumber = user.phone || user.phone_number || null;
+    const branchId = branchIdOverride ?? (await resolveActorBranchId(user));
+    const ipAddress = getClientIp(req || {});
+    const requestMethod = req?.method || null;
+    const requestUrl = req?.originalUrl ? String(req.originalUrl).slice(0, 500) : null;
+    const sanitizedBody = req?.body ? sanitizeBody(req.body) : null;
+    // Khong luu chu ky base64 trong request_body
+    if (sanitizedBody && typeof sanitizedBody === 'object') {
+      if (sanitizedBody.signatureData) {
+        sanitizedBody.hasSignature = true;
+        delete sanitizedBody.signatureData;
+      }
+    }
+
+    const label = stepLabel || step;
+    const resolvedAction =
+      action ||
+      (step === 'created' || step === 'assigned' ? ACTION_TYPES.CREATE : ACTION_TYPES.UPDATE);
+
+    const cleanSnapshot = {
+      ...sanitizeAuditSnapshot(snapshot || {}),
+      ...(meta && typeof meta === 'object' ? sanitizeAuditSnapshot(meta) : {}),
+    };
+
+    const existing = await AuditRepository.findLifecycleAuditLog(tableName, recordId);
+    let prevPayload = null;
+    if (existing?.new_value) {
+      try {
+        prevPayload = typeof existing.new_value === 'string'
+          ? JSON.parse(existing.new_value)
+          : existing.new_value;
+      } catch {
+        prevPayload = null;
+      }
+    }
+
+    const prevSteps = Array.isArray(prevPayload?.steps) ? prevPayload.steps : [];
+    const stepEntry = {
+      step,
+      label,
+      at: new Date().toISOString(),
+      by: userName,
+      description: description || label,
+    };
+    const steps = [...prevSteps, stepEntry];
+    const stepLabels = steps.map((s) => s.label || s.step).filter(Boolean);
+    const desc =
+      description ||
+      `${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}: ${label}`
+        + (stepLabels.length > 1 ? ` — Lịch sử: ${stepLabels.join(' → ')}` : '');
+
+    const newValue = {
+      lifecycle: true,
+      currentStep: step,
+      currentStepLabel: label,
+      steps,
+      snapshot: {
+        ...(prevPayload?.snapshot && typeof prevPayload.snapshot === 'object' ? prevPayload.snapshot : {}),
+        ...cleanSnapshot,
+      },
+    };
+    const newValueStr = JSON.stringify(newValue);
+    const requestBodyStr = sanitizedBody ? JSON.stringify(sanitizedBody) : null;
+
+    if (existing?.id) {
+      const updatedId = await AuditRepository.updateAuditLog(existing.id, {
+        user_id: userId,
+        user_name: String(userName).slice(0, 128),
+        phone_number: phoneNumber,
+        action: resolvedAction,
+        entity_name: entityName,
+        entity_code: entityCode,
+        old_value: existing.new_value
+          ? (typeof existing.new_value === 'string' ? existing.new_value : JSON.stringify(existing.new_value))
+          : null,
+        new_value: newValueStr,
+        ip_address: ipAddress,
+        request_method: requestMethod,
+        request_url: requestUrl,
+        request_body: requestBodyStr,
+        response_status: responseStatus,
+        branch_id: branchId,
+        description: desc,
+      });
+      if (req && typeof req === 'object') {
+        req._manualAuditWritten = true;
+        req._lastAuditLogId = updatedId;
+      }
+      return updatedId;
+    }
+
+    return auditLog({
+      req,
+      action: resolvedAction,
+      tableName,
+      entityCode,
+      recordId,
+      entityName,
+      newValue,
+      description: desc,
+      responseStatus,
+    });
+  } catch (err) {
+    console.error('[auditHelper] lifecycle failed:', err.message);
+    return null;
+  }
+}
+
+/**
  * Helper chi tiet hon cho cac thao tac CRUD
  */
 const auditCrud = {
+  lifecycle: auditLifecycle,
+
   async create(req, { tableName, entityCode, recordId, entityName, data, description }) {
     return auditLog({
       req,
@@ -501,10 +724,12 @@ async function _fireNotification(req, opts, actionType, auditLogId = null) {
 
 module.exports = {
   auditLog,
+  auditLifecycle,
   auditCrud,
   auditNotify,
   ACTION_TYPES,
   ACTION_TO_NOTIFICATION_EVENT,
   sanitizeBody,
+  sanitizeAuditSnapshot,
   getClientIp,
 };

@@ -82,6 +82,9 @@ export async function listUnitsApi() {
  * Tra cuu phu tung theo tu khoa (dung o trang quyet toan sua chua).
  * BE: GET /api/inventory/products/search?q=...
  */
-export async function searchProductsApi(term) {
-  return httpClient.get(`/inventory/products/search?q=${encodeURIComponent(term)}`);
+export async function searchProductsApi(term, branchId) {
+  const qs = new URLSearchParams();
+  qs.set('q', term);
+  if (branchId) qs.set('branchId', String(branchId));
+  return httpClient.get(`/inventory/products/search?${qs.toString()}`);
 }

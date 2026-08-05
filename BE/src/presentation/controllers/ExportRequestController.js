@@ -3,6 +3,13 @@ const { auditCrud } = require('../../utils/auditHelper');
 const ApiError = require('../../utils/ApiError');
 const NotificationService = require('../../application/services/NotificationService');
 
+function hasRole(user, roleName) {
+  const roles = Array.isArray(user?.roles) && user.roles.length
+    ? user.roles
+    : [user?.primaryRole].filter(Boolean);
+  return roles.includes(roleName);
+}
+
 /**
  * Controller cho NV Kho (Warehouse Staff) xu ly phieu xuat kho.
  * Khac ImportRequest:
@@ -26,7 +33,8 @@ class ExportRequestController {
       }
       const result = await this.exportRequestService.list({
         branchId: branchIdToUse,
-        status, repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit,
+        status: hasRole(req.user, 'warehouse_staff') ? 'completed' : status,
+        repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit,
       });
       return success(res, result, 'Export requests retrieved');
     } catch (err) {
@@ -45,14 +53,13 @@ class ExportRequestController {
 
   getNextCode = async (req, res, next) => {
     try {
-      const { branchId, date } = req.query;
+      const { branchId } = req.query;
       const branchIdToUse = branchId ? Number(branchId) : req.user?.branchId;
       if (!branchIdToUse) {
         throw new ApiError(400, 'branchId is required');
       }
       const data = await this.exportRequestService.getNextRequestCode({
         branchId: branchIdToUse,
-        date,
       });
       return success(res, data, 'Next request code generated');
     } catch (err) {
@@ -105,18 +112,27 @@ class ExportRequestController {
         payload.branchId = req.user.branchId;
       }
       const created = await this.exportRequestService.create(payload);
-      await auditCrud.create(req, {
+      const { exportRequestSnapshot } = require('../../utils/auditSnapshots');
+      const code = created?.requestCode || created?.request_code || created?.code || null;
+      const itemCount = created?.itemCount ?? (created?.items || []).length;
+      await auditCrud.lifecycle(req, {
         tableName: 'export_requests',
-        entityCode: created?.request_code || created?.code || null,
+        entityCode: code,
         recordId: created?.id || null,
         entityName: 'Phiếu xuất kho',
-        data: req.body,
+        step: 'created',
+        stepLabel: 'Tạo phiếu xuất kho',
+        action: 'CREATE',
+        description: `Tạo phiếu xuất kho ${code || created?.id}`
+          + (itemCount ? ` — ${itemCount} mặt hàng` : '')
+          + (created?.repairOrderCode ? ` (LSC ${created.repairOrderCode})` : ''),
+        snapshot: exportRequestSnapshot(created),
       });
       await this.notificationService.notifyAdmins('EXPORT_REQUEST_CREATED', {
         auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: created?.request_code || created?.code || `ID-${created?.id}`,
-        targetCode: created?.request_code || created?.code || '',
+        targetName: code || `ID-${created?.id}`,
+        targetCode: code || '',
         userId: created?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ExportRequestController] notifyAdmins:', e.message));
       return success(res, created, 'Export request created', 201);

@@ -3,6 +3,7 @@
  */
 import { getPermissionScreenLabel, getScreenLabel } from './screenLabels';
 import { formatDateSafeWithOffset, secondsSince, getClockOffsetMs } from './dateUtils';
+import { formatPhoneDisplay } from './validation';
 
 export const AUDIT_ACTION_LABELS = {
   CREATE: 'Tạo mới',
@@ -132,7 +133,19 @@ export const AUDIT_FIELD_LABELS = {
   bay_number: 'Số khoang',
   bayNumbers: 'Danh sách số khoang',
   technicianIds: 'Danh sách thợ (ID)',
+  technicianNames: 'Thợ thực hiện',
+  technicians: 'Danh sách thợ',
   technicianId: 'Mã thợ',
+  hasSignature: 'Khách hàng đã ký',
+  signerName: 'Người ký',
+  requestCode: 'Mã phiếu xuất kho',
+  vehiclePlate: 'Biển số xe',
+  exportDate: 'Ngày xuất kho',
+  performedByName: 'Người xuất kho',
+  itemCount: 'Số mặt hàng',
+  totalQuantity: 'Tổng số lượng',
+  currentStepLabel: 'Bước hiện tại',
+  repairOrderCode: 'Mã lệnh sửa chữa',
   memberIds: 'Danh sách thành viên (ID)',
   teamLeaderId: 'Mã tổ trưởng',
   taskId: 'Mã đầu mục công việc',
@@ -889,21 +902,40 @@ function formatKmVi(value) {
   return `${n.toLocaleString('vi-VN')} km`;
 }
 
-/** Tóm tắt 1 dòng hạng mục phiếu quyết toán */
+/** Tóm tắt 1 dòng hạng mục (phiếu QT / xuất kho) */
 function formatSettlementItemLine(item, index) {
   if (!item || typeof item !== 'object') return `${index + 1}. ${String(item)}`;
-  const name = item.description || item.name || item.code || `Hạng mục ${index + 1}`;
-  const qty = item.qty != null ? Number(item.qty) : null;
+  const name = item.description || item.productName || item.name || item.code || item.productCode || `Hạng mục ${index + 1}`;
+  const code = item.code || item.productCode || null;
+  const qty = item.qty != null ? Number(item.qty) : (item.quantity != null ? Number(item.quantity) : null);
   const unit = item.unit || '';
   const price = item.unitPrice != null ? Number(item.unitPrice) : null;
   const lineTotal = item.total != null ? Number(item.total) : null;
   const parts = [`${index + 1}. ${name}`];
-  if (item.code) parts.push(`(mã ${item.code})`);
+  if (code) parts.push(`(mã ${code})`);
   if (qty != null) parts.push(`— SL: ${qty}${unit ? ` ${unit}` : ''}`);
   if (price != null && price > 0) parts.push(`× ${formatMoneyVi(price)}`);
   if (lineTotal != null) parts.push(`= ${formatMoneyVi(lineTotal)}`);
   if (item.isFree) parts.push('(miễn phí)');
   return parts.join(' ');
+}
+
+/** Unwrap lifecycle payload { lifecycle, steps, snapshot } → object phẳng để hiển thị */
+export function unwrapLifecycleAuditValue(newValue) {
+  const obj = parseAuditJson(newValue);
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  if (!obj.lifecycle || !obj.snapshot || typeof obj.snapshot !== 'object') return obj;
+  return {
+    currentStepLabel: obj.currentStepLabel || obj.currentStep || null,
+    ...obj.snapshot,
+    _lifecycleSteps: Array.isArray(obj.steps) ? obj.steps : [],
+  };
+}
+
+export function getLifecycleSteps(newValue) {
+  const obj = parseAuditJson(newValue);
+  if (Array.isArray(obj?.steps)) return obj.steps;
+  return [];
 }
 
 export function formatSettlementItems(items) {
@@ -941,6 +973,10 @@ export function formatAuditFieldValue(key, value) {
   const kind = getAuditFieldDisplayKind(k, value);
 
   if (/password/i.test(k)) return '••••••••';
+  if (k === 'phone' || k === 'phoneNumber' || k === 'phone_number' || k === 'customerPhone') {
+    const formatted = formatPhoneDisplay(value);
+    return formatted || '—';
+  }
   if (kind === 'signature') return 'Đã ký (có ảnh chữ ký)';
   if (kind === 'items') return formatSettlementItems(value);
   if (kind === 'money') return formatMoneyVi(value);
@@ -1001,16 +1037,30 @@ export function formatAuditFieldValue(key, value) {
 }
 
 const SETTLEMENT_PREFERRED_KEYS = [
+  'currentStepLabel',
+  'requestCode',
+  'code',
   'customerId',
   'customerName',
+  'customerPhone',
   'vehicleId',
   'licensePlate',
+  'vehiclePlate',
   'plateNumber',
+  'vehicleModel',
   'customerRequest',
   'note',
   'notes',
   'currentKm',
+  'exportDate',
+  'repairOrderCode',
+  'serviceOrderCode',
+  'bayNumber',
+  'technicianNames',
+  'technicians',
   'items',
+  'itemCount',
+  'totalQuantity',
   'subtotal',
   'discountAmount',
   'afterDiscount',
@@ -1018,10 +1068,15 @@ const SETTLEMENT_PREFERRED_KEYS = [
   'freeAmount',
   'exemptedAmount',
   'total',
+  'amount',
   'signerName',
+  'hasSignature',
   'signatureData',
   'signedAt',
+  'performedByName',
   'status',
+  'taskNames',
+  'completedTaskCount',
 ];
 
 /**
@@ -1029,7 +1084,10 @@ const SETTLEMENT_PREFERRED_KEYS = [
  * @returns {Array<{key,label,value,kind,raw}>}
  */
 export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
-  const obj = parseAuditJson(data);
+  const unwrapped = unwrapLifecycleAuditValue(data);
+  const obj = unwrapped && typeof unwrapped === 'object' && !Array.isArray(unwrapped)
+    ? unwrapped
+    : parseAuditJson(data);
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return [];
 
   const preferred = [
@@ -1063,7 +1121,6 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
     'targetEmail',
     'targetUserId',
     'granted',
-    'itemCount',
     'activeItems',
     'l1Granted',
     'l1Revoked',
@@ -1088,9 +1145,47 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
 
   const pushKey = (key) => {
     if (used.has(key)) return;
+    if (key === '_lifecycleSteps' || key === 'lifecycle' || key === 'steps' || key === 'snapshot') return;
     if (obj[key] === undefined || obj[key] === null || obj[key] === '') return;
     if ((key === 'l1Granted' || key === 'l1Revoked') && Number(obj[key]) === 0) return;
+    // Ẩn ID thô nếu đã có tên thợ
+    if (key === 'technicianIds' && obj.technicianNames) return;
     const raw = obj[key];
+    if (key === 'technicians' && Array.isArray(raw)) {
+      used.add(key);
+      const names = raw.map((t) => (typeof t === 'object' ? (t.name || t.fullName || `#${t.id}`) : String(t))).filter(Boolean).join(', ');
+      if (!names || obj.technicianNames) return;
+      rows.push({
+        key,
+        label: getAuditFieldLabel(key),
+        value: names,
+        kind: 'text',
+        raw,
+      });
+      return;
+    }
+    if (key === 'taskNames' && Array.isArray(raw)) {
+      used.add(key);
+      rows.push({
+        key,
+        label: 'Đầu mục đã hoàn thành',
+        value: raw.filter(Boolean).join('; ') || '—',
+        kind: 'text',
+        raw,
+      });
+      return;
+    }
+    if (key === 'hasSignature') {
+      used.add(key);
+      rows.push({
+        key,
+        label: getAuditFieldLabel(key),
+        value: raw ? 'Có' : 'Chưa',
+        kind: 'text',
+        raw,
+      });
+      return;
+    }
     // Bỏ object lồng nhau phức tạp (không phải mảng hạng mục)
     if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) return;
     used.add(key);

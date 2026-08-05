@@ -66,7 +66,6 @@ async function start() {
       require('./jobs/securityAlertJob').start();
       require('./jobs/auditRetentionJob').start();
       require('./jobs/loginSessionCleanupJob').start();
-      require('./jobs/bayHeartbeatCleanupJob').start();
     } catch (jobErr) {
       console.warn('[BE] Failed to start background jobs:', jobErr.message);
     }
@@ -84,6 +83,13 @@ async function start() {
       console.log('[BE] audit_logs unicode columns ready');
     } catch (schemaErr) {
       console.warn('[BE] ensureAuditLogsUnicodeColumns:', schemaErr.message);
+    }
+
+    try {
+      await require('./infrastructure/database/ensureInventoryRequestUnicode').ensureInventoryRequestUnicode();
+      console.log('[BE] inventory request unit columns ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureInventoryRequestUnicode:', schemaErr.message);
     }
 
     const server = http.createServer({ maxHeaderSize: 32768 }, app);

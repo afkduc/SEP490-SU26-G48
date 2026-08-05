@@ -10,6 +10,7 @@ import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { pickLatestSession } from './securityAlertFocus';
 import { normalizeVietnamese } from '../../utils/vietnamese';
+import { formatPhoneDisplay } from '../../utils/validation';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -298,7 +299,7 @@ function SessionTable({ items, onViewSession, focusedSessionId = null }) {
             <td>
               <div className="admin-sessions__user-cell">
                 <span className="admin-sessions__user-name">{item.user_name || '—'}</span>
-                <span className="admin-sessions__phone">{item.phone_number || '—'}</span>
+                <span className="admin-sessions__phone">{item.phone_number ? formatPhoneDisplay(item.phone_number) : '—'}</span>
               </div>
             </td>
             <td>

@@ -36,6 +36,11 @@ export async function updateRepairSettlementStatusApi(id, status, reason) {
   return httpClient.patch(`/repair-settlements/${id}/status`, { status, reason });
 }
 
+/** Ghi audit khi in phiếu / danh sách công việc (best-effort, không chặn in). */
+export async function logRepairSettlementPrintApi(id, kind = 'settlement') {
+  return httpClient.post(`/repair-settlements/${id}/print-log`, { kind });
+}
+
 export async function createPayosPaymentLinkApi(id) {
   return httpClient.post(`/repair-settlements/${id}/payos/create-payment-link`);
 }
