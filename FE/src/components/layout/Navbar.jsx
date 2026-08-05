@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, getPrimaryRole } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { ROLES } from '../../constants/roles';
+import { BASE_PATH } from '../../config';
 import ScrollToggleButton from '../common/ScrollToggleButton';
 import UserProfileMenu from './UserProfileMenu';
 import './Navbar.css';
@@ -258,7 +259,7 @@ export default function Navbar() {
   return (
     <header className="navbar">
       <div className="navbar__brand">
-        <img className="navbar__logo" src="/AutoGaraLogo-Photoroom.png" alt="AutoGara" />
+        <img className="navbar__logo" src={`${BASE_PATH}/AutoGaraLogo-Photoroom.png`} alt="AutoGara" />
       </div>
 
       <button
