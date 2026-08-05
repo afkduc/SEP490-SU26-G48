@@ -1,11 +1,14 @@
 // CVDV - xem khoang xe nao cua to truong nao dang hoat dong, dang lam xe gi
-// (neu co) - realtime qua cung kenh SSE voi kiosk to truong (TeamLeaderKiosk.jsx).
+// (neu co) - realtime qua cung kenh SSE voi man khoang xe cong khai (Landing
+// /khoang). "Dang hoat dong" gio suy tu activeRepairOrderId (co lenh sua
+// chua dang inprogress hay khong) thay vi occupiedByDeviceId - khong con
+// khai niem "thiet bi dang chiem khoang" nua (khoang xe khong dang nhap).
 import { useCallback, useEffect, useState } from 'react';
 import { listBranchBaysApi } from '../../services/vehicleBayApi';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import './ActiveBaysPage.css';
 
-const REFRESH_EVENT_TYPES = new Set(['bay-occupied', 'bay-released', 'claimed', 'order-completed']);
+const REFRESH_EVENT_TYPES = new Set(['claimed', 'order-completed', 'order-cancelled']);
 
 export default function ActiveBaysPage() {
   const [bays, setBays] = useState([]);
@@ -55,7 +58,7 @@ export default function ActiveBaysPage() {
       {!loading && bays.length > 0 && (
         <div className="active-bays-grid">
           {bays.map((b) => {
-            const active = Boolean(b.occupiedByDeviceId);
+            const active = Boolean(b.activeRepairOrderId);
             return (
               <div key={b.id} className={`active-bays-card ${active ? 'active-bays-card--active' : ''}`}>
                 <div className="active-bays-card__header">

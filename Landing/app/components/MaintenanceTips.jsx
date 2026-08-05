@@ -19,22 +19,46 @@ import styles from "./MaintenanceTips.module.css";
 
 const ICONS = { ClipboardCheck, AlertTriangle, Disc3, Snowflake, Activity, Fuel };
 
-const VISIBLE = 3;
 const SLIDE_INTERVAL_MS = 5000;
 const total = maintenanceTips.length;
-const maxIndex = Math.max(0, total - VISIBLE);
 
-// De cuon tiep tuc sang phai muot ma khi het bai (thay vi giat lui ve dau),
-// noi them ban sao cua VISIBLE bai dau vao cuoi mang - luc track truot toi
-// cuoi cung (loopResetIndex) thi hien thi y het nhu dang o index 0, nen co
-// the "nhay" ve index 0 that ma mat khong nhan ra.
-const loopResetIndex = total;
-const extendedItems = [...maintenanceTips, ...maintenanceTips.slice(0, VISIBLE)];
-const extendedTotal = extendedItems.length;
+// So the hien cung luc phai co gian theo man hinh - truoc day co dinh 3 the
+// moi kich thuoc, tren dien thoai moi the chi con ~90px khien chu vo dong
+// tung ky tu (xem anh chup thuc te tren mobile).
+function getVisibleCount(width) {
+  if (width < 640) return 1;
+  if (width < 1024) return 2;
+  return 3;
+}
 
 export default function MaintenanceTips() {
+  const [visible, setVisible] = useState(3);
   const [index, setIndex] = useState(0);
   const [instant, setInstant] = useState(false);
+
+  useEffect(() => {
+    function updateVisible() {
+      setVisible(getVisibleCount(window.innerWidth));
+    }
+    updateVisible();
+    window.addEventListener("resize", updateVisible);
+    return () => window.removeEventListener("resize", updateVisible);
+  }, []);
+
+  // Xoay ngang dien thoai/doi kich thuoc cua so lam so the hien thay doi ->
+  // ve lai dau, tranh index cu tro sai vi tri sau khi extendedItems doi.
+  useEffect(() => {
+    setIndex(0);
+  }, [visible]);
+
+  const maxIndex = Math.max(0, total - visible);
+  // De cuon tiep tuc sang phai muot ma khi het bai (thay vi giat lui ve dau),
+  // noi them ban sao cua so the dang hien vao cuoi mang - luc track truot toi
+  // cuoi cung (loopResetIndex) thi hien thi y het nhu dang o index 0, nen co
+  // the "nhay" ve index 0 that ma mat khong nhan ra.
+  const loopResetIndex = total;
+  const extendedItems = [...maintenanceTips, ...maintenanceTips.slice(0, visible)];
+  const extendedTotal = extendedItems.length;
 
   useEffect(() => {
     if (maxIndex <= 0) return;
@@ -44,7 +68,7 @@ export default function MaintenanceTips() {
       setIndex((i) => Math.min(i + 1, loopResetIndex));
     }, SLIDE_INTERVAL_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [maxIndex, loopResetIndex]);
 
   useEffect(() => {
     if (!instant) return;
@@ -64,7 +88,7 @@ export default function MaintenanceTips() {
       setIndex(0);
     }, 600);
     return () => clearTimeout(t);
-  }, [index]);
+  }, [index, loopResetIndex]);
 
   const goPrev = () => setIndex((i) => (i <= 0 ? maxIndex : i - 1));
   const goNext = () => setIndex((i) => Math.min(i + 1, loopResetIndex));
@@ -86,7 +110,7 @@ export default function MaintenanceTips() {
             <div
               className={styles.trackInner}
               style={{
-                width: `${(extendedTotal / VISIBLE) * 100}%`,
+                width: `${(extendedTotal / visible) * 100}%`,
                 transform: `translateX(-${index * (100 / extendedTotal)}%)`,
                 transition: instant ? "none" : undefined,
               }}

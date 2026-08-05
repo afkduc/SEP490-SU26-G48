@@ -43,64 +43,6 @@ class VehicleBayRepositoryImpl extends VehicleBayRepository {
     return VehicleBay.fromPersistence(result.recordset[0]);
   }
 
-  async occupy(id, { teamLeaderId, userId, deviceId }) {
-    // 1 khoang chi duoc giu boi DUNG 1 thiet bi tai 1 thoi diem, ke ca giua
-    // nhieu thiet bi cua CUNG 1 to truong (vd to truong dang o khoang 13
-    // bang tablet A thi khong the vao trung khoang 13 bang tablet B nua) -
-    // chi cho chiem khi con trong (NULL) hoac dung chinh thiet bi nay
-    // (deviceId khop) dang giu lai.
-    const result = await query(
-      `UPDATE vehicle_bays
-       SET    occupied_by_device_id = @deviceId,
-              occupied_by_user_id   = @userId,
-              occupied_at           = SYSUTCDATETIME(),
-              last_heartbeat_at     = SYSUTCDATETIME()
-       WHERE  id = @id
-         AND  team_leader_id = @teamLeaderId
-         AND  (occupied_by_device_id IS NULL OR occupied_by_device_id = @deviceId)`,
-      { id, teamLeaderId, userId, deviceId }
-    );
-    if (!result.rowsAffected[0]) return null;
-    return this.findById(id);
-  }
-
-  async release(id, { deviceId }) {
-    await query(
-      `UPDATE vehicle_bays
-       SET    occupied_by_device_id = NULL, occupied_by_user_id = NULL, occupied_at = NULL, last_heartbeat_at = NULL
-       WHERE  id = @id AND occupied_by_device_id = @deviceId`,
-      { id, deviceId }
-    );
-  }
-
-  // Tablet dinh ky bao "van con song" - tra ve true neu khoang nay dung la
-  // dang do deviceId nay giu (false neu da bi giai phong/nguoi khac chiem,
-  // FE se tu quay lai man chon khoang).
-  async heartbeat(id, deviceId) {
-    const result = await query(
-      `UPDATE vehicle_bays SET last_heartbeat_at = SYSUTCDATETIME()
-       WHERE id = @id AND occupied_by_device_id = @deviceId`,
-      { id, deviceId }
-    );
-    return Boolean(result.rowsAffected[0]);
-  }
-
-  // Job nen goi dinh ky (xem jobs/bayHeartbeatCleanupJob.js) - tu nha cac
-  // khoang qua @thresholdSeconds khong heartbeat (mat dien/rot mang/dong tab
-  // khong dang xuat...). Tra ve danh sach khoang vua bi nha (kem branchId)
-  // de job emit SSE 'bay-released' cho tung chi nhanh.
-  async releaseStale(thresholdSeconds) {
-    const result = await query(
-      `UPDATE vehicle_bays
-       SET    occupied_by_device_id = NULL, occupied_by_user_id = NULL, occupied_at = NULL, last_heartbeat_at = NULL
-       OUTPUT INSERTED.id, INSERTED.branch_id, INSERTED.bay_number
-       WHERE  occupied_by_device_id IS NOT NULL
-         AND  last_heartbeat_at < DATEADD(SECOND, -@thresholdSeconds, SYSUTCDATETIME())`,
-      { thresholdSeconds }
-    );
-    return result.recordset.map((r) => ({ id: r.id, branchId: r.branch_id, bayNumber: r.bay_number }));
-  }
-
   async setBayNumbers(branchId, teamLeaderId, bayNumbers) {
     return runInTransaction(async (tx) => {
       const existing = await tx.request().input('branchId', sql.BigInt, branchId)

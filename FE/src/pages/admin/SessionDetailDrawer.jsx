@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatPhoneDisplay } from '../../utils/validation';
 import './components/AdminDrawer.css';
 
 const ACTION_LABELS = {
@@ -128,7 +129,7 @@ export default function SessionDetailDrawer({ session, onClose, onOpenDevicesToP
   if (!session) return null;
 
   const fullName = session.user_name || 'Người dùng';
-  const phone = session.phone_number || '';
+  const phone = session.phone_number ? formatPhoneDisplay(session.phone_number) : '';
   // Uu tien browser/os da duoc BE parse san. Chi fallback parse UA neu BE chua co.
   const browser = session.browser
     ? { name: session.browser, version: '', full: session.user_agent || '' }

@@ -19,3 +19,14 @@ export const ROLE_LABELS = Object.freeze({
 });
 
 export const ROLE_VALUES = Object.freeze(Object.values(ROLES));
+
+export const INVENTORY_HIGHER_ROLES = Object.freeze([
+  ROLES.MANAGER,
+  ROLES.GENERAL_DIRECTOR,
+  ROLES.ADMIN,
+]);
+
+export const INVENTORY_ACCESS_ROLES = Object.freeze([
+  ROLES.WAREHOUSE_STAFF,
+  ...INVENTORY_HIGHER_ROLES,
+]);

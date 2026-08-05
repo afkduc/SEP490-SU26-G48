@@ -38,6 +38,14 @@ export function useStock(initialBranchId) {
 
   const { branchId, search, category, lowStockOnly, page, limit } = params;
 
+  useEffect(() => {
+    setParams((current) => (
+      current.branchId === initialBranchId
+        ? current
+        : { ...current, branchId: initialBranchId, page: 1 }
+    ));
+  }, [initialBranchId]);
+
   const fetchAll = useCallback(async () => {
     if (!branchId) {
       setLoading(false);

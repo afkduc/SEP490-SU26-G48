@@ -1,4 +1,4 @@
-import { ROLES } from '../constants/roles';
+import { ROLES, INVENTORY_ACCESS_ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 
 /**
@@ -66,7 +66,7 @@ export const ROLE_PROFILE_CONFIG = Object.freeze({
     label: 'Nhân viên kho',
     profilePath: ROUTES.INVENTORY_PROFILE,
     profileEditPath: `${ROUTES.INVENTORY_PROFILE}/edit`,
-    allowedRoles: [ROLES.WAREHOUSE_STAFF],
+    allowedRoles: [...INVENTORY_ACCESS_ROLES],
     useAdminLayout: false,
     pageKey: 'warehouse',
   },

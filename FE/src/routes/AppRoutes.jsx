@@ -8,7 +8,7 @@ import SessionTakenOverPrompt from '../components/SessionTakenOverPrompt';
 import ForbiddenModal from '../components/ForbiddenModal';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
-import { ROLES } from '../constants/roles';
+import { ROLES, INVENTORY_ACCESS_ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 import { BASE_PATH } from '../config';
 import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
@@ -148,21 +148,6 @@ function ProfilePageLayout() {
   );
 }
 
-// To truong dung man hinh cam ung gan tuong (kiosk chon khoang xe/nhan viec) -
-// bo ca navbar lan menu ho so mac dinh - TeamLeaderKiosk tu ve nut "Dang
-// xuat" rieng (nha khoang truoc khi dang xuat, xem TeamLeaderKiosk.jsx) de
-// tranh co 2 duong dang xuat khac hanh vi nhau. Cac role khac (CVDV, Quan
-// ly...) van dung navbar binh thuong nhu cu.
-function RepairOrderRouteLayout() {
-  const { user } = useAuth();
-  const isTeamLeaderKiosk = user?.primaryRole === ROLES.TEAM_LEADER;
-  return (
-    <AppLayout showNavbar={!isTeamLeaderKiosk} hideProfileMenu={isTeamLeaderKiosk}>
-      <RepairOrderPage />
-    </AppLayout>
-  );
-}
-
 function AppRoutes() {
   return (
     <>
@@ -185,7 +170,6 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               roles={[
-                ROLES.SERVICE_ADVISOR,
                 ROLES.MANAGER,
                 ROLES.GENERAL_DIRECTOR,
                 ROLES.TEAM_LEADER,
@@ -309,12 +293,14 @@ function AppRoutes() {
           }
         />
 
-        {/* Lệnh sửa chữa */}
+        {/* Lệnh sửa chữa - bảng tin nhận việc của tổ trưởng, xem RepairOrderPage.jsx */}
         <Route
           path="/repair-orders/*"
           element={
-            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.TEAM_LEADER, ROLES.TECHNICIAN, ROLES.MANAGER, ROLES.ADMIN]}>
-              <RepairOrderRouteLayout />
+            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.TECHNICIAN, ROLES.MANAGER, ROLES.ADMIN, ROLES.TEAM_LEADER]}>
+              <AppLayout>
+                <RepairOrderPage />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -371,9 +357,7 @@ function AppRoutes() {
         <Route
           path={ROUTES.INVENTORY}
           element={
-            <ProtectedRoute
-              roles={[ROLES.WAREHOUSE_STAFF]}
-            >
+            <ProtectedRoute roles={[...INVENTORY_ACCESS_ROLES]}>
               <AppLayout>
                 <InventoryLayout />
               </AppLayout>
@@ -387,10 +371,24 @@ function AppRoutes() {
           <Route path="parts/:id" element={<PartDetailPage />} />
           <Route path="stock" element={<StockPage />} />
           <Route path="import-requests" element={<ImportRequestListPage />} />
-          <Route path="import-requests/new" element={<ImportRequestFormPage />} />
+          <Route
+            path="import-requests/new"
+            element={
+              <ProtectedRoute permission="import_requests:create">
+                <ImportRequestFormPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="import-requests/:id" element={<ImportRequestDetailPage />} />
           <Route path="export-requests" element={<ExportRequestListPage />} />
-          <Route path="export-requests/new" element={<ExportRequestFormPage />} />
+          <Route
+            path="export-requests/new"
+            element={
+              <ProtectedRoute permission="export_requests:create">
+                <ExportRequestFormPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="export-requests/:id" element={<ExportRequestDetailPage />} />
         </Route>
 

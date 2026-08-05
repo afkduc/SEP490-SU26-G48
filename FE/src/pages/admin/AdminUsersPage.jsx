@@ -8,6 +8,7 @@ import {
   adminUsersApi,
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
+import { formatPhoneDisplay } from '../../utils/validation';
 import { useToast } from '../../components/common/ToastContext';
 import PermissionGate from '../../components/PermissionGate';
 import AdminPagination from './components/AdminPagination';
@@ -405,7 +406,7 @@ export default function AdminUsersPage() {
                               </span>
                               <span className="user-name-cell__sub">
                                 <span className="font-mono">@{u.name}</span>
-                                {u.phone ? ` · ${u.phone}` : ''}
+                                {u.phone ? ` · ${formatPhoneDisplay(u.phone)}` : ''}
                               </span>
                               {u.email ? (
                                 <span className="user-name-cell__email" title={u.email}>
@@ -471,7 +472,7 @@ export default function AdminUsersPage() {
                             <button
                               type="button"
                               className="btn btn--sm btn--view"
-                              onClick={() => navigate(`/admin/users/${u.id}`)}
+                              onClick={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: window.location.search } })}
                             >
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -483,7 +484,7 @@ export default function AdminUsersPage() {
                               <button
                                 type="button"
                                 className="btn btn--sm btn--edit"
-                                onClick={() => navigate(`/admin/users/${u.id}/edit`)}
+                                onClick={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: window.location.search } })}
                               >
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -495,8 +496,8 @@ export default function AdminUsersPage() {
                           </div>
                           <UserActionMenu
                             user={u}
-                            onView={() => navigate(`/admin/users/${u.id}`)}
-                            onEdit={() => navigate(`/admin/users/${u.id}/edit`)}
+                            onView={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: window.location.search } })}
+                            onEdit={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: window.location.search } })}
                           />
                         </td>
                       </tr>

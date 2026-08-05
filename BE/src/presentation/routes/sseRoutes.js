@@ -271,6 +271,46 @@ function buildSSERouter() {
     });
   });
 
+  /**
+   * GET /api/sse/bay-board?branchId=1
+   *
+   * Public (khong dang nhap) - man khoang xe "/khoang/<chi nhanh>/<so
+   * khoang>" tren Landing (xem publicRoutes.js /public/bays/*). Forward
+   * nguyen payload cho 'new-pending' | 'claimed' | 'order-cancelled' - cac
+   * event nay von khong chua SDT/tong tien (chi settlementId/code/bayNumber/
+   * cancelReason), da o muc chap nhan duoc de lo qua kenh khong xac thuc
+   * (giong nhu da chap nhan cho /sse/gate).
+   */
+  router.get('/bay-board', (req, res) => {
+    const branchId = Number(req.query.branchId);
+    if (!branchId) {
+      return res.status(400).end();
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected' })}\n\n`);
+
+    const RELEVANT_TYPES = new Set(['new-pending', 'claimed', 'order-cancelled']);
+    const unsubscribe = onRepairOrderEvent(branchId, (eventData) => {
+      if (!RELEVANT_TYPES.has(eventData.type)) return;
+      res.write(`event: bay-board\ndata: ${JSON.stringify(eventData)}\n\n`);
+    });
+
+    const heartbeat = setInterval(() => {
+      res.write(`: heartbeat\n\n`);
+    }, 30_000);
+
+    req.on('close', () => {
+      unsubscribe();
+      clearInterval(heartbeat);
+    });
+  });
+
   return router;
 }
 

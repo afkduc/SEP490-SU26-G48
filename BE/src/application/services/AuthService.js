@@ -176,20 +176,9 @@ class AuthService {
       }
     }
 
-    // To truong dang nhap chung 1 tai khoan tren nhieu man hinh khoang xe cung
-    // luc (moi khoang 1 tablet rieng) - KHONG duoc ap dung "dang nhap moi da
-    // dang nhap cu" nhu cac role khac, neu khong tablet truoc se bi vang ra
-    // ngay khi tablet sau dang nhap. Chi bo qua rieng buoc nay cho team_leader,
-    // cac role khac giu nguyen hanh vi single-session cu.
-    const isTeamLeader = roles.some((r) => r.role_name === 'team_leader');
-    // Danh dau de trackLogin (loginSessionMiddleware.js) cung bo qua buoc dong
-    // cac login_sessions/device cu - khong thi tablet truoc van bi 401
-    // SESSION_REPLACED ngay request ke tiep du token_version khong doi.
-    user.isTeamLeader = isTeamLeader;
-
     // Dọn session stale rồi mới xét conflict thật (heartbeat còn sống)
     await this._closeStaleSessionsForUser(user.id);
-    const live = isTeamLeader ? null : await this._findLiveSession(user.id);
+    const live = await this._findLiveSession(user.id);
 
     // Chính sách mới: có phiên sống thì thay thế ngay, không chờ countdown.
     // Giữ biến `force` chỉ để backward-compat với FE cũ.
@@ -200,12 +189,8 @@ class AuthService {
       await this._closeActiveSessionsForUser(user.id, 'FORCE_NEW_LOGIN');
     }
 
-    // team_leader: khong tang token_version (se lam JWT cua cac tablet/khoang
-    // khac dang dang nhap bi invalidate ngay - xem middlewares/auth.js).
-    if (!isTeamLeader) {
-      const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
-      user.token_version = newTokenVersion;
-    }
+    const newTokenVersion = await this.authRepository.incrementTokenVersion(user.id);
+    user.token_version = newTokenVersion;
 
     return { user, pendingComplete: false, replacedLive, clientMeta };
   }

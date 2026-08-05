@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   adminBranchesApi,
   adminRolesApi,
@@ -8,10 +8,12 @@ import {
 import { useToast } from '../../../components/common/ToastContext';
 import {
   EMAIL_HINT,
+  formatPhoneInput,
   isValidEmail,
   isValidPassword,
   isValidPhone,
   isValidUsername,
+  phoneDigitsOnly,
 } from '../../../utils/validation';
 import ResetPasswordModal from './ResetPasswordModal';
 import './UserFormPage.css';
@@ -57,8 +59,10 @@ function hasMultipleRoles(userRoles) {
 export default function UserFormPage({ mode: modeProp }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const isEdit = modeProp === 'edit' || Boolean(id);
+  const listSearch = location.state?.fromListSearch || '';
 
   const [user, setUser] = useState(null);
   const [bootLoading, setBootLoading] = useState(isEdit);
@@ -142,7 +146,7 @@ export default function UserFormPage({ mode: modeProp }) {
       password: '',
       firstName: user.firstName || '',
       lastName: user.lastName || '',
-      phone: user.phone || '',
+      phone: formatPhoneInput(user.phone || ''),
       branchId: branchIdValue,
       roleId: resolvedRoleId,
       status: user.status || 'active',
@@ -198,7 +202,7 @@ export default function UserFormPage({ mode: modeProp }) {
           firstName: form.firstName?.trim() || user.firstName || '',
           lastName: form.lastName?.trim() || user.lastName || '',
           email: form.email?.trim() || user.email,
-          phone: form.phone.trim(),
+          phone: phoneDigitsOnly(form.phone),
           status: form.status,
         };
         if (form.scopeAllBranches) {
@@ -212,7 +216,7 @@ export default function UserFormPage({ mode: modeProp }) {
         }
         await adminUsersApi.update(payload);
         toast.success('Đã cập nhật người dùng');
-        navigate(`/admin/users/${user.id}`);
+        navigate(`/admin/users/${user.id}`, { state: { fromListSearch: listSearch } });
       } else {
         const payload = {
           name: form.name.trim(),
@@ -220,7 +224,7 @@ export default function UserFormPage({ mode: modeProp }) {
           password: form.password,
           firstName: form.firstName.trim() || form.name.trim(),
           lastName: form.lastName.trim(),
-          phone: form.phone.trim(),
+          phone: phoneDigitsOnly(form.phone),
           roleId: Number(form.roleId),
         };
         if (form.scopeAllBranches) {
@@ -264,7 +268,7 @@ export default function UserFormPage({ mode: modeProp }) {
     return (
       <div className="admin-page admin-user-form-page">
         <div className="admin-user-form-page__state admin-user-form-page__state--error">{bootError}</div>
-        <Link to="/admin/users" className="btn btn--ghost">Quay lại danh sách</Link>
+        <Link to={`/admin/users${listSearch}`} className="btn btn--ghost">Quay lại danh sách</Link>
       </div>
     );
   }
@@ -276,7 +280,12 @@ export default function UserFormPage({ mode: modeProp }) {
           <button
             type="button"
             className="admin-user-form-page__back"
-            onClick={() => navigate(isEdit && user ? `/admin/users/${user.id}` : '/admin/users')}
+            onClick={() => navigate(
+              isEdit && user
+                ? `/admin/users/${user.id}`
+                : `/admin/users${listSearch}`,
+              isEdit && user ? { state: { fromListSearch: listSearch } } : undefined,
+            )}
           >
             ← Quay lại
           </button>
@@ -372,7 +381,10 @@ export default function UserFormPage({ mode: modeProp }) {
               <input
                 className={`input ${errors.phone ? 'input--error' : ''}`}
                 value={form.phone}
-                onChange={(e) => handleChange('phone', e.target.value)}
+                onChange={(e) => handleChange('phone', formatPhoneInput(e.target.value))}
+                inputMode="numeric"
+                placeholder="0123-456-789"
+                maxLength={13}
                 placeholder="0912345678"
                 autoComplete="tel"
                 inputMode="numeric"

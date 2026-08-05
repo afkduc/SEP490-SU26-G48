@@ -1,24 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { PermissionGate } from '../../components/PermissionGate';
+import { useInventoryBranch } from './InventoryLayout';
 import { useExportRequests } from '../../hooks/inventory/useExportRequests';
 import './ExportRequestListPage.css';
 
 const STATUS_META = {
   completed: { label: 'Đã xuất', className: 'badge--success' },
-  cancelled: { label: 'Hủy', className: 'badge--danger' },
 };
-
-const STATUS_TABS = [
-  { value: '', label: 'Tất cả' },
-  { value: 'completed', label: 'Đã xuất' },
-  { value: 'cancelled', label: 'Hủy' },
-];
-
-function formatDate(d) {
-  if (!d) return '—';
-  return String(d).slice(0, 10);
-}
 
 function formatDateTime(d) {
   if (!d) return '—';
@@ -27,24 +16,29 @@ function formatDateTime(d) {
 }
 
 export default function ExportRequestListPage() {
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
   const {
     requests, total, page, limit, loading, error,
     params,
-    setStatus, setFromDate, setToDate, setSearch, setPage,
+    setFromDate, setToDate, setSearch, setPage,
   } = useExportRequests(branchId);
 
   const [draftSearch, setDraftSearch] = useState(params.search);
   const [draftFromDate, setDraftFromDate] = useState(params.fromDate);
   const [draftToDate, setDraftToDate] = useState(params.toDate);
+  const [filterError, setFilterError] = useState('');
 
   useEffect(() => { setDraftSearch(params.search); }, [params.search]);
   useEffect(() => { setDraftFromDate(params.fromDate); }, [params.fromDate]);
   useEffect(() => { setDraftToDate(params.toDate); }, [params.toDate]);
 
   function handleApplyFilter() {
+    if (draftFromDate && draftToDate && draftFromDate > draftToDate) {
+      setFilterError('Ngày bắt đầu không được lớn hơn ngày kết thúc.');
+      return;
+    }
+    setFilterError('');
     setSearch(draftSearch);
     setFromDate(draftFromDate);
     setToDate(draftToDate);
@@ -56,6 +50,14 @@ export default function ExportRequestListPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
+  if (!branchId) {
+    return (
+      <div className="er-list__error">
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để xem phiếu xuất.')}
+      </div>
+    );
+  }
+
   return (
     <div className="er-list">
       <div className="er-list__header">
@@ -65,23 +67,11 @@ export default function ExportRequestListPage() {
             Xuất phụ tùng theo phiếu sửa chữa (Service Order). NV kho tự xuất - không cần Manager duyệt.
           </p>
         </div>
-        <Link to="/inventory/export-requests/new" className="btn btn--primary">
-          + Tạo phiếu xuất
-        </Link>
-      </div>
-
-      {/* Tabs theo status */}
-      <div className="er-list__tabs">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={`er-list__tab${params.status === tab.value ? ' er-list__tab--active' : ''}`}
-            onClick={() => setStatus(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <PermissionGate permission="export_requests:create">
+          <Link to="/inventory/export-requests/new" className="btn btn--primary">
+            + Tạo phiếu xuất
+          </Link>
+        </PermissionGate>
       </div>
 
       {/* Filters */}
@@ -89,7 +79,7 @@ export default function ExportRequestListPage() {
         <input
           className="input input--search"
           type="text"
-          placeholder="Tìm theo mã phiếu, mã phiếu sửa chữa, ghi chú..."
+          placeholder="Tìm theo mã phiếu, mã phiếu sửa chữa"
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -99,6 +89,7 @@ export default function ExportRequestListPage() {
           type="date"
           value={draftFromDate}
           onChange={(e) => setDraftFromDate(e.target.value)}
+          max={draftToDate || undefined}
           title="Từ ngày"
         />
         <input
@@ -106,12 +97,14 @@ export default function ExportRequestListPage() {
           type="date"
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
+          min={draftFromDate || undefined}
           title="Đến ngày"
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
           Lọc
         </button>
       </div>
+      {filterError && <div className="er-list__error">{filterError}</div>}
 
       {/* Table */}
       {loading ? (
@@ -125,20 +118,18 @@ export default function ExportRequestListPage() {
               <tr>
                 <th>Mã phiếu</th>
                 <th>Ngày tạo</th>
-                <th>Ngày xuất</th>
                 <th>Phiếu sửa chữa</th>
                 <th>Khách hàng</th>
                 <th>Số dòng</th>
                 <th>Tổng SL</th>
                 <th>Trạng thái</th>
-                <th>Người xuất</th>
                 <th style={{ width: 110 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="table__empty">
+                  <td colSpan={8} className="table__empty">
                     Không có phiếu xuất nào
                   </td>
                 </tr>
@@ -149,7 +140,6 @@ export default function ExportRequestListPage() {
                     <tr key={r.id}>
                       <td><span className="font-mono">{r.requestCode}</span></td>
                       <td>{formatDateTime(r.createdAt)}</td>
-                      <td>{formatDate(r.exportDate)}</td>
                       <td><span className="font-mono">{r.serviceOrderCode || '—'}</span></td>
                       <td>{r.customerName || '—'}</td>
                       <td className="text-right">{r.itemCount ?? 0}</td>
@@ -157,7 +147,6 @@ export default function ExportRequestListPage() {
                       <td>
                         <span className={`badge ${meta.className}`}>{meta.label}</span>
                       </td>
-                      <td>{r.performedByName || '—'}</td>
                       <td className="table__actions">
                         <Link
                           to={`/inventory/export-requests/${r.id}`}

@@ -4,7 +4,8 @@ const config = require('../../config');
 const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
 const { PublicVehicleHistoryDto } = RepairSettlementResponseDto;
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
-const { auditLog } = require('../../utils/auditHelper');
+const { auditCrud } = require('../../utils/auditHelper');
+const { settlementSnapshot } = require('../../utils/auditSnapshots');
 
 let payosClient = null;
 function getPayOS() {
@@ -232,16 +233,17 @@ class RepairSettlementService {
       expiredAt: new Date(expiredAtUnix * 1000),
     });
 
-    await auditLog({
-      req,
-      action: 'CREATE',
+    await auditCrud.lifecycle(req, {
       tableName: 'repair_settlements',
       entityCode: existing.code,
       recordId: Number(id),
       entityName: 'Phiếu quyết toán',
+      step: 'payos_link',
+      stepLabel: 'Tạo mã QR thanh toán',
+      action: 'UPDATE',
+      description: `Phiếu quyết toán ${existing.code}: tạo QR PayOS ${amount.toLocaleString('vi-VN')}đ`,
+      snapshot: settlementSnapshot(existing, { orderCode, amount, status: existing.status }),
       branchId: existing.branchId,
-      newValue: { orderCode, amount },
-      description: `Tạo link thanh toán PayOS ${amount.toLocaleString('vi-VN')}đ cho phiếu ${existing.code}`,
     });
 
     return {
@@ -276,26 +278,23 @@ class RepairSettlementService {
 
     // Ghi audit sau khi xuat hoa don — khong doi logic thanh toan.
     // Webhook khong co JWT: actor = system. requestBody rut gon (khong luu chu ky PayOS).
-    await auditLog({
-      req,
-      action: 'UPDATE',
+    await auditCrud.lifecycle(req, {
       tableName: 'repair_settlements',
       entityName: 'Phiếu quyết toán',
       entityCode: settlement.code || `ID-${tx.service_order_id}`,
       recordId: tx.service_order_id,
-      branchId: settlement.branchId,
-      newValue: {
+      step: 'paid',
+      stepLabel: 'Khách hàng thanh toán (PayOS)',
+      action: 'UPDATE',
+      description: `Phiếu quyết toán ${settlement.code || tx.service_order_id}: khách thanh toán ${(Number(tx.amount) || 0).toLocaleString('vi-VN')}đ qua PayOS — đã xuất hóa đơn`,
+      snapshot: settlementSnapshot(settlement, {
         status: 'invoiced',
         amount: tx.amount,
         reference: webhookData.reference || null,
-      },
-      requestBody: {
         orderCode: webhookData.orderCode,
-        amount: tx.amount,
-        reference: webhookData.reference || null,
-      },
-      description: `Khách hàng thanh toán thành công ${(Number(tx.amount) || 0).toLocaleString('vi-VN')}đ qua PayOS, hệ thống tự xuất hóa đơn cho phiếu ${settlement.code || tx.service_order_id}`,
+      }),
       responseStatus: 200,
+      branchId: settlement.branchId,
     });
   }
 

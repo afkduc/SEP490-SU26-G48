@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { adminBranchesApi } from '../../../services/adminApi';
 import { useToast } from '../../../components/common/ToastContext';
 import { useApiError } from '../../../hooks/useApiError';
 import PermissionGate from '../../../components/PermissionGate';
+import { formatPhoneDisplay } from '../../../utils/validation';
 import '../AdminBranchesPage.css';
 import './BranchPages.css';
 
@@ -18,6 +19,8 @@ function formatCurrency(value) {
 export default function BranchDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const listSearch = location.state?.fromListSearch || '';
   const toast = useToast();
   const { handleApiError } = useApiError();
   const [branch, setBranch] = useState(null);
@@ -87,7 +90,11 @@ export default function BranchDetailPage() {
     <div className="admin-page branch-page">
       <div className="admin-page__header">
         <div className="admin-page__title-block">
-          <button type="button" className="branch-page__back" onClick={() => navigate('/admin/catalog')}>
+          <button
+            type="button"
+            className="branch-page__back"
+            onClick={() => navigate(`/admin/catalog${location.state?.fromListSearch || ''}`)}
+          >
             ← Quay lại danh mục
           </button>
           <div className="admin-page__title-group">
@@ -101,7 +108,7 @@ export default function BranchDetailPage() {
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={() => navigate(`/admin/catalog/branches/${branch.id}/edit`)}
+                onClick={() => navigate(`/admin/catalog/branches/${branch.id}/edit`, { state: { fromListSearch: listSearch } })}
               >
                 Sửa
               </button>
@@ -155,7 +162,7 @@ export default function BranchDetailPage() {
 
             <dl className="branch-detail__list">
               <div><dt>Địa chỉ</dt><dd>{branch.address || '—'}</dd></div>
-              <div><dt>Điện thoại</dt><dd>{branch.phone || '—'}</dd></div>
+              <div><dt>Điện thoại</dt><dd>{branch.phone ? formatPhoneDisplay(branch.phone) : '—'}</dd></div>
               <div>
                 <dt>Email</dt>
                 <dd>

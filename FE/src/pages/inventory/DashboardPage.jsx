@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../../contexts/AppContext';
+import { useInventoryBranch } from './InventoryLayout';
 import { getStockSummaryApi, getTopUsedPartsApi } from '../../services/inventoryApi';
 import { formatCurrency } from '../../utils';
 import { StatTile, BrandDonutChart, TopPartsBarChart } from './InventoryDashboardCharts';
@@ -40,8 +40,7 @@ function computeDateRange(presetKey) {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -75,7 +74,7 @@ export default function DashboardPage() {
     setPartsLoading(true);
     setPartsError(null);
     const { fromDate, toDate } = computeDateRange(period);
-    getTopUsedPartsApi({ fromDate, toDate, limit: 10 })
+    getTopUsedPartsApi({ branchId, fromDate, toDate, limit: 10 })
       .then((res) => { if (mounted) setPartsStats(res); })
       .catch((err) => { if (mounted) setPartsError(err.message || 'Không tải được dữ liệu thống kê'); })
       .finally(() => { if (mounted) setPartsLoading(false); });
@@ -85,7 +84,7 @@ export default function DashboardPage() {
   if (!branchId) {
     return (
       <div className="inv-dashboard__error">
-        Tài khoản chưa được gán chi nhánh - liên hệ admin để được cập nhật.
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để xem dữ liệu kho.')}
       </div>
     );
   }
@@ -101,7 +100,7 @@ export default function DashboardPage() {
     <div className="inv-dashboard">
       <h1 className="inv-dashboard__title">Tổng quan kho</h1>
       <p className="inv-dashboard__subtitle">
-        Số liệu tổng quan của chi nhánh bạn phụ trách.
+        Số liệu tổng quan của chi nhánh đang được chọn trong module kho.
       </p>
 
       {summaryLoading && <div className="inv-dashboard__loading">Đang tải...</div>}

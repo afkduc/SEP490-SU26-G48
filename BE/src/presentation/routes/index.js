@@ -68,8 +68,7 @@ router.use('/maintenance-reminders', buildMaintenanceReminderRouter());
 router.use('/service-requests', buildServiceRequestRouter());
 router.use('/sse', buildSSERouter());
 // Public - khong qua authenticate, dung cho landing page (tra cuu tien do
-// sua chua bang ma, khong can dang nhap). Mount rieng, KHONG dat trong
-// repairOrderRoutes.js vi file do gan authenticate cho ca router.
+// sua chua bang ma, man bao ve, man khoang xe... deu khong can dang nhap).
 router.use('/public', buildPublicRouter());
 // PayOS webhook - khong qua authenticate (xem ghi chu trong payosWebhookRoutes.js).
 router.use('/payos', buildPayosWebhookRouter());

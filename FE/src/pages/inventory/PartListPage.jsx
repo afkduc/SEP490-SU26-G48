@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useInventoryBranch } from './InventoryLayout';
 import { useParts } from '../../hooks/inventory/useParts';
 import { listUnitsApi } from '../../services/productApi';
 import { PermissionGate } from '../../components/PermissionGate';
@@ -33,8 +33,7 @@ function emptyForm() {
 }
 
 export default function PartListPage() {
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
   const {
     parts, total, loading, error, categories,
     params,
@@ -134,7 +133,7 @@ export default function PartListPage() {
   if (!branchId) {
     return (
       <div className="part-list__error">
-        Tài khoản chưa được gán chi nhánh - liên hệ admin để được cập nhật.
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để xem phụ tùng.')}
       </div>
     );
   }
@@ -233,13 +232,13 @@ export default function PartListPage() {
                         </td>
                         <td>{p.category || '—'}</td>
                         <td>{p.unitName || p.unit || '—'}</td>
-                        <td className="text-right">
+                        <td className="text-left">
                           {p.unitPrice != null ? `${Number(p.unitPrice).toLocaleString('vi-VN')} đ` : '—'}
                         </td>
-                        <td className={`text-right ${isLow ? 'text-danger' : 'text-success'}`}>
+                        <td className={`text-left ${isLow ? 'text-danger' : 'text-success'}`}>
                           {stock}
                         </td>
-                        <td className="text-right">{min}</td>
+                        <td className="text-left">{min}</td>
                         <td>
                           <span className={`badge ${STATUS_CLASS[p.status] || ''}`}>
                             {STATUS_LABELS[p.status] || p.status}

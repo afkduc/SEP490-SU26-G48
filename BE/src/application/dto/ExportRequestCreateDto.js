@@ -6,7 +6,7 @@ const ApiError = require('../../utils/ApiError');
  *
  * @param {Object} payload - req.body
  * @returns {Object} { branch_id, repair_order_id, performed_by,
- *                     export_date, notes?, items: [{ product_id, product_code,
+ *                     notes?, items: [{ product_id, product_code,
  *                     product_name, unit?, quantity }] }
  */
 function validateCreateExportRequest(payload) {
@@ -34,16 +34,8 @@ function validateCreateExportRequest(payload) {
     throw new ApiError(400, 'notes qua dai (max 500 ky tu)');
   }
 
-  let exportDate = payload.exportDate ?? payload.export_date ?? new Date();
-  if (typeof exportDate === 'string') {
-    const parsed = new Date(exportDate);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new ApiError(400, 'exportDate khong hop le');
-    }
-    exportDate = parsed;
-  } else if (!(exportDate instanceof Date)) {
-    throw new ApiError(400, 'exportDate khong hop le');
-  }
+  // Ngày xuất luôn là ngày tạo phiếu; không nhận ngày tùy chọn từ client.
+  const exportDate = new Date();
 
   const itemsRaw = Array.isArray(payload.items) ? payload.items : [];
   if (itemsRaw.length === 0) {

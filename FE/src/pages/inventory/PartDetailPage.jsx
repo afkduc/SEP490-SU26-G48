@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { usePartDetail } from '../../hooks/inventory/usePartDetail';
 import { useParts } from '../../hooks/inventory/useParts';
-import { useAuth } from '../../contexts/AppContext';
+import { useInventoryBranch } from './InventoryLayout';
 import { listUnitsApi } from '../../services/productApi';
 import { PermissionGate } from '../../components/PermissionGate';
 import './PartDetailPage.css';
@@ -15,8 +15,7 @@ const STATUS_LABELS = {
 
 export default function PartDetailPage() {
   const { id } = useParams();
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
   const { part, history, loading, error, refetch } = usePartDetail(id);
   const { update, deactivate, reactivate } = useParts({ branchId });
 
@@ -95,6 +94,13 @@ export default function PartDetailPage() {
     }
   }
 
+  if (!branchId) {
+    return (
+      <div className="detail-error">
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để xem chi tiết phụ tùng.')}
+      </div>
+    );
+  }
   if (loading) return <div className="detail-loading">Đang tải...</div>;
   if (error) return <div className="detail-error">Lỗi: {error}</div>;
   if (!part) return <div className="detail-error">Không tìm thấy phụ tùng</div>;

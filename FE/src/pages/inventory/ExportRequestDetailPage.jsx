@@ -4,13 +4,7 @@ import './ExportRequestDetailPage.css';
 
 const STATUS_META = {
   completed: { label: 'Đã xuất', className: 'badge--success' },
-  cancelled: { label: 'Hủy', className: 'badge--danger' },
 };
-
-function formatDate(d) {
-  if (!d) return '—';
-  return String(d).slice(0, 10);
-}
 
 function formatDateTime(d) {
   if (!d) return '—';
@@ -64,7 +58,6 @@ export default function ExportRequestDetailPage() {
             <InfoRow label="Phiếu sửa chữa" value={data.serviceOrderCode} />
             <InfoRow label="Khách hàng" value={data.customerName} />
             <InfoRow label="Xe" value={data.vehiclePlate} />
-            <InfoRow label="Ngày xuất" value={formatDate(data.exportDate)} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
             <InfoRow label="Người xuất" value={data.performedByName} />
             <InfoRow label="Ghi chú" value={data.notes} />
@@ -113,14 +106,8 @@ export default function ExportRequestDetailPage() {
 
         {data.status === 'completed' && (
           <div className="er-detail__notice er-detail__notice--success">
-            Phiếu đã được xuất kho. Tồn kho đã bị trừ và hệ thống đã ghi log vào{' '}
-            <code>inventory_transactions</code> (transaction_type=&apos;export&apos;).
-          </div>
-        )}
-        {data.status === 'cancelled' && (
-          <div className="er-detail__notice er-detail__notice--danger">
-            Phiếu đã bị hủy.
-          </div>
+            Phiếu đã được xuất kho.
+           </div>
         )}
       </div>
     </div>

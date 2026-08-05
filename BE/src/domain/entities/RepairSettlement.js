@@ -32,6 +32,7 @@ class RepairSettlement {
     this.deliveryDate = data.deliveryDate ?? null;
     this.paidAt = data.paidAt ?? null;
     this.cancelReason = data.cancelReason ?? null;
+    this.cancelledAt = data.cancelledAt ?? null;
     // Phieu tiep nhan va ban giao xe (kiem tra noi that/ngoai that/khoang dong
     // co...) - luu nguyen 1 khoi JSON, xem shape trong IntakeChecklistSection.jsx.
     this.intakeChecklist = data.intakeChecklist ?? null;
@@ -82,6 +83,7 @@ class RepairSettlement {
       deliveryDate: headerRow.delivery_date,
       paidAt: headerRow.invoice_issued_at,
       cancelReason: headerRow.cancel_reason,
+      cancelledAt: headerRow.cancelled_at,
       intakeChecklist: headerRow.intake_checklist ? JSON.parse(headerRow.intake_checklist) : null,
       note: headerRow.note ?? null,
       signatureData: headerRow.signature_data ?? null,

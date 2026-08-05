@@ -107,6 +107,9 @@ export default function VehicleHistoryLookupForm() {
                     <span>Tiếp nhận: {h.intakeDate}</span>
                     {h.completedDate && <span>Hoàn thành: {h.completedDate}</span>}
                   </div>
+                  {h.maintenanceItems && (
+                    <div className={styles.historyPackage}>Gói bảo dưỡng: {h.maintenanceItems}</div>
+                  )}
                 </li>
               ))}
             </ul>

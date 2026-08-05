@@ -12,6 +12,7 @@ import {
   formatDurationMs,
 } from '../../utils/auditDisplay';
 import { SECURITY_ALERTS_COUNT_EVENT } from '../../utils/securityAlertEvents';
+import { formatPhoneDisplay } from '../../utils/validation';
 import './AdminDashboardPage.css';
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
@@ -860,13 +861,14 @@ function LoginItem({ item }) {
   const statusBadge = getStatusBadge(item.status);
   const actionBadge = getActionBadge(item.actionType);
 
+  const rawPhone = item.phoneNumber || item.phone_number;
+  const displayPhone = rawPhone ? formatPhoneDisplay(rawPhone) : null;
+
   // Fallback thong minh: uu tien userName > phone > userId > email > "Nguoi dung #id"
   const displayName =
     item.userName ||
     item.user_name ||
-    (item.phoneNumber || item.phone_number
-      ? `SDT: ${item.phoneNumber || item.phone_number}`
-      : null) ||
+    (displayPhone ? `SDT: ${displayPhone}` : null) ||
     (item.email ? item.email : null) ||
     (item.userId || item.user_id
       ? `Người dùng #${item.userId || item.user_id}`
@@ -904,8 +906,8 @@ function LoginItem({ item }) {
           {(item.sessionDuration || item.session_duration_seconds) > 0 && (
             <span><IconCalendar /> {formatDuration(item.sessionDuration || item.session_duration_seconds)}</span>
           )}
-          {(item.phoneNumber || item.phone_number) && item.userName && (
-            <span className="login-item__phone">{item.phoneNumber || item.phone_number}</span>
+          {displayPhone && item.userName && (
+            <span className="login-item__phone">{displayPhone}</span>
           )}
         </div>
       </div>

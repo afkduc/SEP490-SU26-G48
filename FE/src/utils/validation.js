@@ -11,6 +11,28 @@ const EMAIL_REGEX =
 const PHONE_REGEX = /^0[0-9]{9,10}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,50}$/;
 
+/** Chỉ giữ chữ số, tối đa 11 (SĐT VN). */
+export function phoneDigitsOnly(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 11);
+}
+
+/**
+ * Hiển thị SĐT khi gõ: 0123456789 → 0123-456-789 (4-3-3; 11 số → 4-3-4).
+ */
+export function formatPhoneInput(value) {
+  const d = phoneDigitsOnly(value);
+  if (d.length <= 4) return d;
+  if (d.length <= 7) return `${d.slice(0, 4)}-${d.slice(4)}`;
+  return `${d.slice(0, 4)}-${d.slice(4, 7)}-${d.slice(7)}`;
+}
+
+/** Hiển thị SĐT từ DB (chuẩn hóa dấu cũ 0236-3333-3333 → 0236-333-3333). */
+export function formatPhoneDisplay(value) {
+  const d = phoneDigitsOnly(value);
+  if (!d) return '';
+  return formatPhoneInput(d);
+}
+
 export function isValidEmail(value) {
   if (value == null) return false;
   const email = String(value).trim();
@@ -20,7 +42,7 @@ export function isValidEmail(value) {
 
 export function isValidPhone(value) {
   if (value == null) return false;
-  return PHONE_REGEX.test(String(value).trim());
+  return PHONE_REGEX.test(phoneDigitsOnly(value));
 }
 
 export function isValidUsername(value) {

@@ -2,36 +2,16 @@ const { success } = require('../../utils/response');
 const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
 
+// Tick dau muc/Hoan thanh (updateStatus/updateTaskStatus) van nam ben
+// PublicBayBoardController.js - viec do dien ra tai chinh khoang xe (khong
+// dang nhap, xem Landing/app/khoang). Controller nay chi con lai phan to
+// truong lam TU TAI KHOAN CUA CHINH HO (dang nhap binh thuong, khong dung
+// chung nua): xem phieu cho, nhan viec + gan khoang + gan tho cung luc.
 class RepairOrderController {
   constructor({ repairOrderService }) {
     this.repairOrderService = repairOrderService;
     this.notificationService = new NotificationService();
   }
-
-  // Man "Lenh sua chua" la bang dieu phoi chung cua ca chi nhanh (de bat ky
-  // co van dich vu nao cung gan duoc to truong cho don cua dong nghiep) -
-  // khong loc theo advisorId nhu man "Phieu quyet toan", show het theo branch.
-  getAll = async (req, res, next) => {
-    try {
-      const isTeamLeader = (req.user.roles || []).includes('team_leader');
-      const result = await this.repairOrderService.getAll({
-        branchId: req.user.branchId,
-        teamLeaderId: isTeamLeader ? req.user.userId : undefined,
-      });
-      return success(res, result, 'Repair orders retrieved');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  getById = async (req, res, next) => {
-    try {
-      const item = await this.repairOrderService.getById(req.params.id);
-      return success(res, item, 'Repair order retrieved');
-    } catch (err) {
-      next(err);
-    }
-  };
 
   // Public - khong auth (xem publicRoutes.js), khong duoc dung req.user o day.
   lookupPublicProgress = async (req, res, next) => {
@@ -43,37 +23,25 @@ class RepairOrderController {
     }
   };
 
-  // Tho tu nhan viec qua khoang xe (thay cho man "Phan cong" thu cong cu cua
-  // CVDV) - teamLeaderId/branchId lay tu chinh nguoi dang dang nhap, bayId do
-  // FE truyen (khoang tablet nay dang chiem, xem vehicleBayRoutes.js).
+  // To truong nhan 1 phieu quyet toan tu bang tin chung ca chi nhanh, gan
+  // luon cho 1 khoang cua chinh minh (bayId chon tu GET /vehicle-bays/mine).
   claim = async (req, res, next) => {
     try {
+      // Chưa ghi audit ở bước chọn khoang — đợi tổ trưởng xác nhận phân công thợ
+      // (setTechnicians) rồi mới ghi 1 dòng tổng hợp để tránh spam nhật ký.
       const item = await this.repairOrderService.claim(req.body.serviceOrderId, {
         branchId: req.user.branchId,
         teamLeaderId: req.user.userId,
         bayId: req.body.bayId,
         bayNumber: req.body.bayNumber,
       });
-      await auditCrud.create(req, {
-        tableName: 'repair_orders',
-        entityCode: item?.code || null,
-        recordId: item?.id || null,
-        entityName: 'Phiếu sửa chữa',
-        data: req.body,
-      });
-      await this.notificationService.notifyAdmins('REPAIR_ORDER_CREATED', {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: item?.code || `ID-${item?.id}`,
-        targetCode: item?.code || '',
-        userId: item?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
       return success(res, item, 'Repair order claimed', 201);
     } catch (err) {
       next(err);
     }
   };
 
+  // Goi y tho de gan ngay sau khi nhan viec (cung man voi buoc chon khoang).
   searchTechnicians = async (req, res, next) => {
     try {
       const items = await this.repairOrderService.searchTechnicians(req.user.userId, req.user.branchId, req.query.q);
@@ -85,67 +53,68 @@ class RepairOrderController {
 
   setTechnicians = async (req, res, next) => {
     try {
+      const before = await this.repairOrderService.getById(req.params.id);
+      const hadTechnicians = Array.isArray(before?.technicians) && before.technicians.length > 0;
       const item = await this.repairOrderService.setTechnicians(req.params.id, req.body.technicianIds, {
         branchId: req.user.branchId,
         teamLeaderId: req.user.userId,
       });
-      await auditCrud.update(req, {
+      const entityCode = item?.code || `ID-${req.params.id}`;
+      const recordId = item?.id || Number(req.params.id) || null;
+      const { repairOrderSnapshot } = require('../../utils/auditSnapshots');
+      const techNames = (item?.technicians || [])
+        .map((t) => t.fullName || t.name || t.technicianName)
+        .filter(Boolean)
+        .join(', ');
+      const stepLabel = hadTechnicians ? 'Cập nhật phân công thợ' : 'Nhận việc & phân công thợ';
+      await auditCrud.lifecycle(req, {
         tableName: 'repair_orders',
-        entityCode: item?.code || `ID-${req.params.id}`,
-        recordId: item?.id || Number(req.params.id) || null,
-        entityName: 'Phiếu sửa chữa',
-        newData: { technicianIds: req.body.technicianIds },
-        description: `Phân công thợ cho lệnh sửa chữa ${item?.code || req.params.id}`,
+        entityCode,
+        recordId,
+        entityName: 'Lệnh sửa chữa',
+        step: hadTechnicians ? 'reassigned' : 'assigned',
+        stepLabel,
+        action: hadTechnicians ? 'UPDATE' : 'CREATE',
+        description: `${stepLabel} cho lệnh ${entityCode}`
+          + (item?.bayNumber != null ? ` — Khoang ${item.bayNumber}` : '')
+          + (techNames ? ` — Thợ: ${techNames}` : ''),
+        snapshot: repairOrderSnapshot(item),
       });
+      if (!hadTechnicians) {
+        await this.notificationService.notifyAdmins('REPAIR_ORDER_CREATED', {
+          auditLogId: req._lastAuditLogId,
+          actorName: req.user?.name || req.user?.email || 'Admin',
+          targetName: entityCode,
+          targetCode: item?.code || '',
+          userId: item?.id,
+        }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
+      } else {
+        await this.notificationService.notifyAdmins('REPAIR_ORDER_UPDATED', {
+          auditLogId: req._lastAuditLogId,
+          actorName: req.user?.name || req.user?.email || 'Admin',
+          targetName: entityCode,
+          targetCode: item?.code || '',
+          userId: item?.id,
+        }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
+      }
       return success(res, item, 'Technicians assigned');
     } catch (err) {
       next(err);
     }
   };
 
-  updateStatus = async (req, res, next) => {
+  // Toan bo lenh sua chua cua to truong dang dang nhap (inprogress + hoan
+  // thanh) - dung ca cho "Khoang xe cua toi" (loc inprogress, ghep voi bay
+  // qua bayId de xem tien do dau muc) lan "Lich su" (loc completed). Cung
+  // du lieu voi PublicBayBoardController.getHistory, chi khac cho danh tinh
+  // den tu req.user thay vi resolve qua bayId.
+  getMine = async (req, res, next) => {
     try {
-      const item = await this.repairOrderService.updateStatus(req.params.id, req.body.status, {
+      const items = await this.repairOrderService.getAll({
         branchId: req.user.branchId,
+        teamLeaderId: req.user.userId,
       });
-      await auditCrud.update(req, {
-        tableName: 'repair_orders',
-        entityCode: item?.code || item?.repair_order_code || `ID-${req.params.id}`,
-        recordId: item?.id || Number(req.params.id) || null,
-        entityName: 'Phiếu sửa chữa',
-        newData: { status: req.body.status, reason: req.body.reason },
-      });
-      await this.notificationService.notifyAdmins('REPAIR_ORDER_UPDATED', {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: item?.code || item?.repair_order_code || `ID-${req.params.id}`,
-        targetCode: item?.code || item?.repair_order_code || '',
-        userId: item?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[RepairOrderController] notifyAdmins:', e.message));
-      return success(res, item, 'Repair order status updated');
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  updateTaskStatus = async (req, res, next) => {
-    try {
-      const item = await this.repairOrderService.updateTaskStatus(
-        req.params.id,
-        req.params.taskId,
-        Boolean(req.body.isDone),
-        { userId: req.user.userId, branchId: req.user.branchId }
-      );
-      const task = (item?.tasks || []).find((t) => String(t.id) === String(req.params.taskId));
-      await auditCrud.update(req, {
-        tableName: 'repair_orders',
-        entityCode: item?.code || `ID-${req.params.id}`,
-        recordId: item?.id || Number(req.params.id) || null,
-        entityName: 'Lệnh sửa chữa',
-        newData: { taskId: Number(req.params.taskId), isDone: true, taskName: task?.taskName || null },
-        description: `Tổ trưởng xác nhận hoàn thành đầu mục "${task?.taskName || req.params.taskId}" của lệnh ${item?.code || req.params.id}`,
-      });
-      return success(res, item, 'Task status updated');
+      return success(res, items, 'Repair orders retrieved');
     } catch (err) {
       next(err);
     }
