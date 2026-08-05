@@ -2,6 +2,7 @@ const ApiError = require('../../utils/ApiError');
 const ImportRequestResponseDto = require('../dto/ImportRequestResponseDto');
 const { validateCreateImportRequest, validateReject } = require('../dto/ImportRequestCreateDto');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const { normalizeDateRange } = require('../../utils/dateRange');
 
 /**
  * Service cho Import Request.
@@ -16,14 +17,14 @@ class ImportRequestService {
 
   async list({ branchId, status, supplierId, fromDate, toDate, search, page, limit } = {}) {
     if (!branchId) throw new ApiError(400, 'branchId is required');
+    const dateRange = normalizeDateRange(fromDate, toDate);
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const filters = {
       branchId: Number(branchId),
       status: status || undefined,
       supplierId: supplierId ? Number(supplierId) : undefined,
-      fromDate: fromDate ? new Date(fromDate) : undefined,
-      toDate: toDate ? new Date(toDate) : undefined,
+      ...dateRange,
       search: search || undefined,
     };
     const [items, total] = await Promise.all([

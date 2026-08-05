@@ -60,7 +60,8 @@ class ImportRequestController {
       }
       const result = await this.importRequestService.list({
         branchId: branchIdToUse,
-        status, supplierId, fromDate, toDate, search, page, limit,
+        status: hasRole(req.user, 'warehouse_staff') ? 'approved' : status,
+        supplierId, fromDate, toDate, search, page, limit,
       });
       return success(res, result, 'Import requests retrieved');
     } catch (err) {
