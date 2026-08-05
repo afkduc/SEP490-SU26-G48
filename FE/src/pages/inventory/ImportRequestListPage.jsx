@@ -6,17 +6,8 @@ import { useImportRequests } from '../../hooks/inventory/useImportRequests';
 import './ImportRequestListPage.css';
 
 const STATUS_META = {
-  pending: { label: 'Chờ duyệt (phiếu cũ)', className: 'badge--warning' },
   approved: { label: 'Đã nhập kho', className: 'badge--success' },
-  rejected: { label: 'Từ chối', className: 'badge--danger' },
 };
-
-const STATUS_TABS = [
-  { value: '', label: 'Tất cả' },
-  { value: 'pending', label: 'Chờ duyệt (phiếu cũ)' },
-  { value: 'approved', label: 'Đã nhập kho' },
-  { value: 'rejected', label: 'Từ chối' },
-];
 
 function formatDate(d) {
   if (!d) return '—';
@@ -35,18 +26,24 @@ export default function ImportRequestListPage() {
   const {
     requests, total, page, limit, loading, error,
     params,
-    setStatus, setFromDate, setToDate, setSearch, setPage,
+    setFromDate, setToDate, setSearch, setPage,
   } = useImportRequests(branchId);
 
   const [draftSearch, setDraftSearch] = useState(params.search);
   const [draftFromDate, setDraftFromDate] = useState(params.fromDate);
   const [draftToDate, setDraftToDate] = useState(params.toDate);
+  const [filterError, setFilterError] = useState('');
 
   useEffect(() => { setDraftSearch(params.search); }, [params.search]);
   useEffect(() => { setDraftFromDate(params.fromDate); }, [params.fromDate]);
   useEffect(() => { setDraftToDate(params.toDate); }, [params.toDate]);
 
   function handleApplyFilter() {
+    if (draftFromDate && draftToDate && draftFromDate > draftToDate) {
+      setFilterError('Ngày bắt đầu không được lớn hơn ngày kết thúc.');
+      return;
+    }
+    setFilterError('');
     setSearch(draftSearch);
     setFromDate(draftFromDate);
     setToDate(draftToDate);
@@ -72,7 +69,7 @@ export default function ImportRequestListPage() {
         <div>
           <h1 className="ir-list__title">Phiếu nhập kho</h1>
           <p className="ir-list__subtitle">
-            Phiếu nhập mới sẽ cộng tồn kho ngay sau khi tạo; chỉ các phiếu cũ ở trạng thái pending mới cần duyệt.
+            Phiếu nhập được cộng tồn kho ngay sau khi tạo và không cần chờ duyệt.
           </p>
         </div>
         <PermissionGate permission="import_requests:create">
@@ -82,26 +79,12 @@ export default function ImportRequestListPage() {
         </PermissionGate>
       </div>
 
-      {/* Tabs theo status */}
-      <div className="ir-list__tabs">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={`ir-list__tab${params.status === tab.value ? ' ir-list__tab--active' : ''}`}
-            onClick={() => setStatus(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       {/* Filters */}
       <div className="ir-list__filters">
         <input
           className="input input--search"
           type="text"
-          placeholder="Tìm theo mã phiếu, ghi chú..."
+          placeholder="Tìm theo mã phiếu"
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -111,6 +94,7 @@ export default function ImportRequestListPage() {
           type="date"
           value={draftFromDate}
           onChange={(e) => setDraftFromDate(e.target.value)}
+          max={draftToDate || undefined}
           title="Từ ngày"
         />
         <input
@@ -118,12 +102,14 @@ export default function ImportRequestListPage() {
           type="date"
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
+          min={draftFromDate || undefined}
           title="Đến ngày"
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
           Lọc
         </button>
       </div>
+      {filterError && <div className="ir-list__error">{filterError}</div>}
 
       {/* Table */}
       {loading ? (

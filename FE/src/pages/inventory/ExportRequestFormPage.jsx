@@ -221,7 +221,7 @@ export default function ExportRequestFormPage() {
               <input
                 className="input"
                 type="text"
-                placeholder="Tìm theo mã LSC, mã RO, tên khách, biển số xe..."
+                placeholder="Tìm theo mã RO, tên khách, biển số xe..."
                 value={roSearchTerm}
                 onChange={(e) => setRoSearchTerm(e.target.value)}
               />
@@ -234,11 +234,9 @@ export default function ExportRequestFormPage() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Mã LSC</th>
                         <th>Mã RO</th>
                         <th>Khách hàng</th>
                         <th>Xe</th>
-                        <th>Trạng thái</th>
                         <th className="text-right">Số PT</th>
                         <th></th>
                       </tr>
@@ -246,23 +244,14 @@ export default function ExportRequestFormPage() {
                     <tbody>
                       {repairOrders.map((ro) => (
                         <tr key={ro.id}>
-                          <td><span className="font-mono">{ro.repairOrderCode}</span></td>
                           <td><span className="font-mono">{ro.serviceOrderCode || '—'}</span></td>
                           <td>{ro.customerName || '—'}</td>
                           <td>{ro.vehiclePlate || '—'}</td>
-                          <td>
-                            {ro.alreadyExported ? (
-                              <span className="badge badge--danger">Đã xuất</span>
-                            ) : (
-                              <span className="badge badge--success">Chưa xuất</span>
-                            )}
-                          </td>
                           <td className="text-right">{ro.partTaskCount ?? 0}</td>
                           <td>
                             <button
                               type="button"
                               className="btn btn--primary btn--sm"
-                              disabled={ro.alreadyExported}
                               onClick={() => handlePickRo(ro)}
                             >
                               Chọn

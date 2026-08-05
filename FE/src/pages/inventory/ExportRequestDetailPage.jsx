@@ -4,7 +4,6 @@ import './ExportRequestDetailPage.css';
 
 const STATUS_META = {
   completed: { label: 'Đã xuất', className: 'badge--success' },
-  cancelled: { label: 'Hủy', className: 'badge--danger' },
 };
 
 function formatDate(d) {
@@ -113,14 +112,8 @@ export default function ExportRequestDetailPage() {
 
         {data.status === 'completed' && (
           <div className="er-detail__notice er-detail__notice--success">
-            Phiếu đã được xuất kho. Tồn kho đã bị trừ và hệ thống đã ghi log vào{' '}
-            <code>inventory_transactions</code> (transaction_type=&apos;export&apos;).
-          </div>
-        )}
-        {data.status === 'cancelled' && (
-          <div className="er-detail__notice er-detail__notice--danger">
-            Phiếu đã bị hủy.
-          </div>
+            Phiếu đã được xuất kho.
+           </div>
         )}
       </div>
     </div>
