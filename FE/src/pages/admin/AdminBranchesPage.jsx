@@ -335,8 +335,8 @@ export default function AdminBranchesPage({ embedded = false } = {}) {
                 <BranchCard
                   key={branch.id}
                   branch={branch}
-                  onOpen={(b) => navigate(`/admin/catalog/branches/${b.id}`)}
-                  onEdit={(b) => navigate(`/admin/catalog/branches/${b.id}/edit`)}
+                  onOpen={(b) => navigate(`/admin/catalog/branches/${b.id}`, { state: { fromListSearch: window.location.search } })}
+                  onEdit={(b) => navigate(`/admin/catalog/branches/${b.id}/edit`, { state: { fromListSearch: window.location.search } })}
                   onDeactivate={(b) => setDeactivateTarget(b)}
                   onReactivate={handleReactivate}
                 />

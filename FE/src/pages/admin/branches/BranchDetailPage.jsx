@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { adminBranchesApi } from '../../../services/adminApi';
 import { useToast } from '../../../components/common/ToastContext';
 import { useApiError } from '../../../hooks/useApiError';
@@ -18,6 +18,8 @@ function formatCurrency(value) {
 export default function BranchDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const listSearch = location.state?.fromListSearch || '';
   const toast = useToast();
   const { handleApiError } = useApiError();
   const [branch, setBranch] = useState(null);
@@ -87,7 +89,11 @@ export default function BranchDetailPage() {
     <div className="admin-page branch-page">
       <div className="admin-page__header">
         <div className="admin-page__title-block">
-          <button type="button" className="branch-page__back" onClick={() => navigate('/admin/catalog')}>
+          <button
+            type="button"
+            className="branch-page__back"
+            onClick={() => navigate(`/admin/catalog${location.state?.fromListSearch || ''}`)}
+          >
             ← Quay lại danh mục
           </button>
           <div className="admin-page__title-group">
@@ -101,7 +107,7 @@ export default function BranchDetailPage() {
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={() => navigate(`/admin/catalog/branches/${branch.id}/edit`)}
+                onClick={() => navigate(`/admin/catalog/branches/${branch.id}/edit`, { state: { fromListSearch: listSearch } })}
               >
                 Sửa
               </button>

@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { adminBranchesApi } from '../../../services/adminApi';
 import { useToast } from '../../../components/common/ToastContext';
-import { EMAIL_HINT, isValidEmail, isValidPhone } from '../../../utils/validation';
+import {
+  EMAIL_HINT,
+  formatPhoneInput,
+  isValidEmail,
+  isValidPhone,
+  phoneDigitsOnly,
+} from '../../../utils/validation';
 import '../AdminBranchesPage.css';
 import './BranchPages.css';
 
 export default function BranchFormPage({ mode: modeProp }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const listSearch = location.state?.fromListSearch || '';
   const toast = useToast();
   const isEdit = modeProp === 'edit' || Boolean(id);
 
@@ -56,7 +64,7 @@ export default function BranchFormPage({ mode: modeProp }) {
           branchCode: branch?.branchCode || '',
           branchName: branch?.branchName || '',
           address: branch?.address || '',
-          phone: branch?.phone || '',
+          phone: formatPhoneInput(branch?.phone || ''),
           email: (branch?.email || branch?.managerEmail || '').trim(),
           managerId: branch?.managerId || '',
         });
@@ -95,7 +103,7 @@ export default function BranchFormPage({ mode: modeProp }) {
       setError('Mã chi nhánh là bắt buộc');
       return;
     }
-    const phone = form.phone.replace(/\D/g, '');
+    const phone = phoneDigitsOnly(form.phone);
     const email = form.email.trim();
     if (phone && !isValidPhone(phone)) {
       setError('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
@@ -123,7 +131,7 @@ export default function BranchFormPage({ mode: modeProp }) {
       if (isEdit) {
         await adminBranchesApi.update(id, payload);
         toast.success('Cập nhật chi nhánh thành công');
-        navigate(`/admin/catalog/branches/${id}`);
+        navigate(`/admin/catalog/branches/${id}`, { state: { fromListSearch: listSearch } });
       } else {
         const created = await adminBranchesApi.create(payload);
         toast.success('Tạo chi nhánh mới thành công');
@@ -145,7 +153,7 @@ export default function BranchFormPage({ mode: modeProp }) {
     return (
       <div className="admin-page branch-page">
         <div className="branch-page__state branch-page__state--error">{bootError}</div>
-        <Link to="/admin/catalog" className="btn btn--ghost">Quay lại danh mục</Link>
+        <Link to={`/admin/catalog${listSearch}`} className="btn btn--ghost">Quay lại danh mục</Link>
       </div>
     );
   }
@@ -157,7 +165,10 @@ export default function BranchFormPage({ mode: modeProp }) {
           <button
             type="button"
             className="branch-page__back"
-            onClick={() => navigate(isEdit ? `/admin/catalog/branches/${id}` : '/admin/catalog')}
+            onClick={() => navigate(
+              isEdit ? `/admin/catalog/branches/${id}` : `/admin/catalog${listSearch}`,
+              isEdit ? { state: { fromListSearch: listSearch } } : undefined,
+            )}
           >
             ← Quay lại
           </button>
@@ -220,8 +231,10 @@ export default function BranchFormPage({ mode: modeProp }) {
             <input
               type="text"
               value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
-              placeholder="VD: 02433331111"
+              onChange={(e) => set('phone', formatPhoneInput(e.target.value))}
+              placeholder="VD: 0123-456-789"
+              inputMode="numeric"
+              maxLength={13}
             />
           </div>
           <div className="form-group">
