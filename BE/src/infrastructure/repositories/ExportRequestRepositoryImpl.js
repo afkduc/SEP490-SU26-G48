@@ -43,7 +43,7 @@ function buildExportRequestFilters({
     params.fromDate = fromDate;
   }
   if (toDate) {
-    where.push('er.created_at <= @toDate');
+    where.push('er.created_at < DATEADD(day, 1, CAST(@toDate AS date))');
     params.toDate = toDate;
   }
   if (search) {
@@ -199,6 +199,12 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const where = [
       `ro.branch_id = @branchId`,
       `ro.status <> 'cancelled'`,
+      `NOT EXISTS (
+        SELECT 1 FROM export_requests er
+        WHERE (er.repair_order_id = ro.id
+          OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+          AND er.status = 'completed'
+      )`,
     ];
     const params = { branchId };
     if (search) {
@@ -233,10 +239,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
             AND rot.task_type = 'product'
             AND rot.product_id IS NOT NULL
         ) AS total_part_quantity,
-        CASE WHEN EXISTS (
-          SELECT 1 FROM export_requests er
-          WHERE er.repair_order_id = ro.id
-        ) THEN 1 ELSE 0 END AS already_exported
+        CAST(0 AS bit) AS already_exported
       FROM repair_orders ro
       LEFT JOIN service_orders so ON so.id = ro.service_order_id
       LEFT JOIN customers c ON c.id = so.customer_id
@@ -266,6 +269,12 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const where = [
       `ro.branch_id = @branchId`,
       `ro.status <> 'cancelled'`,
+      `NOT EXISTS (
+        SELECT 1 FROM export_requests er
+        WHERE (er.repair_order_id = ro.id
+          OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+          AND er.status = 'completed'
+      )`,
     ];
     const params = { branchId };
     if (search) {
@@ -301,10 +310,12 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          c.full_name AS customer_name,
          v.license_plate AS vehicle_plate,
          tl.user_name AS team_leader_name,
-         CASE WHEN EXISTS (
-           SELECT 1 FROM export_requests er
-           WHERE er.repair_order_id = ro.id
-         ) THEN 1 ELSE 0 END AS already_exported
+        CASE WHEN EXISTS (
+          SELECT 1 FROM export_requests er
+          WHERE (er.repair_order_id = ro.id
+            OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+            AND er.status = 'completed'
+        ) THEN 1 ELSE 0 END AS already_exported
        FROM repair_orders ro
        LEFT JOIN service_orders so ON so.id = ro.service_order_id
        LEFT JOIN customers c ON c.id = so.customer_id
@@ -370,6 +381,20 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
    * Tra ve { request, items } de service sinh response DTO.
    */
   async create(tx, requestData, items) {
+    const existingExport = await tx.request()
+      .input('repair_order_id', sql.BigInt, requestData.repair_order_id)
+      .query(`
+        SELECT TOP 1 er.id
+        FROM export_requests er WITH (UPDLOCK, HOLDLOCK)
+        JOIN repair_orders ro ON ro.id = @repair_order_id
+        WHERE (er.repair_order_id = @repair_order_id
+          OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+          AND er.status = 'completed'
+      `);
+    if (existingExport.recordset.length > 0) {
+      throw new ApiError(409, 'Lenh sua chua nay da duoc xuat kho');
+    }
+
     // 1) Insert header (repair_order_id, khong con service_order_id)
     const insertReq = await tx.request()
       .input('request_code', sql.VarChar(30), requestData.request_code)

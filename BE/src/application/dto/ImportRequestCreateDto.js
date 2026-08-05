@@ -5,7 +5,7 @@ const ApiError = require('../../utils/ApiError');
  * Tra ve object da duoc chuan hoa (so, trim string) hoac nem ApiError(400).
  *
  * @param {Object} payload - req.body
- * @returns {Object} { branch_id, supplier_id?, supplier_invoice_no?, requested_by,
+ * @returns {Object} { branch_id, supplier_id?, supplier_invoice_no, requested_by,
  *                     import_date, notes?, items: [{ product_id, product_code,
  *                     product_name, unit?, quantity }] }
  */
@@ -32,8 +32,13 @@ function validateCreateImportRequest(payload) {
     throw new ApiError(400, 'supplierId khong hop le');
   }
 
-  const supplierInvoiceNo = payload.supplierInvoiceNo ?? payload.supplier_invoice_no ?? null;
-  if (supplierInvoiceNo != null && String(supplierInvoiceNo).length > 50) {
+  const supplierInvoiceNo = String(
+    payload.supplierInvoiceNo ?? payload.supplier_invoice_no ?? '',
+  ).trim();
+  if (!supplierInvoiceNo) {
+    throw new ApiError(400, 'So hoa don nha cung cap khong duoc trong');
+  }
+  if (supplierInvoiceNo.length > 50) {
     throw new ApiError(400, 'supplierInvoiceNo qua dai (max 50 ky tu)');
   }
 
@@ -42,16 +47,8 @@ function validateCreateImportRequest(payload) {
     throw new ApiError(400, 'notes qua dai (max 500 ky tu)');
   }
 
-  let importDate = payload.importDate ?? payload.import_date ?? new Date();
-  if (typeof importDate === 'string') {
-    const parsed = new Date(importDate);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new ApiError(400, 'importDate khong hop le');
-    }
-    importDate = parsed;
-  } else if (!(importDate instanceof Date)) {
-    throw new ApiError(400, 'importDate khong hop le');
-  }
+  // Ngày nhập luôn là thời điểm thực tế tạo phiếu; không nhận ngày tùy chọn từ client.
+  const importDate = new Date();
 
   const itemsRaw = Array.isArray(payload.items) ? payload.items : [];
   if (itemsRaw.length === 0) {
