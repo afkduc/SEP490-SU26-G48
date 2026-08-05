@@ -16,6 +16,7 @@ import {
   humanizeRequestUrl,
   isSameAuditPayload,
   isAuditSignatureValue,
+  getLifecycleSteps,
   AUDIT_TABLE_LABELS,
 } from '../../utils/auditDisplay';
 
@@ -93,20 +94,23 @@ function SettlementItemsTable({ items }) {
         </thead>
         <tbody>
           {list.map((item, index) => {
-            const name = item?.description || item?.name || `Hạng mục ${index + 1}`;
+            const name = item?.description || item?.productName || item?.name || `Hạng mục ${index + 1}`;
+            const code = item?.code || item?.productCode || null;
+            const qty = item?.qty != null ? item.qty : item?.quantity;
             const isParent = item?.isGroupParent;
+            const hasPrice = item?.unitPrice != null || item?.total != null;
             return (
-              <tr key={`${item?.code || 'i'}-${index}`} className={isParent ? 'is-group' : undefined}>
+              <tr key={`${code || 'i'}-${index}`} className={isParent ? 'is-group' : undefined}>
                 <td>{index + 1}</td>
                 <td>
                   <span className="audit-detail__item-name">{name}</span>
                   {item?.isFree ? <span className="audit-detail__item-tag">Miễn phí</span> : null}
                 </td>
-                <td>{item?.code || '—'}</td>
-                <td>{item?.qty != null ? item.qty : '—'}</td>
+                <td>{code || '—'}</td>
+                <td>{qty != null ? qty : '—'}</td>
                 <td>{item?.unit || '—'}</td>
-                <td>{formatMoneyCell(item?.unitPrice)}</td>
-                <td>{formatMoneyCell(item?.total)}</td>
+                <td>{hasPrice ? formatMoneyCell(item?.unitPrice) : '—'}</td>
+                <td>{hasPrice ? formatMoneyCell(item?.total) : '—'}</td>
               </tr>
             );
           })}
@@ -344,10 +348,34 @@ export function AuditLogDetailContent({ log }) {
     statusTone === 'success' ? 'badge--success'
       : statusTone === 'danger' ? 'badge--danger'
         : 'badge--secondary';
+  const lifecycleSteps = getLifecycleSteps(log.new_value);
 
   return (
     <div className="audit-detail-page__body">
       <div className="audit-detail__summary">{summary}</div>
+
+      {lifecycleSteps.length > 0 && (
+        <div className="audit-detail__lifecycle" style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+            Lịch sử các bước trên phiếu này
+          </label>
+          <ol style={{ margin: 0, paddingLeft: 18, display: 8 }}>
+            {lifecycleSteps.map((s, i) => {
+              const when = s?.at ? formatLocal(s.at) : null;
+              return (
+                <li key={`${s?.step || 's'}-${i}`} style={{ fontSize: 13, color: '#334155' }}>
+                  <strong>{s?.label || s?.step || `Bước ${i + 1}`}</strong>
+                  {s?.by ? <span style={{ color: '#64748b' }}> — {s.by}</span> : null}
+                  {when?.main ? <span style={{ color: '#94a3b8' }}> · {when.main}</span> : null}
+                  {s?.description && s.description !== (s.label || s.step) ? (
+                    <div style={{ color: '#64748b', fontSize: 12 }}>{s.description}</div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
 
       <div className="audit-detail__row">
         <div className="audit-detail__field">

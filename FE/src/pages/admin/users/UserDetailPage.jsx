@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { adminUsersApi } from '../../../services/adminApi';
 import PermissionGate from '../../../components/PermissionGate';
 import { useToast } from '../../../components/common/ToastContext';
@@ -57,7 +57,9 @@ function Field({ label, value, badge }) {
 export default function UserDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
+  const listSearch = location.state?.fromListSearch || '';
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -108,7 +110,11 @@ export default function UserDetailPage() {
   return (
     <div className="admin-page admin-user-detail-page">
       <div className="admin-user-detail-page__top">
-        <button type="button" className="admin-user-detail-page__back" onClick={() => navigate('/admin/users')}>
+        <button
+          type="button"
+          className="admin-user-detail-page__back"
+          onClick={() => navigate(`/admin/users${listSearch}`)}
+        >
           ← Quay lại danh sách
         </button>
       </div>
@@ -136,7 +142,7 @@ export default function UserDetailPage() {
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={() => navigate(`/admin/users/${user.id}/edit`)}
+                onClick={() => navigate(`/admin/users/${user.id}/edit`, { state: { fromListSearch: listSearch } })}
               >
                 Sửa
               </button>

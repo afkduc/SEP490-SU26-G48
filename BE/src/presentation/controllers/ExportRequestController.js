@@ -105,18 +105,27 @@ class ExportRequestController {
         payload.branchId = req.user.branchId;
       }
       const created = await this.exportRequestService.create(payload);
-      await auditCrud.create(req, {
+      const { exportRequestSnapshot } = require('../../utils/auditSnapshots');
+      const code = created?.requestCode || created?.request_code || created?.code || null;
+      const itemCount = created?.itemCount ?? (created?.items || []).length;
+      await auditCrud.lifecycle(req, {
         tableName: 'export_requests',
-        entityCode: created?.request_code || created?.code || null,
+        entityCode: code,
         recordId: created?.id || null,
         entityName: 'Phiếu xuất kho',
-        data: req.body,
+        step: 'created',
+        stepLabel: 'Tạo phiếu xuất kho',
+        action: 'CREATE',
+        description: `Tạo phiếu xuất kho ${code || created?.id}`
+          + (itemCount ? ` — ${itemCount} mặt hàng` : '')
+          + (created?.repairOrderCode ? ` (LSC ${created.repairOrderCode})` : ''),
+        snapshot: exportRequestSnapshot(created),
       });
       await this.notificationService.notifyAdmins('EXPORT_REQUEST_CREATED', {
         auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: created?.request_code || created?.code || `ID-${created?.id}`,
-        targetCode: created?.request_code || created?.code || '',
+        targetName: code || `ID-${created?.id}`,
+        targetCode: code || '',
         userId: created?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ExportRequestController] notifyAdmins:', e.message));
       return success(res, created, 'Export request created', 201);

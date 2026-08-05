@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
@@ -202,42 +202,105 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
 
 // ─── Main Component ──────────────────────────────────────────────────
 
+function readAuditParamsFromSearch(sp) {
+  const out = {};
+  const keys = [
+    'keyword', 'userName', 'phone', 'action', 'tableName', 'entityName',
+    'entityCode', 'ipAddress', 'requestMethod', 'responseStatus',
+    'startDate', 'endDate', 'branchId', 'page',
+  ];
+  keys.forEach((k) => {
+    const v = sp.get(k);
+    if (v == null || v === '') return;
+    if (k === 'page' || k === 'branchId' || k === 'responseStatus') {
+      const n = Number(v);
+      if (Number.isFinite(n)) out[k] = n;
+      return;
+    }
+    out[k] = v;
+  });
+  return out;
+}
+
+function writeAuditParamsToSearch(params) {
+  const next = new URLSearchParams();
+  const put = (k, v) => {
+    if (v === undefined || v === null || v === '') return;
+    next.set(k, String(v));
+  };
+  put('keyword', params.keyword);
+  put('userName', params.userName);
+  put('phone', params.phone);
+  put('action', params.action);
+  put('tableName', params.tableName);
+  put('entityName', params.entityName);
+  put('entityCode', params.entityCode);
+  put('ipAddress', params.ipAddress);
+  put('requestMethod', params.requestMethod);
+  put('responseStatus', params.responseStatus);
+  put('startDate', params.startDate);
+  put('endDate', params.endDate);
+  put('branchId', params.branchId);
+  if (params.page > 1) put('page', params.page);
+  return next.toString();
+}
+
 export default function AuditLogsPage() {
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const initialUserName = searchParams.get('userName') || '';
-  const initialEntityCode = searchParams.get('entityCode') || '';
-  const audit = useAuditLogs({
-    ...(initialUserName ? { userName: initialUserName } : {}),
-    ...(initialEntityCode ? { entityCode: initialEntityCode } : {}),
-  });
+  const isInitialMount = useRef(true);
+  const urlSeed = useMemo(() => readAuditParamsFromSearch(searchParams), [searchParams]);
+  const audit = useAuditLogs(urlSeed);
   const { branches, branchesError } = useSharedBranches();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [now, setNow] = useState(() => Date.now());
-  const [showFilters, setShowFilters] = useState(Boolean(initialUserName || initialEntityCode));
+  const [showFilters, setShowFilters] = useState(
+    Boolean(urlSeed.userName || urlSeed.entityCode || urlSeed.keyword || urlSeed.action)
+  );
 
   const openDetail = useCallback((item) => {
     if (!item?.id) return;
+    const qs = writeAuditParamsToSearch(audit.params);
     navigate(`/admin/logs/${item.id}`, {
-      state: { fromListSearch: window.location.search },
+      state: { fromListSearch: qs ? `?${qs}` : '' },
     });
-  }, [navigate]);
+  }, [navigate, audit.params]);
 
+  // Dong bo filter/page len URL de Back tu chi tiet van dung trang
   useEffect(() => {
-    const fromUrl = searchParams.get('userName') || '';
-    const codeFromUrl = searchParams.get('entityCode') || '';
-    if (!fromUrl && !codeFromUrl) return;
-    audit.setParams((p) => ({
-      ...p,
-      ...(fromUrl ? { userName: fromUrl } : {}),
-      ...(codeFromUrl ? { entityCode: codeFromUrl } : {}),
-      page: 1,
-    }));
-    setShowFilters(true);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      const fromUrl = readAuditParamsFromSearch(new URLSearchParams(window.location.search));
+      if (Object.keys(fromUrl).length > 0) {
+        audit.setParams((p) => ({ ...p, ...fromUrl }));
+        setShowFilters(true);
+      }
+      return;
+    }
+    const qs = writeAuditParamsToSearch(audit.params);
+    const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
+    window.history.replaceState(null, '', newUrl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [
+    audit.params.page,
+    audit.params.keyword,
+    audit.params.userName,
+    audit.params.phone,
+    audit.params.action,
+    audit.params.tableName,
+    audit.params.entityName,
+    audit.params.entityCode,
+    audit.params.ipAddress,
+    audit.params.requestMethod,
+    audit.params.responseStatus,
+    audit.params.startDate,
+    audit.params.endDate,
+    audit.params.branchId,
+    location.pathname,
+  ]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 15_000);
