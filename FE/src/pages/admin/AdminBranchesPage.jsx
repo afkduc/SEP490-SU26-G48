@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { adminBranchesApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
 import { useApiError } from '../../hooks/useApiError';
+import { formatPhoneDisplay } from '../../utils/validation';
 import PermissionGate from '../../components/PermissionGate';
 import './AdminBranchesPage.css';
 
@@ -69,11 +70,6 @@ function getInitials(firstName, lastName, userName) {
   return '?';
 }
 
-function formatPhone(phone) {
-  if (!phone) return null;
-  return phone;
-}
-
 function ConfirmDeactivateModal({ branch, onClose, onConfirm, loading }) {
   return (
     <div className="confirm-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -128,7 +124,7 @@ function BranchCard({ branch, onOpen, onEdit, onDeactivate, onReactivate }) {
         {branch.phone && (
           <div className="branch-card__info-row">
             <IconPhone />
-            <span>{formatPhone(branch.phone)}</span>
+            <span>{formatPhoneDisplay(branch.phone)}</span>
           </div>
         )}
         {branch.email && (
