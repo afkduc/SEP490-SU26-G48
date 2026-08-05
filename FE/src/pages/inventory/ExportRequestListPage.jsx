@@ -7,14 +7,7 @@ import './ExportRequestListPage.css';
 
 const STATUS_META = {
   completed: { label: 'Đã xuất', className: 'badge--success' },
-  cancelled: { label: 'Hủy', className: 'badge--danger' },
 };
-
-const STATUS_TABS = [
-  { value: '', label: 'Tất cả' },
-  { value: 'completed', label: 'Đã xuất' },
-  { value: 'cancelled', label: 'Hủy' },
-];
 
 function formatDate(d) {
   if (!d) return '—';
@@ -33,18 +26,24 @@ export default function ExportRequestListPage() {
   const {
     requests, total, page, limit, loading, error,
     params,
-    setStatus, setFromDate, setToDate, setSearch, setPage,
+    setFromDate, setToDate, setSearch, setPage,
   } = useExportRequests(branchId);
 
   const [draftSearch, setDraftSearch] = useState(params.search);
   const [draftFromDate, setDraftFromDate] = useState(params.fromDate);
   const [draftToDate, setDraftToDate] = useState(params.toDate);
+  const [filterError, setFilterError] = useState('');
 
   useEffect(() => { setDraftSearch(params.search); }, [params.search]);
   useEffect(() => { setDraftFromDate(params.fromDate); }, [params.fromDate]);
   useEffect(() => { setDraftToDate(params.toDate); }, [params.toDate]);
 
   function handleApplyFilter() {
+    if (draftFromDate && draftToDate && draftFromDate > draftToDate) {
+      setFilterError('Ngày bắt đầu không được lớn hơn ngày kết thúc.');
+      return;
+    }
+    setFilterError('');
     setSearch(draftSearch);
     setFromDate(draftFromDate);
     setToDate(draftToDate);
@@ -80,26 +79,12 @@ export default function ExportRequestListPage() {
         </PermissionGate>
       </div>
 
-      {/* Tabs theo status */}
-      <div className="er-list__tabs">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={`er-list__tab${params.status === tab.value ? ' er-list__tab--active' : ''}`}
-            onClick={() => setStatus(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       {/* Filters */}
       <div className="er-list__filters">
         <input
           className="input input--search"
           type="text"
-          placeholder="Tìm theo mã phiếu, mã phiếu sửa chữa, ghi chú..."
+          placeholder="Tìm theo mã phiếu, mã phiếu sửa chữa"
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -109,6 +94,7 @@ export default function ExportRequestListPage() {
           type="date"
           value={draftFromDate}
           onChange={(e) => setDraftFromDate(e.target.value)}
+          max={draftToDate || undefined}
           title="Từ ngày"
         />
         <input
@@ -116,12 +102,14 @@ export default function ExportRequestListPage() {
           type="date"
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
+          min={draftFromDate || undefined}
           title="Đến ngày"
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
           Lọc
         </button>
       </div>
+      {filterError && <div className="er-list__error">{filterError}</div>}
 
       {/* Table */}
       {loading ? (

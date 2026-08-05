@@ -23,16 +23,12 @@ function emptyItem() {
   };
 }
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function ImportRequestFormPage() {
   const navigate = useNavigate();
   const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
   const {
-    nextCode, codeDate, loadingCode, codeError, refetchCode,
+    nextCode, codeDate, loadingCode, codeError,
     submitting, submitError, submit,
   } = useImportRequestForm(branchId);
 
@@ -41,7 +37,6 @@ export default function ImportRequestFormPage() {
 
   const [supplierId, setSupplierId] = useState('');
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('');
-  const [importDate, setImportDate] = useState(todayIso());
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([emptyItem()]);
   const [formError, setFormError] = useState('');
@@ -136,7 +131,7 @@ export default function ImportRequestFormPage() {
 
   function validate() {
     if (!supplierId) return 'Vui lòng chọn nhà cung cấp';
-    if (!importDate) return 'Vui lòng chọn ngày nhập';
+    if (!supplierInvoiceNo.trim()) return 'Vui lòng nhập số hóa đơn nhà cung cấp';
     for (let i = 0; i < items.length; i += 1) {
       const it = items[i];
       if (!it.productCode) return `Dòng ${i + 1}: chưa chọn phụ tùng`;
@@ -159,8 +154,7 @@ export default function ImportRequestFormPage() {
     try {
       const created = await submit({
         supplierId: supplierId ? Number(supplierId) : null,
-        supplierInvoiceNo: supplierInvoiceNo || undefined,
-        importDate,
+        supplierInvoiceNo: supplierInvoiceNo.trim(),
         notes: notes || undefined,
         items: items.map((it) => ({
           productId: it.productId,
@@ -217,27 +211,7 @@ export default function ImportRequestFormPage() {
                 placeholder="IRB-{branchId}-{YYYYMMDD}-{seq}"
               />
               {codeError && <div className="ir-form__hint ir-form__hint--error">{codeError}</div>}
-              {!loadingCode && !codeError && (
-                <div className="ir-form__hint">
-                  Ngày sinh mã: <strong>{codeDate || '—'}</strong>
-                  &nbsp;
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={refetchCode}>
-                    Sinh lại
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="ir-form__field">
-              <label className="ir-form__label">Ngày nhập *</label>
-              <input
-                className="input"
-                type="date"
-                value={importDate}
-                onChange={(e) => setImportDate(e.target.value)}
-                required
-              />
-            </div>
+              </div>
           </div>
 
           <div className="ir-form__info-row">
@@ -261,7 +235,7 @@ export default function ImportRequestFormPage() {
             </div>
 
             <div className="ir-form__field">
-              <label className="ir-form__label">Số hóa đơn NCC</label>
+              <label className="ir-form__label">Số hóa đơn NCC *</label>
               <input
                 className="input"
                 type="text"
@@ -269,6 +243,7 @@ export default function ImportRequestFormPage() {
                 onChange={(e) => setSupplierInvoiceNo(e.target.value)}
                 placeholder="VD: INV-2026-001"
                 maxLength={50}
+                required
               />
             </div>
           </div>
