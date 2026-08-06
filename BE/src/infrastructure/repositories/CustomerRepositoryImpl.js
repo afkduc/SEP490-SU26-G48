@@ -142,6 +142,29 @@ class CustomerRepositoryImpl extends CustomerRepository {
               )
             `);
           vehicleId = insertedVehicle.recordset[0].id;
+
+          // Ngay mua chi luu duoc qua warranty_records (xem HEADER_SELECT trong
+          // RepairSettlementRepositoryImpl - doc lai tu day, khong phai cot tren
+          // vehicles) - chi ghi khi xe MOI tao va co nhap Ngay mua tren form,
+          // khong dung lai/sua canh bao cua xe da ton tai tim theo bien so.
+          // Bat loi rieng (khong de van vao rollback ca giao dich) - bang nay
+          // chua tung duoc INSERT o dau trong code truoc gio (chi doc), neu co
+          // rang buoc/cot nao khac ngoai du kien thi van uu tien giu duoc
+          // khach hang/xe vua tao thay vi hong ca phieu quyet toan.
+          if (data.purchaseDate) {
+            try {
+              await tx
+                .request()
+                .input('vehicleId', sql.BigInt, vehicleId)
+                .input('purchaseDate', sql.Date, data.purchaseDate)
+                .query(`
+                  INSERT INTO warranty_records (vehicle_id, purchase_date)
+                  VALUES (@vehicleId, @purchaseDate)
+                `);
+            } catch (err) {
+              console.warn('[CustomerRepositoryImpl] Không lưu được warranty_records.purchase_date:', err.message);
+            }
+          }
         }
       }
 
