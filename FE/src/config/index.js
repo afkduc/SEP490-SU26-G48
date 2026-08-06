@@ -1,9 +1,12 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Khớp vite.config.js `base`: build production = "/crm/", dev = "/".
-// Dùng BASE_URL của Vite (không chỉ PROD) để basename BrowserRouter luôn đúng.
+// Production luôn có /crm (fallback nếu BASE_URL lệch).
 const viteBase = import.meta.env.BASE_URL || '/';
-export const BASE_PATH = viteBase === '/' ? '' : viteBase.replace(/\/$/, '');
+const fromVite = viteBase === '/' ? '' : viteBase.replace(/\/$/, '');
+export const BASE_PATH = import.meta.env.PROD
+  ? (fromVite || '/crm')
+  : fromVite;
 
 export const APP_NAME = 'SEP490-G48';
 
