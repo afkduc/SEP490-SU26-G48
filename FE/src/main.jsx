@@ -7,6 +7,7 @@ import { ToastProvider } from './components/common/ToastContext';
 import { GlobalErrorProvider } from './contexts/GlobalErrorContext';
 import { BASE_PATH } from './config';
 import { ensureCrmHistoryBase } from './utils/ensureCrmHistoryBase';
+import { CrmUrlGuard } from './utils/crmUrl';
 import './styles/index.css';
 
 // Patch History API TRƯỚC khi mount Router — tránh mất prefix /crm trên production.
@@ -15,6 +16,7 @@ ensureCrmHistoryBase();
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter basename={BASE_PATH}>
+      <CrmUrlGuard />
       {/* ToastProvider phai O NGOAI AppProvider vi PermissionEventsRunner
           (render boi AppProvider) se goi useToast() de hien toast refresh. */}
       <ToastProvider>
