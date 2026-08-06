@@ -1,4 +1,4 @@
-import { BASE_PATH } from '../config';
+import { getCrmPrefix } from '../config';
 import { toBrowserUrl } from './crmUrl';
 
 const CRM_ROOTS = [
@@ -22,27 +22,38 @@ function isCrmRootPath(pathname) {
 }
 
 /**
- * Chặn History API ghi URL tuyệt đối thiếu basename /crm (production).
- * Cover: filter sync, nút tiến/lùi AdminLayout, sidebar, browser back/forward.
+ * Patch History API + sửa URL thiếu /crm.
+ * Dùng getCrmPrefix() runtime — không phụ thuộc BASE_PATH lúc import.
  */
 export function ensureCrmHistoryBase() {
-  if (!BASE_PATH || typeof window === 'undefined' || !window.history) return;
+  if (typeof window === 'undefined' || !window.history) return;
 
-  const prefix = BASE_PATH;
   const origReplace = window.history.replaceState.bind(window.history);
   const origPush = window.history.pushState.bind(window.history);
 
-  // Cho crmUrl.forceCrmBrowserUrl gọi native API, tránh đệ quy qua patch.
   window.__crmNativeReplaceState = origReplace;
   window.__crmNativePushState = origPush;
 
   const fixUrl = (url) => {
     if (url == null || typeof url !== 'string') return url;
+    const prefix = getCrmPrefix();
+    if (!prefix) return url;
 
-    // React Router đôi khi chỉ truyền "?roleId=1" — resolve rồi gắn /crm.
+    // Absolute same-origin URL
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      try {
+        const u = new URL(url);
+        if (u.origin !== window.location.origin) return url;
+        return toBrowserUrl(`${u.pathname}${u.search}${u.hash}`);
+      } catch {
+        return url;
+      }
+    }
+
+    // Chỉ query/hash — gắn vào pathname (đã có /crm nếu cần)
     if (url.startsWith('?') || url.startsWith('#')) {
       let path = window.location.pathname || '/';
-      if (!path.startsWith(prefix) && isCrmRootPath(path)) {
+      if (!path.startsWith(`${prefix}/`) && path !== prefix && isCrmRootPath(path)) {
         path = `${prefix}${path}`;
       }
       if (url.startsWith('?')) return `${path}${url}`;
@@ -54,6 +65,8 @@ export function ensureCrmHistoryBase() {
   };
 
   const repairCurrentUrl = () => {
+    const prefix = getCrmPrefix();
+    if (!prefix) return;
     const { pathname, search, hash } = window.location;
     if (
       pathname.startsWith('/')
@@ -75,4 +88,9 @@ export function ensureCrmHistoryBase() {
 
   repairCurrentUrl();
   window.addEventListener('popstate', repairCurrentUrl);
+
+  // Watchdog: nếu filter/navigate làm mất /crm, sửa trong vòng ~300ms
+  if (!window.__crmUrlWatchdog) {
+    window.__crmUrlWatchdog = window.setInterval(repairCurrentUrl, 300);
+  }
 }
