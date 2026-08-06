@@ -16,6 +16,7 @@ import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
 const LOGIN_PATH = `${BASE_PATH}/login`;
 const UNAUTHORIZED_PATH = `${BASE_PATH}/unauthorized`;
 import { SharedDataProvider } from '../contexts/SharedDataContext';
+import { ManagerInventoryNotifyProvider } from '../contexts/ManagerInventoryNotifyContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
 import { useAuth } from '../contexts/AppContext';
 
@@ -152,6 +153,7 @@ function AppRoutes() {
   return (
     <>
       <SharedDataProvider>
+      <ManagerInventoryNotifyProvider>
         <SessionExpiredModal />
         <SessionTakenOverPrompt />
         <ForbiddenModal />
@@ -414,6 +416,7 @@ function AppRoutes() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       </Suspense>
+      </ManagerInventoryNotifyProvider>
     </SharedDataProvider>
     </>
   );
