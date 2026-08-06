@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, getPrimaryRole } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
+import { useManagerInventoryNotify } from '../../contexts/ManagerInventoryNotifyContext';
 import { ROLES } from '../../constants/roles';
 import { BASE_PATH } from '../../config';
 import ScrollToggleButton from '../common/ScrollToggleButton';
@@ -45,10 +46,14 @@ const SERVICE_ADVISOR_NAV = [
 // ===== Manager =====
 const MANAGER_NAV = [
   { label: 'Dashboard', path: '/manager/dashboard' },
-  { label: 'Kho chi nhánh', path: '/manager/inventory' },
-  { label: 'Màn kho', path: '/inventory' },
-  { label: 'Phiếu nhập', icon: '📥', path: '/manager/import-requests' },
-  { label: 'Phiếu xuất', icon: '📤', path: '/manager/export-requests' },
+  {
+    label: 'Kho',
+    children: [
+      { label: 'Kho chi nhánh', path: '/manager/inventory' },
+      { label: 'Phiếu nhập', path: '/manager/import-requests' },
+      { label: 'Phiếu xuất', path: '/manager/export-requests' },
+    ],
+  },
   {
     label: 'Nhân viên',
     children: [
@@ -125,7 +130,7 @@ const ROLES_WITH_DROPDOWN = new Set([
 // truoc, roi click lai dong ngay lai - nen chi bat 1 trong 2 tuy kich thuoc man hinh.
 const NAV_DROPDOWN_COMPACT_QUERY = '(max-width: 1024px)';
 
-function NavDropdownItem({ item, currentPath, badgeCount, onNavigate }) {
+function NavDropdownItem({ item, currentPath, badgeCount, inventoryNewCount, onNavigate }) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef(null);
   const [isCompact, setIsCompact] = useState(
@@ -235,6 +240,9 @@ function NavDropdownItem({ item, currentPath, badgeCount, onNavigate }) {
                 onClick={() => { setOpen(false); onNavigate?.(); }}
               >
                 {child.label}
+                {child.path === '/manager/inventory' && inventoryNewCount > 0 && (
+                  <span className="navbar__badge">{inventoryNewCount > 9 ? '9+' : inventoryNewCount}</span>
+                )}
               </NavLink>
             );
           })}
@@ -246,6 +254,7 @@ function NavDropdownItem({ item, currentPath, badgeCount, onNavigate }) {
 
 export default function Navbar() {
   const { pendingCount } = useServiceRequests();
+  const { newProductCount } = useManagerInventoryNotify();
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -280,6 +289,7 @@ export default function Navbar() {
                 item={item}
                 currentPath={location.pathname}
                 badgeCount={pendingCount}
+                inventoryNewCount={newProductCount}
                 onNavigate={closeMobileNav}
               />
             ))

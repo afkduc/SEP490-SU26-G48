@@ -32,6 +32,14 @@ class ProductRepository {
   async getDistinctCategories() {
     throw new Error('Method getDistinctCategories() must be implemented');
   }
+
+  async markSeenByManager(id) {
+    throw new Error('Method markSeenByManager() must be implemented');
+  }
+
+  async countNewForManager(branchId) {
+    throw new Error('Method countNewForManager() must be implemented');
+  }
 }
 
 module.exports = ProductRepository;
