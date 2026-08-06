@@ -9,6 +9,10 @@
  *                           bang tin cac khoang xe tu them dong moi.
  *   - 'claimed'           : 1 khoang xe vua nhan 1 phieu (payload co bayId de
  *                           cac khoang khac biet phieu nay het con, tu go dong).
+ *                           Phat lai lan nua khi to truong gan xong tho thuc
+ *                           hien (RepairOrderService.setTechnicians) - luc do
+ *                           man Phieu quyet toan cua CVDV moi thuc su chuyen
+ *                           hien thi sang "Đang sửa chữa" (xem FE displayStatus).
  *   - 'task-updated'      : to truong vua tich hoan thanh 1 dau muc cong viec
  *   - 'order-completed'   : to truong vua hoan thanh toan bo lenh sua chua
  *                           (phieu quyet toan goc chuyen sang "Cho thanh toan")

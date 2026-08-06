@@ -94,12 +94,12 @@ class ProductRepositoryImpl extends ProductRepository {
       INSERT INTO products (
         product_code, product_name, category, brand_name, unit_id,
         unit_price, stock_quantity, min_stock, supplier_id,
-        location, branch_id, status, unit_id
+        location, branch_id, status
       )
       VALUES (
         @productCode, @productName, @category, @brandName, @unitId,
         @unitPrice, @stockQuantity, @minStock, @supplierId,
-        @location, @branchId, @status, @unitId
+        @location, @branchId, @status
       );
       SELECT SCOPE_IDENTITY() AS id;
     `;
@@ -116,7 +116,6 @@ class ProductRepositoryImpl extends ProductRepository {
       location: data.location || null,
       branchId: data.branchId || null,
       status: data.status || 'active',
-      unitId: data.unitId || 1,
     };
     const result = await query(sql, params);
     const newId = result.recordset[0].id;
