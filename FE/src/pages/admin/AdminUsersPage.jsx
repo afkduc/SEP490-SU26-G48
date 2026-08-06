@@ -178,9 +178,12 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
-      navigate('/admin/users/new', { replace: true });
+      navigate('/admin/users/new', {
+        replace: true,
+        state: { fromListSearch: location.search },
+      });
     }
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, location.search]);
 
   useEffect(() => {
     if (location.pathname === '/admin/users' && !location.search) {
@@ -283,7 +286,7 @@ export default function AdminUsersPage() {
             <PermissionGate permission="admin:users:create">
               <button
                 className="btn btn--primary admin-page__btn-icon-text"
-                onClick={() => navigate('/admin/users/new')}
+                onClick={() => navigate('/admin/users/new', { state: { fromListSearch: location.search } })}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
@@ -368,6 +368,7 @@ export default function AdminLoginSessionsPage({
   seedKey = 0,
 } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const sessions = useLoginSessions(
     seedKey
       ? {
@@ -399,10 +400,10 @@ export default function AdminLoginSessionsPage({
     navigate(`/admin/login-sessions/${item.id}`, {
       state: {
         session: item,
-        fromListSearch: '?tab=sessions',
+        fromListSearch: location.search || '?tab=sessions',
       },
     });
-  }, [navigate]);
+  }, [navigate, location.search]);
 
   // Seed từ panel cảnh báo ("Lịch sử") — khi đổi cảnh báo trong lúc tab đang mở
   useEffect(() => {
