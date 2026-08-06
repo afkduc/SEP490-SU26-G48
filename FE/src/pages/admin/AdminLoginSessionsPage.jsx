@@ -11,7 +11,7 @@ import { downloadBlob } from '../../utils/downloadBlob';
 import { pickLatestSession } from './securityAlertFocus';
 import { normalizeVietnamese } from '../../utils/vietnamese';
 import { formatPhoneDisplay } from '../../utils/validation';
-import { nextDateRangeState } from '../../utils/dateRange';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -775,39 +775,21 @@ export default function AdminLoginSessionsPage({
 
           <div className="filter-field">
             <label className="filter-field__label">Khoảng ngày</label>
-            <div className="filter-field__date-group">
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={sessions.params.startDate || ''}
-                onChange={(e) => {
-                  const next = nextDateRangeState('start', e.target.value, sessions.params);
-                  sessions.setParams((p) => ({
-                    ...p,
-                    startDate: next.startDate,
-                    endDate: next.endDate,
-                    page: 1,
-                  }));
-                }}
-                title="Từ ngày"
-              />
-              <span className="filter-field__date-sep">—</span>
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={sessions.params.endDate || ''}
-                onChange={(e) => {
-                  const next = nextDateRangeState('end', e.target.value, sessions.params);
-                  sessions.setParams((p) => ({
-                    ...p,
-                    startDate: next.startDate,
-                    endDate: next.endDate,
-                    page: 1,
-                  }));
-                }}
-                title="Đến ngày"
-              />
-            </div>
+            <DateRangeInputs
+              startDate={sessions.params.startDate || ''}
+              endDate={sessions.params.endDate || ''}
+              onChange={({ startDate, endDate }) => {
+                sessions.setParams((p) => ({
+                  ...p,
+                  startDate,
+                  endDate,
+                  page: 1,
+                }));
+              }}
+              className="filter-field__date-group"
+              inputClassName="filter-field__input filter-field__input--date"
+              sepClassName="filter-field__date-sep"
+            />
           </div>
         </div>
 
