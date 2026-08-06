@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
@@ -248,8 +248,7 @@ function writeAuditParamsToSearch(params) {
 export default function AuditLogsPage() {
   const toast = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isInitialMount = useRef(true);
   const urlSeed = useMemo(() => readAuditParamsFromSearch(searchParams), [searchParams]);
   const audit = useAuditLogs(urlSeed);
@@ -269,11 +268,12 @@ export default function AuditLogsPage() {
     });
   }, [navigate, audit.params]);
 
-  // Dong bo filter/page len URL de Back tu chi tiet van dung trang
+  // Đồng bộ filter qua React Router (giữ basename /crm). Không dùng replaceState
+  // với location.pathname vì sẽ mất prefix /crm trên production.
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      const fromUrl = readAuditParamsFromSearch(new URLSearchParams(window.location.search));
+      const fromUrl = readAuditParamsFromSearch(searchParams);
       if (Object.keys(fromUrl).length > 0) {
         audit.setParams((p) => ({ ...p, ...fromUrl }));
         setShowFilters(true);
@@ -281,8 +281,7 @@ export default function AuditLogsPage() {
       return;
     }
     const qs = writeAuditParamsToSearch(audit.params);
-    const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
-    window.history.replaceState(null, '', newUrl);
+    setSearchParams(qs ? new URLSearchParams(qs) : new URLSearchParams(), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     audit.params.page,
@@ -299,7 +298,7 @@ export default function AuditLogsPage() {
     audit.params.startDate,
     audit.params.endDate,
     audit.params.branchId,
-    location.pathname,
+    setSearchParams,
   ]);
 
   useEffect(() => {
