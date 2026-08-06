@@ -1,23 +1,27 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-const viteBase = import.meta.env.BASE_URL || '/';
-const fromVite = viteBase === '/' ? '' : viteBase.replace(/\/$/, '');
+/**
+ * Vite inject BASE_URL từ vite.config `base`:
+ * - build: '/crm/'
+ * - dev: '/'
+ */
+const viteBaseUrl = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+const fromVite = viteBaseUrl === '/' ? '' : viteBaseUrl;
 
 /**
  * Basename cho BrowserRouter.
- * - npm run dev (DEV): '' (localhost:3000/admin/...)
- * - production build: luôn '/crm'
+ * - npm run dev: '' (localhost:3000/admin/...)
+ * - production build: luôn '/crm' (khớp Vite base)
  */
-export const BASE_PATH = import.meta.env.DEV ? fromVite : '/crm';
+export const BASE_PATH = import.meta.env.DEV ? fromVite : (fromVite || '/crm');
 
 /**
- * Prefix khi GHI URL trình duyệt.
- * Production/build luôn '/crm' — không phụ thuộc detect runtime (tránh filter mất /crm).
- * Dev local giữ '' trừ khi Vite base là /crm/.
+ * Prefix khi GHI URL trình duyệt: /crm + /admin/users + ?roleId=...
+ * Production lấy từ Vite BASE_URL (ổn định hơn detect runtime).
  */
 export function getCrmPrefix() {
   if (import.meta.env.DEV) return fromVite || '';
-  return '/crm';
+  return fromVite || '/crm';
 }
 
 export const APP_NAME = 'SEP490-G48';
