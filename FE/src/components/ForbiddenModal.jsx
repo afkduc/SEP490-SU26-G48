@@ -4,6 +4,7 @@ import { FORBIDDEN_KEY } from '../services/httpClient';
 import { useAuth, getRoleHome } from '../contexts/AppContext';
 import { getPermissionScreenLabel } from '../utils/screenLabels';
 import { BASE_PATH } from '../config';
+import { forceCrmBrowserUrl, navigateWithCrm } from '../utils/crmUrl';
 
 const LOGIN_PATH = `${BASE_PATH}/login`;
 let modalShownAt = 0;
@@ -47,12 +48,12 @@ export default function ForbiddenModal() {
   function handleBack() {
     handleClose();
     if (window.history.length > 1) navigate(-1);
-    else navigate(getRoleHome(user) || '/dashboard', { replace: true });
+    else navigateWithCrm(navigate, getRoleHome(user) || '/dashboard', { replace: true });
   }
 
   function handleHome() {
     handleClose();
-    navigate(getRoleHome(user) || '/dashboard', { replace: true });
+    navigateWithCrm(navigate, getRoleHome(user) || '/dashboard', { replace: true });
   }
 
   if (!visible) return null;
