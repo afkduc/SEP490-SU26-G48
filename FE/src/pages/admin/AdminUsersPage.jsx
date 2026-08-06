@@ -177,8 +177,9 @@ export default function AdminUsersPage() {
     // 1) Sync React Router
     navigate({ pathname: '/admin/users', search }, { replace: true });
 
-    // 2) Ghi thẳng URL trình duyệt với /crm (hard-coded)
-    const browserUrl = `/crm/admin/users${search}`;
+    // 2) Ghi thẳng URL trình duyệt với prefix CRM (prod: /crm)
+    const prefix = getCrmPrefix(); // prod luôn '/crm'
+    const browserUrl = `${prefix}/admin/users${search}`;
     const nativeReplace = window.__crmNativeReplaceState
       || window.history.replaceState.bind(window.history);
     nativeReplace(window.history.state, '', browserUrl);
