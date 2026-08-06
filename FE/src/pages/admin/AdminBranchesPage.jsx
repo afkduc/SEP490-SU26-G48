@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { adminBranchesApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
 import { useApiError } from '../../hooks/useApiError';
@@ -182,6 +182,7 @@ function BranchCard({ branch, onOpen, onEdit, onDeactivate, onReactivate }) {
 
 export default function AdminBranchesPage({ embedded = false } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const { handleApiError } = useApiError();
   const [branches, setBranches] = useState([]);
@@ -331,8 +332,8 @@ export default function AdminBranchesPage({ embedded = false } = {}) {
                 <BranchCard
                   key={branch.id}
                   branch={branch}
-                  onOpen={(b) => navigate(`/admin/catalog/branches/${b.id}`, { state: { fromListSearch: window.location.search } })}
-                  onEdit={(b) => navigate(`/admin/catalog/branches/${b.id}/edit`, { state: { fromListSearch: window.location.search } })}
+                  onOpen={(b) => navigate(`/admin/catalog/branches/${b.id}`, { state: { fromListSearch: location.search } })}
+                  onEdit={(b) => navigate(`/admin/catalog/branches/${b.id}/edit`, { state: { fromListSearch: location.search } })}
                   onDeactivate={(b) => setDeactivateTarget(b)}
                   onReactivate={handleReactivate}
                 />
