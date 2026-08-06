@@ -70,14 +70,14 @@
   max-width: 520px;
   width: 100%;
   background: #ffffff;
-  border: 1px solid rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(63, 63, 70, 0.12);
   border-radius: 20px;
   padding: 48px 40px;
   text-align: center;
   box-shadow:
     0 4px 6px rgba(0, 0, 0, 0.02),
-    0 12px 40px rgba(59, 130, 246, 0.08),
-    0 0 0 1px rgba(59, 130, 246, 0.05);
+    0 12px 40px rgba(24, 24, 27, 0.08),
+    0 0 0 1px rgba(24, 24, 27, 0.05);
 }
 
 /* ── Icon ──────────────────────────────────────────────── */
@@ -146,7 +146,7 @@
 }
 
 .error-card__btn:focus-visible {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 0 3px rgba(63, 63, 70, 0.3);
 }
 
 .error-card__btn--primary {
@@ -157,7 +157,7 @@
 .error-card__btn--primary:hover {
   background: #18181b;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+  box-shadow: 0 4px 12px rgba(24, 24, 27, 0.3);
 }
 
 .error-card__btn--secondary {
@@ -217,7 +217,7 @@
 
 .error-card__textarea:focus {
   border-color: #3f3f46;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px rgba(63, 63, 70, 0.1);
 }
 
 .error-card__btn--request {
@@ -233,7 +233,7 @@
   background: linear-gradient(135deg, #f4f4f5, #e4e4e7);
   border-color: #d4d4d8;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 4px 12px rgba(24, 24, 27, 0.15);
 }
 
 .error-card__btn--request:disabled {

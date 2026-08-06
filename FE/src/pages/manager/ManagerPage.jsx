@@ -12,6 +12,27 @@ import ManagerExportRequestDetailPage from './ManagerExportRequestDetailPage';
 import ManagerDashboardPage from './ManagerDashboardPage';
 import ManagerInventoryPage from './ManagerInventoryPage';
 
+const IconSearch = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="7" />
+    <path d="M20 20l-3.5-3.5" />
+  </svg>
+);
+
+const IconView = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const IconEdit = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+  </svg>
+);
+
 const SERVICE_STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
   { value: 'active', label: 'Đang áp dụng' },
@@ -403,7 +424,7 @@ function EmployeeListPage() {
         <div className="page-header-right">
           <PermissionGate permission="screen:manager:employees:view">
             <button type="button" className="btn btn-secondary" onClick={() => exportEmployeesCsv(employees)}>
-              📊 Xuất Excel
+              Xuất Excel
             </button>
           </PermissionGate>
           <PermissionGate permission="screen:manager:employees:create">
@@ -416,7 +437,7 @@ function EmployeeListPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã NV, tên, email..." />
         </div>
 
@@ -503,10 +524,10 @@ function EmployeeListPage() {
                   <td>
                     <div className="table-actions">
                       <PermissionGate permission="screen:manager:employees:view">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}>👁</button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}><IconView /></button>
                       </PermissionGate>
                       <PermissionGate permission="screen:manager:employees:update">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}>✏️</button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}><IconEdit /></button>
                       </PermissionGate>
                     </div>
                   </td>
@@ -751,7 +772,7 @@ function EmployeeFormPage({ mode }) {
 
       <form onSubmit={handleSubmit}>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">👥 Thông tin nhân viên</div>
+          <div className="form-section-title">Thông tin nhân viên</div>
 
           {branch && (
             <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
@@ -916,7 +937,7 @@ function EmployeeFormPage({ mode }) {
 
           {!isEdit && (
             <>
-              <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Thông tin đăng nhập</div>
+              <div className="form-section-title" style={{ marginTop: 24 }}>Thông tin đăng nhập</div>
               <div className="form-grid form-grid-2">
                 <div className="form-group">
                   <label className="form-label required">Mật khẩu tạm thời</label>
@@ -935,7 +956,7 @@ function EmployeeFormPage({ mode }) {
 
           {isEdit && (
             <>
-              <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Mật khẩu</div>
+              <div className="form-section-title" style={{ marginTop: 24 }}>Mật khẩu</div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input
                   type="checkbox"
@@ -1015,7 +1036,7 @@ function ServiceDetailModal({ service, onClose }) {
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{service.description || '—'}</div></div>
           </div>
 
-          <div className="form-section-title" style={{ marginTop: 16 }}>🔩 Phụ tùng cần thiết</div>
+          <div className="form-section-title" style={{ marginTop: 16 }}>Phụ tùng cần thiết</div>
           {parts === null && <div style={{ fontSize: 13, color: 'var(--gray-500)' }}>Đang tải…</div>}
           {parts && parts.length === 0 && <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Chưa khai báo phụ tùng nào</div>}
           {parts && parts.length > 0 && (
@@ -1114,7 +1135,7 @@ function ServiceListPage() {
                 services.map((s) => [s.code, s.name, repairCategoryLabel(s.repairCategory), s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
               )}
             >
-              📊 Xuất Excel
+              Xuất Excel
             </button>
           </PermissionGate>
           <PermissionGate permission="screen:manager:services:create">
@@ -1127,7 +1148,7 @@ function ServiceListPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã DV, tên dịch vụ..." />
         </div>
 
@@ -1206,10 +1227,10 @@ function ServiceListPage() {
                   <td>
                     <div className="table-actions">
                       <PermissionGate permission="screen:manager:services:view">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}>👁</button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}><IconView /></button>
                       </PermissionGate>
                       <PermissionGate permission="screen:manager:services:update">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}>✏️</button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}><IconEdit /></button>
                       </PermissionGate>
                     </div>
                   </td>
@@ -1395,7 +1416,7 @@ function ServiceFormPage({ mode }) {
           </div>
         </div>
         <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', color: '#52525b', borderRadius: 12, padding: 18 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>⚠️ Dịch vụ đã được ngừng áp dụng</div>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Dịch vụ đã được ngừng áp dụng</div>
           <p style={{ marginBottom: 10 }}>
             Dịch vụ này vẫn đang nằm trong {packageWarning.length} gói dịch vụ đang hoạt động. Các gói đó sẽ
             KHÔNG tự động cập nhật — nếu muốn, hãy vào từng gói để bỏ dịch vụ này ra:
@@ -1439,7 +1460,7 @@ function ServiceFormPage({ mode }) {
 
       <form onSubmit={handleSubmit}>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">🛠️ Thông tin dịch vụ</div>
+          <div className="form-section-title">Thông tin dịch vụ</div>
 
           {branch && (
             <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
@@ -1495,7 +1516,7 @@ function ServiceFormPage({ mode }) {
         </div>
 
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">🔩 Phụ tùng cần thiết</div>
+          <div className="form-section-title">Phụ tùng cần thiết</div>
           <div style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 12 }}>
             Khai báo phụ tùng và số lượng cần dùng để hoàn thành dịch vụ này (không bắt buộc).
           </div>
@@ -1677,7 +1698,7 @@ function ServicePackageListPage() {
                 packages.map((p) => [p.code, p.name, repairCategoryLabel(p.repairCategory), p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
               )}
             >
-              📊 Xuất Excel
+              Xuất Excel
             </button>
           </PermissionGate>
           <PermissionGate permission="screen:manager:services:create">
@@ -1690,7 +1711,7 @@ function ServicePackageListPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã gói, tên gói..." />
         </div>
 
@@ -1769,10 +1790,10 @@ function ServicePackageListPage() {
                   <td>
                     <div className="table-actions">
                       <PermissionGate permission="screen:manager:services:view">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}><IconView /></button>
                       </PermissionGate>
                       <PermissionGate permission="screen:manager:services:update">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}><IconEdit /></button>
                       </PermissionGate>
                     </div>
                   </td>
@@ -1945,7 +1966,7 @@ function ServicePackageFormPage({ mode }) {
 
       <form onSubmit={handleSubmit}>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">📦 Thông tin gói dịch vụ</div>
+          <div className="form-section-title">Thông tin gói dịch vụ</div>
 
           {branch && (
             <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
@@ -2016,7 +2037,7 @@ function ServicePackageFormPage({ mode }) {
             ) : (
               <>
                 <div className="search-input" style={{ maxWidth: '100%', marginBottom: 8 }}>
-                  <span className="search-icon">🔍</span>
+                  <span className="search-icon"><IconSearch /></span>
                   <input
                     value={serviceSearch}
                     onChange={(e) => setServiceSearch(e.target.value)}
@@ -2301,7 +2322,7 @@ function SettlementReportsPage() {
 
       <div className="filter-bar">
         <div className="search-input" style={{ maxWidth: 420 }}>
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -2581,7 +2602,7 @@ function TechnicianListPage() {
                 ])
               )}
             >
-              📊 Xuất Excel
+              Xuất Excel
             </button>
           </PermissionGate>
           <PermissionGate permission="screen:manager:technicians:create">
@@ -2594,7 +2615,7 @@ function TechnicianListPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã NV, tên, email..." />
         </div>
 
@@ -2691,10 +2712,10 @@ function TechnicianListPage() {
                   <td>
                     <div className="table-actions">
                       <PermissionGate permission="screen:manager:technicians:view">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}>👁</button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}><IconView /></button>
                       </PermissionGate>
                       <PermissionGate permission="screen:manager:technicians:update">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}>✏️</button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}><IconEdit /></button>
                       </PermissionGate>
                     </div>
                   </td>
@@ -2862,13 +2883,13 @@ function TechnicianFormPage({ mode }) {
 
       {teamLeaderOptions.length === 0 && (
         <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', color: '#52525b', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
-          ⚠️ Chi nhánh chưa có tổ trưởng nào đang hoạt động. Hãy thêm Tổ trưởng trước khi thêm thợ máy.
+          Chi nhánh chưa có tổ trưởng nào đang hoạt động. Hãy thêm Tổ trưởng trước khi thêm thợ máy.
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">🛠️ Thông tin thợ máy</div>
+          <div className="form-section-title">Thông tin thợ máy</div>
 
           {branch && (
             <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
@@ -2939,7 +2960,7 @@ function TechnicianFormPage({ mode }) {
 
           {!isEdit && (
             <>
-              <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Thông tin đăng nhập</div>
+              <div className="form-section-title" style={{ marginTop: 24 }}>Thông tin đăng nhập</div>
               <div className="form-grid form-grid-2">
                 <div className="form-group">
                   <label className="form-label required">Mật khẩu tạm thời</label>

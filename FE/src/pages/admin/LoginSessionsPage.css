@@ -149,6 +149,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  width: 100%;
 }
 
 .admin-sessions .filter-field__date-sep {
@@ -158,10 +160,32 @@
   flex-shrink: 0;
 }
 
+.admin-sessions .filter-field--date {
+  grid-column: span 2;
+  min-width: 0;
+}
+
 .admin-sessions .filter-field__input--date {
   height: 38px;
   padding: 0 10px;
-  width: 140px;
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+}
+
+@media (max-width: 640px) {
+  .admin-sessions .filter-field--date {
+    grid-column: span 1;
+  }
+
+  .admin-sessions .filter-field__date-group {
+    flex-wrap: wrap;
+  }
+
+  .admin-sessions .filter-field__input--date {
+    flex: 1 1 calc(50% - 12px);
+    min-width: 120px;
+  }
 }
 
 .admin-sessions__filter-actions {

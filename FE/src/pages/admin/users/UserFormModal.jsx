@@ -412,7 +412,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                   }}
                   role="alert"
                 >
-                  ⚠️ User này đang có <b>{user.roles.length} vai trò</b>:{' '}
+                  User này đang có <b>{user.roles.length} vai trò</b>:{' '}
                   {user.roles.map((r) => r.roleName).join(', ')}.
                   <br />
                   Nếu bạn <b>không thay đổi</b> dropdown Vai trò bên dưới thì các

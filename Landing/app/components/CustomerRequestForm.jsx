@@ -7,6 +7,11 @@ import Reveal from "./Reveal";
 import { API_BASE_URL } from "../config";
 import styles from "./CustomerRequestForm.module.css";
 
+// Khop voi BE utils/fieldValidation.js - giu dong bo 2 phia.
+const PHONE_REGEX = /^0[0-9]{9,10}$/;
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(com|vn|edu\.vn)$/i;
+const EMAIL_HINT = "Email chỉ chấp nhận đuôi .com, .vn hoặc .edu.vn";
+
 const initialForm = {
   fullName: "",
   gender: "",
@@ -54,8 +59,18 @@ export default function CustomerRequestForm() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setSubmitting(true);
     setError("");
+
+    if (!PHONE_REGEX.test(form.phone.trim())) {
+      setError("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, đủ 10-11 chữ số).");
+      return;
+    }
+    if (form.email.trim() && !EMAIL_REGEX.test(form.email.trim())) {
+      setError(EMAIL_HINT);
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const res = await fetch(`${API_BASE_URL}/public/service-requests`, {

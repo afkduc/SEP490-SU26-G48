@@ -127,14 +127,40 @@ class EmailService {
     }
   }
 
-  async sendPasswordResetEmail({ to, userName, resetUrl, expiresMinutes }) {
+  async sendPasswordResetEmail({ to, userName, resetUrl, resetUrlLocal, resetUrlProd, expiresMinutes }) {
     const subject = 'AutoGara — Xác nhận đổi mật khẩu';
-    const text =
+    const hasBoth = Boolean(resetUrlLocal && resetUrlProd && resetUrlLocal !== resetUrlProd);
+    const primaryUrl = resetUrl || resetUrlLocal || resetUrlProd;
+
+    let text =
       `Xin chào ${userName || ''},\n\n`
       + `Bạn đã yêu cầu đổi mật khẩu tài khoản AutoGara.\n`
       + `Để xác nhận và đặt mật khẩu mới, mở liên kết sau trong ${expiresMinutes} phút:\n`
-      + `${resetUrl}\n\n`
-      + `Nếu bạn không yêu cầu, hãy bỏ qua email này. Mật khẩu hiện tại vẫn giữ nguyên.\n`;
+      + `${primaryUrl}\n\n`;
+    if (hasBoth) {
+      text +=
+        `Link test local:\n${resetUrlLocal}\n\n`
+        + `Link web chính thức:\n${resetUrlProd}\n\n`;
+    }
+    text += `Nếu bạn không yêu cầu, hãy bỏ qua email này. Mật khẩu hiện tại vẫn giữ nguyên.\n`;
+
+    const bothLinksHtml = hasBoth
+      ? `
+        <p style="font-size:13px;color:#475569;margin-top:24px">
+          <strong>Test cả 2 môi trường</strong> (cùng token):
+        </p>
+        <ul style="font-size:13px;color:#64748b;padding-left:18px">
+          <li style="margin-bottom:8px">
+            Local (không /crm):<br/>
+            <a href="${resetUrlLocal}" style="color:#2563eb;word-break:break-all">${resetUrlLocal}</a>
+          </li>
+          <li>
+            Web chính thức (/crm):<br/>
+            <a href="${resetUrlProd}" style="color:#2563eb;word-break:break-all">${resetUrlProd}</a>
+          </li>
+        </ul>
+      `
+      : '';
 
     const html = `
       <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#0f172a;line-height:1.5">
@@ -145,7 +171,7 @@ class EmailService {
           gắn với email này. Nhấn nút bên dưới để xác nhận và chuyển đến trang đặt mật khẩu mới.
         </p>
         <p style="margin:28px 0">
-          <a href="${resetUrl}"
+          <a href="${primaryUrl}"
              style="display:inline-block;background:#111827;color:#fff;text-decoration:none;
                     padding:14px 22px;border-radius:8px;font-weight:600">
             Xác nhận &amp; đặt mật khẩu mới
@@ -155,8 +181,9 @@ class EmailService {
           Liên kết có hiệu lực trong <strong>${expiresMinutes} phút</strong> và chỉ dùng được một lần.
           Nếu bạn không yêu cầu, hãy bỏ qua email này — mật khẩu hiện tại không đổi.
         </p>
+        ${bothLinksHtml}
         <p style="font-size:12px;color:#94a3b8;word-break:break-all;margin-top:20px">
-          Không bấm được nút? Copy link:<br/>${resetUrl}
+          Không bấm được nút? Copy link:<br/>${primaryUrl}
         </p>
       </div>
     `;

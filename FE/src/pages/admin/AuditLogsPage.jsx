@@ -512,7 +512,7 @@ export default function AuditLogsPage() {
               </select>
             </div>
 
-            <div className="filter-field">
+            <div className="filter-field filter-field--date">
               <label className="filter-field__label">Khoảng ngày</label>
               <div className="filter-field__date-group">
                 <input

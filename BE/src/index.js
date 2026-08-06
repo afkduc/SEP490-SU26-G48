@@ -92,6 +92,13 @@ async function start() {
       console.warn('[BE] ensureInventoryRequestUnicode:', schemaErr.message);
     }
 
+    try {
+      await require('./infrastructure/database/ensureRepairOrderTasksColumns').ensureRepairOrderTasksColumns();
+      console.log('[BE] repair_order_tasks/service_order_items note+prev_quantity columns ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureRepairOrderTasksColumns:', schemaErr.message);
+    }
+
     const server = http.createServer({ maxHeaderSize: 32768 }, app);
     server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);

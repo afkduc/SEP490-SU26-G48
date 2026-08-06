@@ -5,6 +5,13 @@ import { useManagerInventoryNotify } from '../../contexts/ManagerInventoryNotify
 import { markProductSeenApi } from '../../services/productApi';
 import { formatCurrency } from '../../utils';
 
+const IconSearch = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="7" />
+    <path d="M20 20l-3.5-3.5" />
+  </svg>
+);
+
 // ─── Trang Kho riêng cho Quản lý - liệt kê từng phụ tùng ───────────────
 // Dung lai hook useStock (da co san, dang dung chung o StockPage cho Nhan
 // vien kho) - chi lam giao dien rieng theo dung style cac man Quan ly, khong
@@ -43,7 +50,7 @@ export default function ManagerInventoryPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><IconSearch /></span>
           <input value={params.search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã, tên phụ tùng..." />
         </div>
         <select className="filter-select" value={params.category} onChange={(e) => setCategory(e.target.value)}>

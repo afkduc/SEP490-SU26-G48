@@ -703,7 +703,7 @@ function RevenueOverviewPage() {
                           height: barHeight,
                           borderRadius: '10px 10px 4px 4px',
                           background: 'linear-gradient(180deg, #3f3f46 0%, #27272a 100%)',
-                          boxShadow: '0 8px 14px rgba(3, 105, 161, 0.25)',
+                          boxShadow: '0 8px 14px rgba(24, 24, 27, 0.25)',
                         }}
                       />
                     </div>

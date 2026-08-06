@@ -257,6 +257,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  width: 100%;
 }
 
 .admin-logs .filter-field__date-sep {
@@ -266,10 +268,17 @@
   flex-shrink: 0;
 }
 
+.admin-logs .filter-field--date {
+  grid-column: span 2;
+  min-width: 0;
+}
+
 .admin-logs .filter-field__input--date {
   height: 38px;
   padding: 0 10px;
-  width: 140px;
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
 }
 
 .admin-logs__filter-actions {
@@ -869,6 +878,10 @@
     grid-template-columns: 1fr 1fr;
   }
 
+  .admin-logs .filter-field--date {
+    grid-column: span 2;
+  }
+
   .admin-logs__header {
     flex-direction: column;
     align-items: flex-start;
@@ -880,11 +893,16 @@
     grid-template-columns: 1fr;
   }
 
-  .filter-field__date-group {
+  .admin-logs .filter-field--date {
+    grid-column: span 1;
+  }
+
+  .admin-logs .filter-field__date-group {
     flex-wrap: wrap;
   }
 
-  .filter-field__input--date {
+  .admin-logs .filter-field__input--date {
+    flex: 1 1 100%;
     width: 100%;
   }
 }

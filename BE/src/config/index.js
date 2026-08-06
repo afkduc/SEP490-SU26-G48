@@ -6,7 +6,24 @@ module.exports = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
   /** TTL khi tick «Ghi nhớ đăng nhập» (localStorage). */
   jwtRememberExpiresIn: process.env.JWT_REMEMBER_EXPIRES_IN || '30d',
-  frontendUrl: (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, ''),
+  /**
+   * FE URLs cho link email (quen MK, PayOS return,...).
+   * - Local: khong /crm  → http://localhost:3000
+   * - Prod:  co /crm     → https://www.autogara.site/crm
+   * FRONTEND_TARGET=local|prod chon URL chinh (nut trong email).
+   * FRONTEND_INCLUDE_BOTH_LINKS=true → email ghi ca 2 link de test.
+   * FRONTEND_URL (cu) van dung neu khong set LOCAL/PROD.
+   */
+  frontendUrlLocal: (process.env.FRONTEND_URL_LOCAL || 'http://localhost:3000').replace(/\/$/, ''),
+  frontendUrlProd: (process.env.FRONTEND_URL_PROD || 'https://www.autogara.site/crm').replace(/\/$/, ''),
+  frontendTarget: String(process.env.FRONTEND_TARGET || 'local').toLowerCase() === 'prod' ? 'prod' : 'local',
+  frontendIncludeBothLinks: process.env.FRONTEND_INCLUDE_BOTH_LINKS === 'true',
+  get frontendUrl() {
+    if (process.env.FRONTEND_URL) {
+      return String(process.env.FRONTEND_URL).replace(/\/$/, '');
+    }
+    return this.frontendTarget === 'prod' ? this.frontendUrlProd : this.frontendUrlLocal;
+  },
   mail: {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: Number(process.env.SMTP_PORT || 587),

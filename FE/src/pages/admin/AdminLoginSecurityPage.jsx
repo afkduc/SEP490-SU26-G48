@@ -314,7 +314,6 @@ export default function AdminLoginSecurityPage() {
               seedFocusIp={sessionSeed.focusIp}
               seedFocusLoginTime={sessionSeed.focusLoginTime}
               seedKey={sessionSeed.key}
-              onOpenDevicesToProcess={handleOpenDevicesToProcess}
             />
             <SecurityAlertRelatedHistory
               alert={sessionSeed.alert}

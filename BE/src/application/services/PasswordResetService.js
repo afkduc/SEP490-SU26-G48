@@ -95,7 +95,12 @@ class PasswordResetService {
       { p1: user.id, p2: tokenHash, p3: expiresMinutes }
     );
 
-    const resetUrl = `${config.frontendUrl}/reset-password?token=${rawToken}`;
+    const resetPath = `/reset-password?token=${rawToken}`;
+    const resetUrlLocal = `${config.frontendUrlLocal}${resetPath}`;
+    const resetUrlProd = `${config.frontendUrlProd}${resetPath}`;
+    const resetUrl = `${config.frontendUrl}${resetPath}`;
+    const includeBoth = config.frontendIncludeBothLinks
+      && config.frontendUrlLocal !== config.frontendUrlProd;
     const userName =
       [user.first_name, user.last_name].filter(Boolean).join(' ')
       || user.user_name
@@ -105,12 +110,16 @@ class PasswordResetService {
       to: user.email,
       userName,
       resetUrl,
+      resetUrlLocal: includeBoth ? resetUrlLocal : undefined,
+      resetUrlProd: includeBoth ? resetUrlProd : undefined,
       expiresMinutes,
     });
 
     if (!mailResult.sent) {
       console.warn(
-        `[PasswordReset] Chưa gửi được email — DEV reset link (userId=${user.id}, ip=${ip || 'n/a'}):\n${resetUrl}`
+        `[PasswordReset] Chưa gửi được email — DEV reset link (userId=${user.id}, ip=${ip || 'n/a'}):\n`
+        + `primary: ${resetUrl}\n`
+        + (includeBoth ? `local: ${resetUrlLocal}\nprod: ${resetUrlProd}\n` : '')
       );
     } else if (mailResult.previewUrl) {
       console.log(`[PasswordReset] Ethereal preview: ${mailResult.previewUrl}`);

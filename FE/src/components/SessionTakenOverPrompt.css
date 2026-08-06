@@ -193,7 +193,7 @@
 .sto-prompt__field input:focus {
   outline: none;
   border-color: #3f3f46;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 3px rgba(63, 63, 70, 0.15);
 }
 
 .sto-prompt__field em {

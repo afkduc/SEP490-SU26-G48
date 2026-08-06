@@ -296,7 +296,7 @@
 .part-detail .btn--ghost { background: transparent; color: var(--md-primary); padding: 0 12px; }
 .part-detail .btn--ghost:hover:not(:disabled) { background-color: rgba(24, 24, 27, 0.08); }
 .part-detail .btn--danger.btn--ghost { color: var(--md-error); }
-.part-detail .btn--danger.btn--ghost:hover:not(:disabled) { background-color: rgba(186, 26, 26, 0.08); }
+.part-detail .btn--danger.btn--ghost:hover:not(:disabled) { background-color: rgba(39, 39, 42, 0.08); }
 
 /* ── MD3 table ── */
 .part-detail .table-responsive {

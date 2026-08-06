@@ -70,7 +70,7 @@ export default function StockPage() {
       {/* Cảnh báo sắp hết hàng */}
       {lowStock.length > 0 && (
         <div className="stock-alert">
-          <h2 className="stock-alert__title">⚠ Cảnh báo tồn kho thấp</h2>
+          <h2 className="stock-alert__title">Cảnh báo tồn kho thấp</h2>
           <p className="stock-alert__desc">
             Có {lowStock.length} phụ tùng đang ở mức sắp hết ({'<= '} tồn tối thiểu). Cần nhập thêm hàng.
           </p>

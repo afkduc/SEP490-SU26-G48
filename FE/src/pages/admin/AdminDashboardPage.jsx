@@ -328,7 +328,7 @@ function getAlertStyle(alert) {
     || raw.includes('đăng nhập')
   ) {
     return dark
-      ? { bg: 'rgba(34,197,94,0.12)', border: '#3f3f46', color: '#a1a1aa', iconBg: 'rgba(34,197,94,0.22)' }
+      ? { bg: 'rgba(63,63,70,0.12)', border: '#3f3f46', color: '#a1a1aa', iconBg: 'rgba(63,63,70,0.22)' }
       : { bg: '#f4f4f5', border: '#a1a1aa', color: '#3f3f46', iconBg: '#e4e4e7' };
   }
   if (
@@ -343,7 +343,7 @@ function getAlertStyle(alert) {
     || raw.includes('vô hiệu')
   ) {
     return dark
-      ? { bg: 'rgba(239,68,68,0.12)', border: '#27272a', color: '#a1a1aa', iconBg: 'rgba(239,68,68,0.22)' }
+      ? { bg: 'rgba(39,39,42,0.12)', border: '#27272a', color: '#a1a1aa', iconBg: 'rgba(39,39,42,0.22)' }
       : { bg: '#e4e4e7', border: '#a1a1aa', color: '#27272a', iconBg: '#e4e4e7' };
   }
   if (

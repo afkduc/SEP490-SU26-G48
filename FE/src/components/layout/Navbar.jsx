@@ -269,15 +269,17 @@ export default function Navbar() {
           <span className="navbar__brand-text">AutoGara</span>
         </div>
 
-      <button
-        type="button"
-        className={'navbar__hamburger' + (mobileNavOpen ? ' navbar__hamburger--active' : '')}
-        aria-label={mobileNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
-        aria-expanded={mobileNavOpen}
-        onClick={() => setMobileNavOpen((v) => !v)}
-      >
-        <span /><span /><span />
-      </button>
+      {navItems.length > 0 && (
+        <button
+          type="button"
+          className={'navbar__hamburger' + (mobileNavOpen ? ' navbar__hamburger--active' : '')}
+          aria-label={mobileNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
+          aria-expanded={mobileNavOpen}
+          onClick={() => setMobileNavOpen((v) => !v)}
+        >
+          <span /><span /><span />
+        </button>
+      )}
 
       <nav className={'navbar__nav' + (mobileNavOpen ? ' navbar__nav--open' : '')}>
         {supportsDropdown

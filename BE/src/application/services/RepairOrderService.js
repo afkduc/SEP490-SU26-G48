@@ -128,6 +128,20 @@ class RepairOrderService {
     const ok = await this.repairOrderRepository.setTechnicians(id, teamLeaderId, branchId, ids);
     if (!ok) throw new ApiError(400, 'Thợ không hợp lệ hoặc đang bận lệnh sửa chữa khác');
 
+    // Realtime: ban dau claim() da chuyen phieu goc sang 'inprogress' ngay
+    // luc chon khoang (truoc khi co tho), nhung man Phieu quyet toan cua CVDV
+    // chi thuc su hien "Đang sửa chữa" tu luc co tho (xem FE displayStatus) -
+    // phat lai 'claimed' (da co san trong RELEVANT_TYPES cua sseRoutes.js) de
+    // CVDV thay ngay, khong doi den vong poll tiep theo.
+    emitRepairOrderEvent(branchId, 'claimed', {
+      teamLeaderId,
+      orderId: Number(id),
+      settlementId: existing.serviceOrderId,
+      code: existing.code,
+      bayId: existing.bayId,
+      bayNumber: existing.bayNumber,
+    });
+
     return this.getById(id);
   }
 
@@ -146,7 +160,11 @@ class RepairOrderService {
     }
     // Chi dau muc "dich vu" (task_type='service') can tich - phu tung
     // (task_type='product') chi de hien thi, khong tinh vao dieu kien hoan thanh.
-    if (status === 'completed' && existing.tasks.some((t) => t.taskType === 'service' && !t.isDone)) {
+    // Dau muc bi khach huy giua chung (isCancelled) khong the tick (xem
+    // updateTaskStatus/FE khoa checkbox) nen cung phai loai khoi dieu kien nay,
+    // neu khong lenh se vinh vien khong hoan thanh duoc sau khi CVDV huy 1
+    // hang muc - xem BayScreen.jsx/TeamLeaderDashboard.jsx allDone.
+    if (status === 'completed' && existing.tasks.some((t) => t.taskType === 'service' && !t.isCancelled && !t.isDone)) {
       throw new ApiError(409, 'Cần tích hoàn thành tất cả đầu mục công việc trước khi kết thúc lệnh');
     }
 

@@ -49,17 +49,38 @@ function playUpdateChime() {
 // ngoac KHONG duoc gach ngang, va text-decoration cua 1 the cha se "xuyen
 // qua" moi span con du con tu dat text-decoration:none, nen khong the chi
 // gop chung vao 1 chuoi roi gach ngang ca <label>/div cha.
+// So luong GIAM so voi prev_quantity (khach hoan tra bot, khong phai huy han)
+// - "SL xN" la CHENH LECH (khac "tổng là: N" cua truong hop TANG, vi TANG chi
+// can biet tong moi con GIAM can biet ro tra lai bao nhieu). Giam het ve 0 (ma
+// van chua qua "Khách hủy" chinh thuc, vd phu tung thao tra lai kho) thi coi
+// nhu da tra lai toan bo - gach ngang giong isCancelled - xem BE
+// RepairSettlementRepositoryImpl._syncRepairOrderTasks.
+function qtyReturnedOf(t) {
+  return t.prevQuantity != null && Number(t.quantity) < Number(t.prevQuantity)
+    ? Number(t.prevQuantity) - Number(t.quantity)
+    : 0;
+}
+function isFullyReturned(t) {
+  return !t.isCancelled && qtyReturnedOf(t) > 0 && Number(t.quantity) === 0;
+}
+function isStruckThrough(t) {
+  return t.isCancelled || isFullyReturned(t);
+}
+
 function TaskNameLabel({ t }) {
+  const qtyReturned = qtyReturnedOf(t);
   const suffix = t.isCancelled
     ? " (Khách hủy)"
-    : t.isQtyIncreased
-      ? ` (Khách thêm số lượng, tổng là: ${t.quantity})`
-      : t.isAddedLater
-        ? " (Khách thêm)"
-        : "";
+    : qtyReturned > 0
+      ? ` (Khách trả lại SL x${qtyReturned})`
+      : t.isQtyIncreased
+        ? ` (Khách thêm số lượng, tổng là: ${t.quantity})`
+        : t.isAddedLater
+          ? " (Khách thêm)"
+          : "";
   return (
     <>
-      <span style={{ textDecoration: t.isCancelled ? "line-through" : "none" }}>{t.taskName}</span>
+      <span style={{ textDecoration: isStruckThrough(t) ? "line-through" : "none" }}>{t.taskName}</span>
       {suffix && <span style={{ textDecoration: "none" }}>{suffix}</span>}
     </>
   );
@@ -94,7 +115,7 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
         {serviceTasks.map((task) => (
           <label
             key={task.id}
-            className={`${styles.task} ${task.isCancelled ? styles.taskCancelled : (task.isDone ? styles.taskDone : "")}`}
+            className={`${styles.task} ${isStruckThrough(task) ? styles.taskCancelled : (task.isDone ? styles.taskDone : "")}`}
           >
             <input
               type="checkbox"
@@ -102,7 +123,13 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
               disabled={busyTaskId === task.id || task.isDone || task.isCancelled}
               onChange={() => onTaskDone(task)}
             />
-            <TaskNameLabel t={task} />
+            <div className={styles.taskBody}>
+              <div className={styles.taskNameRow}>
+                <TaskNameLabel t={task} />
+                {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
+              </div>
+              {task.note && <div className={styles.taskNote}>{task.note}</div>}
+            </div>
           </label>
         ))}
       </div>
@@ -112,8 +139,13 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
           <div className={styles.jobSectionTitle}>Phụ tùng cần dùng</div>
           <div className={styles.jobPartlist}>
             {partTasks.map((task) => (
-              <div key={task.id} className={`${styles.partRow} ${task.isCancelled ? styles.taskCancelled : ""}`}>
-                <TaskNameLabel t={task} />
+              <div key={task.id} className={`${styles.partRow} ${isStruckThrough(task) ? styles.taskCancelled : ""}`}>
+                <div className={styles.taskBody}>
+                  <div className={styles.taskNameRow}>
+                    <TaskNameLabel t={task} />
+                  </div>
+                  {task.note && <div className={styles.taskNote}>{task.note}</div>}
+                </div>
                 {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
               </div>
             ))}

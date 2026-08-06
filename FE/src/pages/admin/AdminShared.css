@@ -175,7 +175,7 @@
 .input--error,
 .input.is-error {
   border-color: var(--ag-danger);
-  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.15);
+  box-shadow: 0 0 0 3px rgba(39, 39, 42, 0.15);
 }
 
 .input--date {

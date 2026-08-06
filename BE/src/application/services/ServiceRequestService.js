@@ -3,6 +3,7 @@ const ServiceRequestResponseDto = require('../dto/ServiceRequestDto');
 const { emitServiceRequestEvent } = require('../events/ServiceRequestEvents');
 const BranchRepositoryImpl = require('../../infrastructure/repositories/BranchRepositoryImpl');
 const { query } = require('../../infrastructure/database/sqlServer');
+const { isValidPhone, isValidEmail, EMAIL_HINT } = require('../../utils/fieldValidation');
 
 // service_packages luu rieng theo tung chi nhanh (gia co the khac nhau) -
 // dung chi nhanh id=1 (Ha Noi, dang co du lieu goi day du nhat) lam gia
@@ -106,6 +107,8 @@ class ServiceRequestService {
 
     if (!fullName) throw new ApiError(400, 'Vui lòng nhập họ và tên');
     if (!phone) throw new ApiError(400, 'Vui lòng nhập số điện thoại');
+    if (!isValidPhone(phone)) throw new ApiError(400, 'Số điện thoại không hợp lệ');
+    if ((payload.email || '').trim() && !isValidEmail(payload.email)) throw new ApiError(400, EMAIL_HINT);
     if (!issue) throw new ApiError(400, 'Vui lòng mô tả vấn đề xe đang gặp phải');
     if (!nearestBranchId) throw new ApiError(400, 'Vui lòng chọn chi nhánh gần bạn nhất');
 
