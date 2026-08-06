@@ -17,6 +17,15 @@ class RepairSettlement {
     // Lenh sua chua dang hien hanh cua phieu nay (null neu chua gan to
     // truong) - dung de CVDV huy truc tiep tu man Phieu quyet toan.
     this.repairOrderId = data.repairOrderId ?? null;
+    // So khoang xe dang thuc hien lenh sua chua nay (vehicle_bays.bay_number
+    // qua repair_orders.bay_id) - null neu chua gan to truong/khoang.
+    this.bayNumber = data.bayNumber ?? null;
+    // Da co it nhat 1 dau muc cua lenh sua chua nay duoc tick hoan thanh -
+    // dung de khoa nut "Huy" o man danh sach khi dang "inprogress" (xem
+    // RepairSettlementService.updateStatus).
+    this.hasCompletedTask = data.hasCompletedTask ?? false;
+    // Da gan tho thuc hien chua - xem HEADER_SELECT/FE displayStatus().
+    this.hasTechnicians = data.hasTechnicians ?? false;
     this.customerRequest = data.customerRequest ?? null;
     this.currentKm = data.currentKm ?? null;
     this.status = data.status ?? 'waiting_repair';
@@ -68,6 +77,9 @@ class RepairSettlement {
       teamLeaderId: headerRow.team_leader_id,
       teamLeaderName: headerRow.team_leader_name,
       repairOrderId: headerRow.repair_order_id,
+      bayNumber: headerRow.bay_number,
+      hasCompletedTask: Boolean(headerRow.has_completed_task),
+      hasTechnicians: Boolean(headerRow.has_technicians),
       customerRequest: headerRow.customer_request,
       currentKm: headerRow.current_km,
       status: headerRow.status,
@@ -129,17 +141,25 @@ class RepairSettlement {
         discount: r.discount_pct,
         isFree: Boolean(r.is_free),
         total: r.total,
+        note: r.note ?? null,
       })),
       tasks: taskRows.map((r) => ({
         id: r.id,
         taskName: r.task_name,
         taskType: r.task_type,
+        quantity: r.quantity,
         isDone: Boolean(r.is_done),
+        isCancelled: Boolean(r.is_cancelled),
+        isAddedLater: Boolean(r.is_added_later),
+        isQtyIncreased: Boolean(r.is_qty_increased),
+        prevQuantity: r.prev_quantity ?? null,
+        note: r.note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,
         fullName: r.user_name,
         phone: r.phone,
+        sameTeam: Boolean(r.same_team),
       })),
     });
   }

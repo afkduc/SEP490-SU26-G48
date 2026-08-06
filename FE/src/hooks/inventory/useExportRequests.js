@@ -9,7 +9,7 @@ import { getExportRequestsApi } from '../../services/exportRequestApi';
 export function useExportRequests(initialBranchId) {
   const [params, setParams] = useState({
     branchId: initialBranchId,
-    status: '',
+    status: 'completed',
     serviceOrderId: '',
     fromDate: '',
     toDate: '',

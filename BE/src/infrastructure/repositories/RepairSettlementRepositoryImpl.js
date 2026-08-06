@@ -3,7 +3,7 @@ const RepairSettlement = require('../../domain/entities/RepairSettlement');
 const { query, sql } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
 const { nowVN } = require('../../utils/dateVN');
-const { buildDesiredTasks } = require('./repairOrderTaskBuilder');
+const { buildDesiredTasks, computeDesiredTasks, loadPackageServiceNames, packageCodesNeeding, PACKAGE_SERVICES_SQL } = require('./repairOrderTaskBuilder');
 
 // Cot join dung chung cho findAll/findById - lay du thong tin khach hang,
 // xe (kem ngay mua tu warranty_records), co van dich vu va to truong.
@@ -19,7 +19,9 @@ const HEADER_SELECT = `
          c.contact_name  AS customer_contact_name,
          c.contact_phone AS customer_contact_phone,
          v.license_plate      AS vehicle_license_plate,
-         v.vehicle_model_text,
+         CASE WHEN vbrand.brand_name IS NOT NULL AND vbrand.brand_name <> N''
+              THEN vbrand.brand_name + N' ' + v.vehicle_model_text
+              ELSE v.vehicle_model_text END AS vehicle_model_text,
          v.frame_number       AS vehicle_frame_number,
          v.engine_number      AS vehicle_engine_number,
          v.current_km         AS vehicle_current_km,
@@ -28,11 +30,28 @@ const HEADER_SELECT = `
          adv.phone     AS advisor_phone,
          tl.user_name  AS team_leader_name,
          inv.issued_at AS invoice_issued_at,
-         ro.id         AS repair_order_id
+         ro.id         AS repair_order_id,
+         vb.bay_number AS bay_number,
+         -- Da co it nhat 1 dau muc duoc tick hoan thanh chua - dung de FE
+         -- khoa nut "Huy" o man danh sach (xem RepairSettlementService
+         -- .updateStatus, BE cung tu chan lai neu co goi thang API).
+         CASE WHEN EXISTS (
+           SELECT 1 FROM repair_order_tasks rot
+           WHERE rot.repair_order_id = ro.id AND rot.is_done = 1
+         ) THEN 1 ELSE 0 END AS has_completed_task,
+         -- Da gan tho thuc hien chua - claim() chuyen status sang 'inprogress'
+         -- ngay luc chon khoang (truoc ca khi gan tho, de khoa khong cho to
+         -- truong khac nhan trung), nhung ben man CVDV chi nen hien "Đang sửa
+         -- chữa" tu luc THUC SU co tho cam may - xem FE displayStatus().
+         CASE WHEN EXISTS (
+           SELECT 1 FROM repair_order_technicians rot2
+           WHERE rot2.repair_order_id = ro.id
+         ) THEN 1 ELSE 0 END AS has_technicians
   FROM   service_orders so
   JOIN   branches  b   ON b.id = so.branch_id
   JOIN   customers c   ON c.id = so.customer_id
   JOIN   vehicles  v   ON v.id = so.vehicle_id
+  LEFT JOIN brands vbrand ON vbrand.id = v.brand_id
   JOIN   users     adv ON adv.id = so.advisor_id
   LEFT JOIN users  tl  ON tl.id = so.team_leader_id
   OUTER APPLY (
@@ -52,11 +71,12 @@ const HEADER_SELECT = `
       -- RepairOrderRepositoryImpl.findByServiceOrderCode ly do tuong tu) -
       -- dung de CVDV huy truc tiep tu man Phieu quyet toan khi phieu dang
       -- "inprogress", khong can qua man "Lenh sua chua" (da bo).
-      SELECT TOP 1 r.id
+      SELECT TOP 1 r.id, r.bay_id
       FROM   repair_orders r
       WHERE  r.service_order_id = so.id AND r.status <> 'cancelled'
       ORDER  BY r.id DESC
   ) ro
+  LEFT JOIN vehicle_bays vb ON vb.id = ro.bay_id
 `;
 
 function genCode(prefix, id) {
@@ -158,7 +178,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     // Chi co khi phieu da duoc gan to truong (co repair_order) - de co van xem
     // duoc tien do tung dau viec To truong da tich, khong can qua man rieng.
     const tasksResult = await query(
-      `SELECT rot.id, rot.task_name, rot.task_type, rot.is_done
+      `SELECT rot.id, rot.task_name, rot.task_type, rot.quantity, rot.is_done, rot.is_cancelled, rot.is_added_later, rot.is_qty_increased, rot.prev_quantity, rot.note
        FROM   repair_order_tasks rot
        JOIN   repair_orders ro ON ro.id = rot.repair_order_id
        WHERE  ro.service_order_id = @id
@@ -169,14 +189,18 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     // Tho thuc hien (co the nhieu tho) - dung DUNG lenh sua chua dang hien
     // hanh (header.repair_order_id, xem HEADER_SELECT OUTER APPLY) de khop
     // voi "To truong" hien cung tren man, tranh gop nham tho tu 1 lenh cu da huy.
+    // same_team: tho nay co cung to voi to truong dang phu trach lenh sua
+    // chua nay khong (khac to nghia la duoc dieu dong sang giup - xem FE
+    // formatTechnicianLabel).
     const techniciansResult = header.repair_order_id
       ? await query(
-          `SELECT u.id, u.user_name, u.phone
+          `SELECT u.id, u.user_name, u.phone,
+                  CASE WHEN u.team_leader_id = @teamLeaderId THEN 1 ELSE 0 END AS same_team
            FROM   repair_order_technicians rot
            JOIN   users u ON u.id = rot.technician_id
            WHERE  rot.repair_order_id = @repairOrderId
            ORDER  BY u.user_name ASC`,
-          { repairOrderId: header.repair_order_id }
+          { repairOrderId: header.repair_order_id, teamLeaderId: header.team_leader_id }
         )
       : { recordset: [] };
 
@@ -340,6 +364,57 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return this.findById(id);
   }
 
+  // Kiem tra doi HTTT/xoa hang muc trong payload MOI co lam "bien mat" 1 dau
+  // muc DA duoc to truong/tho tick hoan thanh hay khong - goi TRUOC khi luu
+  // that (RepairSettlementService.update), khong tin rieng validation phia
+  // FE. Chi co y nghia khi phieu dang co lenh sua chua "inprogress" (da co
+  // tasks) - tra ve false neu chua ai nhan hoac chua tick gi (khong co gi de mat).
+  async wouldLoseCompletedTasks(serviceOrderId, newItems) {
+    const roResult = await query(
+      `SELECT id FROM repair_orders WHERE service_order_id = @serviceOrderId AND status = 'inprogress'`,
+      { serviceOrderId }
+    );
+    const repairOrder = roResult.recordset[0];
+    if (!repairOrder) return false;
+
+    const doneResult = await query(
+      `SELECT task_name, task_type, product_id FROM repair_order_tasks WHERE repair_order_id = @repairOrderId AND is_done = 1`,
+      { repairOrderId: repairOrder.id }
+    );
+    if (doneResult.recordset.length === 0) return false;
+
+    const items = newItems.map((it) => ({
+      lhsc: it.lhsc,
+      serviceId: it.serviceId,
+      itemCode: it.code,
+      description: it.description,
+      productId: it.productId,
+      quantity: it.qty,
+      unitPrice: it.unitPrice,
+      httt: it.httt,
+    }));
+
+    const packageServiceNamesByCode = await loadPackageServiceNames(
+      (code) => query(PACKAGE_SERVICES_SQL, { code }).then((r) => r.recordset),
+      packageCodesNeeding(items)
+    );
+    const desired = computeDesiredTasks(items, packageServiceNamesByCode);
+    const keyOf = (taskType, taskName, productId) => `${taskType}|${taskName}|${productId || ''}`;
+    // Hang muc huy (isCancelled) van giu nguyen key trong desired (khong bien
+    // mat nua - xem repairOrderTaskBuilder.js) nen phai check RIENG: 1 dau
+    // muc DA hoan thanh se "mat" ca khi key bien mat HOAN TOAN LAN khi key con
+    // nhung bi lat sang trang thai huy - ca 2 truong hop deu phai chan.
+    const desiredCancelledKeys = new Set(
+      desired.filter((t) => t.isCancelled).map((t) => keyOf(t.taskType, t.taskName, t.productId))
+    );
+    const desiredKeys = new Set(desired.map((t) => keyOf(t.taskType, t.taskName, t.productId)));
+
+    return doneResult.recordset.some((t) => {
+      const key = keyOf(t.task_type, t.task_name, t.product_id);
+      return !desiredKeys.has(key) || desiredCancelledKeys.has(key);
+    });
+  }
+
   // Co van sua phieu quyet toan (them/bot hang muc) sau khi da gan to truong
   // -> dong bo lai checklist ben To truong (repair_order_tasks) cho khop, thay
   // vi de nguyen danh sach cu tu luc gan viec. Chi dong bo khi lenh sua chua
@@ -358,15 +433,40 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     const existingResult = await tx
       .request()
       .input('repairOrderId', sql.BigInt, repairOrder.id)
-      .query(`SELECT id, task_name, task_type, product_id FROM repair_order_tasks WHERE repair_order_id = @repairOrderId`);
+      .query(`SELECT id, task_name, task_type, product_id, quantity, is_cancelled, note FROM repair_order_tasks WHERE repair_order_id = @repairOrderId`);
     const existing = existingResult.recordset;
 
     const keyOf = (taskType, taskName, productId) => `${taskType}|${taskName}|${productId || ''}`;
-    const existingKeys = new Set(existing.map((t) => keyOf(t.task_type, t.task_name, t.product_id)));
-    const desiredKeys = new Set(desired.map((t) => keyOf(t.taskType, t.taskName, t.productId)));
+    const desiredByKey = new Map(desired.map((t) => [keyOf(t.taskType, t.taskName, t.productId), t]));
+    const existingByKey = new Map(existing.map((t) => [keyOf(t.task_type, t.task_name, t.product_id), t]));
 
-    const toDelete = existing.filter((t) => !desiredKeys.has(keyOf(t.task_type, t.task_name, t.product_id)));
-    const toInsert = desired.filter((t) => !existingKeys.has(keyOf(t.taskType, t.taskName, t.productId)));
+    const toDelete = existing.filter((t) => !desiredByKey.has(keyOf(t.task_type, t.task_name, t.product_id)));
+    // Task moi xuat hien qua 1 lan SUA phieu (khong phai luc nhan viec lan
+    // dau) - danh dau is_added_later=1 de FE hien "(Khach them)".
+    const toInsert = desired.filter((t) => !existingByKey.has(keyOf(t.taskType, t.taskName, t.productId)));
+    // Task cu con giu key nhung trang thai huy thay doi (vua bi huy, hoac
+    // hiem hon la duoc "un-huy") - chi cap nhat co is_cancelled, giu nguyen
+    // is_done/is_added_later da co.
+    const toUpdateCancelled = existing.filter((t) => {
+      const d = desiredByKey.get(keyOf(t.task_type, t.task_name, t.product_id));
+      return d && Boolean(t.is_cancelled) !== Boolean(d.isCancelled);
+    });
+    // Task cu con giu key nhung so luong doi khac (vd khach dang thay 1 lop,
+    // sau muon thay them 3 lop nua -> tong 4) - cap nhat quantity/unit_price
+    // theo so luong moi, VA lat is_qty_increased tuong ung (1 neu TANG so voi
+    // truoc do FE hien "(Khach them so luong, tong la: N)"; 0 neu giam/bang -
+    // tu "quen" lan tang cu neu sau do CVDV dieu chinh giam lai, tranh nham
+    // hien nhan sai khi so luong da tro ve muc binh thuong).
+    const toUpdateQty = existing.filter((t) => {
+      const d = desiredByKey.get(keyOf(t.task_type, t.task_name, t.product_id));
+      return d && !d.isCancelled && Number(d.quantity || 0) !== Number(t.quantity || 0);
+    });
+    // Ghi chu doi rieng (khong lien quan so luong/huy) - CVDV sua lai luu y
+    // cho tho tren 1 hang muc da co san.
+    const toUpdateNote = existing.filter((t) => {
+      const d = desiredByKey.get(keyOf(t.task_type, t.task_name, t.product_id));
+      return d && (d.note || null) !== (t.note || null);
+    });
 
     for (const t of toDelete) {
       await tx.request().input('id', sql.BigInt, t.id).query(`DELETE FROM repair_order_tasks WHERE id = @id`);
@@ -381,10 +481,47 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('productId', sql.BigInt, t.productId || null)
         .input('quantity', sql.Int, t.quantity || 0)
         .input('unitPrice', sql.Decimal(18, 2), t.unitPrice || 0)
+        .input('isCancelled', sql.Bit, t.isCancelled ? 1 : 0)
+        .input('note', sql.NVarChar(500), t.note || null)
         .query(`
-          INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done)
-          VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0)
+          INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done, is_cancelled, is_added_later, note)
+          VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0, @isCancelled, 1, @note)
         `);
+    }
+
+    for (const t of toUpdateCancelled) {
+      const d = desiredByKey.get(keyOf(t.task_type, t.task_name, t.product_id));
+      await tx
+        .request()
+        .input('id', sql.BigInt, t.id)
+        .input('isCancelled', sql.Bit, d.isCancelled ? 1 : 0)
+        .query(`UPDATE repair_order_tasks SET is_cancelled = @isCancelled WHERE id = @id`);
+    }
+
+    for (const t of toUpdateQty) {
+      const d = desiredByKey.get(keyOf(t.task_type, t.task_name, t.product_id));
+      const increased = Number(d.quantity || 0) > Number(t.quantity || 0);
+      await tx
+        .request()
+        .input('id', sql.BigInt, t.id)
+        .input('quantity', sql.Int, d.quantity || 0)
+        .input('unitPrice', sql.Decimal(18, 2), d.unitPrice || 0)
+        .input('isQtyIncreased', sql.Bit, increased ? 1 : 0)
+        // prev_quantity = so luong TRUOC lan doi nay (t.quantity, chua bi ghi
+        // de) - FE dung de tinh chenh lech khi GIAM ("Khách trả lại SL xN"),
+        // xem TaskNameLabel. Moi lan doi tiep theo se ghi de tiep, luon phan
+        // anh dung mac ngay truoc lan sua gan nhat (khong phai lich su day du).
+        .input('prevQuantity', sql.Int, t.quantity ?? null)
+        .query(`UPDATE repair_order_tasks SET quantity = @quantity, unit_price = @unitPrice, is_qty_increased = @isQtyIncreased, prev_quantity = @prevQuantity WHERE id = @id`);
+    }
+
+    for (const t of toUpdateNote) {
+      const d = desiredByKey.get(keyOf(t.task_type, t.task_name, t.product_id));
+      await tx
+        .request()
+        .input('id', sql.BigInt, t.id)
+        .input('note', sql.NVarChar(500), d.note || null)
+        .query(`UPDATE repair_order_tasks SET note = @note WHERE id = @id`);
     }
   }
 
@@ -498,14 +635,15 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('discountPct', sql.Decimal(5, 2), item.discount || 0)
         .input('isFree', sql.Bit, Boolean(item.isFree))
         .input('total', sql.Decimal(18, 2), item.total || 0)
+        .input('note', sql.NVarChar(500), (item.note || '').trim() || null)
         .query(`
           INSERT INTO service_order_items (
             service_order_id, item_type, product_id, service_id, item_code, item_description,
-            lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total
+            lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total, note
           )
           VALUES (
             @serviceOrderId, @itemType, @productId, @serviceId, @itemCode, @itemDescription,
-            @lhsc, @httt, @repairCategory, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total
+            @lhsc, @httt, @repairCategory, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total, @note
           )
         `);
     }

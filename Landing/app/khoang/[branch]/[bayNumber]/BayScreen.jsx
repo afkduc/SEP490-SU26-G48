@@ -8,19 +8,97 @@ import styles from "../../kiosk.module.css";
 
 const POLL_INTERVAL_MS = 15000;
 
+// Bao hieu am thanh khi CVDV vua sua phieu quyet toan giua chung (khach them/
+// huy hang muc) - thong bao cho tho dang cui lam viec, khong can nhin man
+// hinh moi biet. Dung Web Audio API tu tao 3 tieng "bip" lien tiep (song
+// vuong, gion tai hon sine), am to ro rang - khong can file am thanh rieng.
+// Best-effort - trinh duyet co the chan am thanh tu dong neu trang chua co
+// tuong tac nao cua nguoi dung tu truoc, bo qua loi im lang.
+function playUpdateChime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const beep = (startAt) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.value = 1000;
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.6, startAt + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.19);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startAt);
+      osc.stop(startAt + 0.2);
+    };
+    const now = ctx.currentTime;
+    beep(now);
+    beep(now + 0.28);
+    beep(now + 0.56);
+    setTimeout(() => ctx.close(), 1000);
+  } catch {
+    /* bo qua - vd trinh duyet chan autoplay am thanh */
+  }
+}
+
+// Hien thi 1 dau muc - hang muc bi khach huy giua chung (isCancelled) hoac
+// moi duoc CVDV them vao SAU luc nhan viec (isAddedLater) ghi ro o cuoi ten,
+// xem BE repairOrderTaskBuilder.js/computeDesiredTasks. Tach ten (co gach
+// ngang neu huy) voi phan mo ngoac cuoi ten thanh 2 <span> ANH EM - phan mo
+// ngoac KHONG duoc gach ngang, va text-decoration cua 1 the cha se "xuyen
+// qua" moi span con du con tu dat text-decoration:none, nen khong the chi
+// gop chung vao 1 chuoi roi gach ngang ca <label>/div cha.
+// So luong GIAM so voi prev_quantity (khach hoan tra bot, khong phai huy han)
+// - "SL xN" la CHENH LECH (khac "tổng là: N" cua truong hop TANG, vi TANG chi
+// can biet tong moi con GIAM can biet ro tra lai bao nhieu). Giam het ve 0 (ma
+// van chua qua "Khách hủy" chinh thuc, vd phu tung thao tra lai kho) thi coi
+// nhu da tra lai toan bo - gach ngang giong isCancelled - xem BE
+// RepairSettlementRepositoryImpl._syncRepairOrderTasks.
+function qtyReturnedOf(t) {
+  return t.prevQuantity != null && Number(t.quantity) < Number(t.prevQuantity)
+    ? Number(t.prevQuantity) - Number(t.quantity)
+    : 0;
+}
+function isFullyReturned(t) {
+  return !t.isCancelled && qtyReturnedOf(t) > 0 && Number(t.quantity) === 0;
+}
+function isStruckThrough(t) {
+  return t.isCancelled || isFullyReturned(t);
+}
+
+function TaskNameLabel({ t }) {
+  const qtyReturned = qtyReturnedOf(t);
+  const suffix = t.isCancelled
+    ? " (Khách hủy)"
+    : qtyReturned > 0
+      ? ` (Khách trả lại SL x${qtyReturned})`
+      : t.isQtyIncreased
+        ? ` (Khách thêm số lượng, tổng là: ${t.quantity})`
+        : t.isAddedLater
+          ? " (Khách thêm)"
+          : "";
+  return (
+    <>
+      <span style={{ textDecoration: isStruckThrough(t) ? "line-through" : "none" }}>{t.taskName}</span>
+      {suffix && <span style={{ textDecoration: "none" }}>{suffix}</span>}
+    </>
+  );
+}
+
 function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing }) {
   const tasks = order.tasks || [];
   const serviceTasks = tasks.filter((t) => t.taskType === "service");
   const partTasks = tasks.filter((t) => t.taskType !== "service");
-  const doneCount = serviceTasks.filter((t) => t.isDone).length;
-  const allDone = serviceTasks.length > 0 && doneCount === serviceTasks.length;
+  const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
+  const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
+  const allDone = activeServiceTasks.length > 0 && doneCount === activeServiceTasks.length;
 
   return (
     <div className={styles.job}>
       <div className={styles.jobHeader}>
         <div>
-          <div className={styles.jobCode}>{order.code}</div>
-          <div className={styles.jobCustomer}>{order.customer?.fullName}</div>
+          <div className={styles.jobCustomer}>Khách hàng: <b>{order.customer?.fullName}</b></div>
           <div className={styles.jobVehicle}>{order.vehicle?.licensePlate} · {order.vehicle?.vehicleModel}</div>
           {order.technicians?.length > 0 && (
             <div className={styles.jobTechnician}>
@@ -32,17 +110,26 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
 
       {order.notes && <div className={styles.jobNotes}>{order.notes}</div>}
 
-      <div className={styles.jobSectionTitle}>Đầu mục công việc ({doneCount}/{serviceTasks.length})</div>
+      <div className={styles.jobSectionTitle}>Đầu mục công việc ({doneCount}/{activeServiceTasks.length})</div>
       <div className={styles.jobTasklist}>
         {serviceTasks.map((task) => (
-          <label key={task.id} className={`${styles.task} ${task.isDone ? styles.taskDone : ""}`}>
+          <label
+            key={task.id}
+            className={`${styles.task} ${isStruckThrough(task) ? styles.taskCancelled : (task.isDone ? styles.taskDone : "")}`}
+          >
             <input
               type="checkbox"
               checked={task.isDone}
-              disabled={busyTaskId === task.id || task.isDone}
+              disabled={busyTaskId === task.id || task.isDone || task.isCancelled}
               onChange={() => onTaskDone(task)}
             />
-            <span>{task.taskName}</span>
+            <div className={styles.taskBody}>
+              <div className={styles.taskNameRow}>
+                <TaskNameLabel t={task} />
+                {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
+              </div>
+              {task.note && <div className={styles.taskNote}>{task.note}</div>}
+            </div>
           </label>
         ))}
       </div>
@@ -52,8 +139,13 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
           <div className={styles.jobSectionTitle}>Phụ tùng cần dùng</div>
           <div className={styles.jobPartlist}>
             {partTasks.map((task) => (
-              <div key={task.id} className={styles.partRow}>
-                <span>{task.taskName}</span>
+              <div key={task.id} className={`${styles.partRow} ${isStruckThrough(task) ? styles.taskCancelled : ""}`}>
+                <div className={styles.taskBody}>
+                  <div className={styles.taskNameRow}>
+                    <TaskNameLabel t={task} />
+                  </div>
+                  {task.note && <div className={styles.taskNote}>{task.note}</div>}
+                </div>
                 {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
               </div>
             ))}
@@ -140,8 +232,20 @@ export default function BayScreen({ slug, bayNumber }) {
       // To truong vua nhan + gan xong cho dung khoang nay tu tai khoan cua
       // ho - nap lai bay de chuyen sang man viec dang lam.
       refreshBay();
+      return;
     }
-  }, [bay?.id, bay?.activeRepairOrderId, refreshBay]);
+    if (event.type === "task-updated" && event.orderId === bay?.activeRepairOrderId) {
+      // Checklist cua dung lenh dang hien vua doi - co the do to truong/tho
+      // tu tick (event.taskId co gia tri) hoac do CVDV sua phieu giua chung
+      // (event.taskId = null, xem RepairSettlementService.update) - vd khach
+      // them/huy hang muc. Chi phat am bao cho truong hop CVDV sua phieu -
+      // tho dang tu tick tren chinh man hinh nay thi khong can bao lai chinh ho.
+      if (event.taskId == null) {
+        playUpdateChime();
+      }
+      loadActiveOrder();
+    }
+  }, [bay?.id, bay?.activeRepairOrderId, refreshBay, loadActiveOrder]);
 
   // Realtime - kenh public rieng cho man khoang xe, xem sseRoutes.js
   // /sse/bay-board. Kem poll 15s lam luoi an toan phong khi mat ket noi SSE
