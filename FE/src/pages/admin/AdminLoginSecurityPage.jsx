@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useCrmSearchSync } from '../../utils/crmUrl';
 import AdminLoginSessionsPage from './AdminLoginSessionsPage';
 import AdminDevicesPage from './AdminDevicesPage';
 import SecurityAlertsPanel from './SecurityAlertsPanel';
@@ -54,7 +55,8 @@ function resolveTab(rawTab) {
  * 4. Bảng «các lần cùng loại» chỉ hiện khi ≥ 2 lần
  */
 export default function AdminLoginSecurityPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const syncSearch = useCrmSearchSync();
   const activeTab = resolveTab(searchParams.get('tab'));
   const [urgentCount, setUrgentCount] = useState(0);
   const [alertsExpanded, setAlertsExpanded] = useState(
@@ -87,14 +89,14 @@ export default function AdminLoginSecurityPage() {
 
   useEffect(() => {
     if (searchParams.get('tab') !== 'alerts') return;
-    setSearchParams((prev) => {
+    syncSearch((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('tab');
       next.set('alerts', '1');
       return next;
     }, { replace: true });
     setAlertsExpanded(true);
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, syncSearch]);
 
   // Deep-link từ chuông thông báo: ?userId=&search=&ip=&tab=devices|sessions
   useEffect(() => {
@@ -126,7 +128,7 @@ export default function AdminLoginSecurityPage() {
       }));
     }
 
-    setSearchParams((prev) => {
+    syncSearch((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('userId');
       next.delete('search');
@@ -138,24 +140,24 @@ export default function AdminLoginSecurityPage() {
   }, [searchParams.get('userId'), searchParams.get('search'), searchParams.get('ip'), searchParams.get('tab')]);
 
   const setActiveTab = useCallback((tab) => {
-    setSearchParams((prev) => {
+    syncSearch((prev) => {
       const next = new URLSearchParams(prev);
       if (tab === 'devices') next.delete('tab');
       else next.set('tab', tab);
       if (tab === 'sessions') next.delete('alerts');
       return next;
     });
-  }, [setSearchParams]);
+  }, [syncSearch]);
 
   const handleAlertsExpanded = useCallback((open) => {
     setAlertsExpanded(open);
-    setSearchParams((prev) => {
+    syncSearch((prev) => {
       const next = new URLSearchParams(prev);
       if (open) next.set('alerts', '1');
       else next.delete('alerts');
       return next;
     });
-  }, [setSearchParams]);
+  }, [syncSearch]);
 
   const handleCounts = useCallback((countsOrTotal) => {
     if (countsOrTotal && typeof countsOrTotal === 'object') {
@@ -314,7 +316,6 @@ export default function AdminLoginSecurityPage() {
               seedFocusIp={sessionSeed.focusIp}
               seedFocusLoginTime={sessionSeed.focusLoginTime}
               seedKey={sessionSeed.key}
-              onOpenDevicesToProcess={handleOpenDevicesToProcess}
             />
             <SecurityAlertRelatedHistory
               alert={sessionSeed.alert}
