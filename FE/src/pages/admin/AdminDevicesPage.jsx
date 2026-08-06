@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AppContext';
 import { useToast } from '../../components/common/ToastContext';
 import { formatDateSafe } from '../../utils/dateUtils';
 import { pickLatestDevice } from './securityAlertFocus';
-import { nextDateRangeState } from '../../utils/dateRange';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './AdminDevicesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -574,34 +574,16 @@ export default function AdminDevicesPage({
             onChange={(e) => setOsFilter(e.target.value)}
           />
           <div className="admin-devices__filter-group admin-devices__filter-group--date">
-            <input
-              type="date"
-              className="admin-devices__date"
-              value={dateFrom}
-              onChange={(e) => {
-                const next = nextDateRangeState('start', e.target.value, {
-                  startDate: dateFrom,
-                  endDate: dateTo,
-                });
-                setDateFrom(next.startDate);
-                setDateTo(next.endDate);
+            <DateRangeInputs
+              startDate={dateFrom}
+              endDate={dateTo}
+              onChange={({ startDate, endDate }) => {
+                setDateFrom(startDate);
+                setDateTo(endDate);
               }}
-              title="Từ ngày"
-            />
-            <span className="admin-devices__date-sep">—</span>
-            <input
-              type="date"
-              className="admin-devices__date"
-              value={dateTo}
-              onChange={(e) => {
-                const next = nextDateRangeState('end', e.target.value, {
-                  startDate: dateFrom,
-                  endDate: dateTo,
-                });
-                setDateFrom(next.startDate);
-                setDateTo(next.endDate);
-              }}
-              title="Đến ngày"
+              className="admin-devices__date-range"
+              inputClassName="admin-devices__date"
+              sepClassName="admin-devices__date-sep"
             />
           </div>
           {hasActiveFilters && (

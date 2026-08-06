@@ -6,7 +6,7 @@ import { downloadBlob } from '../../utils/downloadBlob';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
 import { useCrmSearchSync } from '../../utils/crmUrl';
-import { nextDateRangeState } from '../../utils/dateRange';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import AdminPagination from './components/AdminPagination';
 import {
   humanizeAuditDescription,
@@ -515,39 +515,21 @@ export default function AuditLogsPage() {
 
             <div className="filter-field">
               <label className="filter-field__label">Khoảng ngày</label>
-              <div className="filter-field__date-group">
-                <input
-                  className="filter-field__input filter-field__input--date"
-                  type="date"
-                  value={audit.params.startDate || ''}
-                  onChange={(e) => {
-                    const next = nextDateRangeState('start', e.target.value, audit.params);
-                    audit.setParams((p) => ({
-                      ...p,
-                      startDate: next.startDate,
-                      endDate: next.endDate,
-                      page: 1,
-                    }));
-                  }}
-                  title="Từ ngày"
-                />
-                <span className="filter-field__date-sep">—</span>
-                <input
-                  className="filter-field__input filter-field__input--date"
-                  type="date"
-                  value={audit.params.endDate || ''}
-                  onChange={(e) => {
-                    const next = nextDateRangeState('end', e.target.value, audit.params);
-                    audit.setParams((p) => ({
-                      ...p,
-                      startDate: next.startDate,
-                      endDate: next.endDate,
-                      page: 1,
-                    }));
-                  }}
-                  title="Đến ngày"
-                />
-              </div>
+              <DateRangeInputs
+                startDate={audit.params.startDate || ''}
+                endDate={audit.params.endDate || ''}
+                onChange={({ startDate, endDate }) => {
+                  audit.setParams((p) => ({
+                    ...p,
+                    startDate,
+                    endDate,
+                    page: 1,
+                  }));
+                }}
+                className="filter-field__date-group"
+                inputClassName="filter-field__input filter-field__input--date"
+                sepClassName="filter-field__date-sep"
+              />
             </div>
           </div>
         )}
