@@ -73,6 +73,8 @@ class RepairOrder {
         isCancelled: Boolean(r.is_cancelled),
         isAddedLater: Boolean(r.is_added_later),
         isQtyIncreased: Boolean(r.is_qty_increased),
+        prevQuantity: r.prev_quantity ?? null,
+        note: r.note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,
