@@ -6,7 +6,11 @@ import { AppProvider, PermissionProvider } from './contexts';
 import { ToastProvider } from './components/common/ToastContext';
 import { GlobalErrorProvider } from './contexts/GlobalErrorContext';
 import { BASE_PATH } from './config';
+import { ensureCrmHistoryBase } from './utils/ensureCrmHistoryBase';
 import './styles/index.css';
+
+// Patch History API TRƯỚC khi mount Router — tránh mất prefix /crm trên production.
+ensureCrmHistoryBase();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

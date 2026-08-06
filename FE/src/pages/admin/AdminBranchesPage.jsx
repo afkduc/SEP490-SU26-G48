@@ -252,7 +252,7 @@ export default function AdminBranchesPage({ embedded = false } = {}) {
           {activeCount} hoạt động{activeCount !== inactiveCount && inactiveCount > 0 ? ` · ${inactiveCount} ngừng` : ''}
         </span>
       )}
-      <button className="btn btn--primary" onClick={() => navigate('/admin/catalog/branches/new')}>
+      <button className="btn btn--primary" onClick={() => navigate('/admin/catalog/branches/new', { state: { fromListSearch: location.search } })}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -322,7 +322,7 @@ export default function AdminBranchesPage({ embedded = false } = {}) {
             <div className="admin-branches__empty">
               <IconBranch />
               <p>Chưa có chi nhánh nào</p>
-              <button className="btn btn--primary" onClick={() => navigate('/admin/catalog/branches/new')}>
+              <button className="btn btn--primary" onClick={() => navigate('/admin/catalog/branches/new', { state: { fromListSearch: location.search } })}>
                 Thêm chi nhánh đầu tiên
               </button>
             </div>
