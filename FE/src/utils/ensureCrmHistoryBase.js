@@ -39,7 +39,7 @@ export function ensureCrmHistoryBase() {
     const prefix = getCrmPrefix();
     if (!prefix) return url;
 
-    // Absolute same-origin URL
+    // Absolute same-origin URL → chuẩn hóa pathname có /crm
     if (url.startsWith('http://') || url.startsWith('https://')) {
       try {
         const u = new URL(url);
@@ -50,17 +50,23 @@ export function ensureCrmHistoryBase() {
       }
     }
 
-    // Chỉ query/hash — gắn vào pathname (đã có /crm nếu cần)
+    // Chỉ query/hash — luôn gắn vào /crm + path hiện tại
     if (url.startsWith('?') || url.startsWith('#')) {
       let path = window.location.pathname || '/';
-      if (!path.startsWith(`${prefix}/`) && path !== prefix && isCrmRootPath(path)) {
+      if (path.startsWith(`${prefix}/`) || path === prefix) {
+        // đã đúng
+      } else if (isCrmRootPath(path)) {
         path = `${prefix}${path}`;
+      } else {
+        // fallback: giữ path, vẫn cố gắn prefix nếu thiếu
+        path = toBrowserUrl(path);
       }
       if (url.startsWith('?')) return `${path}${url}`;
       return `${path}${window.location.search}${url}`;
     }
 
     if (!url.startsWith('/')) return url;
+    // /admin/users?roleId=1 → /crm/admin/users?roleId=1
     return toBrowserUrl(url);
   };
 
