@@ -1,3 +1,6 @@
+// PHẢI import trước react-router — patch History API trước khi Router giữ reference.
+import './crmHistoryBootstrap';
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -6,12 +9,8 @@ import { AppProvider, PermissionProvider } from './contexts';
 import { ToastProvider } from './components/common/ToastContext';
 import { GlobalErrorProvider } from './contexts/GlobalErrorContext';
 import { BASE_PATH } from './config';
-import { ensureCrmHistoryBase } from './utils/ensureCrmHistoryBase';
 import { CrmUrlGuard } from './utils/crmUrl';
 import './styles/index.css';
-
-// Patch History API TRƯỚC khi mount Router — tránh mất prefix /crm trên production.
-ensureCrmHistoryBase();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

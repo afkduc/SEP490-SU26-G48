@@ -28,6 +28,18 @@ function isCrmRootPath(pathname) {
   return CRM_ROOTS.some((root) => pathname === root || pathname.startsWith(`${root}/`));
 }
 
+function normalizeSearch(search = '') {
+  if (typeof search === 'string') {
+    if (!search) return '';
+    return search.startsWith('?') ? search : `?${search}`;
+  }
+  if (search?.toString) {
+    const qs = search.toString();
+    return qs ? `?${qs}` : '';
+  }
+  return '';
+}
+
 /**
  * Path router → URL trình duyệt có /crm (dùng prefix runtime).
  */
@@ -67,17 +79,32 @@ export function parseRouterUrl(to) {
   return { pathname, search, hash };
 }
 
-function buildExpectedUrl(routerPathname, search = '', hash = '') {
+/**
+ * Chuẩn: /crm + /admin/users + ?roleId=...
+ * (dev local: prefix rỗng → /admin/users?...)
+ */
+export function buildExpectedUrl(routerPathname, search = '', hash = '') {
   const prefix = getCrmPrefix();
   const pathname = stripCrmBase(routerPathname || '/');
-  const qs = typeof search === 'string'
-    ? (search.startsWith('?') || search === '' ? search : `?${search}`)
-    : (search?.toString?.() ? `?${search.toString()}` : '');
+  const qs = normalizeSearch(search);
   const hashPart = !hash
     ? ''
     : (hash.startsWith('#') ? hash : `#${hash}`);
   if (!prefix) return `${pathname}${qs}${hashPart}`;
   return `${prefix}${pathname}${qs}${hashPart}`;
+}
+
+/**
+ * Ghi thẳng thanh địa chỉ: luôn /crm + path + query (không nhờ Router tự ghép).
+ */
+export function writeCrmBrowserUrl(routerPathname, search = '', hash = '') {
+  if (typeof window === 'undefined') return '';
+  const expected = buildExpectedUrl(routerPathname, search, hash);
+  const nativeReplace = getNativeReplaceState();
+  if (nativeReplace) {
+    nativeReplace(window.history.state, '', expected);
+  }
+  return expected;
 }
 
 /**
@@ -102,14 +129,14 @@ export function forceCrmBrowserUrl(routerPathname, search = '', hash = '') {
   if (typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(apply);
   }
-  // Thêm 1 nhịp muộn — thắng race với React Router ghi đè thiếu /crm
   setTimeout(apply, 0);
   setTimeout(apply, 50);
+  setTimeout(apply, 150);
+  setTimeout(apply, 300);
 }
 
 /**
  * Nếu thanh địa chỉ đang ở /admin/... (thiếu /crm) thì chèn lại /crm.
- * Dùng cho watchdog + sau filter.
  */
 export function repairMissingCrmPrefix() {
   if (typeof window === 'undefined') return;
@@ -140,7 +167,7 @@ export function navigateWithCrm(navigate, to, opts) {
 }
 
 /**
- * Ép /crm mỗi lần location đổi + watchdog định kỳ (chặn filter làm mất /crm).
+ * Ép /crm mỗi lần location đổi + watchdog định kỳ.
  */
 export function CrmUrlGuard() {
   const location = useLocation();
@@ -153,7 +180,7 @@ export function CrmUrlGuard() {
   useEffect(() => {
     const id = window.setInterval(() => {
       repairMissingCrmPrefix();
-    }, 300);
+    }, 200);
     return () => window.clearInterval(id);
   }, []);
 
@@ -161,13 +188,16 @@ export function CrmUrlGuard() {
 }
 
 /**
- * Đồng bộ filter → URL. Luôn ghi /crm trước/sau navigate.
+ * Đồng bộ filter → URL theo chuẩn:
+ *   /crm + pathname hiện tại + ?search=&roleId=&status=&branchId=
+ * Ghi URL đầy đủ trước, sync Router sau, rồi ép lại nhiều nhịp.
  */
 export function useCrmSearchSync() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationRef = useRef(location);
   locationRef.current = location;
+  const repairTimerRef = useRef(null);
 
   return useCallback((nextParams, navigateOpts = { replace: true }) => {
     const { pathname } = locationRef.current;
@@ -178,19 +208,28 @@ export function useCrmSearchSync() {
       : new URLSearchParams(resolved || {});
     const qs = sp.toString();
     const search = qs ? `?${qs}` : '';
-    const expected = buildExpectedUrl(pathname, search);
-    const nativeReplace = getNativeReplaceState();
 
-    // 1) Ghi URL đầy đủ /crm NGAY (không chờ React Router)
-    if (nativeReplace) {
-      nativeReplace(window.history.state, '', expected);
-    }
+    // 1) Ghi sẵn URL chuẩn: /crm/admin/users?roleId=...
+    writeCrmBrowserUrl(pathname, search);
 
-    // 2) Sync React Router
+    // 2) Sync React Router (state nội bộ; có thể ghi đè thiếu /crm)
     navigate({ pathname, search }, navigateOpts);
 
-    // 3) Ép lại nhiều nhịp — RR thường ghi đè thiếu /crm ngay sau navigate
+    // 3) Ép lại nhiều nhịp cho đến khi thanh địa chỉ đúng
     forceCrmBrowserUrl(pathname, search);
     repairMissingCrmPrefix();
+
+    if (repairTimerRef.current) {
+      window.clearInterval(repairTimerRef.current);
+    }
+    const started = Date.now();
+    repairTimerRef.current = window.setInterval(() => {
+      writeCrmBrowserUrl(pathname, search);
+      repairMissingCrmPrefix();
+      if (Date.now() - started > 800) {
+        window.clearInterval(repairTimerRef.current);
+        repairTimerRef.current = null;
+      }
+    }, 50);
   }, [navigate]);
 }
