@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
+import { useCrmSearchSync } from '../../utils/crmUrl';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import AdminPagination from './components/AdminPagination';
 import {
   humanizeAuditDescription,
@@ -248,8 +250,8 @@ function writeAuditParamsToSearch(params) {
 export default function AuditLogsPage() {
   const toast = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
+  const syncSearch = useCrmSearchSync();
   const isInitialMount = useRef(true);
   const urlSeed = useMemo(() => readAuditParamsFromSearch(searchParams), [searchParams]);
   const audit = useAuditLogs(urlSeed);
@@ -269,11 +271,11 @@ export default function AuditLogsPage() {
     });
   }, [navigate, audit.params]);
 
-  // Dong bo filter/page len URL de Back tu chi tiet van dung trang
+  // Đồng bộ filter — luôn giữ /crm (useCrmSearchSync).
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      const fromUrl = readAuditParamsFromSearch(new URLSearchParams(window.location.search));
+      const fromUrl = readAuditParamsFromSearch(searchParams);
       if (Object.keys(fromUrl).length > 0) {
         audit.setParams((p) => ({ ...p, ...fromUrl }));
         setShowFilters(true);
@@ -281,8 +283,7 @@ export default function AuditLogsPage() {
       return;
     }
     const qs = writeAuditParamsToSearch(audit.params);
-    const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
-    window.history.replaceState(null, '', newUrl);
+    syncSearch(qs ? new URLSearchParams(qs) : new URLSearchParams(), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     audit.params.page,
@@ -299,7 +300,7 @@ export default function AuditLogsPage() {
     audit.params.startDate,
     audit.params.endDate,
     audit.params.branchId,
-    location.pathname,
+    syncSearch,
   ]);
 
   useEffect(() => {
@@ -514,23 +515,21 @@ export default function AuditLogsPage() {
 
             <div className="filter-field">
               <label className="filter-field__label">Khoảng ngày</label>
-              <div className="filter-field__date-group">
-                <input
-                  className="filter-field__input filter-field__input--date"
-                  type="date"
-                  value={audit.params.startDate || ''}
-                  onChange={(e) => audit.updateParam('startDate', e.target.value)}
-                  title="Từ ngày"
-                />
-                <span className="filter-field__date-sep">—</span>
-                <input
-                  className="filter-field__input filter-field__input--date"
-                  type="date"
-                  value={audit.params.endDate || ''}
-                  onChange={(e) => audit.updateParam('endDate', e.target.value)}
-                  title="Đến ngày"
-                />
-              </div>
+              <DateRangeInputs
+                startDate={audit.params.startDate || ''}
+                endDate={audit.params.endDate || ''}
+                onChange={({ startDate, endDate }) => {
+                  audit.setParams((p) => ({
+                    ...p,
+                    startDate,
+                    endDate,
+                    page: 1,
+                  }));
+                }}
+                className="filter-field__date-group"
+                inputClassName="filter-field__input filter-field__input--date"
+                sepClassName="filter-field__date-sep"
+              />
             </div>
           </div>
         )}

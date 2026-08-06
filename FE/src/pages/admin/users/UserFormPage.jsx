@@ -63,6 +63,7 @@ export default function UserFormPage({ mode: modeProp }) {
   const toast = useToast();
   const isEdit = modeProp === 'edit' || Boolean(id);
   const listSearch = location.state?.fromListSearch || '';
+  const backToList = `/admin/users${listSearch}`;
 
   const [user, setUser] = useState(null);
   const [bootLoading, setBootLoading] = useState(isEdit);
@@ -216,7 +217,7 @@ export default function UserFormPage({ mode: modeProp }) {
         }
         await adminUsersApi.update(payload);
         toast.success('Đã cập nhật người dùng');
-        navigate(`/admin/users/${user.id}`, { state: { fromListSearch: listSearch } });
+        navigate(backToList);
       } else {
         const payload = {
           name: form.name.trim(),
@@ -236,7 +237,7 @@ export default function UserFormPage({ mode: modeProp }) {
         const created = await adminUsersApi.create(payload);
         toast.success('Đã tạo người dùng');
         const newId = created?.id || created?.userId;
-        navigate(newId ? `/admin/users/${newId}` : '/admin/users');
+        navigate(newId ? `/admin/users/${newId}` : backToList);
       }
     } catch (err) {
       setApiError(err?.response?.data?.message || err.message || 'Lỗi hệ thống');
@@ -268,7 +269,7 @@ export default function UserFormPage({ mode: modeProp }) {
     return (
       <div className="admin-page admin-user-form-page">
         <div className="admin-user-form-page__state admin-user-form-page__state--error">{bootError}</div>
-        <Link to={`/admin/users${listSearch}`} className="btn btn--ghost">Quay lại danh sách</Link>
+        <Link to={backToList} className="btn btn--ghost">Quay lại danh sách</Link>
       </div>
     );
   }
@@ -280,22 +281,12 @@ export default function UserFormPage({ mode: modeProp }) {
           <button
             type="button"
             className="admin-user-form-page__back"
-            onClick={() => navigate(
-              isEdit && user
-                ? `/admin/users/${user.id}`
-                : `/admin/users${listSearch}`,
-              isEdit && user ? { state: { fromListSearch: listSearch } } : undefined,
-            )}
+            onClick={() => navigate(backToList)}
           >
             ← Quay lại
           </button>
           <div className="admin-page__title-group">
             <h1>{isEdit ? 'Chỉnh sửa người dùng' : 'Tạo người dùng mới'}</h1>
-            <p className="admin-page__subtitle">
-              {isEdit
-                ? 'Cập nhật hồ sơ, chi nhánh và vai trò. Không có thao tác xóa tài khoản.'
-                : 'Tạo tài khoản mới. Tài khoản chỉ có thể khóa / ngừng hoạt động, không xóa.'}
-            </p>
           </div>
         </div>
       </div>
@@ -479,7 +470,7 @@ export default function UserFormPage({ mode: modeProp }) {
             <button
               type="button"
               className="btn btn--ghost"
-              onClick={() => navigate(isEdit && user ? `/admin/users/${user.id}` : '/admin/users')}
+              onClick={() => navigate(backToList)}
               disabled={loading}
             >
               Hủy
