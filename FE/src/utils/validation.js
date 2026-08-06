@@ -11,6 +11,9 @@ const EMAIL_REGEX =
 const PHONE_REGEX = /^0[0-9]{9,10}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,50}$/;
 
+/** Gợi ý UI — độ dài tính theo chữ số, không tính dấu gạch. */
+export const PHONE_HINT = 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)';
+
 /** Chỉ giữ chữ số, tối đa 11 (SĐT VN). */
 export function phoneDigitsOnly(value) {
   return String(value || '').replace(/\D/g, '').slice(0, 11);
@@ -18,6 +21,7 @@ export function phoneDigitsOnly(value) {
 
 /**
  * Hiển thị SĐT khi gõ: 0123456789 → 0123-456-789 (4-3-3; 11 số → 4-3-4).
+ * Độ dài input có gạch tối đa 13 ký tự (11 số + 2 dấu `-`).
  */
 export function formatPhoneInput(value) {
   const d = phoneDigitsOnly(value);
@@ -25,6 +29,9 @@ export function formatPhoneInput(value) {
   if (d.length <= 7) return `${d.slice(0, 4)}-${d.slice(4)}`;
   return `${d.slice(0, 4)}-${d.slice(4, 7)}-${d.slice(7)}`;
 }
+
+/** maxLength cho input đã format (11 số + tối đa 2 dấu `-`). */
+export const PHONE_INPUT_MAX_LENGTH = 13;
 
 /** Hiển thị SĐT từ DB (chuẩn hóa dấu cũ 0236-3333-3333 → 0236-333-3333). */
 export function formatPhoneDisplay(value) {
@@ -40,9 +47,25 @@ export function isValidEmail(value) {
   return EMAIL_REGEX.test(email);
 }
 
+/**
+ * Hợp lệ khi (sau khi bỏ mọi ký tự không phải số):
+ * bắt đầu bằng 0 và đúng 10 hoặc 11 chữ số.
+ */
 export function isValidPhone(value) {
   if (value == null) return false;
   return PHONE_REGEX.test(phoneDigitsOnly(value));
+}
+
+/** null nếu hợp lệ / đang trống tùy required; string = thông báo lỗi. */
+export function getPhoneError(value, { required = true } = {}) {
+  const digits = phoneDigitsOnly(value);
+  if (!digits) return required ? 'Số điện thoại là bắt buộc' : null;
+  if (!digits.startsWith('0')) return 'Số điện thoại phải bắt đầu bằng 0';
+  if (digits.length < 10 || digits.length > 11) {
+    return 'Số điện thoại phải gồm 10–11 chữ số (không tính dấu gạch)';
+  }
+  if (!isValidPhone(digits)) return PHONE_HINT;
+  return null;
 }
 
 export function isValidUsername(value) {
