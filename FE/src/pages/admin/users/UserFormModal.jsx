@@ -7,10 +7,14 @@ import {
 import { useToast } from '../../../components/common/ToastContext';
 import {
   EMAIL_HINT,
+  formatPhoneInput,
+  getPhoneError,
   isValidEmail,
   isValidPassword,
-  isValidPhone,
   isValidUsername,
+  phoneDigitsOnly,
+  PHONE_HINT,
+  PHONE_INPUT_MAX_LENGTH,
 } from '../../../utils/validation';
 import ResetPasswordModal from './ResetPasswordModal';
 import './UserFormModal.css';
@@ -154,7 +158,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
       password: '',
       firstName: user.firstName || '',
       lastName: user.lastName || '',
-      phone: user.phone || '',
+      phone: formatPhoneInput(user.phone || ''),
       branchId: branchIdValue,
       roleId: resolvedRoleId,
       status: user.status || 'active',
@@ -179,11 +183,8 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
     if (form.email && !isValidEmail(form.email)) {
       errs.email = EMAIL_HINT;
     }
-    if (!form.phone.trim()) {
-      errs.phone = 'Số điện thoại là bắt buộc';
-    } else if (!isValidPhone(form.phone)) {
-      errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
-    }
+    const phoneErr = getPhoneError(form.phone, { required: true });
+    if (phoneErr) errs.phone = phoneErr;
     if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc (hoặc chọn "Tất cả chi nhánh")';
     // Bug #10: Khi user co nhieu vai tro va admin KHONG thay doi dropdown
     // -> form.roleId se empty (resolveRoleId returns '' for first multi-role).
@@ -218,7 +219,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           firstName: form.firstName?.trim() || user.firstName || '',
           lastName: form.lastName?.trim() || user.lastName || '',
           email: form.email?.trim() || user.email,
-          phone: form.phone.trim(),
+          phone: phoneDigitsOnly(form.phone),
           status: form.status,
         };
         if (form.scopeAllBranches) {
@@ -238,7 +239,7 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
           password: form.password,
           firstName: form.firstName.trim() || form.name.trim(),
           lastName: form.lastName.trim(),
-          phone: form.phone.trim(),
+          phone: phoneDigitsOnly(form.phone),
           roleId: Number(form.roleId),
         };
         if (form.scopeAllBranches) {
@@ -373,12 +374,17 @@ export default function UserFormModal({ user, onClose, onSuccess }) {
                 <input
                   className={`input ${errors.phone ? 'input--error' : ''}`}
                   value={form.phone}
-                  onChange={(e) => handleChange('phone', e.target.value)}
-                  placeholder="0912345678"
+                  onChange={(e) => handleChange('phone', formatPhoneInput(e.target.value))}
+                  onBlur={() => {
+                    const phoneErr = getPhoneError(form.phone, { required: true });
+                    setErrors((prev) => ({ ...prev, phone: phoneErr || undefined }));
+                  }}
+                  placeholder="0123-456-789"
                   autoComplete="tel"
                   inputMode="numeric"
-                  maxLength={11}
+                  maxLength={PHONE_INPUT_MAX_LENGTH}
                 />
+                <span className="form__hint">{PHONE_HINT}</span>
                 {errors.phone && <span className="form__err">{errors.phone}</span>}
               </div>
             </div>
