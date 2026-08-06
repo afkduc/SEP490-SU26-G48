@@ -9,8 +9,7 @@ import {
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { formatPhoneDisplay } from '../../utils/validation';
-import { navigateWithCrm, forceCrmBrowserUrl, repairMissingCrmPrefix } from '../../utils/crmUrl';
-import { getCrmPrefix } from '../../config';
+import { navigateWithCrm, useCrmSearchSync } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
 import PermissionGate from '../../components/PermissionGate';
 import AdminPagination from './components/AdminPagination';
@@ -126,6 +125,7 @@ export default function AdminUsersPage() {
   }, [roles]);
 
   const [searchParams] = useSearchParams();
+  const syncSearch = useCrmSearchSync();
   const [togglingId, setTogglingId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -137,10 +137,8 @@ export default function AdminUsersPage() {
     if (searchParams.get('tab') !== 'roles') return;
     const next = new URLSearchParams(searchParams);
     next.delete('tab');
-    const qs = next.toString();
-    navigate({ pathname: '/admin/users', search: qs ? `?${qs}` : '' }, { replace: true });
-    forceCrmBrowserUrl('/admin/users', qs ? `?${qs}` : '');
-  }, [searchParams, navigate]);
+    syncSearch(next, { replace: true });
+  }, [searchParams, syncSearch]);
 
   // Không gọi setState trong render — chuyển sang effect (tránh vỡ hooks / action buttons)
   useEffect(() => {
@@ -149,7 +147,8 @@ export default function AdminUsersPage() {
     }
   }, [hasReadPermission, set403Error]);
 
-  // Đồng bộ filter → URL. Ép cứng /crm (không phụ thuộc helper có chạy hay không).
+  // Đồng bộ filter → URL giống AuditLogs: dùng useCrmSearchSync
+  // (ghi /crm trước → navigate → ép lại). Không tự navigate + replaceState.
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -171,35 +170,9 @@ export default function AdminUsersPage() {
     if (params.roleId) next.set('roleId', String(params.roleId));
     if (params.status) next.set('status', params.status);
     if (params.page > 1) next.set('page', String(params.page));
-    const qs = next.toString();
-    const search = qs ? `?${qs}` : '';
-
-    // 1) Sync React Router
-    navigate({ pathname: '/admin/users', search }, { replace: true });
-
-    // 2) Ghi thẳng URL trình duyệt với prefix CRM (prod: /crm)
-    const prefix = getCrmPrefix(); // prod luôn '/crm'
-    const browserUrl = `${prefix}/admin/users${search}`;
-    const nativeReplace = window.__crmNativeReplaceState
-      || window.history.replaceState.bind(window.history);
-    nativeReplace(window.history.state, '', browserUrl);
-
-    // 3) Ép lại sau khi RR có thể ghi đè
-    forceCrmBrowserUrl('/admin/users', search);
-    repairMissingCrmPrefix();
-    const t0 = setTimeout(() => {
-      nativeReplace(window.history.state, '', browserUrl);
-      repairMissingCrmPrefix();
-    }, 0);
-    const t1 = setTimeout(() => {
-      nativeReplace(window.history.state, '', browserUrl);
-    }, 100);
-    return () => {
-      clearTimeout(t0);
-      clearTimeout(t1);
-    };
+    syncSearch(next, { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.search, params.branchId, params.roleId, params.status, params.page, navigate]);
+  }, [params.search, params.branchId, params.roleId, params.status, params.page, syncSearch]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
