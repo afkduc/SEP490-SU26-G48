@@ -9,11 +9,13 @@ import { useToast } from '../../../components/common/ToastContext';
 import {
   EMAIL_HINT,
   formatPhoneInput,
+  getPhoneError,
   isValidEmail,
   isValidPassword,
-  isValidPhone,
   isValidUsername,
   phoneDigitsOnly,
+  PHONE_HINT,
+  PHONE_INPUT_MAX_LENGTH,
 } from '../../../utils/validation';
 import ResetPasswordModal from './ResetPasswordModal';
 import './UserFormPage.css';
@@ -172,11 +174,8 @@ export default function UserFormPage({ mode: modeProp }) {
     if (form.email && !isValidEmail(form.email)) {
       errs.email = EMAIL_HINT;
     }
-    if (!form.phone.trim()) {
-      errs.phone = 'Số điện thoại là bắt buộc';
-    } else if (!isValidPhone(form.phone)) {
-      errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
-    }
+    const phoneErr = getPhoneError(form.phone, { required: true });
+    if (phoneErr) errs.phone = phoneErr;
     if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc (hoặc chọn "Tất cả chi nhánh")';
     if (!form.roleId && !(isEdit && hasMultipleRoles(user?.roles))) {
       errs.roleId = 'Vai trò là bắt buộc';
@@ -373,14 +372,16 @@ export default function UserFormPage({ mode: modeProp }) {
                 className={`input ${errors.phone ? 'input--error' : ''}`}
                 value={form.phone}
                 onChange={(e) => handleChange('phone', formatPhoneInput(e.target.value))}
-                inputMode="numeric"
+                onBlur={() => {
+                  const phoneErr = getPhoneError(form.phone, { required: true });
+                  setErrors((prev) => ({ ...prev, phone: phoneErr || undefined }));
+                }}
                 placeholder="0123-456-789"
-                maxLength={13}
-                placeholder="0912345678"
                 autoComplete="tel"
                 inputMode="numeric"
-                maxLength={11}
+                maxLength={PHONE_INPUT_MAX_LENGTH}
               />
+              <span className="form__hint">{PHONE_HINT}</span>
               {errors.phone && <span className="form__err">{errors.phone}</span>}
             </div>
           </div>
