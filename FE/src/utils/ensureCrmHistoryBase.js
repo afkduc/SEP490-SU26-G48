@@ -1,9 +1,9 @@
 import { BASE_PATH } from '../config';
+import { toBrowserUrl } from './crmUrl';
 
 /**
  * Chặn History API ghi URL tuyệt đối thiếu basename /crm (production).
- * Bug cũ: window.history.replaceState(..., location.pathname + '?...') với
- * pathname của React Router (/admin/...) → mất /crm → F5 ra 404 Landing.
+ * Bug: sync filter dùng location.pathname (/admin/...) → mất /crm → F5 = 404 Landing.
  * React Router khi navigate đúng vẫn truyền sẵn /crm/... nên không bị double.
  */
 export function ensureCrmHistoryBase() {
@@ -14,10 +14,10 @@ export function ensureCrmHistoryBase() {
   const origPush = window.history.pushState.bind(window.history);
 
   const fixUrl = (url) => {
-    if (typeof url !== 'string' || !url.startsWith('/')) return url;
-    if (url === prefix || url.startsWith(`${prefix}/`)) return url;
-    if (url.startsWith('/api')) return url;
-    return `${prefix}${url}`;
+    if (url == null) return url;
+    if (typeof url !== 'string') return url;
+    if (!url.startsWith('/')) return url;
+    return toBrowserUrl(url);
   };
 
   window.history.replaceState = (state, title, url) => {
@@ -27,7 +27,7 @@ export function ensureCrmHistoryBase() {
     origPush(state, title, url == null ? url : fixUrl(url));
   };
 
-  // Sửa luôn thanh địa chỉ nếu đã bị lệch trước khi patch chạy
+  // Sửa thanh địa chỉ nếu đã bị lệch trước khi patch chạy
   const { pathname, search, hash } = window.location;
   if (
     pathname.startsWith('/')
@@ -35,7 +35,6 @@ export function ensureCrmHistoryBase() {
     && !pathname.startsWith(`${prefix}/`)
     && !pathname.startsWith('/api')
   ) {
-    // Chỉ sửa các path nội bộ CRM (tránh đụng Landing: /, /gioi-thieu, ...)
     const crmRoots = [
       '/admin',
       '/login',

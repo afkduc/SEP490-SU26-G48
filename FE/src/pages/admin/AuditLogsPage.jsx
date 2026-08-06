@@ -5,6 +5,7 @@ import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
+import { useCrmSearchSync } from '../../utils/crmUrl';
 import AdminPagination from './components/AdminPagination';
 import {
   humanizeAuditDescription,
@@ -248,7 +249,8 @@ function writeAuditParamsToSearch(params) {
 export default function AuditLogsPage() {
   const toast = useToast();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const syncSearch = useCrmSearchSync();
   const isInitialMount = useRef(true);
   const urlSeed = useMemo(() => readAuditParamsFromSearch(searchParams), [searchParams]);
   const audit = useAuditLogs(urlSeed);
@@ -268,8 +270,7 @@ export default function AuditLogsPage() {
     });
   }, [navigate, audit.params]);
 
-  // Đồng bộ filter qua React Router (giữ basename /crm). Không dùng replaceState
-  // với location.pathname vì sẽ mất prefix /crm trên production.
+  // Đồng bộ filter — luôn giữ /crm (useCrmSearchSync).
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -281,7 +282,7 @@ export default function AuditLogsPage() {
       return;
     }
     const qs = writeAuditParamsToSearch(audit.params);
-    setSearchParams(qs ? new URLSearchParams(qs) : new URLSearchParams(), { replace: true });
+    syncSearch(qs ? new URLSearchParams(qs) : new URLSearchParams(), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     audit.params.page,
@@ -298,7 +299,7 @@ export default function AuditLogsPage() {
     audit.params.startDate,
     audit.params.endDate,
     audit.params.branchId,
-    setSearchParams,
+    syncSearch,
   ]);
 
   useEffect(() => {

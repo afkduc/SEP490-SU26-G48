@@ -1,10 +1,9 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-// He thong quan ly noi bo dat duoi "/crm" tren production (Landing chiem goc
-// domain, xem Landing/app/config.js + nginx.conf location /crm) - rong luc
-// "npm run dev" de giu nguyen thoi quen chay local o localhost:3000/... hien
-// tai. Phai khop voi "base" trong vite.config.js.
-export const BASE_PATH = import.meta.env.PROD ? '/crm' : '';
+// Khớp vite.config.js `base`: build production = "/crm/", dev = "/".
+// Dùng BASE_URL của Vite (không chỉ PROD) để basename BrowserRouter luôn đúng.
+const viteBase = import.meta.env.BASE_URL || '/';
+export const BASE_PATH = viteBase === '/' ? '' : viteBase.replace(/\/$/, '');
 
 export const APP_NAME = 'SEP490-G48';
 
