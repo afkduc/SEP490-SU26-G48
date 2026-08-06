@@ -270,15 +270,17 @@ export default function Navbar() {
         <img className="navbar__logo" src={`${BASE_PATH}/AutoGaraLogo-Photoroom.png`} alt="AutoGara" />
       </div>
 
-      <button
-        type="button"
-        className={'navbar__hamburger' + (mobileNavOpen ? ' navbar__hamburger--active' : '')}
-        aria-label={mobileNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
-        aria-expanded={mobileNavOpen}
-        onClick={() => setMobileNavOpen((v) => !v)}
-      >
-        <span /><span /><span />
-      </button>
+      {navItems.length > 0 && (
+        <button
+          type="button"
+          className={'navbar__hamburger' + (mobileNavOpen ? ' navbar__hamburger--active' : '')}
+          aria-label={mobileNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
+          aria-expanded={mobileNavOpen}
+          onClick={() => setMobileNavOpen((v) => !v)}
+        >
+          <span /><span /><span />
+        </button>
+      )}
 
       <nav className={'navbar__nav' + (mobileNavOpen ? ' navbar__nav--open' : '')}>
         {supportsDropdown
