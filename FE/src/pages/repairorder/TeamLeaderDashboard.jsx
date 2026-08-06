@@ -52,17 +52,38 @@ function inputValueToDDMMYYYY(value) {
 // ngoac KHONG duoc gach ngang, va text-decoration cua 1 the cha se "xuyen
 // qua" moi span con du con tu dat text-decoration:none, nen khong the chi
 // gop chung vao 1 chuoi roi gach ngang ca <label>/div cha.
+// So luong GIAM so voi prev_quantity (khach hoan tra bot, khong phai huy han)
+// - "SL xN" la CHENH LECH (khac "tổng là: N" cua truong hop TANG, vi TANG chi
+// can biet tong moi con GIAM can biet ro tra lai bao nhieu). Giam het ve 0 (ma
+// van chua qua "Khách hủy" chinh thuc, vd phu tung thao tra lai kho) thi coi
+// nhu da tra lai toan bo - gach ngang giong isCancelled - xem BE
+// RepairSettlementRepositoryImpl._syncRepairOrderTasks.
+function qtyReturnedOf(t) {
+  return t.prevQuantity != null && Number(t.quantity) < Number(t.prevQuantity)
+    ? Number(t.prevQuantity) - Number(t.quantity)
+    : 0;
+}
+function isFullyReturned(t) {
+  return !t.isCancelled && qtyReturnedOf(t) > 0 && Number(t.quantity) === 0;
+}
+function isStruckThrough(t) {
+  return t.isCancelled || isFullyReturned(t);
+}
+
 function TaskNameLabel({ t }) {
+  const qtyReturned = qtyReturnedOf(t);
   const suffix = t.isCancelled
     ? ' (Khách hủy)'
-    : t.isQtyIncreased
-      ? ` (Khách thêm số lượng, tổng là: ${t.quantity})`
-      : t.isAddedLater
-        ? ' (Khách thêm)'
-        : '';
+    : qtyReturned > 0
+      ? ` (Khách trả lại SL x${qtyReturned})`
+      : t.isQtyIncreased
+        ? ` (Khách thêm số lượng, tổng là: ${t.quantity})`
+        : t.isAddedLater
+          ? ' (Khách thêm)'
+          : '';
   return (
     <>
-      <span style={{ textDecoration: t.isCancelled ? 'line-through' : 'none' }}>{t.taskName}</span>
+      <span style={{ textDecoration: isStruckThrough(t) ? 'line-through' : 'none' }}>{t.taskName}</span>
       {suffix && <span style={{ textDecoration: 'none' }}>{suffix}</span>}
     </>
   );
@@ -264,6 +285,7 @@ function BayStatusGrid({ bays, orders }) {
         const busy = Boolean(bay.activeRepairOrderId);
         const order = busy ? activeByBayId.get(String(bay.id)) : null;
         const serviceTasks = order ? (order.tasks || []).filter((t) => t.taskType === 'service') : [];
+        const partTasks = order ? (order.tasks || []).filter((t) => t.taskType !== 'service') : [];
         const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
         const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
 
@@ -289,12 +311,37 @@ function BayStatusGrid({ bays, orders }) {
                 {serviceTasks.length > 0 && (
                   <div className="tld-bay-status-card__tasks">
                     {serviceTasks.map((task) => (
-                      <label key={task.id} className={`tld-task ${task.isCancelled ? 'tld-task--cancelled' : (task.isDone ? 'tld-task--done' : '')}`}>
+                      <label key={task.id} className={`tld-task ${isStruckThrough(task) ? 'tld-task--cancelled' : (task.isDone ? 'tld-task--done' : '')}`}>
                         <input type="checkbox" checked={task.isDone} readOnly disabled />
-                        <TaskNameLabel t={task} />
+                        <div className="tld-task__body">
+                          <div className="tld-task__nameRow">
+                            <TaskNameLabel t={task} />
+                            {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
+                          </div>
+                          {task.note && <div className="tld-task__note">{task.note}</div>}
+                        </div>
                       </label>
                     ))}
                   </div>
+                )}
+
+                {partTasks.length > 0 && (
+                  <>
+                    <div className="tld-bay-status-card__parts-title">Phụ tùng cần dùng</div>
+                    <div className="tld-bay-status-card__parts">
+                      {partTasks.map((task) => (
+                        <div key={task.id} className={`tld-part ${isStruckThrough(task) ? 'tld-task--cancelled' : ''}`}>
+                          <div className="tld-task__body">
+                            <div className="tld-task__nameRow">
+                              <TaskNameLabel t={task} />
+                            </div>
+                            {task.note && <div className="tld-task__note">{task.note}</div>}
+                          </div>
+                          {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -558,6 +605,7 @@ export default function TeamLeaderDashboard() {
                   </div>
                   <div className="tld-pending-card__customer">{s.customer?.fullName} — {s.vehicle?.licensePlate}</div>
                   <div className="tld-pending-card__vehicle">{s.vehicle?.vehicleModel}</div>
+                  {s.advisor && <div className="tld-pending-card__advisor">Cố vấn: <b>{s.advisor}</b></div>}
                   <div className="tld-pending-card__request">
                     <span className="tld-pending-card__request-label">Yêu cầu:</span> {s.customerRequest || '—'}
                   </div>

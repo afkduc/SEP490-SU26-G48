@@ -24,6 +24,8 @@ class RepairSettlement {
     // dung de khoa nut "Huy" o man danh sach khi dang "inprogress" (xem
     // RepairSettlementService.updateStatus).
     this.hasCompletedTask = data.hasCompletedTask ?? false;
+    // Da gan tho thuc hien chua - xem HEADER_SELECT/FE displayStatus().
+    this.hasTechnicians = data.hasTechnicians ?? false;
     this.customerRequest = data.customerRequest ?? null;
     this.currentKm = data.currentKm ?? null;
     this.status = data.status ?? 'waiting_repair';
@@ -77,6 +79,7 @@ class RepairSettlement {
       repairOrderId: headerRow.repair_order_id,
       bayNumber: headerRow.bay_number,
       hasCompletedTask: Boolean(headerRow.has_completed_task),
+      hasTechnicians: Boolean(headerRow.has_technicians),
       customerRequest: headerRow.customer_request,
       currentKm: headerRow.current_km,
       status: headerRow.status,
@@ -138,6 +141,7 @@ class RepairSettlement {
         discount: r.discount_pct,
         isFree: Boolean(r.is_free),
         total: r.total,
+        note: r.note ?? null,
       })),
       tasks: taskRows.map((r) => ({
         id: r.id,
@@ -148,6 +152,8 @@ class RepairSettlement {
         isCancelled: Boolean(r.is_cancelled),
         isAddedLater: Boolean(r.is_added_later),
         isQtyIncreased: Boolean(r.is_qty_increased),
+        prevQuantity: r.prev_quantity ?? null,
+        note: r.note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

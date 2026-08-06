@@ -275,23 +275,32 @@
   font-size: 16px;
   cursor: pointer;
 }
-.task input { width: 22px; height: 22px; accent-color: var(--success); }
+.task input { width: 22px; height: 22px; accent-color: var(--success); flex-shrink: 0; }
 .taskDone { background: #e6f4ea; color: var(--success); }
 /* text-decoration KHONG dat o day - de rieng cho span ten trong TaskNameLabel
    (BayScreen.jsx), tranh gach ngang lan qua ca phan "(Khách hủy)". */
 .taskCancelled { color: var(--text-muted); }
 
+/* Bao ten dau muc + "xN" (neu so luong > 1) tren 1 dong, ghi chu (neu co)
+   xuong dong duoi - dung chung cho ca dau muc dich vu (.task) lan phu tung
+   (.partRow), xem BayScreen.jsx. */
+.taskBody { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.taskNameRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.taskNote { font-size: 12px; color: var(--text-muted); font-style: italic; }
+
 .jobPartlist { display: flex; flex-direction: column; gap: 6px; }
 .partRow {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
   padding: 8px 12px;
   background: var(--bg-alt);
   border-radius: 8px;
   font-size: 14px;
   color: var(--text);
 }
-.partRowQty { color: var(--text-muted); }
+.partRowQty { color: var(--text-muted); flex-shrink: 0; }
 
 .jobComplete { width: 100%; justify-content: center; margin-top: 18px; font-size: 17px; padding: 14px; }
 
