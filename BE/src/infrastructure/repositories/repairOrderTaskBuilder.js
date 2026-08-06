@@ -47,6 +47,7 @@ function computeDesiredTasks(items, packageServiceNamesByCode) {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         isCancelled: true,
+        note: item.note || null,
       });
       continue;
     }
@@ -74,6 +75,7 @@ function computeDesiredTasks(items, packageServiceNamesByCode) {
       productId: item.productId,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
+      note: item.note || null,
     });
   }
 
@@ -126,6 +128,7 @@ async function buildDesiredTasks(tx, serviceOrderId) {
     quantity: r.quantity,
     unitPrice: r.unit_price,
     httt: r.httt,
+    note: r.note,
   }));
 
   const packageServiceNamesByCode = await loadPackageServiceNames(

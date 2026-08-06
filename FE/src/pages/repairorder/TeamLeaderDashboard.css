@@ -103,6 +103,11 @@
   color: var(--gray-600);
 }
 
+.tld-pending-card__advisor {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
 .tld-pending-card__request {
   font-size: 13px;
   color: var(--gray-700);
@@ -348,6 +353,55 @@
    (TeamLeaderDashboard.jsx), tranh gach ngang lan qua ca phan "(Khách hủy)". */
 .tld-task--cancelled {
   color: var(--gray-400);
+}
+
+/* Ten dau muc + "xN" (neu so luong > 1) tren 1 dong, ghi chu (neu co) xuong
+   dong duoi - dung chung cho ca dau muc dich vu (.tld-task) lan phu tung
+   (.tld-part). */
+.tld-task__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.tld-task__nameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tld-task__qty {
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+.tld-task__note {
+  font-size: 11px;
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+.tld-bay-status-card__parts-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600);
+  margin-top: 10px;
+}
+
+.tld-bay-status-card__parts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tld-part {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--gray-700);
 }
 
 /* Tab "Lich su" */
