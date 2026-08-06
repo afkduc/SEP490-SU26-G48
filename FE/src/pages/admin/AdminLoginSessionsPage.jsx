@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useAuth } from '../../contexts/AppContext';
-import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import { formatDateSafe } from '../../utils/dateUtils';
 import { auditApi } from '../../services/auditApi';
@@ -366,8 +366,8 @@ export default function AdminLoginSessionsPage({
   seedFocusIp = '',
   seedFocusLoginTime = '',
   seedKey = 0,
-  onOpenDevicesToProcess,
 } = {}) {
+  const navigate = useNavigate();
   const sessions = useLoginSessions(
     seedKey
       ? {
@@ -383,7 +383,6 @@ export default function AdminLoginSessionsPage({
   );
   const { branches, branchesError } = useSharedBranches();
   const { token } = useAuth();
-  const [detailSession, setDetailSession] = useState(null);
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -394,6 +393,16 @@ export default function AdminLoginSessionsPage({
     ip: '',
     loginTime: '',
   });
+
+  const openSessionDetail = useCallback((item) => {
+    if (!item?.id) return;
+    navigate(`/admin/login-sessions/${item.id}`, {
+      state: {
+        session: item,
+        fromListSearch: '?tab=sessions',
+      },
+    });
+  }, [navigate]);
 
   // Seed từ panel cảnh báo ("Lịch sử") — khi đổi cảnh báo trong lúc tab đang mở
   useEffect(() => {
@@ -823,7 +832,7 @@ export default function AdminLoginSessionsPage({
             <div className="admin-sessions__table-wrapper">
               <SessionTable
                 items={sessions.data.items}
-                onViewSession={setDetailSession}
+                onViewSession={openSessionDetail}
                 focusedSessionId={focusedSessionId}
               />
             </div>
@@ -837,26 +846,6 @@ export default function AdminLoginSessionsPage({
           </>
         )}
       </div>
-
-      {detailSession && (
-        <SessionDetailDrawer
-          session={detailSession}
-          onClose={() => setDetailSession(null)}
-          onOpenDevicesToProcess={
-            typeof onOpenDevicesToProcess === 'function'
-              ? () => {
-                  onOpenDevicesToProcess({
-                    userId: detailSession.user_id,
-                    userName: detailSession.user_name,
-                    ipAddress: detailSession.ip_address,
-                    loginTime: detailSession.login_time,
-                  });
-                  setDetailSession(null);
-                }
-              : undefined
-          }
-        />
-      )}
     </div>
   );
 }

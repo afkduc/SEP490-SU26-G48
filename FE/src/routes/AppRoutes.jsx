@@ -38,6 +38,7 @@ const UserFormPage = lazy(() => import('../pages/admin/users/UserFormPage'));
 const UserDetailPage = lazy(() => import('../pages/admin/users/UserDetailPage'));
 const AuditLogsPage = lazy(() => import('../pages/admin/AuditLogsPage'));
 const AuditLogDetailPage = lazy(() => import('../pages/admin/AuditLogDetailPage'));
+const LoginSessionDetailPage = lazy(() => import('../pages/admin/LoginSessionDetailPage'));
 const AdminCatalogPage = lazy(() => import('../pages/admin/AdminCatalogPage'));
 const BranchFormPage = lazy(() => import('../pages/admin/branches/BranchFormPage'));
 const BranchDetailPage = lazy(() => import('../pages/admin/branches/BranchDetailPage'));
@@ -210,6 +211,7 @@ function AppRoutes() {
           <Route path="vehicle-brands" element={<Navigate to="/admin/catalog" replace />} />
           <Route path="login-security" element={<AdminLoginSecurityPage />} />
           <Route path="security-alerts" element={<Navigate to="/admin/login-security?alerts=1" replace />} />
+          <Route path="login-sessions/:id" element={<LoginSessionDetailPage />} />
           <Route path="login-sessions" element={<Navigate to="/admin/login-security?tab=sessions" replace />} />
           <Route path="devices" element={<Navigate to="/admin/login-security" replace />} />
           <Route path="logs" element={<AuditLogsPage />} />
