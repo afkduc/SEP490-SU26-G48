@@ -25,5 +25,8 @@ jobs:
             git fetch origin
             git checkout dev
             git reset --hard origin/dev
+            # FE bundle Vite "nuong" JS luc build — bat buoc no-cache fe
+            # de filter /crm + DateRange khong bi Docker layer cu.
+            docker compose build --no-cache fe
             docker compose up -d --build
             sudo systemctl reload nginx
