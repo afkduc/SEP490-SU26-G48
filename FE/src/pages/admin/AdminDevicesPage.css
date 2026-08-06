@@ -168,6 +168,12 @@
   gap: 6px;
 }
 
+.admin-devices__date-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .admin-devices__select-wrap {
   position: relative;
   display: inline-flex;
