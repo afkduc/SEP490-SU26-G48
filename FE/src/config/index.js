@@ -11,17 +11,17 @@ const fromVite = viteBaseUrl === '/' ? '' : viteBaseUrl;
 /**
  * Basename cho BrowserRouter.
  * - npm run dev: '' (localhost:3000/admin/...)
- * - production build: luôn '/crm' (khớp Vite base)
+ * - production build: luôn '/crm'
  */
-export const BASE_PATH = import.meta.env.DEV ? fromVite : (fromVite || '/crm');
+export const BASE_PATH = import.meta.env.DEV ? fromVite : '/crm';
 
 /**
- * Prefix khi GHI URL trình duyệt: /crm + /admin/users + ?roleId=...
- * Production lấy từ Vite BASE_URL (ổn định hơn detect runtime).
+ * Prefix khi GHI URL trình duyệt.
+ * Production LUÔN '/crm' — không phụ thuộc detect runtime / Vite edge-case.
  */
 export function getCrmPrefix() {
   if (import.meta.env.DEV) return fromVite || '';
-  return fromVite || '/crm';
+  return '/crm';
 }
 
 export const APP_NAME = 'SEP490-G48';
