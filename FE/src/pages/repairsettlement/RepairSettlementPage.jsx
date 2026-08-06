@@ -508,9 +508,7 @@ function printSettlement(order, payosQrCode) {
 
 // ─── Modal xem trước & xuất phiếu quyết toán ────────────────────────
 function SettlementPreviewModal({ order, onClose }) {
-  // Chi con dung de doi chu nut in ("In phieu" vs "In lai phieu") - khong con
-  // nut "Xac nhan xuat hoa don" thu cong nua, PayOS webhook tu dong chuyen
-  // trang thai "invoiced" khi thanh toan thanh cong (xem handlePayosWebhook).
+  // Chi con dung de doi chu nut in ("In phieu" vs "In lai phieu").
   const [hasPrinted, setHasPrinted] = useState(false);
 
   // PayOS: QR dong that, tu tao ngay khi mo modal cho phieu dang cho thanh
@@ -522,6 +520,15 @@ function SettlementPreviewModal({ order, onClose }) {
   const [payosLoading, setPayosLoading] = useState(false);
   const [payosError, setPayosError] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
+
+  // Phuong thuc thu cong thu 2 (ben canh PayOS/chuyen khoan) - khach tra tien
+  // mat tai quay, CVDV tu bam xac nhan thay vi cho quet QR. Goi thang API
+  // status='invoiced' (BE tu ghi payment_method='CASH' cho duong nay, xem
+  // RepairSettlementService.updateStatus) - SSE 'invoiced' se tu dong dong
+  // modal/chuyen tab, khong can xu ly gi them o day ngoai bat cai overlay loading.
+  const [confirmingCash, setConfirmingCash] = useState(false);
+  const [cashError, setCashError] = useState('');
+  const [showCashConfirm, setShowCashConfirm] = useState(false);
 
   const requestPayosQr = async () => {
     setPayosLoading(true);
@@ -536,8 +543,28 @@ function SettlementPreviewModal({ order, onClose }) {
     }
   };
 
+  const handleConfirmCash = async () => {
+    setShowCashConfirm(false);
+    setConfirmingCash(true);
+    setCashError('');
+    try {
+      await updateRepairSettlementStatusApi(order.id, 'invoiced');
+      // Dong modal ngay (khong doi SSE) - danh sach ngoai man se tu cap nhat
+      // qua SSE 'invoiced' rieng (da bat san o RepairSettlementList), khong
+      // phu thuoc vao modal nay con mo hay khong.
+      onClose();
+    } catch (err) {
+      setCashError(err.message || 'Xác nhận thất bại, vui lòng thử lại');
+      setConfirmingCash(false);
+    }
+  };
+
+  // Chan goi trung khi mo modal - React StrictMode (dev) chay effect 2 lan,
+  // neu khong chan se tao 2 payment link PayOS khac nhau cho cung 1 phieu.
+  const payosRequestedForRef = useRef(null);
   useEffect(() => {
-    if (order.status === 'waiting_payment') {
+    if (order.status === 'waiting_payment' && payosRequestedForRef.current !== order.id) {
+      payosRequestedForRef.current = order.id;
       requestPayosQr();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -613,25 +640,61 @@ function SettlementPreviewModal({ order, onClose }) {
                 </tr>
               </thead>
               <tbody>
-                {(order.items || []).map((s, i) => (
-                  <tr key={i}>
-                    <td className="td-cell" style={{ textAlign: 'center', color: '#666' }}>{i + 1}</td>
-                    <td className="td-cell" style={{ textAlign: 'center', fontSize: 10, color: '#888' }}>{s.code || ''}</td>
-                    <td className="td-cell">
-                      {s.description}
-                      {s.isFree && <span className="tag" style={{ marginLeft: 6 }}>Miễn phí</span>}
-                      {!s.isFree && isExemptFromCustomerBilling(s) && <span className="tag" style={{ marginLeft: 6 }}>Miễn thu KH</span>}
-                    </td>
-                    <td className="td-cell" style={{ textAlign: 'center' }}>{REPAIR_CATEGORY_LABEL_BY_VALUE[s.repairCategory] || '—'}</td>
-                    <td className="td-cell" style={{ textAlign: 'center' }}>{s.unit}</td>
-                    <td className="td-cell" style={{ textAlign: 'center' }}>{s.qty}</td>
-                    <td className="td-cell" style={{ textAlign: 'right' }}>{(s.unitPrice || 0).toLocaleString('vi-VN')}</td>
-                    <td className="td-cell" style={{ textAlign: 'right', fontWeight: 700 }}>
-                      {(s.total || 0).toLocaleString('vi-VN')}
-                      {exemptionShortLabel(s) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(s)})</span>}
-                    </td>
-                  </tr>
-                ))}
+                {(() => {
+                  const indexed = (order.items || []).map((s, i) => ({ s, i }));
+                  const laborRows = indexed.filter(({ s }) => s.lhsc !== 'PT');
+                  const partRows = indexed.filter(({ s }) => s.lhsc === 'PT');
+                  const laborSubtotal = laborRows.reduce((sum, { s }) => sum + (s.total || 0), 0);
+                  const partSubtotal = partRows.reduce((sum, { s }) => sum + (s.total || 0), 0);
+
+                  const renderRow = ({ s, i }) => (
+                    <tr key={i}>
+                      <td className="td-cell" style={{ textAlign: 'center', color: '#666' }}>{i + 1}</td>
+                      <td className="td-cell" style={{ textAlign: 'center', fontSize: 10, color: '#888' }}>{s.code || ''}</td>
+                      <td className="td-cell">
+                        {s.description}
+                        {s.isFree && <span className="tag" style={{ marginLeft: 6 }}>Miễn phí</span>}
+                        {!s.isFree && isExemptFromCustomerBilling(s) && <span className="tag" style={{ marginLeft: 6 }}>Miễn thu KH</span>}
+                      </td>
+                      <td className="td-cell" style={{ textAlign: 'center' }}>{REPAIR_CATEGORY_LABEL_BY_VALUE[s.repairCategory] || '—'}</td>
+                      <td className="td-cell" style={{ textAlign: 'center' }}>{s.unit}</td>
+                      <td className="td-cell" style={{ textAlign: 'center' }}>{s.qty}</td>
+                      <td className="td-cell" style={{ textAlign: 'right' }}>{(s.unitPrice || 0).toLocaleString('vi-VN')}</td>
+                      <td className="td-cell" style={{ textAlign: 'right', fontWeight: 700 }}>
+                        {(s.total || 0).toLocaleString('vi-VN')}
+                        {exemptionShortLabel(s) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(s)})</span>}
+                      </td>
+                    </tr>
+                  );
+
+                  return (
+                    <>
+                      <tr>
+                        <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
+                        <td colSpan={6} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>CÔNG VIỆC CẦN THỰC HIỆN</td>
+                      </tr>
+                      {laborRows.map(renderRow)}
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                        <td style={{ fontWeight: 700, textAlign: 'right' }}>{laborSubtotal.toLocaleString('vi-VN')}</td>
+                      </tr>
+
+                      {partRows.length > 0 && (
+                        <>
+                          <tr>
+                            <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
+                            <td colSpan={6} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>PHỤ TÙNG, VẬT TƯ</td>
+                          </tr>
+                          {partRows.map(renderRow)}
+                          <tr>
+                            <td colSpan={7} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                            <td style={{ fontWeight: 700, textAlign: 'right' }}>{partSubtotal.toLocaleString('vi-VN')}</td>
+                          </tr>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
               </tbody>
             </table>
 
@@ -668,14 +731,20 @@ function SettlementPreviewModal({ order, onClose }) {
                         </button>
                       )
                     )}
+                    {cashError && <div style={{ fontSize: 9, color: '#C62828', maxWidth: 130, textAlign: 'center' }}>{cashError}</div>}
                   </>
                 ) : (
                   <div style={{
-                    width: 130, height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 130, height: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                     border: '1px solid #A5D6A7', borderRadius: 8, background: '#E8F5E9',
-                    textAlign: 'center', fontSize: 12, color: '#2E7D32', fontWeight: 600, padding: 6,
+                    textAlign: 'center', fontSize: 12, color: '#2E7D32', fontWeight: 600, padding: 6, gap: 4,
                   }}>
-                    ✓ Đã thanh toán
+                    <span>✓ Đã thanh toán</span>
+                    {order.paymentMethod && (
+                      <span style={{ fontSize: 10, fontWeight: 400 }}>
+                        ({order.paymentMethod === 'CASH' ? 'Tiền mặt' : 'Chuyển khoản'})
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -701,11 +770,44 @@ function SettlementPreviewModal({ order, onClose }) {
 
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
+          {order.status === 'waiting_payment' && (
+            <button className="btn btn-primary" disabled={confirmingCash} onClick={() => setShowCashConfirm(true)}>
+              {confirmingCash ? 'Đang xử lý…' : 'Xác nhận tiền mặt'}
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={handlePrint}>
             {hasPrinted ? 'In lại phiếu quyết toán' : 'In phiếu quyết toán'}
           </button>
         </div>
       </div>
+
+      {showCashConfirm && (
+        <div className="modal-overlay" onClick={(e) => e.stopPropagation()} style={{ zIndex: 1100 }}>
+          <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">Xác nhận thanh toán tiền mặt</span>
+              <button className="modal-close" onClick={() => setShowCashConfirm(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
+                Bạn xác nhận đã nhận được số tiền{' '}
+                <b style={{ color: 'red' }}>{(order.total || 0).toLocaleString('vi-VN')}đ</b>{' '}
+                từ khách hàng <b>{order.customer?.fullName}</b>?
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-danger" onClick={() => setShowCashConfirm(false)}>Hủy</button>
+              <button
+                className="btn btn-primary"
+                style={{ background: '#2E7D32', borderColor: '#2E7D32' }}
+                onClick={handleConfirmCash}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -982,6 +1084,24 @@ function DetailModal({ order, onClose, onPreview }) {
 }
 
 // ─── Danh sách phiếu quyết toán sửa chữa ─────────────────────────────
+// "dd/mm/yyyy HH:mm" (o.date) -> "yyyy-mm-dd" de so sanh voi <input type="date">
+// (chuoi ISO so sanh lexicographic dung thu tu thoi gian).
+function toComparableDate(ddmmyyyyHHmm) {
+  const [dd, mm, yyyy] = (ddmmyyyyHHmm || '').split(' ')[0].split('/');
+  if (!dd || !mm || !yyyy) return '';
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// "dd/mm/yyyy HH:mm" -> timestamp de sap xep tab "Đã xuất hóa đơn" theo thoi
+// gian thanh toan gan nhat truoc (0 neu khong parse duoc, tu roi xuong cuoi).
+function toTimestamp(ddmmyyyyHHmm) {
+  const [datePart, timePart] = (ddmmyyyyHHmm || '').split(' ');
+  const [dd, mm, yyyy] = (datePart || '').split('/');
+  if (!dd || !mm || !yyyy) return 0;
+  const [hh = '0', min = '0'] = (timePart || '').split(':');
+  return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min)).getTime();
+}
+
 function RepairSettlementList() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -996,6 +1116,14 @@ function RepairSettlementList() {
   // gan xong, khong can nguoi dung tu bam lai tab.
   const [tab, setTab] = useState(location.state?.tab || 'waiting_repair');
   const [search, setSearch] = useState('');
+  // Cac bo loc bo sung - AND voi nhau va voi search/tab (loc kep). Tổ trưởng
+  // ap dung moi tab (phieu nao chua co to truong se khong khop khi loc chon 1
+  // ten cu the, dung nhu ky vong); hinh thuc thanh toan chi co y nghia o tab
+  // "Đã xuất hóa đơn" nen chi hien dropdown do o dung tab nay.
+  const [filterTeamLeader, setFilterTeamLeader] = useState('');
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [view, setView] = useState(null);
   const [previewOrder, setPreviewOrder] = useState(null);
   const [page, setPage] = useState(1);
@@ -1096,18 +1224,36 @@ function RepairSettlementList() {
     cancelled: orders.filter((o) => o.status === 'cancelled').length,
   };
 
-  const filtered = orders.filter((o) =>
-    displayStatus(o) === tab &&
-    (!search ||
-      (o.code || '').toLowerCase().includes(search.toLowerCase()) ||
-      (o.customer?.fullName || '').toLowerCase().includes(search.toLowerCase()) ||
-      (o.vehicle?.licensePlate || '').toLowerCase().includes(search.toLowerCase()))
-  );
+  // Danh sach Tổ trưởng duy nhat tu chinh du lieu dang co, cho dropdown loc -
+  // khong goi API rieng, tranh phai dong bo them 1 nguon du lieu khac.
+  const teamLeaderOptions = [...new Set(orders.map((o) => o.teamLeader).filter(Boolean))].sort();
+
+  const filtered = orders.filter((o) => {
+    if (displayStatus(o) !== tab) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      const matches = (o.code || '').toLowerCase().includes(s)
+        || (o.customer?.fullName || '').toLowerCase().includes(s)
+        || (o.vehicle?.licensePlate || '').toLowerCase().includes(s);
+      if (!matches) return false;
+    }
+    if (filterTeamLeader && o.teamLeader !== filterTeamLeader) return false;
+    if (tab === 'invoiced' && filterPaymentMethod && o.paymentMethod !== filterPaymentMethod) return false;
+    const orderDate = toComparableDate(o.date);
+    if (filterDateFrom && (!orderDate || orderDate < filterDateFrom)) return false;
+    if (filterDateTo && (!orderDate || orderDate > filterDateTo)) return false;
+    return true;
+  });
+  // Tab "Đã xuất hóa đơn" mac dinh xep theo thoi gian thanh toan thanh cong
+  // gan hien tai nhat len dau (khong anh huong cac tab khac).
+  if (tab === 'invoiced') {
+    filtered.sort((a, b) => toTimestamp(b.paidDate) - toTimestamp(a.paidDate));
+  }
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const paginated = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
-  useEffect(() => { setPage(1); }, [tab, search]);
+  useEffect(() => { setPage(1); }, [tab, search, filterTeamLeader, filterPaymentMethod, filterDateFrom, filterDateTo]);
 
   // Danh sach chi tra ve thong tin tom tat (khong co items - de tranh phai
   // gop them bang service_order_items cho tung dong khi hien thi danh sach) -
@@ -1183,6 +1329,38 @@ function RepairSettlementList() {
         </div>
       </div>
 
+      {/* Bo loc bo sung - tat ca AND voi nhau va voi o Search/tab o tren (loc kep). */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select className="form-select" style={{ fontSize: 12, width: 'auto', minWidth: 160 }}
+          value={filterTeamLeader} onChange={(e) => setFilterTeamLeader(e.target.value)}>
+          <option value="">Tất cả Tổ trưởng</option>
+          {teamLeaderOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+        </select>
+        {tab === 'invoiced' && (
+          <select className="form-select" style={{ fontSize: 12, width: 'auto', minWidth: 170 }}
+            value={filterPaymentMethod} onChange={(e) => setFilterPaymentMethod(e.target.value)}>
+            <option value="">Tất cả hình thức TT</option>
+            <option value="CASH">Tiền mặt</option>
+            <option value="TRANSFER">Chuyển khoản</option>
+          </select>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--gray-600)' }}>
+          <span>Tiếp nhận từ</span>
+          <input className="form-input" type="date" style={{ fontSize: 12, width: 'auto' }} value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} />
+          <span>đến</span>
+          <input className="form-input" type="date" style={{ fontSize: 12, width: 'auto' }} value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
+        </div>
+        {(filterTeamLeader || filterPaymentMethod || filterDateFrom || filterDateTo) && (
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ fontSize: 11 }}
+            onClick={() => { setFilterTeamLeader(''); setFilterPaymentMethod(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+          >
+            Xóa lọc
+          </button>
+        )}
+      </div>
+
       {loadError && (
         <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
           {loadError}
@@ -1200,19 +1378,21 @@ function RepairSettlementList() {
           <thead>
             <tr>
               <th>Số RO</th><th>Khách hàng</th><th>Xe</th><th>Tổ trưởng</th>
-              <th>Ngày tiếp nhận</th><th>Tổng tiền</th><th>Trạng thái</th><th>Thao tác</th>
+              <th>Ngày tiếp nhận</th><th>Tổng tiền</th><th>Trạng thái</th>
+              {tab === 'invoiced' && <><th>Hình thức TT</th><th>Thời gian TT</th></>}
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8}>
+              <tr><td colSpan={tab === 'invoiced' ? 10 : 8}>
                 <div className="empty-state">
                   <p>Đang tải danh sách phiếu…</p>
                 </div>
               </td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={8}>
+              <tr><td colSpan={tab === 'invoiced' ? 10 : 8}>
                 <div className="empty-state">
                   <h3>Chưa có phiếu quyết toán nào</h3>
                   <p>Không có phiếu nào ở trạng thái này.</p>
@@ -1238,6 +1418,14 @@ function RepairSettlementList() {
                   <td style={{ fontSize: 12 }}>{o.date}</td>
                   <td style={{ fontWeight: 700, color: '#C62828' }}>{formatCurrency(o.total)}</td>
                   <td><span className={`badge ${st?.badge}`}>{st?.label}</span></td>
+                  {tab === 'invoiced' && (
+                    <>
+                      <td style={{ fontSize: 12 }}>
+                        {o.paymentMethod === 'CASH' ? 'Tiền mặt' : o.paymentMethod === 'TRANSFER' ? 'Chuyển khoản' : '—'}
+                      </td>
+                      <td style={{ fontSize: 12 }}>{o.paidDate || '—'}</td>
+                    </>
+                  )}
                   <td>
                     <div className="table-actions">
                       <button className="btn btn-info btn-sm" style={{ fontSize: 11 }} onClick={() => handleViewDetail(o)}>Xem chi tiết</button>
@@ -2267,14 +2455,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       setSaveError('Vui lòng nhập số km hiện tại của xe trước khi lưu.');
       return;
     }
-    // Cong-to-met ve nguyen tac chi tang - so moi THAP HON lan ghi nhan gan
-    // nhat gan nhu chac chan la go nham, nhung van co the la sua lai 1 lan
-    // nhap sai truoc do nen chi canh bao (khong chan cung).
+    // Cong-to-met ve nguyen tac chi tang - chan cung, khong cho luu neu so moi
+    // nhap thap hon lan ghi nhan gan nhat (hien san "Lần trước: N km" canh o
+    // nhap de CVDV tu doi chieu truoc khi go, xem UI o duoi).
     if (vehicleInfo.lastKnownKm != null && Number(vehicleInfo.currentKm) < Number(vehicleInfo.lastKnownKm)) {
-      const proceed = window.confirm(
-        `Số km bạn nhập (${Number(vehicleInfo.currentKm).toLocaleString('vi-VN')}) thấp hơn lần ghi nhận gần nhất (${Number(vehicleInfo.lastKnownKm).toLocaleString('vi-VN')}). Bạn có chắc chắn số này đúng không?`
-      );
-      if (!proceed) return;
+      setSaveError(`Số km hiện tại (${Number(vehicleInfo.currentKm).toLocaleString('vi-VN')}) không được nhỏ hơn lần ghi nhận gần nhất (${Number(vehicleInfo.lastKnownKm).toLocaleString('vi-VN')} km).`);
+      return;
     }
     if (!customerRequest.trim()) {
       setSaveError('Vui lòng nhập mô tả yêu cầu của khách hàng trước khi lưu.');
@@ -2568,8 +2754,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   <input className="form-input" type="date" value={vehicleInfo.purchaseDate} max={todayInputValue} readOnly={isFromLookup || isEdit} onChange={(e) => vInfoSet('purchaseDate', e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label required">Số Km hiện tại</label>
-                  <input className="form-input" type="number" value={vehicleInfo.currentKm} onChange={(e) => vInfoSet('currentKm', e.target.value)} />
+                  <label className="form-label required">
+                    Số Km hiện tại
+                    {vehicleInfo.lastKnownKm != null && (
+                      <span style={{ fontWeight: 400, color: 'var(--gray-500)', marginLeft: 6 }}>
+                        (Lần trước: {Number(vehicleInfo.lastKnownKm).toLocaleString('vi-VN')} km)
+                      </span>
+                    )}
+                  </label>
+                  <input className="form-input" type="number" min={vehicleInfo.lastKnownKm || 0} value={vehicleInfo.currentKm} onChange={(e) => vInfoSet('currentKm', e.target.value)} />
                 </div>
               </div>
               {(() => {

@@ -276,7 +276,26 @@ class RepairSettlementService {
       }
     }
 
-    const entity = await this.repairSettlementRepository.updateStatus(id, status, { issuedBy, cancelReason });
+    // Xuat hoa don qua duong nay (khong phai webhook PayOS) chi co the la CVDV
+    // bam "Xac nhan da thu tien mat" tren man In phieu, nen luon ghi nhan CASH
+    // - duong PayOS (chuyen khoan that) di rieng qua handlePayosWebhook() ben
+    // duoi, khong bao gio goi ham nay.
+    if (status === 'invoiced' && existing.status !== 'waiting_payment') {
+      throw new ApiError(409, 'Phiếu phải ở trạng thái chờ thanh toán mới có thể xác nhận thanh toán');
+    }
+
+    const entity = await this.repairSettlementRepository.updateStatus(id, status, {
+      issuedBy,
+      cancelReason,
+      paymentMethod: status === 'invoiced' ? 'CASH' : undefined,
+    });
+
+    // CVDV vua xac nhan thu tien mat - bao realtime giong het duong PayOS
+    // webhook (xem handlePayosWebhook), de danh sach/modal dang mo tu chuyen
+    // sang tab "Đã xuất hóa đơn" ngay, khong doi F5.
+    if (status === 'invoiced') {
+      emitRepairOrderEvent(existing.branchId, 'invoiced', { settlementId: entity.id });
+    }
 
     // Huy giua chung - neu da co to truong nhan (existing.repairOrderId), BE
     // da tu dong huy luon lenh sua chua cascade (xem
@@ -394,7 +413,7 @@ class RepairSettlementService {
     const settlement = await this.repairSettlementRepository.findById(tx.service_order_id);
     if (!settlement || settlement.status !== 'waiting_payment') return;
 
-    await this.repairSettlementRepository.updateStatus(tx.service_order_id, 'invoiced', { issuedBy: settlement.advisorId });
+    await this.repairSettlementRepository.updateStatus(tx.service_order_id, 'invoiced', { issuedBy: settlement.advisorId, paymentMethod: 'TRANSFER' });
     emitRepairOrderEvent(settlement.branchId, 'invoiced', { settlementId: tx.service_order_id });
 
     // Ghi audit sau khi xuat hoa don — khong doi logic thanh toan.
