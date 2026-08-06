@@ -20,6 +20,10 @@ class Product {
     this.branchId = data.branch_id ?? data.branchId ?? null;
     this.status = data.status ?? 'active';
     this.note = data.note ?? null;
+    this.createdByRole = data.created_by_role ?? data.createdByRole ?? null;
+    this.seenByManagerAt = data.seen_by_manager_at ?? data.seenByManagerAt ?? null;
+    // "Moi" doi voi Quan ly = do Nhan vien kho tao va Quan ly chua tung xem qua.
+    this.isNewForManager = this.createdByRole === 'warehouse_staff' && !this.seenByManagerAt;
   }
 
   static fromPersistence(row) {
@@ -39,6 +43,8 @@ class Product {
       location: row.location,
       branch_id: row.branch_id,
       status: row.status,
+      created_by_role: row.created_by_role,
+      seen_by_manager_at: row.seen_by_manager_at,
     });
   }
 
