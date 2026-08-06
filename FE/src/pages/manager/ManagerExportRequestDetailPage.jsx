@@ -2,16 +2,6 @@ import { Link, useParams } from 'react-router-dom';
 import { useManagerExportRequest } from '../../hooks/manager/useManagerExportRequest';
 import './ManagerExportRequestDetailPage.css';
 
-const STATUS_META = {
-  completed: { label: 'Đã xuất', className: 'badge--success' },
-  cancelled: { label: 'Hủy', className: 'badge--danger' },
-};
-
-function formatDate(d) {
-  if (!d) return '—';
-  return String(d).slice(0, 10);
-}
-
 function formatDateTime(d) {
   if (!d) return '—';
   const s = String(d);
@@ -35,7 +25,6 @@ export default function ManagerExportRequestDetailPage() {
   if (error) return <div className="mer-detail__error">Lỗi: {error}</div>;
   if (!data) return null;
 
-  const meta = STATUS_META[data.status] || { label: data.status, className: '' };
   const items = data.items || [];
   const totalQty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
 
@@ -50,7 +39,6 @@ export default function ManagerExportRequestDetailPage() {
             <h1 className="mer-detail__title">
               Phiếu xuất: <span className="font-mono">{data.requestCode}</span>
             </h1>
-            <span className={`badge ${meta.className}`}>{meta.label}</span>
           </div>
         </div>
       </div>
@@ -63,7 +51,6 @@ export default function ManagerExportRequestDetailPage() {
             <InfoRow label="Phiếu sửa chữa" value={data.serviceOrderCode} />
             <InfoRow label="Khách hàng" value={data.customerName} />
             <InfoRow label="Xe" value={data.vehiclePlate} />
-            <InfoRow label="Ngày xuất" value={formatDate(data.exportDate)} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
             <InfoRow label="Người xuất" value={data.performedByName} />
             <InfoRow label="Ghi chú" value={data.notes} />
@@ -110,17 +97,6 @@ export default function ManagerExportRequestDetailPage() {
           )}
         </div>
 
-        {data.status === 'completed' && (
-          <div className="mer-detail__notice mer-detail__notice--success">
-            Phiếu đã được xuất kho. Tồn kho đã bị trừ và hệ thống đã ghi log vào{' '}
-            <code>inventory_transactions</code> (transaction_type=&apos;export&apos;).
-          </div>
-        )}
-        {data.status === 'cancelled' && (
-          <div className="mer-detail__notice mer-detail__notice--danger">
-            Phiếu đã bị hủy.
-          </div>
-        )}
       </div>
     </div>
   );

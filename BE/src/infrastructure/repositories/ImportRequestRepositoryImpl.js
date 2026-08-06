@@ -37,7 +37,7 @@ function buildImportRequestFilters({
     params.fromDate = fromDate;
   }
   if (toDate) {
-    where.push('ir.created_at <= @toDate');
+    where.push('ir.created_at < DATEADD(day, 1, CAST(@toDate AS date))');
     params.toDate = toDate;
   }
   if (search) {
@@ -74,8 +74,8 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
       SELECT
         ir.*,
         s.supplier_name,
-        u_req.pseudo_id AS requested_by_name,
-        u_apv.pseudo_id AS approved_by_name,
+        COALESCE(NULLIF(LTRIM(RTRIM(u_req.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_req.first_name, N'') + N' ' + ISNULL(u_req.last_name, N''))), N''), u_req.pseudo_id) AS requested_by_name,
+        COALESCE(NULLIF(LTRIM(RTRIM(u_apv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_apv.first_name, N'') + N' ' + ISNULL(u_apv.last_name, N''))), N''), u_apv.pseudo_id) AS approved_by_name,
         (SELECT COUNT(*) FROM import_request_items i WHERE i.import_request_id = ir.id) AS item_count,
         (SELECT ISNULL(SUM(quantity), 0)
            FROM import_request_items i WHERE i.import_request_id = ir.id) AS total_quantity
@@ -108,8 +108,8 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
       `SELECT
          ir.*,
          s.supplier_name,
-         u_req.pseudo_id AS requested_by_name,
-         u_apv.pseudo_id AS approved_by_name
+         COALESCE(NULLIF(LTRIM(RTRIM(u_req.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_req.first_name, N'') + N' ' + ISNULL(u_req.last_name, N''))), N''), u_req.pseudo_id) AS requested_by_name,
+         COALESCE(NULLIF(LTRIM(RTRIM(u_apv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_apv.first_name, N'') + N' ' + ISNULL(u_apv.last_name, N''))), N''), u_apv.pseudo_id) AS approved_by_name
        FROM import_requests ir
        LEFT JOIN suppliers s ON s.id = ir.supplier_id
        LEFT JOIN users u_req ON u_req.id = ir.requested_by
@@ -129,10 +129,17 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
 
   async findItemsByRequestId(importRequestId) {
     const result = await query(
-      `SELECT id, import_request_id, product_id, product_code, product_name, unit, quantity
-       FROM import_request_items
-       WHERE import_request_id = @importRequestId
-       ORDER BY id ASC`,
+      `SELECT iri.id, iri.import_request_id, iri.product_id, iri.product_code,
+              iri.product_name,
+              CASE WHEN iri.unit IS NULL OR iri.unit LIKE N'%?%'
+                   THEN COALESCE(NULLIF(u.unit_name, N''), iri.unit)
+                   ELSE iri.unit END AS unit,
+              iri.quantity
+       FROM import_request_items iri
+       LEFT JOIN products p ON p.id = iri.product_id
+       LEFT JOIN units u ON u.id = p.unit_id
+       WHERE iri.import_request_id = @importRequestId
+       ORDER BY iri.id ASC`,
       { importRequestId }
     );
     return result.recordset.map((r) => ImportRequestItem.fromPersistence(r));
@@ -206,7 +213,7 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
         .input('product_id', sql.BigInt, item.product_id ?? null)
         .input('product_code', sql.VarChar(30), item.product_code)
         .input('product_name', sql.NVarChar(200), item.product_name)
-        .input('unit', sql.VarChar(20), item.unit ?? null)
+        .input('unit', sql.NVarChar(20), item.unit ?? null)
         .input('quantity', sql.Int, item.quantity)
         .query(`
           INSERT INTO import_request_items (

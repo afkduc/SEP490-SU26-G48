@@ -9,7 +9,7 @@ import { getImportRequestsApi } from '../../services/importRequestApi';
 export function useImportRequests(initialBranchId) {
   const [params, setParams] = useState({
     branchId: initialBranchId,
-    status: '',
+    status: 'approved',
     supplierId: '',
     fromDate: '',
     toDate: '',
