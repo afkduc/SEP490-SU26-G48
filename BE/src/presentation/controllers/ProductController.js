@@ -51,6 +51,11 @@ class ProductController {
       if (!payload.branchId && req.user?.branchId) {
         payload.branchId = req.user.branchId;
       }
+      // Luu lai vai tro nguoi tao de biet co phai NV kho tao khong (dung cho
+      // thong bao "san pham moi" ben Quan ly - xem markSeen/getNewCount).
+      payload.createdByRole = req.user?.roles?.includes('warehouse_staff')
+        ? 'warehouse_staff'
+        : (req.user?.roles?.[0] || null);
       const product = await this.productService.createProduct(payload);
       await auditCrud.create(req, {
         tableName: 'products',
@@ -162,6 +167,29 @@ class ProductController {
     try {
       const categories = await this.productService.getCategories();
       return success(res, categories, 'Categories retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Quan ly di chuot vao dong san pham moi (do NV kho tao) trong man Kho chi
+  // nhanh - danh dau la da xem, khong hien cham do nua.
+  markSeen = async (req, res, next) => {
+    try {
+      const product = await this.productService.markSeenByManager(req.params.id);
+      return success(res, product, 'Product marked as seen');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // So san pham do NV kho tao ma Quan ly CHUA xem - hien so do canh
+  // "Kho chi nhanh" tren menu.
+  getNewCount = async (req, res, next) => {
+    try {
+      const branchId = req.query.branchId ? Number(req.query.branchId) : req.user?.branchId;
+      const count = await this.productService.countNewForManager(branchId);
+      return success(res, { count }, 'New product count retrieved');
     } catch (err) {
       next(err);
     }

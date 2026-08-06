@@ -60,7 +60,8 @@ class ImportRequestController {
       }
       const result = await this.importRequestService.list({
         branchId: branchIdToUse,
-        status, supplierId, fromDate, toDate, search, page, limit,
+        status: hasRole(req.user, 'warehouse_staff') ? 'approved' : status,
+        supplierId, fromDate, toDate, search, page, limit,
       });
       return success(res, result, 'Import requests retrieved');
     } catch (err) {
@@ -81,14 +82,13 @@ class ImportRequestController {
 
   getNextCode = async (req, res, next) => {
     try {
-      const { branchId, date } = req.query;
+      const { branchId } = req.query;
       const branchIdToUse = resolveRequestedBranchId(req.user, branchId);
       if (!branchIdToUse) {
         throw new ApiError(400, 'branchId is required');
       }
       const data = await this.importRequestService.getNextRequestCode({
         branchId: branchIdToUse,
-        date,
       });
       return success(res, data, 'Next request code generated');
     } catch (err) {

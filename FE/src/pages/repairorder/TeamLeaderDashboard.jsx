@@ -7,7 +7,7 @@
 //   duoc tick tai man hinh cong khai cua khoang do (Landing /khoang/<chi
 //   nhanh>/<so khoang>), chi xem, khong tick duoc tu day.
 // - Lich su: cac lenh da hoan thanh cua to truong, loc theo ngay.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { listRepairSettlementsApi } from '../../services/repairSettlementApi';
 import { listMyBaysApi } from '../../services/vehicleBayApi';
@@ -43,6 +43,50 @@ function ddmmyyyyToInputValue(ddmmyyyy) {
 function inputValueToDDMMYYYY(value) {
   const [yyyy, mm, dd] = value.split('-');
   return `${dd}/${mm}/${yyyy}`;
+}
+
+// Hien thi 1 dau muc - hang muc bi khach huy giua chung (isCancelled) hoac
+// moi duoc CVDV them vao SAU luc nhan viec (isAddedLater) ghi ro o cuoi ten,
+// xem BE repairOrderTaskBuilder.js/computeDesiredTasks. Tach ten (co gach
+// ngang neu huy) voi phan mo ngoac cuoi ten thanh 2 <span> ANH EM - phan mo
+// ngoac KHONG duoc gach ngang, va text-decoration cua 1 the cha se "xuyen
+// qua" moi span con du con tu dat text-decoration:none, nen khong the chi
+// gop chung vao 1 chuoi roi gach ngang ca <label>/div cha.
+// So luong GIAM so voi prev_quantity (khach hoan tra bot, khong phai huy han)
+// - "SL xN" la CHENH LECH (khac "tổng là: N" cua truong hop TANG, vi TANG chi
+// can biet tong moi con GIAM can biet ro tra lai bao nhieu). Giam het ve 0 (ma
+// van chua qua "Khách hủy" chinh thuc, vd phu tung thao tra lai kho) thi coi
+// nhu da tra lai toan bo - gach ngang giong isCancelled - xem BE
+// RepairSettlementRepositoryImpl._syncRepairOrderTasks.
+function qtyReturnedOf(t) {
+  return t.prevQuantity != null && Number(t.quantity) < Number(t.prevQuantity)
+    ? Number(t.prevQuantity) - Number(t.quantity)
+    : 0;
+}
+function isFullyReturned(t) {
+  return !t.isCancelled && qtyReturnedOf(t) > 0 && Number(t.quantity) === 0;
+}
+function isStruckThrough(t) {
+  return t.isCancelled || isFullyReturned(t);
+}
+
+function TaskNameLabel({ t }) {
+  const qtyReturned = qtyReturnedOf(t);
+  const suffix = t.isCancelled
+    ? ' (Khách hủy)'
+    : qtyReturned > 0
+      ? ` (Khách trả lại SL x${qtyReturned})`
+      : t.isQtyIncreased
+        ? ` (Khách thêm số lượng, tổng là: ${t.quantity})`
+        : t.isAddedLater
+          ? ' (Khách thêm)'
+          : '';
+  return (
+    <>
+      <span style={{ textDecoration: isStruckThrough(t) ? 'line-through' : 'none' }}>{t.taskName}</span>
+      {suffix && <span style={{ textDecoration: 'none' }}>{suffix}</span>}
+    </>
+  );
 }
 
 // Sau khi chon khoang (da claim() thanh cong o BE - khong the huy giua
@@ -241,14 +285,16 @@ function BayStatusGrid({ bays, orders }) {
         const busy = Boolean(bay.activeRepairOrderId);
         const order = busy ? activeByBayId.get(String(bay.id)) : null;
         const serviceTasks = order ? (order.tasks || []).filter((t) => t.taskType === 'service') : [];
-        const doneCount = serviceTasks.filter((t) => t.isDone).length;
+        const partTasks = order ? (order.tasks || []).filter((t) => t.taskType !== 'service') : [];
+        const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
+        const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
 
         return (
           <div key={bay.id} className={`tld-bay-status-card ${busy ? 'tld-bay-status-card--busy' : ''}`}>
             <div className="tld-bay-status-card__header">
               <span className="tld-bay-status-card__number">Khoang {bay.bayNumber}</span>
               <span className={`badge ${busy ? 'badge-inprogress' : 'badge-inactive'}`}>
-                {busy ? `Đang làm (${doneCount}/${serviceTasks.length})` : 'Trống'}
+                {busy ? `Đang làm (${doneCount}/${activeServiceTasks.length})` : 'Trống'}
               </span>
             </div>
 
@@ -256,7 +302,6 @@ function BayStatusGrid({ bays, orders }) {
 
             {busy && order && (
               <>
-                <div className="tld-bay-status-card__code">{order.code}</div>
                 <div className="tld-bay-status-card__customer">{order.customer?.fullName} — {order.vehicle?.licensePlate}</div>
                 {order.technicians?.length > 0 && (
                   <div className="tld-bay-status-card__tech">
@@ -266,12 +311,37 @@ function BayStatusGrid({ bays, orders }) {
                 {serviceTasks.length > 0 && (
                   <div className="tld-bay-status-card__tasks">
                     {serviceTasks.map((task) => (
-                      <label key={task.id} className={`tld-task ${task.isDone ? 'tld-task--done' : ''}`}>
+                      <label key={task.id} className={`tld-task ${isStruckThrough(task) ? 'tld-task--cancelled' : (task.isDone ? 'tld-task--done' : '')}`}>
                         <input type="checkbox" checked={task.isDone} readOnly disabled />
-                        <span>{task.taskName}</span>
+                        <div className="tld-task__body">
+                          <div className="tld-task__nameRow">
+                            <TaskNameLabel t={task} />
+                            {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
+                          </div>
+                          {task.note && <div className="tld-task__note">{task.note}</div>}
+                        </div>
                       </label>
                     ))}
                   </div>
+                )}
+
+                {partTasks.length > 0 && (
+                  <>
+                    <div className="tld-bay-status-card__parts-title">Phụ tùng cần dùng</div>
+                    <div className="tld-bay-status-card__parts">
+                      {partTasks.map((task) => (
+                        <div key={task.id} className={`tld-part ${isStruckThrough(task) ? 'tld-task--cancelled' : ''}`}>
+                          <div className="tld-task__body">
+                            <div className="tld-task__nameRow">
+                              <TaskNameLabel t={task} />
+                            </div>
+                            {task.note && <div className="tld-task__note">{task.note}</div>}
+                          </div>
+                          {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -282,12 +352,66 @@ function BayStatusGrid({ bays, orders }) {
   );
 }
 
-function HistoryPanel({ orders, bays }) {
+// Xem lai 1 lenh da hoan thanh trong Lich su - khach da sua nhung gi (dich
+// vu/phu tung, kem so luong voi hang phu tung), tho nao lam, khoang nao.
+function HistoryDetailModal({ order, onClose }) {
+  const serviceTasks = (order.tasks || []).filter((t) => t.taskType === 'service');
+  const partTasks = (order.tasks || []).filter((t) => t.taskType !== 'service');
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <span className="modal-title">{order.customer?.fullName} — {order.vehicle?.licensePlate}</span>
+          <button type="button" className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="tld-pending-card__vehicle">{order.vehicle?.vehicleModel}</div>
+          <div className="tld-pending-card__vehicle">
+            Khoang {order.bayNumber || '—'} · Nhận: {order.createdAtTime || '—'} · Hoàn thành: {order.completedAtTime || '—'}
+          </div>
+          {order.technicians?.length > 0 && (
+            <div className="tld-bay-status-card__tech" style={{ marginTop: 8 }}>
+              Thợ thực hiện: <b>{order.technicians.map((t) => (t.sameTeam ? t.fullName : `${t.fullName} (Điều động)`)).join(', ')}</b>
+            </div>
+          )}
+
+          {serviceTasks.length > 0 && (
+            <div className="tld-bay-status-card__tasks" style={{ marginTop: 12 }}>
+              {serviceTasks.map((task) => (
+                <label key={task.id} className={`tld-task ${task.isCancelled ? 'tld-task--cancelled' : 'tld-task--done'}`}>
+                  <input type="checkbox" checked={task.isDone} readOnly disabled />
+                  <TaskNameLabel t={task} />
+                </label>
+              ))}
+            </div>
+          )}
+
+          {partTasks.length > 0 && (
+            <>
+              <div className="form-section-title" style={{ marginTop: 16 }}>Phụ tùng đã dùng</div>
+              <div className="tld-bay-status-card__tasks">
+                {partTasks.map((task) => (
+                  <div key={task.id} className={`tld-task ${task.isCancelled ? 'tld-task--cancelled' : ''}`}>
+                    <TaskNameLabel t={task} />
+                    {task.quantity > 1 && <span> x{task.quantity}</span>}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoryPanel({ orders }) {
   const [selectedDate, setSelectedDate] = useState(() => formatDDMMYYYY(new Date()));
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const isToday = selectedDate === formatDDMMYYYY(new Date());
   const completed = orders.filter((o) => o.status === 'completed');
   const filtered = completed.filter((o) => o.completedAt === selectedDate);
-  const bayNumberOf = (o) => bays.find((b) => String(b.id) === String(o.bayId))?.bayNumber;
 
   return (
     <div>
@@ -309,17 +433,19 @@ function HistoryPanel({ orders, bays }) {
       ) : (
         <div className="tld-history-list">
           {filtered.map((o) => (
-            <div key={o.id} className="tld-history-row">
+            <div key={o.id} className="tld-history-row" style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
               <div>
-                <div className="tld-pending-card__code">{o.code}</div>
                 <div className="tld-pending-card__customer">{o.customer?.fullName} — {o.vehicle?.licensePlate}</div>
-                <div className="tld-pending-card__vehicle">Khoang {bayNumberOf(o) || '—'} · {o.vehicle?.vehicleModel}</div>
+                <div className="tld-pending-card__vehicle">Khoang {o.bayNumber || '—'} · {o.vehicle?.vehicleModel}</div>
+                <div className="tld-pending-card__vehicle">Nhận: {o.createdAtTime || '—'} · Hoàn thành: {o.completedAtTime || '—'}</div>
               </div>
               <div className="tld-history-row__date">{o.completedAt}</div>
             </div>
           ))}
         </div>
       )}
+
+      {selectedOrder && <HistoryDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
     </div>
   );
 }
@@ -332,10 +458,25 @@ export default function TeamLeaderDashboard() {
   const [error, setError] = useState('');
   const [claimingSettlement, setClaimingSettlement] = useState(null);
   const [claimedElsewhere, setClaimedElsewhere] = useState({});
+  // So do goc tab - dem viec "chua xem": pendingSeenCount la mo (baseline) so
+  // luong pending tai lan cuoi mo tab "Viec cho nhan" (null = chua seed lan
+  // dau, tranh hien badge ngay khi vua vao trang du chua co gi moi that su);
+  // baysUpdateCount dem so lan co thay doi (claim/tick/huy/hoan thanh) trong
+  // luc KHONG dang mo tab "Khoang xe cua toi".
+  const [pendingSeenCount, setPendingSeenCount] = useState(null);
+  const [baysUpdateCount, setBaysUpdateCount] = useState(0);
+  const activeTabRef = useRef('pending');
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
   const loadPending = useCallback(() => {
     listRepairSettlementsApi({ status: 'waiting_repair', scope: 'branch', limit: 200 })
-      .then((result) => setPending(result.items || []))
+      .then((result) => {
+        const items = result.items || [];
+        setPending(items);
+        // Seed lan dau, hoac dong bo lai ngay neu dang MO SAN tab nay (khong
+        // hien badge cho thu ma to truong dang nhin thay ngay truoc mat).
+        setPendingSeenCount((prev) => (prev === null || activeTabRef.current === 'pending' ? items.length : prev));
+      })
       .catch((err) => setError(err.message || 'Không tải được bảng tin việc'));
   }, []);
 
@@ -393,6 +534,11 @@ export default function TeamLeaderDashboard() {
     if (BAY_REFRESH_EVENT_TYPES.has(event.type)) {
       loadBays();
     }
+    // BAY_REFRESH_EVENT_TYPES la tap con cua ORDER_REFRESH_EVENT_TYPES nen
+    // chi can kiem tra 1 lan - tranh dem trung khi 1 event khop ca 2 tap.
+    if (ORDER_REFRESH_EVENT_TYPES.has(event.type) && activeTabRef.current !== 'bays') {
+      setBaysUpdateCount((c) => c + 1);
+    }
   }, [loadPending, loadBays, loadOrders]);
 
   useRepairOrderEventsSSE(handleEvent, true);
@@ -405,6 +551,14 @@ export default function TeamLeaderDashboard() {
   };
 
   const activeTabLabel = TABS.find((t) => t.key === activeTab)?.label;
+  const pendingBadge = pending && pendingSeenCount !== null ? Math.max(0, pending.length - pendingSeenCount) : 0;
+  const tabBadge = { pending: pendingBadge, bays: baysUpdateCount };
+
+  const handleTabClick = (key) => {
+    setActiveTab(key);
+    if (key === 'pending') setPendingSeenCount(pending?.length ?? 0);
+    if (key === 'bays') setBaysUpdateCount(0);
+  };
 
   return (
     <div>
@@ -421,9 +575,10 @@ export default function TeamLeaderDashboard() {
             key={t.key}
             type="button"
             className={`tld-tab ${activeTab === t.key ? 'tld-tab--active' : ''}`}
-            onClick={() => setActiveTab(t.key)}
+            onClick={() => handleTabClick(t.key)}
           >
             {t.label}
+            {tabBadge[t.key] > 0 && <span className="tld-tab-badge">{tabBadge[t.key] > 9 ? '9+' : tabBadge[t.key]}</span>}
           </button>
         ))}
       </div>
@@ -450,6 +605,7 @@ export default function TeamLeaderDashboard() {
                   </div>
                   <div className="tld-pending-card__customer">{s.customer?.fullName} — {s.vehicle?.licensePlate}</div>
                   <div className="tld-pending-card__vehicle">{s.vehicle?.vehicleModel}</div>
+                  {s.advisor && <div className="tld-pending-card__advisor">Cố vấn: <b>{s.advisor}</b></div>}
                   <div className="tld-pending-card__request">
                     <span className="tld-pending-card__request-label">Yêu cầu:</span> {s.customerRequest || '—'}
                   </div>
@@ -471,7 +627,7 @@ export default function TeamLeaderDashboard() {
 
       {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} />}
 
-      {activeTab === 'history' && <HistoryPanel orders={orders} bays={bays} />}
+      {activeTab === 'history' && <HistoryPanel orders={orders} />}
 
       {claimingSettlement && (
         <ClaimModal

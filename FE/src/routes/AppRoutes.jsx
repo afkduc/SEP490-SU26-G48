@@ -16,6 +16,7 @@ import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
 const LOGIN_PATH = `${BASE_PATH}/login`;
 const UNAUTHORIZED_PATH = `${BASE_PATH}/unauthorized`;
 import { SharedDataProvider } from '../contexts/SharedDataContext';
+import { ManagerInventoryNotifyProvider } from '../contexts/ManagerInventoryNotifyContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
 import { useAuth } from '../contexts/AppContext';
 
@@ -25,7 +26,6 @@ const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const RepairSettlementPage = lazy(() => import('../pages/repairsettlement/RepairSettlementPage'));
 const RepairOrderPage = lazy(() => import('../pages/repairorder/RepairOrderPage'));
-const ActiveBaysPage = lazy(() => import('../pages/repairorder/ActiveBaysPage'));
 const CustomerHistoryPage = lazy(() => import('../pages/customer/CustomerHistoryPage'));
 const CustomerCarePage = lazy(() => import('../pages/customercare/CustomerCarePage'));
 const ServiceRequestsPage = lazy(() => import('../pages/servicerequests/ServiceRequestsPage'));
@@ -153,6 +153,7 @@ function AppRoutes() {
   return (
     <>
       <SharedDataProvider>
+      <ManagerInventoryNotifyProvider>
         <SessionExpiredModal />
         <SessionTakenOverPrompt />
         <ForbiddenModal />
@@ -331,18 +332,6 @@ function AppRoutes() {
           }
         />
 
-        {/* CVDV - xem khoang xe cua to truong nao dang hoat dong, dang lam xe gi */}
-        <Route
-          path="/active-bays"
-          element={
-            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
-              <AppLayout>
-                <ActiveBaysPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-
         {/* Chăm sóc khách hàng - nhắc nhở bảo dưỡng */}
         <Route
           path="/customer-care"
@@ -416,6 +405,7 @@ function AppRoutes() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       </Suspense>
+      </ManagerInventoryNotifyProvider>
     </SharedDataProvider>
     </>
   );

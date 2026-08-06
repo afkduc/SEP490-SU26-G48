@@ -6,6 +6,11 @@ const { PublicVehicleHistoryDto } = RepairSettlementResponseDto;
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
 const { auditCrud } = require('../../utils/auditHelper');
 const { settlementSnapshot } = require('../../utils/auditSnapshots');
+const { isValidPhone, isValidEmail, EMAIL_HINT } = require('../../utils/fieldValidation');
+
+// CCCD (12 so, mau moi) hoac CMND cu (9 so) - chap nhan ca 2 vi du lieu cu
+// van con luu CMND 9 so.
+const CCCD_REGEX = /^[0-9]{9}([0-9]{3})?$/;
 
 let payosClient = null;
 function getPayOS() {
@@ -23,11 +28,46 @@ function getPayOS() {
 // dung dong (cong/vat tu); "ai tra tien" da chuyen het sang HTTT (tranh 2
 // truong cung dung ma 'BH' nhung nghia khac nhau).
 const LHSC_VALUES = ['DV', 'PT'];
-const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB'];
+// 'HUY' = khach huy hang muc nay giua chung (tho dang lam nhung khach khong
+// muon lam nua) - mien thu khach giong BHH/BH/NB, nhung khac o cho: chi duoc
+// chon khi hang muc CHUA duoc tick hoan thanh (xem update() ben duoi).
+const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB', 'HUY'];
 // REPAIR_CATEGORY = "Loai hinh sua chua" THAT (dung nhu thuc te tai dai ly xe -
 // khac voi LHSC o tren, vi LHSC da bi dung nham thanh "loai hang muc").
 const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
+const EXEMPT_HTTT_VALUES = new Set(['BHH', 'BH', 'NB', 'HUY']);
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
+
+// Tinh lai toan bo tong tien tu CHINH danh sach hang muc - khong tin theo
+// subtotal/discountAmount/vat/total FE gui len trong payload (truoc day BE
+// lay thang, ai goi API truc tiep bo qua FE co the tu khai total thap hon
+// gia tri hang muc that, PayOS lai thu dung theo so nay - xem
+// createPayosPaymentLink ben duoi). PHAI khop chinh xac cong thuc voi
+// RepairSettlementPage.jsx calcTotals() de khong lech so voi so CVDV nhin
+// thay tren man hinh truoc khi bam Luu.
+function calcTotalsFromItems(items) {
+  let subtotal = 0;
+  let discountAmount = 0;
+  let freeAmount = 0;
+  for (const item of items) {
+    const qty = Number(item.qty) || 0;
+    const unitPrice = Number(item.unitPrice) || 0;
+    const base = qty * unitPrice;
+    if (item.isFree) {
+      freeAmount += base;
+      continue;
+    }
+    if (EXEMPT_HTTT_VALUES.has(item.httt)) continue;
+    const discountPct = Number(item.discount) || 0;
+    subtotal += base * (1 - discountPct / 100);
+    discountAmount += base * (discountPct / 100);
+  }
+  subtotal = Math.round(subtotal);
+  discountAmount = Math.round(discountAmount);
+  freeAmount = Math.round(freeAmount);
+  const vat = Math.round(subtotal * 0.08);
+  return { subtotal, discountAmount, afterDiscount: subtotal, vat, freeAmount, total: subtotal + vat };
+}
 const ACTIVE_STATUS_LABELS = {
   waiting_repair: 'chờ sửa chữa',
   inprogress: 'đang sửa chữa',
@@ -35,8 +75,9 @@ const ACTIVE_STATUS_LABELS = {
 };
 
 class RepairSettlementService {
-  constructor({ repairSettlementRepository }) {
+  constructor({ repairSettlementRepository, customerRepository }) {
     this.repairSettlementRepository = repairSettlementRepository;
+    this.customerRepository = customerRepository;
   }
 
   async getAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page, limit } = {}) {
@@ -84,9 +125,61 @@ class RepairSettlementService {
     }
   }
 
+  // CVDV go tay khach hang/xe MOI (khong chon tu goi y tra cuu DB co san) -
+  // payload luc do khong co customerId/vehicleId, chi co payload.customer/
+  // payload.vehicle (thong tin tho). Tu tim-hoac-tao khach hang (theo SDT) va
+  // xe (theo bien so) that trong DB, gan lai id vao payload de cac buoc sau
+  // xu ly binh thuong nhu da chon tu tra cuu. Neu payload da co san
+  // customerId/vehicleId (duong tra cuu cu) thi bo qua, giu nguyen hanh vi cu.
+  async _resolveCustomerAndVehicle(payload) {
+    if (payload.customerId && payload.vehicleId) return payload;
+
+    const customer = payload.customer || {};
+    const vehicle = payload.vehicle || {};
+    if (!(customer.fullName || '').trim() || !(customer.phone || '').trim()) {
+      throw new ApiError(400, 'Phải nhập tên và số điện thoại khách hàng');
+    }
+    if (!(vehicle.licensePlate || '').trim()) {
+      throw new ApiError(400, 'Phải nhập biển số xe');
+    }
+    if (!isValidPhone(customer.phone)) {
+      throw new ApiError(400, 'Số điện thoại khách hàng không hợp lệ');
+    }
+    if ((customer.contactPhone || '').trim() && !isValidPhone(customer.contactPhone)) {
+      throw new ApiError(400, 'Số điện thoại người liên hệ không hợp lệ');
+    }
+    if ((customer.email || '').trim() && !isValidEmail(customer.email)) {
+      throw new ApiError(400, EMAIL_HINT);
+    }
+    if ((customer.cccd || '').trim() && !CCCD_REGEX.test(customer.cccd.trim())) {
+      throw new ApiError(400, 'Số CCCD/CMND không hợp lệ (phải là 9 hoặc 12 chữ số)');
+    }
+
+    const { customerId, vehicleId } = await this.customerRepository.findOrCreateForSettlement({
+      fullName: customer.fullName.trim(),
+      phone: customer.phone.trim(),
+      address: customer.address || null,
+      taxCode: customer.taxCode || null,
+      cccd: customer.cccd || null,
+      email: customer.email || null,
+      contactName: customer.contactPerson || null,
+      contactPhone: customer.contactPhone || null,
+      licensePlate: vehicle.licensePlate.trim(),
+      vehicleModelText: vehicle.vehicleModel || null,
+      brandId: vehicle.brandId || null,
+      frameNumber: vehicle.frameNumber || null,
+      engineNumber: vehicle.engineNumber || null,
+      currentKm: payload.currentKm || null,
+      purchaseDate: vehicle.purchaseDate || null,
+    });
+
+    return { ...payload, customerId, vehicleId };
+  }
+
   async create(payload, { branchId, advisorId }) {
     this._assertSignaturePresent(payload.signatureData);
-    const data = this._validateAndNormalize(payload);
+    const resolvedPayload = await this._resolveCustomerAndVehicle(payload);
+    const data = this._validateAndNormalize(resolvedPayload);
     data.signatureData = payload.signatureData;
     data.signerName = (payload.signerName || '').trim() || null;
     await this._assertNoActiveDuplicate(data.customerId, data.vehicleId);
@@ -109,7 +202,29 @@ class RepairSettlementService {
 
     const data = this._validateAndNormalize(payload);
     await this._assertNoActiveDuplicate(data.customerId, data.vehicleId, id);
+
+    // Khong tin rieng FE (co the chan nham/thieu do bug hien thi) - kiem tra
+    // lai o day: doi HTTT/xoa hang muc trong payload nay co lam mat 1 dau muc
+    // DA duoc tick hoan thanh hay khong.
+    const wouldLose = await this.repairSettlementRepository.wouldLoseCompletedTasks(id, data.items);
+    if (wouldLose) {
+      throw new ApiError(409, 'Có đầu mục công việc đã được xác nhận hoàn thành, không thể hủy hoặc xóa hạng mục tương ứng nữa');
+    }
+
     const entity = await this.repairSettlementRepository.update(id, data);
+
+    // Realtime: neu phieu dang co lenh sua chua "inprogress" (da co to
+    // truong/tho), sua hang muc (vd khach huy giua chung) co the lam checklist
+    // thay doi (bot dau muc) - bao ngay cho dashboard to truong + man khoang
+    // xe cong khai, khong doi ho tu F5 moi thay dau muc da bien mat.
+    if (existing.repairOrderId) {
+      emitRepairOrderEvent(existing.branchId, 'task-updated', {
+        orderId: existing.repairOrderId,
+        settlementId: entity.id,
+        taskId: null,
+      });
+    }
+
     return RepairSettlementResponseDto.fromEntity(entity);
   }
 
@@ -149,6 +264,12 @@ class RepairSettlementService {
     if (status === 'cancelled') {
       if (!['waiting_repair', 'inprogress'].includes(existing.status)) {
         throw new ApiError(409, 'Chỉ có thể hủy phiếu khi đang ở trạng thái chờ sửa chữa hoặc đang sửa chữa');
+      }
+      // Dang sua chua nhung chua tick xong dau muc nao thi van huy duoc binh
+      // thuong (chua lam gi thuc te) - da co it nhat 1 dau muc duoc xac nhan
+      // hoan thanh thi khong cho huy nua, tranh mat cong to truong/tho da lam.
+      if (existing.status === 'inprogress' && (existing.tasks || []).some((t) => t.isDone)) {
+        throw new ApiError(409, 'Đã có đầu mục công việc được xác nhận hoàn thành, không thể hủy phiếu này nữa');
       }
       if (!(cancelReason || '').trim()) {
         throw new ApiError(400, 'Phải nhập lý do hủy');
@@ -326,6 +447,22 @@ class RepairSettlementService {
       if (!REPAIR_CATEGORY_VALUES.includes(item.repairCategory)) {
         throw new ApiError(400, `Loại hình sửa chữa không hợp lệ: ${item.repairCategory}`);
       }
+      // So luong: phu tung (PT) hoac hang muc DA HUY duoc phep = 0 (huy giua
+      // chung luon ve 0, xem FE handleCancelItem) - dich vu (DV) con hieu luc
+      // thi phai >= 1, khong co "0 cong" ma van tinh la 1 dau muc that.
+      const minQty = (item.lhsc === 'PT' || item.httt === 'HUY') ? 0 : 1;
+      const qtyNum = Number(item.qty);
+      if (!Number.isFinite(qtyNum) || qtyNum < minQty) {
+        throw new ApiError(400, `Số lượng không hợp lệ ở hạng mục "${item.description}"`);
+      }
+      const unitPriceNum = Number(item.unitPrice);
+      if (!Number.isFinite(unitPriceNum) || unitPriceNum < 0) {
+        throw new ApiError(400, `Đơn giá không hợp lệ ở hạng mục "${item.description}"`);
+      }
+      const discountNum = Number(item.discount) || 0;
+      if (discountNum < 0 || discountNum > 100) {
+        throw new ApiError(400, `Chiết khấu phải trong khoảng 0-100% ở hạng mục "${item.description}"`);
+      }
     }
 
     return {
@@ -334,12 +471,7 @@ class RepairSettlementService {
       customerRequest: payload.customerRequest || null,
       note: payload.note || null,
       currentKm: payload.currentKm ? Number(payload.currentKm) : null,
-      subtotal: payload.subtotal,
-      discountAmount: payload.discountAmount,
-      afterDiscount: payload.afterDiscount,
-      vat: payload.vat,
-      freeAmount: payload.freeAmount,
-      total: payload.total,
+      ...calcTotalsFromItems(items),
       items,
       intakeChecklist: payload.intakeChecklist || null,
     };
