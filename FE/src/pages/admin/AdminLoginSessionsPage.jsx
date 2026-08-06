@@ -11,6 +11,7 @@ import { downloadBlob } from '../../utils/downloadBlob';
 import { pickLatestSession } from './securityAlertFocus';
 import { normalizeVietnamese } from '../../utils/vietnamese';
 import { formatPhoneDisplay } from '../../utils/validation';
+import { nextDateRangeState } from '../../utils/dateRange';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -779,7 +780,15 @@ export default function AdminLoginSessionsPage({
                 className="filter-field__input filter-field__input--date"
                 type="date"
                 value={sessions.params.startDate || ''}
-                onChange={(e) => sessions.updateParam('startDate', e.target.value)}
+                onChange={(e) => {
+                  const next = nextDateRangeState('start', e.target.value, sessions.params);
+                  sessions.setParams((p) => ({
+                    ...p,
+                    startDate: next.startDate,
+                    endDate: next.endDate,
+                    page: 1,
+                  }));
+                }}
                 title="Từ ngày"
               />
               <span className="filter-field__date-sep">—</span>
@@ -787,7 +796,15 @@ export default function AdminLoginSessionsPage({
                 className="filter-field__input filter-field__input--date"
                 type="date"
                 value={sessions.params.endDate || ''}
-                onChange={(e) => sessions.updateParam('endDate', e.target.value)}
+                onChange={(e) => {
+                  const next = nextDateRangeState('end', e.target.value, sessions.params);
+                  sessions.setParams((p) => ({
+                    ...p,
+                    startDate: next.startDate,
+                    endDate: next.endDate,
+                    page: 1,
+                  }));
+                }}
                 title="Đến ngày"
               />
             </div>

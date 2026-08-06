@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AppContext';
 import { useToast } from '../../components/common/ToastContext';
 import { formatDateSafe } from '../../utils/dateUtils';
 import { pickLatestDevice } from './securityAlertFocus';
+import { nextDateRangeState } from '../../utils/dateRange';
 import './AdminDevicesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -577,7 +578,14 @@ export default function AdminDevicesPage({
               type="date"
               className="admin-devices__date"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={(e) => {
+                const next = nextDateRangeState('start', e.target.value, {
+                  startDate: dateFrom,
+                  endDate: dateTo,
+                });
+                setDateFrom(next.startDate);
+                setDateTo(next.endDate);
+              }}
               title="Từ ngày"
             />
             <span className="admin-devices__date-sep">—</span>
@@ -585,7 +593,14 @@ export default function AdminDevicesPage({
               type="date"
               className="admin-devices__date"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              onChange={(e) => {
+                const next = nextDateRangeState('end', e.target.value, {
+                  startDate: dateFrom,
+                  endDate: dateTo,
+                });
+                setDateFrom(next.startDate);
+                setDateTo(next.endDate);
+              }}
               title="Đến ngày"
             />
           </div>

@@ -9,7 +9,7 @@ import {
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { formatPhoneDisplay } from '../../utils/validation';
-import { useCrmSearchSync } from '../../utils/crmUrl';
+import { useCrmSearchSync, navigateWithCrm } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
 import PermissionGate from '../../components/PermissionGate';
 import AdminPagination from './components/AdminPagination';
@@ -175,7 +175,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
-      navigate('/admin/users/new', {
+      navigateWithCrm(navigate, '/admin/users/new', {
         replace: true,
         state: { fromListSearch: location.search },
       });

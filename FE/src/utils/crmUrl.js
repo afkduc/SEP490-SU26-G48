@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { BASE_PATH } from '../config';
 
+function getNativeReplaceState() {
+  if (typeof window === 'undefined') return null;
+  return window.__crmNativeReplaceState
+    || window.history.replaceState.bind(window.history);
+}
+
 /**
  * Path của React Router (vd /admin/users?roleId=1) → URL trình duyệt có /crm.
  */
@@ -40,11 +46,7 @@ export function parseRouterUrl(to) {
   return { pathname, search, hash };
 }
 
-/**
- * Ép thanh địa chỉ khớp path router + basename /crm.
- */
-export function forceCrmBrowserUrl(routerPathname, search = '', hash = '') {
-  if (!BASE_PATH || typeof window === 'undefined') return;
+function buildExpectedUrl(routerPathname, search = '', hash = '') {
   const pathname = stripCrmBase(routerPathname || '/');
   const qs = typeof search === 'string'
     ? (search.startsWith('?') || search === '' ? search : `?${search}`)
@@ -52,16 +54,33 @@ export function forceCrmBrowserUrl(routerPathname, search = '', hash = '') {
   const hashPart = !hash
     ? ''
     : (hash.startsWith('#') ? hash : `#${hash}`);
-  const expected = `${BASE_PATH}${pathname}${qs}${hashPart}`;
-  const actual = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  if (actual !== expected) {
-    window.history.replaceState(window.history.state, '', expected);
+  if (!BASE_PATH) return `${pathname}${qs}${hashPart}`;
+  return `${BASE_PATH}${pathname}${qs}${hashPart}`;
+}
+
+/**
+ * Ép thanh địa chỉ khớp path router + basename /crm.
+ * Dùng native replaceState (không qua patch) + microtask/rAF để thắng race với React Router.
+ */
+export function forceCrmBrowserUrl(routerPathname, search = '', hash = '') {
+  if (!BASE_PATH || typeof window === 'undefined') return;
+  const expected = buildExpectedUrl(routerPathname, search, hash);
+  const apply = () => {
+    const actual = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (actual !== expected) {
+      const nativeReplace = getNativeReplaceState();
+      nativeReplace(window.history.state, '', expected);
+    }
+  };
+  apply();
+  queueMicrotask(apply);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(apply);
   }
 }
 
 /**
  * navigate an toàn trên production: luôn ép URL trình duyệt có /crm sau khi đổi route.
- * Dùng cho AdminLayout tiến/lùi và mọi chỗ navigate bằng string path.
  */
 export function navigateWithCrm(navigate, to, opts) {
   const loc = parseRouterUrl(to);
@@ -74,7 +93,6 @@ export function navigateWithCrm(navigate, to, opts) {
 
 /**
  * Mount trong BrowserRouter — mọi lần đổi route đều ép lại /crm trên thanh địa chỉ.
- * Chặn filter sync, nút tiến/lùi, sidebar, deep-link… mất basename.
  */
 export function CrmUrlGuard() {
   const location = useLocation();
@@ -88,7 +106,7 @@ export function CrmUrlGuard() {
 
 /**
  * Đồng bộ filter/query lên URL — giữ /crm trên production.
- * nextParams: URLSearchParams | Record | (prev: URLSearchParams) => URLSearchParams
+ * Ghi URL bằng native history TRƯỚC, rồi sync React Router, rồi ép lại /crm.
  */
 export function useCrmSearchSync() {
   const navigate = useNavigate();
@@ -106,6 +124,16 @@ export function useCrmSearchSync() {
     const qs = sp.toString();
     const search = qs ? `?${qs}` : '';
 
-    navigateWithCrm(navigate, { pathname, search }, navigateOpts);
+    // 1) Ghi thẳng URL trình duyệt có /crm (tránh setSearchParams/navigate làm mất basename)
+    const nativeReplace = getNativeReplaceState();
+    if (BASE_PATH && nativeReplace) {
+      nativeReplace(window.history.state, '', buildExpectedUrl(pathname, search));
+    }
+
+    // 2) Sync state React Router
+    navigate({ pathname, search }, navigateOpts);
+
+    // 3) Ép lại nếu RR ghi đè thiếu /crm
+    forceCrmBrowserUrl(pathname, search);
   }, [navigate]);
 }

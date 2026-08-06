@@ -32,8 +32,24 @@ export function ensureCrmHistoryBase() {
   const origReplace = window.history.replaceState.bind(window.history);
   const origPush = window.history.pushState.bind(window.history);
 
+  // Cho crmUrl.forceCrmBrowserUrl gọi native API, tránh đệ quy qua patch.
+  window.__crmNativeReplaceState = origReplace;
+  window.__crmNativePushState = origPush;
+
   const fixUrl = (url) => {
-    if (url == null || typeof url !== 'string' || !url.startsWith('/')) return url;
+    if (url == null || typeof url !== 'string') return url;
+
+    // React Router đôi khi chỉ truyền "?roleId=1" — resolve rồi gắn /crm.
+    if (url.startsWith('?') || url.startsWith('#')) {
+      let path = window.location.pathname || '/';
+      if (!path.startsWith(prefix) && isCrmRootPath(path)) {
+        path = `${prefix}${path}`;
+      }
+      if (url.startsWith('?')) return `${path}${url}`;
+      return `${path}${window.location.search}${url}`;
+    }
+
+    if (!url.startsWith('/')) return url;
     return toBrowserUrl(url);
   };
 
