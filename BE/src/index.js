@@ -105,6 +105,13 @@ async function start() {
       console.warn('[BE] ensureRepairOrderTasksColumns:', schemaErr.message);
     }
 
+    try {
+      await require('./infrastructure/database/ensureInvoicePaymentMethod').ensureInvoicePaymentMethod();
+      console.log('[BE] invoices.payment_method column ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureInvoicePaymentMethod:', schemaErr.message);
+    }
+
     const server = http.createServer({ maxHeaderSize: 32768 }, app);
     server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);
