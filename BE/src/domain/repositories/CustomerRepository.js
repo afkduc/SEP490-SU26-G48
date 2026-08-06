@@ -10,6 +10,10 @@ class CustomerRepository {
   async update(id, data) {
     throw new Error('Not implemented');
   }
+
+  async findOrCreateForSettlement(data) {
+    throw new Error('Not implemented');
+  }
 }
 
 module.exports = CustomerRepository;

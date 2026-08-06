@@ -17,7 +17,8 @@ const HEADER_SELECT = `
          v.vehicle_model_text,
          c.id           AS customer_id,
          c.full_name    AS customer_full_name,
-         so.advisor_id  AS advisor_id
+         so.advisor_id  AS advisor_id,
+         vb.bay_number  AS vb_bay_number
   FROM   repair_orders ro
   JOIN   branches b      ON b.id = ro.branch_id
   JOIN   users    tl     ON tl.id = ro.team_leader_id
@@ -25,6 +26,7 @@ const HEADER_SELECT = `
   LEFT JOIN vehicles v       ON v.id = ro.vehicle_id
   LEFT JOIN service_orders so ON so.id = ro.service_order_id
   LEFT JOIN customers c       ON c.id = so.customer_id
+  LEFT JOIN vehicle_bays vb  ON vb.id = ro.bay_id
   OUTER APPLY (
       SELECT STRING_AGG(sp.specialty_name, ', ') AS names
       FROM   user_specialty us

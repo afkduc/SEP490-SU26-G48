@@ -25,7 +25,6 @@ function activeBadge(isActive) {
 }
 
 const SETTLEMENT_STATUS_TABS = [
-  { value: 'all', label: 'Tất cả' },
   { value: 'waiting_repair', label: 'Chờ sửa chữa' },
   { value: 'inprogress', label: 'Đang sửa chữa' },
   { value: 'waiting_payment', label: 'Chờ thanh toán' },
@@ -2199,7 +2198,7 @@ function SettlementDetailModal({ report, onClose }) {
 function SettlementReportsPage() {
   const [reports, setReports] = useState([]);
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('waiting_repair');
   const [intakeDay, setIntakeDay] = useState('');
   const [intakeMonth, setIntakeMonth] = useState('');
   const [intakeYear, setIntakeYear] = useState('');
@@ -2266,10 +2265,14 @@ function SettlementReportsPage() {
   );
 
   const dateFilterYears = settlementRecentYears();
+  // Chi con loc theo ngay o 2 tab "ket qua cuoi cung" (Da xuat hoa don / Da
+  // huy) - 3 tab con lai (Cho sua chua/Dang sua chua/Cho thanh toan) la trang
+  // thai dang xu ly, khong can bo loc ngay nua.
+  const showDateFilter = activeTab === 'invoiced' || activeTab === 'cancelled';
 
   const filteredReports = reports.filter((r) => {
-    if (activeTab !== 'all' && r.status !== activeTab) return false;
-    if (activeTab !== 'all') {
+    if (r.status !== activeTab) return false;
+    if (showDateFilter) {
       if (!settlementDateMatches(r.intakeDate, intakeDay, intakeMonth, intakeYear)) return false;
       if (secondaryDateField && !settlementDateMatches(r[secondaryDateField.key], secondaryDay, secondaryMonth, secondaryYear)) return false;
     }
@@ -2320,7 +2323,7 @@ function SettlementReportsPage() {
         ))}
       </div>
 
-      {activeTab !== 'all' && (
+      {showDateFilter && (
         <div className="filter-bar" style={{ marginTop: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <DateDropdownFilter
             label="Ngày tiếp nhận"

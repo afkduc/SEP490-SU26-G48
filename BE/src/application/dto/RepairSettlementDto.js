@@ -59,6 +59,8 @@ class RepairSettlementResponseDto {
       teamLeader: entity.teamLeaderName,
       technicians: entity.technicians,
       repairOrderId: entity.repairOrderId,
+      bayNumber: entity.bayNumber,
+      hasCompletedTask: entity.hasCompletedTask,
       status: entity.status,
       cancelReason: entity.cancelReason,
       intakeChecklist: entity.intakeChecklist,

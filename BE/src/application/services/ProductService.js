@@ -104,6 +104,17 @@ class ProductService {
     return this.productRepository.getDistinctCategories();
   }
 
+  async markSeenByManager(id) {
+    const product = await this.productRepository.markSeenByManager(id);
+    if (!product) throw new ApiError(404, 'Product not found');
+    return ProductResponseDto.fromEntity(product);
+  }
+
+  async countNewForManager(branchId) {
+    if (!branchId) throw new ApiError(400, 'branchId is required');
+    return this.productRepository.countNewForManager(branchId);
+  }
+
   async listUnits() {
     return this.productRepository.listUnits();
   }

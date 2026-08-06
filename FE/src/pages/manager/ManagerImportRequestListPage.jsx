@@ -4,23 +4,18 @@ import { useAuth } from '../../contexts/AppContext';
 import { useManagerImportRequests } from '../../hooks/manager/useManagerImportRequests';
 import './ManagerImportRequestListPage.css';
 
-const STATUS_META = {
-  pending: { label: 'Chờ duyệt', className: 'badge--warning' },
-  approved: { label: 'Đã duyệt', className: 'badge--success' },
-  rejected: { label: 'Từ chối', className: 'badge--danger' },
-};
-
-const STATUS_TABS = [
-  { value: '', label: 'Tất cả' },
-  { value: 'pending', label: 'Chờ duyệt' },
-  { value: 'approved', label: 'Đã duyệt' },
-  { value: 'rejected', label: 'Từ chối' },
-];
-
 function formatDateTime(d) {
   if (!d) return '—';
   const s = String(d);
   return s.length >= 16 ? s.slice(0, 16).replace('T', ' ') : s;
+}
+
+function addYears(dateStr, years) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  d.setFullYear(d.getFullYear() + years);
+  return d.toISOString().slice(0, 10);
 }
 
 export default function ManagerImportRequestListPage() {
@@ -30,7 +25,7 @@ export default function ManagerImportRequestListPage() {
   const {
     requests, total, page, limit, loading, error,
     params,
-    setStatus, setFromDate, setToDate, setSearch, setPage,
+    setFromDate, setToDate, setSearch, setPage,
   } = useManagerImportRequests(branchId);
 
   const [draftSearch, setDraftSearch] = useState(params.search);
@@ -40,6 +35,20 @@ export default function ManagerImportRequestListPage() {
   useEffect(() => { setDraftSearch(params.search); }, [params.search]);
   useEffect(() => { setDraftFromDate(params.fromDate); }, [params.fromDate]);
   useEffect(() => { setDraftToDate(params.toDate); }, [params.toDate]);
+
+  // "Đến ngày" phải >= "Từ ngày" (khong duoc som hon moc bat dau) va toi da
+  // cach "Từ ngày" 2 nam - doi lai "Từ ngày" ma "Đến ngày" dang chon khong
+  // con hop le trong khoang do thi tu xoa "Đến ngày" di.
+  const toDateMin = draftFromDate || undefined;
+  const toDateMax = draftFromDate ? addYears(draftFromDate, 2) : undefined;
+
+  useEffect(() => {
+    if (!draftFromDate || !draftToDate) return;
+    if (draftToDate < draftFromDate || draftToDate > addYears(draftFromDate, 2)) {
+      setDraftToDate('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftFromDate]);
 
   function handleApplyFilter() {
     setSearch(draftSearch);
@@ -59,23 +68,9 @@ export default function ManagerImportRequestListPage() {
         <div>
           <h1 className="mir-list__title">Phiếu nhập kho</h1>
           <p className="mir-list__subtitle">
-            Xem và duyệt các phiếu nhập phụ tùng từ nhà cung cấp của chi nhánh bạn quản lý.
-            Khi duyệt thành công, hệ thống sẽ cộng tồn kho và ghi log giao dịch.
+            Xem toàn bộ phiếu nhập phụ tùng từ nhà cung cấp của chi nhánh bạn quản lý.
           </p>
         </div>
-      </div>
-
-      <div className="mir-list__tabs">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={`mir-list__tab${params.status === tab.value ? ' mir-list__tab--active' : ''}`}
-            onClick={() => setStatus(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       <div className="mir-list__filters">
@@ -100,6 +95,8 @@ export default function ManagerImportRequestListPage() {
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
           title="Đến ngày"
+          min={toDateMin}
+          max={toDateMax}
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
           Lọc
@@ -120,20 +117,18 @@ export default function ManagerImportRequestListPage() {
                 <th>Nhà cung cấp</th>
                 <th>Số dòng</th>
                 <th>Tổng SL</th>
-                <th>Trạng thái</th>
                 <th style={{ width: 110 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="table__empty">
+                  <td colSpan={6} className="table__empty">
                     Không có phiếu nhập nào trong chi nhánh của bạn
                   </td>
                 </tr>
               ) : (
                 requests.map((r) => {
-                  const meta = STATUS_META[r.status] || { label: r.status, className: '' };
                   return (
                     <tr key={r.id}>
                       <td><span className="font-mono">{r.requestCode}</span></td>
@@ -141,15 +136,12 @@ export default function ManagerImportRequestListPage() {
                       <td>{r.supplierName || '—'}</td>
                       <td className="text-right">{r.itemCount ?? 0}</td>
                       <td className="text-right">{r.totalQuantity ?? 0}</td>
-                      <td>
-                        <span className={`badge ${meta.className}`}>{meta.label}</span>
-                      </td>
                       <td className="table__actions">
                         <Link
                           to={`/manager/import-requests/${r.id}`}
                           className="btn btn--ghost btn--sm"
                         >
-                          {r.status === 'pending' ? 'Duyệt' : 'Xem'}
+                          Xem
                         </Link>
                       </td>
                     </tr>

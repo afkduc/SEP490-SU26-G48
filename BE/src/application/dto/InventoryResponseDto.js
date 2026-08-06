@@ -30,6 +30,7 @@ class InventoryResponseDto {
       status: product.status,
       isLowStock: stock <= min,
       stockGap: stock - min,
+      isNewForManager: !!product.isNewForManager,
     };
   }
 

@@ -69,6 +69,86 @@ class CustomerRepositoryImpl extends CustomerRepository {
     return this.findByIdWithDetails(id);
   }
 
+  // Dung luc tao Phieu quyet toan MA KHONG chon tu goi y tra cuu (khach hang/xe
+  // hoan toan moi, hoac CVDV go tay lai dung SDT/bien so cu) - xem
+  // RepairSettlementService._resolveCustomerAndVehicle. Khac voi
+  // importCustomerVehicleRow (import Excel hang loat, co the BO QUA tao xe neu
+  // trung) - ham nay LUON tra ve du ca customerId lan vehicleId (tim thay thi
+  // dung lai, khong thi tao moi) de phieu quyet toan gan duoc ngay.
+  async findOrCreateForSettlement(data) {
+    return runInTransaction(async (tx) => {
+      const existingCustomer = await tx
+        .request()
+        .input('phone', sql.VarChar(20), data.phone)
+        .query(`SELECT id FROM customers WHERE phone = @phone`);
+
+      let customerId = existingCustomer.recordset[0]?.id || null;
+
+      if (!customerId) {
+        const inserted = await tx
+          .request()
+          .input('fullName', sql.NVarChar(150), data.fullName)
+          .input('phone', sql.VarChar(20), data.phone)
+          .input('cccd', sql.VarChar(20), data.cccd || null)
+          .input('email', sql.VarChar(100), data.email || null)
+          .input('address', sql.NVarChar(255), data.address || null)
+          .input('taxCode', sql.VarChar(20), data.taxCode || null)
+          .input('contactName', sql.NVarChar(100), data.contactName || null)
+          .input('contactPhone', sql.VarChar(20), data.contactPhone || null)
+          .query(`
+            INSERT INTO customers (
+              customer_code, full_name, phone, cccd, email, address,
+              tax_code, contact_name, contact_phone, created_at
+            )
+            OUTPUT inserted.id
+            VALUES (
+              '', @fullName, @phone, @cccd, @email, @address,
+              @taxCode, @contactName, @contactPhone, GETDATE()
+            )
+          `);
+        customerId = inserted.recordset[0].id;
+        await tx
+          .request()
+          .input('id', sql.BigInt, customerId)
+          .input('code', sql.VarChar(20), genCustomerCode(customerId))
+          .query(`UPDATE customers SET customer_code = @code WHERE id = @id`);
+      }
+
+      let vehicleId = null;
+      if (data.licensePlate) {
+        const existingVehicle = await tx
+          .request()
+          .input('licensePlate', sql.VarChar(20), data.licensePlate)
+          .query(`SELECT TOP 1 id FROM vehicles WHERE license_plate = @licensePlate`);
+        vehicleId = existingVehicle.recordset[0]?.id || null;
+
+        if (!vehicleId) {
+          const insertedVehicle = await tx
+            .request()
+            .input('licensePlate', sql.VarChar(20), data.licensePlate)
+            .input('customerId', sql.BigInt, customerId)
+            .input('vehicleModelText', sql.NVarChar(200), data.vehicleModelText || null)
+            .input('brandId', sql.BigInt, data.brandId || null)
+            .input('frameNumber', sql.VarChar(50), data.frameNumber || null)
+            .input('engineNumber', sql.VarChar(50), data.engineNumber || null)
+            .input('currentKm', sql.Int, data.currentKm || 0)
+            .query(`
+              INSERT INTO vehicles (
+                license_plate, customer_id, vehicle_model_text, brand_id, frame_number, engine_number, current_km
+              )
+              OUTPUT inserted.id
+              VALUES (
+                @licensePlate, @customerId, @vehicleModelText, @brandId, @frameNumber, @engineNumber, @currentKm
+              )
+            `);
+          vehicleId = insertedVehicle.recordset[0].id;
+        }
+      }
+
+      return { customerId, vehicleId };
+    });
+  }
+
   // Dung cho import Excel: 1 dong = 1 khach hang + 1 xe. Neu SDT da ton tai thi
   // dung lai khach hang cu (khong tao trung), neu bien so da ton tai thi bo qua
   // phan tao xe (khong doi chu xe cua nguoi khac).

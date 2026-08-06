@@ -34,7 +34,10 @@ function makeProductService() {
 }
 
 function makeRepairSettlementService() {
-  return new RepairSettlementService({ repairSettlementRepository: makeRepairSettlementRepository() });
+  return new RepairSettlementService({
+    repairSettlementRepository: makeRepairSettlementRepository(),
+    customerRepository: makeCustomerRepository(),
+  });
 }
 
 function makeRepairOrderService() {

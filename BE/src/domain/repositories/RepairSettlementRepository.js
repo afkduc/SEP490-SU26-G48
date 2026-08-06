@@ -27,6 +27,10 @@ class RepairSettlementRepository {
     throw new Error('Method update() must be implemented');
   }
 
+  async wouldLoseCompletedTasks(serviceOrderId, newItems) {
+    throw new Error('Method wouldLoseCompletedTasks() must be implemented');
+  }
+
   async updateStatus(id, status, { issuedBy } = {}) {
     throw new Error('Method updateStatus() must be implemented');
   }

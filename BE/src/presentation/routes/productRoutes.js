@@ -14,6 +14,7 @@ function buildProductRouter() {
   router.use(authenticate);
 
   router.get('/categories', controller.getCategories);
+  router.get('/new-count', authorize('manager'), controller.getNewCount);
   router.get('/', controller.getAll);
   router.get('/units', controller.listUnits);
   router.get('/:id', controller.getById);
@@ -24,6 +25,7 @@ function buildProductRouter() {
   router.put('/:id', canManageProducts, controller.update);
   router.delete('/:id', canManageProducts, controller.remove);
   router.patch('/:id/reactivate', canManageProducts, controller.reactivate);
+  router.patch('/:id/mark-seen', authorize('manager'), controller.markSeen);
 
   return router;
 }
