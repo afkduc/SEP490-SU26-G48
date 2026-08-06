@@ -147,8 +147,8 @@ export default function AdminUsersPage() {
     }
   }, [hasReadPermission, set403Error]);
 
-  // Đồng bộ filter → URL giống AuditLogs: dùng useCrmSearchSync
-  // (ghi /crm trước → navigate → ép lại). Không tự navigate + replaceState.
+  // Đồng bộ filter → URL chuẩn: /crm/admin/users?search=&roleId=&status=&branchId=
+  // (prefix /crm cố định, rồi cộng thêm từng trường filter).
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -170,6 +170,7 @@ export default function AdminUsersPage() {
     if (params.roleId) next.set('roleId', String(params.roleId));
     if (params.status) next.set('status', params.status);
     if (params.page > 1) next.set('page', String(params.page));
+    // useCrmSearchSync ghi: /crm + /admin/users + ?...
     syncSearch(next, { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.search, params.branchId, params.roleId, params.status, params.page, syncSearch]);
