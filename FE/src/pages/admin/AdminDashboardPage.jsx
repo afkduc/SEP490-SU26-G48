@@ -13,7 +13,7 @@ import {
 } from '../../utils/auditDisplay';
 import { SECURITY_ALERTS_COUNT_EVENT } from '../../utils/securityAlertEvents';
 import { formatPhoneDisplay } from '../../utils/validation';
-import { nextDateRangeState } from '../../utils/dateRange';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './AdminDashboardPage.css';
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
@@ -1193,35 +1193,17 @@ export default function AdminDashboardPage() {
           </button>
         ))}
         {periodPreset === 'custom' && (
-          <>
-            <input
-              type="date"
-              className="input"
-              value={customFrom}
-              onChange={(e) => {
-                const next = nextDateRangeState('start', e.target.value, {
-                  startDate: customFrom,
-                  endDate: customTo,
-                });
-                setCustomFrom(next.startDate);
-                setCustomTo(next.endDate);
-              }}
-            />
-            <span>→</span>
-            <input
-              type="date"
-              className="input"
-              value={customTo}
-              onChange={(e) => {
-                const next = nextDateRangeState('end', e.target.value, {
-                  startDate: customFrom,
-                  endDate: customTo,
-                });
-                setCustomFrom(next.startDate);
-                setCustomTo(next.endDate);
-              }}
-            />
-          </>
+          <DateRangeInputs
+            startDate={customFrom}
+            endDate={customTo}
+            onChange={({ startDate, endDate }) => {
+              setCustomFrom(startDate);
+              setCustomTo(endDate);
+            }}
+            className="dash-period__dates"
+            inputClassName="input"
+            sep="→"
+          />
         )}
         <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#64748b' }}>
           Đang xem: <strong>{periodLabel}</strong>
