@@ -9,6 +9,7 @@ import {
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { formatPhoneDisplay } from '../../utils/validation';
+import { useCrmSearchSync } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
 import PermissionGate from '../../components/PermissionGate';
 import AdminPagination from './components/AdminPagination';
@@ -123,7 +124,8 @@ export default function AdminUsersPage() {
     if (roles && roles.length > 0) setLocalRoles(roles);
   }, [roles]);
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const syncSearch = useCrmSearchSync();
   const [togglingId, setTogglingId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -133,12 +135,10 @@ export default function AdminUsersPage() {
   // Xóa tab=roles cũ trên URL (màn vai trò đã bỏ)
   useEffect(() => {
     if (searchParams.get('tab') !== 'roles') return;
-    setSearchParams((prev) => {
-      const sp = new URLSearchParams(prev);
-      sp.delete('tab');
-      return sp;
-    }, { replace: true });
-  }, [searchParams, setSearchParams]);
+    const next = new URLSearchParams(searchParams);
+    next.delete('tab');
+    syncSearch(next, { replace: true });
+  }, [searchParams, syncSearch]);
 
   // Không gọi setState trong render — chuyển sang effect (tránh vỡ hooks / action buttons)
   useEffect(() => {
@@ -147,9 +147,7 @@ export default function AdminUsersPage() {
     }
   }, [hasReadPermission, set403Error]);
 
-  // Đồng bộ filter lên URL qua React Router (giữ basename /crm).
-  // Không dùng window.history.replaceState với location.pathname — sẽ mất /crm
-  // trên production và F5 ra 404 của Landing.
+  // Đồng bộ filter lên URL — luôn giữ /crm (xem useCrmSearchSync / forceCrmBrowserUrl).
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -171,10 +169,9 @@ export default function AdminUsersPage() {
     if (params.roleId) next.set('roleId', String(params.roleId));
     if (params.status) next.set('status', params.status);
     if (params.page > 1) next.set('page', String(params.page));
-    setSearchParams(next, { replace: true });
-  // Chỉ đồng bộ khi filter/page đổi — không phụ thuộc searchParams để tránh loop
+    syncSearch(next, { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.search, params.branchId, params.roleId, params.status, params.page, setSearchParams]);
+  }, [params.search, params.branchId, params.roleId, params.status, params.page, syncSearch]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
