@@ -190,9 +190,12 @@ export function CrmUrlGuard() {
 /**
  * Đồng bộ filter → URL theo chuẩn:
  *   /crm + pathname hiện tại + ?search=&roleId=&status=&branchId=
- * Ghi URL đầy đủ trước, sync Router sau, rồi ép lại nhiều nhịp.
+ *
+ * Mặc định KHÔNG gọi navigate (Router hay ghi đè mất /crm trên prod).
+ * Chỉ bật syncRouter khi UI đọc useSearchParams (tab account/security).
  */
-export function useCrmSearchSync() {
+export function useCrmSearchSync(options = {}) {
+  const { syncRouter = false } = options;
   const navigate = useNavigate();
   const location = useLocation();
   const locationRef = useRef(location);
@@ -209,14 +212,15 @@ export function useCrmSearchSync() {
     const qs = sp.toString();
     const search = qs ? `?${qs}` : '';
 
-    // 1) Ghi sẵn URL chuẩn: /crm/admin/users?roleId=...
+    // Luôn ghi sẵn: /crm + path + query
     writeCrmBrowserUrl(pathname, search);
 
-    // 2) Sync React Router (state nội bộ; có thể ghi đè thiếu /crm)
-    navigate({ pathname, search }, navigateOpts);
+    if (syncRouter) {
+      navigate({ pathname, search }, navigateOpts);
+      writeCrmBrowserUrl(pathname, search);
+      forceCrmBrowserUrl(pathname, search);
+    }
 
-    // 3) Ép lại nhiều nhịp cho đến khi thanh địa chỉ đúng
-    forceCrmBrowserUrl(pathname, search);
     repairMissingCrmPrefix();
 
     if (repairTimerRef.current) {
@@ -226,10 +230,10 @@ export function useCrmSearchSync() {
     repairTimerRef.current = window.setInterval(() => {
       writeCrmBrowserUrl(pathname, search);
       repairMissingCrmPrefix();
-      if (Date.now() - started > 800) {
+      if (Date.now() - started > 1000) {
         window.clearInterval(repairTimerRef.current);
         repairTimerRef.current = null;
       }
-    }, 50);
-  }, [navigate]);
+    }, 40);
+  }, [navigate, syncRouter]);
 }

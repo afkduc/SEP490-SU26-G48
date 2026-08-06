@@ -6,6 +6,8 @@ on:
   push:
     branches:
       - dev
+  # Cho phep bam "Run workflow" tren GitHub khi push khong kich hoat Actions
+  workflow_dispatch:
 
 jobs:
   deploy:

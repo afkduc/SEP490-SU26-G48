@@ -56,7 +56,7 @@ function resolveTab(rawTab) {
  */
 export default function AdminLoginSecurityPage() {
   const [searchParams] = useSearchParams();
-  const syncSearch = useCrmSearchSync();
+  const syncSearch = useCrmSearchSync({ syncRouter: true });
   const activeTab = resolveTab(searchParams.get('tab'));
   const [urgentCount, setUrgentCount] = useState(0);
   const [alertsExpanded, setAlertsExpanded] = useState(

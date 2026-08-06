@@ -9,7 +9,7 @@ import {
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { formatPhoneDisplay } from '../../utils/validation';
-import { navigateWithCrm, useCrmSearchSync } from '../../utils/crmUrl';
+import { navigateWithCrm, writeCrmBrowserUrl } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
 import PermissionGate from '../../components/PermissionGate';
 import AdminPagination from './components/AdminPagination';
@@ -125,7 +125,6 @@ export default function AdminUsersPage() {
   }, [roles]);
 
   const [searchParams] = useSearchParams();
-  const syncSearch = useCrmSearchSync();
   const [togglingId, setTogglingId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -137,8 +136,9 @@ export default function AdminUsersPage() {
     if (searchParams.get('tab') !== 'roles') return;
     const next = new URLSearchParams(searchParams);
     next.delete('tab');
-    syncSearch(next, { replace: true });
-  }, [searchParams, syncSearch]);
+    const qs = next.toString();
+    writeCrmBrowserUrl('/admin/users', qs ? `?${qs}` : '');
+  }, [searchParams]);
 
   // Không gọi setState trong render — chuyển sang effect (tránh vỡ hooks / action buttons)
   useEffect(() => {
@@ -147,8 +147,8 @@ export default function AdminUsersPage() {
     }
   }, [hasReadPermission, set403Error]);
 
-  // Đồng bộ filter → URL chuẩn: /crm/admin/users?search=&roleId=&status=&branchId=
-  // (prefix /crm cố định, rồi cộng thêm từng trường filter).
+  // Đồng bộ filter → URL: /crm + /admin/users + ?search=&roleId=&status=&branchId=
+  // Chỉ ghi History — KHÔNG navigate (tránh Router ghi đè mất /crm).
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -170,10 +170,10 @@ export default function AdminUsersPage() {
     if (params.roleId) next.set('roleId', String(params.roleId));
     if (params.status) next.set('status', params.status);
     if (params.page > 1) next.set('page', String(params.page));
-    // useCrmSearchSync ghi: /crm + /admin/users + ?...
-    syncSearch(next, { replace: true });
+    const qs = next.toString();
+    writeCrmBrowserUrl('/admin/users', qs ? `?${qs}` : '');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.search, params.branchId, params.roleId, params.status, params.page, syncSearch]);
+  }, [params.search, params.branchId, params.roleId, params.status, params.page]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
@@ -183,13 +183,6 @@ export default function AdminUsersPage() {
       });
     }
   }, [searchParams, navigate, location.search]);
-
-  useEffect(() => {
-    if (location.pathname === '/admin/users' && !location.search) {
-      setParams((p) => ({ ...p, page: 1 }));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, location.search]);
 
   function resetFilters() {
     setParams(() => ({

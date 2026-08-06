@@ -29,7 +29,7 @@ export default function AdminAccountPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const syncSearch = useCrmSearchSync();
+  const syncSearch = useCrmSearchSync({ syncRouter: true });
   const isEditMode = location.pathname.endsWith('/edit');
   const activeTab = isEditMode ? 'profile' : resolveTab(searchParams.get('tab'));
 
