@@ -62,12 +62,23 @@
 }
 
 /* ── Filter Card ───────────────────────────────────────────── */
+.admin-sessions {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
 .admin-sessions__filters {
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 20px 22px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .admin-sessions__filter-header {

@@ -2,6 +2,8 @@ const { query } = require('../database/sqlServer');
 const {
   sqlAccentInsensitiveLike,
   bindNormalizedLikeParam,
+  bindPhoneDigitsLikeParam,
+  sqlPhoneDigitsLike,
 } = require('../../utils/vietnamese');
 
 /** Auth noise — có trang Lịch sử đăng nhập riêng; mặc định ẩn khỏi nhật ký thao tác. */
@@ -24,6 +26,14 @@ function bindNormalizedLike(params, paramIndex, rawValue) {
 
 function likeAccentInsensitive(columnExpr, paramName) {
   return sqlAccentInsensitiveLike(columnExpr, paramName);
+}
+
+/** Thêm OR khớp SĐT theo chữ số (nếu needle có số). Trả về paramIndex mới. */
+function appendPhoneDigitsOr(parts, params, paramIndex, columnExpr, rawValue) {
+  const key = `p${paramIndex}`;
+  if (!bindPhoneDigitsLikeParam(params, key, rawValue)) return paramIndex;
+  parts.push(sqlPhoneDigitsLike(columnExpr, key));
+  return paramIndex + 1;
 }
 
 function toIsoUtc(value) {
@@ -308,29 +318,30 @@ async function getAuditLogs(filters = {}) {
   // Keyword: chỉ cột ngắn (tên / SĐT / mã / entity) — tránh LIKE bỏ dấu trên description/URL (rất chậm)
   if (keyword) {
     const { key, nextIndex } = bindNormalizedLike(params, paramIndex, keyword);
-    conditions.push(`(
-      ${likeAccentInsensitive('al.user_name', key)} OR
-      ${likeAccentInsensitive('al.phone_number', key)} OR
-      ${likeAccentInsensitive('al.entity_code', key)} OR
-      ${likeAccentInsensitive('al.entity_name', key)}
-    )`);
-    paramIndex = nextIndex;
+    const parts = [
+      likeAccentInsensitive('al.user_name', key),
+      likeAccentInsensitive('al.entity_code', key),
+      likeAccentInsensitive('al.entity_name', key),
+    ];
+    paramIndex = appendPhoneDigitsOr(parts, params, nextIndex, 'al.phone_number', keyword);
+    conditions.push(`(${parts.join(' OR ')})`);
   }
 
-  // Ô "Người dùng": khớp tên hoặc SĐT
+  // Ô "Người dùng": khớp tên hoặc SĐT (SĐT theo chữ số)
   if (userName) {
     const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
-    conditions.push(`(
-      ${likeAccentInsensitive('al.user_name', key)} OR
-      ${likeAccentInsensitive('al.phone_number', key)}
-    )`);
-    paramIndex = nextIndex;
+    const parts = [likeAccentInsensitive('al.user_name', key)];
+    paramIndex = appendPhoneDigitsOr(parts, params, nextIndex, 'al.phone_number', userName);
+    conditions.push(`(${parts.join(' OR ')})`);
   }
 
-  if (phone) {
-    conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${phone}%`;
-    paramIndex++;
+  // SĐT: so khớp theo chữ số (bỏ '-', khoảng trắng). "-" chỉ là format UI.
+  if (phone && String(phone).trim()) {
+    const key = `p${paramIndex}`;
+    if (bindPhoneDigitsLikeParam(params, key, phone)) {
+      conditions.push(sqlPhoneDigitsLike('al.phone_number', key));
+      paramIndex++;
+    }
   }
 
   if (action) {
@@ -499,27 +510,28 @@ async function getAuditLogsForExport(filters = {}) {
 
   if (keyword) {
     const { key, nextIndex } = bindNormalizedLike(params, paramIndex, keyword);
-    conditions.push(`(
-      ${likeAccentInsensitive('al.user_name', key)} OR
-      ${likeAccentInsensitive('al.phone_number', key)} OR
-      ${likeAccentInsensitive('al.entity_code', key)} OR
-      ${likeAccentInsensitive('al.entity_name', key)}
-    )`);
-    paramIndex = nextIndex;
+    const parts = [
+      likeAccentInsensitive('al.user_name', key),
+      likeAccentInsensitive('al.entity_code', key),
+      likeAccentInsensitive('al.entity_name', key),
+    ];
+    paramIndex = appendPhoneDigitsOr(parts, params, nextIndex, 'al.phone_number', keyword);
+    conditions.push(`(${parts.join(' OR ')})`);
   }
 
   if (userName) {
     const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
-    conditions.push(`(
-      ${likeAccentInsensitive('al.user_name', key)} OR
-      ${likeAccentInsensitive('al.phone_number', key)}
-    )`);
-    paramIndex = nextIndex;
+    const parts = [likeAccentInsensitive('al.user_name', key)];
+    paramIndex = appendPhoneDigitsOr(parts, params, nextIndex, 'al.phone_number', userName);
+    conditions.push(`(${parts.join(' OR ')})`);
   }
-  if (phone) {
-    conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${phone}%`;
-    paramIndex++;
+  // SĐT: so khớp theo chữ số (bỏ '-', khoảng trắng). "-" chỉ là format UI.
+  if (phone && String(phone).trim()) {
+    const key = `p${paramIndex}`;
+    if (bindPhoneDigitsLikeParam(params, key, phone)) {
+      conditions.push(sqlPhoneDigitsLike('al.phone_number', key));
+      paramIndex++;
+    }
   }
   if (action) {
     conditions.push(`al.action = @p${paramIndex}`);
@@ -633,17 +645,17 @@ async function getLoginSessions(filters = {}) {
     }
   }
 
-  // Tên người dùng: khớp tên trên phiên hoặc SĐT / email / họ tên trên bảng users
-  if (userName) {
-    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
+  // Người dùng: contains + không phân biệt dấu (vd "son" → sơn/sớn/sonn...)
+  // Khớp tên phiên hoặc email / username / họ tên trên users (không OR sang SĐT —
+  // SĐT dùng field phone riêng và AND với điều kiện này).
+  if (userName && String(userName).trim()) {
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, String(userName).trim());
     conditions.push(`(
       ${likeAccentInsensitive('ls.user_name', key)}
-      OR ${likeAccentInsensitive('ls.phone', key)}
       OR EXISTS (
         SELECT 1 FROM users u
         WHERE u.id = ls.user_id AND (
           ${likeAccentInsensitive('u.email', key)}
-          OR ${likeAccentInsensitive('u.phone', key)}
           OR ${likeAccentInsensitive('u.user_name', key)}
           OR ${likeAccentInsensitive('u.first_name', key)}
           OR ${likeAccentInsensitive('u.last_name', key)}
@@ -654,10 +666,20 @@ async function getLoginSessions(filters = {}) {
     paramIndex = nextIndex;
   }
 
-  if (phone) {
-    conditions.push(`LOWER(ls.phone) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${phone}%`;
-    paramIndex++;
+  // SĐT: AND — khớp số trên phiên HOẶC trên user (bỏ dấu cách / gạch)
+  if (phone && String(phone).trim()) {
+    const key = `p${paramIndex}`;
+    if (bindPhoneDigitsLikeParam(params, key, phone)) {
+      conditions.push(`(
+        ${sqlPhoneDigitsLike('ls.phone', key)}
+        OR EXISTS (
+          SELECT 1 FROM users u
+          WHERE u.id = ls.user_id
+            AND ${sqlPhoneDigitsLike('u.phone', key)}
+        )
+      )`);
+      paramIndex++;
+    }
   }
 
   if (actionType) {

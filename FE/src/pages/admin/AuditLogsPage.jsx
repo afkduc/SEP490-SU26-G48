@@ -13,6 +13,12 @@ import {
   formatAuditTime,
   getAuditActionLabel,
 } from '../../utils/auditDisplay';
+import {
+  formatPhoneInput,
+  isPhoneLikeInput,
+  phoneDigitsForSearch,
+  PHONE_INPUT_MAX_LENGTH,
+} from '../../utils/validation';
 import './AuditLogsPage.css';
 
 const ACTION_OPTIONS = [
@@ -444,9 +450,21 @@ export default function AuditLogsPage() {
             <input
               className="filter-field__input"
               type="text"
+              inputMode={isPhoneLikeInput(audit.params.keyword) ? 'numeric' : 'search'}
               placeholder="Tìm nhanh (tên, SĐT, mã, mô tả...)"
-              value={audit.params.keyword || ''}
-              onChange={(e) => audit.updateParam('keyword', e.target.value)}
+              maxLength={isPhoneLikeInput(audit.params.keyword) ? PHONE_INPUT_MAX_LENGTH : undefined}
+              value={
+                isPhoneLikeInput(audit.params.keyword)
+                  ? formatPhoneInput(audit.params.keyword)
+                  : (audit.params.keyword || '')
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                audit.updateParam(
+                  'keyword',
+                  isPhoneLikeInput(v) ? phoneDigitsForSearch(v).slice(0, 11) : v
+                );
+              }}
             />
           </div>
           <label className="admin-logs__auth-toggle" title="Mặc định ẩn đăng nhập / thất bại (xem ở Lịch sử đăng nhập)">
@@ -482,10 +500,13 @@ export default function AuditLogsPage() {
               <label className="filter-field__label">Số điện thoại</label>
               <input
                 className="filter-field__input"
-                type="text"
-                placeholder="Nhập SĐT..."
-                value={audit.params.phone || ''}
-                onChange={(e) => audit.updateParam('phone', e.target.value)}
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="0123-456-789"
+                maxLength={PHONE_INPUT_MAX_LENGTH}
+                value={formatPhoneInput(audit.params.phone || '')}
+                onChange={(e) => audit.updateParam('phone', phoneDigitsForSearch(e.target.value).slice(0, 11))}
               />
             </div>
 
@@ -569,12 +590,16 @@ export default function AuditLogsPage() {
             )}
           </div>
           <div className="admin-logs__filter-btns">
-            {hasFilters && (
-              <button className="btn btn--ghost btn--sm" onClick={resetFilters}>
-                <IconRefresh />
-                Đặt lại
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={resetFilters}
+              disabled={!hasFilters && !audit.loading}
+              title="Xóa bộ lọc và tải lại danh sách đầy đủ"
+            >
+              <IconRefresh />
+              Đặt lại
+            </button>
           </div>
         </div>
       </div>

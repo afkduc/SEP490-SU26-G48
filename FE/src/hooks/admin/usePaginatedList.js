@@ -38,15 +38,25 @@ export function usePaginatedList({
   const [error, setError] = useState(null);
 
   const paramsRef = useRef(params);
+  const apiFnRef = useRef(apiFn);
+  apiFnRef.current = apiFn;
+
+  const debounceKeysRef = useRef(debounceKeys);
+  debounceKeysRef.current = debounceKeys;
+
   const debouncedRef = useRef({});
+  // Đồng bộ key debounce lần đầu (và khi danh sách key đổi)
   debounceKeys.forEach((k) => {
-    if (!(k in debouncedRef.current)) debouncedRef.current[k] = params[k] ?? '';
+    if (!(k in debouncedRef.current)) {
+      debouncedRef.current[k] = initialParams[k] ?? '';
+    }
   });
 
   const timerRefs = useRef({});
   const fetchSeqRef = useRef(0);
   const debounceMsRef = useRef(debounceMs);
   debounceMsRef.current = debounceMs;
+  const mountedFetchDoneRef = useRef(false);
 
   function cleanParams(p) {
     const out = {};
@@ -58,7 +68,7 @@ export function usePaginatedList({
 
   function getEffectiveParams(currentParams) {
     const effective = { ...currentParams };
-    debounceKeys.forEach((k) => {
+    debounceKeysRef.current.forEach((k) => {
       effective[k] = debouncedRef.current[k] ?? '';
     });
     return effective;
@@ -69,7 +79,7 @@ export function usePaginatedList({
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFn(cleanParams(p));
+      const res = await apiFnRef.current(cleanParams(p));
       // Bỏ qua response cũ nếu đã có request mới hơn
       if (seq !== fetchSeqRef.current) return;
       const items = res?.items ?? res ?? [];
@@ -87,7 +97,7 @@ export function usePaginatedList({
     } finally {
       if (seq === fetchSeqRef.current) setLoading(false);
     }
-  }, [apiFn]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -95,15 +105,13 @@ export function usePaginatedList({
     };
   }, []);
 
-  const triggerFetch = useCallback(() => {
-    callApi(getEffectiveParams(paramsRef.current));
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- debounceKeys ổn định theo hook
-  }, [callApi]);
-
+  // Mount: fetch lần đầu với params hiện tại (gồm seedDefaults)
   useEffect(() => {
-    triggerFetch();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.page, params.pageSize]);
+    if (mountedFetchDoneRef.current) return;
+    mountedFetchDoneRef.current = true;
+    callApi(getEffectiveParams(paramsRef.current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callApi]);
 
   /**
    * Cập nhật 1 param:
@@ -112,7 +120,7 @@ export function usePaginatedList({
    * - Filter khác: gọi API ngay
    */
   const updateParam = useCallback((key, value) => {
-    const isDebounceKey = debounceKeys.includes(key);
+    const isDebounceKey = debounceKeysRef.current.includes(key);
 
     setParamsState((prev) => {
       const next = { ...prev, [key]: value, page: key === 'page' ? value : 1 };
@@ -121,23 +129,33 @@ export function usePaginatedList({
     });
 
     if (isDebounceKey) {
-      // Đồng bộ ngay để nếu đổi page giữa lúc gõ vẫn dùng đúng chuỗi đang nhập
+      // Đồng bộ ngay để API luôn dùng đúng chuỗi đang nhập (AND với các field khác)
       debouncedRef.current[key] = value ?? '';
       if (timerRefs.current[key]) clearTimeout(timerRefs.current[key]);
       timerRefs.current[key] = setTimeout(() => {
+        timerRefs.current[key] = null;
         callApi(getEffectiveParams(paramsRef.current));
       }, debounceMsRef.current);
       return;
     }
 
+    // Đổi page / filter select: hủy debounce text đang chờ rồi fetch ngay với giá trị UI hiện tại
+    Object.keys(timerRefs.current).forEach((k) => {
+      clearTimeout(timerRefs.current[k]);
+      delete timerRefs.current[k];
+    });
+    // Đồng bộ debounce keys từ params (tránh mất chữ đang gõ)
+    debounceKeysRef.current.forEach((k) => {
+      debouncedRef.current[k] = paramsRef.current[k] ?? '';
+    });
     setTimeout(() => callApi(getEffectiveParams(paramsRef.current)), 0);
-  }, [debounceKeys, callApi]);
+  }, [callApi]);
 
   const setParams = useCallback((updater) => {
     setParamsState((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       paramsRef.current = next;
-      debounceKeys.forEach((k) => {
+      debounceKeysRef.current.forEach((k) => {
         if (Object.prototype.hasOwnProperty.call(next, k)) {
           debouncedRef.current[k] = next[k] ?? '';
         }
@@ -150,14 +168,14 @@ export function usePaginatedList({
       delete timerRefs.current[k];
     });
     setTimeout(() => callApi(getEffectiveParams(paramsRef.current)), 0);
-  }, [callApi, debounceKeys]);
+  }, [callApi]);
 
   const refresh = useCallback(async () => {
-    debounceKeys.forEach((key) => {
+    debounceKeysRef.current.forEach((key) => {
       debouncedRef.current[key] = paramsRef.current[key] ?? '';
     });
     await callApi(getEffectiveParams(paramsRef.current));
-  }, [callApi, debounceKeys]);
+  }, [callApi]);
 
   const refetch = useCallback(() => {
     callApi(getEffectiveParams(paramsRef.current));
