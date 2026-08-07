@@ -205,7 +205,7 @@ export default function AdminUsersPage() {
   async function handleToggleStatus(userId, newStatus) {
     const isDeactivate = newStatus === 'inactive';
     const confirmMsg = isDeactivate
-      ? 'Khóa tài khoản này? User sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
+      ? 'Khóa tài khoản này? Người dùng sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
       : 'Kích hoạt lại tài khoản này?';
     if (!window.confirm(confirmMsg)) return;
 
