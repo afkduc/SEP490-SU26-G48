@@ -199,9 +199,9 @@ function getActionBadge(action) {
   if (upper.includes('UPDATE') || upper.includes('EDIT') || upper.includes('MODIFY') || upper.includes('PATCH')) {
     return { label: 'Cập nhật', bg: '#eef2ff', color: '#4338ca' };
   }
-  // Xoa
+  // Vo hieu hoa / log DELETE cu (he thong khong con xoa cung)
   if (upper.includes('DELETE') || upper.includes('REMOVE')) {
-    return { label: 'Xóa', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'Vô hiệu hóa', bg: '#fee2e2', color: '#dc2626' };
   }
   // Dang nhap that bai
   if (upper.includes('LOGIN_FAILED') || upper.includes('LOGINFAIL') || upper.includes('LOGIN FAIL')) {

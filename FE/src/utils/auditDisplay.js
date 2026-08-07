@@ -8,7 +8,7 @@ import { formatPhoneDisplay } from './validation';
 export const AUDIT_ACTION_LABELS = {
   CREATE: 'Tạo mới',
   UPDATE: 'Cập nhật',
-  DELETE: 'Xóa / Vô hiệu hóa',
+  DELETE: 'Vô hiệu hóa',
   DISABLE: 'Ngừng hoạt động',
   REACTIVATE: 'Kích hoạt lại',
   READ: 'Xem dữ liệu',
