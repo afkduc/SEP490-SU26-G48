@@ -308,14 +308,20 @@ export default function AuditLogsPage() {
     return () => clearInterval(t);
   }, []);
 
-  // Làm mới danh sách định kỳ để thời gian / log mới gần realtime
+  // Làm mới định kỳ — tạm dừng khi đang gõ tìm kiếm / đang load (tránh chồng request nặng)
   useEffect(() => {
     const refreshFn = audit.refresh || audit.refetch;
     if (typeof refreshFn !== 'function') return undefined;
+    const searching = Boolean(
+      String(audit.params.keyword || '').trim()
+      || String(audit.params.userName || '').trim()
+      || String(audit.params.phone || '').trim()
+    );
+    if (searching || audit.loading) return undefined;
     const t = setInterval(() => refreshFn(), 20_000);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ gắn theo hàm refresh ổn định
-  }, [audit.refresh, audit.refetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audit.refresh, audit.refetch, audit.loading, audit.params.keyword, audit.params.userName, audit.params.phone]);
 
   async function handleExportExcel() {
     setExporting(true);
