@@ -9,13 +9,18 @@ import { useToast } from '../../../components/common/ToastContext';
 import {
   EMAIL_HINT,
   formatPhoneInput,
+  getPersonNameError,
   getPhoneError,
+  getUsernameError,
   isValidEmail,
   isValidPassword,
-  isValidUsername,
   phoneDigitsOnly,
+  NAME_MAX_LENGTH,
+  PERSON_NAME_HINT,
   PHONE_HINT,
   PHONE_INPUT_MAX_LENGTH,
+  USERNAME_HINT,
+  USERNAME_MAX,
 } from '../../../utils/validation';
 import ResetPasswordModal from './ResetPasswordModal';
 import './UserFormPage.css';
@@ -161,18 +166,19 @@ export default function UserFormPage({ mode: modeProp }) {
 
   function validate() {
     const errs = {};
-    if (!isEdit && !form.name.trim()) errs.name = 'Tên đăng nhập là bắt buộc';
-    else if (!isEdit && !isValidUsername(form.name)) {
-      errs.name = 'Tên đăng nhập 3–50 ký tự, chỉ gồm chữ, số, ., _, -';
+    if (!isEdit) {
+      const usernameErr = getUsernameError(form.name, { required: true });
+      if (usernameErr) errs.name = usernameErr;
     }
     if (!isEdit && !form.email.trim()) errs.email = 'Email là bắt buộc';
     if (!isEdit && !form.password) errs.password = 'Mật khẩu là bắt buộc';
     if (!isEdit && form.password && !isValidPassword(form.password)) {
       errs.password = 'Mật khẩu tối thiểu 6 ký tự, gồm chữ và số';
     }
-    if (!form.lastName.trim()) errs.lastName = 'Tên là bắt buộc';
-    else if (form.lastName.trim().length > 100) errs.lastName = 'Tên tối đa 100 ký tự';
-    if (form.firstName.trim().length > 100) errs.firstName = 'Họ tối đa 100 ký tự';
+    const lastNameErr = getPersonNameError(form.lastName, { required: true, label: 'Tên' });
+    if (lastNameErr) errs.lastName = lastNameErr;
+    const firstNameErr = getPersonNameError(form.firstName, { required: false, label: 'Họ' });
+    if (firstNameErr) errs.firstName = firstNameErr;
     if (form.email && !isValidEmail(form.email)) {
       errs.email = EMAIL_HINT;
     }
@@ -201,8 +207,8 @@ export default function UserFormPage({ mode: modeProp }) {
         const shouldSendRoleId = form.roleId && form.roleId !== '';
         const payload = {
           userId: user.id,
-          firstName: form.firstName?.trim() || user.firstName || '',
-          lastName: form.lastName?.trim() || user.lastName || '',
+          firstName: form.firstName?.trim().replace(/\s+/g, ' ') || user.firstName || '',
+          lastName: form.lastName?.trim().replace(/\s+/g, ' ') || user.lastName || '',
           email: form.email?.trim() || user.email,
           phone: phoneDigitsOnly(form.phone),
           status: form.status,
@@ -224,8 +230,8 @@ export default function UserFormPage({ mode: modeProp }) {
           name: form.name.trim(),
           email: form.email.trim(),
           password: form.password,
-          firstName: form.firstName.trim() || form.name.trim(),
-          lastName: form.lastName.trim(),
+          firstName: form.firstName.trim().replace(/\s+/g, ' ') || form.name.trim(),
+          lastName: form.lastName.trim().replace(/\s+/g, ' '),
           phone: phoneDigitsOnly(form.phone),
           roleId: Number(form.roleId),
         };
@@ -304,11 +310,13 @@ export default function UserFormPage({ mode: modeProp }) {
                 <input
                   className={`input ${errors.name ? 'input--error' : ''}`}
                   value={form.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
+                  onChange={(e) => handleChange('name', e.target.value.slice(0, USERNAME_MAX))}
                   disabled={isEdit}
                   placeholder="nguyen_van_a"
                   autoComplete="off"
+                  maxLength={USERNAME_MAX}
                 />
+                {!isEdit && <span className="form__hint">{USERNAME_HINT}</span>}
                 {errors.name && <span className="form__err">{errors.name}</span>}
               </div>
               <div className="form__field">
@@ -350,11 +358,12 @@ export default function UserFormPage({ mode: modeProp }) {
                 <input
                   className={`input ${errors.firstName ? 'input--error' : ''}`}
                   value={form.firstName}
-                  onChange={(e) => handleChange('firstName', e.target.value)}
+                  onChange={(e) => handleChange('firstName', e.target.value.slice(0, NAME_MAX_LENGTH))}
                   placeholder="Nguyễn"
                   autoComplete="off"
-                  maxLength={100}
+                  maxLength={NAME_MAX_LENGTH}
                 />
+                <span className="form__hint">{PERSON_NAME_HINT} · tối đa {NAME_MAX_LENGTH} ký tự</span>
                 {errors.firstName && <span className="form__err">{errors.firstName}</span>}
               </div>
               <div className="form__field">
@@ -362,11 +371,12 @@ export default function UserFormPage({ mode: modeProp }) {
                 <input
                   className={`input ${errors.lastName ? 'input--error' : ''}`}
                   value={form.lastName}
-                  onChange={(e) => handleChange('lastName', e.target.value)}
+                  onChange={(e) => handleChange('lastName', e.target.value.slice(0, NAME_MAX_LENGTH))}
                   placeholder="Văn A"
                   autoComplete="off"
-                  maxLength={100}
+                  maxLength={NAME_MAX_LENGTH}
                 />
+                <span className="form__hint">{PERSON_NAME_HINT} · tối đa {NAME_MAX_LENGTH} ký tự</span>
                 {errors.lastName && <span className="form__err">{errors.lastName}</span>}
               </div>
             </div>
