@@ -1,0 +1,98 @@
+/**
+ * AutoGara Design Tokens
+ * Mục tiêu: WCAG AA, màu đủ “đậm” để dễ nhìn, vẫn dịu mắt (không neon).
+ */
+
+:root {
+  /* Surfaces — nền cool có chiều sâu, tránh tím nhạt phẳng */
+  --ag-bg: #e8eef8;
+  --ag-surface: #ffffff;
+  --ag-surface-2: #f0f5fc;
+  --ag-card: #ffffff;
+  --ag-card-hover: #eef4fb;
+
+  /* Text — tương phản rõ hơn */
+  --ag-text-primary: #0b1220;
+  --ag-text-secondary: #334155;
+  --ag-text-muted: #52657a;
+  --ag-text-disabled: #94a3b8;
+  --ag-text-inverse: #ffffff;
+
+  /* Brand — indigo đậm + soft rõ */
+  --ag-primary: #4338ca;
+  --ag-primary-hover: #3730a3;
+  --ag-primary-soft: #e0e7ff;
+  --ag-primary-text: #ffffff;
+  --ag-accent: #0891b2;
+  --ag-accent-soft: #cffafe;
+
+  /* Semantic — bão hòa vừa phải, dễ phân biệt */
+  --ag-success: #047857;
+  --ag-success-bg: #d1fae5;
+  --ag-success-border: #6ee7b7;
+  --ag-warning: #b45309;
+  --ag-warning-bg: #ffedd5;
+  --ag-warning-border: #fdba74;
+  --ag-danger: #be123c;
+  --ag-danger-bg: #ffe4e6;
+  --ag-danger-border: #fda4af;
+  --ag-info: #1d4ed8;
+  --ag-info-bg: #dbeafe;
+  --ag-info-border: #93c5fd;
+
+  /* Status extras */
+  --ag-pending: #b45309;
+  --ag-pending-bg: #ffedd5;
+  --ag-draft: #475569;
+  --ag-draft-bg: #e2e8f0;
+  --ag-inactive: #64748b;
+  --ag-inactive-bg: #f1f5f9;
+  --ag-approved: #047857;
+  --ag-approved-bg: #d1fae5;
+  --ag-rejected: #be123c;
+  --ag-rejected-bg: #ffe4e6;
+  --ag-cancelled: #64748b;
+  --ag-cancelled-bg: #e2e8f0;
+
+  /* Chrome */
+  --ag-border: #c7d5ea;
+  --ag-divider: #d8e0ec;
+  --ag-focus-ring: rgba(67, 56, 202, 0.28);
+  --ag-overlay: rgba(15, 23, 42, 0.5);
+
+  /* Sidebar — navy sâu, active sáng hơn */
+  --ag-sidebar-bg: #12163a;
+  --ag-sidebar-text: #c7d2fe;
+  --ag-sidebar-muted: #a5b4fc;
+  --ag-sidebar-active-bg: rgba(99, 102, 241, 0.42);
+  --ag-sidebar-active-text: #ffffff;
+  --ag-sidebar-hover: rgba(255, 255, 255, 0.1);
+  --ag-sidebar-border: rgba(165, 180, 252, 0.18);
+
+  /* Topbar / content */
+  --ag-topbar-bg: rgba(255, 255, 255, 0.92);
+  --ag-input-bg: #ffffff;
+  --ag-input-border: #b8c7e0;
+  --ag-input-placeholder: #94a3b8;
+  --ag-table-header-bg: #e4ebf8;
+  --ag-table-row-hover: #e0e7ff;
+  --ag-table-row-alt: #f5f8fc;
+  --ag-table-border: #d5dee9;
+
+  /* Shadow — có chút tint indigo */
+  --ag-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.07), 0 1px 2px rgba(67, 56, 202, 0.04);
+  --ag-shadow-md: 0 10px 28px rgba(15, 23, 42, 0.1), 0 4px 10px rgba(67, 56, 202, 0.06);
+  --ag-shadow-lg: 0 20px 48px rgba(15, 23, 42, 0.14), 0 8px 16px rgba(67, 56, 202, 0.08);
+
+  /* Radius */
+  --ag-radius-sm: 8px;
+  --ag-radius-md: 12px;
+  --ag-radius-lg: 14px;
+}
+
+/* Focus ring dùng chung */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ag-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--ag-focus-ring);
+}

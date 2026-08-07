@@ -1,18 +1,71 @@
 import httpClient from './httpClient';
 
-export async function loginApi(email, password) {
+export async function loginApi(identifier, password, branchId, { force = false, pendingId = null, remember = false } = {}) {
   const data = await httpClient.post(
     '/auth/login',
-    { email, password },
+    {
+      identifier,
+      email: identifier,
+      password,
+      branchId,
+      remember: Boolean(remember),
+      force: Boolean(force),
+      ...(pendingId ? { pendingId } : {}),
+    },
     { omitAuth: true, skipSessionExpired: true }
   );
-  return data; // { token, user }
+  return data;
+}
+
+export async function getPendingLoginApi(pendingId) {
+  return httpClient.get(`/auth/login/pending/${pendingId}`, {
+    omitAuth: true,
+    skipSessionExpired: true,
+  });
+}
+
+export async function approvePendingLoginApi(pendingId) {
+  return httpClient.post(`/auth/login/pending/${pendingId}/approve`, {});
+}
+
+export async function rejectPendingLoginApi(pendingId) {
+  return httpClient.post(`/auth/login/pending/${pendingId}/reject`, {});
+}
+
+/** Phiên đang online: danh sách yêu cầu login chờ xác nhận. */
+export async function getMyLoginChallengesApi() {
+  return httpClient.get('/auth/login/challenges');
+}
+
+/** Mở modal cảnh báo lớn khi có LOGIN_CHALLENGE. */
+export function dispatchLoginChallenge(detail) {
+  if (typeof window === 'undefined' || !detail?.pendingId) return;
+  window.dispatchEvent(new CustomEvent('login-challenge', { detail }));
+}
+
+/** Mở popup khi phiên bị thiết bị khác thay thế. */
+export function dispatchSessionTakenOver(detail = {}) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('session-taken-over', { detail }));
+}
+
+export async function forgotPasswordApi(email) {
+  return httpClient.post(
+    '/auth/forgot-password',
+    { email },
+    { omitAuth: true, skipSessionExpired: true }
+  );
+}
+
+export async function resetPasswordApi(token, newPassword) {
+  return httpClient.post(
+    '/auth/reset-password',
+    { token, newPassword },
+    { omitAuth: true, skipSessionExpired: true }
+  );
 }
 
 export async function logoutApi() {
-  // PHIEN quan trong: phai goi de BE trackLogout cap nhat DB (status='ended',
-  // logout_time, session_duration_seconds). Neu khong goi -> BE khong biet user
-  // da dang xuat -> session vinh vien o trang thai 'active'.
   const data = await httpClient.post('/auth/logout', {});
   return data;
 }
@@ -22,29 +75,46 @@ export async function getMeApi() {
   return data;
 }
 
-/**
- * Lay thoi gian server UTC (ISO8601).
- * FE dung de tinh clock offset (server - client), tranh hien thi sai khi
- * may client set gio sai.
- */
 export async function getServerTime() {
   const data = await httpClient.get('/auth/server-time');
-  return data; // { serverTime: '2026-07-19T11:25:14.613Z' }
+  return data;
 }
 
-/**
- * Heartbeat: cap nhat last_activity_at theo dinh ky (60s throttle phia BE).
- * Tra ve { updated, deviceId, serverTime }.
- * Loi (401, network) -> nuot, khong anh huong UI.
- */
 export async function heartbeatApi() {
   try {
-    const data = await httpClient.post('/auth/heartbeat', {});
+    const data = await httpClient.post(
+      '/auth/heartbeat',
+      {},
+      { skipSessionExpired: true }
+    );
     return data;
   } catch (err) {
-    // Request cu dang chay se khong bat modal neu token da duoc thay moi;
-    // 401 cua chinh token hien tai van thong bao het phien binh thuong.
-    if (typeof console !== 'undefined') console.debug('[heartbeat] skipped:', err && err.message);
+    const status = err?.status;
+    if (status === 401 || status === 403) {
+      return { unauthorized: true, status };
+    }
+    if (typeof console !== 'undefined') {
+      console.debug('[heartbeat] skipped:', err && err.message);
+    }
     return null;
   }
 }
+
+export async function refreshPermissionsApi() {
+  const data = await httpClient.post('/auth/refresh-permissions', {});
+  return data;
+}
+
+export default {
+  loginApi,
+  logoutApi,
+  getMeApi,
+  getServerTime,
+  heartbeatApi,
+  refreshPermissionsApi,
+  forgotPasswordApi,
+  resetPasswordApi,
+  getPendingLoginApi,
+  approvePendingLoginApi,
+  rejectPendingLoginApi,
+};

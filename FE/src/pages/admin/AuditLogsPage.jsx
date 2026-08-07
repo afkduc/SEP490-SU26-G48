@@ -1,44 +1,42 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuditLogs } from '../../hooks/admin/useAuditLogs';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useToast } from '../../components/common/ToastContext';
+import { useCrmSearchSync } from '../../utils/crmUrl';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import AdminPagination from './components/AdminPagination';
+import {
+  humanizeAuditDescription,
+  formatAuditTime,
+  getAuditActionLabel,
+} from '../../utils/auditDisplay';
 import './AuditLogsPage.css';
 
 const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
-  { value: 'CREATE', label: 'Tạo mới (CREATE)', color: 'success' },
-  { value: 'UPDATE', label: 'Cập nhật (UPDATE)', color: 'info' },
-  { value: 'DELETE', label: 'Xóa (DELETE)', color: 'danger' },
-  { value: 'READ', label: 'Xem dữ liệu (READ)', color: 'slate' },
-  { value: 'LOGIN', label: 'Đăng nhập (LOGIN)', color: 'purple' },
-  { value: 'LOGOUT', label: 'Đăng xuất (LOGOUT)', color: 'gray' },
-  { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất (FORCE_LOGOUT)', color: 'orange' },
-  { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu (CHANGE_PASSWORD)', color: 'teal' },
-  { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu (RESET_PASSWORD)', color: 'cyan' },
-  { value: 'ASSIGN_ROLE', label: 'Gán vai trò (ASSIGN_ROLE)', color: 'indigo' },
-  { value: 'REMOVE_ROLE', label: 'Xóa vai trò (REMOVE_ROLE)', color: 'rose' },
-  { value: 'EXPORT', label: 'Xuất dữ liệu (EXPORT)', color: 'green' },
-  { value: 'IMPORT', label: 'Nhập dữ liệu (IMPORT)', color: 'amber' },
+  { value: 'CREATE', label: 'Tạo mới', color: 'success' },
+  { value: 'UPDATE', label: 'Cập nhật', color: 'info' },
+  { value: 'DELETE', label: 'Xóa', color: 'danger' },
+  { value: 'READ', label: 'Xem dữ liệu', color: 'slate' },
+  { value: 'LOGIN', label: 'Đăng nhập', color: 'purple' },
+  { value: 'FAILED_LOGIN', label: 'Đăng nhập thất bại', color: 'danger' },
+  { value: 'LOGOUT', label: 'Đăng xuất', color: 'gray' },
+  { value: 'FORCE_LOGO', label: 'Buộc đăng xuất', color: 'orange' },
+  { value: 'CHANGE_PASSWORD', label: 'Đổi mật khẩu', color: 'teal' },
+  { value: 'RESET_PASSWORD', label: 'Đặt lại mật khẩu', color: 'cyan' },
+  { value: 'ASSIGN_ROLE', label: 'Gán vai trò', color: 'indigo' },
+  { value: 'REMOVE_ROLE', label: 'Thu hồi vai trò', color: 'rose' },
+  { value: 'EXPORT', label: 'Xuất dữ liệu', color: 'green' },
+  { value: 'IMPORT', label: 'Nhập dữ liệu', color: 'amber' },
+  { value: 'GRANT_SCREEN', label: 'Cấp quyền màn hình', color: 'success' },
+  { value: 'REVOKE_SCREEN', label: 'Thu hồi quyền màn hình', color: 'danger' },
+  { value: 'SAVE_SCREEN_MATRIX', label: 'Lưu ma trận quyền', color: 'indigo' },
+  { value: 'APPROVE_PERMISSION_REQUEST', label: 'Duyệt yêu cầu quyền', color: 'success' },
+  { value: 'REJECT_PERMISSION_REQUEST', label: 'Từ chối yêu cầu quyền', color: 'danger' },
 ];
-
-const ACTION_LABELS = {
-  CREATE: 'Tạo mới',
-  UPDATE: 'Cập nhật',
-  DELETE: 'Xóa',
-  READ: 'Xem dữ liệu',
-  LOGIN: 'Đăng nhập',
-  LOGOUT: 'Đăng xuất',
-  FORCE_LOGOUT: 'Buộc đăng xuất',
-  CHANGE_PASSWORD: 'Đổi mật khẩu',
-  RESET_PASSWORD: 'Đặt lại mật khẩu',
-  ASSIGN_ROLE: 'Gán vai trò',
-  REMOVE_ROLE: 'Xóa vai trò',
-  EXPORT: 'Xuất dữ liệu',
-  IMPORT: 'Nhập dữ liệu',
-};
 
 const ACTION_CLASS = {
   CREATE: 'badge--success',
@@ -46,113 +44,37 @@ const ACTION_CLASS = {
   DELETE: 'badge--danger',
   READ: 'badge--slate',
   LOGIN: 'badge--purple',
+  FAILED_LOGIN: 'badge--danger',
   LOGOUT: 'badge--secondary',
   FORCE_LOGOUT: 'badge--orange',
+  FORCE_LOGO: 'badge--orange',
   CHANGE_PASSWORD: 'badge--teal',
   RESET_PASSWORD: 'badge--cyan',
   ASSIGN_ROLE: 'badge--indigo',
   REMOVE_ROLE: 'badge--rose',
   EXPORT: 'badge--green',
   IMPORT: 'badge--amber',
+  GRANT_SCREEN: 'badge--success',
+  REVOKE_SCREEN: 'badge--danger',
+  BULK_TOGGLE: 'badge--info',
+  SAVE_SCREEN_MATRIX: 'badge--indigo',
+  SAVE_USER_SCREEN_PERMISSIONS: 'badge--teal',
+  CLEAR_USER_SCREEN_PERMISSIONS: 'badge--rose',
+  APPROVE_PERMISSION_REQUEST: 'badge--success',
+  REJECT_PERMISSION_REQUEST: 'badge--danger',
+  APPROVE_LOGIN_CHALLENGE: 'badge--success',
+  REJECT_LOGIN_CHALLENGE: 'badge--danger',
 };
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
-  { value: '2xx', label: '2xx - Thành công' },
-  { value: '4xx', label: '4xx - Lỗi client' },
-  { value: '5xx', label: '5xx - Lỗi server' },
+  { value: '2xx', label: 'Thành công' },
+  { value: '4xx', label: 'Lỗi phía người dùng' },
+  { value: '5xx', label: 'Lỗi máy chủ' },
 ];
 
-/**
- * Map tên bảng (table_name) sang tên tiếng Việt cho dễ hiểu.
- * BE vẫn giữ table_name là key chuẩn (customers, users, ...).
- * Đây chỉ là lớp ánh xạ hiển thị ở frontend.
- */
-const TABLE_NAME_VI = {
-  customers: 'Khách hàng',
-  vehicles: 'Phương tiện',
-  brands: 'Hãng xe',
-  branches: 'Chi nhánh',
-  users: 'Người dùng',
-  user_role: 'Phân quyền người dùng',
-  user_specialty: 'Chuyên môn nhân viên',
-  user_devices: 'Thiết bị đăng nhập',
-  user_notification_settings: 'Cài đặt thông báo',
-  roles: 'Vai trò',
-  role_permissions: 'Phân quyền theo vai trò',
-  role_security_mapping: 'Ánh xạ vai trò - bảo mật',
-  permissions: 'Phân quyền chi tiết',
-  service_categories: 'Danh mục dịch vụ',
-  services: 'Dịch vụ',
-  service_packages: 'Gói dịch vụ',
-  service_package_items: 'Hạng mục gói dịch vụ',
-  suppliers: 'Nhà cung cấp',
-  products: 'Phụ tùng / Sản phẩm',
-  inventory_transactions: 'Giao dịch kho',
-  contracts: 'Hợp đồng',
-  appointments: 'Lịch hẹn',
-  work_orders: 'Phiếu sửa chữa',
-  work_order_items: 'Hạng mục phiếu sửa',
-  repair_orders: 'Phiếu sửa chữa (Repair Order)',
-  repair_order_tasks: 'Công việc sửa chữa',
-  service_orders: 'Đơn dịch vụ',
-  service_order_items: 'Hạng mục đơn dịch vụ',
-  invoices: 'Hóa đơn',
-  payments: 'Thanh toán',
-  specialties: 'Chuyên môn',
-  warranty_records: 'Lịch sử bảo hành',
-  after_service_care: 'Chăm sóc sau dịch vụ',
-  customer_feedback: 'Phản hồi khách hàng',
-  maintenance_reminders: 'Lịch nhắc bảo dưỡng',
-  vehicle_owners: 'Chủ phương tiện',
-  import_requests: 'Yêu cầu nhập kho',
-  import_request_items: 'Chi tiết nhập kho',
-  export_requests: 'Yêu cầu xuất kho',
-  export_request_items: 'Chi tiết xuất kho',
-  entity_definitions: 'Định nghĩa đối tượng',
-  login_sessions: 'Phiên đăng nhập',
-  login_session_events: 'Sự kiện phiên đăng nhập',
-  audit_logs: 'Nhật ký hệ thống',
-  notifications: 'Thông báo',
-};
-
 function formatLocal(value) {
-  if (!value) return { main: '—', sub: '', ago: '' };
-  let d;
-  if (value instanceof Date) {
-    d = value;
-  } else {
-    const s = typeof value === 'string' ? value : String(value);
-    const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(s);
-    d = new Date(hasTz ? s : `${s}Z`);
-  }
-  if (Number.isNaN(d.getTime())) return { main: String(value), sub: '', ago: '' };
-
-  const main = d.toLocaleString('vi-VN', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false,
-  });
-  const sub = d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-  const diffMs = Date.now() - d.getTime();
-  const ago = humanizeAgo(diffMs);
-  return { main, sub, ago };
-}
-
-function humanizeAgo(diffMs) {
-  if (diffMs < 0) return 'vừa xong';
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 5) return 'vừa xong';
-  if (sec < 60) return `${sec} giây trước`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} phút trước`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} giờ trước`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day} ngày trước`;
-  const mo = Math.floor(day / 30);
-  if (mo < 12) return `${mo} tháng trước`;
-  return `${Math.floor(mo / 12)} năm trước`;
+  return formatAuditTime(value);
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -282,19 +204,118 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
 
 // ─── Main Component ──────────────────────────────────────────────────
 
+function readAuditParamsFromSearch(sp) {
+  const out = {};
+  const keys = [
+    'keyword', 'userName', 'phone', 'action', 'tableName', 'entityName',
+    'entityCode', 'ipAddress', 'requestMethod', 'responseStatus',
+    'startDate', 'endDate', 'branchId', 'page',
+  ];
+  keys.forEach((k) => {
+    const v = sp.get(k);
+    if (v == null || v === '') return;
+    if (k === 'page' || k === 'branchId' || k === 'responseStatus') {
+      const n = Number(v);
+      if (Number.isFinite(n)) out[k] = n;
+      return;
+    }
+    out[k] = v;
+  });
+  return out;
+}
+
+function writeAuditParamsToSearch(params) {
+  const next = new URLSearchParams();
+  const put = (k, v) => {
+    if (v === undefined || v === null || v === '') return;
+    next.set(k, String(v));
+  };
+  put('keyword', params.keyword);
+  put('userName', params.userName);
+  put('phone', params.phone);
+  put('action', params.action);
+  put('tableName', params.tableName);
+  put('entityName', params.entityName);
+  put('entityCode', params.entityCode);
+  put('ipAddress', params.ipAddress);
+  put('requestMethod', params.requestMethod);
+  put('responseStatus', params.responseStatus);
+  put('startDate', params.startDate);
+  put('endDate', params.endDate);
+  put('branchId', params.branchId);
+  if (params.page > 1) put('page', params.page);
+  return next.toString();
+}
+
 export default function AuditLogsPage() {
   const toast = useToast();
-  const audit = useAuditLogs();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const syncSearch = useCrmSearchSync();
+  const isInitialMount = useRef(true);
+  const urlSeed = useMemo(() => readAuditParamsFromSearch(searchParams), [searchParams]);
+  const audit = useAuditLogs(urlSeed);
   const { branches, branchesError } = useSharedBranches();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [now, setNow] = useState(() => Date.now());
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(
+    Boolean(urlSeed.userName || urlSeed.entityCode || urlSeed.keyword || urlSeed.action)
+  );
+
+  const openDetail = useCallback((item) => {
+    if (!item?.id) return;
+    const qs = writeAuditParamsToSearch(audit.params);
+    navigate(`/admin/logs/${item.id}`, {
+      state: { fromListSearch: qs ? `?${qs}` : '' },
+    });
+  }, [navigate, audit.params]);
+
+  // Đồng bộ filter — luôn giữ /crm (useCrmSearchSync).
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      const fromUrl = readAuditParamsFromSearch(searchParams);
+      if (Object.keys(fromUrl).length > 0) {
+        audit.setParams((p) => ({ ...p, ...fromUrl }));
+        setShowFilters(true);
+      }
+      return;
+    }
+    const qs = writeAuditParamsToSearch(audit.params);
+    syncSearch(qs ? new URLSearchParams(qs) : new URLSearchParams(), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    audit.params.page,
+    audit.params.keyword,
+    audit.params.userName,
+    audit.params.phone,
+    audit.params.action,
+    audit.params.tableName,
+    audit.params.entityName,
+    audit.params.entityCode,
+    audit.params.ipAddress,
+    audit.params.requestMethod,
+    audit.params.responseStatus,
+    audit.params.startDate,
+    audit.params.endDate,
+    audit.params.branchId,
+    syncSearch,
+  ]);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30_000);
+    const t = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(t);
   }, []);
+
+  // Làm mới danh sách định kỳ để thời gian / log mới gần realtime
+  useEffect(() => {
+    const refreshFn = audit.refresh || audit.refetch;
+    if (typeof refreshFn !== 'function') return undefined;
+    const t = setInterval(() => refreshFn(), 20_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ gắn theo hàm refresh ổn định
+  }, [audit.refresh, audit.refetch]);
 
   async function handleExportExcel() {
     setExporting(true);
@@ -324,6 +345,7 @@ export default function AuditLogsPage() {
       startDate: '',
       endDate: '',
       branchId: undefined,
+      excludeAuthEvents: true,
       page: 1,
       pageSize: 10,
     }));
@@ -394,21 +416,35 @@ export default function AuditLogsPage() {
             <input
               className="filter-field__input"
               type="text"
-              placeholder="Tìm kiếm nhanh (tên, mã, mô tả, URL...)"
+              placeholder="Tìm nhanh (tên, SĐT, mã, mô tả...)"
               value={audit.params.keyword || ''}
               onChange={(e) => audit.updateParam('keyword', e.target.value)}
             />
           </div>
+          <label className="admin-logs__auth-toggle" title="Mặc định ẩn đăng nhập / thất bại (xem ở Lịch sử đăng nhập)">
+            <input
+              type="checkbox"
+              checked={audit.params.excludeAuthEvents !== false && audit.params.excludeAuthEvents !== 'false'}
+              onChange={(e) => {
+                audit.setParams((prev) => ({
+                  ...prev,
+                  excludeAuthEvents: e.target.checked,
+                  page: 1,
+                }));
+              }}
+            />
+            <span>Ẩn đăng nhập / thất bại</span>
+          </label>
         </div>
 
         {showFilters && (
           <div className="admin-logs__filter-body">
             <div className="filter-field">
-              <label className="filter-field__label">Tên người dùng</label>
+              <label className="filter-field__label">Người dùng</label>
               <input
                 className="filter-field__input"
                 type="text"
-                placeholder="Nhập tên người dùng..."
+                placeholder="Tên hoặc SĐT (có/không dấu)..."
                 value={audit.params.userName || ''}
                 onChange={(e) => audit.updateParam('userName', e.target.value)}
               />
@@ -422,6 +458,17 @@ export default function AuditLogsPage() {
                 placeholder="Nhập SĐT..."
                 value={audit.params.phone || ''}
                 onChange={(e) => audit.updateParam('phone', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field__label">Mã phiếu</label>
+              <input
+                className="filter-field__input"
+                type="text"
+                placeholder="VD: RO-2026-080, LSC-..., YCDV-..."
+                value={audit.params.entityCode || ''}
+                onChange={(e) => audit.updateParam('entityCode', e.target.value)}
               />
             </div>
 
@@ -468,23 +515,21 @@ export default function AuditLogsPage() {
 
             <div className="filter-field">
               <label className="filter-field__label">Khoảng ngày</label>
-              <div className="filter-field__date-group">
-                <input
-                  className="filter-field__input filter-field__input--date"
-                  type="date"
-                  value={audit.params.startDate || ''}
-                  onChange={(e) => audit.updateParam('startDate', e.target.value)}
-                  title="Từ ngày"
-                />
-                <span className="filter-field__date-sep">—</span>
-                <input
-                  className="filter-field__input filter-field__input--date"
-                  type="date"
-                  value={audit.params.endDate || ''}
-                  onChange={(e) => audit.updateParam('endDate', e.target.value)}
-                  title="Đến ngày"
-                />
-              </div>
+              <DateRangeInputs
+                startDate={audit.params.startDate || ''}
+                endDate={audit.params.endDate || ''}
+                onChange={({ startDate, endDate }) => {
+                  audit.setParams((p) => ({
+                    ...p,
+                    startDate,
+                    endDate,
+                    page: 1,
+                  }));
+                }}
+                className="filter-field__date-group"
+                inputClassName="filter-field__input filter-field__input--date"
+                sepClassName="filter-field__date-sep"
+              />
             </div>
           </div>
         )}
@@ -526,7 +571,7 @@ export default function AuditLogsPage() {
         ) : (
           <>
             <div className="admin-logs__table-wrapper">
-              <AuditTable items={audit.data.items} />
+              <AuditTable items={audit.data.items} onRowClick={openDetail} now={now} />
             </div>
             <Pagination
               currentPage={audit.data.page || 1}
@@ -549,20 +594,21 @@ function TableSkeleton({ rows }) {
   return (
     <table className="table">
         <colgroup>
-          <col /><col /><col /><col />
+          <col /><col /><col /><col /><col />
         </colgroup>
       <thead>
         <tr>
           <th>Người dùng</th>
           <th>Hành động</th>
           <th>Mô tả</th>
+          <th>Chi nhánh</th>
           <th>Thời gian</th>
         </tr>
       </thead>
       <tbody>
         {Array.from({ length: rows }).map((_, i) => (
           <tr key={i}>
-            {[...Array(4)].map((_, j) => (
+            {[...Array(5)].map((_, j) => (
               <td key={j}>
                 <div className="skeleton-line" style={{ width: `${50 + Math.random() * 40}%` }} />
               </td>
@@ -574,24 +620,25 @@ function TableSkeleton({ rows }) {
   );
 }
 
-function AuditTable({ items }) {
+function AuditTable({ items, onRowClick, now }) {
   if (!items || items.length === 0) {
     return (
       <table className="table">
         <colgroup>
-          <col /><col /><col /><col />
+          <col /><col /><col /><col /><col />
         </colgroup>
         <thead>
           <tr>
             <th>Người dùng</th>
             <th>Hành động</th>
             <th>Mô tả</th>
+            <th>Chi nhánh</th>
             <th>Thời gian</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td colSpan={4} className="table__empty">
+            <td colSpan={5} className="table__empty">
               Không có nhật ký nào phù hợp với bộ lọc
             </td>
           </tr>
@@ -603,24 +650,32 @@ function AuditTable({ items }) {
   return (
     <table className="table">
         <colgroup>
-          <col /><col /><col /><col />
+          <col /><col /><col /><col /><col />
         </colgroup>
       <thead>
         <tr>
           <th>Người dùng</th>
           <th>Hành động</th>
           <th>Mô tả</th>
+          <th>Chi nhánh</th>
           <th>Thời gian</th>
         </tr>
       </thead>
       <tbody>
         {items.map((item) => {
+          void now; // tick để cập nhật "vừa xong" realtime
           const t = formatLocal(item.logged_at);
           const userName = item.user_name || 'Hệ thống';
           const initials = userName.split(' ').filter(Boolean).slice(-2)
             .map((p) => p[0]).join('').toUpperCase() || '?';
+          const description = humanizeAuditDescription(
+            item.description,
+            item.action,
+            item.new_value,
+            { entityCode: item.entity_code, entityName: item.entity_name }
+          );
           return (
-            <tr key={item.id}>
+            <tr key={item.id} onClick={() => onRowClick && onRowClick(item)} style={{ cursor: 'pointer' }} title="Nhấp để xem chi tiết">
               <td>
                 <div className="audit-logs__user-cell" title={userName}>
                   <span className="audit-logs__user-avatar" aria-hidden="true">{initials}</span>
@@ -631,15 +686,24 @@ function AuditTable({ items }) {
               </td>
               <td>
                 {item.action ? (
-                  <span className={`badge ${ACTION_CLASS[item.action] || 'badge--secondary'}`} title={item.action}>
-                    {ACTION_LABELS[item.action] || item.action}
+                  <span className={`badge ${ACTION_CLASS[item.action] || 'badge--secondary'}`}>
+                    {getAuditActionLabel(item.action)}
                   </span>
                 ) : '—'}
               </td>
               <td>
-                <span className="audit-logs__description" title={item.description || ''}>
-                  {item.description || '—'}
+                <span className="audit-logs__description" title={description}>
+                  {description || '—'}
                 </span>
+              </td>
+              <td className="audit-logs__cell--branch">
+                {item.branch_name
+                  || item.branchName
+                  || ((item.user_name || item.userName || '').toLowerCase() === 'system'
+                    ? 'Hệ thống'
+                    : (item.branch_id != null || item.branchId != null
+                      ? `#${item.branch_id ?? item.branchId}`
+                      : '—'))}
               </td>
               <td className="audit-logs__cell--time">
                 <div className="audit-logs__time-cell">

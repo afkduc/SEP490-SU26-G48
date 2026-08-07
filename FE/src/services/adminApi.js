@@ -9,8 +9,8 @@ import { fetchBlob } from '../utils/downloadBlob';
  * tra ve thang phan data (object). Nen KHONG goi them .data o day.
  * Tuong tu cho listAdminUsers.
  */
-export async function getAdminDashboardStats() {
-  return httpClient.get('/admin/dashboard');
+export async function getAdminDashboardStats(params = {}) {
+  return httpClient.get(`/admin/dashboard${buildQuery(params)}`);
 }
 
 export async function listAdminUsers() {
@@ -48,12 +48,11 @@ function buildQuery(params = {}) {
  *     tra ve: { id, name, email, fullName, phone, branchId, branchName, status, roles, ... }
  *
  *   - resetPassword(userId, options): POST /api/admin/users/:id/reset-password
- *     options: { mustChangePassword?: boolean, newPassword?: string }
- *       mustChangePassword: mac dinh true (co the client override qua body)
+ *     options: { newPassword?: string }
  *       newPassword:
  *         - undefined/empty -> BE sinh MK random 12 ky tu (hoa+thuong+so+dac biet)
  *         - co gia tri      -> BE validate (>=6 ky tu) va dung MK do
- *     tra ve: { userId, newPassword, isManual, mustChangePassword, message }
+ *     tra ve: { userId, newPassword, isManual, message }
  */
 class AdminUsersApi {
   list(params = {}) {
@@ -72,8 +71,8 @@ class AdminUsersApi {
     return httpClient.put(`/admin/users/${payload.userId}`, payload);
   }
 
-  resetPassword(userId, { mustChangePassword = true, newPassword } = {}) {
-    const body = { mustChangePassword };
+  resetPassword(userId, { newPassword } = {}) {
+    const body = {};
     if (newPassword !== undefined && newPassword !== null && newPassword !== '') {
       body.newPassword = newPassword;
     }
@@ -146,56 +145,12 @@ class AdminBranchesApi {
 const adminBranchesApi = new AdminBranchesApi();
 
 /**
- * Admin Roles API (UC-11)
- *   - list():                    GET /api/admin/roles
- *   - getDetail(id):            GET /api/admin/roles/:id
- *   - create(payload):          POST /api/admin/roles
- *   - update(id, payload):      PUT /api/admin/roles/:id
- *   - delete(id):               DELETE /api/admin/roles/:id
- *   - listPermissions():         GET /api/admin/permissions
- *   - getRolePermissions(id):    GET /api/admin/roles/:id/permissions
- *   - setRolePermissions(id, permIds[]): PUT /api/admin/roles/:id/permissions
- *   - getRoleUsers(id):         GET /api/admin/roles/:id/users
+ * Admin Roles API — danh sách role để gán trên form user (không còn màn CRUD vai trò).
+ *   - list(): GET /api/admin/roles
  */
 class AdminRolesApi {
   list() {
     return httpClient.get('/admin/roles');
-  }
-
-  getDetail(id) {
-    return httpClient.get(`/admin/roles/${id}`);
-  }
-
-  create(payload) {
-    return httpClient.post('/admin/roles', payload);
-  }
-
-  update(id, payload) {
-    return httpClient.put(`/admin/roles/${id}`, payload);
-  }
-
-  delete(id) {
-    return httpClient.delete(`/admin/roles/${id}`);
-  }
-
-  toggleStatus(id) {
-    return httpClient.patch(`/admin/roles/${id}/toggle-status`);
-  }
-
-  listPermissions() {
-    return httpClient.get('/admin/permissions');
-  }
-
-  getRolePermissions(id) {
-    return httpClient.get(`/admin/roles/${id}/permissions`);
-  }
-
-  setRolePermissions(id, permissionIds) {
-    return httpClient.put(`/admin/roles/${id}/permissions`, { permissionIds });
-  }
-
-  getRoleUsers(id) {
-    return httpClient.get(`/admin/roles/${id}/users`);
   }
 }
 
@@ -264,7 +219,7 @@ export async function reissueAdminToken() {
 
 /**
  * POST /api/admin/refresh-permissions
- * Lay permissions moi nhat tu DB sau khi admin sua ma tran quyen.
+ * Lay permissions moi nhat tu DB.
  * Tra ve: { token, permissions }
  */
 export async function refreshPermissionsApi() {
@@ -285,10 +240,9 @@ export {
 
 /**
  * Admin Devices API
- *   - list(params):     GET /api/admin/devices
+ *   - list(params): GET /api/admin/devices
  *   - listByUser(id): GET /api/admin/devices/user/:id
- *   - forceLogout(deviceId): DELETE /api/admin/devices/:deviceId
- *   - forceLogoutOthers(userId, currentDeviceId): DELETE /api/admin/devices/user/:userId/others
+ *   - forceLogout(deviceId): POST /api/admin/devices/:deviceId/logout
  */
 class AdminDevicesApi {
   list(params = {}) {
@@ -300,19 +254,7 @@ class AdminDevicesApi {
   }
 
   forceLogout(deviceId) {
-    return httpClient.delete(`/admin/devices/${deviceId}`);
-  }
-
-  forceLogoutOthers(userId, currentDeviceId) {
-    return httpClient.delete(`/admin/devices/user/${userId}/others?currentDeviceId=${currentDeviceId || ''}`);
-  }
-
-  /**
-   * Admin force logout ALL devices of a user (including current).
-   * DELETE /api/admin/devices/user/:userId/all
-   */
-  forceLogoutAllDevices(userId) {
-    return httpClient.delete(`/admin/devices/user/${userId}/all`);
+    return httpClient.post(`/admin/devices/${deviceId}/logout`);
   }
 }
 
@@ -321,57 +263,25 @@ const adminDevicesApi = new AdminDevicesApi();
 export { AdminDevicesApi, adminDevicesApi };
 
 /**
- * Admin Specialties API
- *   - list():              GET /api/admin/specialties
- *   - create(payload):    POST /api/admin/specialties
- *   - update(id, payload): PUT /api/admin/specialties/:id
- *   - delete(id):         DELETE /api/admin/specialties/:id
- *   - getUserSpecialties(userId): GET /api/admin/users/:userId/specialties
- *   - setUserSpecialties(userId, ids[]): PUT /api/admin/users/:userId/specialties
- */
-class AdminSpecialtiesApi {
-  list() {
-    return httpClient.get('/admin/specialties');
-  }
-
-  create(payload) {
-    return httpClient.post('/admin/specialties', payload);
-  }
-
-  update(id, payload) {
-    return httpClient.put(`/admin/specialties/${id}`, payload);
-  }
-
-  delete(id) {
-    return httpClient.delete(`/admin/specialties/${id}`);
-  }
-
-  toggleStatus(id) {
-    return httpClient.patch(`/admin/specialties/${id}/toggle-status`);
-  }
-
-  getUserSpecialties(userId) {
-    return httpClient.get(`/admin/users/${userId}/specialties`);
-  }
-
-  setUserSpecialties(userId, specialtyIds) {
-    return httpClient.put(`/admin/users/${userId}/specialties`, { specialtyIds });
-  }
-}
-
-const adminSpecialtiesApi = new AdminSpecialtiesApi();
-
-export { AdminSpecialtiesApi, adminSpecialtiesApi };
-
-/**
  * Admin Security Alerts API
  *   - list(params):   GET /api/admin/security-alerts
  *   - getCounts():    GET /api/admin/security-alerts/counts
  *   - ack(id):        PATCH /api/admin/security-alerts/:id/ack
+ *   - ackAll():       PATCH /api/admin/security-alerts/ack-all
  */
 class AdminSecurityAlertsApi {
   list(params = {}) {
     return httpClient.get(`/admin/security-alerts${buildQuery(params)}`);
+  }
+
+  /** Lịch sử đầy đủ cùng nhóm rule+user (cho popup chi tiết) */
+  related({ ruleKey, userId, pageSize = 50 } = {}) {
+    return httpClient.get(`/admin/security-alerts${buildQuery({
+      related: '1',
+      ruleKey,
+      userId: userId ?? '',
+      pageSize,
+    })}`);
   }
 
   getCounts() {
@@ -380,6 +290,10 @@ class AdminSecurityAlertsApi {
 
   ack(alertId) {
     return httpClient.patch(`/admin/security-alerts/${alertId}/ack`);
+  }
+
+  ackAll() {
+    return httpClient.patch('/admin/security-alerts/ack-all');
   }
 }
 

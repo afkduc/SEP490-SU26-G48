@@ -3,6 +3,12 @@ const ServiceRequestResponseDto = require('../dto/ServiceRequestDto');
 const { emitServiceRequestEvent } = require('../events/ServiceRequestEvents');
 const BranchRepositoryImpl = require('../../infrastructure/repositories/BranchRepositoryImpl');
 const { query } = require('../../infrastructure/database/sqlServer');
+const { isValidPhone, isValidEmail, EMAIL_HINT } = require('../../utils/fieldValidation');
+
+// service_packages luu rieng theo tung chi nhanh (gia co the khac nhau) -
+// dung chi nhanh id=1 (Ha Noi, dang co du lieu goi day du nhat) lam gia
+// tham khao chung cho section + trang chi tiet "Goi dich vu" tren landing.
+const PUBLIC_SERVICE_PACKAGE_BRANCH_ID = 1;
 
 class ServiceRequestService {
   constructor({ serviceRequestRepository }) {
@@ -10,19 +16,86 @@ class ServiceRequestService {
     this.branchRepository = new BranchRepositoryImpl();
   }
 
-  // Public - danh sach chi nhanh rut gon cho 2 dropdown tren landing page,
-  // khong lo thong tin quan ly chi nhanh.
+  // Public - danh sach chi nhanh cho dropdown + section "He thong chi nhanh"
+  // tren landing page. Bo qua thong tin quan ly chi nhanh (manager...).
   async getPublicBranches() {
     const branches = await this.branchRepository.findAll();
     return branches
       .filter((b) => b.isActive)
-      .map((b) => ({ id: b.id, name: b.branchName }));
+      .map((b) => ({ id: b.id, code: b.branchCode, name: b.branchName, address: b.address, phone: b.phone }));
   }
 
-  // Public - danh sach hang xe (KIA/Mazda...) cho dropdown tren landing page.
+  // Public - danh sach hang xe cho dropdown tren landing page. AutoGara chi
+  // nhan bao duong/sua chua Kia va Mazda nen loc cung ngay tai day.
   async getPublicVehicleBrands() {
-    const result = await query('SELECT id, brand_name FROM brands ORDER BY brand_name ASC');
-    return result.recordset.map((row) => ({ id: row.id, name: row.brand_name }));
+    const VehicleBrandRepository = require('../../infrastructure/repositories/VehicleBrandRepository');
+    const repo = new VehicleBrandRepository();
+    try {
+      const items = await repo.list({ includeInactive: false });
+      return items.map((b) => ({ id: b.id, name: b.brandName }));
+    } catch (_) {
+      const result = await query(
+        'SELECT id, brand_name FROM brands ORDER BY brand_name ASC'
+      );
+      return result.recordset.map((row) => ({ id: row.id, name: row.brand_name }));
+    }
+  }
+
+  // Public - vai goi dich vu tieu bieu cho section "Goi dich vu" tren landing
+  // page. service_packages luu rieng theo tung chi nhanh (gia co the khac
+  // nhau) - lay tam theo chi nhanh id=1 (Ha Noi, chi nhanh dang co du lieu
+  // goi day du nhat) lam gia tham khao chung.
+  async getPublicServicePackages() {
+    const result = await query(
+      `SELECT sp.package_code, sp.package_name, sp.total_price, sp.description, c.category_name
+       FROM service_packages sp
+       LEFT JOIN service_categories c ON c.id = sp.category_id
+       WHERE sp.branch_id = @branchId AND sp.is_active = 1
+       ORDER BY sp.total_price ASC`,
+      { branchId: PUBLIC_SERVICE_PACKAGE_BRANCH_ID }
+    );
+    return result.recordset.map((row) => ({
+      code: row.package_code,
+      name: row.package_name,
+      totalPrice: Number(row.total_price || 0),
+      description: row.description,
+      categoryName: row.category_name,
+    }));
+  }
+
+  // Public - chi tiet 1 goi dich vu (trang /goi-dich-vu/[code] tren landing),
+  // kem danh sach hang muc con de khach xem "goi nay gom nhung gi".
+  async getPublicServicePackageByCode(code) {
+    const result = await query(
+      `SELECT sp.id, sp.package_name, sp.total_price, sp.description, sp.purpose, c.category_name
+       FROM service_packages sp
+       LEFT JOIN service_categories c ON c.id = sp.category_id
+       WHERE sp.package_code = @code AND sp.branch_id = @branchId AND sp.is_active = 1`,
+      { code, branchId: PUBLIC_SERVICE_PACKAGE_BRANCH_ID }
+    );
+    const row = result.recordset[0];
+    if (!row) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+
+    const itemsResult = await query(
+      `SELECT s.service_name, s.unit_price
+       FROM service_package_items spi
+       JOIN services s ON s.id = spi.service_id
+       WHERE spi.package_id = @packageId AND s.is_active = 1
+       ORDER BY s.service_name ASC`,
+      { packageId: row.id }
+    );
+
+    return {
+      name: row.package_name,
+      totalPrice: Number(row.total_price || 0),
+      description: row.description,
+      purpose: row.purpose,
+      categoryName: row.category_name,
+      items: itemsResult.recordset.map((r) => ({
+        name: r.service_name,
+        unitPrice: Number(r.unit_price || 0),
+      })),
+    };
   }
 
   // Public - khach gui form "Lien he" tu landing page.
@@ -34,6 +107,8 @@ class ServiceRequestService {
 
     if (!fullName) throw new ApiError(400, 'Vui lòng nhập họ và tên');
     if (!phone) throw new ApiError(400, 'Vui lòng nhập số điện thoại');
+    if (!isValidPhone(phone)) throw new ApiError(400, 'Số điện thoại không hợp lệ');
+    if ((payload.email || '').trim() && !isValidEmail(payload.email)) throw new ApiError(400, EMAIL_HINT);
     if (!issue) throw new ApiError(400, 'Vui lòng mô tả vấn đề xe đang gặp phải');
     if (!nearestBranchId) throw new ApiError(400, 'Vui lòng chọn chi nhánh gần bạn nhất');
 

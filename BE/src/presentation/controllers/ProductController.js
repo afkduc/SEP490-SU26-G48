@@ -1,8 +1,12 @@
 const { success } = require('../../utils/response');
+const { auditCrud } = require('../../utils/auditHelper');
+const NotificationService = require('../../application/services/NotificationService');
+const { formatEntityName } = require('../../utils/notificationFormat');
 
 class ProductController {
   constructor({ productService }) {
     this.productService = productService;
+    this.notificationService = new NotificationService();
   }
 
   listUnits = async (req, res, next) => {
@@ -44,11 +48,33 @@ class ProductController {
   create = async (req, res, next) => {
     try {
       const payload = { ...req.body };
-      // Neu client khong truyen branchId thi lay tu token (neu co).
       if (!payload.branchId && req.user?.branchId) {
         payload.branchId = req.user.branchId;
       }
+      // Luu lai vai tro nguoi tao de biet co phai NV kho tao khong (dung cho
+      // thong bao "san pham moi" ben Quan ly - xem markSeen/getNewCount).
+      payload.createdByRole = req.user?.roles?.includes('warehouse_staff')
+        ? 'warehouse_staff'
+        : (req.user?.roles?.[0] || null);
       const product = await this.productService.createProduct(payload);
+      await auditCrud.create(req, {
+        tableName: 'products',
+        entityCode: product?.product_code || product?.code || null,
+        recordId: product?.id || null,
+        entityName: 'Phụ tùng / Sản phẩm',
+        data: req.body,
+      });
+      await this.notificationService.notifyAdmins('PRODUCT_CREATED', {
+        auditLogId: req._lastAuditLogId,
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id,
+          'Sản phẩm',
+        ),
+        targetCode: product?.product_code || product?.code || '',
+        userId: product?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
       return success(res, product, 'Product created', 201);
     } catch (err) {
       next(err);
@@ -58,6 +84,24 @@ class ProductController {
   update = async (req, res, next) => {
     try {
       const product = await this.productService.updateProduct(req.params.id, req.body);
+      await auditCrud.update(req, {
+        tableName: 'products',
+        entityCode: product?.product_code || `ID-${req.params.id}`,
+        recordId: product?.id || Number(req.params.id) || null,
+        entityName: 'Phụ tùng / Sản phẩm',
+        newData: req.body,
+      });
+      await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
+        auditLogId: req._lastAuditLogId,
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id || req.params.id,
+          'Sản phẩm',
+        ),
+        targetCode: product?.product_code || product?.code || '',
+        userId: product?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
       return success(res, product, 'Product updated');
     } catch (err) {
       next(err);
@@ -66,8 +110,54 @@ class ProductController {
 
   remove = async (req, res, next) => {
     try {
+      // Soft-disable: không hard delete. Đồng bộ nghiệp vụ Ngừng/Disable.
       const product = await this.productService.deleteProduct(req.params.id);
-      return success(res, product, 'Product deleted');
+      await auditCrud.update(req, {
+        tableName: 'products',
+        entityCode: product?.product_code || `ID-${req.params.id}`,
+        recordId: product?.id || Number(req.params.id) || null,
+        entityName: 'Phụ tùng / Sản phẩm',
+        newData: { status: 'inactive' },
+      });
+      await this.notificationService.notifyAdmins('PRODUCT_DISABLED', {
+        auditLogId: req._lastAuditLogId,
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id || req.params.id,
+          'Sản phẩm',
+        ),
+        targetCode: product?.product_code || product?.code || '',
+        userId: Number(req.params.id) || null,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
+      return success(res, product, 'Product deactivated');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  reactivate = async (req, res, next) => {
+    try {
+      const product = await this.productService.reactivateProduct(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'products',
+        entityCode: product?.product_code || `ID-${req.params.id}`,
+        recordId: product?.id || Number(req.params.id) || null,
+        entityName: 'Phụ tùng / Sản phẩm',
+        newData: { status: 'active' },
+      });
+      await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
+        auditLogId: req._lastAuditLogId,
+        actorName: req.user?.name || req.user?.email || 'Admin',
+        targetName: formatEntityName(
+          product?.name || product?.product_name,
+          product?.id || req.params.id,
+          'Sản phẩm',
+        ),
+        targetCode: product?.product_code || product?.code || '',
+        userId: product?.id,
+      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[ProductController] notifyAdmins:', e.message));
+      return success(res, product, 'Product reactivated');
     } catch (err) {
       next(err);
     }
@@ -77,6 +167,29 @@ class ProductController {
     try {
       const categories = await this.productService.getCategories();
       return success(res, categories, 'Categories retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Quan ly di chuot vao dong san pham moi (do NV kho tao) trong man Kho chi
+  // nhanh - danh dau la da xem, khong hien cham do nua.
+  markSeen = async (req, res, next) => {
+    try {
+      const product = await this.productService.markSeenByManager(req.params.id);
+      return success(res, product, 'Product marked as seen');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // So san pham do NV kho tao ma Quan ly CHUA xem - hien so do canh
+  // "Kho chi nhanh" tren menu.
+  getNewCount = async (req, res, next) => {
+    try {
+      const branchId = req.query.branchId ? Number(req.query.branchId) : req.user?.branchId;
+      const count = await this.productService.countNewForManager(branchId);
+      return success(res, { count }, 'New product count retrieved');
     } catch (err) {
       next(err);
     }

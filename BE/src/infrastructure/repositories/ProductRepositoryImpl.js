@@ -94,12 +94,12 @@ class ProductRepositoryImpl extends ProductRepository {
       INSERT INTO products (
         product_code, product_name, category, brand_name, unit_id,
         unit_price, stock_quantity, min_stock, supplier_id,
-        location, branch_id, status, unit_id
+        location, branch_id, status, created_by_role
       )
       VALUES (
         @productCode, @productName, @category, @brandName, @unitId,
         @unitPrice, @stockQuantity, @minStock, @supplierId,
-        @location, @branchId, @status, @unitId
+        @location, @branchId, @status, @createdByRole
       );
       SELECT SCOPE_IDENTITY() AS id;
     `;
@@ -116,11 +116,29 @@ class ProductRepositoryImpl extends ProductRepository {
       location: data.location || null,
       branchId: data.branchId || null,
       status: data.status || 'active',
-      unitId: data.unitId || 1,
+      createdByRole: data.createdByRole || null,
     };
     const result = await query(sql, params);
     const newId = result.recordset[0].id;
     return this.findById(newId);
+  }
+
+  // Danh dau 1 phu tung la "da xem" boi Quan ly (Manager) - dung khi hover
+  // vao dong san pham moi trong man Kho chi nhanh.
+  async markSeenByManager(id) {
+    await query(`UPDATE products SET seen_by_manager_at = GETDATE() WHERE id = @id AND seen_by_manager_at IS NULL`, { id });
+    return this.findById(id);
+  }
+
+  // Dem so san pham do Nhan vien kho tao ma Quan ly CHUA xem - hien so do
+  // canh "Kho chi nhanh" tren menu.
+  async countNewForManager(branchId) {
+    const result = await query(
+      `SELECT COUNT(*) AS total FROM products
+       WHERE branch_id = @branchId AND created_by_role = 'warehouse_staff' AND seen_by_manager_at IS NULL`,
+      { branchId }
+    );
+    return result.recordset[0].total;
   }
 
   async update(id, data) {
@@ -172,10 +190,20 @@ class ProductRepositoryImpl extends ProductRepository {
   }
 
   async delete(id) {
+    // Soft-disable: không hard DELETE (đồng bộ nghiệp vụ Disable/Ngừng).
     const before = await this.findById(id);
     if (!before) return null;
-    await query(`DELETE FROM products WHERE id = @id`, { id });
-    return before;
+    if (before.status === 'inactive') return before;
+    await query(`UPDATE products SET status = N'inactive' WHERE id = @id`, { id });
+    return this.findById(id);
+  }
+
+  async reactivate(id) {
+    const before = await this.findById(id);
+    if (!before) return null;
+    if (before.status === 'active') return before;
+    await query(`UPDATE products SET status = N'active' WHERE id = @id`, { id });
+    return this.findById(id);
   }
 
   async count({ branchId, status, search, category, lowStockOnly } = {}) {

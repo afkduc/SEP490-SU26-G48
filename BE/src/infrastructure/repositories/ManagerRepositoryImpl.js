@@ -1,10 +1,10 @@
-const { query } = require('../database/sqlServer');
+const { query, sql } = require('../database/sqlServer');
+const { runInTransaction } = require('../../utils/sqlTransaction');
 
 // Tổ trưởng đã gộp vào module Nhân viên (dùng chung listEmployees/createEmployee/...),
 // nên phải nằm trong EMPLOYEE_ROLES để hiện ra trong danh sách/tìm kiếm nhân viên.
-const EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'accountant', 'team_leader'];
-// Vai trò được PHÉP GÁN khi tạo/sửa nhân viên (khác EMPLOYEE_ROLES ở chỗ không cho
-// tạo mới Kế toán qua màn này nữa).
+const EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'team_leader'];
+// Vai trò được PHÉP GÁN khi tạo/sửa nhân viên.
 const ASSIGNABLE_EMPLOYEE_ROLES = ['service_advisor', 'warehouse_staff', 'team_leader'];
 const TECHNICIAN_ROLE = 'technician';
 const TEAM_LEADER_ROLE = 'team_leader';
@@ -36,7 +36,6 @@ function aggregateEmployees(rows = []) {
         statusLabel: statusLabel(row.status),
         teamSize: row.team_size,
         teamMemberCount: row.team_member_count || 0,
-        avatar: row.avatar,
         notes: row.notes,
         createdAt: normalizeDate(row.created_at),
         branch: row.branch_id
@@ -81,6 +80,8 @@ function mapSettlementRow(row) {
     status: row.status,
     intakeDate: normalizeDate(row.intake_date),
     completedDate: normalizeDate(row.completed_date),
+    cancelledAt: normalizeDate(row.cancelled_at),
+    paidAt: normalizeDate(row.invoice_issued_at),
     total: Number(row.total || 0),
     subtotal: Number(row.subtotal || 0),
     discountAmount: Number(row.discount_amount || 0),
@@ -165,9 +166,9 @@ function mapPackageRow(row) {
     name: row.package_name,
     categoryId: row.category_id,
     categoryName: row.category_name,
-    applicableKm: row.applicable_km,
     totalPrice: Number(row.total_price || 0),
     description: row.description,
+    purpose: row.purpose,
     isActive: !!row.is_active,
     repairCategory: row.repair_category,
   };
@@ -215,7 +216,6 @@ class ManagerRepositoryImpl {
           u.status,
           u.team_size,
           (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count,
-          u.avatar,
           u.notes,
           u.created_at,
           u.branch_id,
@@ -262,7 +262,6 @@ class ManagerRepositoryImpl {
           u.status,
           u.team_size,
           (SELECT COUNT(*) FROM users t WHERE t.team_leader_id = u.id) AS team_member_count,
-          u.avatar,
           u.notes,
           u.created_at,
           u.branch_id,
@@ -298,6 +297,12 @@ class ManagerRepositoryImpl {
 
       const specialtiesByUser = await this._fetchSpecialtiesByUserIds([Number(id)]);
       employee.specialties = specialtiesByUser.get(Number(id)) || [];
+
+      const baysResult = await query(
+        `SELECT bay_number FROM vehicle_bays WHERE team_leader_id = @id ORDER BY bay_number ASC`,
+        { id: Number(id) }
+      );
+      employee.bays = baysResult.recordset.map((r) => r.bay_number);
     }
 
     return employee;
@@ -344,7 +349,7 @@ class ManagerRepositoryImpl {
     return this.getEmployeeById(branchId, userId);
   }
 
-  async updateEmployee(branchId, id, { fullName, email, phone, roleId, status, specialtyIds }) {
+  async updateEmployee(branchId, id, { fullName, email, phone, roleId, status, specialtyIds, passwordHash }) {
     await query(
       `UPDATE users
        SET user_name = @fullName,
@@ -362,6 +367,15 @@ class ManagerRepositoryImpl {
         branchId: Number(branchId),
       }
     );
+
+    // Chi doi mat khau khi Quan ly co nhap mat khau moi (passwordHash) - de
+    // trong thi giu nguyen mat khau cu, khong bat buoc phai nhap moi lan sua.
+    if (passwordHash) {
+      await query(
+        `UPDATE users SET user_password = @passwordHash WHERE id = @id AND branch_id = @branchId`,
+        { passwordHash, id: Number(id), branchId: Number(branchId) }
+      );
+    }
 
     if (roleId) {
       await query('DELETE FROM user_role WHERE user_id = @id', { id: Number(id) });
@@ -412,7 +426,7 @@ class ManagerRepositoryImpl {
       branchId: Number(branchId),
       search: filters.search ? `%${filters.search.trim()}%` : null,
       status: filters.status && filters.status !== 'all' ? (filters.status === 'active' ? 1 : 0) : null,
-      categoryId: filters.categoryId && filters.categoryId !== 'all' ? Number(filters.categoryId) : null,
+      repairCategory: filters.repairCategory && filters.repairCategory !== 'all' ? filters.repairCategory : null,
     };
 
     const result = await query(
@@ -422,7 +436,7 @@ class ManagerRepositoryImpl {
        LEFT JOIN service_categories c ON c.id = s.category_id
        WHERE s.branch_id = @branchId
          AND (@status IS NULL OR s.is_active = @status)
-         AND (@categoryId IS NULL OR s.category_id = @categoryId)
+         AND (@repairCategory IS NULL OR s.repair_category = @repairCategory)
          AND (
            @search IS NULL
            OR s.service_code LIKE @search
@@ -553,16 +567,18 @@ class ManagerRepositoryImpl {
       branchId: Number(branchId),
       search: filters.search ? `%${filters.search.trim()}%` : null,
       status: filters.status && filters.status !== 'all' ? (filters.status === 'active' ? 1 : 0) : null,
+      repairCategory: filters.repairCategory && filters.repairCategory !== 'all' ? filters.repairCategory : null,
     };
 
     const result = await query(
       `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
-              sp.applicable_km, sp.total_price, sp.description, sp.is_active, sp.repair_category,
+              sp.total_price, sp.description, sp.purpose, sp.is_active, sp.repair_category,
               (SELECT COUNT(*) FROM service_package_items spi WHERE spi.package_id = sp.id) AS item_count
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
        WHERE sp.branch_id = @branchId
          AND (@status IS NULL OR sp.is_active = @status)
+         AND (@repairCategory IS NULL OR sp.repair_category = @repairCategory)
          AND (
            @search IS NULL
            OR sp.package_code LIKE @search
@@ -578,7 +594,7 @@ class ManagerRepositoryImpl {
   async getServicePackageById(branchId, id) {
     const result = await query(
       `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
-              sp.applicable_km, sp.total_price, sp.description, sp.is_active, sp.repair_category
+              sp.total_price, sp.description, sp.purpose, sp.is_active, sp.repair_category
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
        WHERE sp.id = @id AND sp.branch_id = @branchId`,
@@ -629,18 +645,18 @@ class ManagerRepositoryImpl {
     }
   }
 
-  async createServicePackage({ branchId, packageCode, packageName, categoryId, applicableKm, totalPrice, description, repairCategory, serviceIds }) {
+  async createServicePackage({ branchId, packageCode, packageName, categoryId, totalPrice, description, purpose, repairCategory, serviceIds }) {
     const result = await query(
-      `INSERT INTO service_packages (package_code, package_name, category_id, applicable_km, total_price, description, is_active, branch_id, repair_category)
+      `INSERT INTO service_packages (package_code, package_name, category_id, total_price, description, purpose, is_active, branch_id, repair_category)
        OUTPUT INSERTED.id
-       VALUES (@packageCode, @packageName, @categoryId, @applicableKm, @totalPrice, @description, 1, @branchId, @repairCategory)`,
+       VALUES (@packageCode, @packageName, @categoryId, @totalPrice, @description, @purpose, 1, @branchId, @repairCategory)`,
       {
         packageCode,
         packageName,
         categoryId,
-        applicableKm,
         totalPrice,
         description,
+        purpose: purpose || null,
         branchId: Number(branchId),
         repairCategory: repairCategory || null,
       }
@@ -650,23 +666,23 @@ class ManagerRepositoryImpl {
     return this.getServicePackageById(branchId, packageId);
   }
 
-  async updateServicePackage(branchId, id, { packageName, categoryId, applicableKm, totalPrice, description, isActive, repairCategory, serviceIds }) {
+  async updateServicePackage(branchId, id, { packageName, categoryId, totalPrice, description, purpose, isActive, repairCategory, serviceIds }) {
     await query(
       `UPDATE service_packages
        SET package_name = @packageName,
            category_id = @categoryId,
-           applicable_km = @applicableKm,
            total_price = @totalPrice,
            description = @description,
+           purpose = @purpose,
            is_active = @isActive,
            repair_category = @repairCategory
        WHERE id = @id AND branch_id = @branchId`,
       {
         packageName,
         categoryId,
-        applicableKm,
         totalPrice,
         description,
+        purpose: purpose || null,
         isActive: isActive ? 1 : 0,
         repairCategory: repairCategory || null,
         id: Number(id),
@@ -721,13 +737,21 @@ class ManagerRepositoryImpl {
           so.free_amount,
           so.total,
           so.intake_date,
-          so.completed_date
+          so.completed_date,
+          so.cancelled_at,
+          inv.issued_at AS invoice_issued_at
        FROM service_orders so
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
        INNER JOIN users advisor ON advisor.id = so.advisor_id
        LEFT JOIN users leader ON leader.id = so.team_leader_id
+       OUTER APPLY (
+           SELECT TOP 1 i.issued_at
+           FROM   invoices i
+           WHERE  i.service_order_id = so.id
+           ORDER  BY i.issued_at DESC
+       ) inv
        WHERE so.branch_id = @branchId
          AND (@status IS NULL OR so.status = @status)
          AND (
@@ -778,13 +802,21 @@ class ManagerRepositoryImpl {
           so.free_amount,
           so.total,
           so.intake_date,
-          so.completed_date
+          so.completed_date,
+          so.cancelled_at,
+          inv.issued_at AS invoice_issued_at
        FROM service_orders so
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
        INNER JOIN users advisor ON advisor.id = so.advisor_id
        LEFT JOIN users leader ON leader.id = so.team_leader_id
+       OUTER APPLY (
+           SELECT TOP 1 i.issued_at
+           FROM   invoices i
+           WHERE  i.service_order_id = so.id
+           ORDER  BY i.issued_at DESC
+       ) inv
        WHERE so.id = @id AND so.branch_id = @branchId`,
       { id: Number(id), branchId: Number(branchId) }
     );
@@ -1010,6 +1042,45 @@ class ManagerRepositoryImpl {
     return this.getTechnicianById(branchId, id);
   }
 
+  // Dong bo lai toan bo thanh vien doi cua 1 to truong - go those khong con
+  // trong memberIds, gan those moi (chi ap dung user role technician, cung
+  // chi nhanh) - xem ManagerService.setTeamMembers.
+  async setTeamMembers(branchId, teamLeaderId, memberIds) {
+    await runInTransaction(async (tx) => {
+      if (memberIds.length > 0) {
+        const inClause = memberIds.map((_, i) => `@m${i}`).join(',');
+        const unsetReq = tx.request()
+          .input('teamLeaderId', sql.BigInt, teamLeaderId)
+          .input('branchId', sql.BigInt, branchId);
+        memberIds.forEach((mid, i) => unsetReq.input(`m${i}`, sql.BigInt, mid));
+        await unsetReq.query(
+          `UPDATE users SET team_leader_id = NULL
+           WHERE team_leader_id = @teamLeaderId AND branch_id = @branchId AND id NOT IN (${inClause})`
+        );
+
+        const setReq = tx.request()
+          .input('teamLeaderId', sql.BigInt, teamLeaderId)
+          .input('branchId', sql.BigInt, branchId);
+        memberIds.forEach((mid, i) => setReq.input(`m${i}`, sql.BigInt, mid));
+        await setReq.query(`
+          UPDATE u SET u.team_leader_id = @teamLeaderId
+          FROM   users u
+          WHERE  u.id IN (${inClause}) AND u.branch_id = @branchId
+            AND  EXISTS (
+              SELECT 1 FROM user_role ur JOIN roles r ON r.id = ur.role_id
+              WHERE ur.user_id = u.id AND r.role_name = '${TECHNICIAN_ROLE}'
+            )
+        `);
+      } else {
+        await tx.request()
+          .input('teamLeaderId', sql.BigInt, teamLeaderId)
+          .input('branchId', sql.BigInt, branchId)
+          .query('UPDATE users SET team_leader_id = NULL WHERE team_leader_id = @teamLeaderId AND branch_id = @branchId');
+      }
+    });
+
+    return this.getEmployeeById(branchId, teamLeaderId);
+  }
 }
 
 module.exports = ManagerRepositoryImpl;

@@ -38,7 +38,9 @@ async function authenticate(req, res, next) {
     const authRow = result.recordset[0];
     const dbVersion = authRow?.token_version;
     if (dbVersion !== undefined && decoded.tokenVersion !== dbVersion) {
-      return next(new ApiError(401, 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.'));
+      const e = new ApiError(401, 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại.');
+      e.code = 'SESSION_REPLACED';
+      return next(e);
     }
 
     if (authRow?.status && authRow.status !== 'active') {
@@ -49,15 +51,33 @@ async function authenticate(req, res, next) {
       return next(new ApiError(401, 'Chi nhánh của tài khoản này đang bị ngưng hoạt động.'));
     }
 
-    // Kiem tra device con active khong (per-device logout)
-    // Neu co deviceId trong JWT, kiem tra is_current trong user_devices
-    if (decoded.deviceId) {
+    // Single-session: uu tien sessionId trong JWT.
+    // Neu session van active → cho qua (phien moi vua login), khong phu thuoc
+    // is_current (tranh race heartbeat/login lam is_current=0 → spinner vo han).
+    if (decoded.sessionId) {
+      const sessionResult = await query(
+        `SELECT status FROM login_sessions
+         WHERE id = @sessionId AND user_id = @userId AND action_type = 'LOGIN'`,
+        { sessionId: decoded.sessionId, userId: decoded.userId }
+      );
+      const sessionRow = sessionResult.recordset[0];
+      if (!sessionRow || sessionRow.status !== 'active') {
+        const e = new ApiError(401, 'Đã có người đăng nhập tài khoản của bạn. Vui lòng đăng nhập lại.');
+        e.code = 'SESSION_REPLACED';
+        return next(e);
+      }
+    } else if (decoded.deviceId) {
+      // Token cu khong co sessionId: fallback theo is_current (bit MSSQL → boolean/number)
       const deviceResult = await query(
         `SELECT is_current FROM user_devices WHERE id = @deviceId AND user_id = @userId`,
         { deviceId: decoded.deviceId, userId: decoded.userId }
       );
-      if (deviceResult.recordset.length > 0 && deviceResult.recordset[0].is_current === 0) {
-        return next(new ApiError(401, 'Thiết bị đã bị đăng xuất từ quản trị. Vui lòng đăng nhập lại.'));
+      if (deviceResult.recordset.length > 0) {
+        const raw = deviceResult.recordset[0].is_current;
+        const isCurrent = raw === 1 || raw === true;
+        if (!isCurrent) {
+          return next(new ApiError(401, 'Thiết bị đã bị đăng xuất từ quản trị. Vui lòng đăng nhập lại.'));
+        }
       }
     }
 
@@ -70,7 +90,9 @@ async function authenticate(req, res, next) {
       permissions: decoded.permissions || [],
       branchId: decoded.branchId,
       tokenVersion: decoded.tokenVersion,
+      sessionId: decoded.sessionId || null,
       deviceId: decoded.deviceId || null,
+      remember: Boolean(decoded.remember),
     };
     next();
   } catch {

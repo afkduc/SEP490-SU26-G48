@@ -8,17 +8,19 @@ function makeRepairOrderController() {
   return new RepairOrderController({ repairOrderService: makeRepairOrderService() });
 }
 
+// To truong (dang nhap binh thuong tu chinh tai khoan cua ho) nhan viec tu
+// bang tin chung ca chi nhanh, gan cho 1 khoang cua minh + tho thuc hien.
+// Tick dau muc/Hoan thanh dien ra rieng, tai chinh khoang xe, khong dang
+// nhap - xem publicRoutes.js /public/bays/* + PublicBayBoardController.js.
 function buildRepairOrderRouter() {
   const router = express.Router();
   const controller = makeRepairOrderController();
 
   router.use(authenticate, trackActivity);
-  router.get('/', controller.getAll);
-  router.get('/team-leaders', controller.getTeamLeaders);
-  router.get('/:id', controller.getById);
-  router.post('/', controller.create);
-  router.patch('/:id/status', controller.updateStatus);
-  router.patch('/:id/tasks/:taskId', controller.updateTaskStatus);
+  router.post('/claim', controller.claim);
+  router.get('/mine', controller.getMine);
+  router.get('/technicians/search', controller.searchTechnicians);
+  router.patch('/:id/technicians', controller.setTechnicians);
 
   return router;
 }

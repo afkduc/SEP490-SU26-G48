@@ -20,11 +20,19 @@
   font-weight: 600;
 }
 
+.admin-pagination__info--mobile {
+  display: none;
+}
+
 .admin-pagination__controls {
   display: flex;
   gap: 4px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.admin-pagination__controls--mobile {
+  display: none;
 }
 
 .admin-pagination__nav-btn,
@@ -97,37 +105,70 @@
   letter-spacing: 1px;
 }
 
-/* Mobile responsive */
+.admin-pagination__mobile-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.admin-pagination__mobile-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-pagination__mobile-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+  .admin-pagination {
+    gap: 10px;
+  }
+}
+
+/* Mobile */
 @media (max-width: 640px) {
   .admin-pagination {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 14px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
     gap: 10px;
   }
 
-  .admin-pagination__info {
-    text-align: center;
-    font-size: 0.78rem;
-  }
-
-  .admin-pagination__controls {
-    justify-content: center;
-  }
-
-  /* Hide first/last buttons on mobile */
-  .admin-pagination__edge-btn {
+  .admin-pagination__info--desktop {
     display: none;
   }
 
-  /* Hide text, show only icons for prev/next on mobile */
-  .admin-pagination__nav-btn:not(.admin-pagination__edge-btn) {
-    padding: 0 10px;
-    font-size: 0;
+  .admin-pagination__info--mobile {
+    display: inline;
+    font-size: 0.85rem;
+    color: #475569;
   }
 
-  .admin-pagination__nav-btn:not(.admin-pagination__edge-btn) svg {
-    width: 16px;
-    height: 16px;
+  .admin-pagination__info--mobile strong {
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .admin-pagination__controls--desktop {
+    display: none;
+  }
+
+  .admin-pagination__controls--mobile {
+    display: flex;
+    gap: 8px;
   }
 }

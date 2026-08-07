@@ -1,8 +1,74 @@
 const ApiError = require('../../utils/ApiError');
+const { buildAuditDescription } = require('../../utils/auditLabels');
 
 class AuditService {
   constructor(auditRepository) {
     this.auditRepository = auditRepository;
+  }
+
+  /**
+   * Alias gon cho insertAuditLog - nhieu controller dang goi this.auditService.log().
+   * Giu ten cu de tuong thich nguoc, ngoai ra cung cap insertAuditLog() cho
+   * code cu.
+   *
+   * Auto-map field alias de tuong thich voi nhieu controller dang goi voi
+   * ten field khac nhau:
+   *   - actorEmail / actorName / actorUserName -> user_name
+   *   - resource / resourceType -> table_name
+   *   - actorId -> user_id
+   */
+  async log(logData) {
+    if (!logData || typeof logData !== 'object') {
+      throw new ApiError(400, 'logData la bat buoc');
+    }
+
+    const normalized = { ...logData };
+    if (!normalized.user_name) {
+      normalized.user_name = normalized.actorEmail || normalized.actorName || normalized.actorUserName || null;
+    }
+    if (!normalized.table_name) {
+      normalized.table_name = normalized.resource || normalized.resourceType || 'unknown';
+    }
+    if (!normalized.user_id && normalized.actorId) {
+      normalized.user_id = normalized.actorId;
+    }
+    // Map common request aliases used by controllers
+    if (!normalized.ip_address && (normalized.ip || normalized.ipAddress)) {
+      normalized.ip_address = normalized.ip || normalized.ipAddress;
+    }
+    if (!normalized.record_id && normalized.resourceId != null) {
+      normalized.record_id = String(normalized.resourceId);
+    }
+    if (!normalized.request_url && normalized.userAgent) {
+      // keep userAgent available in description if no dedicated column write
+      if (!normalized.description) {
+        normalized.description = `UA: ${String(normalized.userAgent).slice(0, 120)}`;
+      }
+    }
+    // Map details -> new_value / description để FE hiển thị được
+    if (normalized.details && !normalized.new_value) {
+      normalized.new_value = typeof normalized.details === 'string'
+        ? normalized.details
+        : JSON.stringify(normalized.details);
+    }
+    if (!normalized.description && normalized.details) {
+      const d = typeof normalized.details === 'string'
+        ? (() => { try { return JSON.parse(normalized.details); } catch { return null; } })()
+        : normalized.details;
+      if (d && typeof d === 'object') {
+        const built = buildAuditDescription(normalized.action, d);
+        if (built) normalized.description = built;
+      }
+    } else if (!normalized.description && normalized.action) {
+      normalized.description = buildAuditDescription(normalized.action, {});
+    }
+
+    // Truncate action for safety (some DBs historically used short action columns)
+    if (normalized.action && String(normalized.action).length > 50) {
+      normalized.action = String(normalized.action).slice(0, 50);
+    }
+
+    return this.insertAuditLog(normalized);
   }
 
   async insertAuditLog(logData) {
@@ -39,6 +105,7 @@ class AuditService {
 
     return this.auditRepository.getAuditLogs({
       ...filters,
+      excludeAuthEvents: Boolean(filters.excludeAuthEvents),
       page: parsedPage,
       pageSize: parsedPageSize,
     });
@@ -73,6 +140,7 @@ class AuditService {
       startDate: filters.startDate,
       endDate: filters.endDate,
       branchId: filters.branchId,
+      excludeAuthEvents: Boolean(filters.excludeAuthEvents),
     });
   }
 
@@ -93,6 +161,14 @@ class AuditService {
       ...filters,
       page: parsedPage,
       pageSize: parsedPageSize,
+    });
+  }
+
+  async exportLoginSessions(filters = {}) {
+    return this.auditRepository.getLoginSessions({
+      ...filters,
+      page: 1,
+      pageSize: 5000,
     });
   }
 

@@ -1,9 +1,32 @@
 const ApiError = require('../../utils/ApiError');
 
 class UserRoleService {
-  constructor({ userRoleRepository, roleRepository }) {
+  constructor({ userRoleRepository, roleRepository, userRepository }) {
     this.userRoleRepository = userRoleRepository;
     this.roleRepository = roleRepository;
+    this.userRepository = userRepository;
+    this.authRepo = null;
+    try {
+      // Lazy require de tranh circular import.
+      const AuthRepositoryImpl = require('../../infrastructure/repositories/AuthRepositoryImpl');
+      this.authRepo = new AuthRepositoryImpl();
+    } catch (e) {
+      console.warn('[UserRoleService] AuthRepositoryImpl not available, token_version bump disabled:', e.message);
+    }
+  }
+
+  /**
+   * Bump token_version cho user (JWT cu vo hieu luc, user phai login lai).
+   * Skip actor (admin dang thuc hien) de khong tu logout minh.
+   */
+  async _bumpTokenVersion(userId, actorId) {
+    if (!this.authRepo) return;
+    if (Number(userId) === Number(actorId)) return;
+    try {
+      await this.authRepo.incrementTokenVersion(userId);
+    } catch (e) {
+      console.warn(`[UserRoleService] bump token_version cho user ${userId} failed:`, e.message);
+    }
   }
 
   /**
@@ -27,9 +50,16 @@ class UserRoleService {
     }
     const ids = Array.isArray(roleIds) ? roleIds : [Number(roleIds)];
     const assignedRoles = [];
+    if (this.userRepository && typeof this.userRepository.findById === 'function') {
+      const targetUser = await this.userRepository.findById(Number(userId));
+      if (!targetUser) throw new ApiError(404, `User id=${userId} khong ton tai`);
+    }
     for (const roleId of ids) {
       const role = await this.roleRepository.findById(roleId);
       if (!role) throw new ApiError(404, `Role id=${roleId} khong ton tai`);
+      if (role.isActive === false) {
+        throw new ApiError(400, `Vai trò "${role.role_name || role.roleName}" đang ngừng hoạt động`);
+      }
       await this.userRoleRepository.assignRole(Number(userId), roleId);
       assignedRoles.push(role.role_label || role.role_name);
     }
@@ -37,6 +67,9 @@ class UserRoleService {
 
     // Notify user about role change
     this._sendRoleChangedNotification(userId, 'ASSIGNED', assignedRoles.join(', '), changedBy);
+
+    // Bump token_version -> user bi 401 o request tiep theo (SessionExpiredModal hien)
+    await this._bumpTokenVersion(userId, changedBy);
 
     return result;
   }
@@ -50,7 +83,12 @@ class UserRoleService {
   async revokeRole(userId, roleId, changedBy) {
     if (!userId) throw new ApiError(400, 'userId la bat buoc');
     if (!roleId) throw new ApiError(400, 'roleId la bat buoc');
-    
+
+    if (this.userRepository && typeof this.userRepository.findById === 'function') {
+      const targetUser = await this.userRepository.findById(Number(userId));
+      if (!targetUser) throw new ApiError(404, `User id=${userId} khong ton tai`);
+    }
+
     // Get role info before revoking for notification
     const role = await this.roleRepository.findById(roleId);
     const roleName = role ? (role.role_label || role.role_name) : '';
@@ -60,6 +98,9 @@ class UserRoleService {
 
     // Notify user about role revocation
     this._sendRoleChangedNotification(userId, 'REVOKED', roleName, changedBy);
+
+    // Bump token_version
+    await this._bumpTokenVersion(userId, changedBy);
 
     return result;
   }
@@ -87,6 +128,9 @@ class UserRoleService {
     if (assignedRoles.length > 0) {
       this._sendRoleChangedNotification(userId, 'ASSIGNED', assignedRoles.join(', '), changedBy);
     }
+
+    // Bump token_version
+    await this._bumpTokenVersion(userId, changedBy);
 
     return result;
   }
