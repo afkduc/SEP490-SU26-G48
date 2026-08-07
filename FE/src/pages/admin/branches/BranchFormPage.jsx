@@ -10,6 +10,7 @@ import {
   isValidPhone,
   phoneDigitsOnly,
   NAME_MAX_LENGTH,
+  PHONE_INPUT_MAX_LENGTH,
 } from '../../../utils/validation';
 import '../AdminBranchesPage.css';
 import './BranchPages.css';
@@ -235,12 +236,13 @@ export default function BranchFormPage({ mode: modeProp }) {
           <div className="form-group">
             <label>Số điện thoại</label>
             <input
-              type="text"
+              type="tel"
               value={form.phone}
               onChange={(e) => set('phone', formatPhoneInput(e.target.value))}
               placeholder="VD: 0123-456-789"
               inputMode="numeric"
-              maxLength={13}
+              autoComplete="tel"
+              maxLength={PHONE_INPUT_MAX_LENGTH}
             />
           </div>
           <div className="form-group">

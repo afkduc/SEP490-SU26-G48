@@ -7,6 +7,9 @@
   flex-direction: column;
   gap: 20px;
   min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .admin-devices--embedded {
@@ -69,6 +72,7 @@
   flex-direction: column;
   gap: 12px;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   padding: 14px 16px;
   background: #fff;
@@ -76,6 +80,7 @@
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .admin-devices__toolbar-top {
@@ -83,6 +88,7 @@
   align-items: center;
   gap: 10px;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -269,6 +275,8 @@
   border: 1px solid #d5dee9;
   border-radius: 12px;
   overflow: hidden;
+  max-width: 100%;
+  min-width: 0;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 

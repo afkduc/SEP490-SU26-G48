@@ -8,7 +8,13 @@ import {
   adminUsersApi,
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
-import { formatPhoneDisplay } from '../../utils/validation';
+import {
+  formatPhoneDisplay,
+  formatPhoneInput,
+  isPhoneLikeInput,
+  phoneDigitsForSearch,
+  PHONE_INPUT_MAX_LENGTH,
+} from '../../utils/validation';
 import { navigateWithCrm, writeCrmBrowserUrl } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
 import PermissionGate from '../../components/PermissionGate';
@@ -191,6 +197,7 @@ export default function AdminUsersPage() {
       roleId: undefined,
       status: undefined,
       page: 1,
+      pageSize: params.pageSize || 10,
     }));
   }
 
@@ -300,9 +307,21 @@ export default function AdminUsersPage() {
           <input
             className="input input--search"
             type="text"
+            inputMode={isPhoneLikeInput(params.search) ? 'numeric' : 'search'}
             placeholder="Tìm theo tên, email, SĐT (có/không dấu)..."
-            value={params.search || ''}
-            onChange={(e) => updateParam('search', e.target.value)}
+            maxLength={isPhoneLikeInput(params.search) ? PHONE_INPUT_MAX_LENGTH : undefined}
+            value={
+              isPhoneLikeInput(params.search)
+                ? formatPhoneInput(params.search)
+                : (params.search || '')
+            }
+            onChange={(e) => {
+              const v = e.target.value;
+              updateParam(
+                'search',
+                isPhoneLikeInput(v) ? phoneDigitsForSearch(v).slice(0, 11) : v
+              );
+            }}
           />
 
           <select
