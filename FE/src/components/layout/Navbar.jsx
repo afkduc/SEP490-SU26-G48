@@ -239,7 +239,6 @@ export default function Navbar() {
   };
 
   const initials = getInitials(user?.name || '');
-  const roleLabel = user?.primaryRoleLabel || user?.primaryRole || '';
   const displayName = user?.lastName || user?.name?.split(' ').pop() || '';
 
   return (
@@ -279,7 +278,6 @@ export default function Navbar() {
           <span className="online-dot" />
           <span className="online-label">Trực tuyến</span>
         </div>
-        {roleLabel && <span className="navbar__role-badge">{roleLabel}</span>}
 
         <div className="navbar__user" onClick={() => setDropdownOpen((v) => !v)}>
           <div className="navbar__avatar">{initials}</div>
