@@ -1,49 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
-
-const GENERAL_DIRECTOR_ACTIONS = [
-  {
-    label: 'Phiếu quyết toán',
-    path: '/general-director/reports/settlements',
-    icon: '📑',
-  },
-  {
-    label: 'Doanh thu',
-    path: '/general-director/reports/revenue',
-    icon: '📈',
-  },
-  {
-    label: 'Nhân sự vận hành',
-    path: '/general-director/employees',
-    icon: '👥',
-  },
-  {
-    label: 'Kỹ thuật viên',
-    path: '/general-director/technicians',
-    icon: '🛠️',
-  },
-  {
-    label: 'DS giám đốc chi nhánh',
-    path: '/general-director/branch-managers',
-    icon: '🏢',
-  },
-];
-
-const QUICK_LINK_STYLES = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  padding: '12px 14px',
-  borderRadius: 14,
-  border: '1px solid #E5E7EB',
-  background: 'white',
-  color: '#111827',
-  textDecoration: 'none',
-  boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
-};
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -378,31 +337,7 @@ function DetailModal({ report, onClose }) {
 }
 
 function ModuleActionBar() {
-  return (
-    <div style={{ marginBottom: 18 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        {GENERAL_DIRECTOR_ACTIONS.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            style={({ isActive }) => ({
-              ...QUICK_LINK_STYLES,
-              border: isActive ? '1px solid #0F766E' : QUICK_LINK_STYLES.border,
-              background: isActive ? 'linear-gradient(135deg, #ECFEFF 0%, #F0FDFA 100%)' : QUICK_LINK_STYLES.background,
-              boxShadow: isActive ? '0 14px 28px rgba(15, 118, 110, 0.12)' : QUICK_LINK_STYLES.boxShadow,
-            })}
-          >
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: '#F3F4F6', display: 'grid', placeItems: 'center', fontSize: 18 }}>
-              {item.icon}
-            </div>
-            <div>
-              <div style={{ fontWeight: 800 }}>{item.label}</div>
-            </div>
-          </NavLink>
-        ))}
-      </div>
-    </div>
-  );
+  return null;
 }
 
 function PlaceholderPanel({ title, uc, description, actions, children }) {
@@ -1609,11 +1544,6 @@ function BranchManagerListPage() {
           <h1>Danh sách giám đốc chi nhánh</h1>
           <div className="breadcrumb">General Director / Danh sách giám đốc chi nhánh</div>
         </div>
-        <div className="page-header-right">
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/general-director/branch-managers/create')}>
-            + Thêm Giám đốc chi nhánh
-          </button>
-        </div>
       </div>
 
       <ModuleActionBar />
@@ -1634,6 +1564,21 @@ function BranchManagerListPage() {
           </div>
         </div>
         <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>👤 {user?.name || 'General Director'}</div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!canCreateManager}
+          title={canCreateManager ? 'Thêm Giám đốc chi nhánh' : 'Bạn không có quyền thêm Giám đốc chi nhánh'}
+          onClick={() => {
+            if (!canCreateManager) return;
+            navigate('/general-director/branch-managers/create');
+          }}
+        >
+          + Thêm Giám đốc chi nhánh
+        </button>
       </div>
 
       <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
