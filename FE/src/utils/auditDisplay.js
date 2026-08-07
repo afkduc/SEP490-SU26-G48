@@ -137,6 +137,9 @@ export const AUDIT_FIELD_LABELS = {
   technicians: 'Danh sách thợ',
   technicianId: 'Mã thợ',
   hasSignature: 'Khách hàng đã ký',
+  // signature (hash PayOS) ≠ signatureData (ảnh chữ ký tay — BE không lưu base64 trong log)
+  signature: 'Mã xác thực',
+  Signature: 'Mã xác thực',
   signerName: 'Người ký',
   requestCode: 'Mã phiếu xuất kho',
   vehiclePlate: 'Biển số xe',
@@ -167,7 +170,7 @@ export const AUDIT_FIELD_LABELS = {
   plateNumber: 'Biển số xe',
   plate_number: 'Biển số xe',
   vin: 'Số khung (VIN)',
-  brandId: 'Mã hãng xe',
+  brandId: 'Hãng xe',
   brandName: 'Hãng xe',
   model: 'Dòng xe',
   year: 'Năm sản xuất',
@@ -259,6 +262,36 @@ export const AUDIT_FIELD_LABELS = {
   tableName: 'Bảng dữ liệu',
   table_name: 'Bảng dữ liệu',
   loaiBanIn: 'Loại bản in',
+
+  // PayOS / thanh toán
+  desc: 'Mô tả kết quả',
+  Desc: 'Mô tả kết quả',
+  success: 'Thành công',
+  Success: 'Thành công',
+  reference: 'Mã tham chiếu',
+  Reference: 'Mã tham chiếu',
+  checksumKey: 'Khóa kiểm tra',
+  paymentLinkId: 'Mã link thanh toán',
+  accountNumber: 'Số tài khoản',
+  accountName: 'Tên tài khoản',
+  currency: 'Loại tiền',
+  amountPaid: 'Số tiền đã thanh toán',
+
+  // Yêu cầu dịch vụ (landing / CVDV)
+  issue: 'Vấn đề / nhu cầu',
+  issueDescription: 'Mô tả vấn đề',
+  issue_description: 'Mô tả vấn đề',
+  purchaseBranchId: 'Chi nhánh mua xe',
+  purchase_branch_id: 'Chi nhánh mua xe',
+  purchaseBranchName: 'Chi nhánh mua xe',
+  purchaseBranchOther: 'Chi nhánh mua xe (khác)',
+  purchase_branch_other: 'Chi nhánh mua xe (khác)',
+  nearestBranchId: 'Chi nhánh gần nhất',
+  nearest_branch_id: 'Chi nhánh gần nhất',
+  nearestBranchName: 'Chi nhánh gần nhất',
+  nearest_branch_name: 'Chi nhánh gần nhất',
+  carBrandId: 'Hãng xe',
+  car_brand_id: 'Hãng xe',
 };
 
 /** Bảng → nhãn tiếng Việt (dùng chung list/detail/dashboard) */
@@ -448,6 +481,19 @@ const FIELD_TOKEN_VI = {
   step: 'bước',
   url: 'đường dẫn',
   link: 'liên kết',
+  desc: 'mô tả',
+  success: 'thành công',
+  reference: 'tham chiếu',
+  issue: 'vấn đề',
+  purchase: 'mua xe',
+  nearest: 'gần nhất',
+  other: 'khác',
+  car: 'xe',
+  brand: 'hãng',
+  checksum: 'kiểm tra',
+  currency: 'tiền tệ',
+  account: 'tài khoản',
+  paid: 'đã thanh toán',
 };
 
 /**
@@ -992,8 +1038,76 @@ export function formatSettlementItems(items) {
 export function isAuditSignatureValue(value) {
   if (value == null) return false;
   const s = String(value);
+  // Hash HMAC/SHA PayOS (64 hex) — không phải ảnh chữ ký tay
+  if (/^[a-f0-9]{32,128}$/i.test(s.trim())) return false;
   return s.startsWith('data:image/') || (s.length > 200 && /^[A-Za-z0-9+/=]+$/.test(s.slice(0, 80)));
 }
+
+/** Chuẩn hóa địa danh VN thiếu dấu (vd HA NOI → Hà Nội) khi hiển thị log */
+const PLACE_LABELS_VI = {
+  'ha noi': 'Hà Nội',
+  hanoi: 'Hà Nội',
+  'tp ha noi': 'Hà Nội',
+  'thanh pho ha noi': 'Hà Nội',
+  'ho chi minh': 'TP. Hồ Chí Minh',
+  hcm: 'TP. Hồ Chí Minh',
+  'tp hcm': 'TP. Hồ Chí Minh',
+  'tp. hcm': 'TP. Hồ Chí Minh',
+  saigon: 'TP. Hồ Chí Minh',
+  'sai gon': 'TP. Hồ Chí Minh',
+  'da nang': 'Đà Nẵng',
+  danang: 'Đà Nẵng',
+  'hai phong': 'Hải Phòng',
+  haiphong: 'Hải Phòng',
+  'can tho': 'Cần Thơ',
+  cantho: 'Cần Thơ',
+  'ha long': 'Hạ Long',
+  halong: 'Hạ Long',
+  'quang ninh': 'Quảng Ninh',
+  'binh duong': 'Bình Dương',
+  'dong nai': 'Đồng Nai',
+  'khanh hoa': 'Khánh Hòa',
+  'nghe an': 'Nghệ An',
+  'thanh hoa': 'Thanh Hóa',
+  hue: 'Huế',
+  'thua thien hue': 'Thừa Thiên Huế',
+};
+
+function formatPlaceVi(value) {
+  if (value == null || value === '') return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const norm = raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+  const compact = norm.replace(/\s+/g, '');
+  return PLACE_LABELS_VI[norm] || PLACE_LABELS_VI[compact] || null;
+}
+
+const RESULT_VALUE_LABELS = {
+  success: 'Thành công',
+  successful: 'Thành công',
+  failed: 'Thất bại',
+  failure: 'Thất bại',
+  error: 'Lỗi',
+  pending: 'Đang chờ',
+  cancelled: 'Đã hủy',
+  canceled: 'Đã hủy',
+};
+
+const GENDER_LABELS = {
+  male: 'Nam',
+  female: 'Nữ',
+  nam: 'Nam',
+  nu: 'Nữ',
+  'nữ': 'Nữ',
+  other: 'Khác',
+};
 
 /**
  * Phân loại hiển thị field (UI render theo kind).
@@ -1001,6 +1115,7 @@ export function isAuditSignatureValue(value) {
  */
 export function getAuditFieldDisplayKind(key, value) {
   const k = String(key || '');
+  // Chỉ render ảnh khi đúng signatureData (base64). Field `signature` của PayOS là hash.
   if (/signatureData|signature_data/i.test(k) && isAuditSignatureValue(value)) return 'signature';
   if ((k === 'items' || k === 'Items') && (Array.isArray(value) || typeof value === 'string')) {
     const parsed = Array.isArray(value) ? value : parseAuditJson(value);
@@ -1026,6 +1141,36 @@ export function formatAuditFieldValue(key, value) {
   if (kind === 'items') return formatSettlementItems(value);
   if (kind === 'money') return formatMoneyVi(value);
   if (kind === 'km') return formatKmVi(value);
+
+  // Hash xác thực PayOS (không phải ảnh chữ ký tay)
+  if (
+    (k === 'signature' || k === 'Signature')
+    && typeof value === 'string'
+    && /^[a-f0-9]{32,128}$/i.test(value.trim())
+  ) {
+    const hex = value.trim();
+    return hex.length > 20 ? `${hex.slice(0, 12)}…${hex.slice(-8)}` : hex;
+  }
+
+  if (k === 'desc' || k === 'Desc' || k === 'message' || k === 'result') {
+    const raw = String(value).trim();
+    const norm = raw.toLowerCase();
+    return RESULT_VALUE_LABELS[norm] || raw;
+  }
+  if (k === 'success' || k === 'Success') {
+    if (value === true || value === 1 || value === 'true') return 'Có';
+    if (value === false || value === 0 || value === 'false') return 'Không';
+    const norm = String(value).trim().toLowerCase();
+    return RESULT_VALUE_LABELS[norm] || String(value);
+  }
+  if (k === 'gender') {
+    const norm = String(value).trim().toLowerCase();
+    return GENDER_LABELS[norm] || String(value);
+  }
+  if (k === 'city' || k === 'address' || k === 'district' || k === 'ward') {
+    const place = formatPlaceVi(value);
+    if (place) return place;
+  }
 
   if (k === 'status' || k === 'paymentStatus' || k === 'payment_status') {
     const raw = String(value);
@@ -1115,6 +1260,8 @@ export function formatAuditFieldValue(key, value) {
   if (s.startsWith('data:image/')) return 'Đã ký (có ảnh chữ ký)';
   const statusHit = STATUS_LABELS[s.toLowerCase()];
   if (statusHit && /status|trạng thái/i.test(k)) return statusHit;
+  const resultHit = RESULT_VALUE_LABELS[s.toLowerCase()];
+  if (resultHit && /desc|success|result|message|status/i.test(k)) return resultHit;
   // Enum in phiếu còn sót tiếng Anh dù key lạ
   const printNorm = s.toLowerCase().replace(/[\s-]+/g, '_');
   if (PRINT_KIND_LABELS[printNorm] && /kind|print|loai|step/i.test(k)) {
@@ -1123,6 +1270,8 @@ export function formatAuditFieldValue(key, value) {
   if (PRINT_KIND_LABELS[printNorm] && (printNorm === 'settlement' || printNorm === 'worklist')) {
     return PRINT_KIND_LABELS[printNorm];
   }
+  const placeHit = formatPlaceVi(s);
+  if (placeHit && /city|address|district|ward|tinh|thanh/i.test(k)) return placeHit;
   // Không cắt ngắn số / mã ngắn; chỉ cắt chuỗi rất dài (không phải chữ ký — đã xử lý)
   if (s.length > 200) return `${s.slice(0, 120)}…`;
   return s;
