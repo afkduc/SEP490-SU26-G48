@@ -171,6 +171,8 @@ export default function UserFormPage({ mode: modeProp }) {
       errs.password = 'Mật khẩu tối thiểu 6 ký tự, gồm chữ và số';
     }
     if (!form.lastName.trim()) errs.lastName = 'Tên là bắt buộc';
+    else if (form.lastName.trim().length > 100) errs.lastName = 'Tên tối đa 100 ký tự';
+    if (form.firstName.trim().length > 100) errs.firstName = 'Họ tối đa 100 ký tự';
     if (form.email && !isValidEmail(form.email)) {
       errs.email = EMAIL_HINT;
     }
@@ -346,12 +348,14 @@ export default function UserFormPage({ mode: modeProp }) {
               <div className="form__field">
                 <label className="form__label">Họ</label>
                 <input
-                  className="input"
+                  className={`input ${errors.firstName ? 'input--error' : ''}`}
                   value={form.firstName}
                   onChange={(e) => handleChange('firstName', e.target.value)}
                   placeholder="Nguyễn"
                   autoComplete="off"
+                  maxLength={100}
                 />
+                {errors.firstName && <span className="form__err">{errors.firstName}</span>}
               </div>
               <div className="form__field">
                 <label className="form__label">Tên <span className="required">*</span></label>
@@ -361,6 +365,7 @@ export default function UserFormPage({ mode: modeProp }) {
                   onChange={(e) => handleChange('lastName', e.target.value)}
                   placeholder="Văn A"
                   autoComplete="off"
+                  maxLength={100}
                 />
                 {errors.lastName && <span className="form__err">{errors.lastName}</span>}
               </div>
@@ -391,7 +396,7 @@ export default function UserFormPage({ mode: modeProp }) {
 
             {isEdit && hasMultipleRoles(user?.roles) && (
               <div className="form__warning" role="alert">
-                User này đang có <b>{user.roles.length} vai trò</b>:{' '}
+                Tài khoản này đang có <b>{user.roles.length} vai trò</b>:{' '}
                 {user.roles.map((r) => r.roleName).join(', ')}.
                 <br />
                 Nếu bạn <b>không thay đổi</b> dropdown Vai trò thì các vai trò hiện tại được giữ nguyên.
