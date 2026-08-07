@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth, getPrimaryRole } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { useManagerInventoryNotify } from '../../contexts/ManagerInventoryNotifyContext';
@@ -83,13 +83,9 @@ const WAREHOUSE_STAFF_NAV = [
 
 // ===== General Director =====
 const GENERAL_DIRECTOR_NAV = [
-  { label: 'Bảng điều khiển', path: '/dashboard' },
-  { label: 'Kho', path: '/inventory' },
   { label: 'Báo cáo doanh thu', path: '/general-director/reports/revenue' },
   { label: 'Báo cáo quyết toán', path: '/general-director/reports/settlements' },
-  { label: 'Chi nhánh', path: '/general-director/branch-managers' },
   { label: 'Nhân viên', path: '/general-director/employees' },
-  { label: 'Quản lý chi nhánh', path: '/general-director/branch-managers' },
   { label: 'Thợ máy', path: '/general-director/technicians' },
 ];
 
