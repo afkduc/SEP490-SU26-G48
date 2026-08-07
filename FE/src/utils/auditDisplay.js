@@ -233,6 +233,32 @@ export const AUDIT_FIELD_LABELS = {
   groupId: 'Nhóm hạng mục',
   isGroupParent: 'Là dòng nhóm',
   isFree: 'Miễn phí',
+
+  // In phiếu / payload gửi kèm (tránh lộ key tiếng Anh như Kind, print kind)
+  kind: 'Loại bản in',
+  printKind: 'Loại bản in',
+  print_kind: 'Loại bản in',
+  lastPrintKind: 'Loại bản in gần nhất',
+  last_print_kind: 'Loại bản in gần nhất',
+  customerPhone: 'SĐT khách hàng',
+  customer_phone: 'SĐT khách hàng',
+  vehicleModel: 'Dòng xe',
+  vehicle_model: 'Dòng xe',
+  serviceOrderCode: 'Mã phiếu tiếp nhận',
+  service_order_code: 'Mã phiếu tiếp nhận',
+  taskNames: 'Tên đầu mục công việc',
+  completedTaskCount: 'Số đầu mục đã xong',
+  paymentStatus: 'Trạng thái thanh toán',
+  payment_status: 'Trạng thái thanh toán',
+  payosOrderCode: 'Mã đơn PayOS',
+  checkoutUrl: 'Link thanh toán',
+  step: 'Bước',
+  stepLabel: 'Tên bước',
+  step_label: 'Tên bước',
+  action: 'Hành động',
+  tableName: 'Bảng dữ liệu',
+  table_name: 'Bảng dữ liệu',
+  loaiBanIn: 'Loại bản in',
 };
 
 /** Bảng → nhãn tiếng Việt (dùng chung list/detail/dashboard) */
@@ -415,6 +441,13 @@ const FIELD_TOKEN_VI = {
   items: 'hạng mục',
   qty: 'số lượng',
   unit: 'đơn vị',
+  kind: 'loại',
+  print: 'in',
+  worklist: 'danh sách công việc',
+  label: 'nhãn',
+  step: 'bước',
+  url: 'đường dẫn',
+  link: 'liên kết',
 };
 
 /**
@@ -444,6 +477,18 @@ export function getAuditFieldLabel(key) {
   const label = viParts.join(' ').replace(/\s+/g, ' ').trim();
   return label ? label.charAt(0).toUpperCase() + label.slice(1) : raw;
 }
+
+/** Giá trị kind / lastPrintKind trong payload in phiếu */
+const PRINT_KIND_LABELS = {
+  settlement: 'Phiếu quyết toán',
+  worklist: 'Danh sách công việc',
+  print_settlement: 'Phiếu quyết toán',
+  print_worklist: 'Danh sách công việc',
+  'phiếu quyết toán': 'Phiếu quyết toán',
+  'phieu quyet toan': 'Phiếu quyết toán',
+  'danh sách công việc': 'Danh sách công việc',
+  'danh sach cong viec': 'Danh sách công việc',
+};
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
@@ -982,10 +1027,33 @@ export function formatAuditFieldValue(key, value) {
   if (kind === 'money') return formatMoneyVi(value);
   if (kind === 'km') return formatKmVi(value);
 
-  if (k === 'status') {
+  if (k === 'status' || k === 'paymentStatus' || k === 'payment_status') {
     const raw = String(value);
     const norm = raw.toLowerCase().replace(/[\s-]+/g, '_');
     return STATUS_LABELS[norm] || STATUS_LABELS[raw.toLowerCase()] || raw;
+  }
+  if (
+    k === 'kind'
+    || k === 'printKind'
+    || k === 'print_kind'
+    || k === 'lastPrintKind'
+    || k === 'last_print_kind'
+    || k === 'loaiBanIn'
+  ) {
+    const raw = String(value).trim();
+    const norm = raw.toLowerCase().replace(/[\s-]+/g, '_');
+    const spaced = raw.toLowerCase().replace(/\s+/g, ' ').trim();
+    return (
+      PRINT_KIND_LABELS[norm]
+      || PRINT_KIND_LABELS[spaced]
+      || PRINT_KIND_LABELS[raw.toLowerCase()]
+      || raw
+    );
+  }
+  if (k === 'step') {
+    const raw = String(value).trim();
+    const norm = raw.toLowerCase().replace(/[\s-]+/g, '_');
+    return PRINT_KIND_LABELS[norm] || STATUS_LABELS[norm] || raw;
   }
   if (k === 'repairCategory' || k === 'repair_category') {
     const code = String(value).trim().toUpperCase();
@@ -998,6 +1066,22 @@ export function formatAuditFieldValue(key, value) {
   if (k === 'httt') {
     const code = String(value).trim().toUpperCase();
     return HTTT_LABELS[code] || String(value);
+  }
+  if (k === 'paymentMethod' || k === 'payment_method') {
+    const raw = String(value).trim();
+    const norm = raw.toLowerCase().replace(/[\s-]+/g, '_');
+    const PAYMENT_METHOD_LABELS = {
+      cash: 'Tiền mặt',
+      transfer: 'Chuyển khoản',
+      bank_transfer: 'Chuyển khoản',
+      card: 'Thẻ',
+      payos: 'PayOS',
+      qr: 'QR PayOS',
+      tien_mat: 'Tiền mặt',
+      'tiền mặt': 'Tiền mặt',
+      'chuyển khoản': 'Chuyển khoản',
+    };
+    return PAYMENT_METHOD_LABELS[norm] || PAYMENT_METHOD_LABELS[raw.toLowerCase()] || raw;
   }
   if (k === 'granted') return value === true || value === 1 || value === 'true' ? 'Đã cấp' : 'Thu hồi / chưa cấp';
   if (k === 'isDone' || k === 'released' || k === 'isSent' || k === 'isActive' || k === 'is_active' || k === 'isFree' || k === 'isGroupParent') {
@@ -1031,6 +1115,14 @@ export function formatAuditFieldValue(key, value) {
   if (s.startsWith('data:image/')) return 'Đã ký (có ảnh chữ ký)';
   const statusHit = STATUS_LABELS[s.toLowerCase()];
   if (statusHit && /status|trạng thái/i.test(k)) return statusHit;
+  // Enum in phiếu còn sót tiếng Anh dù key lạ
+  const printNorm = s.toLowerCase().replace(/[\s-]+/g, '_');
+  if (PRINT_KIND_LABELS[printNorm] && /kind|print|loai|step/i.test(k)) {
+    return PRINT_KIND_LABELS[printNorm];
+  }
+  if (PRINT_KIND_LABELS[printNorm] && (printNorm === 'settlement' || printNorm === 'worklist')) {
+    return PRINT_KIND_LABELS[printNorm];
+  }
   // Không cắt ngắn số / mã ngắn; chỉ cắt chuỗi rất dài (không phải chữ ký — đã xử lý)
   if (s.length > 200) return `${s.slice(0, 120)}…`;
   return s;
@@ -1077,6 +1169,12 @@ const SETTLEMENT_PREFERRED_KEYS = [
   'status',
   'taskNames',
   'completedTaskCount',
+  'lastPrintKind',
+  'kind',
+  'printKind',
+  'loaiBanIn',
+  'paymentMethod',
+  'paymentStatus',
 ];
 
 /**
