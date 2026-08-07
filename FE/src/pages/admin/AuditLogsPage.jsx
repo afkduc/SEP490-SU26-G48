@@ -19,7 +19,8 @@ const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
   { value: 'CREATE', label: 'Tạo mới', color: 'success' },
   { value: 'UPDATE', label: 'Cập nhật', color: 'info' },
-  { value: 'DELETE', label: 'Xóa', color: 'danger' },
+  // action DELETE trong DB = log cũ / vô hiệu hóa — hệ thống không còn xóa cứng user/chi nhánh
+  { value: 'DELETE', label: 'Vô hiệu hóa', color: 'danger' },
   { value: 'READ', label: 'Xem dữ liệu', color: 'slate' },
   { value: 'LOGIN', label: 'Đăng nhập', color: 'purple' },
   { value: 'FAILED_LOGIN', label: 'Đăng nhập thất bại', color: 'danger' },
@@ -162,18 +163,32 @@ const IconSearch = () => (
 
 // ─── Stats Cards ────────────────────────────────────────────────────
 
-function StatsCards({ stats, loading }) {
+function StatsCards({ stats, loading, onFilterAction }) {
   const cards = [
-    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: stats?.total || 0, label: 'Tổng bản ghi' },
-    { icon: <IconCreate />, iconCls: 'stat-card__icon--green', value: stats?.create || 0, label: 'Tạo mới' },
-    { icon: <IconUpdate />, iconCls: 'stat-card__icon--blue', value: stats?.update || 0, label: 'Cập nhật' },
-    { icon: <IconDelete />, iconCls: 'stat-card__icon--red', value: stats?.delete || 0, label: 'Xóa' },
+    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: stats?.total || 0, label: 'Tổng bản ghi', action: '' },
+    { icon: <IconCreate />, iconCls: 'stat-card__icon--green', value: stats?.create || 0, label: 'Tạo mới', action: 'CREATE' },
+    { icon: <IconUpdate />, iconCls: 'stat-card__icon--blue', value: stats?.update || 0, label: 'Cập nhật', action: 'UPDATE' },
+    // Không còn chức năng xóa cứng — thẻ này phản ánh log action DELETE/REMOVE (thường là dữ liệu cũ hoặc vô hiệu hóa)
+    { icon: <IconDelete />, iconCls: 'stat-card__icon--red', value: stats?.delete || 0, label: 'Vô hiệu hóa', action: 'DELETE', hint: 'Gồm log cũ action DELETE (không phải xóa cứng hiện tại)' },
   ];
 
   return (
     <div className="admin-logs__stats">
       {cards.map((c, i) => (
-        <div key={i} className="stat-card">
+        <div
+          key={i}
+          className={`stat-card${c.action !== undefined && onFilterAction ? ' stat-card--clickable' : ''}`}
+          role={onFilterAction ? 'button' : undefined}
+          tabIndex={onFilterAction ? 0 : undefined}
+          title={c.hint || (c.action ? `Lọc theo: ${c.label}` : undefined)}
+          onClick={onFilterAction ? () => onFilterAction(c.action) : undefined}
+          onKeyDown={onFilterAction ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onFilterAction(c.action);
+            }
+          } : undefined}
+        >
           <div className={`stat-card__icon ${c.iconCls}`}>{c.icon}</div>
           <div className="stat-card__content">
             <span className="stat-card__value">
@@ -398,7 +413,14 @@ export default function AuditLogsPage() {
       )}
 
       {/* Stats Cards */}
-      <StatsCards stats={audit.data.stats} loading={audit.loading} />
+      <StatsCards
+        stats={audit.data.stats}
+        loading={audit.loading}
+        onFilterAction={(action) => {
+          audit.updateParam('action', action || '');
+          audit.updateParam('page', 1);
+        }}
+      />
 
       {/* Filter Card */}
       <div className="admin-logs__filters">
