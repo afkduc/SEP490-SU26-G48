@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
@@ -11,6 +11,7 @@ import { downloadBlob } from '../../utils/downloadBlob';
 import { pickLatestSession } from './securityAlertFocus';
 import { normalizeVietnamese } from '../../utils/vietnamese';
 import { formatPhoneDisplay } from '../../utils/validation';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -368,6 +369,7 @@ export default function AdminLoginSessionsPage({
   seedKey = 0,
 } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const sessions = useLoginSessions(
     seedKey
       ? {
@@ -399,10 +401,10 @@ export default function AdminLoginSessionsPage({
     navigate(`/admin/login-sessions/${item.id}`, {
       state: {
         session: item,
-        fromListSearch: '?tab=sessions',
+        fromListSearch: location.search || '?tab=sessions',
       },
     });
-  }, [navigate]);
+  }, [navigate, location.search]);
 
   // Seed từ panel cảnh báo ("Lịch sử") — khi đổi cảnh báo trong lúc tab đang mở
   useEffect(() => {
@@ -773,23 +775,21 @@ export default function AdminLoginSessionsPage({
 
           <div className="filter-field filter-field--date">
             <label className="filter-field__label">Khoảng ngày</label>
-            <div className="filter-field__date-group">
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={sessions.params.startDate || ''}
-                onChange={(e) => sessions.updateParam('startDate', e.target.value)}
-                title="Từ ngày"
-              />
-              <span className="filter-field__date-sep">—</span>
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={sessions.params.endDate || ''}
-                onChange={(e) => sessions.updateParam('endDate', e.target.value)}
-                title="Đến ngày"
-              />
-            </div>
+            <DateRangeInputs
+              startDate={sessions.params.startDate || ''}
+              endDate={sessions.params.endDate || ''}
+              onChange={({ startDate, endDate }) => {
+                sessions.setParams((p) => ({
+                  ...p,
+                  startDate,
+                  endDate,
+                  page: 1,
+                }));
+              }}
+              className="filter-field__date-group"
+              inputClassName="filter-field__input filter-field__input--date"
+              sepClassName="filter-field__date-sep"
+            />
           </div>
         </div>
 

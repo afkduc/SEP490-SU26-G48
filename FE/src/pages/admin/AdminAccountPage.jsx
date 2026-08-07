@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useCrmSearchSync } from '../../utils/crmUrl';
 import AdminProfilePage from './AdminProfilePage';
 import AdminProfileNotificationsPage from './AdminProfileNotificationsPage';
 import './AdminHub.css';
@@ -27,7 +28,8 @@ function resolveTab(raw) {
 export default function AdminAccountPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const syncSearch = useCrmSearchSync({ syncRouter: true });
   const isEditMode = location.pathname.endsWith('/edit');
   const activeTab = isEditMode ? 'profile' : resolveTab(searchParams.get('tab'));
 
@@ -39,13 +41,13 @@ export default function AdminAccountPage() {
       navigate(tab === 'notifications' ? '/admin/profile?tab=notifications' : '/admin/profile');
       return;
     }
-    setSearchParams((prev) => {
+    syncSearch((prev) => {
       const next = new URLSearchParams(prev);
       if (tab === 'profile') next.delete('tab');
       else next.set('tab', tab);
       return next;
     });
-  }, [activeTab, isEditMode, navigate, setSearchParams]);
+  }, [activeTab, isEditMode, navigate, syncSearch]);
 
   return (
     <div className="admin-page admin-hub">

@@ -9,11 +9,13 @@ import { useToast } from '../../../components/common/ToastContext';
 import {
   EMAIL_HINT,
   formatPhoneInput,
+  getPhoneError,
   isValidEmail,
   isValidPassword,
-  isValidPhone,
   isValidUsername,
   phoneDigitsOnly,
+  PHONE_HINT,
+  PHONE_INPUT_MAX_LENGTH,
 } from '../../../utils/validation';
 import ResetPasswordModal from './ResetPasswordModal';
 import './UserFormPage.css';
@@ -63,6 +65,7 @@ export default function UserFormPage({ mode: modeProp }) {
   const toast = useToast();
   const isEdit = modeProp === 'edit' || Boolean(id);
   const listSearch = location.state?.fromListSearch || '';
+  const backToList = `/admin/users${listSearch}`;
 
   const [user, setUser] = useState(null);
   const [bootLoading, setBootLoading] = useState(isEdit);
@@ -171,11 +174,8 @@ export default function UserFormPage({ mode: modeProp }) {
     if (form.email && !isValidEmail(form.email)) {
       errs.email = EMAIL_HINT;
     }
-    if (!form.phone.trim()) {
-      errs.phone = 'Số điện thoại là bắt buộc';
-    } else if (!isValidPhone(form.phone)) {
-      errs.phone = 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số';
-    }
+    const phoneErr = getPhoneError(form.phone, { required: true });
+    if (phoneErr) errs.phone = phoneErr;
     if (!form.branchId) errs.branchId = 'Chi nhánh là bắt buộc (hoặc chọn "Tất cả chi nhánh")';
     if (!form.roleId && !(isEdit && hasMultipleRoles(user?.roles))) {
       errs.roleId = 'Vai trò là bắt buộc';
@@ -216,7 +216,7 @@ export default function UserFormPage({ mode: modeProp }) {
         }
         await adminUsersApi.update(payload);
         toast.success('Đã cập nhật người dùng');
-        navigate(`/admin/users/${user.id}`, { state: { fromListSearch: listSearch } });
+        navigate(backToList);
       } else {
         const payload = {
           name: form.name.trim(),
@@ -236,7 +236,7 @@ export default function UserFormPage({ mode: modeProp }) {
         const created = await adminUsersApi.create(payload);
         toast.success('Đã tạo người dùng');
         const newId = created?.id || created?.userId;
-        navigate(newId ? `/admin/users/${newId}` : '/admin/users');
+        navigate(newId ? `/admin/users/${newId}` : backToList);
       }
     } catch (err) {
       setApiError(err?.response?.data?.message || err.message || 'Lỗi hệ thống');
@@ -268,7 +268,7 @@ export default function UserFormPage({ mode: modeProp }) {
     return (
       <div className="admin-page admin-user-form-page">
         <div className="admin-user-form-page__state admin-user-form-page__state--error">{bootError}</div>
-        <Link to={`/admin/users${listSearch}`} className="btn btn--ghost">Quay lại danh sách</Link>
+        <Link to={backToList} className="btn btn--ghost">Quay lại danh sách</Link>
       </div>
     );
   }
@@ -280,22 +280,12 @@ export default function UserFormPage({ mode: modeProp }) {
           <button
             type="button"
             className="admin-user-form-page__back"
-            onClick={() => navigate(
-              isEdit && user
-                ? `/admin/users/${user.id}`
-                : `/admin/users${listSearch}`,
-              isEdit && user ? { state: { fromListSearch: listSearch } } : undefined,
-            )}
+            onClick={() => navigate(backToList)}
           >
             ← Quay lại
           </button>
           <div className="admin-page__title-group">
             <h1>{isEdit ? 'Chỉnh sửa người dùng' : 'Tạo người dùng mới'}</h1>
-            <p className="admin-page__subtitle">
-              {isEdit
-                ? 'Cập nhật hồ sơ, chi nhánh và vai trò. Không có thao tác xóa tài khoản.'
-                : 'Tạo tài khoản mới. Tài khoản chỉ có thể khóa / ngừng hoạt động, không xóa.'}
-            </p>
           </div>
         </div>
       </div>
@@ -382,14 +372,16 @@ export default function UserFormPage({ mode: modeProp }) {
                 className={`input ${errors.phone ? 'input--error' : ''}`}
                 value={form.phone}
                 onChange={(e) => handleChange('phone', formatPhoneInput(e.target.value))}
-                inputMode="numeric"
+                onBlur={() => {
+                  const phoneErr = getPhoneError(form.phone, { required: true });
+                  setErrors((prev) => ({ ...prev, phone: phoneErr || undefined }));
+                }}
                 placeholder="0123-456-789"
-                maxLength={13}
-                placeholder="0912345678"
                 autoComplete="tel"
                 inputMode="numeric"
-                maxLength={11}
+                maxLength={PHONE_INPUT_MAX_LENGTH}
               />
+              <span className="form__hint">{PHONE_HINT}</span>
               {errors.phone && <span className="form__err">{errors.phone}</span>}
             </div>
           </div>
@@ -479,7 +471,7 @@ export default function UserFormPage({ mode: modeProp }) {
             <button
               type="button"
               className="btn btn--ghost"
-              onClick={() => navigate(isEdit && user ? `/admin/users/${user.id}` : '/admin/users')}
+              onClick={() => navigate(backToList)}
               disabled={loading}
             >
               Hủy

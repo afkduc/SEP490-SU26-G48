@@ -17,6 +17,7 @@ export default function BranchFormPage({ mode: modeProp }) {
   const navigate = useNavigate();
   const location = useLocation();
   const listSearch = location.state?.fromListSearch || '';
+  const backToList = `/admin/catalog${listSearch}`;
   const toast = useToast();
   const isEdit = modeProp === 'edit' || Boolean(id);
 
@@ -131,12 +132,12 @@ export default function BranchFormPage({ mode: modeProp }) {
       if (isEdit) {
         await adminBranchesApi.update(id, payload);
         toast.success('Cập nhật chi nhánh thành công');
-        navigate(`/admin/catalog/branches/${id}`, { state: { fromListSearch: listSearch } });
+        navigate(backToList);
       } else {
         const created = await adminBranchesApi.create(payload);
         toast.success('Tạo chi nhánh mới thành công');
         const newId = created?.id;
-        navigate(newId ? `/admin/catalog/branches/${newId}` : '/admin/catalog');
+        navigate(newId ? `/admin/catalog/branches/${newId}` : backToList);
       }
     } catch (err) {
       setError(err.message || 'Lỗi khi lưu chi nhánh');
@@ -153,7 +154,7 @@ export default function BranchFormPage({ mode: modeProp }) {
     return (
       <div className="admin-page branch-page">
         <div className="branch-page__state branch-page__state--error">{bootError}</div>
-        <Link to={`/admin/catalog${listSearch}`} className="btn btn--ghost">Quay lại danh mục</Link>
+        <Link to={backToList} className="btn btn--ghost">Quay lại danh mục</Link>
       </div>
     );
   }
@@ -165,10 +166,7 @@ export default function BranchFormPage({ mode: modeProp }) {
           <button
             type="button"
             className="branch-page__back"
-            onClick={() => navigate(
-              isEdit ? `/admin/catalog/branches/${id}` : `/admin/catalog${listSearch}`,
-              isEdit ? { state: { fromListSearch: listSearch } } : undefined,
-            )}
+            onClick={() => navigate(backToList)}
           >
             ← Quay lại
           </button>
@@ -254,7 +252,7 @@ export default function BranchFormPage({ mode: modeProp }) {
           <button
             type="button"
             className="btn btn--secondary"
-            onClick={() => navigate(isEdit ? `/admin/catalog/branches/${id}` : '/admin/catalog')}
+            onClick={() => navigate(backToList)}
             disabled={saving}
           >
             Hủy

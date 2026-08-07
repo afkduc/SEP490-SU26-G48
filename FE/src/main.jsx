@@ -1,3 +1,6 @@
+// PHẢI import trước react-router — patch History API trước khi Router giữ reference.
+import './crmHistoryBootstrap';
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -6,11 +9,13 @@ import { AppProvider, PermissionProvider } from './contexts';
 import { ToastProvider } from './components/common/ToastContext';
 import { GlobalErrorProvider } from './contexts/GlobalErrorContext';
 import { BASE_PATH } from './config';
+import { CrmUrlGuard } from './utils/crmUrl';
 import './styles/index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter basename={BASE_PATH}>
+      <CrmUrlGuard />
       {/* ToastProvider phai O NGOAI AppProvider vi PermissionEventsRunner
           (render boi AppProvider) se goi useToast() de hien toast refresh. */}
       <ToastProvider>

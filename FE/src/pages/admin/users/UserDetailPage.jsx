@@ -61,6 +61,7 @@ export default function UserDetailPage() {
   const location = useLocation();
   const toast = useToast();
   const listSearch = location.state?.fromListSearch || '';
+  const backToList = `/admin/users${listSearch}`;
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -114,7 +115,7 @@ export default function UserDetailPage() {
         <button
           type="button"
           className="admin-user-detail-page__back"
-          onClick={() => navigate(`/admin/users${listSearch}`)}
+          onClick={() => navigate(backToList)}
         >
           ← Quay lại danh sách
         </button>
@@ -159,7 +160,7 @@ export default function UserDetailPage() {
           <div className="admin-user-detail-page__state admin-user-detail-page__state--error">
             {error}
             <div style={{ marginTop: 12 }}>
-              <Link to="/admin/users" className="btn btn--ghost">Về danh sách</Link>
+              <Link to={backToList} className="btn btn--ghost">Về danh sách</Link>
             </div>
           </div>
         ) : user ? (

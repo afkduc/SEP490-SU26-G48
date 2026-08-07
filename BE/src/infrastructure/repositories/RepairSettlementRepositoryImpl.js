@@ -30,6 +30,7 @@ const HEADER_SELECT = `
          adv.phone     AS advisor_phone,
          tl.user_name  AS team_leader_name,
          inv.issued_at AS invoice_issued_at,
+         inv.payment_method,
          ro.id         AS repair_order_id,
          vb.bay_number AS bay_number,
          -- Da co it nhat 1 dau muc duoc tick hoan thanh chua - dung de FE
@@ -61,7 +62,7 @@ const HEADER_SELECT = `
       ORDER  BY w.purchase_date DESC
   ) wr
   OUTER APPLY (
-      SELECT TOP 1 i.issued_at
+      SELECT TOP 1 i.issued_at, i.payment_method
       FROM   invoices i
       WHERE  i.service_order_id = so.id
       ORDER  BY i.issued_at DESC
@@ -525,7 +526,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     }
   }
 
-  async updateStatus(id, status, { issuedBy, cancelReason } = {}) {
+  async updateStatus(id, status, { issuedBy, cancelReason, paymentMethod } = {}) {
     await runInTransaction(async (tx) => {
       if (status === 'waiting_payment') {
         await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
@@ -567,9 +568,10 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
           .input('customerId', sql.BigInt, order.customer_id)
           .input('amount', sql.Decimal(18, 2), order.total)
           .input('issuedBy', sql.BigInt, issuedBy)
+          .input('paymentMethod', sql.NVarChar(20), paymentMethod || 'TRANSFER')
           .query(`
-            INSERT INTO invoices (invoice_code, service_order_id, branch_id, customer_id, amount, paid, status, issued_at, issued_by)
-            VALUES ('', @serviceOrderId, @branchId, @customerId, @amount, @amount, 'issued', GETDATE(), @issuedBy);
+            INSERT INTO invoices (invoice_code, service_order_id, branch_id, customer_id, amount, paid, status, issued_at, issued_by, payment_method)
+            VALUES ('', @serviceOrderId, @branchId, @customerId, @amount, @amount, 'issued', GETDATE(), @issuedBy, @paymentMethod);
             SELECT SCOPE_IDENTITY() AS id;
           `);
         const invId = invResult.recordset[0].id;

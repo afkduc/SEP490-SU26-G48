@@ -6,6 +6,8 @@ on:
   push:
     branches:
       - dev
+  # Cho phep bam "Run workflow" tren GitHub khi push khong kich hoat Actions
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -25,5 +27,8 @@ jobs:
             git fetch origin
             git checkout dev
             git reset --hard origin/dev
+            # FE/Landing bundle "nuong" luc build — bat buoc no-cache
+            # de fix /crm + redirect Landing khong bi Docker layer cu.
+            docker compose build --no-cache fe landing
             docker compose up -d --build
             sudo systemctl reload nginx

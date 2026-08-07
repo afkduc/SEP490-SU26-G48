@@ -7,6 +7,7 @@ const {
   PASSWORD_MIN_LENGTH,
   isValidEmail,
   isValidPhone,
+  phoneDigitsOnly,
   isValidUsername,
   isValidPassword,
 } = require('../../utils/fieldValidation');
@@ -119,12 +120,14 @@ class AdminUserService {
       throw new ApiError(400, `Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
     }
 
-    const phoneTrimmed = phone !== undefined && phone !== null ? String(phone).trim() : '';
+    const phoneTrimmed = phone !== undefined && phone !== null
+      ? phoneDigitsOnly(phone)
+      : '';
     if (!phoneTrimmed) {
       throw new ApiError(400, 'Số điện thoại là bắt buộc');
     }
     if (!isValidPhone(phoneTrimmed)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10–11 chữ số');
+      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
     }
 
     let parsedBranchId = null;
@@ -241,12 +244,12 @@ class AdminUserService {
     }
 
     if (phone !== undefined && phone !== null) {
-      const phoneTrimmed = String(phone).trim();
+      const phoneTrimmed = phoneDigitsOnly(phone);
       if (!phoneTrimmed) {
         throw new ApiError(400, 'Số điện thoại là bắt buộc');
       }
       if (!isValidPhone(phoneTrimmed)) {
-        throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10–11 chữ số');
+        throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
       }
       const phoneOwner = await this.adminUserRepository.findByPhone(phoneTrimmed);
       if (phoneOwner && Number(phoneOwner.id) !== Number(userId)) {

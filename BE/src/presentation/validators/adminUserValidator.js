@@ -100,7 +100,7 @@ function validateCreateUser(req, res, next) {
       throw new ApiError(400, 'Số điện thoại là bắt buộc');
     }
     if (!isValidPhone(phone)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10–11 chữ số');
+      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
     }
     if (scopeAllBranches !== true) {
       if (branchId === undefined || branchId === null || branchId === '') {
@@ -137,7 +137,7 @@ function validateUpdateUser(req, res, next) {
     if (phone !== undefined && phone !== null) {
       if (!String(phone).trim()) throw new ApiError(400, 'Số điện thoại là bắt buộc');
       if (!isValidPhone(phone)) {
-        throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10–11 chữ số');
+        throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
       }
     }
 

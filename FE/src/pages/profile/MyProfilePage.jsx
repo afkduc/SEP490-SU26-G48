@@ -12,6 +12,7 @@ import {
   isProfileNotificationsPath,
   isProfileEditPath,
 } from '../../utils/profilePaths';
+import { useCrmSearchSync } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
 import { EMAIL_HINT, isValidEmail, isValidPhone } from '../../utils/validation';
 import './MyProfilePage.css';
@@ -142,7 +143,8 @@ export default function MyProfilePage({
 } = {}) {
   const { user, setUser, reloadPermissions, logout } = useAuth();
   const toast = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const syncSearch = useCrmSearchSync();
   const location = useLocation();
   const navigate = useNavigate();
   const [loggingOutAll, setLoggingOutAll] = useState(false);
@@ -179,12 +181,12 @@ export default function MyProfilePage({
     if (searchParams.get('tab') !== 'edit') return;
     if (isEditMode) {
       if (searchParams.get('tab')) {
-        setSearchParams({}, { replace: true });
+        syncSearch(new URLSearchParams(), { replace: true });
       }
       return;
     }
     navigate(profileEditPath, { replace: true });
-  }, [searchParams, isEditMode, navigate, profileEditPath, setSearchParams]);
+  }, [searchParams, isEditMode, navigate, profileEditPath, syncSearch]);
 
   const [editForm, setEditForm] = useState({
     email: '',
@@ -236,7 +238,8 @@ export default function MyProfilePage({
     if (searchParams.get('tab') || searchParams.get('reason')) {
       const next = new URLSearchParams(searchParams);
       next.delete('reason');
-      setSearchParams(next, { replace: true });
+      next.delete('tab');
+      syncSearch(next, { replace: true });
     }
   }
 

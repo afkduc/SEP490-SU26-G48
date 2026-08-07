@@ -93,7 +93,7 @@ export default function BranchDetailPage() {
           <button
             type="button"
             className="branch-page__back"
-            onClick={() => navigate(`/admin/catalog${location.state?.fromListSearch || ''}`)}
+            onClick={() => navigate(`/admin/catalog${listSearch}`)}
           >
             ← Quay lại danh mục
           </button>
@@ -146,7 +146,7 @@ export default function BranchDetailPage() {
           <div className="branch-page__state branch-page__state--error">
             {error}
             <div style={{ marginTop: 12 }}>
-              <Link to="/admin/catalog" className="btn btn--ghost">Về danh mục</Link>
+              <Link to={`/admin/catalog${listSearch}`} className="btn btn--ghost">Về danh mục</Link>
             </div>
           </div>
         )}

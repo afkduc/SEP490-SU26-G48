@@ -2,11 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useAuth,
-  getPrimaryRole,
   getRoleProfilePath,
 } from '../../contexts/AppContext';
-import { ROLE_LABELS } from '../../constants/roles';
-import { getProfileConfigByRole } from '../../config/roleProfileConfig';
 import './UserProfileMenu.css';
 
 function getInitials(name = '') {
@@ -58,15 +55,6 @@ export default function UserProfileMenu({
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
-
-  const role = getPrimaryRole(user);
-  const roleConfig = getProfileConfigByRole(role);
-  const roleLabel =
-    user?.primaryRoleLabel
-    || roleConfig?.label
-    || ROLE_LABELS[role]
-    || role
-    || '';
 
   const profilePath = getRoleProfilePath(user);
   const displayName = user?.name || user?.userName || '—';
@@ -122,7 +110,6 @@ export default function UserProfileMenu({
         {!compact && (
           <div className="user-profile-menu__info">
             <span className="user-profile-menu__name">{displayName}</span>
-            <span className="user-profile-menu__role">{roleLabel}</span>
           </div>
         )}
         <IconChevron />

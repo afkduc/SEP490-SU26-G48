@@ -30,9 +30,14 @@ function isValidEmail(value) {
   return EMAIL_REGEX.test(email);
 }
 
+function phoneDigitsOnly(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 11);
+}
+
+/** Bắt đầu bằng 0, 10–11 chữ số (bỏ qua dấu gạch / ký tự khác). */
 function isValidPhone(value) {
   if (value === undefined || value === null) return false;
-  return PHONE_REGEX.test(String(value).trim());
+  return PHONE_REGEX.test(phoneDigitsOnly(value));
 }
 
 function isValidUsername(value) {
@@ -69,6 +74,7 @@ module.exports = {
   EMAIL_HINT,
   isValidEmail,
   isValidPhone,
+  phoneDigitsOnly,
   isValidUsername,
   isValidPassword,
   parsePositiveInt,

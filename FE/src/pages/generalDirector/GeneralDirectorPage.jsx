@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { usePermission } from '../../contexts/PermissionContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
 
-/** SVG đen/xám cho mockup — tránh emoji có màu sẵn */
+const IconSearch = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
+
 const ic = {
   stroke: 'currentColor',
   fill: 'none',
@@ -18,26 +24,11 @@ const ic = {
   viewBox: '0 0 24 24',
 };
 
-const IconDoc = () => (
-  <svg {...ic}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
-);
-const IconChart = () => (
-  <svg {...ic}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
-);
-const IconUsers = () => (
-  <svg {...ic}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-);
-const IconTool = () => (
-  <svg {...ic}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
-);
 const IconBuilding = () => (
   <svg {...ic}><rect x="4" y="2" width="16" height="20" rx="2" /><line x1="9" y1="6" x2="9" y2="6.01" /><line x1="15" y1="6" x2="15" y2="6.01" /><line x1="9" y1="10" x2="9" y2="10.01" /><line x1="15" y1="10" x2="15" y2="10.01" /><line x1="9" y1="14" x2="9" y2="14.01" /><line x1="15" y1="14" x2="15" y2="14.01" /><path d="M10 22v-4h4v4" /></svg>
 );
 const IconUser = () => (
   <svg {...ic} width={14} height={14}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-);
-const IconSearch = () => (
-  <svg {...ic} width={14} height={14}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
 );
 const IconEmpty = () => (
   <svg {...ic} width={28} height={28} style={{ color: '#a1a1aa' }}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M8 13h2" /></svg>
@@ -51,47 +42,6 @@ const IconDown = () => (
 const IconBlock = () => (
   <svg {...ic} width={28} height={28} style={{ color: '#a1a1aa' }}><rect x="3" y="11" width="18" height="10" rx="1" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
 );
-
-const GENERAL_DIRECTOR_ACTIONS = [
-  {
-    label: 'Phiếu quyết toán',
-    path: '/general-director/reports/settlements',
-    icon: <IconDoc />,
-  },
-  {
-    label: 'Doanh thu',
-    path: '/general-director/reports/revenue',
-    icon: <IconChart />,
-  },
-  {
-    label: 'Nhân sự vận hành',
-    path: '/general-director/employees',
-    icon: <IconUsers />,
-  },
-  {
-    label: 'Kỹ thuật viên',
-    path: '/general-director/technicians',
-    icon: <IconTool />,
-  },
-  {
-    label: 'DS giám đốc chi nhánh',
-    path: '/general-director/branch-managers',
-    icon: <IconBuilding />,
-  },
-];
-
-const QUICK_LINK_STYLES = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  padding: '12px 14px',
-  borderRadius: 14,
-  border: '1px solid #e4e4e7',
-  background: 'white',
-  color: '#18181b',
-  textDecoration: 'none',
-  boxShadow: '0 10px 24px rgba(9, 9, 11, 0.05)',
-};
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -425,31 +375,7 @@ function DetailModal({ report, onClose }) {
 }
 
 function ModuleActionBar() {
-  return (
-    <div style={{ marginBottom: 18 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        {GENERAL_DIRECTOR_ACTIONS.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            style={({ isActive }) => ({
-              ...QUICK_LINK_STYLES,
-              border: isActive ? '1px solid #3f3f46' : QUICK_LINK_STYLES.border,
-              background: isActive ? 'linear-gradient(135deg, #f4f4f5 0%, #f4f4f5 100%)' : QUICK_LINK_STYLES.background,
-              boxShadow: isActive ? '0 14px 28px rgba(9, 9, 11, 0.12)' : QUICK_LINK_STYLES.boxShadow,
-            })}
-          >
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: '#f4f4f5', color: '#18181b', display: 'grid', placeItems: 'center' }}>
-              {item.icon}
-            </div>
-            <div>
-              <div style={{ fontWeight: 800 }}>{item.label}</div>
-            </div>
-          </NavLink>
-        ))}
-      </div>
-    </div>
-  );
+  return null;
 }
 
 function PlaceholderPanel({ title, uc, description, actions, children }) {
@@ -1662,13 +1588,6 @@ function BranchManagerListPage() {
           <h1>Danh sách giám đốc chi nhánh</h1>
           <div className="breadcrumb">General Director / Danh sách giám đốc chi nhánh</div>
         </div>
-        <div className="page-header-right">
-          {canCreateManager && (
-            <button type="button" className="btn btn-primary" onClick={() => navigate('/general-director/branch-managers/create')}>
-              + Thêm Giám đốc chi nhánh
-            </button>
-          )}
-        </div>
       </div>
 
       <ModuleActionBar />
@@ -1689,6 +1608,21 @@ function BranchManagerListPage() {
           </div>
         </div>
         <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><IconUser />{user?.name || 'General Director'}</span></div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!canCreateManager}
+          title={canCreateManager ? 'Thêm Giám đốc chi nhánh' : 'Bạn không có quyền thêm Giám đốc chi nhánh'}
+          onClick={() => {
+            if (!canCreateManager) return;
+            navigate('/general-director/branch-managers/create');
+          }}
+        >
+          + Thêm Giám đốc chi nhánh
+        </button>
       </div>
 
       <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
