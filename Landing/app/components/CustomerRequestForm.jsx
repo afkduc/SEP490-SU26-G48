@@ -7,6 +7,11 @@ import Reveal from "./Reveal";
 import { API_BASE_URL } from "../config";
 import styles from "./CustomerRequestForm.module.css";
 
+// Khop voi BE utils/fieldValidation.js - giu dong bo 2 phia.
+const PHONE_REGEX = /^0[0-9]{9,10}$/;
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(com|vn|edu\.vn)$/i;
+const EMAIL_HINT = "Email chỉ chấp nhận đuôi .com, .vn hoặc .edu.vn";
+
 const initialForm = {
   fullName: "",
   gender: "",
@@ -17,7 +22,6 @@ const initialForm = {
   purchaseBranchId: "",
   purchaseBranchOther: "",
   vehicleBrandId: "",
-  vehicleBrandOther: "",
   nearestBranchId: "",
 };
 
@@ -45,7 +49,7 @@ export default function CustomerRequestForm() {
       .then((body) => {
         if (body?.success) setVehicleBrands(body.data);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   function handleChange(e) {
@@ -55,8 +59,18 @@ export default function CustomerRequestForm() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setSubmitting(true);
     setError("");
+
+    if (!PHONE_REGEX.test(form.phone.trim())) {
+      setError("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, đủ 10-11 chữ số).");
+      return;
+    }
+    if (form.email.trim() && !EMAIL_REGEX.test(form.email.trim())) {
+      setError(EMAIL_HINT);
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const res = await fetch(`${API_BASE_URL}/public/service-requests`, {
@@ -74,11 +88,7 @@ export default function CustomerRequestForm() {
               ? Number(form.purchaseBranchId)
               : null,
           purchaseBranchOther: form.purchaseBranchId === "other" ? form.purchaseBranchOther : null,
-          vehicleBrandId:
-            form.vehicleBrandId && form.vehicleBrandId !== "other"
-              ? Number(form.vehicleBrandId)
-              : null,
-          vehicleBrandOther: form.vehicleBrandId === "other" ? form.vehicleBrandOther : null,
+          vehicleBrandId: form.vehicleBrandId ? Number(form.vehicleBrandId) : null,
           nearestBranchId: Number(form.nearestBranchId),
         }),
       });
@@ -189,32 +199,19 @@ export default function CustomerRequestForm() {
                   )}
                 </div>
 
-                <div className={styles.row}>
-                  <label className={styles.field}>
-                    <span>Hãng xe</span>
-                    <select name="vehicleBrandId" value={form.vehicleBrandId} onChange={handleChange}>
-                      <option value="" disabled>
-                        Xe của bạn thuộc hãng xe nào?
+                <label className={styles.field}>
+                  <span>Hãng xe</span>
+                  <select name="vehicleBrandId" value={form.vehicleBrandId} onChange={handleChange}>
+                    <option value="" disabled>
+                      Chọn hãng xe của bạn?
+                    </option>
+                    {vehicleBrands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
                       </option>
-                      {vehicleBrands.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                      <option value="other">Khác</option>
-                    </select>
-                  </label>
-                  {form.vehicleBrandId === "other" && (
-                    <label className={styles.field}>
-                      <span>Hãng xe khác</span>
-                      <input
-                        name="vehicleBrandOther"
-                        value={form.vehicleBrandOther}
-                        onChange={handleChange}
-                      />
-                    </label>
-                  )}
-                </div>
+                    ))}
+                  </select>
+                </label>
 
                 <label className={styles.field}>
                   <span>Vị trí *</span>

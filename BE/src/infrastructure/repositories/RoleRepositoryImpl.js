@@ -1,4 +1,4 @@
-const { query } = require('../database/sqlServer');
+const { query, executeTransaction } = require('../database/sqlServer');
 
 class RoleRepositoryImpl {
   /**
@@ -89,23 +89,6 @@ class RoleRepositoryImpl {
   }
 
   /**
-   * Xoa role (chi xoa neu khong co user_role tham chieu)
-   */
-  async delete(id) {
-    const check = await query(
-      'SELECT COUNT(*) AS cnt FROM user_role WHERE role_id = @p1',
-      { p1: id }
-    );
-    if (check.recordset[0].cnt > 0) {
-      return { success: false, reason: 'has_users' };
-    }
-    // Xoa cac role_permissions truoc
-    await query('DELETE FROM role_permissions WHERE role_id = @p1', { p1: id });
-    await query('DELETE FROM roles WHERE id = @p1', { p1: id });
-    return { success: true };
-  }
-
-  /**
    * Toggle trang thai active/inactive
    */
   async toggleStatus(id) {
@@ -144,6 +127,60 @@ class RoleRepositoryImpl {
       { p1: roleId }
     );
     return result.recordset.map((row) => row.permission_id);
+  }
+
+  /**
+   * Lay tat ca roles kem permissionIds (dung cho ma tran quyen - tranh N+1 query)
+   * @returns {Promise<Array<{id, roleName, roleLabel, isActive, userCount, permissionIds: number[]}>}
+   */
+  async findAllWithPermissions() {
+    const rolesResult = await query(`
+      SELECT
+        r.id,
+        r.role_name,
+        r.role_label,
+        ISNULL(r.is_active, 1) AS is_active,
+        (SELECT COUNT(*) FROM user_role ur WHERE ur.role_id = r.id) AS user_count
+      FROM roles r
+      ORDER BY r.id ASC
+    `);
+    const roles = rolesResult.recordset.map((row) => ({
+      id: row.id,
+      roleName: row.role_name,
+      roleLabel: row.role_label,
+      isActive: Boolean(row.is_active),
+      userCount: Number(row.user_count),
+      permissionIds: [],
+    }));
+
+    if (roles.length === 0) return roles;
+
+    const ids = roles.map((r) => r.id);
+    const placeholders = ids.map((_, i) => `@p${i + 1}`).join(', ');
+    const rpResult = await query(
+      `SELECT role_id, permission_id FROM role_permissions WHERE role_id IN (${placeholders})`,
+      Object.fromEntries(ids.map((id, i) => [`p${i + 1}`, id]))
+    );
+
+    const byRole = new Map();
+    for (const row of rpResult.recordset) {
+      if (!byRole.has(row.role_id)) byRole.set(row.role_id, []);
+      byRole.get(row.role_id).push(row.permission_id);
+    }
+    for (const role of roles) {
+      role.permissionIds = byRole.get(role.id) || [];
+    }
+    return roles;
+  }
+
+  /**
+   * Lay permission ID hop le (dung de validate setRolePermissions)
+   */
+  async findAllPermissionIds() {
+    const result = await query(
+      `SELECT id FROM permissions`
+    );
+    return new Set(result.recordset.map((row) => Number(row.id)));
   }
 
   /**
@@ -188,23 +225,160 @@ class RoleRepositoryImpl {
   }
 
   /**
-   * Lay tat ca permission_key strings cua 1 user (dùng cho RBAC enforcement).
-   * Chỉ lấy roles đang active (is_active = 1) và permissions của các role đó.
+   * Lay role theo id, tra ve chi id + role_name (dung cho guard checks).
+   * @param {number} roleId
+   * @returns {Promise<{id:number, roleName:string}|null>}
+   */
+  async findRoleLite(roleId) {
+    const result = await query(
+      'SELECT id, role_name FROM roles WHERE id = @p1',
+      { p1: roleId }
+    );
+    const row = result.recordset[0];
+    if (!row) return null;
+    return { id: row.id, roleName: row.role_name };
+  }
+
+  /**
+   * Dem so user dang co 1 permission cu the (qua role_permissions).
+   * Dung cho last-admin guard.
+   * @param {string} permissionKey
+   * @returns {Promise<number>}
+   */
+  async countUsersWithPermission(permissionKey) {
+    const result = await query(`
+      SELECT COUNT(DISTINCT ur.user_id) AS cnt
+      FROM user_role ur
+      JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
+      JOIN role_permissions rp ON rp.role_id = r.id
+      JOIN permissions p ON p.id = rp.permission_id
+      WHERE p.permission_key = @p1
+        AND ISNULL(ur.is_active, 1) = 1
+    `, { p1: permissionKey });
+    return Number(result.recordset[0]?.cnt || 0);
+  }
+
+  /**
+   * Bulk set permissions cho nhieu role trong 1 transaction (atomic).
+   * @param {Array<{roleId:number, permissionIds:number[]}>} changes
+   * @returns {Promise<{roleId:number, added:number[], removed:number[]}[]>}
+   */
+  async setRolePermissionsMatrixTx(changes, actorUserId) {
+    return executeTransaction(async (txQuery) => {
+      const results = [];
+
+      for (const change of changes) {
+        const { roleId, permissionIds } = change;
+
+        // Lay permission hien tai
+        const beforeResult = await txQuery(
+          'SELECT permission_id FROM role_permissions WHERE role_id = @p1',
+          { p1: roleId }
+        );
+        const beforeIds = new Set(beforeResult.recordset.map((r) => Number(r.permission_id)));
+        const afterIds = new Set((permissionIds || []).map(Number));
+
+        // Diff
+        const removed = [...beforeIds].filter((id) => !afterIds.has(id));
+        const added = [...afterIds].filter((id) => !beforeIds.has(id));
+
+        // Xoa cu
+        if (beforeIds.size > 0) {
+          await txQuery(
+            'DELETE FROM role_permissions WHERE role_id = @p1',
+            { p1: roleId }
+          );
+        }
+
+        // Chen moi
+        if (afterIds.size > 0) {
+          const ids = [...afterIds];
+          const values = ids.map((_, i) => `(@p1, @p${i + 2})`).join(', ');
+          const params = { p1: roleId };
+          ids.forEach((pid, i) => { params[`p${i + 2}`] = pid; });
+          await txQuery(
+            `INSERT INTO role_permissions (role_id, permission_id) VALUES ${values}`,
+            params
+          );
+        }
+
+        results.push({ roleId, added, removed });
+      }
+
+      return results;
+    });
+  }
+
+  /**
+   * Lay permission_key cua user:
+   *  - Layer 1: role_permissions (DB)
+   *  - Layer 2: default screen:* theo role_name (code map) — thay ma tran DB da go
+   * Wildcard '*' duoc PermissionService.can() check rieng.
+   *
    * @param {number} userId
    * @returns {Promise<string[]>}
    */
   async getUserPermissionKeys(userId) {
     const result = await query(`
-      SELECT DISTINCT p.permission_key
+      SELECT DISTINCT CAST(p.permission_key AS NVARCHAR(500)) COLLATE database_default AS perm_key
       FROM user_role ur
-      JOIN roles r ON r.id = ur.role_id
+      JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
       JOIN role_permissions rp ON rp.role_id = r.id
       JOIN permissions p ON p.id = rp.permission_id
       WHERE ur.user_id = @p1
         AND ISNULL(ur.is_active, 1) = 1
-        AND ISNULL(r.is_active, 1) = 1
+        AND p.permission_key IS NOT NULL
     `, { p1: userId });
-    return result.recordset.map((row) => row.permission_key);
+
+    const fromDb = result.recordset.map((row) => row.perm_key);
+    if (fromDb.includes('*')) {
+      return fromDb;
+    }
+
+    const rolesResult = await query(`
+      SELECT DISTINCT LOWER(LTRIM(RTRIM(r.role_name))) AS role_name
+      FROM user_role ur
+      JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
+      WHERE ur.user_id = @p1
+        AND ISNULL(ur.is_active, 1) = 1
+        AND r.role_name IS NOT NULL
+    `, { p1: userId });
+
+    const roleNames = rolesResult.recordset.map((row) => row.role_name);
+    const {
+      getDefaultScreenPermissionsForRoles,
+    } = require('../../config/defaultScreenPermissionsByRole');
+    const fromRoleDefaults = getDefaultScreenPermissionsForRoles(roleNames);
+
+    return [...new Set([...fromDb, ...fromRoleDefaults])];
+  }
+
+  /**
+   * Permission keys cho JWT.
+   * Neu co wildcard '*' thi chi tra ['*'] de tranh JWT qua lon (431).
+   * Neu khong: role_permissions + default screen:*:access (va L2 can thiet).
+   *
+   * @param {number} userId
+   * @returns {Promise<string[]>}
+   */
+  async getUserPermissionKeysCompact(userId) {
+    const star = await query(
+      `SELECT TOP 1 p.id
+       FROM user_role ur
+       JOIN roles r ON r.id = ur.role_id AND ISNULL(r.is_active, 1) = 1
+       JOIN role_permissions rp ON rp.role_id = r.id
+       JOIN permissions p ON p.id = rp.permission_id
+       WHERE ur.user_id = @p1
+         AND ISNULL(ur.is_active, 1) = 1
+         AND p.permission_key = '*'`,
+      { p1: userId }
+    );
+    if (star.recordset.length > 0) {
+      return ['*'];
+    }
+
+    // Full set (DB + default screen) — PermissionGate FE can L2 :view/:update
+    return this.getUserPermissionKeys(userId);
   }
 
   /**

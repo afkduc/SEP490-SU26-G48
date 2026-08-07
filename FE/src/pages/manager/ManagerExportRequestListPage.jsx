@@ -4,26 +4,18 @@ import { useAuth } from '../../contexts/AppContext';
 import { useManagerExportRequests } from '../../hooks/manager/useManagerExportRequests';
 import './ManagerExportRequestListPage.css';
 
-const STATUS_META = {
-  completed: { label: 'Da xuat', className: 'badge--success' },
-  cancelled: { label: 'Huy', className: 'badge--danger' },
-};
-
-const STATUS_TABS = [
-  { value: '', label: 'Tat ca' },
-  { value: 'completed', label: 'Da xuat' },
-  { value: 'cancelled', label: 'Huy' },
-];
-
-function formatDate(d) {
-  if (!d) return '—';
-  return String(d).slice(0, 10);
-}
-
 function formatDateTime(d) {
   if (!d) return '—';
   const s = String(d);
   return s.length >= 16 ? s.slice(0, 16).replace('T', ' ') : s;
+}
+
+function addYears(dateStr, years) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  d.setFullYear(d.getFullYear() + years);
+  return d.toISOString().slice(0, 10);
 }
 
 export default function ManagerExportRequestListPage() {
@@ -33,7 +25,7 @@ export default function ManagerExportRequestListPage() {
   const {
     requests, total, page, limit, loading, error,
     params,
-    setStatus, setFromDate, setToDate, setSearch, setPage,
+    setFromDate, setToDate, setSearch, setPage,
   } = useManagerExportRequests(branchId);
 
   const [draftSearch, setDraftSearch] = useState(params.search);
@@ -43,6 +35,20 @@ export default function ManagerExportRequestListPage() {
   useEffect(() => { setDraftSearch(params.search); }, [params.search]);
   useEffect(() => { setDraftFromDate(params.fromDate); }, [params.fromDate]);
   useEffect(() => { setDraftToDate(params.toDate); }, [params.toDate]);
+
+  // "Đến ngày" phải >= "Từ ngày" (khong duoc som hon moc bat dau) va toi da
+  // cach "Từ ngày" 2 nam - doi lai "Từ ngày" ma "Đến ngày" dang chon khong
+  // con hop le trong khoang do thi tu xoa "Đến ngày" di.
+  const toDateMin = draftFromDate || undefined;
+  const toDateMax = draftFromDate ? addYears(draftFromDate, 2) : undefined;
+
+  useEffect(() => {
+    if (!draftFromDate || !draftToDate) return;
+    if (draftToDate < draftFromDate || draftToDate > addYears(draftFromDate, 2)) {
+      setDraftToDate('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftFromDate]);
 
   function handleApplyFilter() {
     setSearch(draftSearch);
@@ -60,32 +66,19 @@ export default function ManagerExportRequestListPage() {
     <div className="mer-list">
       <div className="mer-list__header">
         <div>
-          <h1 className="mer-list__title">Phieu xuat kho (Manager)</h1>
+          <h1 className="mer-list__title">Phiếu xuất kho</h1>
           <p className="mer-list__subtitle">
-            Xem lich su xuat kho cua chi nhanh ban quan ly. NV kho tu xuat truc tiep
-            theo phieu sua chua - khong can Manager duyet.
+            Xem lịch sử xuất kho của chi nhánh bạn quản lý. NV kho tự xuất trực tiếp
+            theo phiếu sửa chữa - không cần Manager duyệt.
           </p>
         </div>
-      </div>
-
-      <div className="mer-list__tabs">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={`mer-list__tab${params.status === tab.value ? ' mer-list__tab--active' : ''}`}
-            onClick={() => setStatus(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       <div className="mer-list__filters">
         <input
           className="input input--search"
           type="text"
-          placeholder="Tim theo ma phieu, ma phieu sua chua, ghi chu..."
+          placeholder="Tìm theo mã phiếu, mã phiếu sửa chữa, ghi chú..."
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -95,70 +88,63 @@ export default function ManagerExportRequestListPage() {
           type="date"
           value={draftFromDate}
           onChange={(e) => setDraftFromDate(e.target.value)}
-          title="Tu ngay"
+          title="Từ ngày"
         />
         <input
           className="input"
           type="date"
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
-          title="Den ngay"
+          title="Đến ngày"
+          min={toDateMin}
+          max={toDateMax}
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
-          Loc
+          Lọc
         </button>
       </div>
 
       {loading ? (
-        <div className="mer-list__loading">Dang tai...</div>
+        <div className="mer-list__loading">Đang tải...</div>
       ) : error ? (
-        <div className="mer-list__error">Loi: {error}</div>
+        <div className="mer-list__error">Lỗi: {error}</div>
       ) : (
         <div className="table-responsive">
           <table className="table">
             <thead>
               <tr>
-                <th>Ma phieu</th>
-                <th>Ngay tao</th>
-                <th>Ngay xuat</th>
-                <th>Phieu sua chua</th>
-                <th>Khach hang</th>
-                <th>So dong</th>
-                <th>Tong SL</th>
-                <th>Trang thai</th>
-                <th>Nguoi xuat</th>
-                <th style={{ width: 90 }}>Hanh dong</th>
+                <th>Mã phiếu</th>
+                <th>Ngày tạo</th>
+                <th>Phiếu sửa chữa</th>
+                <th>Khách hàng</th>
+                <th>Số dòng</th>
+                <th>Tổng SL</th>
+                <th style={{ width: 90 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="table__empty">
-                    Khong co phieu xuat nao trong chi nhanh cua ban
+                  <td colSpan={7} className="table__empty">
+                    Không có phiếu xuất nào trong chi nhánh của bạn
                   </td>
                 </tr>
               ) : (
                 requests.map((r) => {
-                  const meta = STATUS_META[r.status] || { label: r.status, className: '' };
                   return (
                     <tr key={r.id}>
                       <td><span className="font-mono">{r.requestCode}</span></td>
                       <td>{formatDateTime(r.createdAt)}</td>
-                      <td>{formatDate(r.exportDate)}</td>
                       <td><span className="font-mono">{r.serviceOrderCode || '—'}</span></td>
                       <td>{r.customerName || '—'}</td>
                       <td className="text-right">{r.itemCount ?? 0}</td>
                       <td className="text-right">{r.totalQuantity ?? 0}</td>
-                      <td>
-                        <span className={`badge ${meta.className}`}>{meta.label}</span>
-                      </td>
-                      <td>{r.performedByName || '—'}</td>
                       <td className="table__actions">
                         <Link
                           to={`/manager/export-requests/${r.id}`}
                           className="btn btn--ghost btn--sm"
                         >
-                          Xem
+                          Chi tiết
                         </Link>
                       </td>
                     </tr>
@@ -173,7 +159,7 @@ export default function ManagerExportRequestListPage() {
       {!loading && total > 0 && (
         <div className="mer-list__pagination">
           <span className="mer-list__pagination-info">
-            Tong: <strong>{total}</strong> phieu
+            Tổng: <strong>{total}</strong> phiếu
           </span>
           <div className="mer-list__pagination-controls">
             <button
@@ -182,7 +168,7 @@ export default function ManagerExportRequestListPage() {
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
             >
-              &laquo; Truoc
+              &laquo; Trước
             </button>
             <span className="mer-list__pagination-current">
               Trang {page} / {totalPages}

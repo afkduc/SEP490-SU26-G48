@@ -1,5 +1,7 @@
 const { query } = require('../database/sqlServer');
 
+// Cot chinh cua user (khong bao gom branchName - do ProfileBranchService
+// se lay rieng tu users.branch_id va user_branches).
 const PROFILE_COLUMNS = `
   u.id,
   u.user_name,
@@ -8,13 +10,14 @@ const PROFILE_COLUMNS = `
   u.last_name,
   u.phone,
   u.branch_id,
-  b.branch_name,
   u.status,
-  u.created_at
+  u.created_at,
+  u.updated_at
 `;
 
-function toProfileRow(row) {
+function toProfileRow(row, branchName, assignedBranches = []) {
   if (!row) return null;
+
   return {
     id: row.id,
     userName: row.user_name,
@@ -23,26 +26,32 @@ function toProfileRow(row) {
     lastName: row.last_name,
     phone: row.phone,
     branchId: row.branch_id,
-    branchName: row.branch_name,
+    branchName: branchName || null,
     status: row.status,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
     roles: [],
+    assignedBranches,
   };
 }
 
 class ProfileRepositoryImpl {
+  /**
+   * Tra ve row thuc cua user (chua roles/branches).
+   * Logic lay assignedBranches da duoc tach sang ProfileBranchService
+   * va do Controller goi rieng -> sua ngay 22/07/2026.
+   */
   async findById(userId) {
     const result = await query(
       `SELECT ${PROFILE_COLUMNS}
        FROM   users u
-       LEFT   JOIN branches b ON b.id = u.branch_id
        WHERE  u.id = @p1`,
       { p1: userId }
     );
     const row = result.recordset[0];
     if (!row) return null;
 
-    const profile = toProfileRow(row);
+    const profile = toProfileRow(row, null, []);
 
     const rolesResult = await query(
       `SELECT r.role_name, r.role_label
@@ -79,6 +88,16 @@ class ProfileRepositoryImpl {
     return result.recordset[0] || null;
   }
 
+  async findByPhone(phone) {
+    const result = await query(
+      `SELECT id, phone
+       FROM   users
+       WHERE  phone = @p1`,
+      { p1: phone }
+    );
+    return result.recordset[0] || null;
+  }
+
   async update(userId, { email, firstName, lastName, phone }) {
     const updates = [];
     const params = {};
@@ -105,7 +124,11 @@ class ProfileRepositoryImpl {
       p++;
     }
 
-    if (updates.length === 0) {
+    // Set updated_at = SYSUTCDATETIME() de trigger khong can chay.
+    // Tranh phu thuoc trigger (se hoat dong ngay ca khi trigger bi drop).
+    if (updates.length > 0) {
+      updates.push(`updated_at = SYSUTCDATETIME()`);
+    } else {
       return this.findById(userId);
     }
 
@@ -118,13 +141,13 @@ class ProfileRepositoryImpl {
     return this.findById(userId);
   }
 
-  async updatePassword(userId, passwordHash, mustChangePassword = false) {
+  async updatePassword(userId, passwordHash) {
     await query(
       `UPDATE users
-       SET    user_password         = @p1,
-              must_change_password  = @p2
-       WHERE  id = @p3`,
-      { p1: passwordHash, p2: mustChangePassword ? 1 : 0, p3: userId }
+       SET    user_password = @p1,
+              updated_at    = SYSUTCDATETIME()
+       WHERE  id = @p2`,
+      { p1: passwordHash, p2: userId }
     );
   }
 }

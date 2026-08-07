@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useInventoryBranch } from './InventoryLayout';
 import { useParts } from '../../hooks/inventory/useParts';
 import { listUnitsApi } from '../../services/productApi';
+import { PermissionGate } from '../../components/PermissionGate';
+import { getSuppliersApi } from '../../services/supplierApi';
 import './PartListPage.css';
 
 const STATUS_LABELS = {
@@ -31,24 +33,27 @@ function emptyForm() {
 }
 
 export default function PartListPage() {
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
   const {
     parts, total, loading, error, categories,
     params,
     setSearch, setStatus, setCategory, setLowStockOnly, setPage,
-    create, update, remove,
+    create, update, deactivate, reactivate,
   } = useParts({ branchId });
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm());
   const [formError, setFormError] = useState('');
-  const [deletingId, setDeletingId] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
   const [units, setUnits] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
 
   useEffect(() => {
     listUnitsApi().then(setUnits).catch(() => setUnits([]));
+    getSuppliersApi({ status: 'active' })
+      .then((res) => setSuppliers(res.items || []))
+      .catch(() => setSuppliers([]));
   }, []);
 
   function openCreate() {
@@ -108,13 +113,18 @@ export default function PartListPage() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('Xác nhận xóa phụ tùng này?')) return;
-    setDeletingId(id);
+  async function handleToggleStatus(p) {
+    const isActive = p.status === 'active';
+    const msg = isActive
+      ? 'Xác nhận tạm ngừng phụ tùng này?'
+      : 'Xác nhận kích hoạt lại phụ tùng này?';
+    if (!window.confirm(msg)) return;
+    setTogglingId(p.id);
     try {
-      await remove(id);
+      if (isActive) await deactivate(p.id);
+      else await reactivate(p.id);
     } finally {
-      setDeletingId(null);
+      setTogglingId(null);
     }
   }
 
@@ -123,7 +133,7 @@ export default function PartListPage() {
   if (!branchId) {
     return (
       <div className="part-list__error">
-        Tài khoản chưa được gán chi nhánh - liên hệ admin để được cập nhật.
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để xem phụ tùng.')}
       </div>
     );
   }
@@ -135,9 +145,11 @@ export default function PartListPage() {
           <h1 className="part-list__title">Danh sách phụ tùng</h1>
           <p className="part-list__subtitle">Quản lý thông tin phụ tùng (số lượng tồn được cập nhật qua phiếu nhập/xuất)</p>
         </div>
-        <button className="btn btn--primary" onClick={openCreate}>
-          + Thêm phụ tùng
-        </button>
+        <PermissionGate permission="screen:inventory:products:create">
+          <button className="btn btn--primary" onClick={openCreate}>
+            + Thêm phụ tùng
+          </button>
+        </PermissionGate>
       </div>
 
       {/* Filters */}
@@ -220,13 +232,13 @@ export default function PartListPage() {
                         </td>
                         <td>{p.category || '—'}</td>
                         <td>{p.unitName || p.unit || '—'}</td>
-                        <td className="text-right">
+                        <td className="text-left">
                           {p.unitPrice != null ? `${Number(p.unitPrice).toLocaleString('vi-VN')} đ` : '—'}
                         </td>
-                        <td className={`text-right ${isLow ? 'text-danger' : 'text-success'}`}>
+                        <td className={`text-left ${isLow ? 'text-danger' : 'text-success'}`}>
                           {stock}
                         </td>
-                        <td className="text-right">{min}</td>
+                        <td className="text-left">{min}</td>
                         <td>
                           <span className={`badge ${STATUS_CLASS[p.status] || ''}`}>
                             {STATUS_LABELS[p.status] || p.status}
@@ -239,16 +251,20 @@ export default function PartListPage() {
                           >
                             Chi tiết
                           </Link>
-                          <button className="btn btn--ghost btn--sm" onClick={() => openEdit(p)}>
-                            Sửa
-                          </button>
-                          <button
-                            className="btn btn--ghost btn--sm btn--danger"
-                            onClick={() => handleDelete(p.id)}
-                            disabled={deletingId === p.id}
-                          >
-                            Xóa
-                          </button>
+                          <PermissionGate permission="screen:inventory:products:update">
+                            <button className="btn btn--ghost btn--sm" onClick={() => openEdit(p)}>
+                              Sửa
+                            </button>
+                          </PermissionGate>
+                          <PermissionGate permission="screen:inventory:products:delete">
+                            <button
+                              className="btn btn--ghost btn--sm btn--danger"
+                              onClick={() => handleToggleStatus(p)}
+                              disabled={togglingId === p.id}
+                            >
+                              {p.status === 'active' ? 'Ngừng' : 'Kích hoạt'}
+                            </button>
+                          </PermissionGate>
                         </td>
                       </tr>
                     );
@@ -352,9 +368,13 @@ export default function PartListPage() {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Nhà cung cấp</label>
-                  <input className="input" type="number" min="0" value={form.supplierId}
-                    onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
-                    placeholder="ID nhà cung cấp (số)" />
+                  <select className="input input--select" value={form.supplierId}
+                    onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
+                    <option value="">-- Chọn nhà cung cấp --</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.supplierName} ({s.supplierCode})</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Vị trí (Kho)</label>

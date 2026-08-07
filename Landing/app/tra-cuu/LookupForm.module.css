@@ -81,6 +81,11 @@
   font-weight: 700;
 }
 
+.pending {
+  background: rgba(34, 197, 94, 0.16);
+  color: var(--success);
+}
+
 .progress {
   background: rgba(255, 176, 32, 0.16);
   color: var(--accent-2);

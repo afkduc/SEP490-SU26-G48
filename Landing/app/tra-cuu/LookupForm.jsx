@@ -6,6 +6,7 @@ import { API_BASE_URL } from "../config";
 import styles from "./LookupForm.module.css";
 
 const STATUS_LABELS = {
+  pending_assignment: { label: "Đang chờ sửa chữa", tone: "pending" },
   inprogress: { label: "Đang sửa chữa", tone: "progress" },
   completed: { label: "Đã hoàn thành", tone: "done" },
   cancelled: { label: "Đã huỷ", tone: "cancelled" },
@@ -48,8 +49,11 @@ export default function LookupForm() {
     }
   }
 
-  const doneCount = result?.tasks?.filter((t) => t.isDone).length ?? 0;
-  const totalCount = result?.tasks?.length ?? 0;
+  // "Dang cho sua chua" / "Hoan thanh" chi la 2 moc dau/cuoi de minh hoa ca
+  // hanh trinh - khong tinh vao % tien do, chi tinh tren hang muc that su.
+  const realTasks = result?.tasks?.filter((t) => !t.isMilestone) ?? [];
+  const doneCount = realTasks.filter((t) => t.isDone).length;
+  const totalCount = realTasks.length;
   const percent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
   const statusInfo = result ? STATUS_LABELS[result.status] ?? { label: result.status, tone: "progress" } : null;
 
@@ -61,7 +65,7 @@ export default function LookupForm() {
           type="text"
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          placeholder="Nhập mã sửa chữa (VD: LSC-2026-012)"
+          placeholder="Nhập mã sửa chữa (VD: RO-2026-012)"
           autoComplete="off"
         />
         <button className={styles.submit} type="submit" disabled={status === "loading"}>

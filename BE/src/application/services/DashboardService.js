@@ -7,14 +7,14 @@ class DashboardService {
     this.dashboardRepository = dashboardRepository;
   }
 
-  async getOverview({ branchId, fromDate, toDate, status, categoryId } = {}) {
+  async getOverview({ branchId, advisorId, fromDate, toDate, status, categoryId } = {}) {
     if (!branchId) throw new ApiError(400, 'branchId is required');
     if (status && !STATUS_VALUES.includes(status)) {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
     }
 
     const [overview, categories] = await Promise.all([
-      this.dashboardRepository.getOverview({ branchId, fromDate, toDate, status, categoryId }),
+      this.dashboardRepository.getOverview({ branchId, advisorId, fromDate, toDate, status, categoryId }),
       this.dashboardRepository.listCategories(),
     ]);
 

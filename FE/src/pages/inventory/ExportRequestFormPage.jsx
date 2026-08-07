@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AppContext';
+import { useInventoryBranch } from './InventoryLayout';
 import { useExportRequestForm } from '../../hooks/inventory/useExportRequestForm';
 import { productApi } from '../../services';
+import { PermissionGate } from '../../components/PermissionGate';
 import './ExportRequestFormPage.css';
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function buildItemFromRo(roTask) {
   return {
@@ -24,8 +21,7 @@ function buildItemFromRo(roTask) {
 
 export default function ExportRequestFormPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const branchId = user?.branchId;
+  const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
   const {
     nextCode, codeDate, loadingCode, codeError, refetchCode,
@@ -34,7 +30,6 @@ export default function ExportRequestFormPage() {
     loadRepairOrder, loadingRoDetail,
   } = useExportRequestForm(branchId);
 
-  const [exportDate, setExportDate] = useState(todayIso());
   const [notes, setNotes] = useState('');
   const [selectedRo, setSelectedRo] = useState(null);
   const [items, setItems] = useState([]);
@@ -64,7 +59,7 @@ export default function ExportRequestFormPage() {
     const handle = setTimeout(async () => {
       setSearchingProducts(true);
       try {
-        const res = await productApi.searchProductsApi(term);
+        const res = await productApi.searchProductsApi(term, branchId);
         const list = Array.isArray(res) ? res : (res?.items || []);
         setProductSearchResults(list.slice(0, 20));
       } catch (_) {
@@ -74,7 +69,7 @@ export default function ExportRequestFormPage() {
       }
     }, 300);
     return () => clearTimeout(handle);
-  }, [productSearchTerm]);
+  }, [productSearchTerm, branchId]);
 
   async function handlePickRo(ro) {
     setFormError('');
@@ -142,7 +137,6 @@ export default function ExportRequestFormPage() {
 
   function validate() {
     if (!selectedRo) return 'Vui lòng chọn lệnh sửa chữa';
-    if (!exportDate) return 'Vui lòng chọn ngày xuất';
     if (items.length === 0) return 'Phiếu xuất phải có ít nhất 1 dòng phụ tùng';
     for (let i = 0; i < items.length; i += 1) {
       const it = items[i];
@@ -168,7 +162,6 @@ export default function ExportRequestFormPage() {
     try {
       const created = await submit({
         repairOrderId: selectedRo.id,
-        exportDate,
         notes: notes || undefined,
         items: items.map((it) => ({
           productId: it.productId,
@@ -188,6 +181,14 @@ export default function ExportRequestFormPage() {
     (sum, it) => sum + (Number(it.quantity) || 0),
     0,
   );
+
+  if (!branchId) {
+    return (
+      <div className="er-form__error">
+        {loadingBranches ? 'Đang tải danh sách chi nhánh...' : (branchError || 'Vui lòng chọn chi nhánh để tạo phiếu xuất.')}
+      </div>
+    );
+  }
 
   return (
     <div className="er-form">
@@ -213,7 +214,7 @@ export default function ExportRequestFormPage() {
               <input
                 className="input"
                 type="text"
-                placeholder="Tìm theo mã LSC, mã RO, tên khách, biển số xe..."
+                placeholder="Tìm theo mã RO, tên khách, biển số xe..."
                 value={roSearchTerm}
                 onChange={(e) => setRoSearchTerm(e.target.value)}
               />
@@ -226,11 +227,9 @@ export default function ExportRequestFormPage() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Mã LSC</th>
                         <th>Mã RO</th>
                         <th>Khách hàng</th>
                         <th>Xe</th>
-                        <th>Trạng thái</th>
                         <th className="text-right">Số PT</th>
                         <th></th>
                       </tr>
@@ -238,26 +237,17 @@ export default function ExportRequestFormPage() {
                     <tbody>
                       {repairOrders.map((ro) => (
                         <tr key={ro.id}>
-                          <td><span className="font-mono">{ro.repairOrderCode}</span></td>
                           <td><span className="font-mono">{ro.serviceOrderCode || '—'}</span></td>
                           <td>{ro.customerName || '—'}</td>
                           <td>{ro.vehiclePlate || '—'}</td>
-                          <td>
-                            {ro.alreadyExported ? (
-                              <span className="badge badge--danger">Đã xuất</span>
-                            ) : (
-                              <span className="badge badge--success">Chưa xuất</span>
-                            )}
-                          </td>
                           <td className="text-right">{ro.partTaskCount ?? 0}</td>
                           <td>
                             <button
                               type="button"
                               className="btn btn--primary btn--sm"
-                              disabled={ro.alreadyExported}
                               onClick={() => handlePickRo(ro)}
                             >
-                              Chon
+                              Chọn
                             </button>
                           </td>
                         </tr>
@@ -270,11 +260,10 @@ export default function ExportRequestFormPage() {
           ) : (
             <div className="er-form__so-summary">
               <div className="er-form__info-grid">
-                <div><strong>Ma LSC:</strong> <span className="font-mono">{selectedRo.repairOrderCode}</span></div>
-                <div><strong>Ma RO:</strong> <span className="font-mono">{selectedRo.serviceOrderCode || '—'}</span></div>
-                <div><strong>Khach hang:</strong> {selectedRo.customerName || '—'}</div>
+                <div><strong>Mã RO:</strong> <span className="font-mono">{selectedRo.serviceOrderCode || '—'}</span></div>
+                <div><strong>Khách hàng:</strong> {selectedRo.customerName || '—'}</div>
                 <div><strong>Xe:</strong> {selectedRo.vehiclePlate || '—'}</div>
-                <div><strong>To truong:</strong> {selectedRo.teamLeaderName || '—'}</div>
+                <div><strong>Tổ trưởng:</strong> {selectedRo.teamLeaderName || '—'}</div>
               </div>
               <button type="button" className="btn btn--ghost btn--sm" onClick={handleChangeRo}>
                 Đổi phiếu khác
@@ -298,27 +287,8 @@ export default function ExportRequestFormPage() {
                     placeholder="EXB-{branchId}-{YYYYMMDD}-{seq}"
                   />
                   {codeError && <div className="er-form__hint er-form__hint--error">{codeError}</div>}
-                  {!loadingCode && !codeError && (
-                    <div className="er-form__hint">
-                      Ngày sinh mã: <strong>{codeDate || '—'}</strong>
-                      &nbsp;
-                      <button type="button" className="btn btn--ghost btn--sm" onClick={refetchCode}>
-                        Sinh lại
-                      </button>
-                    </div>
-                  )}
                 </div>
 
-                <div className="er-form__field">
-                  <label className="er-form__label">Ngày xuất *</label>
-                  <input
-                    className="input"
-                    type="date"
-                    value={exportDate}
-                    onChange={(e) => setExportDate(e.target.value)}
-                    required
-                  />
-                </div>
               </div>
 
               <div className="er-form__field">
@@ -393,9 +363,9 @@ export default function ExportRequestFormPage() {
                                 type="button"
                                 className="btn btn--ghost btn--sm"
                                 onClick={() => removeItem(it.rowKey)}
-                                title="Xoa dong nay"
+                                title="Xóa dòng này"
                               >
-                                Xoa
+                                Xóa
                               </button>
                             </td>
                           </tr>
@@ -404,7 +374,7 @@ export default function ExportRequestFormPage() {
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan={6} className="text-right"><strong>Tong so luong:</strong></td>
+                        <td colSpan={6} className="text-right"><strong>Tổng số lượng:</strong></td>
                         <td className="text-right"><strong>{totalQuantity}</strong></td>
                       </tr>
                     </tfoot>
@@ -432,7 +402,7 @@ export default function ExportRequestFormPage() {
                         <button type="button" className="er-form__product-hit" onClick={() => addManualProduct(p)}>
                           <span className="font-mono">{p.code || p.productCode}</span>
                           <span className="er-form__product-name">{p.name || p.productName}</span>
-                          <span className="er-form__product-stock">Ton: {p.stockQuantity ?? p.stock_quantity ?? '—'}</span>
+                          <span className="er-form__product-stock">Tồn: {p.stockQuantity ?? p.stock_quantity ?? '—'}</span>
                         </button>
                       </li>
                     ))}
@@ -454,13 +424,15 @@ export default function ExportRequestFormPage() {
             <Link to="/inventory/export-requests" className="btn btn--ghost">
               Hủy
             </Link>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={submitting || loadingCode || !nextCode || items.length === 0}
-            >
-              {submitting ? 'Đang lưu...' : 'Tạo phiếu xuất'}
-            </button>
+            <PermissionGate permission="export_requests:create">
+              <button
+                type="submit"
+                className="btn btn--primary"
+                disabled={submitting || loadingCode || !nextCode || items.length === 0}
+              >
+                {submitting ? 'Đang lưu...' : 'Tạo phiếu xuất'}
+              </button>
+            </PermissionGate>
           </div>
         )}
       </form>

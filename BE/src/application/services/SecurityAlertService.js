@@ -6,8 +6,18 @@ class SecurityAlertService {
     this.repository = new SecurityAlertRepository();
   }
 
-  async list({ severity, isAcknowledged, page, pageSize }) {
-    return this.repository.findAll({ severity, isAcknowledged, page, pageSize });
+  async list({ severity, isAcknowledged, page, pageSize, collapsed = true }) {
+    return this.repository.findAll({
+      severity,
+      isAcknowledged,
+      page,
+      pageSize,
+      collapsed: collapsed !== false && collapsed !== 'false',
+    });
+  }
+
+  async getRelated({ ruleKey, userId, limit }) {
+    return this.repository.findRelated({ ruleKey, userId, limit });
   }
 
   async getCounts() {
@@ -17,7 +27,8 @@ class SecurityAlertService {
   async acknowledge(alertId, userId) {
     const alert = await this.repository.findById(alertId);
     if (!alert) throw new ApiError(404, 'Canh bao khong ton tai');
-    return this.repository.acknowledge(alertId, userId);
+    // Ack cả nhóm trùng (cùng rule + user)
+    return this.repository.acknowledgeGroup(alertId, userId);
   }
 
   async acknowledgeAll(userId) {

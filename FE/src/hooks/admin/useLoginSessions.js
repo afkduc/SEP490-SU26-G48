@@ -9,6 +9,8 @@ const DEFAULT_PARAMS = {
   startDate: '',
   endDate: '',
   branchId: undefined,
+  ipAddress: '',
+  sessionId: undefined,
   page: 1,
   pageSize: 10,
 };
@@ -17,11 +19,11 @@ const DEFAULT_PARAMS = {
  * Hook lấy danh sách phiên đăng nhập (login sessions) cho admin.
  * `userName` và `phone` được debounce 200ms thông qua usePaginatedList.
  */
-export function useLoginSessions() {
+export function useLoginSessions(seedDefaults = {}) {
   const list = usePaginatedList({
     apiFn: adminLoginSessionsApi.list,
-    defaultParams: DEFAULT_PARAMS,
-    debounceKeys: ['userName', 'phone'],
+    defaultParams: { ...DEFAULT_PARAMS, ...seedDefaults },
+    debounceKeys: ['userName', 'phone', 'ipAddress'],
     debounceMs: 200,
   });
 
@@ -34,5 +36,6 @@ export function useLoginSessions() {
     updateParam: list.updateParam,
     refetch: list.refetch,
     refresh: list.refresh,
+    setItems: list.setItems,
   };
 }

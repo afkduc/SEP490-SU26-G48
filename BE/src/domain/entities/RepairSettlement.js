@@ -14,6 +14,18 @@ class RepairSettlement {
     this.advisorId = data.advisorId ?? null;
     this.teamLeaderId = data.teamLeaderId ?? null;
     this.teamLeaderName = data.teamLeaderName ?? null;
+    // Lenh sua chua dang hien hanh cua phieu nay (null neu chua gan to
+    // truong) - dung de CVDV huy truc tiep tu man Phieu quyet toan.
+    this.repairOrderId = data.repairOrderId ?? null;
+    // So khoang xe dang thuc hien lenh sua chua nay (vehicle_bays.bay_number
+    // qua repair_orders.bay_id) - null neu chua gan to truong/khoang.
+    this.bayNumber = data.bayNumber ?? null;
+    // Da co it nhat 1 dau muc cua lenh sua chua nay duoc tick hoan thanh -
+    // dung de khoa nut "Huy" o man danh sach khi dang "inprogress" (xem
+    // RepairSettlementService.updateStatus).
+    this.hasCompletedTask = data.hasCompletedTask ?? false;
+    // Da gan tho thuc hien chua - xem HEADER_SELECT/FE displayStatus().
+    this.hasTechnicians = data.hasTechnicians ?? false;
     this.customerRequest = data.customerRequest ?? null;
     this.currentKm = data.currentKm ?? null;
     this.status = data.status ?? 'waiting_repair';
@@ -23,14 +35,24 @@ class RepairSettlement {
     this.vat = data.vat ?? 0;
     this.freeAmount = data.freeAmount ?? 0;
     this.total = data.total ?? 0;
-    this.nextMaintenanceKm = data.nextMaintenanceKm ?? null;
-    this.nextMaintenanceDate = data.nextMaintenanceDate ?? null;
     this.isWarranty = data.isWarranty ?? false;
     this.intakeDate = data.intakeDate ?? null;
     this.completedDate = data.completedDate ?? null;
     this.deliveryDate = data.deliveryDate ?? null;
     this.paidAt = data.paidAt ?? null;
+    // 'TRANSFER' (PayOS) | 'CASH' (CVDV xac nhan tay) - null neu chua thanh toan.
+    this.paymentMethod = data.paymentMethod ?? null;
     this.cancelReason = data.cancelReason ?? null;
+    this.cancelledAt = data.cancelledAt ?? null;
+    // Phieu tiep nhan va ban giao xe (kiem tra noi that/ngoai that/khoang dong
+    // co...) - luu nguyen 1 khoi JSON, xem shape trong IntakeChecklistSection.jsx.
+    this.intakeChecklist = data.intakeChecklist ?? null;
+    this.note = data.note ?? null;
+    // Chu ky dien tu tai cho (nguoi lien he ky truc tiep khi tao phieu) - xem
+    // RepairSettlementService._assertSignaturePresent.
+    this.signatureData = data.signatureData ?? null;
+    this.signerName = data.signerName ?? null;
+    this.signedAt = data.signedAt ?? null;
 
     this.customer = data.customer ?? null; // { id, fullName, phone, address, taxCode, cccd, email, contactPerson, contactPhone }
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel, frameNumber, engineNumber, purchaseDate, currentKm }
@@ -39,9 +61,12 @@ class RepairSettlement {
     // Chi co du lieu khi phieu da duoc gan to truong (co repair_order) - dung
     // de co van xem tien do tung dau viec To truong da tich (xem [{ id, taskName, taskType, isDone }]).
     this.tasks = data.tasks ?? [];
+    // Tho thuc hien lenh sua chua (repair_order_technicians, co the nhieu tho) -
+    // chi co khi da gan to truong, xem [{ id, fullName, phone }].
+    this.technicians = data.technicians ?? [];
   }
 
-  static fromPersistence(headerRow, itemRows = [], taskRows = []) {
+  static fromPersistence(headerRow, itemRows = [], taskRows = [], technicianRows = []) {
     if (!headerRow) return null;
     return new RepairSettlement({
       id: headerRow.id,
@@ -53,6 +78,10 @@ class RepairSettlement {
       advisorId: headerRow.advisor_id,
       teamLeaderId: headerRow.team_leader_id,
       teamLeaderName: headerRow.team_leader_name,
+      repairOrderId: headerRow.repair_order_id,
+      bayNumber: headerRow.bay_number,
+      hasCompletedTask: Boolean(headerRow.has_completed_task),
+      hasTechnicians: Boolean(headerRow.has_technicians),
       customerRequest: headerRow.customer_request,
       currentKm: headerRow.current_km,
       status: headerRow.status,
@@ -62,14 +91,19 @@ class RepairSettlement {
       vat: headerRow.vat,
       freeAmount: headerRow.free_amount,
       total: headerRow.total,
-      nextMaintenanceKm: headerRow.next_maintenance_km,
-      nextMaintenanceDate: headerRow.next_maintenance_date,
       isWarranty: Boolean(headerRow.is_warranty),
       intakeDate: headerRow.intake_date,
       completedDate: headerRow.completed_date,
       deliveryDate: headerRow.delivery_date,
       paidAt: headerRow.invoice_issued_at,
+      paymentMethod: headerRow.payment_method ?? null,
       cancelReason: headerRow.cancel_reason,
+      cancelledAt: headerRow.cancelled_at,
+      intakeChecklist: headerRow.intake_checklist ? JSON.parse(headerRow.intake_checklist) : null,
+      note: headerRow.note ?? null,
+      signatureData: headerRow.signature_data ?? null,
+      signerName: headerRow.signature_signer_name ?? null,
+      signedAt: headerRow.signature_signed_at ?? null,
       customer: {
         id: headerRow.customer_id,
         fullName: headerRow.customer_full_name,
@@ -110,12 +144,25 @@ class RepairSettlement {
         discount: r.discount_pct,
         isFree: Boolean(r.is_free),
         total: r.total,
+        note: r.note ?? null,
       })),
       tasks: taskRows.map((r) => ({
         id: r.id,
         taskName: r.task_name,
         taskType: r.task_type,
+        quantity: r.quantity,
         isDone: Boolean(r.is_done),
+        isCancelled: Boolean(r.is_cancelled),
+        isAddedLater: Boolean(r.is_added_later),
+        isQtyIncreased: Boolean(r.is_qty_increased),
+        prevQuantity: r.prev_quantity ?? null,
+        note: r.note ?? null,
+      })),
+      technicians: technicianRows.map((r) => ({
+        id: r.id,
+        fullName: r.user_name,
+        phone: r.phone,
+        sameTeam: Boolean(r.same_team),
       })),
     });
   }

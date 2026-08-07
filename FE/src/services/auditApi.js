@@ -73,6 +73,11 @@ class AuditApi {
     const path = `${API_BASE_URL}/audit/export${buildQuery(params)}`;
     return fetchBlob(path);
   }
+
+  exportLoginSessions(params = {}) {
+    const path = `${API_BASE_URL}/audit/login-sessions/export${buildQuery(params)}`;
+    return fetchBlob(path);
+  }
 }
 
 const auditApi = new AuditApi();

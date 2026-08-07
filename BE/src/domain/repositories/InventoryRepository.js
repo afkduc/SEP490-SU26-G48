@@ -81,6 +81,22 @@ class InventoryRepository {
   async findAllActiveProducts(branchId) {
     throw new Error('Method findAllActiveProducts() must be implemented');
   }
+
+  /**
+   * Thong ke phu tung duoc su dung nhieu nhat trong 1 khoang thoi gian, ket
+   * hop 2 nguon:
+   *   - inventory_transactions (transaction_type='export') - luong xuat kho
+   *     thuc te.
+   *   - service_order_items (lhsc='PT') - nhu cau phu tung tren phieu quyet
+   *     toan (co the chua duoc xuat kho).
+   * Dung cho Dashboard Tong quan kho.
+   * @param {number} branchId
+   * @param {Object} params - { fromDate, toDate, limit }
+   * @returns {Promise<{ topParts: Object[], topBrands: Object[], summary: Object }>}
+   */
+  async getTopUsedPartsStats(branchId, { fromDate, toDate, limit } = {}) {
+    throw new Error('Method getTopUsedPartsStats() must be implemented');
+  }
 }
 
 module.exports = InventoryRepository;

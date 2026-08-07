@@ -1,21 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
-import UserDetailDrawer from './users/UserDetailDrawer';
-import SessionDetailDrawer from './SessionDetailDrawer';
+import { useAuth } from '../../contexts/AppContext';
 import AdminPagination from './components/AdminPagination';
 import { formatDateSafe } from '../../utils/dateUtils';
+import { auditApi } from '../../services/auditApi';
+import { downloadBlob } from '../../utils/downloadBlob';
+import { pickLatestSession } from './securityAlertFocus';
+import { normalizeVietnamese } from '../../utils/vietnamese';
+import { formatPhoneDisplay } from '../../utils/validation';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
   { value: 'LOGIN', label: 'Đăng nhập' },
   { value: 'LOGIN_FAILED', label: 'Đăng nhập thất bại' },
+  { value: 'LOGOUT', label: 'Đăng xuất' },
+  { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất' },
 ];
 
-const ACTION_CLASS = { LOGIN: 'badge--success', LOGIN_FAILED: 'badge--danger' };
-const ACTION_LABEL = { LOGIN: 'Đăng nhập', LOGIN_FAILED: 'Thất bại' };
+const ACTION_CLASS = {
+  LOGIN: 'badge--success',
+  LOGIN_FAILED: 'badge--danger',
+  LOGOUT: 'badge--secondary',
+  FORCE_LOGOUT: 'badge--orange',
+};
+const ACTION_LABEL = {
+  LOGIN: 'Đăng nhập',
+  LOGIN_FAILED: 'Đăng nhập thất bại',
+  LOGOUT: 'Đăng xuất',
+  FORCE_LOGOUT: 'Buộc đăng xuất',
+};
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -35,27 +53,6 @@ function formatDate(value) {
     locale: 'vi-VN',
     withSeconds: true,
   });
-}
-
-function renderBrowser(item) {
-  if (item.browser && item.os) {
-    return (
-      <span>
-        <strong>{item.browser}</strong>
-        <span style={{ color: '#64748b' }}> · {item.os}</span>
-      </span>
-    );
-  }
-  if (item.browser) {
-    return <strong>{item.browser}</strong>;
-  }
-  if (!item.user_agent) return '—';
-  const match = item.user_agent.match(/(Edge|Edg|Chrome|Firefox|Safari|OPR|Opera)[\/ ]?([\d.]+)/i);
-  if (match) {
-    const name = match[1] === 'Edg' ? 'Edge' : match[1];
-    return <span><strong>{name}</strong> {match[2]}</span>;
-  }
-  return item.user_agent.slice(0, 30);
 }
 
 function formatDuration(seconds) {
@@ -215,18 +212,25 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
 
 // ─── Table Skeleton ────────────────────────────────────────────────
 
+const SESSION_COLS = (
+  <colgroup>
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '20%' }} />
+  </colgroup>
+);
+
 function TableSkeleton({ rows }) {
   return (
-    <table className="table">
+    <table className="table admin-sessions__table">
+      {SESSION_COLS}
       <thead>
         <tr>
-          <th>Thời gian đăng nhập</th>
+          <th>Thời gian</th>
           <th>Người dùng</th>
-          <th>Số điện thoại</th>
-          <th>Hành động</th>
-          <th>Trạng thái</th>
-          <th>IP</th>
-          <th>Trình duyệt</th>
+          <th>Sự kiện</th>
           <th>Thời lượng</th>
           <th>Thao tác</th>
         </tr>
@@ -234,9 +238,9 @@ function TableSkeleton({ rows }) {
       <tbody>
         {Array.from({ length: rows }).map((_, i) => (
           <tr key={i}>
-            {[...Array(9)].map((_, j) => (
+            {[...Array(5)].map((__, j) => (
               <td key={j}>
-                <div className="skeleton-line" style={{ width: `${50 + Math.random() * 40}%` }} />
+                <div className="skeleton-line" style={{ width: `${50 + ((i * 7 + j * 13) % 40)}%` }} />
               </td>
             ))}
           </tr>
@@ -248,28 +252,29 @@ function TableSkeleton({ rows }) {
 
 // ─── Session Table ─────────────────────────────────────────────────
 
-function SessionTable({ items, onViewUser, onViewSession }) {
+function SessionTable({ items, onViewSession, focusedSessionId = null }) {
   useDurationTicker(30000);
+
+  const head = (
+    <thead>
+      <tr>
+        <th>Thời gian</th>
+        <th>Người dùng</th>
+        <th>Sự kiện</th>
+        <th>Thời lượng</th>
+        <th>Thao tác</th>
+      </tr>
+    </thead>
+  );
 
   if (!items || items.length === 0) {
     return (
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Thời gian đăng nhập</th>
-            <th>Người dùng</th>
-            <th>Số điện thoại</th>
-            <th>Hành động</th>
-            <th>Trạng thái</th>
-            <th>IP</th>
-            <th>Trình duyệt</th>
-            <th>Thời lượng</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
+      <table className="table admin-sessions__table">
+        {SESSION_COLS}
+        {head}
         <tbody>
           <tr>
-            <td colSpan={9} className="table__empty">
+            <td colSpan={5} className="table__empty">
               Không có lịch sử đăng nhập nào phù hợp với bộ lọc
             </td>
           </tr>
@@ -279,52 +284,51 @@ function SessionTable({ items, onViewUser, onViewSession }) {
   }
 
   return (
-    <table className="table">
-      <thead>
-        <tr>
-          <th>Thời gian đăng nhập</th>
-          <th>Người dùng</th>
-          <th>Số điện thoại</th>
-          <th>Hành động</th>
-          <th>Trạng thái</th>
-          <th>IP</th>
-          <th>Trình duyệt</th>
-          <th>Thời lượng</th>
-          <th>Thao tác</th>
-        </tr>
-      </thead>
+    <table className="table admin-sessions__table">
+      {SESSION_COLS}
+      {head}
       <tbody>
         {items.map((item) => (
-          <tr key={item.id}>
-            <td className="admin-sessions__date">{formatDate(item.login_time)}</td>
-            <td className="admin-sessions__user-name">{item.user_name || '—'}</td>
-            <td className="admin-sessions__phone">{item.phone_number || '—'}</td>
+          <tr
+            key={item.id}
+            id={`admin-session-row-${item.id}`}
+            className={Number(focusedSessionId) === Number(item.id) ? 'admin-sessions__row--focused' : ''}
+          >
             <td>
-              {item.action_type ? (
-                <span className={`badge ${ACTION_CLASS[item.action_type] || 'badge--secondary'}`}>
-                  {ACTION_LABEL[item.action_type] || item.action_type}
-                </span>
-              ) : '—'}
+              <span className="admin-sessions__date">{formatDate(item.login_time)}</span>
             </td>
             <td>
-              {item.status ? (
-                <span className={`badge ${STATUS_CLASS[item.status] || 'badge--secondary'}`}>
-                  {STATUS_LABEL[item.status] || item.status}
-                </span>
-              ) : '—'}
+              <div className="admin-sessions__user-cell">
+                <span className="admin-sessions__user-name">{item.user_name || '—'}</span>
+                <span className="admin-sessions__phone">{item.phone_number ? formatPhoneDisplay(item.phone_number) : '—'}</span>
+              </div>
             </td>
-            <td className="admin-sessions__ip">{item.ip_address || '—'}</td>
-            <td className="admin-sessions__user-agent" title={item.user_agent || ''}>
-              {renderBrowser(item)}
+            <td>
+              <div className="admin-sessions__event-cell">
+                {item.action_type ? (
+                  <span className={`badge ${ACTION_CLASS[item.action_type] || 'badge--secondary'}`}>
+                    {ACTION_LABEL[item.action_type] || item.action_type}
+                  </span>
+                ) : (
+                  <span className="badge badge--secondary">—</span>
+                )}
+                {item.status ? (
+                  <span className={`badge ${STATUS_CLASS[item.status] || 'badge--secondary'}`}>
+                    {STATUS_LABEL[item.status] || item.status}
+                  </span>
+                ) : null}
+              </div>
             </td>
-            <td className="admin-sessions__duration">
-              {item.status === 'active' ? (
-                <span style={{ color: '#0891b2', fontWeight: 600 }}>
-                  {formatDuration(liveDurationSeconds(item.login_time)) || '—'}
-                </span>
-              ) : (
-                formatDuration(item.session_duration_seconds) || '—'
-              )}
+            <td>
+              <span className="admin-sessions__duration">
+                {item.status === 'active' ? (
+                  <span style={{ color: '#0891b2', fontWeight: 600 }}>
+                    {formatDuration(liveDurationSeconds(item.login_time)) || '—'}
+                  </span>
+                ) : (
+                  formatDuration(item.session_duration_seconds) || '—'
+                )}
+              </span>
             </td>
             <td>
               <div className="admin-sessions__row-actions">
@@ -338,7 +342,7 @@ function SessionTable({ items, onViewUser, onViewSession }) {
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
-                  Chi tiết
+                  <span className="admin-sessions__action-label">Chi tiết</span>
                 </button>
               </div>
             </td>
@@ -351,26 +355,257 @@ function SessionTable({ items, onViewUser, onViewSession }) {
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export default function AdminLoginSessionsPage() {
-  const sessions = useLoginSessions();
+export default function AdminLoginSessionsPage({
+  embedded = false,
+  seedUserName = '',
+  seedIpAddress = '',
+  seedStartDate = '',
+  seedEndDate = '',
+  seedActionType = '',
+  seedSessionId = null,
+  seedFocusSessionId = null,
+  seedFocusIp = '',
+  seedFocusLoginTime = '',
+  seedKey = 0,
+} = {}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const sessions = useLoginSessions(
+    seedKey
+      ? {
+          userName: seedUserName || '',
+          ipAddress: seedIpAddress || '',
+          startDate: seedStartDate || '',
+          endDate: seedEndDate || '',
+          actionType: seedActionType || '',
+          sessionId: seedSessionId || undefined,
+          pageSize: seedSessionId ? 20 : 10,
+        }
+      : {}
+  );
   const { branches, branchesError } = useSharedBranches();
-  const [detailUserId, setDetailUserId] = useState(null);
-  const [detailSession, setDetailSession] = useState(null);
+  const { token } = useAuth();
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+  const [focusedSessionId, setFocusedSessionId] = useState(null);
+  const focusScrollPendingRef = useRef(false);
+  const focusPayloadRef = useRef({
+    sessionId: null,
+    ip: '',
+    loginTime: '',
+  });
 
-  // SSE: nhan su kien realtime tu server, chi refetch khi co su kien moi
+  const openSessionDetail = useCallback((item) => {
+    if (!item?.id) return;
+    navigate(`/admin/login-sessions/${item.id}`, {
+      state: {
+        session: item,
+        fromListSearch: location.search || '?tab=sessions',
+      },
+    });
+  }, [navigate, location.search]);
+
+  // Seed từ panel cảnh báo ("Lịch sử") — khi đổi cảnh báo trong lúc tab đang mở
+  useEffect(() => {
+    if (!seedKey) return;
+    focusPayloadRef.current = {
+      // Không ghim sessionId cũ — luôn chọn phiên mới nhất trong list đã lọc
+      sessionId: null,
+      ip: seedFocusIp || seedIpAddress || '',
+      loginTime: '',
+    };
+    focusScrollPendingRef.current = true;
+    setFocusedSessionId(null);
+    sessions.setParams(() => ({
+      userName: seedUserName || '',
+      phone: '',
+      actionType: seedActionType || '',
+      status: '',
+      startDate: seedStartDate || '',
+      endDate: seedEndDate || '',
+      branchId: undefined,
+      ipAddress: seedIpAddress || '',
+      sessionId: undefined,
+      page: 1,
+      pageSize: 20,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey]);
+
+  // Sau khi seed + list load xong: highlight + scroll tới phiên MỚI NHẤT
+  useEffect(() => {
+    if (!focusScrollPendingRef.current) return;
+    if (sessions.loading) return;
+
+    const payload = focusPayloadRef.current;
+    const seeded = Boolean(
+      seedKey
+      && (seedUserName || seedIpAddress || seedFocusIp || seedFocusSessionId || seedSessionId)
+    );
+    const hasFocus = seeded || String(payload.ip || '').trim();
+    if (!hasFocus) {
+      setFocusedSessionId(null);
+      focusScrollPendingRef.current = false;
+      return;
+    }
+
+    const match = pickLatestSession(sessions.data?.items || [], { ip: '' });
+    if (!match) {
+      setFocusedSessionId(null);
+      focusScrollPendingRef.current = false;
+      return;
+    }
+
+    setFocusedSessionId(match.id);
+    requestAnimationFrame(() => {
+      document.getElementById(`admin-session-row-${match.id}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    });
+    focusScrollPendingRef.current = false;
+  }, [sessions.data?.items, sessions.loading, seedKey, seedUserName, seedIpAddress, seedFocusIp, seedFocusSessionId, seedSessionId]);
+
+  // Debounce refetch SSE - gom nhieu event thanh 1 lan refetch
+  // (tranh nhap nhay khi user click nhieu action cung luc)
+  const sseRefetchTimerRef = useRef(null);
+
+  // Lay current items qua ref (tranh closure stale)
+  const dataRef = useRef(sessions.data);
+  const paramsRef = useRef(sessions.params);
+  useEffect(() => {
+    dataRef.current = sessions.data;
+  }, [sessions.data]);
+  useEffect(() => {
+    paramsRef.current = sessions.params;
+  }, [sessions.params]);
+
+  // SSE: smart patch thay vi full refetch moi event.
+  // - Neu co sessionId va ta biet id do, patch row tuong ung (khong refetch).
+  // - Chi refetch full khi:
+  //   (a) event khong co sessionId (khoang hiem)
+  //   (b) row dang xem khong co trong page hien tai (do filter)
+  // - Debounce 400ms de gom nhieu event.
   const handleSessionEvent = (eventData) => {
-    console.log('[AdminLoginSessionsPage] SSE event:', eventData);
-    // Co su kien -> refetch full list de dam bao du lieu dong bo
-    sessions.refetch();
+    const eventType = eventData && eventData.type;
+    const sessionUserName = eventData && eventData.userName;
+    const sessionUserId = eventData && eventData.userId;
+    const sessionId = eventData && eventData.sessionId;
+    const deviceId = eventData && eventData.deviceId;
+
+    // Filter matching (de khong patch khi event khong thuoc filter hien tai)
+    const p = paramsRef.current;
+    const filterUserName = normalizeVietnamese(p.userName || '').trim();
+    const filterActionType = p.actionType || '';
+    const filterStatus = p.status || '';
+    const filterBranchId = p.branchId;
+
+    if (filterUserName) {
+      const haystack = normalizeVietnamese(
+        [sessionUserName, eventData?.phone, eventData?.phoneNumber, eventData?.email]
+          .filter(Boolean)
+          .join(' ')
+      );
+      if (!haystack.includes(filterUserName)) {
+        return; // Khong match filter -> bo qua
+      }
+    }
+    if (filterActionType && eventType) {
+      const actionMap = { login: 'LOGIN', logout: 'LOGOUT', force: 'FORCE_LOGOUT', login_failed: 'LOGIN_FAILED' };
+      const expectedAction = actionMap[eventType] || eventType.toUpperCase();
+      if (filterActionType !== expectedAction && filterActionType !== eventType) {
+        return; // Khong match action filter
+      }
+    }
+    if (filterStatus) {
+      const statusByEvent = { login: 'active', logout: 'ended', force: 'ended', login_failed: 'failed' };
+      const eventStatus = statusByEvent[eventType];
+      if (eventStatus && filterStatus !== eventStatus) return;
+    }
+    // void for future use
+    void sessionUserId;
+    void filterBranchId;
+    void deviceId;
+
+    // Patch row inline (khong refetch full)
+    if (sessionId && eventType) {
+      const currentItems = dataRef.current?.items || [];
+      const existingRow = currentItems.find((i) => i.id === sessionId);
+      const newRow = buildRowFromEvent(eventType, eventData, existingRow);
+      if (existingRow) {
+        // Row ton tai trong page -> patch ngay
+        sessions.setItems((prev) => prev.map((i) => (i.id === sessionId ? newRow : i)));
+        return;
+      }
+      // Row moi chua co trong page -> can refetch de lay item moi (insert)
+      // Debounce de gom nhieu event cung sessionId
+      if (sseRefetchTimerRef.current) {
+        clearTimeout(sseRefetchTimerRef.current);
+      }
+      sseRefetchTimerRef.current = setTimeout(() => {
+        sessions.refetch();
+        sseRefetchTimerRef.current = null;
+      }, 400);
+      return;
+    }
+
+    // Fallback: khong co sessionId -> refetch (de an toan)
+    if (sseRefetchTimerRef.current) {
+      clearTimeout(sseRefetchTimerRef.current);
+    }
+    sseRefetchTimerRef.current = setTimeout(() => {
+      sessions.refetch();
+      sseRefetchTimerRef.current = null;
+    }, 400);
   };
 
-  const { connected } = useLoginSessionsSSE(handleSessionEvent, realtimeEnabled);
+  // Build row moi tu SSE event (de patch inline)
+  function buildRowFromEvent(eventType, eventData, existing) {
+    const base = existing || {};
+    const now = eventData.serverTime || eventData.timestamp || new Date().toISOString();
+    const isLogin = eventType === 'login';
+    const isLogout = eventType === 'logout' || eventType === 'force';
+    const isFailed = eventType === 'login_failed';
+
+    return {
+      ...base,
+      id: eventData.sessionId,
+      user_id: eventData.userId || base.user_id,
+      user_name: eventData.userName || base.user_name,
+      phone_number: eventData.phone || base.phone_number,
+      ip_address: eventData.ipAddress || base.ip_address,
+      user_agent: eventData.userAgent || base.user_agent,
+      browser: eventData.browser || base.browser,
+      os: eventData.os || base.os,
+      branch_id: eventData.branchId || base.branch_id,
+      action_type: isLogin ? 'LOGIN' : isFailed ? 'LOGIN_FAILED' : 'LOGOUT',
+      status: isLogin ? 'active' : isFailed ? 'failed' : 'ended',
+      login_time: isLogin ? now : base.login_time,
+      logout_time: isLogout ? now : base.logout_time,
+      last_activity_at: now,
+      ...(isLogin ? { session_duration_seconds: null } : {}),
+    };
+  }
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (sseRefetchTimerRef.current) {
+        clearTimeout(sseRefetchTimerRef.current);
+        sseRefetchTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const { connected } = useLoginSessionsSSE(handleSessionEvent, realtimeEnabled, token);
 
   const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
   const hasFilters = sessions.params.userName || sessions.params.phone ||
     sessions.params.actionType || sessions.params.status ||
     sessions.params.startDate || sessions.params.endDate ||
+    sessions.params.ipAddress ||
+    sessions.params.sessionId ||
     (sessions.params.branchId != null);
 
   function resetFilters() {
@@ -382,35 +617,72 @@ export default function AdminLoginSessionsPage() {
       startDate: '',
       endDate: '',
       branchId: undefined,
+      ipAddress: '',
+      sessionId: undefined,
       page: 1,
       pageSize: 10,
     }));
+    setFocusedSessionId(null);
   }
 
+  const headerActions = (
+    <div className="admin-page__header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={realtimeEnabled}
+          onChange={(e) => setRealtimeEnabled(e.target.checked)}
+        />
+        Cập nhật realtime
+      </label>
+      <button
+        type="button"
+        className="btn btn--secondary btn--sm"
+        disabled={exporting}
+        onClick={async () => {
+          setExporting(true);
+          setExportError(null);
+          try {
+            const blob = await auditApi.exportLoginSessions(sessions.params);
+            downloadBlob(blob, 'login_sessions.xlsx');
+          } catch (err) {
+            setExportError(err?.message || 'Xuất Excel thất bại');
+          } finally {
+            setExporting(false);
+          }
+        }}
+      >
+        {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+      </button>
+    </div>
+  );
+
   return (
-    <div className="admin-page">
-      {/* Header */}
-      <div className="admin-page__header">
-        <div className="admin-page__title-block">
-          <div className="admin-page__title-icon" style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)', boxShadow: '0 6px 20px rgba(8, 145, 178, 0.35)' }}>
-            <IconSession />
+    <div className={`admin-page admin-sessions${embedded ? ' admin-page--embedded' : ''}`}>
+      {!embedded && (
+        <div className="admin-page__header">
+          <div className="admin-page__title-block">
+            <div className="admin-page__title-icon" style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)', boxShadow: '0 6px 20px rgba(8, 145, 178, 0.35)' }}>
+              <IconSession />
+            </div>
+            <div className="admin-page__title-group">
+              <h1>Lịch sử đăng nhập</h1>
+              <p className="admin-page__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
+            </div>
           </div>
-          <div className="admin-page__title-group">
-            <h1>Lịch sử đăng nhập</h1>
-            <p className="admin-page__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
-          </div>
+          {headerActions}
         </div>
-        <div className="admin-page__header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={realtimeEnabled}
-              onChange={(e) => setRealtimeEnabled(e.target.checked)}
-            />
-            Cập nhật realtime
-          </label>
+      )}
+
+      {embedded && (
+        <div className="admin-hub__toolbar">
+          {headerActions}
         </div>
-      </div>
+      )}
+
+      {exportError && (
+        <div className="admin-page__error" style={{ marginBottom: 12 }}>{exportError}</div>
+      )}
 
       {/* Stats Cards */}
       <StatsCards stats={sessions.data.stats} loading={sessions.loading} />
@@ -426,13 +698,24 @@ export default function AdminLoginSessionsPage() {
 
         <div className="admin-sessions__filter-body">
           <div className="filter-field">
-            <label className="filter-field__label">Tên người dùng</label>
+            <label className="filter-field__label">Người dùng</label>
             <input
               className="filter-field__input"
               type="text"
-              placeholder="Nhập tên người dùng..."
+              placeholder="Tên, email hoặc SĐT..."
               value={sessions.params.userName || ''}
               onChange={(e) => sessions.updateParam('userName', e.target.value)}
+            />
+          </div>
+
+          <div className="filter-field">
+            <label className="filter-field__label">Địa chỉ IP</label>
+            <input
+              className="filter-field__input"
+              type="text"
+              placeholder="VD: 192.168..."
+              value={sessions.params.ipAddress || ''}
+              onChange={(e) => sessions.updateParam('ipAddress', e.target.value)}
             />
           </div>
 
@@ -492,23 +775,21 @@ export default function AdminLoginSessionsPage() {
 
           <div className="filter-field">
             <label className="filter-field__label">Khoảng ngày</label>
-            <div className="filter-field__date-group">
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={sessions.params.startDate || ''}
-                onChange={(e) => sessions.updateParam('startDate', e.target.value)}
-                title="Từ ngày"
-              />
-              <span className="filter-field__date-sep">—</span>
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={sessions.params.endDate || ''}
-                onChange={(e) => sessions.updateParam('endDate', e.target.value)}
-                title="Đến ngày"
-              />
-            </div>
+            <DateRangeInputs
+              startDate={sessions.params.startDate || ''}
+              endDate={sessions.params.endDate || ''}
+              onChange={({ startDate, endDate }) => {
+                sessions.setParams((p) => ({
+                  ...p,
+                  startDate,
+                  endDate,
+                  page: 1,
+                }));
+              }}
+              className="filter-field__date-group"
+              inputClassName="filter-field__input filter-field__input--date"
+              sepClassName="filter-field__date-sep"
+            />
           </div>
         </div>
 
@@ -551,8 +832,8 @@ export default function AdminLoginSessionsPage() {
             <div className="admin-sessions__table-wrapper">
               <SessionTable
                 items={sessions.data.items}
-                onViewUser={setDetailUserId}
-                onViewSession={setDetailSession}
+                onViewSession={openSessionDetail}
+                focusedSessionId={focusedSessionId}
               />
             </div>
             <Pagination
@@ -565,22 +846,6 @@ export default function AdminLoginSessionsPage() {
           </>
         )}
       </div>
-
-      {/* User detail drawer */}
-      {detailUserId && (
-        <UserDetailDrawer
-          userId={detailUserId}
-          onClose={() => setDetailUserId(null)}
-        />
-      )}
-
-      {/* Session detail drawer */}
-      {detailSession && (
-        <SessionDetailDrawer
-          session={detailSession}
-          onClose={() => setDetailSession(null)}
-        />
-      )}
     </div>
   );
 }

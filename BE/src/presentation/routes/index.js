@@ -10,6 +10,7 @@ const buildSupplierRouter = require('./supplierRoutes');
 const buildCatalogRouter = require('./catalogRoutes');
 const buildRepairSettlementRouter = require('./repairSettlementRoutes');
 const buildRepairOrderRouter = require('./repairOrderRoutes');
+const buildVehicleBayRouter = require('./vehicleBayRoutes');
 const buildGeneralDirectorRouter = require('./generalDirectorRoutes');
 const buildManagerRouter = require('./managerRoutes');
 const buildCustomerRouter = require('./customerRoutes');
@@ -22,6 +23,7 @@ const buildMaintenanceReminderRouter = require('./maintenanceReminderRoutes');
 const buildSSERouter = require('./sseRoutes');
 const buildPublicRouter = require('./publicRoutes');
 const buildServiceRequestRouter = require('./serviceRequestRoutes');
+const buildPayosWebhookRouter = require('./payosWebhookRoutes');
 
 const router = express.Router();
 
@@ -53,6 +55,7 @@ router.use('/suppliers', buildSupplierRouter());
 router.use('/catalog', buildCatalogRouter());
 router.use('/repair-settlements', buildRepairSettlementRouter());
 router.use('/repair-orders', buildRepairOrderRouter());
+router.use('/vehicle-bays', buildVehicleBayRouter());
 router.use('/general-director', buildGeneralDirectorRouter());
 router.use('/manager', buildManagerRouter());
 router.use('/customers', buildCustomerRouter());
@@ -65,8 +68,9 @@ router.use('/maintenance-reminders', buildMaintenanceReminderRouter());
 router.use('/service-requests', buildServiceRequestRouter());
 router.use('/sse', buildSSERouter());
 // Public - khong qua authenticate, dung cho landing page (tra cuu tien do
-// sua chua bang ma, khong can dang nhap). Mount rieng, KHONG dat trong
-// repairOrderRoutes.js vi file do gan authenticate cho ca router.
+// sua chua bang ma, man bao ve, man khoang xe... deu khong can dang nhap).
 router.use('/public', buildPublicRouter());
+// PayOS webhook - khong qua authenticate (xem ghi chu trong payosWebhookRoutes.js).
+router.use('/payos', buildPayosWebhookRouter());
 
 module.exports = router;

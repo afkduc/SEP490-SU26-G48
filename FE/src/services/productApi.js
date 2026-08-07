@@ -49,8 +49,21 @@ export async function updateProductApi(id, payload) {
   return httpClient.put(`/products/${id}`, stripStock(payload));
 }
 
-export async function deleteProductApi(id) {
+/**
+ * Soft-disable phụ tùng (status=inactive). Không hard delete.
+ * BE: DELETE /api/products/:id → deactivate
+ */
+export async function deactivateProductApi(id) {
   return httpClient.delete(`/products/${id}`);
+}
+
+/** @deprecated Dùng deactivateProductApi — giữ alias để tương thích import cũ */
+export async function deleteProductApi(id) {
+  return deactivateProductApi(id);
+}
+
+export async function reactivateProductApi(id) {
+  return httpClient.patch(`/products/${id}/reactivate`);
 }
 
 export async function getCategoriesApi() {
@@ -66,9 +79,29 @@ export async function listUnitsApi() {
 }
 
 /**
+ * So san pham do Nhan vien kho tao ma Quan ly chua xem qua.
+ * BE: GET /api/products/new-count -> { count }
+ */
+export async function getNewProductsCountApi() {
+  return httpClient.get('/products/new-count');
+}
+
+/**
+ * Danh dau 1 san pham la "da xem" boi Quan ly (goi khi di chuot vao dong
+ * san pham moi trong man Kho chi nhanh).
+ * BE: PATCH /api/products/:id/mark-seen
+ */
+export async function markProductSeenApi(id) {
+  return httpClient.patch(`/products/${id}/mark-seen`);
+}
+
+/**
  * Tra cuu phu tung theo tu khoa (dung o trang quyet toan sua chua).
  * BE: GET /api/inventory/products/search?q=...
  */
-export async function searchProductsApi(term) {
-  return httpClient.get(`/inventory/products/search?q=${encodeURIComponent(term)}`);
+export async function searchProductsApi(term, branchId) {
+  const qs = new URLSearchParams();
+  qs.set('q', term);
+  if (branchId) qs.set('branchId', String(branchId));
+  return httpClient.get(`/inventory/products/search?${qs.toString()}`);
 }

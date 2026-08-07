@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 require('./config/env');
 
@@ -10,9 +11,9 @@ const { makeMaintenanceReminderRepository } = require('./infrastructure/reposito
 
 const MAINTENANCE_REMINDER_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 gio/lan
 
-// Tu dong sinh nhac nho bao duong tu next_maintenance_km/date cua phieu quyet
-// toan gan nhat - chay 1 lan luc khoi dong roi lap lai dinh ky, khong lam
-// gian doan server neu loi (chi log).
+// Tu dong sinh 3 moc nhac nho bao duong (1 tuan/1 thang/2 thang tinh tu ngay
+// tao phieu) cho tung phieu quyet toan - chay 1 lan luc khoi dong roi lap lai
+// dinh ky, khong lam gian doan server neu loi (chi log).
 async function syncMaintenanceReminders() {
   try {
     await makeMaintenanceReminderRepository().syncFromServiceOrders();
@@ -27,7 +28,13 @@ const app = express();
 // CORS_ORIGIN: danh sach origin duoc phep, phan cach boi dau phay - cho phep
 // them origin thuc te khi deploy (IP/domain server) ma khong phai sua code,
 // mac dinh giu nguyen 2 origin dev cu neu khong set.
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000')
+const allowedOrigins = (process.env.CORS_ORIGIN || [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  // Vite tự nhảy port khi 3000 bận (vd npm run dev → 3001)
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+].join(','))
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
@@ -46,8 +53,10 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
 };
 app.use(cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Default 100kb qua nho - anh chu ky dien tu (base64 PNG, xem SignaturePad.jsx)
+// thuong lon hon muc nay.
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(logger);
 
 app.use(config.apiPrefix, routes);
@@ -67,12 +76,54 @@ async function start() {
       console.warn('[BE] Failed to start background jobs:', jobErr.message);
     }
 
-    app.listen(config.port, () => {
+    // Dam bao cot thiet bi tin cay
+    try {
+      await require('./infrastructure/repositories/DeviceRepository').ensureTrustedSchema();
+      console.log('[BE] user_devices trusted columns ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureTrustedSchema:', schemaErr.message);
+    }
+
+    try {
+      await require('./infrastructure/database/ensureAuditLogsUnicode').ensureAuditLogsUnicodeColumns();
+      console.log('[BE] audit_logs unicode columns ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureAuditLogsUnicodeColumns:', schemaErr.message);
+    }
+
+    try {
+      await require('./infrastructure/database/ensureInventoryRequestUnicode').ensureInventoryRequestUnicode();
+      console.log('[BE] inventory request unit columns ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureInventoryRequestUnicode:', schemaErr.message);
+    }
+
+    try {
+      await require('./infrastructure/database/ensureRepairOrderTasksColumns').ensureRepairOrderTasksColumns();
+      console.log('[BE] repair_order_tasks/service_order_items note+prev_quantity columns ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureRepairOrderTasksColumns:', schemaErr.message);
+    }
+
+    try {
+      await require('./infrastructure/database/ensureInvoicePaymentMethod').ensureInvoicePaymentMethod();
+      console.log('[BE] invoices.payment_method column ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureInvoicePaymentMethod:', schemaErr.message);
+    }
+
+    const server = http.createServer({ maxHeaderSize: 32768 }, app);
+    server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);
     });
 
+    // Keep timeouts reasonable for dev/prod
+    server.headersTimeout = 60000;
+    server.requestTimeout = 60000;
+
     syncMaintenanceReminders();
     setInterval(syncMaintenanceReminders, MAINTENANCE_REMINDER_SYNC_INTERVAL_MS);
+
   } catch (err) {
     console.error('Failed to start server:', err.message);
     process.exit(1);
@@ -80,3 +131,6 @@ async function start() {
 }
 
 start();
+
+
+

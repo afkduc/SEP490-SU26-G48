@@ -1,0 +1,321 @@
+/* Man hinh khoang xe - kiosk cham gan tuong tai tung khoang, khong dang nhap.
+   Port tu FE/src/pages/repairorder/TeamLeaderKiosk.css, doi sang bo bien mau
+   cua Landing (bg, surface, border, text, text-muted, accent, success) thay
+   vi cac bien gray/primary chi co o FE React app. Cac class "tien ich"
+   (btn, modal, form-input) truoc day dung chung tu global.css cua FE nay
+   duoc dinh nghia rieng trong module nay vi Landing khong co san. */
+
+/* ─── Tien ich dung chung (btn/modal/form) ─── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btnPrimary { background: var(--accent); color: #fff; }
+.btnSecondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btnSm { padding: 6px 12px; font-size: 13px; }
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 16, 12, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modalSm { max-width: 420px; }
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.modalTitle { font-size: 17px; font-weight: 700; }
+.modalBody { padding: 22px; }
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--border);
+}
+
+.formInput {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 15px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+.formHint { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+
+/* ─── Man chinh ─── */
+.center {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  text-align: center;
+}
+
+.title { font-size: 32px; margin: 0; }
+
+.leaderName { font-size: 22px; font-weight: 800; color: var(--accent); }
+
+.error {
+  background: #fdecea;
+  border: 1px solid #f3c1bb;
+  color: var(--accent);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.errorCancelled {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-weight: 600;
+}
+
+.empty { font-size: 16px; color: var(--text-muted); padding: 20px; }
+
+/* Luoi khoang (dung o man /khoang/[branch]) */
+.bayGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.bayTile {
+  padding: 32px 16px;
+  border-radius: 18px;
+  border: 3px solid var(--accent);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.bayTile:active { transform: scale(0.97); }
+
+.bayTileBusy {
+  border-color: var(--border);
+  background: var(--bg-alt);
+  color: var(--text-muted);
+}
+
+.bayTileNumber { font-size: 26px; font-weight: 800; }
+.bayTileStatus { font-size: 14px; font-weight: 500; }
+.bayTileLeader { font-size: 13px; color: var(--text-muted); }
+
+/* Man lam viec chinh cua 1 khoang */
+.board {
+  min-height: 100vh;
+  padding: 20px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.boardTopbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.boardBayLabel { font-size: 40px; font-weight: 800; color: var(--accent); }
+.boardTabs { display: flex; gap: 8px; margin-left: auto; }
+
+.tab {
+  padding: 10px 20px;
+  border-radius: 20px;
+  border: 2px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tabActive { border-color: var(--accent-2); background: var(--accent-2); color: #fff; }
+
+.pendingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.pendingCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 2px 10px rgba(33, 29, 26, 0.06);
+}
+
+.pendingCardHeader { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pendingCardDate { font-size: 12px; color: var(--text-muted); }
+.pendingCardRequest {
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-alt);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 4px;
+}
+.pendingCardRequestLabel { font-weight: 700; color: var(--text-muted); }
+.pendingCardFooter { display: flex; justify-content: flex-end; margin-top: 10px; }
+.pendingCardFooter .btn { font-size: 15px; padding: 10px 22px; }
+.pendingRowTaken { font-size: 14px; font-weight: 700; color: var(--text-muted); font-style: italic; }
+
+.job {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  max-width: 640px;
+}
+.jobHeader { margin-bottom: 12px; }
+.jobCustomer { font-weight: 700; font-size: 17px; margin-top: 2px; }
+.jobVehicle { font-size: 13px; color: var(--text-muted); }
+.jobTechnician { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+.techChips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.techChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 14px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 14px;
+}
+.techChipPhone { color: var(--text-muted); font-weight: 500; }
+.techChipOtherTeam { color: var(--accent-2); font-weight: 600; font-size: 13px; }
+.techChipRemove {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px;
+  line-height: 1;
+}
+
+.techSuggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: var(--surface);
+  border: 1px solid var(--accent-2);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+.techSuggestionsItem { padding: 12px 14px; cursor: pointer; font-size: 15px; border-bottom: 1px solid var(--bg-alt); }
+.techSuggestionsItem:hover { background: var(--bg-alt); }
+.techSuggestionsItemBusy { cursor: not-allowed; color: var(--text-muted); background: var(--bg-alt); }
+.techSuggestionsItemBusy:hover { background: var(--bg-alt); }
+.techSuggestionsPhone { color: var(--text-muted); }
+.techSuggestionsOtherTeam { color: var(--accent-2); font-weight: 600; font-size: 13px; }
+.techSuggestionsBusy { color: var(--accent); font-weight: 600; font-size: 13px; }
+
+.jobNotes { background: var(--bg-alt); border-radius: 8px; padding: 10px 14px; font-size: 14px; margin-bottom: 14px; }
+.jobSectionTitle { font-size: 14px; font-weight: 700; color: var(--text); margin: 14px 0 8px; }
+.jobTasklist { display: flex; flex-direction: column; gap: 8px; }
+
+.task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-alt);
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.task input { width: 22px; height: 22px; accent-color: var(--success); flex-shrink: 0; }
+.taskDone { background: #e6f4ea; color: var(--success); }
+/* text-decoration KHONG dat o day - de rieng cho span ten trong TaskNameLabel
+   (BayScreen.jsx), tranh gach ngang lan qua ca phan "(Khách hủy)". */
+.taskCancelled { color: var(--text-muted); }
+
+/* Bao ten dau muc + "xN" (neu so luong > 1) tren 1 dong, ghi chu (neu co)
+   xuong dong duoi - dung chung cho ca dau muc dich vu (.task) lan phu tung
+   (.partRow), xem BayScreen.jsx. */
+.taskBody { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.taskNameRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.taskNote { font-size: 12px; color: var(--text-muted); font-style: italic; }
+
+.jobPartlist { display: flex; flex-direction: column; gap: 6px; }
+.partRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-alt);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+.partRowQty { color: var(--text-muted); flex-shrink: 0; }
+
+.jobComplete { width: 100%; justify-content: center; margin-top: 18px; font-size: 17px; padding: 14px; }
+
+.history { max-width: 640px; }
+.historyFilter { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.historyFilter input[type="date"] { max-width: 200px; }
+
+.historyRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-bottom: 10px;
+}
+.historyRowDate { font-size: 13px; color: var(--text-muted); }

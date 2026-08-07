@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
-import { formatCurrency, formatDate } from '../../utils';
+import { usePermission } from '../../contexts/PermissionContext';
+import { formatCurrency, formatDate, formatDateTime } from '../../utils';
 import managerApi from '../../services/managerApi';
+import { PermissionGate } from '../../components/PermissionGate';
 import ManagerImportRequestListPage from './ManagerImportRequestListPage';
 import ManagerImportRequestDetailPage from './ManagerImportRequestDetailPage';
 import ManagerExportRequestListPage from './ManagerExportRequestListPage';
 import ManagerExportRequestDetailPage from './ManagerExportRequestDetailPage';
+import ManagerDashboardPage from './ManagerDashboardPage';
+import ManagerInventoryPage from './ManagerInventoryPage';
 
 const SERVICE_STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -21,11 +25,11 @@ function activeBadge(isActive) {
 }
 
 const SETTLEMENT_STATUS_TABS = [
-  { value: 'all', label: 'Tất cả' },
   { value: 'waiting_repair', label: 'Chờ sửa chữa' },
   { value: 'inprogress', label: 'Đang sửa chữa' },
   { value: 'waiting_payment', label: 'Chờ thanh toán' },
   { value: 'invoiced', label: 'Đã xuất hóa đơn' },
+  { value: 'cancelled', label: 'Đã hủy' },
 ];
 
 const SETTLEMENT_STATUS_META = {
@@ -33,10 +37,84 @@ const SETTLEMENT_STATUS_META = {
   inprogress: { label: 'Đang sửa chữa', color: '#1565C0', background: '#E3F2FD' },
   waiting_payment: { label: 'Chờ thanh toán', color: '#2E7D32', background: '#E8F5E9' },
   invoiced: { label: 'Đã xuất hóa đơn', color: '#424242', background: '#F5F5F5' },
+  cancelled: { label: 'Đã hủy', color: '#B91C1C', background: '#FEF2F2' },
 };
 
 function settlementStatusBadge(status) {
   return SETTLEMENT_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
+}
+
+// Ngoai "Ngay tiep nhan" (luon loc duoc o moi tab tru "Tat ca"), moi tab con
+// co the loc them theo 1 moc thoi gian rieng phan anh dung y nghia cua tab do -
+// "Cho sua chua"/"Dang sua chua" chi co ngay tiep nhan nen khong co field thu 2.
+const SETTLEMENT_SECONDARY_DATE_FIELD_BY_TAB = {
+  waiting_payment: { key: 'completedDate', label: 'Ngày hoàn thành' },
+  invoiced: { key: 'paidAt', label: 'Ngày xuất hóa đơn' },
+  cancelled: { key: 'cancelledAt', label: 'Ngày hủy' },
+};
+
+// day/month/year rong ('') = khong loc theo phan do (vd chi chon Thang + Nam
+// -> loc theo ca thang, khong can biet dung ngay nao).
+function settlementDateMatches(value, day, month, year) {
+  if (!day && !month && !year) return true;
+  if (!value) return false;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return false;
+  if (day && d.getDate() !== Number(day)) return false;
+  if (month && d.getMonth() + 1 !== Number(month)) return false;
+  if (year && d.getFullYear() !== Number(year)) return false;
+  return true;
+}
+
+// Luon hien co dinh 5 nam gan nhat (nam hien tai va 4 nam truoc do), khong
+// phu thuoc du lieu dang tai co hay khong - de nguoi dung luon chon duoc nam
+// truoc do de tim, kho phai vi chua co ban ghi nao trong nam do ma dropdown
+// bi thieu lua chon.
+function settlementRecentYears() {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, i) => currentYear - i);
+}
+
+// 3 dropdown Ngay/Thang/Nam dung chung cho 1 moc thoi gian.
+// minDay/minMonth/minYear (tuy chon): "moc toi thieu" - dung cho cac moc
+// Ngay hoan thanh/Ngay xuat hoa don/Ngay huy vi ve logic chung KHONG THE som
+// hon Ngay tiep nhan da chon o filter ben canh - an bot lua chon nam/thang/
+// ngay som hon moc do de nguoi dung khong the lam ra 1 bo loc vo ly (khong
+// bao gio co ket qua).
+function DateDropdownFilter({ label, day, month, year, years, onDayChange, onMonthChange, onYearChange, minDay, minMonth, minYear }) {
+  const yearOptions = minYear ? years.filter((y) => y >= Number(minYear)) : years;
+  const sameYearAsMin = !!(minYear && year && Number(year) === Number(minYear));
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1)
+    .filter((m) => !(sameYearAsMin && minMonth) || m >= Number(minMonth));
+  const sameMonthAsMin = sameYearAsMin && !!(minMonth && month && Number(month) === Number(minMonth));
+  const dayOptions = Array.from({ length: 31 }, (_, i) => i + 1)
+    .filter((d) => !(sameMonthAsMin && minDay) || d >= Number(minDay));
+
+  return (
+    <div className="form-group" style={{ marginBottom: 0 }}>
+      <label className="form-label" style={{ fontSize: 11 }}>{label}</label>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <select className="form-select" value={day} onChange={(e) => onDayChange(e.target.value)} style={{ minWidth: 80 }}>
+          <option value="">Ngày</option>
+          {dayOptions.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <select className="form-select" value={month} onChange={(e) => onMonthChange(e.target.value)} style={{ minWidth: 90 }}>
+          <option value="">Tháng</option>
+          {monthOptions.map((m) => (
+            <option key={m} value={m}>Tháng {m}</option>
+          ))}
+        </select>
+        <select className="form-select" value={year} onChange={(e) => onYearChange(e.target.value)} style={{ minWidth: 90 }}>
+          <option value="">Năm</option>
+          {yearOptions.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
 }
 
 function DetailRow({ label, value }) {
@@ -76,6 +154,9 @@ const AVATAR_COLORS = ['#2563EB', '#059669', '#D97706', '#DB2777', '#7C3AED', '#
 const PAGE_SIZE = 10;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^0[0-9]{9,10}$/;
+// Email nhan vien moi luon thuoc domain cong ty - chi cho nhap phan ten,
+// duoi @autogara.com duoc tu dong gan vao khi tao moi.
+const EMPLOYEE_EMAIL_DOMAIN = '@autogara.com';
 
 function statusBadge(status) {
   return STATUS_BADGE[status] || { label: status || 'Không rõ', className: 'badge-inactive' };
@@ -141,20 +222,23 @@ function EmployeeAvatar({ employee }) {
 function EmployeeDetailModal({ employee, onClose }) {
   const [members, setMembers] = useState(null);
   const [specialties, setSpecialties] = useState(null);
+  const [bays, setBays] = useState(null);
   const isTeamLeader = employee?.roles?.includes('team_leader');
 
   useEffect(() => {
-    if (!employee?.id || !isTeamLeader) { setMembers(null); setSpecialties(null); return undefined; }
+    if (!employee?.id || !isTeamLeader) { setMembers(null); setSpecialties(null); setBays(null); return undefined; }
     let mounted = true;
     setMembers(null);
     setSpecialties(null);
+    setBays(null);
     managerApi.getEmployeeById(employee.id)
       .then((data) => {
         if (!mounted) return;
         setMembers(data?.members || []);
         setSpecialties(data?.specialties || []);
+        setBays(data?.bays || []);
       })
-      .catch(() => { if (mounted) { setMembers([]); setSpecialties([]); } });
+      .catch(() => { if (mounted) { setMembers([]); setSpecialties([]); setBays([]); } });
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee?.id, isTeamLeader]);
@@ -227,6 +311,17 @@ function EmployeeDetailModal({ employee, onClose }) {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              <div style={{ fontWeight: 700, margin: '16px 0 8px', fontSize: 13, color: 'var(--gray-700)' }}>
+                Khoang xe phụ trách ({(bays || []).length})
+              </div>
+              {bays === null && <p className="form-hint">Đang tải…</p>}
+              {bays && bays.length === 0 && <p className="form-hint">Chưa phụ trách khoang xe nào.</p>}
+              {bays && bays.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {bays.map((n) => <span key={n} className="tag">Khoang {n}</span>)}
                 </div>
               )}
             </>
@@ -306,12 +401,16 @@ function EmployeeListPage() {
           <div className="breadcrumb">Trang chủ / Nhân viên</div>
         </div>
         <div className="page-header-right">
-          <button type="button" className="btn btn-secondary" onClick={() => exportEmployeesCsv(employees)}>
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/employees/create')}>
-            + Thêm nhân viên
-          </button>
+          <PermissionGate permission="screen:manager:employees:view">
+            <button type="button" className="btn btn-secondary" onClick={() => exportEmployeesCsv(employees)}>
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="screen:manager:employees:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/employees/create')}>
+              + Thêm nhân viên
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -403,8 +502,12 @@ function EmployeeListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="screen:manager:employees:view">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="screen:manager:employees:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -440,6 +543,10 @@ function EmployeeFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:employees:update')
+    : can('screen:manager:employees:create');
 
   const [branch, setBranch] = useState(null);
   const [roles, setRoles] = useState([]);
@@ -451,6 +558,19 @@ function EmployeeFormPage({ mode }) {
   const [loading, setLoading] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // Chi hien o che do sua: mac dinh khong doi mat khau, tich vao moi hien o
+  // nhap mat khau moi - tranh bat buoc phai nhap lai moi lan chinh sua thong
+  // tin khac cua nhan vien.
+  const [changePassword, setChangePassword] = useState(false);
+
+  // To truong quan ly 1 doi tho (users.team_leader_id) + phu trach vai khoang
+  // xe (bang vehicle_bays) - chi co y nghia khi da co san mot to truong (che
+  // do sua), vi API set 2 thu nay can id cua chinh to truong.
+  const [members, setMembers] = useState([]);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberSuggestions, setMemberSuggestions] = useState([]);
+  const [bayNumbers, setBayNumbers] = useState([]);
+  const [bayNumberInput, setBayNumberInput] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -473,6 +593,8 @@ function EmployeeFormPage({ mode }) {
             confirmPassword: '',
             specialtyIds: (data.specialties || []).map((s) => s.id),
           });
+          setMembers(data.members || []);
+          setBayNumbers(data.bays || []);
         })
         .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin nhân viên'); })
         .finally(() => { if (mounted) setLoading(false); });
@@ -500,6 +622,44 @@ function EmployeeFormPage({ mode }) {
     });
   };
 
+  // Go ten tim tho may de them vao doi - loc san nhung nguoi da co trong
+  // danh sach members hien tai, khong can bam chon xong roi lai loc tay.
+  useEffect(() => {
+    if (!isEdit || !isTeamLeaderRole || !memberSearch.trim()) { setMemberSuggestions([]); return undefined; }
+    let alive = true;
+    const timer = setTimeout(() => {
+      managerApi.getTechnicians({ search: memberSearch.trim(), status: 'active' })
+        .then((data) => {
+          if (!alive) return;
+          const memberIds = new Set(members.map((m) => m.id));
+          setMemberSuggestions((data || []).filter((t) => !memberIds.has(t.id)));
+        })
+        .catch(() => { if (alive) setMemberSuggestions([]); });
+    }, 300);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [memberSearch, isEdit, isTeamLeaderRole, members]);
+
+  const addMember = (technician) => {
+    setMembers((prev) => (prev.some((m) => m.id === technician.id) ? prev : [...prev, { id: technician.id, employeeId: technician.employeeId, fullName: technician.fullName }]));
+    setMemberSearch('');
+    setMemberSuggestions([]);
+  };
+
+  const removeMember = (memberId) => {
+    setMembers((prev) => prev.filter((m) => m.id !== memberId));
+  };
+
+  const addBayNumber = () => {
+    const n = Number(bayNumberInput);
+    if (!Number.isInteger(n) || n <= 0) return;
+    setBayNumbers((prev) => (prev.includes(n) ? prev : [...prev, n].sort((a, b) => a - b)));
+    setBayNumberInput('');
+  };
+
+  const removeBayNumber = (n) => {
+    setBayNumbers((prev) => prev.filter((x) => x !== n));
+  };
+
   const validate = () => {
     const errors = {};
     if (!form.fullName.trim()) errors.fullName = 'Vui lòng nhập họ và tên';
@@ -508,8 +668,8 @@ function EmployeeFormPage({ mode }) {
     if (!form.phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại';
     else if (!PHONE_REGEX.test(form.phone.trim())) errors.phone = 'Số điện thoại không hợp lệ';
     if (!form.roleId) errors.roleId = 'Vui lòng chọn vai trò';
-    if (!isEdit) {
-      if (!form.password) errors.password = 'Vui lòng nhập mật khẩu tạm thời';
+    if (!isEdit || changePassword) {
+      if (!form.password) errors.password = 'Vui lòng nhập mật khẩu';
       else if (form.password.length < 8) errors.password = 'Mật khẩu tối thiểu 8 ký tự';
       if (form.confirmPassword !== form.password) errors.confirmPassword = 'Xác nhận mật khẩu không khớp';
     }
@@ -521,6 +681,12 @@ function EmployeeFormPage({ mode }) {
     event.preventDefault();
     setError('');
     if (!validate()) return;
+    // To truong luon phai phu trach it nhat 3 khoang de doi cua ho co du cho
+    // hoat dong - trung voi rang buoc o BE (ManagerService.setBayNumbers).
+    if (isEdit && isTeamLeaderRole && bayNumbers.length < 3) {
+      setError('Mỗi tổ trưởng phải phụ trách tối thiểu 3 khoang xe.');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -534,7 +700,15 @@ function EmployeeFormPage({ mode }) {
       };
 
       if (isEdit) {
+        if (changePassword) {
+          payload.password = form.password;
+          payload.confirmPassword = form.confirmPassword;
+        }
         await managerApi.updateEmployee(id, payload);
+        if (isTeamLeaderRole) {
+          await managerApi.setEmployeeTeamMembers(id, members.map((m) => m.id));
+          await managerApi.setEmployeeBays(id, bayNumbers);
+        }
         navigate('/manager/employees');
       } else {
         await managerApi.createEmployee({ ...payload, password: form.password, confirmPassword: form.confirmPassword });
@@ -546,6 +720,10 @@ function EmployeeFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/employees" replace />;
+  }
 
   if (loading) {
     return (
@@ -591,7 +769,31 @@ function EmployeeFormPage({ mode }) {
 
             <div className="form-group">
               <label className="form-label required">Email</label>
-              <input className="form-input" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="email@autogara.vn" />
+              {isEdit ? (
+                <input className="form-input" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="email@autogara.com" />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                  <input
+                    className="form-input"
+                    style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+                    value={form.email.split('@')[0]}
+                    onChange={(e) => {
+                      const local = e.target.value.split('@')[0];
+                      setField('email', local ? `${local}${EMPLOYEE_EMAIL_DOMAIN}` : '');
+                    }}
+                    placeholder="nguyenvana"
+                  />
+                  <span
+                    style={{
+                      display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 14, color: 'var(--gray-600, #4b5563)',
+                      background: 'var(--gray-100, #f3f4f6)', border: '1px solid var(--gray-300, #d1d5db)', borderLeft: 'none',
+                      borderTopRightRadius: 'var(--radius-sm, 6px)', borderBottomRightRadius: 'var(--radius-sm, 6px)', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {EMPLOYEE_EMAIL_DOMAIN}
+                  </span>
+                </div>
+              )}
               {fieldErrors.email && <span className="form-error">{fieldErrors.email}</span>}
             </div>
 
@@ -644,6 +846,74 @@ function EmployeeFormPage({ mode }) {
             </div>
           )}
 
+          {isTeamLeaderRole && isEdit && (
+            <div className="form-group" style={{ marginTop: 14, position: 'relative' }}>
+              <label className="form-label">Thành viên đội</label>
+              <input
+                className="form-input"
+                placeholder="Gõ tên thợ máy để tìm và thêm..."
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+              />
+              {memberSuggestions.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', maxHeight: 220, overflowY: 'auto' }}>
+                  {memberSuggestions.map((t) => (
+                    <div key={t.id} onMouseDown={() => addMember(t)}
+                      style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--gray-100)' }}>
+                      <b>{t.fullName}</b> <span style={{ color: 'var(--gray-500)' }}>({t.employeeId})</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {members.length === 0 ? (
+                <p className="form-hint">Chưa có thợ máy nào trong đội.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                  {members.map((m) => (
+                    <span key={m.id} className="tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      {m.fullName}
+                      <button type="button" onClick={() => removeMember(m.id)}
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--gray-500)', padding: 0 }}>✕</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isTeamLeaderRole && isEdit && (
+            <div className="form-group" style={{ marginTop: 14 }}>
+              <label className="form-label">Khoang xe phụ trách</label>
+              <p className="form-hint" style={{ marginTop: 0 }}>Mỗi tổ trưởng phải phụ trách tối thiểu 3 khoang xe.</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="form-input"
+                  style={{ maxWidth: 160 }}
+                  type="number"
+                  min={1}
+                  placeholder="Số khoang"
+                  value={bayNumberInput}
+                  onChange={(e) => setBayNumberInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBayNumber(); } }}
+                />
+                <button type="button" className="btn btn-secondary" onClick={addBayNumber}>+ Thêm khoang</button>
+              </div>
+              {bayNumbers.length === 0 ? (
+                <p className="form-hint">Chưa phụ trách khoang xe nào.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                  {bayNumbers.map((n) => (
+                    <span key={n} className="tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      Khoang {n}
+                      <button type="button" onClick={() => removeBayNumber(n)}
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--gray-500)', padding: 0 }}>✕</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {!isEdit && (
             <>
               <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Thông tin đăng nhập</div>
@@ -659,7 +929,42 @@ function EmployeeFormPage({ mode }) {
                   {fieldErrors.confirmPassword && <span className="form-error">{fieldErrors.confirmPassword}</span>}
                 </div>
               </div>
-              <p className="form-hint" style={{ marginTop: 8 }}>Nhân viên sẽ đổi mật khẩu lần đầu đăng nhập.</p>
+              <p className="form-hint" style={{ marginTop: 8 }}>Hãy gửi mật khẩu cho nhân viên qua kênh an toàn.</p>
+            </>
+          )}
+
+          {isEdit && (
+            <>
+              <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Mật khẩu</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={changePassword}
+                  onChange={(e) => {
+                    setChangePassword(e.target.checked);
+                    if (!e.target.checked) {
+                      setField('password', '');
+                      setField('confirmPassword', '');
+                    }
+                  }}
+                />
+                <span>Đặt lại mật khẩu mới cho nhân viên này</span>
+              </label>
+
+              {changePassword && (
+                <div className="form-grid form-grid-2" style={{ marginTop: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label required">Mật khẩu mới</label>
+                    <input type="password" className="form-input" value={form.password} onChange={(e) => setField('password', e.target.value)} placeholder="Tối thiểu 8 ký tự" autoFocus />
+                    {fieldErrors.password && <span className="form-error">{fieldErrors.password}</span>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label required">Xác nhận mật khẩu mới</label>
+                    <input type="password" className="form-input" value={form.confirmPassword} onChange={(e) => setField('confirmPassword', e.target.value)} placeholder="Nhập lại mật khẩu mới" />
+                    {fieldErrors.confirmPassword && <span className="form-error">{fieldErrors.confirmPassword}</span>}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -704,7 +1009,7 @@ function ServiceDetailModal({ service, onClose }) {
           </div>
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
             <div className="detail-row"><div className="detail-label">Mã dịch vụ</div><div className="detail-value">{service.code}</div></div>
-            <div className="detail-row"><div className="detail-label">Danh mục</div><div className="detail-value">{service.categoryName || '—'}</div></div>
+            <div className="detail-row"><div className="detail-label">Loại hình sửa chữa</div><div className="detail-value">{repairCategoryLabel(service.repairCategory)}</div></div>
             <div className="detail-row"><div className="detail-label">Đơn giá</div><div className="detail-value">{formatCurrency(service.unitPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Thời gian thực hiện</div><div className="detail-value">{service.durationMin ? `${service.durationMin} phút` : '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{service.description || '—'}</div></div>
@@ -744,9 +1049,8 @@ function ServiceDetailModal({ service, onClose }) {
 function ServiceListPage() {
   const navigate = useNavigate();
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
-  const [categoryId, setCategoryId] = useState('all');
+  const [repairCategory, setRepairCategory] = useState('all');
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -755,18 +1059,12 @@ function ServiceListPage() {
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
-  useEffect(() => {
-    let mounted = true;
-    managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
-    return () => { mounted = false; };
-  }, []);
-
   const reload = () => {
     const seq = ++requestSeq.current;
     setLoading(true);
     setError('');
     managerApi
-      .getServices({ search: search.trim(), categoryId, status })
+      .getServices({ search: search.trim(), repairCategory, status })
       .then((data) => {
         if (seq !== requestSeq.current) return;
         setServices(data || []);
@@ -787,11 +1085,11 @@ function ServiceListPage() {
     searchTimer.current = setTimeout(reload, 300);
     return () => clearTimeout(searchTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, categoryId, status]);
+  }, [search, repairCategory, status]);
 
   const clearFilters = () => {
     setSearch('');
-    setCategoryId('all');
+    setRepairCategory('all');
     setStatus('all');
   };
 
@@ -806,20 +1104,24 @@ function ServiceListPage() {
           <div className="breadcrumb">Trang chủ / Dịch vụ lẻ</div>
         </div>
         <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-dich-vu.csv',
-              ['Mã DV', 'Tên dịch vụ', 'Danh mục', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
-              services.map((s) => [s.code, s.name, s.categoryName, s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/services/create')}>
-            + Thêm dịch vụ
-          </button>
+          <PermissionGate permission="screen:manager:services:view">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCsv(
+                'danh-sach-dich-vu.csv',
+                ['Mã DV', 'Tên dịch vụ', 'Loại hình sửa chữa', 'Đơn giá', 'Thời gian (phút)', 'Trạng thái'],
+                services.map((s) => [s.code, s.name, repairCategoryLabel(s.repairCategory), s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
+              )}
+            >
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="screen:manager:services:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/services/create')}>
+              + Thêm dịch vụ
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -829,10 +1131,10 @@ function ServiceListPage() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã DV, tên dịch vụ..." />
         </div>
 
-        <select className="filter-select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="all">Tất cả danh mục</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+        <select className="filter-select" value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)}>
+          <option value="all">Tất cả loại hình sửa chữa</option>
+          {REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
 
@@ -864,7 +1166,7 @@ function ServiceListPage() {
             <tr>
               <th>Mã DV</th>
               <th>Tên dịch vụ</th>
-              <th>Danh mục</th>
+              <th>Loại hình sửa chữa</th>
               <th>Đơn giá</th>
               <th>Thời gian</th>
               <th>Trạng thái</th>
@@ -897,14 +1199,18 @@ function ServiceListPage() {
                 <tr key={service.id}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{service.code}</td>
                   <td style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{service.name}</td>
-                  <td>{service.categoryName || '—'}</td>
+                  <td>{repairCategoryLabel(service.repairCategory)}</td>
                   <td>{formatCurrency(service.unitPrice)}</td>
                   <td>{service.durationMin ? `${service.durationMin} phút` : '—'}</td>
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="screen:manager:services:view">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="screen:manager:services:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -937,22 +1243,29 @@ function ServiceListPage() {
 const REPAIR_CATEGORY_OPTIONS = [
   { value: '', label: '' },
   { value: 'ER', label: 'Sửa chữa động cơ' },
-  { value: 'CB', label: 'Sửa chữa gầm - phanh' },
+  { value: 'CB', label: 'Sửa chữa gầm' },
   { value: 'EE', label: 'Sửa chữa điện - điện tử' },
   { value: 'BP', label: 'Đồng sơn' },
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
 ];
 
+function repairCategoryLabel(code) {
+  return REPAIR_CATEGORY_OPTIONS.find((o) => o.value === code)?.label || '—';
+}
+
 function ServiceFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:services:update')
+    : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
-  const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
-    serviceName: '', categoryId: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
+    serviceName: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
   });
   const [parts, setParts] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -964,7 +1277,6 @@ function ServiceFormPage({ mode }) {
   useEffect(() => {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
-    managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
     managerApi.getProducts().then((data) => { if (mounted) setProducts(data || []); }).catch(() => {});
 
     if (isEdit && id) {
@@ -974,7 +1286,6 @@ function ServiceFormPage({ mode }) {
           if (!mounted || !data) return;
           setForm({
             serviceName: data.name || '',
-            categoryId: data.categoryId ? String(data.categoryId) : '',
             unitPrice: data.unitPrice ?? '',
             durationMin: data.durationMin ?? '',
             description: data.description || '',
@@ -1005,7 +1316,6 @@ function ServiceFormPage({ mode }) {
   const validate = () => {
     const errors = {};
     if (!form.serviceName.trim()) errors.serviceName = 'Vui lòng nhập tên dịch vụ';
-    if (!form.categoryId) errors.categoryId = 'Vui lòng chọn danh mục';
     if (form.unitPrice === '' || Number.isNaN(Number(form.unitPrice)) || Number(form.unitPrice) < 0) {
       errors.unitPrice = 'Đơn giá không hợp lệ';
     }
@@ -1033,7 +1343,6 @@ function ServiceFormPage({ mode }) {
     try {
       const payload = {
         serviceName: form.serviceName.trim(),
-        categoryId: Number(form.categoryId),
         unitPrice: Number(form.unitPrice),
         durationMin: form.durationMin === '' ? null : Number(form.durationMin),
         description: form.description.trim(),
@@ -1062,6 +1371,10 @@ function ServiceFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/services" replace />;
+  }
 
   if (loading) {
     return (
@@ -1140,17 +1453,6 @@ function ServiceFormPage({ mode }) {
               <label className="form-label required">Tên dịch vụ</label>
               <input className="form-input" value={form.serviceName} onChange={(e) => setField('serviceName', e.target.value)} placeholder="Nhập tên dịch vụ" />
               {fieldErrors.serviceName && <span className="form-error">{fieldErrors.serviceName}</span>}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label required">Danh mục</label>
-              <select className="form-select" value={form.categoryId} onChange={(e) => setField('categoryId', e.target.value)}>
-                <option value="">-- Chọn danh mục --</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {fieldErrors.categoryId && <span className="form-error">{fieldErrors.categoryId}</span>}
             </div>
 
             <div className="form-group">
@@ -1262,10 +1564,10 @@ function ServicePackageDetailModal({ pkg, onClose }) {
           </div>
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 16 }}>
             <div className="detail-row"><div className="detail-label">Mã gói</div><div className="detail-value">{pkg.code}</div></div>
-            <div className="detail-row"><div className="detail-label">Danh mục</div><div className="detail-value">{pkg.categoryName || '—'}</div></div>
-            <div className="detail-row"><div className="detail-label">Mốc km áp dụng</div><div className="detail-value">{pkg.applicableKm ? `${pkg.applicableKm} km` : '—'}</div></div>
+            <div className="detail-row"><div className="detail-label">Loại hình sửa chữa</div><div className="detail-value">{repairCategoryLabel(pkg.repairCategory)}</div></div>
             <div className="detail-row"><div className="detail-label">Giá gói</div><div className="detail-value">{formatCurrency(pkg.totalPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{pkg.description || '—'}</div></div>
+            <div className="detail-row"><div className="detail-label">Giải thích chi tiết</div><div className="detail-value">{pkg.purpose || '—'}</div></div>
           </div>
           <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13, color: 'var(--gray-700)' }}>
             Dịch vụ trong gói ({(pkg.services || []).length})
@@ -1301,6 +1603,7 @@ function ServicePackageListPage() {
   const navigate = useNavigate();
   const [packages, setPackages] = useState([]);
   const [search, setSearch] = useState('');
+  const [repairCategory, setRepairCategory] = useState('all');
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1315,7 +1618,7 @@ function ServicePackageListPage() {
     setLoading(true);
     setError('');
     managerApi
-      .getServicePackages({ search: search.trim(), status })
+      .getServicePackages({ search: search.trim(), repairCategory, status })
       .then((data) => {
         if (seq !== requestSeq.current) return;
         setPackages(data || []);
@@ -1336,10 +1639,11 @@ function ServicePackageListPage() {
     searchTimer.current = setTimeout(reload, 300);
     return () => clearTimeout(searchTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status]);
+  }, [search, repairCategory, status]);
 
   const clearFilters = () => {
     setSearch('');
+    setRepairCategory('all');
     setStatus('all');
   };
 
@@ -1363,20 +1667,24 @@ function ServicePackageListPage() {
           <div className="breadcrumb">Trang chủ / Gói dịch vụ</div>
         </div>
         <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-goi-dich-vu.csv',
-              ['Mã gói', 'Tên gói', 'Danh mục', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
-              packages.map((p) => [p.code, p.name, p.categoryName, p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/service-packages/create')}>
-            + Thêm gói dịch vụ
-          </button>
+          <PermissionGate permission="screen:manager:services:view">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCsv(
+                'danh-sach-goi-dich-vu.csv',
+                ['Mã gói', 'Tên gói', 'Loại hình sửa chữa', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
+                packages.map((p) => [p.code, p.name, repairCategoryLabel(p.repairCategory), p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
+              )}
+            >
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="screen:manager:services:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/service-packages/create')}>
+              + Thêm gói dịch vụ
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -1385,6 +1693,13 @@ function ServicePackageListPage() {
           <span className="search-icon">🔍</span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã gói, tên gói..." />
         </div>
+
+        <select className="filter-select" value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)}>
+          <option value="all">Tất cả loại hình sửa chữa</option>
+          {REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
 
         <select className="filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
           {SERVICE_STATUS_OPTIONS.map((option) => (
@@ -1414,7 +1729,7 @@ function ServicePackageListPage() {
             <tr>
               <th>Mã gói</th>
               <th>Tên gói</th>
-              <th>Danh mục</th>
+              <th>Loại hình sửa chữa</th>
               <th>Số dịch vụ</th>
               <th>Giá gói</th>
               <th>Trạng thái</th>
@@ -1447,14 +1762,18 @@ function ServicePackageListPage() {
                 <tr key={pkg.id}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{pkg.code}</td>
                   <td style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{pkg.name}</td>
-                  <td>{pkg.categoryName || '—'}</td>
+                  <td>{repairCategoryLabel(pkg.repairCategory)}</td>
                   <td>{pkg.itemCount}</td>
                   <td>{formatCurrency(pkg.totalPrice)}</td>
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="screen:manager:services:view">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="screen:manager:services:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -1484,13 +1803,16 @@ function ServicePackageFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:services:update')
+    : can('screen:manager:services:create');
 
   const [branch, setBranch] = useState(null);
-  const [categories, setCategories] = useState([]);
   const [availableServices, setAvailableServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [form, setForm] = useState({
-    packageName: '', categoryId: '', applicableKm: '', totalPrice: '', description: '', isActive: true, repairCategory: '', serviceIds: [],
+    packageName: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [],
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1500,7 +1822,6 @@ function ServicePackageFormPage({ mode }) {
   useEffect(() => {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
-    managerApi.getServiceCategories().then((data) => { if (mounted) setCategories(data || []); }).catch(() => {});
     managerApi.getServices({ status: 'all' }).then((data) => { if (mounted) setAvailableServices(data || []); }).catch(() => {});
 
     if (isEdit && id) {
@@ -1510,10 +1831,9 @@ function ServicePackageFormPage({ mode }) {
           if (!mounted || !data) return;
           setForm({
             packageName: data.name || '',
-            categoryId: data.categoryId ? String(data.categoryId) : '',
-            applicableKm: data.applicableKm ?? '',
             totalPrice: data.totalPrice ?? '',
             description: data.description || '',
+            purpose: data.purpose || '',
             isActive: data.isActive,
             repairCategory: data.repairCategory || '',
             serviceIds: (data.services || []).map((s) => s.id),
@@ -1546,7 +1866,6 @@ function ServicePackageFormPage({ mode }) {
   const validate = () => {
     const errors = {};
     if (!form.packageName.trim()) errors.packageName = 'Vui lòng nhập tên gói';
-    if (!form.categoryId) errors.categoryId = 'Vui lòng chọn danh mục';
     if (form.totalPrice === '' || Number.isNaN(Number(form.totalPrice)) || Number(form.totalPrice) < 0) {
       errors.totalPrice = 'Giá gói không hợp lệ';
     }
@@ -1564,10 +1883,9 @@ function ServicePackageFormPage({ mode }) {
     try {
       const payload = {
         packageName: form.packageName.trim(),
-        categoryId: Number(form.categoryId),
-        applicableKm: form.applicableKm === '' ? null : Number(form.applicableKm),
         totalPrice: Number(form.totalPrice),
         description: form.description.trim(),
+        purpose: form.purpose.trim(),
         isActive: form.isActive,
         repairCategory: form.repairCategory || null,
         serviceIds: form.serviceIds,
@@ -1585,6 +1903,10 @@ function ServicePackageFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/service-packages" replace />;
+  }
 
   if (loading) {
     return (
@@ -1640,17 +1962,6 @@ function ServicePackageFormPage({ mode }) {
             </div>
 
             <div className="form-group">
-              <label className="form-label required">Danh mục</label>
-              <select className="form-select" value={form.categoryId} onChange={(e) => setField('categoryId', e.target.value)}>
-                <option value="">-- Chọn danh mục --</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {fieldErrors.categoryId && <span className="form-error">{fieldErrors.categoryId}</span>}
-            </div>
-
-            <div className="form-group">
               <label className="form-label required">Giá gói (VND)</label>
               <input type="number" min="0" className="form-input" value={form.totalPrice} onChange={(e) => setField('totalPrice', e.target.value)} placeholder="0" />
               {fieldErrors.totalPrice && <span className="form-error">{fieldErrors.totalPrice}</span>}
@@ -1683,6 +1994,17 @@ function ServicePackageFormPage({ mode }) {
           <div className="form-group" style={{ marginTop: 14 }}>
             <label className="form-label">Mô tả</label>
             <textarea className="form-textarea" value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Mô tả ngắn về gói dịch vụ" />
+          </div>
+
+          <div className="form-group" style={{ marginTop: 14 }}>
+            <label className="form-label">Giải thích chi tiết (hiển thị ở trang chi tiết gói trên landing page)</label>
+            <textarea
+              className="form-textarea"
+              rows={5}
+              value={form.purpose}
+              onChange={(e) => setField('purpose', e.target.value)}
+              placeholder="Gói này dùng để làm gì, khi nào nên thực hiện, vì sao cần thiết..."
+            />
           </div>
 
           <div className="form-group" style={{ marginTop: 14 }}>
@@ -1770,8 +2092,24 @@ function SettlementDetailModal({ report, onClose }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, marginBottom: 18 }}>
             <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin phiếu</div>
-              <DetailRow label="Ngày tiếp nhận" value={formatDate(report.intakeDate)} />
-              <DetailRow label="Ngày hoàn thành" value={formatDate(report.completedDate)} />
+              <DetailRow label="Ngày tiếp nhận" value={formatDateTime(report.intakeDate)} />
+              {report.status === 'cancelled' ? (
+                <DetailRow label="Ngày hủy" value={report.cancelledAt ? formatDateTime(report.cancelledAt) : 'Không có dữ liệu'} />
+              ) : (
+                <>
+                  <DetailRow label="Ngày hoàn thành" value={formatDateTime(report.completedDate)} />
+                  <DetailRow
+                    label="Ngày thanh toán"
+                    value={
+                      report.paidAt
+                        ? formatDateTime(report.paidAt)
+                        : report.status === 'invoiced'
+                          ? 'Không có dữ liệu hóa đơn'
+                          : 'Chưa thanh toán'
+                    }
+                  />
+                </>
+              )}
               <DetailRow label="Tư vấn dịch vụ" value={`${report.advisor?.name || '—'}${report.advisor?.phone ? ` · ${report.advisor.phone}` : ''}`} />
               <DetailRow label="Tổ trưởng" value={report.teamLeader?.name || 'Chưa gán'} />
               <DetailRow label="Yêu cầu khách hàng" value={report.customerRequest} />
@@ -1860,7 +2198,13 @@ function SettlementDetailModal({ report, onClose }) {
 function SettlementReportsPage() {
   const [reports, setReports] = useState([]);
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('waiting_repair');
+  const [intakeDay, setIntakeDay] = useState('');
+  const [intakeMonth, setIntakeMonth] = useState('');
+  const [intakeYear, setIntakeYear] = useState('');
+  const [secondaryDay, setSecondaryDay] = useState('');
+  const [secondaryMonth, setSecondaryMonth] = useState('');
+  const [secondaryYear, setSecondaryYear] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeReport, setActiveReport] = useState(null);
@@ -1868,6 +2212,7 @@ function SettlementReportsPage() {
   const [detailError, setDetailError] = useState('');
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
+  const secondaryDateField = SETTLEMENT_SECONDARY_DATE_FIELD_BY_TAB[activeTab] || null;
 
   const reload = () => {
     const seq = ++requestSeq.current;
@@ -1896,6 +2241,20 @@ function SettlementReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  useEffect(() => {
+    setIntakeDay(''); setIntakeMonth(''); setIntakeYear('');
+    setSecondaryDay(''); setSecondaryMonth(''); setSecondaryYear('');
+  }, [activeTab]);
+
+  // Doi lai "Ngay tiep nhan" thi bo chon moc con lai (Ngay hoan thanh/Ngay
+  // xuat hoa don/Ngay huy) luon - vi khoang cho phep chon cua no thay doi
+  // theo, giu nguyen lua chon cu de tranh ket qua "trong qua khu" khong
+  // hop le.
+  useEffect(() => {
+    setSecondaryDay(''); setSecondaryMonth(''); setSecondaryYear('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intakeDay, intakeMonth, intakeYear]);
+
   const counts = reports.reduce(
     (acc, r) => {
       acc.all += 1;
@@ -1905,7 +2264,20 @@ function SettlementReportsPage() {
     { all: 0 }
   );
 
-  const filteredReports = activeTab === 'all' ? reports : reports.filter((r) => r.status === activeTab);
+  const dateFilterYears = settlementRecentYears();
+  // Chi con loc theo ngay o 2 tab "ket qua cuoi cung" (Da xuat hoa don / Da
+  // huy) - 3 tab con lai (Cho sua chua/Dang sua chua/Cho thanh toan) la trang
+  // thai dang xu ly, khong can bo loc ngay nua.
+  const showDateFilter = activeTab === 'invoiced' || activeTab === 'cancelled';
+
+  const filteredReports = reports.filter((r) => {
+    if (r.status !== activeTab) return false;
+    if (showDateFilter) {
+      if (!settlementDateMatches(r.intakeDate, intakeDay, intakeMonth, intakeYear)) return false;
+      if (secondaryDateField && !settlementDateMatches(r[secondaryDateField.key], secondaryDay, secondaryMonth, secondaryYear)) return false;
+    }
+    return true;
+  });
 
   const openDetail = (report) => {
     setActiveReport(report);
@@ -1951,6 +2323,40 @@ function SettlementReportsPage() {
         ))}
       </div>
 
+      {showDateFilter && (
+        <div className="filter-bar" style={{ marginTop: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <DateDropdownFilter
+            label="Ngày tiếp nhận"
+            day={intakeDay} month={intakeMonth} year={intakeYear}
+            years={dateFilterYears}
+            onDayChange={setIntakeDay} onMonthChange={setIntakeMonth} onYearChange={setIntakeYear}
+          />
+
+          {secondaryDateField && (
+            <DateDropdownFilter
+              label={secondaryDateField.label}
+              day={secondaryDay} month={secondaryMonth} year={secondaryYear}
+              years={dateFilterYears}
+              onDayChange={setSecondaryDay} onMonthChange={setSecondaryMonth} onYearChange={setSecondaryYear}
+              minDay={intakeDay} minMonth={intakeMonth} minYear={intakeYear}
+            />
+          )}
+
+          {(intakeDay || intakeMonth || intakeYear || secondaryDay || secondaryMonth || secondaryYear) && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setIntakeDay(''); setIntakeMonth(''); setIntakeYear('');
+                setSecondaryDay(''); setSecondaryMonth(''); setSecondaryYear('');
+              }}
+            >
+              ✕ Xóa lọc ngày
+            </button>
+          )}
+        </div>
+      )}
+
       {error && (
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
@@ -1967,7 +2373,7 @@ function SettlementReportsPage() {
               <th>Khách hàng</th>
               <th>Tư vấn</th>
               <th>Tiếp nhận</th>
-              <th>Hoàn thành</th>
+              {activeTab !== 'cancelled' && <th>Hoàn thành</th>}
               <th>Chi phí</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
@@ -1975,7 +2381,7 @@ function SettlementReportsPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9}>
+              <tr><td colSpan={activeTab === 'cancelled' ? 8 : 9}>
                 <div className="empty-state">
                   <div className="empty-state-icon">⏳</div>
                   <h3>Đang tải danh sách phiếu quyết toán</h3>
@@ -1984,7 +2390,7 @@ function SettlementReportsPage() {
             )}
 
             {!loading && filteredReports.length === 0 && !error && (
-              <tr><td colSpan={9}>
+              <tr><td colSpan={activeTab === 'cancelled' ? 8 : 9}>
                 <div className="empty-state">
                   <div className="empty-state-icon">📭</div>
                   <h3>Không có phiếu quyết toán phù hợp</h3>
@@ -2013,7 +2419,7 @@ function SettlementReportsPage() {
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{report.advisor?.phone || ''}</div>
                   </td>
                   <td style={{ fontSize: 12 }}>{formatDate(report.intakeDate)}</td>
-                  <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>
+                  {activeTab !== 'cancelled' && <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>}
                   <td style={{ fontWeight: 800, color: '#C62828' }}>{formatCurrency(report.total)}</td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
@@ -2161,24 +2567,28 @@ function TechnicianListPage() {
           <div className="breadcrumb">Trang chủ / Thợ máy</div>
         </div>
         <div className="page-header-right">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => exportCsv(
-              'danh-sach-tho-may.csv',
-              ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Chuyên môn', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
-              technicians.map((t) => [
-                t.employeeId, t.fullName, t.email, t.teamLeaderName,
-                (t.specialties || []).map((s) => s.name).join('; '),
-                t.phone, formatDate(t.createdAt), statusBadge(t.status).label,
-              ])
-            )}
-          >
-            📊 Xuất Excel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/technicians/create')}>
-            + Thêm thợ máy
-          </button>
+          <PermissionGate permission="screen:manager:technicians:view">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => exportCsv(
+                'danh-sach-tho-may.csv',
+                ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Chuyên môn', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
+                technicians.map((t) => [
+                  t.employeeId, t.fullName, t.email, t.teamLeaderName,
+                  (t.specialties || []).map((s) => s.name).join('; '),
+                  t.phone, formatDate(t.createdAt), statusBadge(t.status).label,
+                ])
+              )}
+            >
+              📊 Xuất Excel
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="screen:manager:technicians:create">
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/technicians/create')}>
+              + Thêm thợ máy
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -2280,8 +2690,12 @@ function TechnicianListPage() {
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}>👁</button>
-                      <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}>✏️</button>
+                      <PermissionGate permission="screen:manager:technicians:view">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}>👁</button>
+                      </PermissionGate>
+                      <PermissionGate permission="screen:manager:technicians:update">
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}>✏️</button>
+                      </PermissionGate>
                     </div>
                   </td>
                 </tr>
@@ -2311,6 +2725,10 @@ function TechnicianFormPage({ mode }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = mode === 'edit';
+  const { can } = usePermission();
+  const allowed = isEdit
+    ? can('screen:manager:technicians:update')
+    : can('screen:manager:technicians:create');
 
   const [branch, setBranch] = useState(null);
   const [teamLeaderOptions, setTeamLeaderOptions] = useState([]);
@@ -2413,6 +2831,10 @@ function TechnicianFormPage({ mode }) {
       setSubmitting(false);
     }
   };
+
+  if (!allowed) {
+    return <Navigate to="/manager/technicians" replace />;
+  }
 
   if (loading) {
     return (
@@ -2530,7 +2952,7 @@ function TechnicianFormPage({ mode }) {
                   {fieldErrors.confirmPassword && <span className="form-error">{fieldErrors.confirmPassword}</span>}
                 </div>
               </div>
-              <p className="form-hint" style={{ marginTop: 8 }}>Thợ máy sẽ đổi mật khẩu lần đầu đăng nhập.</p>
+              <p className="form-hint" style={{ marginTop: 8 }}>Hãy gửi mật khẩu cho thợ máy qua kênh an toàn.</p>
             </>
           )}
         </div>
@@ -2568,6 +2990,8 @@ export default function ManagerPage() {
   return (
     <Routes>
       <Route index element={<Navigate to="employees" replace />} />
+      <Route path="dashboard" element={<ManagerDashboardPage />} />
+      <Route path="inventory" element={<ManagerInventoryPage />} />
       <Route path="employees" element={<EmployeeListPage />} />
       <Route path="employees/create" element={<EmployeeFormPage mode="create" />} />
       <Route path="employees/:id/edit" element={<EmployeeFormPage mode="edit" />} />

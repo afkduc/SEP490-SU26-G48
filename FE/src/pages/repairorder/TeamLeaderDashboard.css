@@ -1,0 +1,440 @@
+.tld-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 20px;
+}
+
+.tld-tab {
+  position: relative;
+  border: none;
+  background: none;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-500);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tld-tab:hover {
+  color: var(--gray-800);
+}
+
+.tld-tab--active {
+  color: var(--primary-dark);
+  border-bottom-color: var(--primary);
+}
+
+/* So do goc phai - bao co thay doi/viec moi chua xem, giong badge thong bao
+   chuong o navbar (xem Navbar.css .navbar__badge) - bien mat khi bam vao tab. */
+.tld-tab-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tld-error {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.tld-pending-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.tld-pending-card {
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tld-pending-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tld-pending-card__code {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.tld-pending-card__date {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.tld-pending-card__customer {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.tld-pending-card__vehicle {
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+.tld-pending-card__advisor {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.tld-pending-card__request {
+  font-size: 13px;
+  color: var(--gray-700);
+  background: var(--gray-50);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.tld-pending-card__request-label {
+  font-weight: 600;
+  color: var(--gray-500);
+}
+
+.tld-pending-card__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.tld-pending-card__taken {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+.tld-empty {
+  color: var(--gray-500);
+  font-size: 14px;
+  padding: 12px 0;
+}
+
+/* Chon khoang trong modal Nhan viec */
+.tld-bay-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.tld-bay-picker__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--gray-50);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.tld-bay-picker__tile:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: #fff;
+}
+
+.tld-bay-picker__tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.tld-bay-picker__number {
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.tld-bay-picker__status {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.tld-bay-picker__tile--busy .tld-bay-picker__status {
+  color: #B91C1C;
+}
+
+/* Chon tho trong modal Nhan viec */
+.tld-tech-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tld-tech-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--gray-100);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.tld-tech-chip__phone {
+  color: var(--gray-500);
+}
+
+.tld-tech-chip__other-team {
+  color: #B45309;
+}
+
+.tld-tech-chip__remove {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--gray-500);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.tld-tech-chip__remove:hover {
+  color: #B91C1C;
+}
+
+.tld-tech-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 20;
+}
+
+.tld-tech-suggestions__item {
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tld-tech-suggestions__item:hover {
+  background: var(--gray-50);
+}
+
+.tld-tech-suggestions__item--busy {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tld-tech-suggestions__phone {
+  color: var(--gray-500);
+}
+
+.tld-tech-suggestions__other-team {
+  color: #B45309;
+}
+
+.tld-tech-suggestions__busy {
+  color: #B91C1C;
+}
+
+/* Tab "Khoang xe cua toi" */
+.tld-bay-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.tld-bay-status-card {
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-left: 4px solid var(--gray-300);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tld-bay-status-card--busy {
+  border-left-color: #F57F17;
+}
+
+.tld-bay-status-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tld-bay-status-card__number {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.tld-bay-status-card__code {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.tld-bay-status-card__customer {
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+.tld-bay-status-card__tech {
+  font-size: 13px;
+  color: var(--gray-700);
+}
+
+.tld-bay-status-card__tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--gray-100);
+}
+
+.tld-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+
+.tld-task input {
+  accent-color: var(--primary);
+  cursor: default;
+}
+
+/* Tich xanh binh thuong khi hoan thanh - KHONG gach ngang, gach ngang danh
+   rieng cho truong hop khach huy hang muc (xem HistorySettlementPage.jsx). */
+.tld-task--done {
+  color: #2E7D32;
+}
+
+.tld-task--done input {
+  accent-color: #2E7D32;
+}
+
+/* Gach ngang - danh rieng cho hang muc bi khach huy giua chung. */
+/* text-decoration KHONG dat o day - de rieng cho span ten trong TaskNameLabel
+   (TeamLeaderDashboard.jsx), tranh gach ngang lan qua ca phan "(Khách hủy)". */
+.tld-task--cancelled {
+  color: var(--gray-400);
+}
+
+/* Ten dau muc + "xN" (neu so luong > 1) tren 1 dong, ghi chu (neu co) xuong
+   dong duoi - dung chung cho ca dau muc dich vu (.tld-task) lan phu tung
+   (.tld-part). */
+.tld-task__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.tld-task__nameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tld-task__qty {
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+.tld-task__note {
+  font-size: 11px;
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+.tld-bay-status-card__parts-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600);
+  margin-top: 10px;
+}
+
+.tld-bay-status-card__parts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tld-part {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+
+/* Tab "Lich su" */
+.tld-history-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tld-history-filter .form-input {
+  max-width: 200px;
+}
+
+.tld-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tld-history-row {
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tld-history-row__date {
+  font-size: 13px;
+  color: var(--gray-500);
+  white-space: nowrap;
+}

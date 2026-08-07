@@ -1,4 +1,40 @@
 const { query } = require('../database/sqlServer');
+const {
+  sqlAccentInsensitiveLike,
+  bindNormalizedLikeParam,
+} = require('../../utils/vietnamese');
+
+/** Auth noise — có trang Lịch sử đăng nhập riêng; mặc định ẩn khỏi nhật ký thao tác. */
+const AUTH_AUDIT_ACTIONS = [
+  'LOGIN',
+  'FAILED_LOGIN',
+  'LOGOUT',
+  'FORCE_LOGOUT',
+  'FORCE_LOGO',
+  'REFRESH_TOKEN',
+  'VERIFY_OTP',
+  'SEND_OTP',
+];
+
+function bindNormalizedLike(params, paramIndex, rawValue) {
+  const key = `p${paramIndex}`;
+  bindNormalizedLikeParam(params, key, rawValue);
+  return { key, nextIndex: paramIndex + 1 };
+}
+
+function likeAccentInsensitive(columnExpr, paramName) {
+  return sqlAccentInsensitiveLike(columnExpr, paramName);
+}
+
+function toIsoUtc(value) {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toISOString();
+  }
+  return value;
+}
 
 const AUDIT_LOG_COLUMNS = `
   al.id,
@@ -16,12 +52,37 @@ const AUDIT_LOG_COLUMNS = `
   al.request_body,
   al.response_status,
   al.duration_ms,
-  al.branch_id,
+  COALESCE(al.branch_id, u.branch_id) AS branch_id,
+  COALESCE(
+    b.branch_name,
+    ub.branch_name,
+    CASE
+      -- Thao tac he thong (quen mat khau cong khai, job, ...) — khong gan chi nhanh
+      WHEN al.user_id IS NULL OR LOWER(LTRIM(RTRIM(ISNULL(al.user_name, N'')))) = N'system'
+        THEN N'Hệ thống'
+      -- Admin / GD all-scope
+      WHEN u.id IS NOT NULL AND u.branch_id IS NULL THEN N'Tất cả chi nhánh'
+      ELSE NULL
+    END
+  ) AS branch_name,
   al.description,
   al.old_value,
   al.new_value,
-  al.logged_at,
-  b.branch_name
+  al.logged_at
+`;
+
+/**
+ * Chi nhánh hiển thị:
+ *  1) al.branch_id ghi lúc audit
+ *  2) fallback users.branch_id của người thao tác (log cũ thiếu branch_id)
+ *  3) actor «system» / không user → «Hệ thống»
+ *  4) admin/all-scope (users.branch_id NULL) → «Tất cả chi nhánh»
+ */
+const AUDIT_LOG_FROM = `
+  audit_logs al
+  LEFT JOIN users u ON u.id = al.user_id
+  LEFT JOIN branches b ON b.id = al.branch_id
+  LEFT JOIN branches ub ON ub.id = u.branch_id
 `;
 
 const LOGIN_SESSION_COLUMNS = `
@@ -67,7 +128,7 @@ function toAuditLogRow(row) {
     description: row.description,
     old_value: row.old_value,
     new_value: row.new_value,
-    logged_at: row.logged_at,
+    logged_at: toIsoUtc(row.logged_at),
   };
 }
 
@@ -178,7 +239,7 @@ async function insertAuditLog(logData) {
      VALUES (
        @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10,
        @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18,
-       COALESCE(@p19, GETDATE())
+       COALESCE(@p19, SYSUTCDATETIME())
      )`,
     params
   );
@@ -204,6 +265,7 @@ async function getAuditLogs(filters = {}) {
     startDate,
     endDate,
     branchId,
+    excludeAuthEvents = false,
     page = 1,
     pageSize = 20,
   } = filters;
@@ -212,24 +274,29 @@ async function getAuditLogs(filters = {}) {
   const params = {};
   let paramIndex = 1;
 
-  // Keyword search across multiple fields
+  // Keyword search — tên / SĐT / mô tả / mã… (không phân biệt hoa thường & dấu)
   if (keyword) {
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, keyword);
     conditions.push(`(
-      LOWER(al.user_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.description) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.entity_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.entity_code) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.table_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.request_url) LIKE LOWER(@p${paramIndex})
+      ${likeAccentInsensitive('al.user_name', key)} OR
+      ${likeAccentInsensitive('al.phone_number', key)} OR
+      ${likeAccentInsensitive('al.description', key)} OR
+      ${likeAccentInsensitive('al.entity_name', key)} OR
+      ${likeAccentInsensitive('al.entity_code', key)} OR
+      ${likeAccentInsensitive('al.table_name', key)} OR
+      ${likeAccentInsensitive('al.request_url', key)}
     )`);
-    params[`p${paramIndex}`] = `%${keyword}%`;
-    paramIndex++;
+    paramIndex = nextIndex;
   }
 
+  // Ô "Người dùng": khớp tên hoặc SĐT
   if (userName) {
-    conditions.push(`LOWER(al.user_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${userName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
+    conditions.push(`(
+      ${likeAccentInsensitive('al.user_name', key)} OR
+      ${likeAccentInsensitive('al.phone_number', key)}
+    )`);
+    paramIndex = nextIndex;
   }
 
   if (phone) {
@@ -242,6 +309,15 @@ async function getAuditLogs(filters = {}) {
     conditions.push(`al.action = @p${paramIndex}`);
     params[`p${paramIndex}`] = action;
     paramIndex++;
+  } else if (excludeAuthEvents) {
+    // An dang nhap / that bai khoi danh sach thao tac (co trang Lich su dang nhap rieng)
+    const placeholders = AUTH_AUDIT_ACTIONS.map((a, i) => {
+      const key = `p${paramIndex + i}`;
+      params[key] = a;
+      return `@${key}`;
+    });
+    conditions.push(`al.action NOT IN (${placeholders.join(', ')})`);
+    paramIndex += AUTH_AUDIT_ACTIONS.length;
   }
 
   if (tableName) {
@@ -251,15 +327,15 @@ async function getAuditLogs(filters = {}) {
   }
 
   if (entityName) {
-    conditions.push(`LOWER(al.entity_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${entityName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, entityName);
+    conditions.push(likeAccentInsensitive('al.entity_name', key));
+    paramIndex = nextIndex;
   }
 
   if (entityCode) {
-    conditions.push(`LOWER(al.entity_code) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${entityCode}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, entityCode);
+    conditions.push(likeAccentInsensitive('al.entity_code', key));
+    paramIndex = nextIndex;
   }
 
   if (ipAddress) {
@@ -289,7 +365,7 @@ async function getAuditLogs(filters = {}) {
   }
 
   if (branchId) {
-    conditions.push(`al.branch_id = @p${paramIndex}`);
+    conditions.push(`COALESCE(al.branch_id, u.branch_id) = @p${paramIndex}`);
     params[`p${paramIndex}`] = branchId;
     paramIndex++;
   }
@@ -314,7 +390,7 @@ async function getAuditLogs(filters = {}) {
   // Get count and stats in parallel
   const [countResult, statsResult] = await Promise.all([
     query(
-      `SELECT COUNT(*) AS total FROM audit_logs al WHERE ${whereClause}`,
+      `SELECT COUNT(*) AS total FROM ${AUDIT_LOG_FROM} WHERE ${whereClause}`,
       params
     ),
     query(
@@ -323,7 +399,7 @@ async function getAuditLogs(filters = {}) {
         SUM(CASE WHEN al.action IN ('CREATE', 'INSERT') THEN 1 ELSE 0 END) AS create_count,
         SUM(CASE WHEN al.action IN ('UPDATE', 'EDIT') THEN 1 ELSE 0 END) AS update_count,
         SUM(CASE WHEN al.action IN ('DELETE', 'REMOVE') THEN 1 ELSE 0 END) AS delete_count
-       FROM audit_logs al WHERE ${whereClause}`,
+       FROM ${AUDIT_LOG_FROM} WHERE ${whereClause}`,
       params
     ),
   ]);
@@ -333,8 +409,7 @@ async function getAuditLogs(filters = {}) {
 
   const dataResult = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
-     FROM   audit_logs al
-     LEFT   JOIN branches b ON b.id = al.branch_id
+     FROM   ${AUDIT_LOG_FROM}
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY`,
@@ -363,8 +438,7 @@ async function getAuditLogs(filters = {}) {
 async function getAuditLogById(id) {
   const result = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
-     FROM   audit_logs al
-     LEFT   JOIN branches b ON b.id = al.branch_id
+     FROM   ${AUDIT_LOG_FROM}
      WHERE  al.id = @p1`,
     { p1: id }
   );
@@ -391,6 +465,7 @@ async function getAuditLogsForExport(filters = {}) {
     startDate,
     endDate,
     branchId,
+    excludeAuthEvents = false,
     limit = 10000,
   } = filters;
 
@@ -399,22 +474,26 @@ async function getAuditLogsForExport(filters = {}) {
   let paramIndex = 1;
 
   if (keyword) {
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, keyword);
     conditions.push(`(
-      LOWER(al.user_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.description) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.entity_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.entity_code) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.table_name) LIKE LOWER(@p${paramIndex}) OR
-      LOWER(al.request_url) LIKE LOWER(@p${paramIndex})
+      ${likeAccentInsensitive('al.user_name', key)} OR
+      ${likeAccentInsensitive('al.phone_number', key)} OR
+      ${likeAccentInsensitive('al.description', key)} OR
+      ${likeAccentInsensitive('al.entity_name', key)} OR
+      ${likeAccentInsensitive('al.entity_code', key)} OR
+      ${likeAccentInsensitive('al.table_name', key)} OR
+      ${likeAccentInsensitive('al.request_url', key)}
     )`);
-    params[`p${paramIndex}`] = `%${keyword}%`;
-    paramIndex++;
+    paramIndex = nextIndex;
   }
 
   if (userName) {
-    conditions.push(`LOWER(al.user_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${userName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
+    conditions.push(`(
+      ${likeAccentInsensitive('al.user_name', key)} OR
+      ${likeAccentInsensitive('al.phone_number', key)}
+    )`);
+    paramIndex = nextIndex;
   }
   if (phone) {
     conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
@@ -425,6 +504,14 @@ async function getAuditLogsForExport(filters = {}) {
     conditions.push(`al.action = @p${paramIndex}`);
     params[`p${paramIndex}`] = action;
     paramIndex++;
+  } else if (excludeAuthEvents) {
+    const placeholders = AUTH_AUDIT_ACTIONS.map((a, i) => {
+      const key = `p${paramIndex + i}`;
+      params[key] = a;
+      return `@${key}`;
+    });
+    conditions.push(`al.action NOT IN (${placeholders.join(', ')})`);
+    paramIndex += AUTH_AUDIT_ACTIONS.length;
   }
   if (tableName) {
     conditions.push(`LOWER(al.table_name) LIKE LOWER(@p${paramIndex})`);
@@ -432,14 +519,14 @@ async function getAuditLogsForExport(filters = {}) {
     paramIndex++;
   }
   if (entityName) {
-    conditions.push(`LOWER(al.entity_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${entityName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, entityName);
+    conditions.push(likeAccentInsensitive('al.entity_name', key));
+    paramIndex = nextIndex;
   }
   if (entityCode) {
-    conditions.push(`LOWER(al.entity_code) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${entityCode}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, entityCode);
+    conditions.push(likeAccentInsensitive('al.entity_code', key));
+    paramIndex = nextIndex;
   }
   if (ipAddress) {
     conditions.push(`al.ip_address LIKE @p${paramIndex}`);
@@ -465,7 +552,7 @@ async function getAuditLogsForExport(filters = {}) {
     }
   }
   if (branchId) {
-    conditions.push(`al.branch_id = @p${paramIndex}`);
+    conditions.push(`COALESCE(al.branch_id, u.branch_id) = @p${paramIndex}`);
     params[`p${paramIndex}`] = branchId;
     paramIndex++;
   }
@@ -485,8 +572,7 @@ async function getAuditLogsForExport(filters = {}) {
 
   const dataResult = await query(
     `SELECT ${AUDIT_LOG_COLUMNS}
-     FROM   audit_logs al
-     LEFT   JOIN branches b ON b.id = al.branch_id
+     FROM   ${AUDIT_LOG_FROM}
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
      OFFSET 0 ROWS FETCH NEXT @p_limit ROWS ONLY`,
@@ -506,6 +592,8 @@ async function getLoginSessions(filters = {}) {
     endDate,
     status,
     branchId,
+    ipAddress,
+    sessionId,
     page = 1,
     pageSize = 20,
   } = filters;
@@ -514,10 +602,35 @@ async function getLoginSessions(filters = {}) {
   const params = {};
   let paramIndex = 1;
 
+  // Exact session — dùng khi admin nhảy từ cảnh báo (kể cả phiên đã ended/offline)
+  if (sessionId != null && String(sessionId).trim() !== '') {
+    const sid = Number(sessionId);
+    if (Number.isFinite(sid) && sid > 0) {
+      conditions.push(`ls.id = @p${paramIndex}`);
+      params[`p${paramIndex}`] = sid;
+      paramIndex++;
+    }
+  }
+
+  // Tên người dùng: khớp tên trên phiên hoặc SĐT / email / họ tên trên bảng users
   if (userName) {
-    conditions.push(`LOWER(ls.user_name) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${userName}%`;
-    paramIndex++;
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
+    conditions.push(`(
+      ${likeAccentInsensitive('ls.user_name', key)}
+      OR ${likeAccentInsensitive('ls.phone', key)}
+      OR EXISTS (
+        SELECT 1 FROM users u
+        WHERE u.id = ls.user_id AND (
+          ${likeAccentInsensitive('u.email', key)}
+          OR ${likeAccentInsensitive('u.phone', key)}
+          OR ${likeAccentInsensitive('u.user_name', key)}
+          OR ${likeAccentInsensitive('u.first_name', key)}
+          OR ${likeAccentInsensitive('u.last_name', key)}
+          OR ${likeAccentInsensitive(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
+        )
+      )
+    )`);
+    paramIndex = nextIndex;
   }
 
   if (phone) {
@@ -544,6 +657,12 @@ async function getLoginSessions(filters = {}) {
     paramIndex++;
   }
 
+  if (ipAddress) {
+    conditions.push(`ls.ip_address LIKE @p${paramIndex}`);
+    params[`p${paramIndex}`] = `%${ipAddress}%`;
+    paramIndex++;
+  }
+
   if (startDate) {
     conditions.push(`ls.login_time >= @p${paramIndex}`);
     params[`p${paramIndex}`] = startDate;
@@ -551,8 +670,13 @@ async function getLoginSessions(filters = {}) {
   }
 
   if (endDate) {
+    // Bao gồm cả ngày endDate (so sánh tới cuối ngày nếu chỉ YYYY-MM-DD)
+    const endRaw = String(endDate);
+    const endInclusive = /^\d{4}-\d{2}-\d{2}$/.test(endRaw)
+      ? `${endRaw} 23:59:59`
+      : endDate;
     conditions.push(`ls.login_time <= @p${paramIndex}`);
-    params[`p${paramIndex}`] = endDate;
+    params[`p${paramIndex}`] = endInclusive;
     paramIndex++;
   }
 
@@ -645,13 +769,86 @@ async function getAuditLogsByUser(userId, limit = 10) {
   const safeLimit = Math.max(1, parseInt(limit, 10) || 10);
   const result = await query(
     `SELECT TOP (@p2) ${AUDIT_LOG_COLUMNS}
-     FROM   audit_logs al
-     LEFT   JOIN branches b ON b.id = al.branch_id
+     FROM   ${AUDIT_LOG_FROM}
      WHERE  al.user_id = @p1
      ORDER  BY al.logged_at DESC, al.id DESC`,
     { p1: userId, p2: safeLimit }
   );
   return result.recordset.map(toAuditLogRow);
+}
+
+/**
+ * Tim ban ghi lifecycle (1 log / 1 phieu) theo table_name + record_id.
+ * Uu tien dong co marker "lifecycle":true; neu chua co thi lay dong dau tien.
+ */
+async function findLifecycleAuditLog(tableName, recordId) {
+  if (!tableName || recordId == null || recordId === '') return null;
+  const result = await query(
+    `SELECT TOP 1 id, action, description, new_value, entity_code, logged_at
+     FROM audit_logs
+     WHERE table_name = @p1 AND record_id = @p2
+       AND (
+         new_value LIKE '%"lifecycle":true%'
+         OR new_value LIKE '%"lifecycle": true%'
+       )
+     ORDER BY id ASC`,
+    { p1: String(tableName).slice(0, 50), p2: Number(recordId) || recordId }
+  );
+  if (result.recordset?.[0]) return result.recordset[0];
+
+  const fallback = await query(
+    `SELECT TOP 1 id, action, description, new_value, entity_code, logged_at
+     FROM audit_logs
+     WHERE table_name = @p1 AND record_id = @p2
+     ORDER BY id ASC`,
+    { p1: String(tableName).slice(0, 50), p2: Number(recordId) || recordId }
+  );
+  return fallback.recordset?.[0] || null;
+}
+
+/** Cap nhat ban ghi lifecycle + bump logged_at de len dau danh sach. */
+async function updateAuditLog(id, fields = {}) {
+  if (!id) return null;
+  const result = await query(
+    `UPDATE audit_logs SET
+       user_id = @p2,
+       user_name = @p3,
+       phone_number = @p4,
+       action = @p5,
+       entity_name = COALESCE(@p6, entity_name),
+       entity_code = COALESCE(@p7, entity_code),
+       old_value = @p8,
+       new_value = @p9,
+       ip_address = @p10,
+       request_method = @p11,
+       request_url = @p12,
+       request_body = @p13,
+       response_status = @p14,
+       branch_id = COALESCE(@p15, branch_id),
+       description = @p16,
+       logged_at = SYSUTCDATETIME()
+     WHERE id = @p1;
+     SELECT @p1 AS id;`,
+    {
+      p1: Number(id),
+      p2: fields.user_id ?? null,
+      p3: fields.user_name != null ? String(fields.user_name).slice(0, 128) : null,
+      p4: fields.phone_number ?? null,
+      p5: fields.action,
+      p6: fields.entity_name ?? null,
+      p7: fields.entity_code ?? null,
+      p8: fields.old_value ?? null,
+      p9: fields.new_value ?? null,
+      p10: fields.ip_address ?? null,
+      p11: fields.request_method ?? null,
+      p12: fields.request_url ?? null,
+      p13: fields.request_body ?? null,
+      p14: fields.response_status ?? null,
+      p15: fields.branch_id ?? null,
+      p16: fields.description ?? null,
+    }
+  );
+  return result.recordset?.[0]?.id ?? Number(id);
 }
 
 module.exports = {
@@ -663,4 +860,7 @@ module.exports = {
   getLoginSessionsSince,
   getEntityDefinitions,
   getAuditLogsByUser,
+  findLifecycleAuditLog,
+  updateAuditLog,
+  AUTH_AUDIT_ACTIONS,
 };

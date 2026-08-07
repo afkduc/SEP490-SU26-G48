@@ -6,6 +6,12 @@ import './AdminPagination.css';
  *  - currentPage, totalPages, total, onChange, loading
  *  - accent: 'cyan' | 'indigo' (màu nút active)
  *  - siblingCount: số trang hiển thị 2 bên trang hiện tại (mặc định 1)
+ *
+ * Desktop:
+ *   << < Prev 1 2 3 4 > Next >>
+ *
+ * Mobile (responsive):
+ *   < Trang 2 / 15 > (Previous | 2/15 | Next)
  */
 export default function AdminPagination({
   currentPage,
@@ -57,11 +63,15 @@ export default function AdminPagination({
 
   return (
     <div className="admin-pagination">
-      <span className="admin-pagination__info">
+      <span className="admin-pagination__info admin-pagination__info--desktop">
         Tổng <strong>{total}</strong> bản ghi
         &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
       </span>
-      <div className="admin-pagination__controls">
+      <span className="admin-pagination__info admin-pagination__info--mobile">
+        <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
+      </span>
+
+      <div className="admin-pagination__controls admin-pagination__controls--desktop">
         {/* « First */}
         <button
           type="button"
@@ -141,6 +151,33 @@ export default function AdminPagination({
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="13 17 18 12 13 7" />
             <polyline points="6 17 11 12 6 7" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="admin-pagination__controls admin-pagination__controls--mobile">
+        <button
+          type="button"
+          className="admin-pagination__mobile-btn"
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={isFirst || loading}
+          aria-label="Trang trước"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Trước
+        </button>
+        <button
+          type="button"
+          className="admin-pagination__mobile-btn"
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={isLast || loading}
+          aria-label="Trang sau"
+        >
+          Sau
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
       </div>
