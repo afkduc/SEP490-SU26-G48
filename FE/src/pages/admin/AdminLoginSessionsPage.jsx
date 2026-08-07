@@ -10,7 +10,12 @@ import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { pickLatestSession } from './securityAlertFocus';
 import { normalizeVietnamese } from '../../utils/vietnamese';
-import { formatPhoneDisplay } from '../../utils/validation';
+import {
+  formatPhoneDisplay,
+  formatPhoneInput,
+  phoneDigitsForSearch,
+  PHONE_INPUT_MAX_LENGTH,
+} from '../../utils/validation';
 import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './LoginSessionsPage.css';
 
@@ -494,21 +499,30 @@ export default function AdminLoginSessionsPage({
     const sessionId = eventData && eventData.sessionId;
     const deviceId = eventData && eventData.deviceId;
 
-    // Filter matching (de khong patch khi event khong thuoc filter hien tai)
+    // Filter matching (AND — khong patch khi event khong thuoc filter hien tai)
     const p = paramsRef.current;
     const filterUserName = normalizeVietnamese(p.userName || '').trim();
+    const filterPhoneDigits = String(p.phone || '').replace(/\D/g, '');
     const filterActionType = p.actionType || '';
     const filterStatus = p.status || '';
     const filterBranchId = p.branchId;
 
     if (filterUserName) {
       const haystack = normalizeVietnamese(
-        [sessionUserName, eventData?.phone, eventData?.phoneNumber, eventData?.email]
+        [sessionUserName, eventData?.email, eventData?.userName]
           .filter(Boolean)
           .join(' ')
       );
       if (!haystack.includes(filterUserName)) {
-        return; // Khong match filter -> bo qua
+        return; // Khong match filter userName -> bo qua
+      }
+    }
+    if (filterPhoneDigits) {
+      const eventPhoneDigits = String(
+        eventData?.phone || eventData?.phoneNumber || ''
+      ).replace(/\D/g, '');
+      if (!eventPhoneDigits.includes(filterPhoneDigits)) {
+        return;
       }
     }
     if (filterActionType && eventType) {
@@ -609,6 +623,7 @@ export default function AdminLoginSessionsPage({
     (sessions.params.branchId != null);
 
   function resetFilters() {
+    // Xóa mọi điều kiện lọc + sessionId seed → trả về full danh sách
     sessions.setParams(() => ({
       userName: '',
       phone: '',
@@ -623,6 +638,7 @@ export default function AdminLoginSessionsPage({
       pageSize: 10,
     }));
     setFocusedSessionId(null);
+    focusScrollPendingRef.current = false;
   }
 
   const headerActions = (
@@ -723,10 +739,13 @@ export default function AdminLoginSessionsPage({
             <label className="filter-field__label">Số điện thoại</label>
             <input
               className="filter-field__input"
-              type="text"
-              placeholder="Nhập SĐT..."
-              value={sessions.params.phone || ''}
-              onChange={(e) => sessions.updateParam('phone', e.target.value)}
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              placeholder="0123-456-789"
+              maxLength={PHONE_INPUT_MAX_LENGTH}
+              value={formatPhoneInput(sessions.params.phone || '')}
+              onChange={(e) => sessions.updateParam('phone', phoneDigitsForSearch(e.target.value).slice(0, 11))}
             />
           </div>
 
@@ -795,17 +814,23 @@ export default function AdminLoginSessionsPage({
 
         <div className="admin-sessions__filter-actions">
           <div className="admin-sessions__filter-results">
-            {sessions.data.total > 0 && (
+            {sessions.loading ? (
+              <>Đang lọc...</>
+            ) : (
               <>Tìm thấy <strong>{sessions.data.total}</strong> phiên đăng nhập</>
             )}
           </div>
           <div className="admin-sessions__filter-btns">
-            {hasFilters && (
-              <button className="btn btn--ghost btn--sm" onClick={resetFilters}>
-                <IconRefresh />
-                Đặt lại
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={resetFilters}
+              disabled={!hasFilters && !sessions.loading}
+              title="Xóa bộ lọc và tải lại danh sách đầy đủ"
+            >
+              <IconRefresh />
+              Đặt lại
+            </button>
           </div>
         </div>
       </div>

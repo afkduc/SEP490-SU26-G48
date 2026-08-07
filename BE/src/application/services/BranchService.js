@@ -6,7 +6,13 @@ const {
   isValidEmail,
   isValidPhone,
   getBranchNameError,
+  phoneDigitsOnly,
 } = require('../../utils/fieldValidation');
+
+function normalizeOptionalPhone(phone) {
+  if (phone === undefined || phone === null || !String(phone).trim()) return null;
+  return phoneDigitsOnly(phone) || null;
+}
 
 function validateOptionalContact({ phone, email }) {
   if (phone !== undefined && phone !== null && String(phone).trim()) {
@@ -75,7 +81,7 @@ class BranchService {
       branchCode: branchCode.trim(),
       branchName: branchNameTrimmed,
       address: address ? String(address).trim().slice(0, 255) : null,
-      phone: phone ? String(phone).trim() : null,
+      phone: normalizeOptionalPhone(phone),
       email: email ? String(email).trim() : null,
       managerId: managerId ? Number(managerId) : null,
     });
@@ -113,7 +119,7 @@ class BranchService {
       address: address !== undefined
         ? (address ? String(address).trim().slice(0, 255) : null)
         : undefined,
-      phone: phone !== undefined ? (phone ? String(phone).trim() : null) : undefined,
+      phone: phone !== undefined ? normalizeOptionalPhone(phone) : undefined,
       email: email !== undefined ? (email ? String(email).trim() : null) : undefined,
       managerId: managerId !== undefined ? (managerId ? Number(managerId) : null) : undefined,
     });

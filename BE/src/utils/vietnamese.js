@@ -53,9 +53,42 @@ function bindNormalizedLikeParam(params, paramKey, rawValue) {
   return paramKey;
 }
 
+/** Chỉ giữ chữ số (SĐT). Không slice — dùng cho tìm contains (0123 khớp 0123456789). */
+function phoneDigitsOnly(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+/**
+ * Biểu thức SQL bỏ '-', khoảng trắng, '.', '+' trên cột SĐT.
+ * Dùng khi so khớp: UI có thể hiện 0123-456-789 nhưng DB/search là chữ số.
+ */
+function sqlPhoneDigitsExpr(columnExpr) {
+  return `REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(${columnExpr}, N''), N'-', N''), N' ', N''), N'.', N''), N'+', N'')`;
+}
+
+/**
+ * Gán params[paramKey] = %digits% nếu rawValue có chữ số.
+ * @returns {string|null} paramKey hoặc null nếu không có số
+ */
+function bindPhoneDigitsLikeParam(params, paramKey, rawValue) {
+  const digits = phoneDigitsOnly(rawValue);
+  if (!digits) return null;
+  params[paramKey] = `%${digits}%`;
+  return paramKey;
+}
+
+/** SQL fragment: cột SĐT LIKE @param (param đã qua bindPhoneDigitsLikeParam). */
+function sqlPhoneDigitsLike(columnExpr, paramName) {
+  return `${sqlPhoneDigitsExpr(columnExpr)} LIKE @${paramName}`;
+}
+
 module.exports = {
   normalizeVietnamese,
   sqlUnaccentExpr,
   sqlAccentInsensitiveLike,
   bindNormalizedLikeParam,
+  phoneDigitsOnly,
+  sqlPhoneDigitsExpr,
+  bindPhoneDigitsLikeParam,
+  sqlPhoneDigitsLike,
 };

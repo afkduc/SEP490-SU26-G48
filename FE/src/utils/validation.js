@@ -23,9 +23,24 @@ const PERSON_NAME_REGEX = /^\p{L}+(?:[ '\-]\p{L}+)*$/u;
 /** Gợi ý UI — độ dài tính theo chữ số, không tính dấu gạch. */
 export const PHONE_HINT = 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)';
 
-/** Chỉ giữ chữ số, tối đa 11 (SĐT VN). */
+/** Chỉ giữ chữ số, tối đa 11 (SĐT VN — form nhập). */
 export function phoneDigitsOnly(value) {
   return String(value || '').replace(/\D/g, '').slice(0, 11);
+}
+
+/** Chữ số không giới hạn độ dài — dùng ô tìm (contains `0123`). */
+export function phoneDigitsForSearch(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+/**
+ * Ô search chung: chuỗi chỉ gồm số / dấu phân cách → coi là đang gõ SĐT.
+ * (Có chữ cái → tìm tên/email bình thường.)
+ */
+export function isPhoneLikeInput(value) {
+  const s = String(value || '');
+  if (!s.trim()) return false;
+  return /^[\d\s\-+.()]+$/.test(s) && /\d/.test(s);
 }
 
 /**
