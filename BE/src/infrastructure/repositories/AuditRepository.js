@@ -36,6 +36,20 @@ function toIsoUtc(value) {
   return value;
 }
 
+const AUDIT_LOG_BRANCH_NAME = `
+  COALESCE(
+    b.branch_name,
+    ub.branch_name,
+    CASE
+      WHEN al.user_id IS NULL OR LOWER(LTRIM(RTRIM(ISNULL(al.user_name, N'')))) = N'system'
+        THEN N'Hệ thống'
+      WHEN u.id IS NOT NULL AND u.branch_id IS NULL THEN N'Tất cả chi nhánh'
+      ELSE NULL
+    END
+  ) AS branch_name
+`;
+
+/** Cột đủ cho chi tiết / export (có JSON lớn). */
 const AUDIT_LOG_COLUMNS = `
   al.id,
   al.user_id,
@@ -53,20 +67,34 @@ const AUDIT_LOG_COLUMNS = `
   al.response_status,
   al.duration_ms,
   COALESCE(al.branch_id, u.branch_id) AS branch_id,
-  COALESCE(
-    b.branch_name,
-    ub.branch_name,
-    CASE
-      -- Thao tac he thong (quen mat khau cong khai, job, ...) — khong gan chi nhanh
-      WHEN al.user_id IS NULL OR LOWER(LTRIM(RTRIM(ISNULL(al.user_name, N'')))) = N'system'
-        THEN N'Hệ thống'
-      -- Admin / GD all-scope
-      WHEN u.id IS NOT NULL AND u.branch_id IS NULL THEN N'Tất cả chi nhánh'
-      ELSE NULL
-    END
-  ) AS branch_name,
+  ${AUDIT_LOG_BRANCH_NAME},
   al.description,
   al.old_value,
+  al.new_value,
+  al.logged_at
+`;
+
+/** Cột list — bỏ request_body/old_value để giảm IO; giữ new_value cho humanize mô tả. */
+const AUDIT_LOG_LIST_COLUMNS = `
+  al.id,
+  al.user_id,
+  al.user_name,
+  al.phone_number,
+  al.action,
+  al.table_name,
+  al.entity_name,
+  al.entity_code,
+  al.record_id,
+  al.ip_address,
+  al.request_method,
+  al.request_url,
+  NULL AS request_body,
+  al.response_status,
+  al.duration_ms,
+  COALESCE(al.branch_id, u.branch_id) AS branch_id,
+  ${AUDIT_LOG_BRANCH_NAME},
+  al.description,
+  NULL AS old_value,
   al.new_value,
   al.logged_at
 `;
@@ -84,6 +112,9 @@ const AUDIT_LOG_FROM = `
   LEFT JOIN branches b ON b.id = al.branch_id
   LEFT JOIN branches ub ON ub.id = u.branch_id
 `;
+
+/** FROM nhẹ cho COUNT/STATS khi không lọc theo chi nhánh (không cần join). */
+const AUDIT_LOG_FROM_LIGHT = `audit_logs al`;
 
 const LOGIN_SESSION_COLUMNS = `
   ls.id,
@@ -274,17 +305,14 @@ async function getAuditLogs(filters = {}) {
   const params = {};
   let paramIndex = 1;
 
-  // Keyword search — tên / SĐT / mô tả / mã… (không phân biệt hoa thường & dấu)
+  // Keyword: chỉ cột ngắn (tên / SĐT / mã / entity) — tránh LIKE bỏ dấu trên description/URL (rất chậm)
   if (keyword) {
     const { key, nextIndex } = bindNormalizedLike(params, paramIndex, keyword);
     conditions.push(`(
       ${likeAccentInsensitive('al.user_name', key)} OR
       ${likeAccentInsensitive('al.phone_number', key)} OR
-      ${likeAccentInsensitive('al.description', key)} OR
-      ${likeAccentInsensitive('al.entity_name', key)} OR
       ${likeAccentInsensitive('al.entity_code', key)} OR
-      ${likeAccentInsensitive('al.table_name', key)} OR
-      ${likeAccentInsensitive('al.request_url', key)}
+      ${likeAccentInsensitive('al.entity_name', key)}
     )`);
     paramIndex = nextIndex;
   }
@@ -387,28 +415,24 @@ async function getAuditLogs(filters = {}) {
   const safePageSize = Math.max(1, Math.min(parseInt(pageSize, 10) || 20, 100));
   const offset = (safePage - 1) * safePageSize;
 
-  // Get count and stats in parallel
-  const [countResult, statsResult] = await Promise.all([
-    query(
-      `SELECT COUNT(*) AS total FROM ${AUDIT_LOG_FROM} WHERE ${whereClause}`,
-      params
-    ),
-    query(
-      `SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN al.action IN ('CREATE', 'INSERT') THEN 1 ELSE 0 END) AS create_count,
-        SUM(CASE WHEN al.action IN ('UPDATE', 'EDIT') THEN 1 ELSE 0 END) AS update_count,
-        SUM(CASE WHEN al.action IN ('DELETE', 'REMOVE') THEN 1 ELSE 0 END) AS delete_count
-       FROM ${AUDIT_LOG_FROM} WHERE ${whereClause}`,
-      params
-    ),
-  ]);
+  // Stats đủ lấy total — không chạy COUNT riêng (tránh scan filter 2 lần)
+  // Không lọc branch → FROM nhẹ (không join users/branches)
+  const statsFrom = branchId ? AUDIT_LOG_FROM : AUDIT_LOG_FROM_LIGHT;
+  const statsResult = await query(
+    `SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN al.action IN ('CREATE', 'INSERT') THEN 1 ELSE 0 END) AS create_count,
+      SUM(CASE WHEN al.action IN ('UPDATE', 'EDIT') THEN 1 ELSE 0 END) AS update_count,
+      SUM(CASE WHEN al.action IN ('DELETE', 'REMOVE') THEN 1 ELSE 0 END) AS delete_count
+     FROM ${statsFrom} WHERE ${whereClause}`,
+    params
+  );
 
-  const total = countResult.recordset[0].total;
-  const stats = statsResult.recordset[0];
+  const stats = statsResult.recordset[0] || {};
+  const total = stats.total || 0;
 
   const dataResult = await query(
-    `SELECT ${AUDIT_LOG_COLUMNS}
+    `SELECT ${AUDIT_LOG_LIST_COLUMNS}
      FROM   ${AUDIT_LOG_FROM}
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
@@ -478,11 +502,8 @@ async function getAuditLogsForExport(filters = {}) {
     conditions.push(`(
       ${likeAccentInsensitive('al.user_name', key)} OR
       ${likeAccentInsensitive('al.phone_number', key)} OR
-      ${likeAccentInsensitive('al.description', key)} OR
-      ${likeAccentInsensitive('al.entity_name', key)} OR
       ${likeAccentInsensitive('al.entity_code', key)} OR
-      ${likeAccentInsensitive('al.table_name', key)} OR
-      ${likeAccentInsensitive('al.request_url', key)}
+      ${likeAccentInsensitive('al.entity_name', key)}
     )`);
     paramIndex = nextIndex;
   }
