@@ -523,7 +523,7 @@ export default function AdminDevicesPage({
             </div>
             <div className="admin-devices__title-group">
               <h1>Thiết bị đăng nhập</h1>
-              <p className="admin-devices__subtitle">Quản lý thiết bị đang đăng nhập &amp; Force Logout</p>
+              <p className="admin-devices__subtitle">Quản lý thiết bị đang đăng nhập và buộc đăng xuất</p>
             </div>
           </div>
         </div>

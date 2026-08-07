@@ -100,6 +100,10 @@ export default function BranchFormPage({ mode: modeProp }) {
       setError('Tên chi nhánh là bắt buộc');
       return;
     }
+    if (form.branchName.trim().length > 100) {
+      setError('Tên chi nhánh tối đa 100 ký tự');
+      return;
+    }
     if (!isEdit && !form.branchCode.trim()) {
       setError('Mã chi nhánh là bắt buộc');
       return;
@@ -197,6 +201,7 @@ export default function BranchFormPage({ mode: modeProp }) {
             value={form.branchName}
             onChange={(e) => set('branchName', e.target.value)}
             placeholder="VD: AutoGara Hà Nội"
+            maxLength={100}
             required
           />
         </div>

@@ -31,7 +31,7 @@ function buildAdminRouter() {
   router.get('/dashboard', controller.getDashboardStats);
 
   router.get('/users', validateListUsersQuery, controller.listUsers);
-  router.get('/users/export', controller.exportUsers);
+  router.get('/users/export', validateListUsersQuery, controller.exportUsers);
   router.get('/users/:id', validateIdParam('id'), controller.getUserDetail);
   router.post('/users', validateCreateUser, controller.createUser);
   router.put('/users/:id', validateIdParam('id'), validateUpdateUser, controller.updateUser);

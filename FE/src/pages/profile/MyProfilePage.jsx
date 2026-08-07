@@ -14,7 +14,12 @@ import {
 } from '../../utils/profilePaths';
 import { useCrmSearchSync } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
-import { EMAIL_HINT, isValidEmail, isValidPhone } from '../../utils/validation';
+import {
+  EMAIL_HINT,
+  isValidEmail,
+  isValidPhone,
+  phoneDigitsOnly,
+} from '../../utils/validation';
 import './MyProfilePage.css';
 
 const IconUser = ({ size = 20 }) => (
@@ -244,7 +249,11 @@ export default function MyProfilePage({
   }
 
   function handleEditChange(e) {
-    setEditForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setEditForm((f) => ({
+      ...f,
+      [name]: name === 'phone' ? phoneDigitsOnly(value) : value,
+    }));
   }
 
   async function handleEditSubmit(e) {
@@ -252,7 +261,7 @@ export default function MyProfilePage({
     setEditError(null);
     setEditSuccess(null);
 
-    const phone = editForm.phone.trim();
+    const phone = phoneDigitsOnly(editForm.phone);
     const email = editForm.email.trim();
     if (!email) {
       setEditError('Email là bắt buộc');
