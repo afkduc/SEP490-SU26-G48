@@ -86,6 +86,7 @@ const GENERAL_DIRECTOR_NAV = [
   { label: 'Báo cáo doanh thu', path: '/general-director/reports/revenue' },
   { label: 'Báo cáo quyết toán', path: '/general-director/reports/settlements' },
   { label: 'Nhân viên', path: '/general-director/employees' },
+  { label: 'Quản lý chi nhánh', path: '/general-director/branch-managers' },
   { label: 'Thợ máy', path: '/general-director/technicians' },
 ];
 
