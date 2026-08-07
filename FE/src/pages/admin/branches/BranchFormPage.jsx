@@ -5,9 +5,11 @@ import { useToast } from '../../../components/common/ToastContext';
 import {
   EMAIL_HINT,
   formatPhoneInput,
+  getBranchNameError,
   isValidEmail,
   isValidPhone,
   phoneDigitsOnly,
+  NAME_MAX_LENGTH,
 } from '../../../utils/validation';
 import '../AdminBranchesPage.css';
 import './BranchPages.css';
@@ -96,12 +98,9 @@ export default function BranchFormPage({ mode: modeProp }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!form.branchName.trim()) {
-      setError('Tên chi nhánh là bắt buộc');
-      return;
-    }
-    if (form.branchName.trim().length > 100) {
-      setError('Tên chi nhánh tối đa 100 ký tự');
+    const branchNameErr = getBranchNameError(form.branchName, { required: true });
+    if (branchNameErr) {
+      setError(branchNameErr);
       return;
     }
     if (!isEdit && !form.branchCode.trim()) {
@@ -123,8 +122,8 @@ export default function BranchFormPage({ mode: modeProp }) {
     setError('');
     try {
       const payload = {
-        branchName: form.branchName.trim(),
-        address: form.address.trim() || undefined,
+        branchName: form.branchName.trim().replace(/\s+/g, ' '),
+        address: form.address.trim().slice(0, 255) || undefined,
         phone: phone || undefined,
         email: email || undefined,
         managerId: form.managerId ? Number(form.managerId) : null,
@@ -199,11 +198,14 @@ export default function BranchFormPage({ mode: modeProp }) {
           <input
             type="text"
             value={form.branchName}
-            onChange={(e) => set('branchName', e.target.value)}
+            onChange={(e) => set('branchName', e.target.value.slice(0, NAME_MAX_LENGTH))}
             placeholder="VD: AutoGara Hà Nội"
-            maxLength={100}
+            maxLength={NAME_MAX_LENGTH}
             required
           />
+          <p className="form__hint" style={{ marginTop: 6, color: '#64748b', fontSize: '0.8rem' }}>
+            Không bắt đầu bằng số · tối đa {NAME_MAX_LENGTH} ký tự
+          </p>
         </div>
 
         <div className="form-group">
@@ -211,8 +213,9 @@ export default function BranchFormPage({ mode: modeProp }) {
           <input
             type="text"
             value={form.address}
-            onChange={(e) => set('address', e.target.value)}
+            onChange={(e) => set('address', e.target.value.slice(0, 255))}
             placeholder="VD: 123 Nguyễn Trãi, Thanh Xuân, Hà Nội"
+            maxLength={255}
           />
         </div>
 
