@@ -1,4 +1,4 @@
-const { query } = require('../infrastructure/database/sqlServer');
+const { query, executeTransaction } = require('../infrastructure/database/sqlServer');
 const { emitLoginSessionEvent } = require('../application/events/LoginSessionEvents');
 
 function safeString(value, max = 255) {
@@ -165,25 +165,86 @@ function _sendLoginNotification(userId, browser, os, ipAddress, deviceId) {
   try {
     const NotificationService = require('../application/services/NotificationService');
     const ns = new NotificationService();
-    // notify() la async - PHAI bat .catch() vi khong await o day (fire-and-
-    // forget), neu khong reject se thanh unhandled rejection va lam crash
-    // ca process (Node moi mac dinh thoat process khi co unhandled rejection).
-    ns.notify('LOGIN_SUCCESS', {
+    const deviceLabel = [browser, os].filter(Boolean).join(' · ') || 'Thiết bị mới';
+    // Báo kiểu Facebook: login từ thiết bị/IP mới → luôn hiện in-app (skipSettings)
+    ns.notify('NEW_DEVICE', {
       userId,
       browser,
       os,
       ip: ipAddress,
       deviceId,
-    }).catch((err) => {
-      console.error('[loginSessionMiddleware] Failed to send login notification:', err.message);
+      device: deviceLabel,
+      location: ipAddress || 'vị trí không xác định',
+    }, { skipSettings: true }).catch((err) => {
+      console.error('[loginSessionMiddleware] Failed to send new-device notification:', err.message);
     });
   } catch (err) {
     console.error('[loginSessionMiddleware] Failed to send login notification:', err.message);
   }
 }
 
+function _sendLoginFailedNotification(userId, reason, ipAddress, browser, os) {
+  if (!userId) return;
+  try {
+    const NotificationService = require('../application/services/NotificationService');
+    const ns = new NotificationService();
+    ns.notify('LOGIN_FAILED', {
+      userId,
+      reason: reason || 'Sai mật khẩu hoặc thông tin đăng nhập',
+      ip: ipAddress,
+      browser,
+      os,
+    }, { skipSettings: true }).catch((err) => {
+      console.error('[loginSessionMiddleware] Failed to send login-failed notification:', err.message);
+    });
+  } catch (err) {
+    console.error('[loginSessionMiddleware] Failed to send login-failed notification:', err.message);
+  }
+}
+
+async function _writeLoginAuditLog(req, { success, userId, userName, reason, ipAddress, branchId = null }) {
+  try {
+    const { auditLog, ACTION_TYPES } = require('../utils/auditHelper');
+    // Gan tam user vao req de auditLog lay dung actor (login chua co JWT)
+    const prevUser = req.user;
+    const actorLabel = userName || prevUser?.name || prevUser?.email || 'unknown';
+    req.user = {
+      ...(prevUser || {}),
+      userId: userId || prevUser?.userId || null,
+      id: userId || prevUser?.id || null,
+      name: actorLabel,
+      email: userName || prevUser?.email || actorLabel,
+      user_name: actorLabel,
+      phone: prevUser?.phone || null,
+      branch_id: branchId != null ? branchId : (prevUser?.branch_id ?? null),
+    };
+    await auditLog({
+      req,
+      action: success ? ACTION_TYPES.LOGIN : ACTION_TYPES.FAILED_LOGIN,
+      tableName: 'login_sessions',
+      entityName: success ? 'Đăng nhập thành công' : 'Đăng nhập thất bại',
+      entityCode: actorLabel || null,
+      recordId: userId || null,
+      description: success
+        ? `Đăng nhập thành công${actorLabel ? `: ${actorLabel}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`
+        : `Đăng nhập thất bại${actorLabel ? `: ${actorLabel}` : ''}${reason ? ` — ${reason}` : ''}${ipAddress ? ` từ ${ipAddress}` : ''}`,
+      responseStatus: success ? 200 : 401,
+    });
+    req.user = prevUser;
+  } catch (err) {
+    console.warn('[loginSessionMiddleware] audit_logs write failed (non-blocking):', err.message);
+  }
+}
+
 async function trackLogin(req, user) {
   try {
+    // Dam bao cot is_trusted ton tai truoc khi upsert device
+    try {
+      await require('../infrastructure/repositories/DeviceRepository').ensureTrustedSchema();
+    } catch (schemaErr) {
+      console.warn('[trackLogin] ensureTrustedSchema:', schemaErr.message);
+    }
+
     const { ipAddress, userAgent } = getRequestMeta(req);
     const { browser, os } = parseUserAgent(userAgent);
 
@@ -194,84 +255,121 @@ async function trackLogin(req, user) {
       ? user.branch_id
       : null;
 
-    // Step 1: Close stale sessions of this user OR ones that point to a
-    // device that has been revoked. Without this, leaving a tab open or
-    // server restarts leave rows status='active' forever, which then makes
-    // the login-session history disagree with the devices page.
-    if (userId) {
-      try {
-        // Close the user's existing active sessions
-        const result = await query(
+    // ============================================================
+    // TRANSACTION: tat ca thay doi lien quan den login phai atomic.
+    // Neu bat ky buoc nao fail -> rollback toan bo (close stale sessions,
+    // device-set-current=0, insert session, upsert device).
+    // Day la fix cho "lịch sử đăng nhập het dong bo với thiết bị":
+    //   - Cu: 4 query rieng le, neu query 3 fail thi session dang active nhu
+    //     device da inactive (hoac nguoc lai) → 2 màn không khớp.
+    //   - Moi: 1 transaction de dat consistency.
+    // ============================================================
+    const result = await executeTransaction(async (txQuery) => {
+      const out = { sessionId: null, deviceId: null, isNewDevice: false, isTrusted: false };
+
+      // Step 1: Close stale sessions CUA USER HIEN TAI (logic single-session).
+      if (userId) {
+        const closeSessions = await txQuery(
           `UPDATE login_sessions
            SET    logout_time              = SYSUTCDATETIME(),
                   logout_reason            = 'NEW_LOGIN_OVERRIDE',
                   session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
                   status                   = 'ended'
-           WHERE  user_id   = @p1
-             AND  status   = 'active'
+           WHERE  user_id     = @p1
+             AND  status      = 'active'
              AND  action_type = 'LOGIN'`,
           { p1: userId }
         );
-        if (result.rowsAffected && result.rowsAffected[0] > 0) {
-          console.log(`[trackLogin] Closed ${result.rowsAffected[0]} previous session(s) for userId=${userId}`);
+        if (closeSessions.rowsAffected && closeSessions.rowsAffected[0] > 0) {
+          console.log(`[trackLogin] Closed ${closeSessions.rowsAffected[0]} previous session(s) for userId=${userId}`);
         }
 
-        // Dong device cua user bi kick (chi user hien tai)
-        await query(
+        // Dong device cua user hien tai (logic single-session: chi 1 device current)
+        await txQuery(
           'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
           { p1: userId }
         );
+      }
 
-        // Dong luon cac session active cua user khac ma minh dang dang nhap,
-        // tranh truong hop mot user cua ticket #login-session-mismatch van
-        // dang giu session active ma khong co device tuong ung.
-        await query(
-          `UPDATE login_sessions
-              SET logout_time = SYSUTCDATETIME(),
-                  logout_reason = 'STALE_HEARTBEAT',
-                  status = 'ended'
-            WHERE status = 'active'
-              AND action_type = 'LOGIN'
-              AND user_id != @p1
-              AND NOT EXISTS (
-                SELECT 1 FROM user_devices ud
-                WHERE ud.user_id = login_sessions.user_id
-                  AND ud.is_current = 1
-              )`,
-          { p1: userId }
+      // Step 2: Insert session moi
+      const insertResult = await txQuery(
+        `INSERT INTO login_sessions
+           (action_type, user_id, user_name, phone, ip_address, user_agent,
+            browser, os, branch_id, status, login_time, last_activity_at)
+         VALUES
+           ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'active', SYSUTCDATETIME(), SYSUTCDATETIME());
+         SELECT @@IDENTITY AS new_id;`,
+        {
+          p1: userId,
+          p2: userName,
+          p3: phone,
+          p4: ipAddress,
+          p5: userAgent,
+          p6: browser,
+          p7: os,
+          p8: branchId,
+        }
+      );
+
+      const rawSessionId = insertResult.recordset?.[0]?.new_id;
+      out.sessionId = rawSessionId !== null && rawSessionId !== undefined ? Number(rawSessionId) : null;
+
+      // Step 3: Upsert device (trong transaction)
+      // - Khớp đúng IP+browser+os → tái dùng
+      // - Ngược lại tạo mới → báo thiết bị mới (không còn nhánh "tin cậy")
+      // Luôn gắn device (IP fallback) để JWT có deviceId + session active —
+      // tránh heartbeat/API đá phiên mới ngay sau login.
+      const deviceIp = ipAddress || '0.0.0.0';
+      if (userId) {
+        const { deviceName } = parseUserAgent(userAgent);
+        const existing = await txQuery(
+          `SELECT TOP 1 id, is_current FROM user_devices
+           WHERE user_id = @p1 AND ip_address = @p2 AND browser = @p3 AND os = @p4`,
+          { p1: userId, p2: deviceIp, p3: browser, p4: os }
         );
-      } catch (err) {
-        console.error('[loginSessionMiddleware] failed to close stale sessions:', err.message);
+
+        if (existing.recordset.length > 0) {
+          const existingDevice = existing.recordset[0];
+          out.deviceId = existingDevice.id;
+          out.isNewDevice = false;
+          out.isTrusted = false;
+          await txQuery(
+            `UPDATE user_devices
+             SET    is_current = 1,
+                    last_login_at = SYSUTCDATETIME(),
+                    last_activity_at = SYSUTCDATETIME(),
+                    user_agent = @p5
+             WHERE  id = @p1`,
+            { p1: existingDevice.id, p5: userAgent }
+          );
+        } else {
+          const insertDevice = await txQuery(
+            `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, is_trusted, last_login_at, last_activity_at)
+             VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+             SELECT @@IDENTITY AS new_id;`,
+            { p1: userId, p2: deviceName, p3: browser, p4: os, p5: deviceIp, p6: userAgent }
+          );
+          const rawNewId = insertDevice.recordset?.[0]?.new_id;
+          out.deviceId = rawNewId !== null && rawNewId !== undefined ? Number(rawNewId) : null;
+          out.isNewDevice = true;
+          out.isTrusted = false;
+        }
       }
-    }
 
-    // Buoc 4: Insert session moi
-    // Bang login_sessions co trigger INSTEAD OF, nen OUTPUT INSERTED.id se throw
-    // error "cannot have any enabled triggers if the statement contains an
-    // OUTPUT clause without INTO clause". Phai dung @@IDENTITY (tra gia tri
-    // identity cuoi cung do bat ky statement nao tao ra, ke ca trigger).
-    const insertResult = await query(
-      `INSERT INTO login_sessions
-         (action_type, user_id, user_name, phone, ip_address, user_agent,
-          browser, os, branch_id, status, login_time)
-       VALUES
-         ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'active', SYSUTCDATETIME());
-       SELECT @@IDENTITY AS new_id;`,
-      {
-        p1: userId,
-        p2: userName,
-        p3: phone,
-        p4: ipAddress,
-        p5: userAgent,
-        p6: browser,
-        p7: os,
-        p8: branchId,
+      // Step 4: Link session ↔ device
+      if (out.sessionId && out.deviceId) {
+        await txQuery(
+          'UPDATE login_sessions SET device_id = @p1 WHERE id = @p2 AND user_id = @p3',
+          { p1: out.deviceId, p2: out.sessionId, p3: userId }
+        );
       }
-    );
 
-    const rawSessionId = insertResult.recordset?.[0]?.new_id;
-    const sessionId = rawSessionId !== null && rawSessionId !== undefined ? Number(rawSessionId) : null;
+      return out;
+    });
 
+    const { sessionId, deviceId, isNewDevice } = result;
+
+    // Post-commit (khong can transaction): log event + SSE
     if (sessionId) {
       await logSessionEvent({
         sessionId,
@@ -283,15 +381,6 @@ async function trackLogin(req, user) {
       });
     }
 
-    // Buoc 5: Update device CHO USER HIEN TAI (chi anh huong device cua user nay)
-    // Khong anh huong device cua user khac
-    // Tra ve deviceId de AuthService co the them vao JWT
-    let deviceId = null;
-    if (userId && ipAddress) {
-      deviceId = await upsertDevice(userId, userAgent, ipAddress);
-    }
-
-    // Emit SSE event (sau khi co deviceId)
     if (sessionId) {
       emitLoginSessionEvent('login', {
         sessionId,
@@ -302,18 +391,24 @@ async function trackLogin(req, user) {
         browser,
         os,
         branchId,
-        deviceId,  // Them deviceId vao event
+        deviceId,
       });
-
-      // Send notification for successful login
-      _sendLoginNotification(userId, browser, os, ipAddress, deviceId);
+      // Báo khi thiết bị mới (IP+browser+os chưa từng ghi nhận)
+      if (isNewDevice) {
+        _sendLoginNotification(userId, browser, os, ipAddress, deviceId);
+      }
+      await _writeLoginAuditLog(req, {
+        success: true,
+        userId,
+        userName,
+        ipAddress,
+      });
     }
 
-    // Tra ve deviceId de AuthService co the them vao JWT
-    return { deviceId };
+    return { deviceId, sessionId };
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLogin failed:', err.message ? err.message : err);
-    return { deviceId: null };
+    return { deviceId: null, sessionId: null };
   }
 }
 
@@ -324,10 +419,11 @@ async function trackLogout(req) {
       return;
     }
 
-    // JWT payload co cac field: userId, email, name (la user_name), roles, branchId
-    // Token cu co the chi co userName thay vi name -> chap nhan ca hai.
+    // JWT payload co cac field: userId, email, name (la user_name), roles, branchId, deviceId
     const userName = safeString(req.user.name || req.user.user_name);
     const userId = req.user.userId || req.user.id || null;
+    const deviceId = req.user.deviceId || null;
+    const sessionId = req.user.sessionId || null; // ← QUAN TRONG: dong dung session cua browser hien tai
 
     if (!userName && !userId) {
       console.error('[loginSessionMiddleware] trackLogout skipped: missing user identifier');
@@ -336,37 +432,110 @@ async function trackLogout(req) {
 
     const { ipAddress, userAgent } = getRequestMeta(req);
 
-    // Dong session active gan nhat cua user. Uu tien user_id de tranh nham khi
-    // user doi ten hien thi (user_name).
-    const active = await query(
-      `SELECT TOP 1 id, user_id
-       FROM   login_sessions
-       WHERE  status = 'active' AND action_type = 'LOGIN'
-         ${userId ? 'AND user_id = @p2' : 'AND user_name = @p1'}
-       ORDER  BY login_time DESC`,
-      userId ? { p2: userId } : { p1: userName }
-    );
-
-    if (!active.recordset.length) {
-      console.warn(`[loginSessionMiddleware] trackLogout: no active session for ${userName || userId}`);
-      return;
+    // BUG CU: chi lay 1 session moi nhat theo user_id → neu user login 2 noi
+    // (Edge + Chrome), logout 1 tab chi dong session cua 1 trong 2 browser
+    // → browser con lai van hien "Dang hoat dong" tren trang admin.
+    //
+    // FIX: Uu tien theo deviceId (JWT co deviceId tu login). Neu khong co
+    // deviceId (token cu, backward compat) → fallback theo user_id nhu cu,
+    // nhung ADDITIONALLY close TAT CA session khac cua user dang su dung
+    // status='active' chi giu lai session moi nhat (giam dang bộ).
+    let active;
+    if (sessionId) {
+      active = await query(
+        `SELECT TOP 1 id, user_id, ip_address
+         FROM login_sessions
+         WHERE id = @p1 AND user_id = @p2
+           AND status = 'active' AND action_type = 'LOGIN'`,
+        { p1: sessionId, p2: userId }
+      );
+    } else if (deviceId) {
+      active = await query(
+        `SELECT TOP 1 id, user_id, ip_address
+         FROM login_sessions
+         WHERE device_id = @p1 AND user_id = @p2
+           AND status = 'active' AND action_type = 'LOGIN'`,
+        { p1: deviceId, p2: userId }
+      );
+    } else {
+      active = await query(
+        `SELECT TOP 1 id, user_id
+         FROM login_sessions
+         WHERE status = 'active' AND action_type = 'LOGIN'
+           ${userId ? 'AND user_id = @p1' : 'AND user_name = @p2'}
+         ORDER BY login_time DESC`,
+        userId ? { p1: userId } : { p2: userName }
+      );
     }
 
-    const sessionId = active.recordset[0].id;
+    if (!active.recordset.length) {
+      // Token moi luon phai logout theo session/device ID; khong fallback sang
+      // session khac cua cung user vi se dong nham phien dang nhap.
+      if (sessionId || deviceId) {
+        console.warn(`[loginSessionMiddleware] trackLogout: session not found for sessionId=${sessionId || 'n/a'}, deviceId=${deviceId || 'n/a'}`);
+        return;
+      }
+
+      // Token cu khong co ID moi dung fallback theo user.
+      const fallback = await query(
+        `SELECT TOP 1 id, user_id
+         FROM   login_sessions
+         WHERE  status = 'active' AND action_type = 'LOGIN'
+           ${userId ? 'AND user_id = @p1' : 'AND user_name = @p2'}
+         ORDER  BY login_time DESC`,
+        userId ? { p1: userId } : { p2: userName }
+      );
+      if (!fallback.recordset.length) {
+        console.warn(`[loginSessionMiddleware] trackLogout: no active session for ${userName || userId}`);
+        return;
+      }
+      active = fallback;
+    }
+
+    const endedSessionId = active.recordset[0].id;
     const sessionUserId = active.recordset[0].user_id;
 
-    await query(
-      `UPDATE login_sessions
-       SET    logout_time                = SYSUTCDATETIME(),
-              logout_reason              = 'USER_INITIATED',
-              session_duration_seconds   = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
-              status                     = 'ended'
-       WHERE  id = @p1`,
-      { p1: sessionId }
-    );
+    // (ipAddress, userAgent da duoc lay o tren tu getRequestMeta)
+
+    // ============================================================
+    // TRANSACTION: close session + close device phai atomic.
+    // Neu 1 trong 2 fail -> rollback toan bo (tranh
+    // session dong nhung device van "current" hoac nguoc lai).
+    // ============================================================
+    await executeTransaction(async (txQuery) => {
+      await txQuery(
+        `UPDATE login_sessions
+         SET    logout_time                = SYSUTCDATETIME(),
+                logout_reason              = 'USER_INITIATED',
+                session_duration_seconds   = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+                status                     = 'ended'
+         WHERE  id = @p1`,
+        { p1: endedSessionId }
+      );
+
+      if (sessionUserId) {
+        if (deviceId) {
+          await txQuery(
+            `UPDATE user_devices
+             SET last_activity_at = SYSUTCDATETIME(), is_current = 0
+             WHERE id = @p1 AND user_id = @p2`,
+            { p1: deviceId, p2: sessionUserId }
+          );
+        } else {
+          await txQuery(
+            `UPDATE user_devices
+             SET last_activity_at = SYSUTCDATETIME(), is_current = 0
+             WHERE user_id = @p1 AND is_current = 1`,
+            { p1: sessionUserId }
+          );
+        }
+      }
+    }).catch((err) => {
+      console.error('[loginSessionMiddleware] logout transaction failed:', err.message);
+    });
 
     await logSessionEvent({
-      sessionId,
+      sessionId: endedSessionId,
       eventType: 'LOGOUT',
       userId: sessionUserId,
       userName,
@@ -374,28 +543,30 @@ async function trackLogout(req) {
       userAgent,
     });
 
-    // Cap nhat last_activity_at = now truoc khi logout
-    // Sau do set is_current = 0
-    // Device chi active khi user dang su dung, logout se tat
-    if (sessionUserId) {
-      const devResult = await query(
-        `UPDATE user_devices 
-         SET last_activity_at = SYSUTCDATETIME(), is_current = 0 
-         WHERE user_id = @p1 AND is_current = 1`,
-        { p1: sessionUserId }
-      );
-      if (devResult.rowsAffected && devResult.rowsAffected[0] > 0) {
-        console.log(`[loginSessionMiddleware] Marked ${devResult.rowsAffected[0]} device(s) as inactive for userId=${sessionUserId}`);
-      }
-    }
-
     // Emit SSE event
     emitLoginSessionEvent('logout', {
-      sessionId,
+      sessionId: endedSessionId,
       userId: sessionUserId,
       userName,
       ipAddress,
+      deviceId,
     });
+
+    try {
+      const { auditLog, ACTION_TYPES } = require('../utils/auditHelper');
+      await auditLog({
+        req,
+        action: ACTION_TYPES.LOGOUT,
+        tableName: 'login_sessions',
+        entityName: 'Đăng xuất',
+        entityCode: userName || null,
+        recordId: sessionUserId || endedSessionId,
+        description: `Đăng xuất${userName ? `: ${userName}` : ''}`,
+        responseStatus: 200,
+      });
+    } catch (auditErr) {
+      console.warn('[loginSessionMiddleware] logout audit failed:', auditErr.message);
+    }
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLogout ERROR:', err && err.message ? err.message : err);
   }
@@ -471,6 +642,23 @@ async function trackLoginFailed(req, payload) {
           failureReason,
         });
       }
+
+      // Soft-fail (sai chi nhánh / tài khoản khóa…): không chuông, không audit FAILED_LOGIN.
+      // AuthController cũng không gọi trackLoginFailed cho các case này; giữ guard phòng gọi khác.
+      const skipSecurityNoise = ['WRONG_BRANCH', 'BRANCH_REQUIRED', 'ACCOUNT_DISABLED', 'BRANCH_DISABLED'];
+      if (skipSecurityNoise.includes(failureReason)) {
+        return;
+      }
+
+      _sendLoginFailedNotification(userId, failureReason, ipAddress, browser, os);
+      await _writeLoginAuditLog(req, {
+        success: false,
+        userId,
+        userName,
+        reason: failureReason,
+        ipAddress,
+        branchId,
+      });
     }
   } catch (err) {
     console.error('[loginSessionMiddleware] trackLoginFailed failed:', err && err.message ? err.message : err);

@@ -52,6 +52,10 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
 
   const handleSave = useCallback(async () => {
     if (!userId) return;
+    if (selected.size === 0) {
+      setError('Phải chọn ít nhất một vai trò');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -63,8 +67,8 @@ export default function AssignRoleModal({ userId, onClose, onSuccess }) {
       // role is assigned but not selected -> revoke
       const toRevoke = [...currentIds].filter((id) => !selected.has(id));
 
-      for (const roleId of toAssign) {
-        await adminUserRolesApi.assignRoles({ userId, roleIds: [roleId] });
+      if (toAssign.length > 0) {
+        await adminUserRolesApi.assignRoles(userId, toAssign);
       }
       for (const roleId of toRevoke) {
         await adminUserRolesApi.revokeRole(userId, roleId);

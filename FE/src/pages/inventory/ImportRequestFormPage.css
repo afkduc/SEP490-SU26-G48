@@ -1,5 +1,40 @@
+/* ============================================================
+   ImportRequestFormPage — Material Design 3
+   Scope trong .ir-form để không ảnh hưởng trang khác.
+============================================================ */
 .ir-form {
-  padding: 24px 32px;
+  --md-primary: #4f46e5;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #e0e7ff;
+  --md-on-primary-container: #1e1b4b;
+  --md-surface: #ffffff;
+  --md-surface-variant: #f4f4fb;
+  --md-surface-container: #f7f7fd;
+  --md-on-surface: #1c1b1f;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #cac4d0;
+  --md-outline-variant: #e7e0ec;
+  --md-error: #ba1a1a;
+  --md-error-container: #ffdad6;
+  --md-on-error-container: #410002;
+  --md-success: #146c2e;
+  --md-success-container: #c6f0cd;
+  --md-on-success-container: #002106;
+  --md-warning-container: #ffdea8;
+  --md-on-warning-container: #2a1800;
+
+  --md-elevation-1: 0 1px 2px rgba(0,0,0,0.30), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-elevation-2: 0 1px 2px rgba(0,0,0,0.30), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-full: 9999px;
+
+  padding: 8px 4px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: var(--md-on-surface);
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .ir-form__header {
@@ -8,62 +43,69 @@
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .ir-form__title {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 400;
   margin: 0 0 4px;
-  color: #1f2937;
+  color: var(--md-on-surface);
 }
 
 .ir-form__subtitle {
-  font-size: 13px;
-  color: #6b7280;
+  font-size: 14px;
+  color: var(--md-on-surface-variant);
   margin: 0;
   max-width: 640px;
 }
 
 .ir-form__body {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-lg);
   padding: 24px;
+  box-shadow: var(--md-elevation-1);
 }
 
 .ir-form__info {
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 16px;
-  margin-bottom: 16px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  padding-bottom: 20px;
+  margin-bottom: 20px;
 }
 
 .ir-form__info-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .ir-form__title { font-size: 22px; line-height: 28px; }
+  .ir-form__info-row { grid-template-columns: 1fr; }
 }
 
 .ir-form__field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .ir-form__label {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--md-on-surface-variant);
 }
 
 .ir-form__hint {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--md-on-surface-variant);
 }
+.ir-form__hint--error { color: var(--md-error); }
 
-.ir-form__hint--error {
-  color: #dc2626;
-}
+.ir-form__items { margin-top: 4px; }
 
 .ir-form__items-header {
   display: flex;
@@ -74,8 +116,9 @@
 
 .ir-form__items-title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   margin: 0;
+  color: var(--md-on-surface);
 }
 
 .ir-form__dropdown {
@@ -83,10 +126,10 @@
   top: 100%;
   left: 0;
   right: 0;
-  background: #fff;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-sm);
+  box-shadow: var(--md-elevation-2);
   max-height: 240px;
   overflow-y: auto;
   z-index: 30;
@@ -96,7 +139,7 @@
 .ir-form__dropdown-item {
   padding: 8px 10px;
   font-size: 13px;
-  color: #4b5563;
+  color: var(--md-on-surface-variant);
 }
 
 .ir-form__dropdown-item--clickable {
@@ -105,24 +148,18 @@
   border: none;
   text-align: left;
   cursor: pointer;
+  color: var(--md-on-surface);
 }
+.ir-form__dropdown-item--clickable:hover { background: var(--md-surface-variant); }
 
-.ir-form__dropdown-item--clickable:hover {
-  background: #f3f4f6;
-}
-
-.ir-form__dropdown-meta {
-  color: #9ca3af;
-  font-size: 12px;
-}
+.ir-form__dropdown-meta { color: var(--md-on-surface-variant); font-size: 12px; }
 
 .ir-form__error {
   margin-top: 12px;
-  padding: 10px 12px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 6px;
-  color: #b91c1c;
+  padding: 12px 14px;
+  background: var(--md-error-container);
+  border-radius: var(--md-shape-sm);
+  color: var(--md-on-error-container);
   font-size: 13px;
 }
 
@@ -131,46 +168,103 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--md-outline-variant);
 }
 
-/* Table styles */
-.table {
+/* ── MD3 inputs ── */
+.ir-form .input,
+.ir-form .input--select {
+  width: 100%;
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-sm);
+  background: var(--md-surface);
+  font-size: 14px;
+  color: var(--md-on-surface);
+  outline: none;
+  box-sizing: border-box;
+}
+.ir-form textarea.input {
+  height: auto;
+  padding: 10px 16px;
+  resize: vertical;
+  min-height: 60px;
+}
+.ir-form .input:focus { border-color: var(--md-primary); box-shadow: inset 0 0 0 1px var(--md-primary); }
+.ir-form select.input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2349454f' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+.ir-form .table input.input { height: 40px; }
+
+/* ── MD3 buttons ── */
+.ir-form .btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--md-shape-full);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.ir-form .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ir-form .btn--primary { background: var(--md-primary); color: var(--md-on-primary); box-shadow: var(--md-elevation-1); }
+.ir-form .btn--primary:hover:not(:disabled) { box-shadow: var(--md-elevation-2); }
+.ir-form .btn--secondary {
+  background: var(--md-surface);
+  color: var(--md-primary);
+  border: 1px solid var(--md-outline);
+}
+.ir-form .btn--secondary:hover:not(:disabled) { background: var(--md-surface-variant); }
+.ir-form .btn--ghost { background: transparent; color: var(--md-primary); padding: 0 12px; }
+.ir-form .btn--ghost:hover:not(:disabled) { background-color: rgba(79, 70, 229, 0.08); }
+.ir-form .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
+/* ── MD3 table ── */
+.ir-form .table-responsive {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-md);
+  overflow: auto;
+}
+.ir-form .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 14px;
 }
-
-.table thead tr {
-  background: #eef2ff;
-}
-
-.table th {
-  padding: 10px 12px;
+.ir-form .table thead tr { background: var(--md-surface-variant); }
+.ir-form .table th {
+  padding: 12px 14px;
   text-align: left;
   font-size: 12px;
-  font-weight: 700;
-  color: #4338ca;
-  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
   letter-spacing: 0.5px;
   white-space: nowrap;
-  border-bottom: 2px solid #6366f1;
+  border-bottom: 1px solid var(--md-outline-variant);
 }
-
-.table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid #e2e8f0;
-  color: #374151;
+.ir-form .table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface);
   text-align: left;
 }
+.ir-form .table tbody tr:last-child td { border-bottom: none; }
+.ir-form .table tbody tr:hover { background-color: var(--md-surface-container); }
+.ir-form .table tfoot td { border-top: 1px solid var(--md-outline-variant); border-bottom: none; }
 
-.table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.table tbody tr:hover {
-  background-color: #f8fafc;
-}
-
-.table-responsive {
-  overflow-x: auto;
-}
+.ir-form .font-mono { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--md-primary); }
+.ir-form .text-right { text-align: right; }

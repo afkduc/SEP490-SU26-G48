@@ -1,5 +1,40 @@
+/* ============================================================
+   ImportRequestListPage — Material Design 3
+   Scope trong .ir-list để không ảnh hưởng trang khác.
+============================================================ */
 .ir-list {
-  padding: 24px 32px;
+  --md-primary: #4f46e5;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #e0e7ff;
+  --md-on-primary-container: #1e1b4b;
+  --md-surface: #ffffff;
+  --md-surface-variant: #f4f4fb;
+  --md-surface-container: #f7f7fd;
+  --md-on-surface: #1c1b1f;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #cac4d0;
+  --md-outline-variant: #e7e0ec;
+  --md-error: #ba1a1a;
+  --md-error-container: #ffdad6;
+  --md-on-error-container: #410002;
+  --md-success: #146c2e;
+  --md-success-container: #c6f0cd;
+  --md-on-success-container: #002106;
+  --md-warning-container: #ffdea8;
+  --md-on-warning-container: #2a1800;
+
+  --md-elevation-1: 0 1px 2px rgba(0,0,0,0.30), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-elevation-2: 0 1px 2px rgba(0,0,0,0.30), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-full: 9999px;
+
+  padding: 8px 4px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: var(--md-on-surface);
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .ir-list__header {
@@ -8,68 +43,65 @@
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .ir-list__title {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 400;
   margin: 0 0 4px;
-  color: #1f2937;
+  color: var(--md-on-surface);
 }
 
 .ir-list__subtitle {
-  font-size: 13px;
-  color: #6b7280;
+  font-size: 14px;
+  color: var(--md-on-surface-variant);
   margin: 0;
+  max-width: 60ch;
 }
 
 .ir-list__tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   margin-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 8px;
+  border-bottom: 1px solid var(--md-outline-variant);
 }
 
 .ir-list__tab {
   background: transparent;
-  border: 1px solid transparent;
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #4b5563;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .ir-list__tab:hover {
-  background: #f3f4f6;
+  color: var(--md-on-surface);
 }
 
 .ir-list__tab--active {
-  background: #1f6feb;
-  color: #fff;
-  border-color: #1f6feb;
+  color: var(--md-primary);
+  border-bottom-color: var(--md-primary);
 }
 
 .ir-list__filters {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
   margin-bottom: 16px;
   flex-wrap: wrap;
-}
-
-.ir-list__filters .input {
-  height: 36px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 0 10px;
-  font-size: 13px;
+  padding: 16px;
+  background: var(--md-surface-container);
+  border-radius: var(--md-shape-md);
 }
 
 .ir-list__filters .input--search {
-  min-width: 260px;
+  min-width: 240px;
   flex: 1;
 }
 
@@ -77,20 +109,21 @@
 .ir-list__error {
   padding: 32px;
   text-align: center;
-  color: #6b7280;
+  border-radius: var(--md-shape-md);
+  font-size: 14px;
 }
-
-.ir-list__error {
-  color: #dc2626;
-}
+.ir-list__loading { background: var(--md-surface-variant); color: var(--md-on-surface-variant); }
+.ir-list__error { background: var(--md-error-container); color: var(--md-on-error-container); }
 
 .ir-list__pagination {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-top: 16px;
-  font-size: 13px;
-  color: #4b5563;
+  padding-top: 16px;
+  border-top: 1px solid var(--md-outline-variant);
+  font-size: 14px;
+  color: var(--md-on-surface-variant);
 }
 
 .ir-list__pagination-controls {
@@ -102,46 +135,120 @@
 .ir-list__pagination-current {
   min-width: 100px;
   text-align: center;
+  color: var(--md-on-surface);
 }
 
-/* Table styles */
-.table {
+@media (max-width: 768px) {
+  .ir-list__title { font-size: 22px; line-height: 28px; }
+  .ir-list__filters { padding: 12px; }
+  .ir-list__filters .input--search { min-width: 100%; }
+}
+
+/* ── MD3 inputs ── */
+.ir-list .input,
+.ir-list .input--search {
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-sm);
+  background: var(--md-surface);
+  font-size: 14px;
+  color: var(--md-on-surface);
+  outline: none;
+  box-sizing: border-box;
+}
+.ir-list .input:focus { border-color: var(--md-primary); box-shadow: inset 0 0 0 1px var(--md-primary); }
+.ir-list .input[type="date"] { min-width: 150px; }
+
+/* ── MD3 buttons ── */
+.ir-list .btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--md-shape-full);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.ir-list .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ir-list .btn--primary { background: var(--md-primary); color: var(--md-on-primary); box-shadow: var(--md-elevation-1); }
+.ir-list .btn--primary:hover:not(:disabled) { box-shadow: var(--md-elevation-2); }
+.ir-list .btn--secondary {
+  background: var(--md-surface);
+  color: var(--md-primary);
+  border: 1px solid var(--md-outline);
+}
+.ir-list .btn--secondary:hover:not(:disabled) { background: var(--md-surface-variant); }
+.ir-list .btn--ghost { background: transparent; color: var(--md-primary); padding: 0 12px; }
+.ir-list .btn--ghost:hover:not(:disabled) { background-color: rgba(79, 70, 229, 0.08); }
+.ir-list .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
+/* ── MD3 table ── */
+.ir-list .table-responsive {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-lg);
+  overflow: auto;
+  box-shadow: var(--md-elevation-1);
+}
+.ir-list .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 14px;
 }
-
-.table thead tr {
-  background: #eef2ff;
-}
-
-.table th {
-  padding: 10px 12px;
+.ir-list .table thead tr { background: var(--md-surface-variant); }
+.ir-list .table th {
+  padding: 14px 16px;
   text-align: left;
   font-size: 12px;
-  font-weight: 700;
-  color: #4338ca;
-  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
   letter-spacing: 0.5px;
   white-space: nowrap;
-  border-bottom: 2px solid #6366f1;
+  border-bottom: 1px solid var(--md-outline-variant);
 }
-
-.table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid #e2e8f0;
-  color: #374151;
+.ir-list .table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface);
   text-align: left;
 }
+.ir-list .table tbody tr:last-child td { border-bottom: none; }
+.ir-list .table tbody tr:hover { background-color: var(--md-surface-container); }
 
-.table tbody tr:last-child td {
-  border-bottom: none;
+.ir-list .table__empty {
+  text-align: center;
+  color: var(--md-on-surface-variant);
+  padding: 40px 12px !important;
 }
 
-.table tbody tr:hover {
-  background-color: #f8fafc;
+.ir-list .table__actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
 }
 
-.table-responsive {
-  overflow-x: auto;
+.ir-list .font-mono { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--md-primary); }
+.ir-list .text-right { text-align: right; }
+
+/* ── Chips ── */
+.ir-list .badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--md-shape-sm);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }
+.ir-list .badge--success { background: var(--md-success-container); color: var(--md-on-success-container); }
+.ir-list .badge--warning { background: var(--md-warning-container); color: var(--md-on-warning-container); }
+.ir-list .badge--danger { background: var(--md-error-container); color: var(--md-on-error-container); }

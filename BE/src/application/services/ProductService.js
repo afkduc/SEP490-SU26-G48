@@ -88,13 +88,31 @@ class ProductService {
   }
 
   async deleteProduct(id) {
-    const deleted = await this.productRepository.delete(id);
-    if (!deleted) throw new ApiError(404, 'Product not found');
-    return ProductResponseDto.fromEntity(deleted);
+    // Soft-disable (status=inactive). Giữ tên method để tương thích controller cũ.
+    const deactivated = await this.productRepository.delete(id);
+    if (!deactivated) throw new ApiError(404, 'Product not found');
+    return ProductResponseDto.fromEntity(deactivated);
   }
 
-async getCategories() {
+  async reactivateProduct(id) {
+    const product = await this.productRepository.reactivate(id);
+    if (!product) throw new ApiError(404, 'Product not found');
+    return ProductResponseDto.fromEntity(product);
+  }
+
+  async getCategories() {
     return this.productRepository.getDistinctCategories();
+  }
+
+  async markSeenByManager(id) {
+    const product = await this.productRepository.markSeenByManager(id);
+    if (!product) throw new ApiError(404, 'Product not found');
+    return ProductResponseDto.fromEntity(product);
+  }
+
+  async countNewForManager(branchId) {
+    if (!branchId) throw new ApiError(400, 'branchId is required');
+    return this.productRepository.countNewForManager(branchId);
   }
 
   async listUnits() {

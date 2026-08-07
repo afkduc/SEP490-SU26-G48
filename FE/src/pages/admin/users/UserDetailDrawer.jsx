@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
 import { adminUsersApi } from '../../../services/adminApi';
-import AssignRoleModal from './AssignRoleModal';
-import ResetPasswordModal from './ResetPasswordModal';
+import { formatPhoneDisplay } from '../../../utils/validation';
 import '../components/AdminDrawer.css';
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
-  inactive: 'Ngừng hoạt động',
+  inactive: 'Không hoạt động',
   locked: 'Bị khóa',
 };
 
 const STATUS_CLASS = {
   active: 'badge--success',
-  inactive: 'badge--secondary',
+  inactive: 'badge--danger',
   locked: 'badge--danger',
 };
 
@@ -31,19 +30,6 @@ function formatDateTime(value) {
   }
 }
 
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  } catch {
-    return value;
-  }
-}
-
 function getInitials(firstName, lastName) {
   if (firstName || lastName) {
     return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
@@ -51,15 +37,10 @@ function getInitials(firstName, lastName) {
   return '?';
 }
 
-function DetailRow({ icon, label, value, badge }) {
+function DetailRow({ label, value, badge }) {
   return (
     <div className="detail-list__item">
-      <dt>
-        {icon && (
-          <span style={{ opacity: 0.6 }}>{icon}</span>
-        )}
-        {label}
-      </dt>
+      <dt>{label}</dt>
       <dd>
         {badge ? (
           <span className={`badge ${badge}`}>{value}</span>
@@ -71,12 +52,10 @@ function DetailRow({ icon, label, value, badge }) {
   );
 }
 
-export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
+export default function UserDetailDrawer({ userId, onClose }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showAssign, setShowAssign] = useState(false);
-  const [showReset, setShowReset] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -129,7 +108,6 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
             <div className="drawer__error">{error}</div>
           ) : user ? (
             <>
-              {/* User card */}
               <div className="user-info-card">
                 <div className="user-info-card__avatar">
                   {getInitials(user.firstName, user.lastName)}
@@ -137,12 +115,14 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                 <h3 className="user-info-card__name">{fullName}</h3>
                 <p className="user-info-card__username">
                   @{user.name}
-                  {user.phone ? ` · ${user.phone}` : ''}
+                  {user.phone ? ` · ${formatPhoneDisplay(user.phone)}` : ''}
                 </p>
                 {user.roles?.length > 0 && (
                   <div className="user-info-card__roles">
                     {user.roles.map((r) => {
-                      const name = typeof r === 'object' && r !== null ? r.roleName : r;
+                      const name = typeof r === 'object' && r !== null
+                        ? (r.roleLabel || r.roleName)
+                        : r;
                       const key = typeof r === 'object' && r !== null ? r.roleId : r;
                       return (
                         <span key={key} className="badge badge--info">{name}</span>
@@ -152,20 +132,13 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                 )}
               </div>
 
-              {/* Detail list */}
               <dl className="detail-list">
                 <div className="detail-list__group">
                   <div className="detail-list__group-title">Thông tin tài khoản</div>
                 </div>
                 <div className="detail-list__group">
-                  <DetailRow
-                    label="ID"
-                    value={<span className="font-mono">#{user.id}</span>}
-                  />
-                  <DetailRow
-                    label="Email"
-                    value={user.email}
-                  />
+                  <DetailRow label="ID" value={<span className="font-mono">#{user.id}</span>} />
+                  <DetailRow label="Email" value={user.email} />
                   <DetailRow
                     label="Trạng thái"
                     value={STATUS_LABELS[user.status] || user.status}
@@ -177,18 +150,9 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                   <div className="detail-list__group-title">Thông tin cá nhân</div>
                 </div>
                 <div className="detail-list__group">
-                  <DetailRow
-                    label="Họ"
-                    value={user.firstName || '—'}
-                  />
-                  <DetailRow
-                    label="Tên"
-                    value={user.lastName || '—'}
-                  />
-                  <DetailRow
-                    label="Số điện thoại"
-                    value={user.phone || '—'}
-                  />
+                  <DetailRow label="Họ" value={user.firstName || '—'} />
+                  <DetailRow label="Tên" value={user.lastName || '—'} />
+                  <DetailRow label="Số điện thoại" value={user.phone ? formatPhoneDisplay(user.phone) : '—'} />
                 </div>
 
                 <div className="detail-list__group">
@@ -197,7 +161,11 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                 <div className="detail-list__group">
                   <DetailRow
                     label="Chi nhánh"
-                    value={user.branchName || '—'}
+                    value={
+                      user.scopeAllBranches
+                        ? 'Tất cả chi nhánh'
+                        : (user.branchName || '—')
+                    }
                   />
                 </div>
 
@@ -205,10 +173,7 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
                   <div className="detail-list__group-title">Lịch sử</div>
                 </div>
                 <div className="detail-list__group">
-                  <DetailRow
-                    label="Ngày tạo"
-                    value={formatDateTime(user.createdAt)}
-                  />
+                  <DetailRow label="Ngày tạo" value={formatDateTime(user.createdAt)} />
                   <DetailRow
                     label="Đăng nhập cuối"
                     value={user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Chưa có dữ liệu'}
@@ -218,49 +183,7 @@ export default function UserDetailDrawer({ userId, onClose, onRolesChanged }) {
             </>
           ) : null}
         </div>
-
-        <div className="drawer__footer">
-          <button
-            className="drawer__btn-secondary"
-            onClick={() => setShowReset(true)}
-            type="button"
-            disabled={!user?.id}
-            title="Tạo mật khẩu mới ngẫu nhiên cho người dùng này"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-            Đặt lại mật khẩu
-          </button>
-          <button className="drawer__btn-assign" onClick={() => setShowAssign(true)} type="button">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              <line x1="12" y1="8" x2="12" y2="16"/>
-              <line x1="8" y1="12" x2="16" y2="12"/>
-            </svg>
-            Phân quyền
-          </button>
-        </div>
       </div>
-
-      {showAssign && user && (
-        <AssignRoleModal
-          userId={user.id}
-          onClose={() => setShowAssign(false)}
-          onSuccess={() => {
-            onRolesChanged?.();
-            onClose?.();
-          }}
-        />
-      )}
-
-      {showReset && user && (
-        <ResetPasswordModal
-          user={{ id: user.id, name: fullName, email: user.email }}
-          onClose={() => setShowReset(false)}
-        />
-      )}
     </div>
   );
 }

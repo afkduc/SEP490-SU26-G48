@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { formatDateSafe } from '../../utils/dateUtils';
@@ -12,6 +12,24 @@ import './ServiceRequestsPage.css';
 
 const GENDER_LABELS = { nam: 'Nam', nu: 'Nữ', khac: 'Khác' };
 const STATUS_LABELS = { pending: 'Chưa tiếp nhận', accepted: 'Đã tiếp nhận', cancelled: 'Đã huỷ' };
+const STATUS_BADGE_CLASS = { pending: 'badge-pending', accepted: 'badge-completed', cancelled: 'badge-cancelled' };
+
+const STATUS_FILTER_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'pending', label: 'Chưa tiếp nhận' },
+  { value: 'accepted', label: 'Đã tiếp nhận' },
+  { value: 'cancelled', label: 'Đã huỷ' },
+];
+
+// Trang thai LICH HEN (khac voi trang thai YEU CAU o tren) - loc rieng vi 1
+// yeu cau "Da tiep nhan" co the chua co lich hen, dang co lich, hoac lich da
+// bi huy (CVDV huy roi nhung yeu cau goc van "Da tiep nhan").
+const APPOINTMENT_FILTER_OPTIONS = [
+  { value: '', label: 'Tất cả lịch hẹn' },
+  { value: 'none', label: 'Chưa có lịch hẹn' },
+  { value: 'scheduled', label: 'Đã lên lịch' },
+  { value: 'cancelled', label: 'Đã huỷ lịch hẹn' },
+];
 
 // Luon khoa timezone Asia/Ho_Chi_Minh khi format (giong formatDateSafe dang
 // dung o cac trang khac) - KHONG dung toLocaleString mac dinh vi no doc theo
@@ -54,6 +72,78 @@ export default function ServiceRequestsPage() {
   const [detailTarget, setDetailTarget] = useState(null); // request
   const [error, setError] = useState('');
 
+  // Bo loc - deu ap dung tren du lieu da tai san (requests tu context, khong
+  // goi lai API) va co the ket hop tu do (loc kep): tim kiem + trang thai yeu
+  // cau + trang thai lich hen + chi nhanh + khoang ngay gui + "chi cua toi".
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [apptFilter, setApptFilter] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  const branchOptions = useMemo(() => {
+    const set = new Set(requests.map((r) => r.nearestBranchName).filter(Boolean));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [requests]);
+
+  const counts = useMemo(
+    () => ({
+      total: requests.length,
+      pending: requests.filter((r) => r.status === 'pending').length,
+      accepted: requests.filter((r) => r.status === 'accepted').length,
+      cancelled: requests.filter((r) => r.status === 'cancelled').length,
+    }),
+    [requests]
+  );
+
+  const hasActiveFilters = Boolean(
+    search.trim() || statusFilter || apptFilter || branchFilter || onlyMine || fromDate || toDate
+  );
+
+  const resetFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setApptFilter('');
+    setBranchFilter('');
+    setOnlyMine(false);
+    setFromDate('');
+    setToDate('');
+  };
+
+  const filteredRequests = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+    const to = toDate ? new Date(`${toDate}T23:59:59`) : null;
+    return requests.filter((r) => {
+      if (statusFilter && r.status !== statusFilter) return false;
+      if (apptFilter === 'none' && r.appointment) return false;
+      if (apptFilter === 'scheduled' && r.appointment?.status !== 'scheduled') return false;
+      if (apptFilter === 'cancelled' && r.appointment?.status !== 'cancelled') return false;
+      if (branchFilter && r.nearestBranchName !== branchFilter) return false;
+      if (onlyMine && String(r.acceptedBy) !== String(user?.id)) return false;
+      const createdAt = r.createdAt ? new Date(r.createdAt) : null;
+      if (from && (!createdAt || createdAt < from)) return false;
+      if (to && (!createdAt || createdAt > to)) return false;
+      if (term) {
+        const haystack = `${r.fullName || ''} ${r.phone || ''} ${r.email || ''}`.toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
+    });
+  }, [requests, search, statusFilter, apptFilter, branchFilter, onlyMine, fromDate, toDate, user?.id]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, apptFilter, branchFilter, onlyMine, fromDate, toDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paginatedRequests = filteredRequests.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
   async function handleAccept(request) {
     setBusyId(request.id);
     setError('');
@@ -94,26 +184,100 @@ export default function ServiceRequestsPage() {
         </div>
       </div>
 
+      <div className="sr-stats">
+        <div className="sr-stat">
+          <span className="sr-stat__value">{counts.total}</span>
+          <span className="sr-stat__label">Tổng yêu cầu</span>
+        </div>
+        <div className="sr-stat sr-stat--pending">
+          <span className="sr-stat__value">{counts.pending}</span>
+          <span className="sr-stat__label">Chưa tiếp nhận</span>
+        </div>
+        <div className="sr-stat sr-stat--accepted">
+          <span className="sr-stat__value">{counts.accepted}</span>
+          <span className="sr-stat__label">Đã tiếp nhận</span>
+        </div>
+        <div className="sr-stat sr-stat--cancelled">
+          <span className="sr-stat__value">{counts.cancelled}</span>
+          <span className="sr-stat__label">Đã huỷ</span>
+        </div>
+      </div>
+
       {error && <div className="form-error" style={{ margin: '0 0 16px' }}>{error}</div>}
 
-      {requests.length === 0 ? (
-        <p style={{ color: 'var(--gray-500)' }}>Chưa có yêu cầu nào.</p>
-      ) : (
-        <div className="sr-list">
-          {requests.map((r) => (
-            <RequestCard
-              key={r.id}
-              request={r}
-              currentUserId={user?.id}
-              busy={busyId === r.id}
-              onAccept={() => handleAccept(r)}
-              onCreateAppointment={() => setApptTarget({ request: r, appointment: null })}
-              onEditAppointment={() => setApptTarget({ request: r, appointment: r.appointment })}
-              onCancelAppointment={() => setCancelTarget({ request: r, appointment: r.appointment })}
-              onViewDetail={() => setDetailTarget(r)}
-            />
-          ))}
+      <div className="filter-bar">
+        <div className="search-input">
+          <input placeholder="Tên khách hàng, SĐT, email…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
+          <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            {STATUS_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
+          <select className="form-select" value={apptFilter} onChange={(e) => setApptFilter(e.target.value)}>
+            {APPOINTMENT_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        {branchOptions.length > 0 && (
+          <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
+            <select className="form-select" value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
+              <option value="">Tất cả chi nhánh</option>
+              {branchOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label className="form-label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Từ ngày</label>
+          <input className="form-input" type="date" style={{ width: 150 }} value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label className="form-label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Đến ngày</label>
+          <input className="form-input" type="date" style={{ width: 150 }} value={toDate} onChange={(e) => setToDate(e.target.value)} />
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+          Của tôi
+        </label>
+        {hasActiveFilters && (
+          <button className="btn btn-secondary btn-sm" onClick={resetFilters}>Xoá lọc</button>
+        )}
+        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)', alignSelf: 'center' }}>
+          {filteredRequests.length} / {counts.total} yêu cầu
+        </div>
+      </div>
+
+      {filteredRequests.length === 0 ? (
+        <div className="empty-state">
+          <h3>Không có yêu cầu nào</h3>
+          <p>{counts.total === 0 ? 'Chưa có yêu cầu nào được gửi từ landing page.' : 'Không có yêu cầu nào khớp với bộ lọc hiện tại.'}</p>
+        </div>
+      ) : (
+        <>
+          <div className="sr-list">
+            {paginatedRequests.map((r) => (
+              <RequestCard
+                key={r.id}
+                request={r}
+                currentUserId={user?.id}
+                busy={busyId === r.id}
+                onAccept={() => handleAccept(r)}
+                onCreateAppointment={() => setApptTarget({ request: r, appointment: null })}
+                onEditAppointment={() => setApptTarget({ request: r, appointment: r.appointment })}
+                onCancelAppointment={() => setCancelTarget({ request: r, appointment: r.appointment })}
+                onViewDetail={() => setDetailTarget(r)}
+              />
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, fontSize: 12, color: 'var(--gray-500)' }}>
+            <div>Trang {pageSafe}/{totalPages}</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button className="btn btn-secondary btn-sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => p - 1)}>Trước</button>
+              <button className="btn btn-secondary btn-sm" disabled={pageSafe >= totalPages} onClick={() => setPage((p) => p + 1)}>Sau</button>
+            </div>
+          </div>
+        </>
       )}
 
       {apptTarget && (
@@ -154,7 +318,10 @@ function RequestCard({
     <div className="sr-card">
       <div className="sr-card__head">
         <div>
-          <h3>{request.fullName}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <h3 style={{ margin: 0 }}>{request.fullName}</h3>
+            <span className={`badge ${STATUS_BADGE_CLASS[request.status]}`}>{STATUS_LABELS[request.status]}</span>
+          </div>
           <a href={`tel:${request.phone}`} className="sr-card__phone">{request.phone}</a>
         </div>
         <span className="sr-card__time">{formatDateTime(request.createdAt)}</span>
@@ -391,7 +558,7 @@ function DetailModal({ request, onClose }) {
           </div>
           <div><span>Chi nhánh gần nhất</span><strong>{request.nearestBranchName}</strong></div>
           <div><span>Vấn đề gặp phải</span><strong>{request.issueDescription}</strong></div>
-          <div><span>Trạng thái</span><strong>{STATUS_LABELS[request.status] || request.status}</strong></div>
+          <div><span>Trạng thái</span><strong><span className={`badge ${STATUS_BADGE_CLASS[request.status]}`}>{STATUS_LABELS[request.status] || request.status}</span></strong></div>
           <div><span>Người tiếp nhận</span><strong>{request.acceptedByName || '-'}</strong></div>
           <div><span>Thời gian gửi</span><strong>{formatDateTime(request.createdAt)}</strong></div>
           {appt && (

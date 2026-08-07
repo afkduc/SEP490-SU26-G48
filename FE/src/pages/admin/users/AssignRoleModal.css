@@ -215,7 +215,7 @@
   gap: 10px;
 }
 
-.btn-cancel {
+.admin-users .btn-cancel {
   padding: 8px 18px;
   border-radius: 8px;
   border: 1.5px solid #e2e8f0;
@@ -226,16 +226,16 @@
   transition: all 0.15s;
 }
 
-.btn-cancel:hover:not(:disabled) {
+.admin-users .btn-cancel:hover:not(:disabled) {
   background: #f8fafc;
 }
 
-.btn-cancel:disabled {
+.admin-users .btn-cancel:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.btn-save {
+.admin-users .btn-save {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -250,18 +250,18 @@
   transition: all 0.15s;
 }
 
-.btn-save:hover:not(:disabled) {
+.admin-users .btn-save:hover:not(:disabled) {
   opacity: 0.9;
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
 }
 
-.btn-save:disabled {
+.admin-users .btn-save:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
 /* ── Spinner ─────────────────────────────────────────────────────── */
-.spinner {
+.admin-users .spinner {
   width: 20px;
   height: 20px;
   border: 2.5px solid #e2e8f0;
@@ -270,7 +270,7 @@
   animation: spin 0.7s linear infinite;
 }
 
-.spinner--sm {
+.admin-users .spinner--sm {
   width: 14px;
   height: 14px;
   border-width: 2px;

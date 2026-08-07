@@ -22,9 +22,49 @@ async function query(queryStr, params = {}) {
   const conn = await getPool();
   const request = conn.request();
   Object.entries(params).forEach(([key, value]) => {
-    request.input(key, value);
+    // Ep Unicode string -> NVarChar de tranh VARCHAR Latin doi dau Viet thanh '?'
+    if (typeof value === 'string') {
+      request.input(key, sql.NVarChar(sql.MAX), value);
+    } else {
+      request.input(key, value);
+    }
   });
   return request.query(queryStr);
 }
 
-module.exports = { getPool, query, sql };
+/**
+ * Chay mot callback trong transaction (BEGIN/COMMIT/ROLLBACK).
+ * Callback nhan mot `txQuery(queryStr, params)` de chay query trong transaction do.
+ * Neu callback throw -> ROLLBACK tu dong; neu OK -> COMMIT.
+ *
+ * Ly do: can atomicity cho bulk operations (vd: setRolePermissionsMatrix —
+ * cap nhat nhieu role trong 1 transaction de tranh partial-fail state).
+ */
+async function executeTransaction(callback) {
+  const conn = await getPool();
+  const tx = conn.transaction();
+  await tx.begin();
+
+  const txQuery = async (queryStr, params = {}) => {
+    const request = tx.request();
+    Object.entries(params).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        request.input(key, sql.NVarChar(sql.MAX), value);
+      } else {
+        request.input(key, value);
+      }
+    });
+    return request.query(queryStr);
+  };
+
+  try {
+    const result = await callback(txQuery);
+    await tx.commit();
+    return result;
+  } catch (err) {
+    try { await tx.rollback(); } catch (_) { /* ignore rollback errors */ }
+    throw err;
+  }
+}
+
+module.exports = { getPool, query, sql, executeTransaction };

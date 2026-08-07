@@ -14,32 +14,43 @@ const LIST_SELECT = `
   JOIN   customers c ON c.id = mr.customer_id
 `;
 
-// Sinh nhac nho tu du doan bao duong ke tiep (next_maintenance_km/date) cua
-// phieu quyet toan GAN NHAT (chua huy) cho tung xe - tranh sinh trung nhieu
-// nhac nho cho cung 1 du doan neu ham nay duoc goi lap lai (startup/interval/
-// truoc moi lan liet ke).
+// Sinh 3 moc nhac nho co dinh cho MOI phieu quyet toan (chua huy), tinh tu
+// ngay tao phieu (intake_date) - khong con phu thuoc CVDV go tay so
+// km/ngay bao duong ke tiep nua (da bo han 2 truong nay, xem
+// RepairSettlementRepositoryImpl): 1 tuan (cham soc/hoi tham sau sua chua),
+// 1 thang va 2 thang (nhac bao duong dinh ky). Dedup theo (service_order_id,
+// reminder_type) - moi phieu chi sinh dung 1 nhac nho cho moi moc, du ham
+// nay duoc goi lap lai nhieu lan (startup/interval/truoc moi lan liet ke).
 const SYNC_SQL = `
-  ;WITH latest_prediction AS (
-    SELECT so.vehicle_id, so.customer_id, so.branch_id,
-           so.next_maintenance_km, so.next_maintenance_date,
-           ROW_NUMBER() OVER (PARTITION BY so.vehicle_id ORDER BY so.intake_date DESC, so.id DESC) AS rn
+  ;WITH milestones AS (
+    SELECT so.id AS service_order_id, so.vehicle_id, so.customer_id, so.branch_id,
+           N'Chăm sóc sau sửa chữa (1 tuần)' AS reminder_type,
+           CAST(DATEADD(DAY, 7, so.intake_date) AS DATE) AS due_date
     FROM   service_orders so
     WHERE  so.status <> 'cancelled'
-      AND  (so.next_maintenance_km IS NOT NULL OR so.next_maintenance_date IS NOT NULL)
+    UNION ALL
+    SELECT so.id, so.vehicle_id, so.customer_id, so.branch_id,
+           N'Nhắc bảo dưỡng định kỳ (1 tháng)',
+           CAST(DATEADD(MONTH, 1, so.intake_date) AS DATE)
+    FROM   service_orders so
+    WHERE  so.status <> 'cancelled'
+    UNION ALL
+    SELECT so.id, so.vehicle_id, so.customer_id, so.branch_id,
+           N'Nhắc bảo dưỡng định kỳ (2 tháng)',
+           CAST(DATEADD(MONTH, 2, so.intake_date) AS DATE)
+    FROM   service_orders so
+    WHERE  so.status <> 'cancelled'
   )
   INSERT INTO maintenance_reminders (
-    vehicle_id, customer_id, branch_id, reminder_type, due_date, due_km, is_sent, is_confirmed, created_at
+    service_order_id, vehicle_id, customer_id, branch_id, reminder_type, due_date, is_sent, is_confirmed, created_at
   )
-  SELECT lp.vehicle_id, lp.customer_id, lp.branch_id, N'Bảo dưỡng định kỳ',
-         lp.next_maintenance_date, lp.next_maintenance_km, 0, 0, GETDATE()
-  FROM   latest_prediction lp
-  WHERE  lp.rn = 1
-    AND  NOT EXISTS (
-      SELECT 1 FROM maintenance_reminders mr
-      WHERE mr.vehicle_id = lp.vehicle_id
-        AND ISNULL(mr.due_date, '1900-01-01') = ISNULL(lp.next_maintenance_date, '1900-01-01')
-        AND ISNULL(mr.due_km, -1) = ISNULL(lp.next_maintenance_km, -1)
-    )
+  SELECT m.service_order_id, m.vehicle_id, m.customer_id, m.branch_id, m.reminder_type, m.due_date, 0, 0, GETDATE()
+  FROM   milestones m
+  WHERE  NOT EXISTS (
+    SELECT 1 FROM maintenance_reminders mr
+    WHERE mr.service_order_id = m.service_order_id
+      AND mr.reminder_type = m.reminder_type
+  )
 `;
 
 function buildConditions({ branchId, status, search }) {
@@ -68,7 +79,7 @@ class MaintenanceReminderRepositoryImpl extends MaintenanceReminderRepository {
 
   async findAll({ branchId, status, search } = {}) {
     const { params, conditions } = buildConditions({ branchId, status, search });
-    const sqlText = `${LIST_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY ISNULL(mr.due_date, '9999-12-31') ASC, mr.due_km ASC`;
+    const sqlText = `${LIST_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY mr.due_date ASC, mr.id ASC`;
     const result = await query(sqlText, params);
     return result.recordset.map((row) => MaintenanceReminder.fromPersistence(row));
   }

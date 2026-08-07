@@ -1,7 +1,19 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
-import { getAdminDashboardStats } from '../../services/adminApi';
+import { getAdminDashboardStats, adminSecurityAlertsApi } from '../../services/adminApi';
+import { getNotifications } from '../../services/notificationApi';
+import { humanizeNotificationMessage } from '../../utils/notificationDisplay';
+import {
+  humanizeAuditDescription,
+  getAuditActionLabel,
+  getAuditTableLabel,
+  getHttpMethodLabel,
+  formatDurationMs,
+} from '../../utils/auditDisplay';
+import { SECURITY_ALERTS_COUNT_EVENT } from '../../utils/securityAlertEvents';
+import { formatPhoneDisplay } from '../../utils/validation';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './AdminDashboardPage.css';
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
@@ -120,12 +132,12 @@ function formatRelativeTime(dateStr) {
   const now = new Date();
   const diffMs = now - date;
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'Vua xong';
-  if (diffMin < 60) return `${diffMin} phut truoc`;
+  if (diffMin < 1) return 'Vừa xong';
+  if (diffMin < 60) return `${diffMin} phút trước`;
   const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} gio truoc`;
+  if (diffHour < 24) return `${diffHour} giờ trước`;
   const diffDay = Math.floor(diffHour / 24);
-  return `${diffDay} ngay truoc`;
+  return `${diffDay} ngày trước`;
 }
 
 function formatDuration(seconds) {
@@ -174,26 +186,26 @@ function formatActionLabel(action) {
 }
 
 function getActionBadge(action) {
-  const fallbackLabel = formatActionLabel(action) || 'UNKNOWN';
-  if (!action) return { label: 'UNKNOWN', bg: '#f1f5f9', color: '#64748b' };
+  const fallbackLabel = getAuditActionLabel(action) || 'Thao tác';
+  if (!action) return { label: 'Thao tác', bg: '#f1f5f9', color: '#64748b' };
 
   const upper = String(action).toUpperCase();
 
   // Tao moi / Insert
   if (upper.includes('CREATE') || upper.includes('INSERT') || upper.includes('ADD')) {
-    return { label: 'TAO MOI', bg: '#dcfce7', color: '#15803d' };
+    return { label: 'Tạo mới', bg: '#dcfce7', color: '#15803d' };
   }
   // Cap nhat / Edit
   if (upper.includes('UPDATE') || upper.includes('EDIT') || upper.includes('MODIFY') || upper.includes('PATCH')) {
-    return { label: 'CAP NHAT', bg: '#eef2ff', color: '#4338ca' };
+    return { label: 'Cập nhật', bg: '#eef2ff', color: '#4338ca' };
   }
   // Xoa
   if (upper.includes('DELETE') || upper.includes('REMOVE')) {
-    return { label: 'XOA', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'Xóa', bg: '#fee2e2', color: '#dc2626' };
   }
   // Dang nhap that bai
   if (upper.includes('LOGIN_FAILED') || upper.includes('LOGINFAIL') || upper.includes('LOGIN FAIL')) {
-    return { label: 'DANG NHAP THAT BAI', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'Đăng nhập thất bại', bg: '#fee2e2', color: '#dc2626' };
   }
   // Dang nhap / Dang xuat
   if (upper.includes('LOGOUT') || upper.includes('SIGNOUT')) {
@@ -266,17 +278,20 @@ function getActionBadge(action) {
 }
 
 function getResponseBadge(status) {
-  if (status == null) return null;
-  if (status >= 200 && status < 300) return { label: status, bg: '#dcfce7', color: '#15803d' };
-  if (status >= 400 && status < 500) return { label: status, bg: '#fef3c7', color: '#b45309' };
-  if (status >= 500) return { label: status, bg: '#fee2e2', color: '#dc2626' };
-  return { label: status, bg: '#f1f5f9', color: '#475569' };
+  if (status == null || status === '' || Number(status) === 0) {
+    return { label: 'Đã thực hiện', bg: '#dcfce7', color: '#15803d' };
+  }
+  if (status >= 200 && status < 300) return { label: 'Thành công', bg: '#dcfce7', color: '#15803d' };
+  if (status >= 400 && status < 500) return { label: 'Lỗi yêu cầu', bg: '#fef3c7', color: '#b45309' };
+  if (status >= 500) return { label: 'Lỗi hệ thống', bg: '#fee2e2', color: '#dc2626' };
+  return { label: `HTTP ${status}`, bg: '#f1f5f9', color: '#475569' };
 }
 
 function getStatusBadge(status) {
   if (!status) return { label: '—', bg: '#f1f5f9', color: '#64748b' };
-  const upper = status.toUpperCase();
-  if (upper === 'SUCCESS' || upper === 'ACTIVE') return { label: 'Thành công', bg: '#dcfce7', color: '#15803d' };
+  const upper = String(status).toUpperCase();
+  if (upper === 'SUCCESS' || upper === 'ACTIVE') return { label: 'Đang hoạt động', bg: '#dcfce7', color: '#15803d' };
+  if (upper === 'ENDED' || upper === 'LOGGED_OUT') return { label: 'Đã đăng xuất', bg: '#f1f5f9', color: '#64748b' };
   if (upper === 'FAILED' || upper === 'FAIL') return { label: 'Thất bại', bg: '#fee2e2', color: '#dc2626' };
   if (upper === 'LOCKED') return { label: 'Bị khóa', bg: '#fee2e2', color: '#dc2626' };
   if (upper === 'INACTIVE') return { label: 'Ngừng hoạt động', bg: '#f1f5f9', color: '#64748b' };
@@ -292,13 +307,60 @@ function getAlertIcon(iconType) {
   }
 }
 
-function getAlertStyle(type) {
-  switch (type) {
-    case 'danger': return { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', iconBg: '#fee2e2' };
-    case 'warning': return { bg: '#fffbeb', border: '#fde68a', color: '#d97706', iconBg: '#fef3c7' };
-    case 'info': return { bg: '#eff6ff', border: '#bfdbfe', color: '#2563eb', iconBg: '#dbeafe' };
-    default: return { bg: '#f8fafc', border: '#e2e8f0', color: '#475569', iconBg: '#f1f5f9' };
+function isAdminDarkTheme() {
+  try {
+    return localStorage.getItem('admin-theme') === 'dark'
+      || !!document.querySelector('.admin-shell--dark');
+  } catch {
+    return false;
   }
+}
+
+function getAlertStyle(alert) {
+  // Ưu tiên: severity (notification) > type (legacy) > action (audit)
+  // create/login = xanh; sửa/cập nhật = vàng; ngừng/khóa/xóa = đỏ
+  const raw = (alert.severity || alert.type || alert.action || alert.title || '').toLowerCase();
+  const dark = isAdminDarkTheme();
+  if (
+    raw === 'success'
+    || raw.includes('create')
+    || raw.includes('login')
+    || raw.includes('tạo')
+    || raw.includes('đăng nhập')
+  ) {
+    return dark
+      ? { bg: 'rgba(34,197,94,0.12)', border: '#166534', color: '#86efac', iconBg: 'rgba(34,197,94,0.22)' }
+      : { bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a', iconBg: '#dcfce7' };
+  }
+  if (
+    raw === 'danger'
+    || raw === 'error'
+    || raw === 'critical'
+    || raw.includes('disable')
+    || raw.includes('delete')
+    || raw.includes('reject')
+    || raw.includes('ngừng')
+    || raw.includes('khóa')
+    || raw.includes('vô hiệu')
+  ) {
+    return dark
+      ? { bg: 'rgba(239,68,68,0.12)', border: '#991b1b', color: '#fca5a5', iconBg: 'rgba(239,68,68,0.22)' }
+      : { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', iconBg: '#fee2e2' };
+  }
+  if (
+    raw === 'warning'
+    || raw === 'info'
+    || raw.includes('update')
+    || raw.includes('cập nhật')
+    || raw.includes('sửa')
+  ) {
+    return dark
+      ? { bg: 'rgba(245,158,11,0.12)', border: '#92400e', color: '#fcd34d', iconBg: 'rgba(245,158,11,0.22)' }
+      : { bg: '#fffbeb', border: '#fde68a', color: '#d97706', iconBg: '#fef3c7' };
+  }
+  return dark
+    ? { bg: '#162032', border: '#334155', color: '#cbd5e1', iconBg: '#1e293b' }
+    : { bg: '#f8fafc', border: '#e2e8f0', color: '#475569', iconBg: '#f1f5f9' };
 }
 
 // Severity: danh gia muc do nghiem trong cua canh bao
@@ -309,10 +371,14 @@ const SEVERITY_LABELS = {
   low: 'Thấp',
 };
 const SEVERITY_STYLES = {
-  critical: { label: 'CRITICAL', bg: '#dc2626', color: '#ffffff' },
-  high: { label: 'HIGH', bg: '#f97316', color: '#ffffff' },
-  medium: { label: 'MEDIUM', bg: '#eab308', color: '#1f2937' },
-  low: { label: 'LOW', bg: '#10b981', color: '#ffffff' },
+  critical: { label: 'Nghiêm trọng', bg: '#991b1b', color: '#ffffff' },
+  high:     { label: 'Cao',         bg: '#dc2626', color: '#ffffff' },
+  medium:   { label: 'Trung bình',  bg: '#eab308', color: '#1f2937' },
+  low:      { label: 'Thấp',        bg: '#10b981', color: '#ffffff' },
+  success:  { label: 'Thành công',  bg: '#16a34a', color: '#ffffff' },
+  info:     { label: 'Thông tin',   bg: '#2563eb', color: '#ffffff' },
+  warning:  { label: 'Cảnh báo',    bg: '#d97706', color: '#ffffff' },
+  error:    { label: 'Lỗi',         bg: '#dc2626', color: '#ffffff' },
 };
 
 // Category: phan loai canh bao
@@ -377,9 +443,14 @@ function inferCategory(alert) {
 
 // Severity inference: du vao type va noi dung
 function inferSeverity(alert) {
-  if (alert.severity) return alert.severity.toLowerCase();
-  if (alert.type === 'danger') return 'high';
-  if (alert.type === 'warning') return 'medium';
+  const s = alert.severity || alert.type || '';
+  const sl = s.toLowerCase();
+  if (sl === 'critical') return 'critical';
+  if (sl === 'success') return 'low';
+  if (sl === 'info')    return 'low';
+  if (sl === 'error')  return 'high';
+  if (sl === 'danger') return 'high';
+  if (sl === 'warning') return 'medium';
   return 'low';
 }
 
@@ -388,14 +459,15 @@ function resolveAlertActor(alert) {
   return (
     alert.actor ||
     alert.actorName ||
+    alert.actor_name ||
     alert.user_name ||
     alert.userName ||
-    (alert.affectedEntity ? `Hệ thống (${alert.affectedEntity})` : null)
+    (alert.targetName ? `bởi ${alert.targetName}` : null)
   );
 }
 
 function AlertItem({ alert }) {
-  const style = getAlertStyle(alert.type);
+  const style = getAlertStyle(alert);
   const category = inferCategory(alert);
   const severity = inferSeverity(alert);
   const severityStyle = SEVERITY_STYLES[severity];
@@ -403,10 +475,16 @@ function AlertItem({ alert }) {
 
   // Fallback noi dung chinh: uu tien alert.message, neu trong thi dung title + affectedEntity
   const title = alert.title || 'Cảnh báo hệ thống';
-  const message =
+  const message = humanizeNotificationMessage(
     alert.message ||
     alert.description ||
-    (alert.affectedEntity ? `Liên quan đến ${alert.affectedEntity}` : null);
+    (alert.affectedEntity ? `Liên quan đến ${alert.affectedEntity}` : null),
+    alert.metadata || {
+      targetCode: alert.affectedEntity,
+      targetName: alert.targetName,
+      actorName: alert.actorName,
+    },
+  );
 
   const actor = resolveAlertActor(alert);
 
@@ -607,6 +685,7 @@ function generateAlertsFromStats(stats) {
 
 // Gop audit_logs + login_sessions thanh mot danh sach thoi gian thong nhat,
 // dam bao widget nhat ky khong bao gio trong neu it nhat mot trong hai co du lieu.
+// Gom trùng: cùng loại login (action+user+IP) / cùng audit gần giống → chỉ giữ bản mới nhất.
 function buildCombinedActivity(recentLogs, recentLogins) {
   const items = [];
 
@@ -623,7 +702,7 @@ function buildCombinedActivity(recentLogs, recentLogins) {
     items.push({
       kind: 'login_session',
       id: `session-${s.id}`,
-      time: s.login_time || s.logout_time,
+      time: s.loginTime || s.login_time || s.logoutTime || s.logout_time,
       payload: s,
     });
   });
@@ -634,23 +713,88 @@ function buildCombinedActivity(recentLogs, recentLogins) {
     return tb - ta;
   });
 
-  return items.slice(0, 10);
+  const seen = new Set();
+  const collapsed = [];
+  for (const item of items) {
+    let key;
+    if (item.kind === 'login_session') {
+      const s = item.payload || {};
+      key = `login:${s.actionType || s.action_type || ''}|${s.userName || s.user_name || ''}|${s.ipAddress || s.ip_address || ''}`;
+    } else {
+      const log = item.payload || {};
+      key = `audit:${log.action || ''}|${log.actorName || log.user_name || ''}|${log.targetType || log.table_name || ''}|${log.targetId || log.record_id || ''}|${log.responseStatus ?? log.response_status ?? ''}`;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    collapsed.push(item);
+  }
+
+  return collapsed.slice(0, 10);
+}
+
+/** Gom thông báo/cảnh báo trùng trên widget Tổng quan (giống chuông). */
+const DASH_SPAM_PATTERNS = [
+  { re: /đăng nhập trên thiết bị khác|đăng nhập thay phiên|đã có người đăng nhập tài khoản|session_takeover|SESSION_TAKEN_OVER|SECURITY_SESSION_TAKEOVER/i, key: 'session_takeover' },
+  { re: /admin không hoạt động|inactive_admin|SECURITY_INACTIVE_ADMIN/i, key: 'inactive_admin' },
+  { re: /đăng nhập từ ip mới|new_device|SECURITY_NEW_DEVICE_IP|NEW_DEVICE/i, key: 'new_device_ip' },
+  { re: /nhiều lần đăng nhập thất bại|failed_login|SECURITY_FAILED_LOGIN_BURST/i, key: 'failed_login_burst' },
+];
+
+function dashAlertCollapseKey(item) {
+  const rule = item.ruleKey || item.rule_key || item.metadata?.ruleKey;
+  const uid = item.userId || item.metadata?.relatedUserId || item.metadata?.userId || 0;
+  if (rule) return `rule:${rule}:${uid}`;
+
+  const type = item.notifType || item.metadata?.eventType || '';
+  const title = String(item.title || '');
+  const hay = `${type} ${title}`;
+  for (const { re, key } of DASH_SPAM_PATTERNS) {
+    if (re.test(hay)) return `rule:${key}:${uid}`;
+  }
+  if (type) return `type:${type}`;
+  return `id:${item.id}`;
+}
+
+function collapseDashboardAlerts(list) {
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    const key = dashAlertCollapseKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
 }
 
 function ActivityItem({ log }) {
   const badge = getActionBadge(log.action);
   const respBadge = getResponseBadge(log.responseStatus ?? log.response_status);
+  const actionUpper = String(log.action || '').toUpperCase();
+  const isAuthAction = ['LOGIN', 'FAILED_LOGIN', 'LOGOUT', 'FORCE_LOGO', 'FORCE_LOGOUT'].includes(actionUpper);
 
   // Lay ten actor voi fallback an toan
   const actor =
-    log.actorName || log.user_name || log.userName || log.actor || 'He thong';
+    log.actorName || log.user_name || log.userName || log.actor || 'Hệ thống';
 
-  // Lay details: uu tien log.details / log.description, fallback tu data khac
   const details =
-    log.details ||
-    log.description ||
+    humanizeAuditDescription(
+      log.details || log.description,
+      log.action,
+      log.new_value || log.newValue,
+    ) ||
     buildActivityDetails(log) ||
-    (log.ipAddress ? `Tu ${log.ipAddress}` : null);
+    (log.ipAddress || log.ip_address ? `Từ IP ${log.ipAddress || log.ip_address}` : null);
+
+  const tableKey = log.tableName || log.table_name || log.targetType;
+  const rawEntityCode = String(log.entityCode || log.entity_code || '').trim();
+  // entity_code từng lưu VARCHAR → tiếng Việt thành "Tr?n..."; ẩn khi lỗi / trùng tên actor / sự kiện auth
+  const showEntityCode = Boolean(
+    rawEntityCode
+    && !isAuthAction
+    && rawEntityCode !== actor
+    && !/\?/.test(rawEntityCode),
+  );
 
   return (
     <div className="activity-item">
@@ -669,38 +813,40 @@ function ActivityItem({ log }) {
               {respBadge.label}
             </span>
           )}
-          {log.requestMethod && (
-            <span className="activity-item__method">{log.requestMethod}</span>
+          {(log.requestMethod || log.request_method) && (
+            <span className="activity-item__method">
+              {getHttpMethodLabel(log.requestMethod || log.request_method)}
+            </span>
           )}
         </div>
 
         {details && <div className="activity-item__details">{details}</div>}
 
         <div className="activity-item__meta">
-          {(log.tableName || log.table_name) && (
+          {tableKey && (
             <span className="activity-item__meta-item activity-item__meta-item--strong">
               <IconTerminal />
-              <span>{log.tableName || log.table_name}</span>
+              <span>{getAuditTableLabel(tableKey)}</span>
             </span>
           )}
-          {(log.entityCode || log.entity_code) && (
+          {showEntityCode && (
             <span className="activity-item__meta-item activity-item__meta-item--code">
-              {log.entityCode || log.entity_code}
+              {rawEntityCode}
             </span>
           )}
-          {!log.entityCode && !log.entity_code && (log.recordId ?? log.record_id) != null && (
+          {!showEntityCode && !rawEntityCode && (log.recordId ?? log.record_id ?? log.targetId) != null && (
             <span className="activity-item__meta-item activity-item__meta-item--code">
-              #{log.recordId ?? log.record_id}
+              #{log.recordId ?? log.record_id ?? log.targetId}
             </span>
           )}
-          {log.ipAddress && (
+          {(log.ipAddress || log.ip_address) && (
             <span className="activity-item__meta-item">
-              <IconGlobe /> {log.ipAddress}
+              <IconGlobe /> {log.ipAddress || log.ip_address}
             </span>
           )}
-          {log.durationMs != null && (
+          {(log.durationMs != null || log.duration_ms != null) && (
             <span className="activity-item__meta-item">
-              <IconClock /> {log.durationMs}ms
+              <IconClock /> {formatDurationMs(log.durationMs ?? log.duration_ms)}
             </span>
           )}
           <span className="activity-item__meta-item">
@@ -716,13 +862,14 @@ function LoginItem({ item }) {
   const statusBadge = getStatusBadge(item.status);
   const actionBadge = getActionBadge(item.actionType);
 
+  const rawPhone = item.phoneNumber || item.phone_number;
+  const displayPhone = rawPhone ? formatPhoneDisplay(rawPhone) : null;
+
   // Fallback thong minh: uu tien userName > phone > userId > email > "Nguoi dung #id"
   const displayName =
     item.userName ||
     item.user_name ||
-    (item.phoneNumber || item.phone_number
-      ? `SDT: ${item.phoneNumber || item.phone_number}`
-      : null) ||
+    (displayPhone ? `SDT: ${displayPhone}` : null) ||
     (item.email ? item.email : null) ||
     (item.userId || item.user_id
       ? `Người dùng #${item.userId || item.user_id}`
@@ -760,8 +907,8 @@ function LoginItem({ item }) {
           {(item.sessionDuration || item.session_duration_seconds) > 0 && (
             <span><IconCalendar /> {formatDuration(item.sessionDuration || item.session_duration_seconds)}</span>
           )}
-          {(item.phoneNumber || item.phone_number) && item.userName && (
-            <span className="login-item__phone">{item.phoneNumber || item.phone_number}</span>
+          {displayPhone && item.userName && (
+            <span className="login-item__phone">{displayPhone}</span>
           )}
         </div>
       </div>
@@ -786,45 +933,195 @@ function QuickAction({ to, icon, label, desc, accent }) {
 
 const QUICK_ACTIONS = [
   { to: '/admin/users', icon: <IconUsers />, label: 'Quản lý người dùng', desc: 'Xem, chỉnh sửa & phân quyền', accent: '#4f46e5' },
-  { to: '/admin/users/create', icon: <IconUsers />, label: 'Thêm người dùng mới', desc: 'Tạo tài khoản mới', accent: '#059669' },
+  { to: '/admin/login-security', icon: <IconAlert />, label: 'Bảo mật đăng nhập', desc: 'Thiết bị + tín hiệu cảnh báo', accent: '#ef4444' },
   { to: '/admin/logs', icon: <IconLog />, label: 'Nhật ký hoạt động', desc: 'Lịch sử thao tác', accent: '#d97706' },
-  { to: '/admin/login-sessions', icon: <IconLogin />, label: 'Lịch sử đăng nhập', desc: 'Theo dõi thiết bị & phiên', accent: '#0891b2' },
-  { to: '/admin/profile', icon: <IconTerminal />, label: 'Hồ sơ cá nhân', desc: 'Chỉnh sửa thông tin', accent: '#db2777' },
+  { to: '/admin/catalog', icon: <IconLogin />, label: 'Danh mục hệ thống', desc: 'Chi nhánh', accent: '#0891b2' },
+  { to: '/admin/profile', icon: <IconTerminal />, label: 'Tài khoản của tôi', desc: 'Hồ sơ & thông báo', accent: '#db2777' },
 ];
 
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
+  const [periodPreset, setPeriodPreset] = useState('today');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  function resolvePeriodRange(preset, fromVal, toVal) {
+    const today = new Date();
+    const yyyyMmDd = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    if (preset === 'custom') {
+      return { fromDate: fromVal || undefined, toDate: toVal || undefined };
+    }
+    if (preset === 'month') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { fromDate: yyyyMmDd(start), toDate: yyyyMmDd(today) };
+    }
+    if (preset === 'year') {
+      const start = new Date(today.getFullYear(), 0, 1);
+      return { fromDate: yyyyMmDd(start), toDate: yyyyMmDd(today) };
+    }
+    // today
+    const d = yyyyMmDd(today);
+    return { fromDate: d, toDate: d };
+  }
+
+  const periodLabel = (() => {
+    if (periodPreset === 'today') return 'Hôm nay';
+    if (periodPreset === 'month') return 'Tháng này';
+    if (periodPreset === 'year') return 'Năm nay';
+    if (customFrom && customTo) return `${customFrom} → ${customTo}`;
+    return 'Tùy chọn';
+  })();
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+
     (async () => {
       try {
-        const statsData = await getAdminDashboardStats();
-        if (!cancelled) {
-          setStats(statsData);
+        const range = resolvePeriodRange(periodPreset, customFrom, customTo);
+        if (periodPreset === 'custom' && (!range.fromDate || !range.toDate)) {
+          if (!cancelled) setLoading(false);
+          return;
         }
+        const statsData = await getAdminDashboardStats(range);
+        if (cancelled) return;
+        setStats(statsData);
+        setError(null);
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Không thể tải thống kê');
+        if (cancelled) return;
+        if (err?.name === 'AbortError' || err?.code === 'ABORTED' || err?.code === 'LOGGED_OUT') {
+          return;
+        }
+        setError(err.message || 'Không thể tải thống kê');
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
+  }, [periodPreset, customFrom, customTo]);
+
+  // Fetch notifications CRUD gan day (poll 60s de dashboard cap nhat realtime-like)
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId = null;
+
+    const fetchNotifs = async () => {
+      try {
+        const data = await getNotifications({ pageSize: 20 });
+        const items = data?.items || data || [];
+        if (!cancelled) setNotifications(items);
+      } catch (_) {
+        // Silent fail
+      }
+    };
+
+    fetchNotifs();
+    intervalId = setInterval(fetchNotifs, 60_000);
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
-  // Gop alerts tu backend voi alerts tu sinh (auto) de widget luon co noi dung.
-  // Uu tien alerts backend, sau do them alerts auto neu can.
+  // Đồng bộ số cảnh báo bảo mật (đã gom) — event từ panel + poll ngắn
+  useEffect(() => {
+    let cancelled = false;
+
+    const applyCounts = (counts) => {
+      if (cancelled || !counts) return;
+      // Không ghi đè số cảnh báo theo khoảng lọc trên dashboard (B1).
+      // Counts toàn cục vẫn xem tại tab Bảo mật đăng nhập.
+      void counts;
+    };
+
+    const refreshCounts = async () => {
+      try {
+        const counts = await adminSecurityAlertsApi.getCounts();
+        applyCounts(counts);
+      } catch (_) {
+        // Silent
+      }
+    };
+
+    refreshCounts();
+    const intervalId = setInterval(refreshCounts, 30_000);
+
+    const onCountEvent = (e) => {
+      const detail = e?.detail;
+      if (detail && typeof detail === 'object' && ('critical' in detail || 'high' in detail)) {
+        applyCounts(detail);
+      } else {
+        refreshCounts();
+      }
+    };
+    window.addEventListener(SECURITY_ALERTS_COUNT_EVENT, onCountEvent);
+    const onFocus = () => refreshCounts();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+      window.removeEventListener(SECURITY_ALERTS_COUNT_EVENT, onCountEvent);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
+  // Gop notifications CRUD + alerts tu backend + alerts tu sinh (auto) de widget luon co noi dung.
+  // Hien thi notifications CRUD truoc (mau xanh/vang/do theo action), sau do security alerts.
   const derivedAlerts = (() => {
     if (!stats) return [];
-    const backendAlerts = Array.isArray(stats.alerts) ? stats.alerts : [];
-    if (backendAlerts.length > 0) return backendAlerts;
 
-    // Sinh alerts tu stats neu backend tra rong
-    const autoAlerts = generateAlertsFromStats(stats);
-    return autoAlerts;
+    // 1. Notifications tu CRUD (mau phan biet theo severity)
+    const notifItems = notifications.map((n) => ({
+      id: `notif-${n.id}`,
+      title: n.title,
+      message: humanizeNotificationMessage(n.message, n.metadata),
+      severity: n.severity || null,
+      type: n.severity || 'info',
+      notifType: n.type,
+      time: n.createdAt || n.timestamp || n.created_at,
+      actorName: n.metadata?.actorName || null,
+      targetName: n.metadata?.targetName || null,
+      affectedEntity: n.metadata?.targetCode || null,
+      metadata: n.metadata,
+      _source: 'notification',
+    }));
+
+    // 2. Security alerts — chỉ Critical/High trên widget Tổng quan
+    const backendAlerts = (Array.isArray(stats.alerts) ? stats.alerts : [])
+      .filter((a) => a.severity === 'critical' || a.severity === 'high')
+      .map((a) => ({
+        ...a,
+        ruleKey: a.ruleKey || a.rule_key,
+        userId: a.userId || a.user_id,
+      }));
+
+    // 3. Alerts tu sinh (auto) neu backend tra rong
+    const autoAlerts = (backendAlerts.length === 0 && notifications.length === 0)
+      ? generateAlertsFromStats(stats)
+      : [];
+
+    // Gop + sort theo thoi gian moi nhat + bỏ trùng (giống chuông)
+    const all = [...notifItems, ...backendAlerts, ...autoAlerts];
+    all.sort((a, b) => {
+      const ta = a.time ? new Date(a.time).getTime() : 0;
+      const tb = b.time ? new Date(b.time).getTime() : 0;
+      return tb - ta;
+    });
+
+    return collapseDashboardAlerts(all).slice(0, 12);
   })();
 
   // Gop nhat ky hoat dong voi login sessions, sort theo thoi gian moi nhat.
@@ -865,11 +1162,53 @@ export default function AdminDashboardPage() {
         </div>
         <div className="dash-header__right">
           <div className="dash-header__live-dot" />
-          <span className="dash-header__live-label">Live</span>
+          <span className="dash-header__live-label">Trực tiếp</span>
           <span className="dash-header__update">
             Cập nhật: {stats?.generatedAt ? formatDateTime(stats.generatedAt) : '...'}
           </span>
         </div>
+      </div>
+
+      <div className="dash-period-bar" style={{
+        display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+        marginBottom: 16, padding: '12px 16px', background: '#fff',
+        border: '1px solid #e2e8f0', borderRadius: 12,
+      }}>
+        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+          Thống kê IAM / bảo mật — khoảng:
+        </span>
+        {[
+          { id: 'today', label: 'Hôm nay' },
+          { id: 'month', label: 'Tháng này' },
+          { id: 'year', label: 'Năm nay' },
+          { id: 'custom', label: 'Tùy chọn' },
+        ].map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className={`btn btn--sm ${periodPreset === p.id ? 'btn--primary' : 'btn--ghost'}`}
+            onClick={() => setPeriodPreset(p.id)}
+          >
+            {p.label}
+          </button>
+        ))}
+        {periodPreset === 'custom' && (
+          <DateRangeInputs
+            startDate={customFrom}
+            endDate={customTo}
+            onChange={({ startDate, endDate }) => {
+              setCustomFrom(startDate);
+              setCustomTo(endDate);
+            }}
+            className="dash-period__dates"
+            inputClassName="input"
+            sep="→"
+          />
+        )}
+        <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#64748b' }}>
+          Đang xem: <strong>{periodLabel}</strong>
+          {stats?.periodAuditCount != null ? ` · ${stats.periodAuditCount} nhật ký` : ''}
+        </span>
       </div>
 
       {/* ── Loading / Error ─────────────────────────────────────── */}
@@ -923,11 +1262,31 @@ export default function AdminDashboardPage() {
             <StatCard
               accent="#0891b2"
               icon={<IconLogin />}
-              label="Đăng nhập hôm nay"
+              label={`Đăng nhập (${periodLabel})`}
               value={stats.todayLogins}
-              sub={`${stats.failedLogins} lần thất bại`}
+              sub={`${stats.failedLogins} lần thất bại trong khoảng`}
             />
           </div>
+
+          {/* Banner chỉ Critical/High — tránh ồn Info/Medium */}
+          {(() => {
+            const critical = Number(stats.alertCounts?.critical) || 0;
+            const high = Number(stats.alertCounts?.high) || 0;
+            const urgent = critical + high;
+            if (urgent <= 0) return null;
+            return (
+              <Link to="/admin/login-security?alerts=1" className="dash-alert-banner">
+                <IconAlert />
+                <span>
+                  Có{' '}
+                  <strong>{urgent > 99 ? '99+' : urgent}</strong>
+                  {' '}cảnh báo bảo mật cần xử lý
+                  {' '}(Nghiêm trọng {critical} · Cao {high})
+                </span>
+                <span className="dash-alert-banner__link">Xem và xử lý <IconArrowRight /></span>
+              </Link>
+            );
+          })()}
 
           {/* ── Row 2: Alerts + Logs widget ────────────────────── */}
           <div className="dash-row-2">
@@ -937,6 +1296,8 @@ export default function AdminDashboardPage() {
                 dot="linear-gradient(135deg, #ef4444, #f97316)"
                 title="Thông báo hệ thống"
                 badge={derivedAlerts.length}
+                link="/admin/login-security?alerts=1"
+                linkLabel="Cảnh báo bảo mật"
               />
               <div className="dash-widget__body">
                 {derivedAlerts.length > 0 ? (
@@ -965,7 +1326,7 @@ export default function AdminDashboardPage() {
                   <Link to="/admin/logs" className="section-header__link">
                     Xem tất cả <IconArrowRight />
                   </Link>
-                  <Link to="/admin/login-sessions" className="section-header__link section-header__link--alt">
+                  <Link to="/admin/login-security?tab=sessions" className="section-header__link section-header__link--alt">
                     Lịch sử đăng nhập <IconArrowRight />
                   </Link>
                 </div>
@@ -1022,6 +1383,7 @@ export default function AdminDashboardPage() {
           </div>
         </>
       )}
+
     </div>
   );
 }

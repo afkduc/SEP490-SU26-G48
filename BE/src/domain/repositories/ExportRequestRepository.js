@@ -11,7 +11,7 @@
  *     4) INSERT inventory_transactions (transaction_type='export')
  *     neu 1 trong 4 buoc loi -> rollback toan bo.
  *
- * - Phu tung can xuat duoc trich tu repair_order_tasks WHERE task_type='PART'.
+ * - Phu tung can xuat duoc trich tu repair_order_tasks WHERE task_type='product'.
  *   Khi NVKho xuat, BE se lay cac phu tung do lam "snapshot" va cho phep
  *   dieu chinh quantity (vi co the xuat khong het hoac them phu tung phat sinh).
  */
@@ -63,8 +63,9 @@ class ExportRequestRepository {
   }
 
   /**
-   * Lay cac Repair Order co the xuat kho (status IN ('pending','inprogress')
-   * va chua tung duoc xuat cho RO do). Tra ve kem tasks (PART) de FE hien thi.
+   * Lay cac Repair Order co the xuat kho (status <> 'cancelled', bao gom ca
+   * 'inprogress' va 'completed') va chua tung duoc xuat cho RO do. Tra ve kem
+   * tasks (product) de FE hien thi.
    * @param {Object} filters - { branchId, search, page, limit }
    * @returns {Promise<Array<{ id, repairOrderCode, serviceOrderCode, customerName, vehiclePlate, status, items: Array }>>}
    */
@@ -73,7 +74,7 @@ class ExportRequestRepository {
   }
 
   /**
-   * Lay 1 Repair Order kem cac phu tung (task_type='PART') chua xuat.
+   * Lay 1 Repair Order kem cac phu tung (task_type='product') chua xuat.
    * @param {number} repairOrderId
    * @returns {Promise<{ repairOrderCode, serviceOrderCode, customerName, vehiclePlate, status, items: Array }|null>}
    */

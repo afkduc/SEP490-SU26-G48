@@ -1,8 +1,11 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { adminDevicesApi } from '../../services/adminApi';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
+import { useAuth } from '../../contexts/AppContext';
 import { useToast } from '../../components/common/ToastContext';
 import { formatDateSafe } from '../../utils/dateUtils';
+import { pickLatestDevice } from './securityAlertFocus';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './AdminDevicesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -80,7 +83,7 @@ function formatDate(dateStr) {
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
-  { value: 'true', label: '● Hiện tại' },
+  { value: 'true', label: '● Đang hoạt động' },
   { value: 'false', label: '○ Không hoạt động' },
 ];
 
@@ -106,9 +109,9 @@ const OS_OPTIONS = [
 
 function SelectFilter({ value, options, onChange, placeholder }) {
   return (
-    <div className="select-filter-wrapper">
+    <div className="admin-devices__select-wrap">
       <select
-        className="select-filter"
+        className="admin-devices__select"
         value={value}
         onChange={onChange}
       >
@@ -116,7 +119,7 @@ function SelectFilter({ value, options, onChange, placeholder }) {
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-      <span className="select-filter-arrow"><IconChevronDown /></span>
+      <span className="admin-devices__select-arrow"><IconChevronDown /></span>
     </div>
   );
 }
@@ -193,17 +196,30 @@ function Pagination({ page, pageSize, total, onPageChange }) {
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export default function AdminDevicesPage() {
+export default function AdminDevicesPage({
+  embedded = false,
+  seedSearch = '',
+  seedUserId = null,
+  seedIsCurrent = '',
+  seedKey = 0,
+  seedFocusIp = '',
+  seedFocusLoginTime = '',
+} = {}) {
   const toast = useToast();
+  const { token } = useAuth();
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
-  const [searchTimer, setSearchTimer] = useState(null);
+  // Bug cu: searchTimer la useState -> clearTimeout(searchTimer) co the clear
+  // timeout cu (state chua update) khi user go lien tuc -> race condition.
+  // Fix: dung useRef de luu timer ID (ref dong bo, khong can render moi).
+  const searchTimerRef = useRef(null);
 
   const [statusFilter, setStatusFilter] = useState('');
+  const [userIdFilter, setUserIdFilter] = useState(null);
   const [browserFilter, setBrowserFilter] = useState('');
   const [osFilter, setOsFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -212,7 +228,13 @@ export default function AdminDevicesPage() {
   const [logoutTarget, setLogoutTarget] = useState(null);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
+  const [focusedDeviceId, setFocusedDeviceId] = useState(null);
+  const focusScrollPendingRef = useRef(false);
+  const focusPayloadRef = useRef({ ip: '', loginTime: '' });
+
   const PAGE_SIZE = 20;
+  /** Bỏ qua effect filter khi vừa seed / lần mount đầu — tránh loadData chồng → giật màn hình */
+  const skipFilterReloadRef = useRef(true);
 
   const loadData = useCallback(async (pageNum = 1, extraParams = {}) => {
     setLoading(true);
@@ -222,13 +244,21 @@ export default function AdminDevicesPage() {
         page: pageNum,
         pageSize: PAGE_SIZE,
         search: search || undefined,
-        ...extraParams,
       };
+      if (userIdFilter) params.userId = userIdFilter;
       if (statusFilter) params.isCurrent = statusFilter;
       if (browserFilter) params.browser = browserFilter;
       if (osFilter) params.os = osFilter;
       if (dateFrom) params.dateFrom = dateFrom;
       if (dateTo) params.dateTo = dateTo;
+      // Seed từ cảnh bảo: extraParams thắng state (tránh race setState)
+      Object.assign(params, extraParams);
+      // Chuẩn hóa: chuỗi rỗng / null = bỏ filter
+      Object.keys(params).forEach((k) => {
+        if (params[k] === '' || params[k] === null || params[k] === undefined) {
+          delete params[k];
+        }
+      });
 
       const data = await adminDevicesApi.list(params);
       setDevices(data?.items || []);
@@ -239,16 +269,107 @@ export default function AdminDevicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, browserFilter, osFilter, dateFrom, dateTo]);
+  }, [search, userIdFilter, statusFilter, browserFilter, osFilter, dateFrom, dateTo]);
 
-  useEffect(() => { loadData(1); }, []);
+  // Mount: chỉ load mặc định khi KHÔNG có seed (seed effect sẽ load 1 lần)
+  useEffect(() => {
+    if (seedKey) return undefined;
+    loadData(1);
+    // Cho phép filter effect sau frame đầu
+    const t = requestAnimationFrame(() => {
+      skipFilterReloadRef.current = false;
+    });
+    return () => cancelAnimationFrame(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Seed từ cảnh báo / «Xử lý trên tab Thiết bị» — đúng 1 lần load
+  useEffect(() => {
+    if (!seedKey) return;
+    skipFilterReloadRef.current = true;
+
+    const nextSearch = seedSearch || '';
+    const nextUserId = seedUserId || null;
+    const nextStatus = seedIsCurrent ?? '';
+    setSearch(nextSearch);
+    setUserIdFilter(nextUserId);
+    setStatusFilter(nextStatus);
+    setBrowserFilter('');
+    setOsFilter('');
+    setDateFrom('');
+    setDateTo('');
+
+    focusPayloadRef.current = {
+      ip: seedFocusIp || '',
+      loginTime: seedFocusLoginTime || '',
+    };
+    focusScrollPendingRef.current = true;
+    setFocusedDeviceId(null);
+
+    loadData(1, {
+      search: nextSearch || undefined,
+      userId: nextUserId || undefined,
+      isCurrent: nextStatus || undefined,
+      browser: undefined,
+      os: undefined,
+      dateFrom: undefined,
+      dateTo: undefined,
+    }).finally(() => {
+      // Đợi state filter settle rồi mới bật lại auto-reload
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          skipFilterReloadRef.current = false;
+        });
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey]);
+
+  function pickFocusDeviceId(list, focusIp) {
+    const latest = pickLatestDevice(list, { ip: focusIp });
+    return latest?.id ?? null;
+  }
+
+  // Sau khi seed thay đổi + danh sách load xong, scroll tới thiết bị MỚI NHẤT.
+  useEffect(() => {
+    if (!focusScrollPendingRef.current) return;
+    if (loading) return;
+
+    const { ip } = focusPayloadRef.current;
+    if (!String(ip || '').trim() && !seedUserId && !seedSearch) {
+      setFocusedDeviceId(null);
+      focusScrollPendingRef.current = false;
+      return;
+    }
+
+    // List đã lọc theo user/search — highlight thiết bị mới nhất trong list.
+    const focusId = pickFocusDeviceId(devices, '');
+    setFocusedDeviceId(focusId);
+
+    if (focusId) {
+      requestAnimationFrame(() => {
+        document.getElementById(`admin-device-row-${focusId}`)?.scrollIntoView({
+          behavior: 'auto',
+          block: 'nearest',
+        });
+      });
+    }
+
+    focusScrollPendingRef.current = false;
+  }, [devices, loading, seedUserId, seedSearch]);
+
+  // Reload khi đổi filter — bỏ qua lần mount / lúc đang seed
+  useEffect(() => {
+    if (skipFilterReloadRef.current) return;
+    loadData(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, browserFilter, osFilter, dateFrom, dateTo, userIdFilter]);
 
   // SSE listener - chi cap nhat row bi anh huong (login/logout/force),
   // tranh loadData() gay giat man hinh khi user dang cuon/xem.
   const handleSSEEvent = useCallback((eventData) => {
     if (!eventData || !['login', 'logout', 'force'].includes(eventData.type)) return;
 
-    // Truong hop co deviceId va ta biet id do, patch ngay row tuong ung
     const changedDeviceId = Number(
       eventData.deviceId ?? eventData.payload?.deviceId ?? eventData.device?.id
     );
@@ -256,19 +377,24 @@ export default function AdminDevicesPage() {
       eventData.userId ?? eventData.payload?.userId ?? eventData.user?.id
     );
 
-    if (eventData.type === 'force' && changedDeviceId) {
+    if (eventData.type === 'force' || eventData.type === 'logout') {
       setDevices((prev) =>
-        prev.map((d) => (d.id === changedDeviceId ? { ...d, isCurrent: false } : d))
+        prev.map((d) => {
+          if (changedDeviceId && d.id === changedDeviceId) return { ...d, isCurrent: false };
+          if (!changedDeviceId && userIdChanged && d.userId === userIdChanged) {
+            return { ...d, isCurrent: false };
+          }
+          return d;
+        })
       );
+      // force/logout không có deviceId → refetch để đồng bộ với lịch sử đăng nhập
+      if (!changedDeviceId) loadData(page);
       return;
     }
 
-    // Truong hop login: neu co deviceId, patch row do thanh current; neu khong,
-    // fallback refetch (khi do co the co row moi hoac row cu bi set isCurrent=0)
     if (eventData.type === 'login' && (changedDeviceId || userIdChanged)) {
       setDevices((prev) => {
         let next = prev;
-        // Set isCurrent=false cho moi row cua user (tru row moi)
         if (userIdChanged) {
           next = next.map((d) =>
             d.userId === userIdChanged && d.id !== changedDeviceId
@@ -276,24 +402,20 @@ export default function AdminDevicesPage() {
               : d
           );
         }
-        // Set isCurrent=true cho row moi neu co deviceId
         if (changedDeviceId) {
           next = next.map((d) => (d.id === changedDeviceId ? { ...d, isCurrent: true } : d));
         }
         return next;
       });
-      // Neu khong co deviceId, can refetch de lay row moi insert
-      if (!changedDeviceId) {
-        loadData(page);
-      }
+      if (!changedDeviceId) loadData(page);
       return;
     }
 
-    // Truong hop logout hoac khong ro deviceId -> refetch
     loadData(page);
   }, [loadData, page]);
 
-  useLoginSessionsSSE(handleSSEEvent);
+  // Truyen token de SSE auth (BE validate Bearer hoac ?token= query)
+  useLoginSessionsSSE(handleSSEEvent, true, token);
 
   // Sort client-side de dam bao is_current len tren, moi nhat truoc.
   // BE da sort (trong DeviceRepository), nhung useMemo nay giup FE on dinh
@@ -319,12 +441,24 @@ export default function AdminDevicesPage() {
   function handleSearchChange(e) {
     const val = e.target.value;
     setSearch(val);
-    clearTimeout(searchTimer);
-    const timer = setTimeout(() => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    searchTimerRef.current = setTimeout(() => {
+      searchTimerRef.current = null;
       loadData(1);
     }, 400);
-    setSearchTimer(timer);
   }
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+        searchTimerRef.current = null;
+      }
+    };
+  }, []);
 
   function handleFilterChange() {
     loadData(1);
@@ -332,12 +466,21 @@ export default function AdminDevicesPage() {
 
   function handleClearFilters() {
     setSearch('');
+    setUserIdFilter(null);
     setStatusFilter('');
     setBrowserFilter('');
     setOsFilter('');
     setDateFrom('');
     setDateTo('');
-    loadData(1);
+    loadData(1, {
+      search: undefined,
+      userId: undefined,
+      isCurrent: undefined,
+      browser: undefined,
+      os: undefined,
+      dateFrom: undefined,
+      dateTo: undefined,
+    });
   }
 
   function handlePageChange(newPage) {
@@ -351,7 +494,7 @@ export default function AdminDevicesPage() {
     setLogoutLoading(true);
     try {
       await adminDevicesApi.forceLogout(targetId);
-      toast.success(`Đã đăng xuất thiết bị "${targetName}"`);
+      toast.warning(`Đã đăng xuất thiết bị "${targetName}"`);
       setLogoutTarget(null);
       
       // Smooth update - chi cap nhat device bi revoke, khong load lai toan bo trang
@@ -368,92 +511,87 @@ export default function AdminDevicesPage() {
     }
   }
 
-  const hasActiveFilters = statusFilter || browserFilter || osFilter || dateFrom || dateTo || search;
+  const hasActiveFilters = statusFilter || browserFilter || osFilter || dateFrom || dateTo || search || userIdFilter;
 
   return (
-    <div className="admin-devices">
-      {/* Header */}
-      <div className="admin-devices__header">
-        <div className="admin-devices__title-block">
-          <div className="admin-devices__title-icon">
-            <IconDevice />
-          </div>
-          <div className="admin-devices__title-group">
-            <h1>Thiết bị đăng nhập</h1>
-            <p className="admin-devices__subtitle">Quản lý thiết bị đang đăng nhập &amp; Force Logout</p>
+    <div className={`admin-devices${embedded ? ' admin-devices--embedded' : ''}`}>
+      {!embedded && (
+        <div className="admin-devices__header">
+          <div className="admin-devices__title-block">
+            <div className="admin-devices__title-icon">
+              <IconDevice />
+            </div>
+            <div className="admin-devices__title-group">
+              <h1>Thiết bị đăng nhập</h1>
+              <p className="admin-devices__subtitle">Quản lý thiết bị đang đăng nhập &amp; Force Logout</p>
+            </div>
           </div>
         </div>
-        <div className="admin-devices__actions">
-          <button className="btn btn--ghost btn--sm" onClick={() => loadData(page)} title="Làm mới">
+      )}
+
+      {/* Toolbar: tìm kiếm + lọc + làm mới trên 1 khối */}
+      <div className="admin-devices__toolbar">
+        <div className="admin-devices__toolbar-top">
+          <div className="admin-devices__search-wrap">
+            <span className="admin-devices__search-icon" aria-hidden="true">
+              <IconSearch />
+            </span>
+            <input
+              type="text"
+              className="admin-devices__search"
+              placeholder="Tìm theo tên, email, SĐT, IP..."
+              value={search}
+              onChange={handleSearchChange}
+            />
+          </div>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm admin-devices__refresh"
+            onClick={() => loadData(page)}
+            title="Làm mới"
+          >
             <IconRefresh /> Làm mới
           </button>
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="admin-devices__filters">
-        <div className="search-input-wrapper">
-          <IconSearch />
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Tìm theo tên, SĐT, IP, trình duyệt..."
-            value={search}
-            onChange={handleSearchChange}
-          />
-        </div>
-
-        <div className="filter-row">
-          <div className="filter-group">
+        <div className="admin-devices__toolbar-filters">
+          <div className="admin-devices__filter-group">
             <IconFilter />
             <SelectFilter
               value={statusFilter}
               options={STATUS_OPTIONS}
-              onChange={(e) => { setStatusFilter(e.target.value); }}
-              onBlur={handleFilterChange}
+              onChange={(e) => setStatusFilter(e.target.value)}
             />
           </div>
-
-          <div className="filter-group">
-            <SelectFilter
-              value={browserFilter}
-              options={BROWSER_OPTIONS}
-              onChange={(e) => { setBrowserFilter(e.target.value); }}
-              onBlur={handleFilterChange}
+          <SelectFilter
+            value={browserFilter}
+            options={BROWSER_OPTIONS}
+            onChange={(e) => setBrowserFilter(e.target.value)}
+          />
+          <SelectFilter
+            value={osFilter}
+            options={OS_OPTIONS}
+            onChange={(e) => setOsFilter(e.target.value)}
+          />
+          <div className="admin-devices__filter-group admin-devices__filter-group--date">
+            <DateRangeInputs
+              startDate={dateFrom}
+              endDate={dateTo}
+              onChange={({ startDate, endDate }) => {
+                setDateFrom(startDate);
+                setDateTo(endDate);
+              }}
+              className="admin-devices__date-range"
+              inputClassName="admin-devices__date"
+              sepClassName="admin-devices__date-sep"
             />
           </div>
-
-          <div className="filter-group">
-            <SelectFilter
-              value={osFilter}
-              options={OS_OPTIONS}
-              onChange={(e) => { setOsFilter(e.target.value); }}
-              onBlur={handleFilterChange}
-            />
-          </div>
-
-          <div className="filter-group filter-group--date">
-            <input
-              type="date"
-              className="date-input"
-              value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); }}
-              onBlur={handleFilterChange}
-              title="Từ ngày"
-            />
-            <span className="date-separator">—</span>
-            <input
-              type="date"
-              className="date-input"
-              value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); }}
-              onBlur={handleFilterChange}
-              title="Đến ngày"
-            />
-          </div>
-
           {hasActiveFilters && (
-            <button className="btn btn--ghost btn--sm btn--clear-filters" onClick={handleClearFilters}>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm admin-devices__clear-filters"
+              onClick={handleClearFilters}
+            >
               ✕ Xóa lọc
             </button>
           )}
@@ -486,8 +624,16 @@ export default function AdminDevicesPage() {
       )}
 
       {!loading && !error && devices.length > 0 && (
-        <div className="devices-table-wrapper">
-          <table className="devices-table">
+        <div className="admin-devices__table-wrap">
+          <table className="admin-devices__table">
+            <colgroup>
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '24%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>Thiết bị</th>
@@ -500,45 +646,58 @@ export default function AdminDevicesPage() {
             </thead>
             <tbody>
               {sortedDevices.map((device) => (
-                <tr key={device.id}>
+                <tr
+                  key={device.id}
+                  id={`admin-device-row-${device.id}`}
+                  className={focusedDeviceId === device.id ? 'admin-devices__row--focused' : ''}
+                >
                   <td>
-                    <div className="device-info">
-                      <span className="device-name">
-                        {getBrowserIcon(device.browser)} {device.deviceName || 'Unknown Device'}
+                    <div className="admin-devices__cell-stack">
+                      <span className="admin-devices__cell-title">
+                        {getBrowserIcon(device.browser)} {device.deviceName || 'Thiết bị không xác định'}
                       </span>
-                      <span className="device-meta">{device.browser} · {device.os}</span>
+                      <span className="admin-devices__cell-sub">{device.browser} · {device.os}</span>
                     </div>
                   </td>
                   <td>
-                    <div className="user-info">
-                      <span className="user-name-cell">{device.displayName || device.userName || '—'}</span>
-                      {device.branchName && <span className="user-branch-cell">{device.branchName}</span>}
+                    <div className="admin-devices__cell-stack">
+                      <span className="admin-devices__cell-title">{device.displayName || device.userName || '—'}</span>
+                      {device.userName && device.displayName && device.displayName !== device.userName && (
+                        <span className="admin-devices__cell-sub">@{String(device.userName).replace(/^@/, '')}</span>
+                      )}
+                      {device.branchName && <span className="admin-devices__cell-sub">{device.branchName}</span>}
                     </div>
                   </td>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{device.ipAddress || '—'}</td>
-                  <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>{formatDate(device.lastLoginAt)}</td>
                   <td>
-                    <span className={`current-badge ${device.isCurrent ? 'current-badge--yes' : 'current-badge--no'}`}>
-                      {device.isCurrent ? '● Hiện tại' : '○ Không hoạt động'}
-                    </span>
+                    <span className="admin-devices__mono">{device.ipAddress || '—'}</span>
                   </td>
                   <td>
-                    {/* Button Force Logout CHI enable khi isCurrent=true.
-                        Khi isCurrent=false: hien thi text "Da dang xuat" (readonly).
-                        Day la logic da dung tu truoc - giu nguyen. */}
-                    {!device.isCurrent ? (
-                      <span className="btn btn--secondary btn--sm btn--disabled">
-                        Đã đăng xuất
+                    <span className="admin-devices__mono">{formatDate(device.lastLoginAt)}</span>
+                  </td>
+                  <td>
+                    <div className="admin-devices__status-stack">
+                      <span className={`admin-devices__badge ${device.isCurrent ? 'admin-devices__badge--on' : 'admin-devices__badge--off'}`}>
+                        {device.isCurrent ? '● Hiện tại' : '○ Không hoạt động'}
                       </span>
-                    ) : (
-                      <button
-                        className="btn btn--danger btn--sm"
-                        onClick={() => setLogoutTarget(device)}
-                        title="Đăng xuất khỏi thiết bị này"
-                      >
-                        <IconLogout /> Đăng xuất
-                      </button>
-                    )}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="admin-devices__row-actions">
+                      {!device.isCurrent ? (
+                        <span className="btn btn--secondary btn--sm btn--disabled">
+                          Đã đăng xuất
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn--danger btn--sm"
+                          onClick={() => setLogoutTarget(device)}
+                          title="Đăng xuất khỏi thiết bị này"
+                        >
+                          <IconLogout /> Đăng xuất
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

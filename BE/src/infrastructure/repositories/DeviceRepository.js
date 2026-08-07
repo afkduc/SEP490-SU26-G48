@@ -1,20 +1,53 @@
 const { query } = require('../database/sqlServer');
+const {
+  sqlAccentInsensitiveLike,
+  bindNormalizedLikeParam,
+} = require('../../utils/vietnamese');
 
 /**
  * Chuyen gia tri Date tu mssql thanh ISO8601 UTC string ('...Z').
- * Boi vi sqlServer.js da cau hinh useUTC: true nen cac gia tri Date
- * tra ve o UTC. Ham nay chi dam bao output luon la ISO string de FE
- * parse de dang bang new Date(...) ma khong bi lech mu gio.
  */
 function toIsoUtc(value) {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString();
   if (typeof value === 'string') {
-    // Neu da la ISO co 'Z' hoac offset thi giu nguyen
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? value : d.toISOString();
   }
   return value;
+}
+
+let trustedSchemaReady = false;
+let trustedSchemaPromise = null;
+
+/** Dam bao cot is_trusted / trusted_at ton tai (idempotent). */
+async function ensureTrustedSchema() {
+  if (trustedSchemaReady) return;
+  if (trustedSchemaPromise) return trustedSchemaPromise;
+  trustedSchemaPromise = (async () => {
+    try {
+      await query(`
+        IF COL_LENGTH('dbo.user_devices', 'is_trusted') IS NULL
+        BEGIN
+          ALTER TABLE dbo.user_devices
+            ADD is_trusted BIT NOT NULL
+              CONSTRAINT DF_user_devices_is_trusted DEFAULT (0);
+        END
+      `);
+      await query(`
+        IF COL_LENGTH('dbo.user_devices', 'trusted_at') IS NULL
+        BEGIN
+          ALTER TABLE dbo.user_devices ADD trusted_at DATETIME2 NULL;
+        END
+      `);
+      trustedSchemaReady = true;
+    } catch (err) {
+      console.warn('[DeviceRepository] ensureTrustedSchema failed:', err.message);
+      trustedSchemaPromise = null;
+      throw err;
+    }
+  })();
+  return trustedSchemaPromise;
 }
 
 function mapRow(row) {
@@ -28,6 +61,8 @@ function mapRow(row) {
     ipAddress: row.ip_address,
     userAgent: row.user_agent,
     isCurrent: row.is_current === 1 || row.is_current === true,
+    isTrusted: row.is_trusted === 1 || row.is_trusted === true,
+    trustedAt: toIsoUtc(row.trusted_at),
     lastLoginAt: toIsoUtc(row.last_login_at),
     lastActivityAt: toIsoUtc(row.last_activity_at),
     createdAt: toIsoUtc(row.created_at),
@@ -35,28 +70,22 @@ function mapRow(row) {
 }
 
 class DeviceRepository {
-  /**
-   * Lay tat ca devices cua 1 user
-   */
+  async ensureSchema() {
+    return ensureTrustedSchema();
+  }
+
   async findByUserId(userId) {
+    await ensureTrustedSchema();
     const result = await query(`
       SELECT
-        d.id,
-        d.user_id,
-        d.device_name,
-        d.browser,
-        d.os,
-        d.ip_address,
-        d.user_agent,
-        d.is_current,
-        d.last_login_at,
-        d.last_activity_at,
-        d.created_at,
+        d.id, d.user_id, d.device_name, d.browser, d.os, d.ip_address, d.user_agent,
+        d.is_current, d.is_trusted, d.trusted_at, d.last_login_at, d.last_activity_at, d.created_at,
         u.user_name
       FROM user_devices d
       LEFT JOIN users u ON u.id = d.user_id
       WHERE d.user_id = @p1
-      ORDER BY 
+      ORDER BY
+        CASE WHEN d.is_trusted = 1 THEN 0 ELSE 1 END,
         CASE WHEN d.is_current = 1 THEN 0 ELSE 1 END,
         ISNULL(d.last_activity_at, d.last_login_at) DESC,
         d.last_login_at DESC
@@ -64,28 +93,17 @@ class DeviceRepository {
     return result.recordset.map(mapRow);
   }
 
-  /**
-   * Lay tat ca devices dang active (is_current = 1) cua 1 user
-   */
   async findActiveByUserId(userId) {
+    await ensureTrustedSchema();
     const result = await query(`
       SELECT
-        d.id,
-        d.user_id,
-        d.device_name,
-        d.browser,
-        d.os,
-        d.ip_address,
-        d.is_current,
-        d.last_login_at,
-        d.last_activity_at,
+        d.id, d.user_id, d.device_name, d.browser, d.os, d.ip_address,
+        d.is_current, d.is_trusted, d.trusted_at, d.last_login_at, d.last_activity_at,
         u.user_name
       FROM user_devices d
       LEFT JOIN users u ON u.id = d.user_id
       WHERE d.user_id = @p1 AND d.is_current = 1
-      ORDER BY 
-        ISNULL(d.last_activity_at, d.last_login_at) DESC,
-        d.last_login_at DESC
+      ORDER BY ISNULL(d.last_activity_at, d.last_login_at) DESC, d.last_login_at DESC
     `, { p1: userId });
     return result.recordset.map((row) => ({
       id: Number(row.id),
@@ -96,29 +114,19 @@ class DeviceRepository {
       os: row.os,
       ipAddress: row.ip_address,
       isCurrent: true,
+      isTrusted: row.is_trusted === 1 || row.is_trusted === true,
+      trustedAt: toIsoUtc(row.trusted_at),
       lastLoginAt: toIsoUtc(row.last_login_at),
       lastActivityAt: toIsoUtc(row.last_activity_at),
     }));
   }
 
-  /**
-   * Lay 1 device theo id. Dung cho forceLogout (truoc day phai goi findAll
-   * voi pageSize:1000 de tim - rat ton kem).
-   */
   async findById(id) {
+    await ensureTrustedSchema();
     const result = await query(`
       SELECT
-        d.id,
-        d.user_id,
-        d.device_name,
-        d.browser,
-        d.os,
-        d.ip_address,
-        d.user_agent,
-        d.is_current,
-        d.last_login_at,
-        d.last_activity_at,
-        d.created_at,
+        d.id, d.user_id, d.device_name, d.browser, d.os, d.ip_address, d.user_agent,
+        d.is_current, d.is_trusted, d.trusted_at, d.last_login_at, d.last_activity_at, d.created_at,
         u.user_name
       FROM user_devices d
       LEFT JOIN users u ON u.id = d.user_id
@@ -128,10 +136,8 @@ class DeviceRepository {
     return mapRow(result.recordset[0]);
   }
 
-  /**
-   * Lay tat ca devices cua tat ca user (admin overview)
-   */
   async findAll({ userId, search, browser, os, isCurrent, dateFrom, dateTo, page = 1, pageSize = 20 }) {
+    await ensureTrustedSchema();
     const conditions = ['1=1'];
     const params = {};
     let idx = 1;
@@ -143,16 +149,20 @@ class DeviceRepository {
     }
 
     if (search) {
+      const key = `p${idx}`;
+      bindNormalizedLikeParam(params, key, search);
       conditions.push(`(
-        LOWER(u.user_name) LIKE LOWER(@p${idx})
-        OR LOWER(u.first_name) LIKE LOWER(@p${idx})
-        OR LOWER(u.last_name) LIKE LOWER(@p${idx})
-        OR LOWER(d.device_name) LIKE LOWER(@p${idx})
-        OR d.ip_address LIKE @p${idx}
-        OR LOWER(d.browser) LIKE LOWER(@p${idx})
-        OR LOWER(d.os) LIKE LOWER(@p${idx})
+        ${sqlAccentInsensitiveLike('u.user_name', key)}
+        OR ${sqlAccentInsensitiveLike('u.email', key)}
+        OR ${sqlAccentInsensitiveLike('u.first_name', key)}
+        OR ${sqlAccentInsensitiveLike('u.last_name', key)}
+        OR ${sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
+        OR ${sqlAccentInsensitiveLike('u.phone', key)}
+        OR ${sqlAccentInsensitiveLike('d.device_name', key)}
+        OR d.ip_address LIKE @${key}
+        OR ${sqlAccentInsensitiveLike('d.browser', key)}
+        OR ${sqlAccentInsensitiveLike('d.os', key)}
       )`);
-      params[`p${idx}`] = `%${search}%`;
       idx++;
     }
 
@@ -200,24 +210,15 @@ class DeviceRepository {
 
     const dataResult = await query(`
       SELECT
-        d.id,
-        d.user_id,
-        d.device_name,
-        d.browser,
-        d.os,
-        d.ip_address,
-        d.is_current,
-        d.last_login_at,
-        d.last_activity_at,
-        u.user_name,
-        u.first_name,
-        u.last_name,
-        b.branch_name
+        d.id, d.user_id, d.device_name, d.browser, d.os, d.ip_address,
+        d.is_current, d.is_trusted, d.trusted_at, d.last_login_at, d.last_activity_at,
+        u.user_name, u.first_name, u.last_name, b.branch_name
       FROM user_devices d
       LEFT JOIN users u ON u.id = d.user_id
       LEFT JOIN branches b ON b.id = u.branch_id
       WHERE ${where}
-      ORDER BY 
+      ORDER BY
+        CASE WHEN d.is_trusted = 1 THEN 0 ELSE 1 END,
         CASE WHEN d.is_current = 1 THEN 0 ELSE 1 END,
         ISNULL(d.last_activity_at, d.last_login_at) DESC,
         d.last_login_at DESC
@@ -237,6 +238,8 @@ class DeviceRepository {
       os: row.os,
       ipAddress: row.ip_address,
       isCurrent: row.is_current === 1 || row.is_current === true,
+      isTrusted: row.is_trusted === 1 || row.is_trusted === true,
+      trustedAt: toIsoUtc(row.trusted_at),
       lastLoginAt: toIsoUtc(row.last_login_at),
       lastActivityAt: toIsoUtc(row.last_activity_at),
     }));
@@ -249,17 +252,10 @@ class DeviceRepository {
     };
   }
 
-  /**
-   * Xoa 1 device
-   */
   async delete(id) {
     await query('DELETE FROM user_devices WHERE id = @p1', { p1: id });
   }
 
-  /**
-   * Xoa tat ca device cua 1 user tru device hien tai (is_current = 1)
-   * Tra ve so device da xoa
-   */
   async deleteOtherDevices(userId, currentDeviceId) {
     const result = await query(`
       DELETE FROM user_devices
@@ -269,9 +265,6 @@ class DeviceRepository {
     return result.rowsAffected[0];
   }
 
-  /**
-   * Xoa device cua user tren 1 IP cu the
-   */
   async deleteByUserAndIp(userId, ipAddress) {
     await query(
       `DELETE FROM user_devices WHERE user_id = @p1 AND ip_address = @p2`,
@@ -279,9 +272,6 @@ class DeviceRepository {
     );
   }
 
-  /**
-   * Revoke all devices of a user (set is_current = 0 for all).
-   */
   async revokeAllDevices(userId) {
     await query(`
       UPDATE user_devices
@@ -290,9 +280,6 @@ class DeviceRepository {
     `, { p1: userId });
   }
 
-  /**
-   * Dem so device active cua user
-   */
   async countActiveByUserId(userId) {
     const result = await query(
       'SELECT COUNT(*) AS total FROM user_devices WHERE user_id = @p1 AND is_current = 1',
@@ -301,51 +288,25 @@ class DeviceRepository {
     return Number(result.recordset[0].total);
   }
 
-  /**
-   * Update last_activity_at with 60s throttle.
-   * Only updates if last_activity_at is NULL or >= 60 seconds ago.
-   * Returns true if updated, false if skipped.
-   *
-   * QUAN TRONG: Bang user_devices co trigger INSTEAD OF UPDATE. Trigger
-   * tu thuc hien UPDATE va set last_activity_at = SYSUTCDATETIME() neu
-   * gia tri moi > now. Dieu nay khien:
-   *   1. result.rowsAffected[0] luon = 0 (trigger chay thay the)
-   *   2. Kho xac dinh duoc "co that su update hay khong" tu rowsAffected
-   * Fix: SELECT gia tri last_activity_at TRUOC, doi chieu sau UPDATE de
-   * xac dinh co thay doi khong (dung OUTPUT inserted.last_activity_at
-   * cung bi trigger chan, nen phai lay gia tri cu de so sanh).
-   */
   async updateLastActivityIfNeeded(deviceId) {
-    // 1. Lay gia tri last_activity_at hien tai
     const before = await query(
-      `SELECT TOP 1
-         last_activity_at,
-         is_current
-       FROM user_devices
-       WHERE id = @p1`,
+      `SELECT TOP 1 last_activity_at, is_current FROM user_devices WHERE id = @p1`,
       { p1: deviceId }
     );
     if (!before.recordset.length) return false;
     const row = before.recordset[0];
-    // Neu khong phai device hien tai -> khong update
     const isCurrent = row.is_current === 1 || row.is_current === true;
     if (!isCurrent) return false;
 
-    // 2. Kiem tra throttle: chi update neu NULL hoac >= 60s truoc
     const now = Date.now();
     const lastMs = row.last_activity_at ? new Date(row.last_activity_at).getTime() : null;
     if (lastMs !== null && now - lastMs < 60_000) return false;
 
-    // 3. Thuc hien UPDATE (trigger INSTEAD OF se thuc hien UPDATE that su)
-    //    rowsAffected se tra 0 nhung du lieu van update
     await query(
-      `UPDATE user_devices
-       SET last_activity_at = SYSUTCDATETIME()
-       WHERE id = @p1`,
+      `UPDATE user_devices SET last_activity_at = SYSUTCDATETIME() WHERE id = @p1`,
       { p1: deviceId }
     );
 
-    // 4. Verify: SELECT lai de confirm thuc su da update
     const after = await query(
       `SELECT TOP 1 last_activity_at FROM user_devices WHERE id = @p1`,
       { p1: deviceId }
@@ -354,9 +315,9 @@ class DeviceRepository {
       ? new Date(after.recordset[0].last_activity_at).getTime()
       : null;
     if (!afterMs) return false;
-    // Cap nhat thanh cong neu gia tri moi khac gia tri cu (hoac cua bi NULL)
     return lastMs === null || afterMs > lastMs;
   }
 }
 
 module.exports = DeviceRepository;
+module.exports.ensureTrustedSchema = ensureTrustedSchema;

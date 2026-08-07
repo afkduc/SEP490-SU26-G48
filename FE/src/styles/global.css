@@ -317,6 +317,7 @@ body {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .data-table { width: 100%; border-collapse: collapse; }
@@ -446,6 +447,15 @@ body {
 .modal-md { max-width: 640px; }
 .modal-lg { max-width: 900px; }
 .modal-xl { max-width: 1100px; }
+
+/* An thanh cuon (doc/ngang) nhung van cuon duoc binh thuong bang chuot/touch/
+   ban phim - dung cho cap modal xem chi tiet + xem tinh trang xe ban dau canh nhau. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 
 @keyframes modalIn {
   from { opacity: 0; transform: scale(0.95) translateY(-10px); }
@@ -580,8 +590,18 @@ body {
 .table__actions { display: flex; gap: 4px; align-items: center; }
 .table__empty { text-align: center; color: #9ca3af; padding: 40px 12px !important; }
 
+/* Class dung chung cho cac luoi 2 cot thong tin (kieu "Thong tin khach hang" /
+   "Thong tin xe" canh nhau) dung inline style rai rac o nhieu trang (modal chi
+   tiet, form tao lenh sua chua...) - khong dung .form-grid-2 (danh rieng cho
+   luoi input form) de tranh doi lai css cua cac cho dang dung no. */
+.responsive-2col {
+  display: grid;
+  gap: 16px;
+}
+
 @media (max-width: 900px) {
   .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
+  .responsive-2col { grid-template-columns: 1fr !important; }
 
   /* Man hinh nho: bang thuong phai cuon ngang - lam mo 2 canh trai/phai de
      goi y con noi dung o ngoai vung nhin, khong can JS theo doi vi tri cuon. */

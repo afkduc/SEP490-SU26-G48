@@ -1,0 +1,152 @@
+.branch-page__back {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #4f46e5;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.branch-page {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.branch-page__card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px 28px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.branch-page__state {
+  padding: 16px 0;
+  color: #64748b;
+}
+
+.branch-page__state--error {
+  color: #dc2626;
+}
+
+.branch-page__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .branch-page__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.branch-page__error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.branch-page__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.branch-page .form-group {
+  margin-bottom: 14px;
+}
+
+.branch-page .form-group label {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.branch-page .form-group label span {
+  color: #dc2626;
+}
+
+.branch-page .form-group input,
+.branch-page .form-group select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  box-sizing: border-box;
+}
+
+.branch-page .form-hint {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.branch-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.branch-detail__name {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #0f172a;
+}
+
+.branch-detail__list {
+  margin: 0 0 24px;
+  display: grid;
+  gap: 10px;
+}
+
+.branch-detail__list > div {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.branch-detail__list dt {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.branch-detail__list dd {
+  margin: 0;
+  color: #0f172a;
+}
+
+.branch-detail__stats-title {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.branch-detail__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  .branch-detail__stats {
+    grid-template-columns: 1fr;
+  }
+}

@@ -23,6 +23,7 @@ class ProductResponseDto {
       branchId: product.branchId,
       status: product.status,
       isLowStock: product.isLowStock ? product.isLowStock() : product.stockQuantity <= product.minStock,
+      isNewForManager: !!product.isNewForManager,
     };
   }
 

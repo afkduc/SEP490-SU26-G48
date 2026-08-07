@@ -2,14 +2,16 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
+import { useGlobalError } from '../../contexts/GlobalErrorContext';
+import { usePermission } from '../../contexts';
 import {
   adminUsersApi,
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
+import { formatPhoneDisplay } from '../../utils/validation';
+import { navigateWithCrm, writeCrmBrowserUrl } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
-import UserFormModal from './users/UserFormModal';
-import UserDetailDrawer from './users/UserDetailDrawer';
-import AssignRoleModal from './users/AssignRoleModal';
+import PermissionGate from '../../components/PermissionGate';
 import AdminPagination from './components/AdminPagination';
 import TableSkeleton from './components/TableSkeleton';
 import './AdminUsersPage.css';
@@ -17,34 +19,18 @@ import './AdminUsersPage.css';
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
   { value: 'active', label: 'Hoạt động' },
-  { value: 'inactive', label: 'Ngừng hoạt động' },
-  { value: 'locked', label: 'Bị khóa' },
+  { value: 'inactive', label: 'Không hoạt động' },
 ];
 
 const STATUS_LABELS = {
   active: 'Hoạt động',
-  inactive: 'Ngừng hoạt động',
-  locked: 'Bị khóa',
+  inactive: 'Không hoạt động',
 };
 
 const STATUS_CLASS = {
   active: 'badge--success',
-  inactive: 'badge--secondary',
-  locked: 'badge--danger',
+  inactive: 'badge--danger',
 };
-
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  } catch {
-    return value;
-  }
-}
 
 function getInitials(firstName, lastName) {
   if (firstName || lastName) {
@@ -53,7 +39,63 @@ function getInitials(firstName, lastName) {
   return '?';
 }
 
+/**
+ * Action menu rieng cho mobile (3 cham / popup) de tranh tran bang.
+ */
+function UserActionMenu({ user, onView, onEdit }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function onDoc(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  return (
+    <div className="user-action-menu" ref={ref}>
+      <button
+        type="button"
+        className="user-action-menu__trigger"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Them thao tac"
+        aria-expanded={open}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="5" cy="12" r="1.8" />
+          <circle cx="12" cy="12" r="1.8" />
+          <circle cx="19" cy="12" r="1.8" />
+        </svg>
+      </button>
+      {open && (
+        <div className="user-action-menu__dropdown" role="menu">
+          <button type="button" onClick={() => { setOpen(false); onView(); }} role="menuitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Chi tiet
+          </button>
+          <PermissionGate permission="admin:users:update">
+            <button type="button" onClick={() => { setOpen(false); onEdit(); }} role="menuitem">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              Sua
+            </button>
+          </PermissionGate>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminUsersPage() {
+  const { can } = usePermission();
+  const { set403Error } = useGlobalError();
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -71,11 +113,9 @@ export default function AdminUsersPage() {
 
   const { branches, roles, branchesLoading, rolesLoading, branchesError, rolesError } = useSharedBranches();
 
-  // Local state for filters (ensure always available even if SharedDataContext is slow)
   const [localBranches, setLocalBranches] = useState([]);
   const [localRoles, setLocalRoles] = useState([]);
 
-  // Sync from SharedDataContext to local state
   useEffect(() => {
     if (branches && branches.length > 0) setLocalBranches(branches);
   }, [branches]);
@@ -85,61 +125,64 @@ export default function AdminUsersPage() {
   }, [roles]);
 
   const [searchParams] = useSearchParams();
-  const [showModal, setShowModal] = useState(false);
-  const [editUser, setEditUser] = useState(null);
-  const [detailUserId, setDetailUserId] = useState(null);
-  const [assignUserId, setAssignUserId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
 
-  // ── Sync filters → URL (không trigger re-render nhiều lần) ──
+  const hasReadPermission = can('admin:users:read');
+
+  // Xóa tab=roles cũ trên URL (màn vai trò đã bỏ)
+  useEffect(() => {
+    if (searchParams.get('tab') !== 'roles') return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('tab');
+    const qs = next.toString();
+    writeCrmBrowserUrl('/admin/users', qs ? `?${qs}` : '');
+  }, [searchParams]);
+
+  // Không gọi setState trong render — chuyển sang effect (tránh vỡ hooks / action buttons)
+  useEffect(() => {
+    if (!hasReadPermission) {
+      set403Error('admin:users:read', 'Bạn không có quyền truy cập trang quản lý người dùng.');
+    }
+  }, [hasReadPermission, set403Error]);
+
+  // Đồng bộ filter → URL: /crm + /admin/users + ?search=&roleId=&status=&branchId=
+  // Chỉ ghi History — KHÔNG navigate (tránh Router ghi đè mất /crm).
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      // Init from URL on first mount
-      const sp = new URLSearchParams(window.location.search);
       const urlParams = {};
-      if (sp.get('search')) urlParams.search = sp.get('search');
-      if (sp.get('branchId')) urlParams.branchId = Number(sp.get('branchId'));
-      if (sp.get('roleId')) urlParams.roleId = Number(sp.get('roleId'));
-      if (sp.get('status')) urlParams.status = sp.get('status');
-      if (sp.get('page')) urlParams.page = Number(sp.get('page'));
+      if (searchParams.get('search')) urlParams.search = searchParams.get('search');
+      if (searchParams.get('branchId')) urlParams.branchId = Number(searchParams.get('branchId'));
+      if (searchParams.get('roleId')) urlParams.roleId = Number(searchParams.get('roleId'));
+      if (searchParams.get('status')) urlParams.status = searchParams.get('status');
+      if (searchParams.get('page')) urlParams.page = Number(searchParams.get('page'));
       if (Object.keys(urlParams).length > 0) {
         setParams((p) => ({ ...p, ...urlParams }));
       }
       return;
     }
 
-    // Sync state → URL
-    const sp = new URLSearchParams();
-    if (params.search) sp.set('search', params.search);
-    if (params.branchId) sp.set('branchId', params.branchId);
-    if (params.roleId) sp.set('roleId', params.roleId);
-    if (params.status) sp.set('status', params.status);
-    if (params.page > 1) sp.set('page', params.page);
-    const qs = sp.toString();
-    const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
-    window.history.replaceState(null, '', newUrl);
+    const next = new URLSearchParams();
+    if (params.search) next.set('search', params.search);
+    if (params.branchId) next.set('branchId', String(params.branchId));
+    if (params.roleId) next.set('roleId', String(params.roleId));
+    if (params.status) next.set('status', params.status);
+    if (params.page > 1) next.set('page', String(params.page));
+    const qs = next.toString();
+    writeCrmBrowserUrl('/admin/users', qs ? `?${qs}` : '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.search, params.branchId, params.roleId, params.status, params.page]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
-      setShowModal(true);
-      setEditUser(null);
+      navigateWithCrm(navigate, '/admin/users/new', {
+        replace: true,
+        state: { fromListSearch: location.search },
+      });
     }
-  }, [searchParams]);
-
-  // Reset page ve 1 khi route /admin/users duoc click tu sidebar
-  // Dung window.location de so sanh vi no thay doi khi URL thay doi (query string cung thay doi)
-  useEffect(() => {
-    const currentUrl = window.location.href;
-    // Chi reset khi pathname la /admin/users VA khong co query string (tu sidebar click)
-    if (location.pathname === '/admin/users' && !window.location.search) {
-      setParams((p) => ({ ...p, page: 1 }));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, window.location.search]);
+  }, [searchParams, navigate, location.search]);
 
   function resetFilters() {
     setParams(() => ({
@@ -155,11 +198,21 @@ export default function AdminUsersPage() {
     updateParam('page', page);
   }
 
-    async function handleToggleStatus(userId, newStatus) {
+  if (!hasReadPermission) {
+    return null;
+  }
+
+  async function handleToggleStatus(userId, newStatus) {
+    const isDeactivate = newStatus === 'inactive';
+    const confirmMsg = isDeactivate
+      ? 'Khóa tài khoản này? User sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
+      : 'Kích hoạt lại tài khoản này?';
+    if (!window.confirm(confirmMsg)) return;
+
     setTogglingId(userId);
     try {
       await adminUsersApi.update({ userId, status: newStatus });
-      toast.success(newStatus === 'locked' ? 'Tài khoản đã bị khóa' : 'Tài khoản đã được kích hoạt');
+      toast.success(isDeactivate ? 'Đã khóa tài khoản' : 'Đã kích hoạt tài khoản');
       refresh();
     } catch (err) {
       toast.error(err.message || 'Lỗi khi cập nhật trạng thái');
@@ -185,7 +238,7 @@ export default function AdminUsersPage() {
   const currentPage = data.page || 1;
 
   return (
-    <div className="admin-page">
+    <div className="admin-page admin-users">
       {/* Header */}
       <div className="admin-page__header">
         <div className="admin-page__title-block">
@@ -198,41 +251,44 @@ export default function AdminUsersPage() {
             </svg>
           </div>
           <div className="admin-page__title-group">
-            <h1>Quản lý người dùng</h1>
+            <h1>Người dùng</h1>
             <p className="admin-page__subtitle">
-              Danh sách tài khoản hệ thống
+              Quản lý tài khoản và phân vai trò trên hồ sơ người dùng
             </p>
           </div>
         </div>
         <div className="admin-page__actions">
-          {data.total > 0 && (
-            <span className="admin-page__total-badge">{data.total} tài khoản</span>
-          )}
-          <button
-            className="btn btn--secondary"
-            onClick={handleExportExcel}
-            disabled={exporting || loading}
-            title="Xuất danh sách người dùng (theo bộ lọc hiện tại) ra file Excel"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            {exporting ? 'Đang xuất...' : 'Xuất Excel'}
-          </button>
-          <button
-            className="btn btn--primary"
-            onClick={() => { setEditUser(null); setShowModal(true); }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Tạo người dùng mới
-          </button>
-        </div>
+            <span className="admin-page__total-badge" title="Tổng số người dùng">
+              {loading ? '...' : data.total} tài khoản
+            </span>
+            <button
+              className="btn btn--secondary admin-page__btn-icon-text"
+              onClick={handleExportExcel}
+              disabled={exporting || loading}
+              title="Xuất danh sách người dùng"
+              aria-label="Xuất Excel"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span className="admin-page__btn-label">{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
+            </button>
+            <PermissionGate permission="admin:users:create">
+              <button
+                className="btn btn--primary admin-page__btn-icon-text"
+                onClick={() => navigate('/admin/users/new', { state: { fromListSearch: location.search } })}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span className="admin-page__btn-label">Tạo người dùng</span>
+              </button>
+            </PermissionGate>
+          </div>
         {exportError && (
-          <div className="admin-users__error" style={{ marginTop: 12 }}>
+          <div className="admin-users__error" style={{ marginTop: 12, width: '100%' }}>
             <strong>Xuất Excel thất bại:</strong> {exportError}
           </div>
         )}
@@ -244,7 +300,7 @@ export default function AdminUsersPage() {
           <input
             className="input input--search"
             type="text"
-            placeholder="Tìm theo tên, email, số điện thoại..."
+            placeholder="Tìm theo tên, email, SĐT (có/không dấu)..."
             value={params.search || ''}
             onChange={(e) => updateParam('search', e.target.value)}
           />
@@ -275,7 +331,7 @@ export default function AdminUsersPage() {
               {(rolesError || rolesLoading) ? `Đang tải...` : 'Tất cả vai trò'}
             </option>
             {localRoles.map((r) => (
-              <option key={r.id} value={r.id}>{r.roleName}</option>
+              <option key={r.id} value={r.id}>{r.roleLabel || r.roleName}</option>
             ))}
           </select>
 
@@ -289,11 +345,11 @@ export default function AdminUsersPage() {
             ))}
           </select>
 
-          <button className="btn btn--ghost" onClick={resetFilters}>
+          <button className="btn btn--ghost filter-row__reset" onClick={resetFilters}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
             </svg>
-            Đặt lại
+            <span>Đặt lại</span>
           </button>
         </div>
       </div>
@@ -304,58 +360,29 @@ export default function AdminUsersPage() {
           <div className="table-card__title">Danh sách người dùng</div>
         </div>
 
-        {loading ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Người dùng</th>
-                  <th>Email</th>
-                  <th>Chi nhánh</th>
-                  <th>Vai trò</th>
-                  <th>Trạng thái</th>
-                  <th>Ngày tạo</th>
-                  <th style={{ textAlign: 'right' }}>Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...Array(5)].map((_, i) => (
-                  <tr key={i}>
-                    <td data-label="Người dùng"><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div className="skeleton skeleton--circle" style={{ width: 34, height: 34 }} /><div><div className="skeleton" style={{ width: 100, height: 12 }} /><div className="skeleton" style={{ width: 70, height: 10, marginTop: 4 }} /></div></div></td>
-                    <td data-label="Email"><div className="skeleton" style={{ width: 140, height: 12 }} /></td>
-                    <td data-label="Chi nhánh"><div className="skeleton" style={{ width: 90, height: 12 }} /></td>
-                    <td data-label="Vai trò"><div className="skeleton" style={{ width: 60, height: 20, borderRadius: 20 }} /></td>
-                    <td data-label="Trạng thái"><div className="skeleton" style={{ width: 70, height: 20, borderRadius: 20 }} /></td>
-                    <td data-label="Ngày tạo"><div className="skeleton" style={{ width: 70, height: 12 }} /></td>
-                    <td data-label="Hành động"><div className="skeleton" style={{ width: 180, height: 28, borderRadius: 6 }} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {loading && data.total === 0 ? (
+          <TableSkeleton columns={['Người dùng', 'Chi nhánh', 'Vai trò', 'Trạng thái', 'Hành động']} />
         ) : error ? (
           <div className="admin-users__error">
             <strong>Lỗi:</strong> {error.message || 'Không thể tải danh sách'}
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table">
+            <div className="table-scroll">
+              <table className="table admin-users__table">
                 <thead>
                   <tr>
                     <th>Người dùng</th>
-                    <th>Email</th>
                     <th>Chi nhánh</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
-                    <th>Ngày tạo</th>
-                    <th style={{ textAlign: 'right' }}>Hành động</th>
+                    <th className="table__actions-col">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(!data.items || data.items.length === 0) ? (
                     <tr>
-                      <td colSpan={7} className="table__empty">
+                      <td colSpan={5} className="table__empty">
                         Không có người dùng nào phù hợp với bộ lọc
                       </td>
                     </tr>
@@ -363,7 +390,7 @@ export default function AdminUsersPage() {
                     data.items.map((u) => (
                       <tr key={u.id}>
                         <td data-label="Người dùng">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div className="user-name-row">
                             <div className="user-avatar">
                               {getInitials(u.firstName, u.lastName)}
                             </div>
@@ -375,25 +402,47 @@ export default function AdminUsersPage() {
                               </span>
                               <span className="user-name-cell__sub">
                                 <span className="font-mono">@{u.name}</span>
-                                {u.phone ? ` · ${u.phone}` : ''}
+                                {u.phone ? ` · ${formatPhoneDisplay(u.phone)}` : ''}
                               </span>
+                              {u.email ? (
+                                <span className="user-name-cell__email" title={u.email}>
+                                  {u.email}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                         </td>
-                        <td data-label="Email" style={{ color: '#64748b', fontSize: '0.85rem' }}>{u.email || '—'}</td>
-                        <td data-label="Chi nhánh" style={{ color: '#64748b', fontSize: '0.85rem' }}>{u.branchName || '—'}</td>
+                        <td data-label="Chi nhánh">
+                          {u.scopeAllBranches ? (
+                            <span
+                              className="badge badge--branch"
+                              title="Người dùng quản lý tất cả chi nhánh"
+                            >
+                              Tất cả chi nhánh
+                            </span>
+                          ) : u.branchName ? (
+                            <span className="badge badge--branch">
+                              {u.branchName}
+                            </span>
+                          ) : (
+                            <span className="user-table__empty">—</span>
+                          )}
+                        </td>
                         <td data-label="Vai trò">
                           {u.roles?.length > 0 ? (
-                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            <div className="user-table__roles">
                               {u.roles.map((r) => {
                                 const name = typeof r === 'object' && r !== null ? r.roleName : r;
+                                const key = typeof r === 'object' && r !== null ? r.roleId : r;
                                 return (
-                                  <span key={typeof r === 'object' && r !== null ? r.roleId : r} className="badge badge--info">{name}</span>
+                                  <span key={key} className="badge badge--info" title={name}>
+                                    {name}
+                                  </span>
                                 );
                               })}
                             </div>
                           ) : (
-                            <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>—</span>
+                            <span className="user-table__empty">—</span>
                           )}
                         </td>
                         <td data-label="Trạng thái">
@@ -402,50 +451,50 @@ export default function AdminUsersPage() {
                               {STATUS_LABELS[u.status] || u.status}
                             </span>
                             <button
-                              className={`btn btn--sm ${u.status === 'active' ? 'btn--danger-ghost' : 'btn--success-ghost'} admin-users__toggle-btn`}
-                              title={u.status === 'active' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
-                              onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'locked' : 'active')}
+                              type="button"
+                              className={`badge admin-users__toggle-badge ${
+                                u.status === 'active' ? 'badge--danger' : 'badge--success'
+                              }`}
+                              title={u.status === 'active' ? 'Khóa tài khoản' : 'Kích hoạt lại tài khoản'}
+                              onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
                               disabled={togglingId === u.id}
                             >
-                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khóa' : 'Mở')}
+                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khóa' : 'Kích hoạt')}
                             </button>
                           </div>
                         </td>
-                        <td data-label="Ngày tạo" className="admin-users__date">{formatDate(u.createdAt)}</td>
-                        <td className="admin-users__actions-cell">
+                        <td className="admin-users__actions-cell" data-label="Hành động">
                           <div className="action-btns">
                             <button
+                              type="button"
                               className="btn btn--sm btn--view"
-                              onClick={() => setDetailUserId(u.id)}
+                              onClick={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: location.search } })}
                             >
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                                 <circle cx="12" cy="12" r="3"/>
                               </svg>
-                              Chi tiết
+                              <span>Chi tiết</span>
                             </button>
-                            <button
-                              className="btn btn--sm btn--role"
-                              onClick={() => setAssignUserId(u.id)}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                                <line x1="12" y1="8" x2="12" y2="16"/>
-                                <line x1="8" y1="12" x2="16" y2="12"/>
-                              </svg>
-                              Phân quyền
-                            </button>
-                            <button
-                              className="btn btn--sm btn--edit"
-                              onClick={() => { setEditUser(u); setShowModal(true); }}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                              </svg>
-                              Sửa
-                            </button>
+                            <PermissionGate permission="admin:users:update">
+                              <button
+                                type="button"
+                                className="btn btn--sm btn--edit"
+                                onClick={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: location.search } })}
+                              >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <span>Sửa</span>
+                              </button>
+                            </PermissionGate>
                           </div>
+                          <UserActionMenu
+                            user={u}
+                            onView={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: location.search } })}
+                            onEdit={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: location.search } })}
+                          />
                         </td>
                       </tr>
                     ))
@@ -454,7 +503,6 @@ export default function AdminUsersPage() {
               </table>
             </div>
 
-            {/* Pagination */}
             {data.total > 0 && (
               <AdminPagination
                 currentPage={currentPage}
@@ -468,30 +516,6 @@ export default function AdminUsersPage() {
           </>
         )}
       </div>
-
-      {showModal && (
-        <UserFormModal
-          user={editUser}
-          onClose={() => { setShowModal(false); setEditUser(null); }}
-          onSuccess={() => refresh()}
-        />
-      )}
-
-      {detailUserId && (
-        <UserDetailDrawer
-          userId={detailUserId}
-          onClose={() => setDetailUserId(null)}
-          onRolesChanged={() => refresh()}
-        />
-      )}
-
-      {assignUserId && (
-        <AssignRoleModal
-          userId={assignUserId}
-          onClose={() => setAssignUserId(null)}
-          onSuccess={() => refresh()}
-        />
-      )}
     </div>
   );
 }

@@ -20,13 +20,19 @@ class PermissionService {
 
   /**
    * Lấy toàn bộ permission keys của 1 user (từ cache hoặc DB).
+   * role_permissions + default screen:* theo role (thay ma trận DB đã gỡ).
+   *
    * @param {number} userId
+   * @param {object} [options]
+   * @param {boolean} [options.skipCache=false]
    * @returns {Promise<Set<string>>}
    */
-  async getUserPermissions(userId) {
-    const cached = permissionCache.get(userId);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      return cached.permissions;
+  async getUserPermissions(userId, options = {}) {
+    if (!options.skipCache) {
+      const cached = permissionCache.get(userId);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return cached.permissions;
+      }
     }
 
     const perms = await this.roleRepository.getUserPermissionKeys(userId);
@@ -41,16 +47,47 @@ class PermissionService {
   }
 
   /**
+   * Lay permission keys compact cho JWT (cung nguon role_permissions; '*' thi chi tra ['*']).
+   * Cache rieng voi key prefix 'compact:'.
+   *
+   * @param {number} userId
+   * @param {object} [options]
+   * @param {boolean} [options.skipCache=false] - Bypass cache
+   * @returns {Promise<string[]>}
+   */
+  async getUserPermissionsCompact(userId, options = {}) {
+    const cacheKey = `compact:${userId}`;
+    if (!options.skipCache) {
+      const cached = permissionCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return Array.from(cached.permissions);
+      }
+    }
+
+    const perms = await this.roleRepository.getUserPermissionKeysCompact(userId);
+    const permSet = new Set(perms);
+
+    permissionCache.set(cacheKey, {
+      permissions: permSet,
+      timestamp: Date.now(),
+    });
+
+    return Array.from(permSet);
+  }
+
+  /**
    * Kiểm tra user có một permission cụ thể không.
    * @param {number} userId
    * @param {string} permissionKey  vd: 'admin:users:create'
+   * @param {object} [options]
+   * @param {boolean} [options.skipCache=false] - Bypass cache khi check
    * @returns {Promise<boolean>}
    */
-  async can(userId, permissionKey) {
+  async can(userId, permissionKey, options = {}) {
     if (!userId) return false;
     if (!permissionKey) return false;
 
-    const perms = await this.getUserPermissions(userId);
+    const perms = await this.getUserPermissions(userId, options);
 
     // Wildcard check: nếu user có '*' → full access
     if (perms.has('*')) return true;
@@ -64,10 +101,10 @@ class PermissionService {
    * @param {string[]} permissionKeys
    * @returns {Promise<boolean>}
    */
-  async canAll(userId, permissionKeys) {
+  async canAll(userId, permissionKeys, options = {}) {
     if (!Array.isArray(permissionKeys) || permissionKeys.length === 0) return true;
     for (const key of permissionKeys) {
-      const ok = await this.can(userId, key);
+      const ok = await this.can(userId, key, options);
       if (!ok) return false;
     }
     return true;
@@ -79,10 +116,10 @@ class PermissionService {
    * @param {string[]} permissionKeys
    * @returns {Promise<boolean>}
    */
-  async canAny(userId, permissionKeys) {
+  async canAny(userId, permissionKeys, options = {}) {
     if (!Array.isArray(permissionKeys) || permissionKeys.length === 0) return true;
     for (const key of permissionKeys) {
-      const ok = await this.can(userId, key);
+      const ok = await this.can(userId, key, options);
       if (ok) return true;
     }
     return false;
