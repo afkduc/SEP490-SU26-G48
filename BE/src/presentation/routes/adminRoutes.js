@@ -16,7 +16,7 @@ const { validateCreateBranch, validateUpdateBranch } = require('../validators/ad
  * Admin routes — role admin only.
  * Kept: users, branches, list roles (for assign), assign/revoke, devices (single logout),
  * security alerts, login-sessions recent.
- * Removed: role CRUD / permission matrix, specialty, trust device, force-logout-all/others.
+ * Removed: role CRUD / permission matrix (UI + BE service/repo matrix APIs).
  */
 function buildAdminRouter() {
   const router = express.Router();
