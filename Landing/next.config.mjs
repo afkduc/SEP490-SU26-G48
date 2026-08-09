@@ -3,6 +3,25 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/** CRM roots — nếu F5 vào URL thiếu /crm (host nginx đưa về Landing) thì 307 sang /crm/... */
+const CRM_REDIRECT_ROOTS = [
+  'admin',
+  'login',
+  'unauthorized',
+  'manager',
+  'inventory',
+  'repair',
+  'technician',
+  'customer',
+  'profile',
+  'team-leader',
+  'warehouse',
+  'cashier',
+  'receptionist',
+  'general-director',
+  'repair-settlement',
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
@@ -17,6 +36,20 @@ const nextConfig = {
   // tranh nham lan nay.
   turbopack: {
     root: __dirname,
+  },
+  async redirects() {
+    return CRM_REDIRECT_ROOTS.flatMap((root) => [
+      {
+        source: `/${root}`,
+        destination: `/crm/${root}`,
+        permanent: false,
+      },
+      {
+        source: `/${root}/:path*`,
+        destination: `/crm/${root}/:path*`,
+        permanent: false,
+      },
+    ]);
   },
 };
 

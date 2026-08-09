@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { adminBranchesApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
 import { useApiError } from '../../hooks/useApiError';
@@ -115,24 +115,27 @@ function BranchCard({ branch, onOpen, onEdit, onDeactivate, onReactivate }) {
       </div>
 
       <div className="branch-card__body">
-        {branch.address && (
+        {/* Luôn render đủ 3 hàng để card cao đều dù thiếu địa chỉ / SĐT / email */}
+        <div className="branch-card__info">
           <div className="branch-card__info-row">
             <IconMapPin />
-            <span>{branch.address}</span>
+            <span className={branch.address ? undefined : 'branch-card__info-empty'}>
+              {branch.address || 'Chưa có địa chỉ'}
+            </span>
           </div>
-        )}
-        {branch.phone && (
           <div className="branch-card__info-row">
             <IconPhone />
-            <span>{formatPhoneDisplay(branch.phone)}</span>
+            <span className={branch.phone ? undefined : 'branch-card__info-empty'}>
+              {branch.phone ? formatPhoneDisplay(branch.phone) : 'Chưa có số điện thoại'}
+            </span>
           </div>
-        )}
-        {branch.email && (
           <div className="branch-card__info-row">
             <IconMail />
-            <span>{branch.email}</span>
+            <span className={branch.email ? undefined : 'branch-card__info-empty'}>
+              {branch.email || 'Chưa có email'}
+            </span>
           </div>
-        )}
+        </div>
 
         <div className="branch-card__manager">
           <div className="branch-card__manager-avatar">{initials}</div>
@@ -182,6 +185,7 @@ function BranchCard({ branch, onOpen, onEdit, onDeactivate, onReactivate }) {
 
 export default function AdminBranchesPage({ embedded = false } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const { handleApiError } = useApiError();
   const [branches, setBranches] = useState([]);
@@ -251,7 +255,7 @@ export default function AdminBranchesPage({ embedded = false } = {}) {
           {activeCount} hoạt động{activeCount !== inactiveCount && inactiveCount > 0 ? ` · ${inactiveCount} ngừng` : ''}
         </span>
       )}
-      <button className="btn btn--primary" onClick={() => navigate('/admin/catalog/branches/new')}>
+      <button className="btn btn--primary" onClick={() => navigate('/admin/catalog/branches/new', { state: { fromListSearch: location.search } })}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -321,7 +325,7 @@ export default function AdminBranchesPage({ embedded = false } = {}) {
             <div className="admin-branches__empty">
               <IconBranch />
               <p>Chưa có chi nhánh nào</p>
-              <button className="btn btn--primary" onClick={() => navigate('/admin/catalog/branches/new')}>
+              <button className="btn btn--primary" onClick={() => navigate('/admin/catalog/branches/new', { state: { fromListSearch: location.search } })}>
                 Thêm chi nhánh đầu tiên
               </button>
             </div>
@@ -331,8 +335,8 @@ export default function AdminBranchesPage({ embedded = false } = {}) {
                 <BranchCard
                   key={branch.id}
                   branch={branch}
-                  onOpen={(b) => navigate(`/admin/catalog/branches/${b.id}`, { state: { fromListSearch: window.location.search } })}
-                  onEdit={(b) => navigate(`/admin/catalog/branches/${b.id}/edit`, { state: { fromListSearch: window.location.search } })}
+                  onOpen={(b) => navigate(`/admin/catalog/branches/${b.id}`, { state: { fromListSearch: location.search } })}
+                  onEdit={(b) => navigate(`/admin/catalog/branches/${b.id}/edit`, { state: { fromListSearch: location.search } })}
                   onDeactivate={(b) => setDeactivateTarget(b)}
                   onReactivate={handleReactivate}
                 />

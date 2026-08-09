@@ -6,6 +6,7 @@ import UserProfileMenu from './UserProfileMenu';
 import NotificationBell from '../NotificationBell';
 import { adminSecurityAlertsApi } from '../../services/adminApi';
 import { SECURITY_ALERTS_COUNT_EVENT } from '../../utils/securityAlertEvents';
+import { forceCrmBrowserUrl, navigateWithCrm } from '../../utils/crmUrl';
 import './AdminLayout.css';
 
 const ADMIN_SIDEBAR = [
@@ -167,7 +168,7 @@ function AdminSidebar({ isMobileOpen, onClose, onItemClick, onNavStart, onNavEnd
     const samePage = targetPath === location.pathname;
     onNavStart?.();
     if (!samePage) {
-      navigate(targetPath);
+      navigateWithCrm(navigate, targetPath);
     }
     // Chỉ soft-remount khi click lại đúng trang hiện tại (làm mới state).
     // Đổi trang: React Router đã mount page mới — remount thêm chỉ hủy API đang chạy.
@@ -339,6 +340,10 @@ export default function AdminLayout({ children }) {
 
   useEffect(() => {
     syncAdminHistoryState();
+    // Mọi lần đổi route trong admin: ép lại /crm trên thanh địa chỉ
+    if (String(location.pathname).startsWith('/admin')) {
+      forceCrmBrowserUrl(location.pathname, location.search, location.hash);
+    }
   }, [location.pathname, location.search, location.hash, location.key]);
 
   const handleGoBack = () => {
@@ -354,7 +359,7 @@ export default function AdminLayout({ children }) {
     adminHistoryIndexRef.current = targetIndex;
     setCanGoBack(targetIndex > 0);
     setCanGoForward(true);
-    navigate(target.url, { replace: true });
+    navigateWithCrm(navigate, target.url, { replace: true });
   };
 
   const handleGoForward = () => {
@@ -370,7 +375,7 @@ export default function AdminLayout({ children }) {
     adminHistoryIndexRef.current = targetIndex;
     setCanGoBack(targetIndex > 0);
     setCanGoForward(targetIndex < stack.length - 1);
-    navigate(target.url, { replace: true });
+    navigateWithCrm(navigate, target.url, { replace: true });
   };
 
   const allItems = visibleGroups.flatMap((g) => g.items);

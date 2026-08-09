@@ -37,8 +37,7 @@ async function query(queryStr, params = {}) {
  * Callback nhan mot `txQuery(queryStr, params)` de chay query trong transaction do.
  * Neu callback throw -> ROLLBACK tu dong; neu OK -> COMMIT.
  *
- * Ly do: can atomicity cho bulk operations (vd: setRolePermissionsMatrix —
- * cap nhat nhieu role trong 1 transaction de tranh partial-fail state).
+ * Dung cho cac bulk/atomic write (vd: import approve + stock) — tranh partial-fail.
  */
 async function executeTransaction(callback) {
   const conn = await getPool();

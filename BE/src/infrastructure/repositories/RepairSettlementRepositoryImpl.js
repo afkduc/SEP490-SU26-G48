@@ -30,6 +30,7 @@ const HEADER_SELECT = `
          adv.phone     AS advisor_phone,
          tl.user_name  AS team_leader_name,
          inv.issued_at AS invoice_issued_at,
+         inv.payment_method,
          ro.id         AS repair_order_id,
          vb.bay_number AS bay_number,
          -- Da co it nhat 1 dau muc duoc tick hoan thanh chua - dung de FE
@@ -38,7 +39,15 @@ const HEADER_SELECT = `
          CASE WHEN EXISTS (
            SELECT 1 FROM repair_order_tasks rot
            WHERE rot.repair_order_id = ro.id AND rot.is_done = 1
-         ) THEN 1 ELSE 0 END AS has_completed_task
+         ) THEN 1 ELSE 0 END AS has_completed_task,
+         -- Da gan tho thuc hien chua - claim() chuyen status sang 'inprogress'
+         -- ngay luc chon khoang (truoc ca khi gan tho, de khoa khong cho to
+         -- truong khac nhan trung), nhung ben man CVDV chi nen hien "Đang sửa
+         -- chữa" tu luc THUC SU co tho cam may - xem FE displayStatus().
+         CASE WHEN EXISTS (
+           SELECT 1 FROM repair_order_technicians rot2
+           WHERE rot2.repair_order_id = ro.id
+         ) THEN 1 ELSE 0 END AS has_technicians
   FROM   service_orders so
   JOIN   branches  b   ON b.id = so.branch_id
   JOIN   customers c   ON c.id = so.customer_id
@@ -53,7 +62,7 @@ const HEADER_SELECT = `
       ORDER  BY w.purchase_date DESC
   ) wr
   OUTER APPLY (
-      SELECT TOP 1 i.issued_at
+      SELECT TOP 1 i.issued_at, i.payment_method
       FROM   invoices i
       WHERE  i.service_order_id = so.id
       ORDER  BY i.issued_at DESC
@@ -170,7 +179,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     // Chi co khi phieu da duoc gan to truong (co repair_order) - de co van xem
     // duoc tien do tung dau viec To truong da tich, khong can qua man rieng.
     const tasksResult = await query(
-      `SELECT rot.id, rot.task_name, rot.task_type, rot.quantity, rot.is_done, rot.is_cancelled, rot.is_added_later, rot.is_qty_increased
+      `SELECT rot.id, rot.task_name, rot.task_type, rot.quantity, rot.is_done, rot.is_cancelled, rot.is_added_later, rot.is_qty_increased, rot.prev_quantity, rot.note
        FROM   repair_order_tasks rot
        JOIN   repair_orders ro ON ro.id = rot.repair_order_id
        WHERE  ro.service_order_id = @id
@@ -425,7 +434,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     const existingResult = await tx
       .request()
       .input('repairOrderId', sql.BigInt, repairOrder.id)
-      .query(`SELECT id, task_name, task_type, product_id, quantity, is_cancelled FROM repair_order_tasks WHERE repair_order_id = @repairOrderId`);
+      .query(`SELECT id, task_name, task_type, product_id, quantity, is_cancelled, note FROM repair_order_tasks WHERE repair_order_id = @repairOrderId`);
     const existing = existingResult.recordset;
 
     const keyOf = (taskType, taskName, productId) => `${taskType}|${taskName}|${productId || ''}`;
@@ -453,6 +462,12 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
       const d = desiredByKey.get(keyOf(t.task_type, t.task_name, t.product_id));
       return d && !d.isCancelled && Number(d.quantity || 0) !== Number(t.quantity || 0);
     });
+    // Ghi chu doi rieng (khong lien quan so luong/huy) - CVDV sua lai luu y
+    // cho tho tren 1 hang muc da co san.
+    const toUpdateNote = existing.filter((t) => {
+      const d = desiredByKey.get(keyOf(t.task_type, t.task_name, t.product_id));
+      return d && (d.note || null) !== (t.note || null);
+    });
 
     for (const t of toDelete) {
       await tx.request().input('id', sql.BigInt, t.id).query(`DELETE FROM repair_order_tasks WHERE id = @id`);
@@ -468,9 +483,10 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('quantity', sql.Int, t.quantity || 0)
         .input('unitPrice', sql.Decimal(18, 2), t.unitPrice || 0)
         .input('isCancelled', sql.Bit, t.isCancelled ? 1 : 0)
+        .input('note', sql.NVarChar(500), t.note || null)
         .query(`
-          INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done, is_cancelled, is_added_later)
-          VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0, @isCancelled, 1)
+          INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done, is_cancelled, is_added_later, note)
+          VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0, @isCancelled, 1, @note)
         `);
     }
 
@@ -492,11 +508,25 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('quantity', sql.Int, d.quantity || 0)
         .input('unitPrice', sql.Decimal(18, 2), d.unitPrice || 0)
         .input('isQtyIncreased', sql.Bit, increased ? 1 : 0)
-        .query(`UPDATE repair_order_tasks SET quantity = @quantity, unit_price = @unitPrice, is_qty_increased = @isQtyIncreased WHERE id = @id`);
+        // prev_quantity = so luong TRUOC lan doi nay (t.quantity, chua bi ghi
+        // de) - FE dung de tinh chenh lech khi GIAM ("Khách trả lại SL xN"),
+        // xem TaskNameLabel. Moi lan doi tiep theo se ghi de tiep, luon phan
+        // anh dung mac ngay truoc lan sua gan nhat (khong phai lich su day du).
+        .input('prevQuantity', sql.Int, t.quantity ?? null)
+        .query(`UPDATE repair_order_tasks SET quantity = @quantity, unit_price = @unitPrice, is_qty_increased = @isQtyIncreased, prev_quantity = @prevQuantity WHERE id = @id`);
+    }
+
+    for (const t of toUpdateNote) {
+      const d = desiredByKey.get(keyOf(t.task_type, t.task_name, t.product_id));
+      await tx
+        .request()
+        .input('id', sql.BigInt, t.id)
+        .input('note', sql.NVarChar(500), d.note || null)
+        .query(`UPDATE repair_order_tasks SET note = @note WHERE id = @id`);
     }
   }
 
-  async updateStatus(id, status, { issuedBy, cancelReason } = {}) {
+  async updateStatus(id, status, { issuedBy, cancelReason, paymentMethod } = {}) {
     await runInTransaction(async (tx) => {
       if (status === 'waiting_payment') {
         await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
@@ -538,9 +568,10 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
           .input('customerId', sql.BigInt, order.customer_id)
           .input('amount', sql.Decimal(18, 2), order.total)
           .input('issuedBy', sql.BigInt, issuedBy)
+          .input('paymentMethod', sql.NVarChar(20), paymentMethod || 'TRANSFER')
           .query(`
-            INSERT INTO invoices (invoice_code, service_order_id, branch_id, customer_id, amount, paid, status, issued_at, issued_by)
-            VALUES ('', @serviceOrderId, @branchId, @customerId, @amount, @amount, 'issued', GETDATE(), @issuedBy);
+            INSERT INTO invoices (invoice_code, service_order_id, branch_id, customer_id, amount, paid, status, issued_at, issued_by, payment_method)
+            VALUES ('', @serviceOrderId, @branchId, @customerId, @amount, @amount, 'issued', GETDATE(), @issuedBy, @paymentMethod);
             SELECT SCOPE_IDENTITY() AS id;
           `);
         const invId = invResult.recordset[0].id;
@@ -606,14 +637,15 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('discountPct', sql.Decimal(5, 2), item.discount || 0)
         .input('isFree', sql.Bit, Boolean(item.isFree))
         .input('total', sql.Decimal(18, 2), item.total || 0)
+        .input('note', sql.NVarChar(500), (item.note || '').trim() || null)
         .query(`
           INSERT INTO service_order_items (
             service_order_id, item_type, product_id, service_id, item_code, item_description,
-            lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total
+            lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total, note
           )
           VALUES (
             @serviceOrderId, @itemType, @productId, @serviceId, @itemCode, @itemDescription,
-            @lhsc, @httt, @repairCategory, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total
+            @lhsc, @httt, @repairCategory, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total, @note
           )
         `);
     }

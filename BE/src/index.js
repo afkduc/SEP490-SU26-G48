@@ -28,7 +28,13 @@ const app = express();
 // CORS_ORIGIN: danh sach origin duoc phep, phan cach boi dau phay - cho phep
 // them origin thuc te khi deploy (IP/domain server) ma khong phai sua code,
 // mac dinh giu nguyen 2 origin dev cu neu khong set.
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000')
+const allowedOrigins = (process.env.CORS_ORIGIN || [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  // Vite tự nhảy port khi 3000 bận (vd npm run dev → 3001)
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+].join(','))
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
@@ -90,6 +96,20 @@ async function start() {
       console.log('[BE] inventory request unit columns ready');
     } catch (schemaErr) {
       console.warn('[BE] ensureInventoryRequestUnicode:', schemaErr.message);
+    }
+
+    try {
+      await require('./infrastructure/database/ensureRepairOrderTasksColumns').ensureRepairOrderTasksColumns();
+      console.log('[BE] repair_order_tasks/service_order_items note+prev_quantity columns ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureRepairOrderTasksColumns:', schemaErr.message);
+    }
+
+    try {
+      await require('./infrastructure/database/ensureInvoicePaymentMethod').ensureInvoicePaymentMethod();
+      console.log('[BE] invoices.payment_method column ready');
+    } catch (schemaErr) {
+      console.warn('[BE] ensureInvoicePaymentMethod:', schemaErr.message);
     }
 
     const server = http.createServer({ maxHeaderSize: 32768 }, app);

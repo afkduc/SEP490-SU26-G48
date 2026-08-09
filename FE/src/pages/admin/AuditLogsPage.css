@@ -90,6 +90,15 @@
   transform: translateY(-1px);
 }
 
+.admin-logs .stat-card--clickable {
+  cursor: pointer;
+}
+
+.admin-logs .stat-card--clickable:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
 .admin-logs .stat-card__icon {
   width: 40px;
   height: 40px;

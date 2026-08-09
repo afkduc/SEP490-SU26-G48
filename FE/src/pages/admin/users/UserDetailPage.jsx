@@ -4,6 +4,7 @@ import { adminUsersApi } from '../../../services/adminApi';
 import PermissionGate from '../../../components/PermissionGate';
 import { useToast } from '../../../components/common/ToastContext';
 import { formatPhoneDisplay } from '../../../utils/validation';
+import ResetPasswordModal from './ResetPasswordModal';
 import './UserDetailPage.css';
 
 const STATUS_LABELS = {
@@ -61,10 +62,12 @@ export default function UserDetailPage() {
   const location = useLocation();
   const toast = useToast();
   const listSearch = location.state?.fromListSearch || '';
+  const backToList = `/admin/users${listSearch}`;
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toggling, setToggling] = useState(false);
+  const [showReset, setShowReset] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -89,7 +92,7 @@ export default function UserDetailPage() {
     if (!user) return;
     const next = user.status === 'active' ? 'inactive' : 'active';
     const confirmMsg = next === 'inactive'
-      ? 'Khóa tài khoản này? User sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
+      ? 'Khóa tài khoản này? Người dùng sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
       : 'Kích hoạt lại tài khoản này?';
     if (!window.confirm(confirmMsg)) return;
     setToggling(true);
@@ -114,7 +117,7 @@ export default function UserDetailPage() {
         <button
           type="button"
           className="admin-user-detail-page__back"
-          onClick={() => navigate(`/admin/users${listSearch}`)}
+          onClick={() => navigate(backToList)}
         >
           ← Quay lại danh sách
         </button>
@@ -132,6 +135,13 @@ export default function UserDetailPage() {
         {user && (
           <div className="admin-page__actions">
             <PermissionGate permission="admin:users:update">
+              <button
+                type="button"
+                className="btn btn--outline"
+                onClick={() => setShowReset(true)}
+              >
+                Đặt lại mật khẩu
+              </button>
               <button
                 type="button"
                 className={`btn ${user.status === 'active' ? 'btn--secondary' : 'btn--primary'}`}
@@ -159,7 +169,7 @@ export default function UserDetailPage() {
           <div className="admin-user-detail-page__state admin-user-detail-page__state--error">
             {error}
             <div style={{ marginTop: 12 }}>
-              <Link to="/admin/users" className="btn btn--ghost">Về danh sách</Link>
+              <Link to={backToList} className="btn btn--ghost">Về danh sách</Link>
             </div>
           </div>
         ) : user ? (
@@ -255,6 +265,17 @@ export default function UserDetailPage() {
           </>
         ) : null}
       </div>
+
+      {showReset && user && (
+        <ResetPasswordModal
+          user={user}
+          onClose={() => setShowReset(false)}
+          onSuccess={() => {
+            setShowReset(false);
+            toast.success('Đã đặt lại mật khẩu');
+          }}
+        />
+      )}
     </div>
   );
 }

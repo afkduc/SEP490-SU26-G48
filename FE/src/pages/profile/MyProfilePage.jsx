@@ -12,8 +12,17 @@ import {
   isProfileNotificationsPath,
   isProfileEditPath,
 } from '../../utils/profilePaths';
+import { useCrmSearchSync } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
-import { EMAIL_HINT, isValidEmail, isValidPhone } from '../../utils/validation';
+import {
+  EMAIL_HINT,
+  getPersonNameError,
+  isValidEmail,
+  isValidPhone,
+  phoneDigitsOnly,
+  NAME_MAX_LENGTH,
+  PERSON_NAME_HINT,
+} from '../../utils/validation';
 import './MyProfilePage.css';
 
 const IconUser = ({ size = 20 }) => (
@@ -142,7 +151,8 @@ export default function MyProfilePage({
 } = {}) {
   const { user, setUser, reloadPermissions, logout } = useAuth();
   const toast = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const syncSearch = useCrmSearchSync();
   const location = useLocation();
   const navigate = useNavigate();
   const [loggingOutAll, setLoggingOutAll] = useState(false);
@@ -179,12 +189,12 @@ export default function MyProfilePage({
     if (searchParams.get('tab') !== 'edit') return;
     if (isEditMode) {
       if (searchParams.get('tab')) {
-        setSearchParams({}, { replace: true });
+        syncSearch(new URLSearchParams(), { replace: true });
       }
       return;
     }
     navigate(profileEditPath, { replace: true });
-  }, [searchParams, isEditMode, navigate, profileEditPath, setSearchParams]);
+  }, [searchParams, isEditMode, navigate, profileEditPath, syncSearch]);
 
   const [editForm, setEditForm] = useState({
     email: '',
@@ -236,12 +246,17 @@ export default function MyProfilePage({
     if (searchParams.get('tab') || searchParams.get('reason')) {
       const next = new URLSearchParams(searchParams);
       next.delete('reason');
-      setSearchParams(next, { replace: true });
+      next.delete('tab');
+      syncSearch(next, { replace: true });
     }
   }
 
   function handleEditChange(e) {
-    setEditForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    let next = value;
+    if (name === 'phone') next = phoneDigitsOnly(value);
+    if (name === 'firstName' || name === 'lastName') next = value.slice(0, NAME_MAX_LENGTH);
+    setEditForm((f) => ({ ...f, [name]: next }));
   }
 
   async function handleEditSubmit(e) {
@@ -249,8 +264,10 @@ export default function MyProfilePage({
     setEditError(null);
     setEditSuccess(null);
 
-    const phone = editForm.phone.trim();
+    const phone = phoneDigitsOnly(editForm.phone);
     const email = editForm.email.trim();
+    const firstName = editForm.firstName.trim().replace(/\s+/g, ' ');
+    const lastName = editForm.lastName.trim().replace(/\s+/g, ' ');
     if (!email) {
       setEditError('Email là bắt buộc');
       return;
@@ -267,12 +284,22 @@ export default function MyProfilePage({
       setEditError('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
       return;
     }
+    const firstNameErr = getPersonNameError(firstName, { required: false, label: 'Họ' });
+    if (firstNameErr) {
+      setEditError(firstNameErr);
+      return;
+    }
+    const lastNameErr = getPersonNameError(lastName, { required: false, label: 'Tên' });
+    if (lastNameErr) {
+      setEditError(lastNameErr);
+      return;
+    }
 
     setEditLoading(true);
     try {
       const payload = { email, phone };
-      if (editForm.firstName.trim()) payload.firstName = editForm.firstName.trim();
-      if (editForm.lastName.trim()) payload.lastName = editForm.lastName.trim();
+      if (firstName) payload.firstName = firstName;
+      if (lastName) payload.lastName = lastName;
 
       const updated = await updateMyProfile(payload);
       setProfile(updated);
@@ -532,6 +559,8 @@ export default function MyProfilePage({
                         value={editForm.firstName}
                         onChange={handleEditChange}
                         placeholder="Nhập họ"
+                        maxLength={NAME_MAX_LENGTH}
+                        title={PERSON_NAME_HINT}
                       />
                     </div>
                     <div className="form-group">
@@ -544,6 +573,8 @@ export default function MyProfilePage({
                         value={editForm.lastName}
                         onChange={handleEditChange}
                         placeholder="Nhập tên"
+                        maxLength={NAME_MAX_LENGTH}
+                        title={PERSON_NAME_HINT}
                       />
                     </div>
                   </div>

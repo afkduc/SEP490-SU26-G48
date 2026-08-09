@@ -5,9 +5,12 @@ import { useToast } from '../../../components/common/ToastContext';
 import {
   EMAIL_HINT,
   formatPhoneInput,
+  getBranchNameError,
   isValidEmail,
   isValidPhone,
   phoneDigitsOnly,
+  NAME_MAX_LENGTH,
+  PHONE_INPUT_MAX_LENGTH,
 } from '../../../utils/validation';
 import '../AdminBranchesPage.css';
 import './BranchPages.css';
@@ -17,6 +20,7 @@ export default function BranchFormPage({ mode: modeProp }) {
   const navigate = useNavigate();
   const location = useLocation();
   const listSearch = location.state?.fromListSearch || '';
+  const backToList = `/admin/catalog${listSearch}`;
   const toast = useToast();
   const isEdit = modeProp === 'edit' || Boolean(id);
 
@@ -95,8 +99,9 @@ export default function BranchFormPage({ mode: modeProp }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!form.branchName.trim()) {
-      setError('Tên chi nhánh là bắt buộc');
+    const branchNameErr = getBranchNameError(form.branchName, { required: true });
+    if (branchNameErr) {
+      setError(branchNameErr);
       return;
     }
     if (!isEdit && !form.branchCode.trim()) {
@@ -118,8 +123,8 @@ export default function BranchFormPage({ mode: modeProp }) {
     setError('');
     try {
       const payload = {
-        branchName: form.branchName.trim(),
-        address: form.address.trim() || undefined,
+        branchName: form.branchName.trim().replace(/\s+/g, ' '),
+        address: form.address.trim().slice(0, 255) || undefined,
         phone: phone || undefined,
         email: email || undefined,
         managerId: form.managerId ? Number(form.managerId) : null,
@@ -131,12 +136,12 @@ export default function BranchFormPage({ mode: modeProp }) {
       if (isEdit) {
         await adminBranchesApi.update(id, payload);
         toast.success('Cập nhật chi nhánh thành công');
-        navigate(`/admin/catalog/branches/${id}`, { state: { fromListSearch: listSearch } });
+        navigate(backToList);
       } else {
         const created = await adminBranchesApi.create(payload);
         toast.success('Tạo chi nhánh mới thành công');
         const newId = created?.id;
-        navigate(newId ? `/admin/catalog/branches/${newId}` : '/admin/catalog');
+        navigate(newId ? `/admin/catalog/branches/${newId}` : backToList);
       }
     } catch (err) {
       setError(err.message || 'Lỗi khi lưu chi nhánh');
@@ -153,7 +158,7 @@ export default function BranchFormPage({ mode: modeProp }) {
     return (
       <div className="admin-page branch-page">
         <div className="branch-page__state branch-page__state--error">{bootError}</div>
-        <Link to={`/admin/catalog${listSearch}`} className="btn btn--ghost">Quay lại danh mục</Link>
+        <Link to={backToList} className="btn btn--ghost">Quay lại danh mục</Link>
       </div>
     );
   }
@@ -165,10 +170,7 @@ export default function BranchFormPage({ mode: modeProp }) {
           <button
             type="button"
             className="branch-page__back"
-            onClick={() => navigate(
-              isEdit ? `/admin/catalog/branches/${id}` : `/admin/catalog${listSearch}`,
-              isEdit ? { state: { fromListSearch: listSearch } } : undefined,
-            )}
+            onClick={() => navigate(backToList)}
           >
             ← Quay lại
           </button>
@@ -197,10 +199,14 @@ export default function BranchFormPage({ mode: modeProp }) {
           <input
             type="text"
             value={form.branchName}
-            onChange={(e) => set('branchName', e.target.value)}
+            onChange={(e) => set('branchName', e.target.value.slice(0, NAME_MAX_LENGTH))}
             placeholder="VD: AutoGara Hà Nội"
+            maxLength={NAME_MAX_LENGTH}
             required
           />
+          <p className="form__hint" style={{ marginTop: 6, color: '#64748b', fontSize: '0.8rem' }}>
+            Không bắt đầu bằng số · tối đa {NAME_MAX_LENGTH} ký tự
+          </p>
         </div>
 
         <div className="form-group">
@@ -208,8 +214,9 @@ export default function BranchFormPage({ mode: modeProp }) {
           <input
             type="text"
             value={form.address}
-            onChange={(e) => set('address', e.target.value)}
+            onChange={(e) => set('address', e.target.value.slice(0, 255))}
             placeholder="VD: 123 Nguyễn Trãi, Thanh Xuân, Hà Nội"
+            maxLength={255}
           />
         </div>
 
@@ -229,12 +236,13 @@ export default function BranchFormPage({ mode: modeProp }) {
           <div className="form-group">
             <label>Số điện thoại</label>
             <input
-              type="text"
+              type="tel"
               value={form.phone}
               onChange={(e) => set('phone', formatPhoneInput(e.target.value))}
               placeholder="VD: 0123-456-789"
               inputMode="numeric"
-              maxLength={13}
+              autoComplete="tel"
+              maxLength={PHONE_INPUT_MAX_LENGTH}
             />
           </div>
           <div className="form-group">
@@ -254,7 +262,7 @@ export default function BranchFormPage({ mode: modeProp }) {
           <button
             type="button"
             className="btn btn--secondary"
-            onClick={() => navigate(isEdit ? `/admin/catalog/branches/${id}` : '/admin/catalog')}
+            onClick={() => navigate(backToList)}
             disabled={saving}
           >
             Hủy
