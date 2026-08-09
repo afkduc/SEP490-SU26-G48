@@ -155,6 +155,25 @@ class ImportRequestService {
     }
     return this.getById(numId, { branchId });
   }
+
+  /**
+   * Danh dau phieu la "da xem" boi Manager (dung cho thong bao dom).
+   */
+  async markSeenByManager(id) {
+    const numId = Number(id);
+    if (!Number.isFinite(numId) || numId <= 0) {
+      throw new ApiError(400, 'id khong hop le');
+    }
+    await this.importRequestRepository.markSeenByManager(numId);
+  }
+
+  /**
+   * Dem so phieu nhap chua duoc Manager xem trong 1 chi nhanh.
+   */
+  async countNewForManager(branchId) {
+    if (!branchId) throw new ApiError(400, 'branchId is required');
+    return this.importRequestRepository.countNewForManager(Number(branchId));
+  }
 }
 
 module.exports = ImportRequestService;

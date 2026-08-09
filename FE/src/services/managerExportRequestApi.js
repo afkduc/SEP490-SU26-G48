@@ -24,3 +24,19 @@ export async function getManagerExportRequestsApi(params = {}) {
 export async function getManagerExportRequestByIdApi(id) {
   return httpClient.get(`/manager/export-requests/${id}`);
 }
+
+/**
+ * So phieu xuat chua duoc Manager xem (badge do tren Navbar).
+ * BE: GET /api/manager/export-requests/new-count
+ */
+export async function getNewExportRequestsCountApi() {
+  return httpClient.get('/manager/export-requests/new-count');
+}
+
+/**
+ * Danh dau 1 phieu xuat la "da xem" (goi khi Manager mo trang chi tiet).
+ * BE: PATCH /api/manager/export-requests/:id/mark-seen
+ */
+export async function markExportRequestSeenApi(id) {
+  return httpClient.patch(`/manager/export-requests/${id}/mark-seen`);
+}
