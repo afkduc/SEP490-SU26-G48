@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const ImportRequestService = require('../ImportRequestService');
+const ImportRequestService = require('../../src/application/services/ImportRequestService');
 
 function buildPayload() {
   return {
