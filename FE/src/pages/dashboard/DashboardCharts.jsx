@@ -56,7 +56,11 @@ export function StatTile({ label, value }) {
 }
 
 // ─── Line chart: Doanh thu theo tháng ─────────────────────────────────
-export function RevenueLineChart({ data }) {
+// onPointClick (tuy chon): goi voi { month, label, totalRevenue, totalOrders }
+// khi bam vao 1 diem - dung cho ManagerDashboardPage mo danh sach phieu da
+// thanh toan cua thang do. Trang Co van (DashboardPage) khong truyen prop
+// nay nen hanh vi/giao dien khong doi.
+export function RevenueLineChart({ data, onPointClick }) {
   const width = 560;
   const height = 220;
   const padding = { top: 16, right: 16, bottom: 26, left: 54 };
@@ -111,7 +115,8 @@ export function RevenueLineChart({ data }) {
               fill="transparent"
               onMouseEnter={() => setHoverIdx(i)}
               onMouseLeave={() => setHoverIdx(null)}
-              style={{ cursor: 'pointer' }}
+              onClick={() => onPointClick?.(p)}
+              style={{ cursor: onPointClick ? 'pointer' : 'default' }}
             />
             <circle
               cx={p.x} cy={p.y} r={hoverIdx === i ? 6 : 4}
@@ -137,6 +142,7 @@ export function RevenueLineChart({ data }) {
         >
           <div style={{ fontWeight: 700 }}>{formatCurrency(points[hoverIdx].totalRevenue)}</div>
           <div style={{ opacity: 0.8 }}>{points[hoverIdx].label} · {points[hoverIdx].totalOrders} phiếu</div>
+          {onPointClick && <div style={{ opacity: 0.65, fontSize: 10, marginTop: 2 }}>Bấm để xem danh sách phiếu đã thanh toán</div>}
         </div>
       )}
     </div>

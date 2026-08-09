@@ -1,5 +1,8 @@
+import { useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useManagerImportRequest } from '../../hooks/manager/useManagerImportRequest';
+import { useManagerInventoryNotify } from '../../contexts/ManagerInventoryNotifyContext';
+import { markImportRequestSeenApi } from '../../services/managerImportRequestApi';
 import './ManagerImportRequestDetailPage.css';
 
 function formatDateTime(d) {
@@ -20,6 +23,17 @@ function InfoRow({ label, value }) {
 export default function ManagerImportRequestDetailPage() {
   const { id } = useParams();
   const { data, loading, error } = useManagerImportRequest(id);
+  const { decrementNewImportRequestCount } = useManagerInventoryNotify();
+
+  // Chi khi Manager mo trang chi tiet thi cham do moi mat (khac voi Kho phu
+  // tung dung hover) - goi mark-seen 1 lan duy nhat khi phieu con la "moi".
+  const seenRef = useRef(false);
+  useEffect(() => {
+    if (!data || !data.isNewForManager || seenRef.current) return;
+    seenRef.current = true;
+    decrementNewImportRequestCount();
+    markImportRequestSeenApi(data.id).catch(() => {});
+  }, [data, decrementNewImportRequestCount]);
 
   if (loading) return <div className="mir-detail__loading">Đang tải...</div>;
   if (error) return <div className="mir-detail__error">Lỗi: {error}</div>;

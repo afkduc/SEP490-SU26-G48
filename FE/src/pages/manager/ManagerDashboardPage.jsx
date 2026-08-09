@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AppContext';
+import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { getDashboardOverviewApi } from '../../services/dashboardApi';
-import { formatCurrency } from '../../utils';
+import managerApi from '../../services/managerApi';
+import { formatCurrency, formatDate } from '../../utils';
 import { STATUS_LABELS } from '../repairsettlement/mockData';
 import {
   STATUS_ORDER, REPAIR_CATEGORY_HUES,
   StatTile, RevenueLineChart, StatusStackedBarChart, StatusDonutChart, RepairCategoryStackedBarChart,
 } from '../dashboard/DashboardCharts';
+import SettlementDetailModal, { settlementStatusBadge } from './SettlementDetailModal';
 import '../dashboard/DashboardPage.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -45,6 +48,175 @@ function computeDateRange(presetKey) {
   return { fromDate: '', toDate: '' };
 }
 
+// Cac loai su kien SSE (/sse/repair-orders) anh huong so lieu Dashboard:
+// phieu moi tao, hoan thanh (cho thanh toan), thanh toan xong (xuat hoa
+// don), hoac bi huy. Bo qua cac event khac (claimed, task-updated,
+// bay-occupied...) vi khong doi status/total cua service_orders.
+const DASHBOARD_RELEVANT_EVENTS = new Set([
+  'new-pending', 'order-completed', 'invoiced', 'order-cancelled',
+]);
+
+// 'YYYY-MM' - phai khop dinh dang voi monthKey() trong DashboardRepositoryImpl.js
+// (BE) de doi chieu dung voi field "month" cua tung diem tren RevenueLineChart.
+function monthKeyOf(dateVal) {
+  if (!dateVal) return null;
+  const d = new Date(dateVal);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Modal danh sach phieu DA THANH TOAN cua 1 thang - mo khi bam vao 1 diem tren
+// bieu do "Doanh thu theo tháng". Loc theo intakeDate (khong phai paidAt) vi
+// bieu do doanh thu cua BE cung gom theo intake_date (xem DashboardRepositoryImpl
+// .getOverview - trendResult GROUP BY thang cua intake_date), nen phai loc
+// dung nhung phieu da tinh vao dung con so tren bieu do. Table/cot giong het
+// tab "Đã xuất hóa đơn" cua SettlementReportsPage - "Xem chi tiết" mo lai
+// SettlementDetailModal dung chung.
+function MonthPaidSettlementsModal({ month, monthLabel, onClose }) {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeReport, setActiveReport] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError('');
+    managerApi
+      .getSettlementReports({})
+      .then((data) => { if (alive) setReports(data || []); })
+      .catch((err) => { if (alive) setError(err.message || 'Không tải được danh sách phiếu quyết toán'); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  const filtered = reports.filter((r) => r.status === 'invoiced' && monthKeyOf(r.intakeDate) === month);
+
+  const openDetail = (report) => {
+    setActiveReport(report);
+    setDetailError('');
+    setDetailLoading(true);
+    managerApi
+      .getSettlementReportById(report.id)
+      .then((data) => setActiveReport(data || report))
+      .catch((err) => setDetailError(err.message || 'Không tải được chi tiết phiếu quyết toán'))
+      .finally(() => setDetailLoading(false));
+  };
+
+  return (
+    <>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 1100 }}>
+        <div className="modal-header">
+          <h3 className="modal-title">Phiếu đã thanh toán · Tháng {monthLabel}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body" style={{ maxHeight: '80vh', overflow: 'auto' }}>
+          {error && (
+            <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+              {error}
+            </div>
+          )}
+
+          <div className="table-wrapper" style={{ boxShadow: 'none', marginBottom: 0 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Mã phiếu</th>
+                  <th>Xe</th>
+                  <th>Khách hàng</th>
+                  <th>Tư vấn</th>
+                  <th>Tiếp nhận</th>
+                  <th>Hoàn thành</th>
+                  <th>Chi phí</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr><td colSpan={9}>
+                    <div className="empty-state">
+                      <div className="empty-state-icon">⏳</div>
+                      <h3>Đang tải danh sách phiếu quyết toán</h3>
+                    </div>
+                  </td></tr>
+                )}
+
+                {!loading && filtered.length === 0 && !error && (
+                  <tr><td colSpan={9}>
+                    <div className="empty-state">
+                      <div className="empty-state-icon">📭</div>
+                      <h3>Không có phiếu đã thanh toán trong tháng này</h3>
+                    </div>
+                  </td></tr>
+                )}
+
+                {!loading && filtered.map((report) => {
+                  const badge = settlementStatusBadge(report.status);
+                  return (
+                    <tr key={report.id}>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--primary-dark)' }}>{report.code}</td>
+                      <td>
+                        <div style={{ fontWeight: 700 }}>{report.vehicle?.licensePlate || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>
+                          {report.vehicle?.vehicleModel || '—'}{report.vehicle?.manufactureYear ? ` · ${report.vehicle.manufactureYear}` : ''}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 700 }}>{report.customer?.fullName || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{report.customer?.phone || '—'}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 700 }}>{report.advisor?.name || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{report.advisor?.phone || ''}</div>
+                      </td>
+                      <td style={{ fontSize: 12 }}>{formatDate(report.intakeDate)}</td>
+                      <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>
+                      <td style={{ fontWeight: 800, color: '#C62828' }}>{formatCurrency(report.total)}</td>
+                      <td>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td>
+                        <button className="btn btn-info btn-sm" onClick={() => openDetail(report)}>Xem chi tiết</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {!loading && (
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--gray-500)' }}>{filtered.length} phiếu</div>
+          )}
+
+          {detailError && (
+            <div style={{ marginTop: 12, background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', borderRadius: 10, padding: '12px 14px' }}>
+              {detailError}
+            </div>
+          )}
+          {detailLoading && (
+            <div style={{ marginTop: 12, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#334155', borderRadius: 10, padding: '12px 14px' }}>
+              Đang tải chi tiết phiếu quyết toán...
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    {!detailLoading && activeReport && (
+      <SettlementDetailModal report={activeReport} onClose={() => setActiveReport(null)} />
+    )}
+    </>
+  );
+}
+
 // ─── Trang Dashboard riêng cho Quản lý chi nhánh ──────────────────────
 // Cung 1 nguon du lieu voi trang Co van (GET /dashboard/overview - BE da loc
 // theo branch_id cua nguoi dang nhap nen luon la so lieu CA CHI NHANH, khong
@@ -60,6 +232,7 @@ export default function ManagerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedMonth, setSelectedMonth] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -72,6 +245,15 @@ export default function ManagerDashboardPage() {
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [preset, status, categoryId, refreshKey]);
+
+  // Tu dong lam moi Dashboard (khong can F5) khi co thay doi anh huong so
+  // lieu - dung chung kenh SSE /sse/repair-orders (da scope san theo branchId
+  // cua nguoi dang nhap) voi trang Quyet toan sua chua.
+  const handleRepairOrderEvent = useCallback((event) => {
+    if (!DASHBOARD_RELEVANT_EVENTS.has(event?.type)) return;
+    setRefreshKey((k) => k + 1);
+  }, []);
+  useRepairOrderEventsSSE(handleRepairOrderEvent, true);
 
   const kpis = overview?.kpis || { totalOrders: 0, totalRevenue: 0, avgOrderValue: 0, successRate: null };
   const monthlyTrend = overview?.monthlyTrend || [];
@@ -125,7 +307,12 @@ export default function ManagerDashboardPage() {
       <div className="dash-grid-3">
         <div className="dash-card dash-card--chart" style={{ gridColumn: 'span 2' }}>
           <div className="dash-card__title">Doanh thu theo tháng</div>
-          {loading ? <div className="empty-state" style={{ minHeight: 220 }}><p>Đang tải…</p></div> : <RevenueLineChart data={monthlyTrend} />}
+          {loading ? <div className="empty-state" style={{ minHeight: 220 }}><p>Đang tải…</p></div> : (
+            <RevenueLineChart
+              data={monthlyTrend}
+              onPointClick={(p) => setSelectedMonth({ month: p.month, label: p.label })}
+            />
+          )}
         </div>
         <div className="dash-card dash-card--chart">
           <div className="dash-card__title">Trạng thái phiếu</div>
@@ -186,6 +373,14 @@ export default function ManagerDashboardPage() {
           </table>
         </div>
       </div>
+
+      {selectedMonth && (
+        <MonthPaidSettlementsModal
+          month={selectedMonth.month}
+          monthLabel={selectedMonth.label}
+          onClose={() => setSelectedMonth(null)}
+        />
+      )}
     </div>
   );
 }

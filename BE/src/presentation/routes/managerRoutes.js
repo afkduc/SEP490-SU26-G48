@@ -69,6 +69,11 @@ function buildManagerRouter() {
     importRequestController.list,
   );
   router.get(
+    '/import-requests/new-count',
+    requirePerm('import_requests:read'),
+    importRequestController.getNewCount,
+  );
+  router.get(
     '/import-requests/:id',
     requirePerm('import_requests:read'),
     importRequestController.getById,
@@ -83,6 +88,11 @@ function buildManagerRouter() {
     requirePerm('import_requests:approve'),
     importRequestController.reject,
   );
+  router.patch(
+    '/import-requests/:id/mark-seen',
+    requirePerm('import_requests:read'),
+    importRequestController.markSeen,
+  );
 
   // ===== Phieu xuat kho (Manager) =====
   // Manager truy cap /manager/export-requests ... de xem lich su xuat kho (read-only).
@@ -93,9 +103,19 @@ function buildManagerRouter() {
     exportRequestController.list,
   );
   router.get(
+    '/export-requests/new-count',
+    requirePerm('export_requests:read'),
+    exportRequestController.getNewCount,
+  );
+  router.get(
     '/export-requests/:id',
     requirePerm('export_requests:read'),
     exportRequestController.getById,
+  );
+  router.patch(
+    '/export-requests/:id/mark-seen',
+    requirePerm('export_requests:read'),
+    exportRequestController.markSeen,
   );
 
   return router;
