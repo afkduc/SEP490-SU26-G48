@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const ExportRequestService = require('../ExportRequestService');
+const ExportRequestService = require('../../src/application/services/ExportRequestService');
 
 test('list rejects a reversed date range', async () => {
   const service = new ExportRequestService({
