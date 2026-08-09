@@ -4,7 +4,14 @@ import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useAuth } from '../../contexts/AppContext';
 import { useToast } from '../../components/common/ToastContext';
 import { formatDateSafe } from '../../utils/dateUtils';
+import {
+  formatPhoneInput,
+  isPhoneLikeInput,
+  phoneDigitsForSearch,
+  PHONE_INPUT_MAX_LENGTH,
+} from '../../utils/validation';
 import { pickLatestDevice } from './securityAlertFocus';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './AdminDevicesPage.css';
 
 // ─── Icons ────────────────────────────────────────────────────────────
@@ -242,7 +249,7 @@ export default function AdminDevicesPage({
       const params = {
         page: pageNum,
         pageSize: PAGE_SIZE,
-        search: search || undefined,
+        search: (search || '').trim() || undefined,
       };
       if (userIdFilter) params.userId = userIdFilter;
       if (statusFilter) params.isCurrent = statusFilter;
@@ -438,14 +445,20 @@ export default function AdminDevicesPage({
   }, [devices]);
 
   function handleSearchChange(e) {
-    const val = e.target.value;
+    const raw = e.target.value;
+    // Ô search: nếu đang gõ SĐT thì format UI có "-", state/API chỉ giữ chữ số.
+    const val = isPhoneLikeInput(raw)
+      ? phoneDigitsForSearch(raw).slice(0, 11)
+      : raw;
     setSearch(val);
     if (searchTimerRef.current) {
       clearTimeout(searchTimerRef.current);
     }
+    // Truyền search tường minh — tránh stale closure (gõ "admn" mà API nhận "adm").
+    const trimmed = val.trim();
     searchTimerRef.current = setTimeout(() => {
       searchTimerRef.current = null;
-      loadData(1);
+      loadData(1, { search: trimmed || undefined });
     }, 400);
   }
 
@@ -459,11 +472,11 @@ export default function AdminDevicesPage({
     };
   }, []);
 
-  function handleFilterChange() {
-    loadData(1);
-  }
-
   function handleClearFilters() {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
     setSearch('');
     setUserIdFilter(null);
     setStatusFilter('');
@@ -471,6 +484,7 @@ export default function AdminDevicesPage({
     setOsFilter('');
     setDateFrom('');
     setDateTo('');
+    setFocusedDeviceId(null);
     loadData(1, {
       search: undefined,
       userId: undefined,
@@ -480,6 +494,11 @@ export default function AdminDevicesPage({
       dateFrom: undefined,
       dateTo: undefined,
     });
+  }
+
+  /** Làm mới = xóa thanh tìm kiếm + mọi bộ lọc, trả về full danh sách */
+  function handleRefresh() {
+    handleClearFilters();
   }
 
   function handlePageChange(newPage) {
@@ -522,7 +541,7 @@ export default function AdminDevicesPage({
             </div>
             <div className="admin-devices__title-group">
               <h1>Thiết bị đăng nhập</h1>
-              <p className="admin-devices__subtitle">Quản lý thiết bị đang đăng nhập &amp; Force Logout</p>
+              <p className="admin-devices__subtitle">Quản lý thiết bị đang đăng nhập và buộc đăng xuất</p>
             </div>
           </div>
         </div>
@@ -538,16 +557,18 @@ export default function AdminDevicesPage({
             <input
               type="text"
               className="admin-devices__search"
+              inputMode={isPhoneLikeInput(search) ? 'numeric' : 'search'}
               placeholder="Tìm theo tên, email, SĐT, IP..."
-              value={search}
+              maxLength={isPhoneLikeInput(search) ? PHONE_INPUT_MAX_LENGTH : undefined}
+              value={isPhoneLikeInput(search) ? formatPhoneInput(search) : search}
               onChange={handleSearchChange}
             />
           </div>
           <button
             type="button"
             className="btn btn--ghost btn--sm admin-devices__refresh"
-            onClick={() => loadData(page)}
-            title="Làm mới"
+            onClick={handleRefresh}
+            title="Xóa tìm kiếm/lọc và tải lại danh sách đầy đủ"
           >
             <IconRefresh /> Làm mới
           </button>
@@ -573,20 +594,16 @@ export default function AdminDevicesPage({
             onChange={(e) => setOsFilter(e.target.value)}
           />
           <div className="admin-devices__filter-group admin-devices__filter-group--date">
-            <input
-              type="date"
-              className="admin-devices__date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              title="Từ ngày"
-            />
-            <span className="admin-devices__date-sep">—</span>
-            <input
-              type="date"
-              className="admin-devices__date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              title="Đến ngày"
+            <DateRangeInputs
+              startDate={dateFrom}
+              endDate={dateTo}
+              onChange={({ startDate, endDate }) => {
+                setDateFrom(startDate);
+                setDateTo(endDate);
+              }}
+              className="admin-devices__date-range"
+              inputClassName="admin-devices__date"
+              sepClassName="admin-devices__date-sep"
             />
           </div>
           {hasActiveFilters && (

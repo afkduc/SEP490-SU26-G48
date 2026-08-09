@@ -2,12 +2,12 @@ const ApiError = require('../../utils/ApiError');
 const {
   EMAIL_HINT,
   EMAIL_MAX_LENGTH,
-  NAME_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   isValidEmail,
   isValidPhone,
-  isValidUsername,
   isValidPassword,
+  getUsernameError,
+  getPersonNameError,
 } = require('../../utils/fieldValidation');
 
 const VALID_STATUSES = ['active', 'inactive'];
@@ -62,12 +62,8 @@ function validateCreateUser(req, res, next) {
   try {
     const { name, email, password, roleId, branchId, scopeAllBranches, firstName, lastName, phone } = req.body || {};
 
-    if (!name || !String(name).trim()) {
-      throw new ApiError(400, 'Tên đăng nhập là bắt buộc');
-    }
-    if (!isValidUsername(name)) {
-      throw new ApiError(400, 'Tên đăng nhập 3–50 ký tự, chỉ gồm chữ, số, dấu chấm, gạch dưới, gạch ngang');
-    }
+    const usernameErr = getUsernameError(name, { required: true });
+    if (usernameErr) throw new ApiError(400, usernameErr);
     if (!email || !String(email).trim()) {
       throw new ApiError(400, 'Email là bắt buộc');
     }
@@ -87,20 +83,15 @@ function validateCreateUser(req, res, next) {
     if (!Number.isInteger(parsedRole) || parsedRole <= 0) {
       throw new ApiError(400, 'roleId phải là số nguyên dương');
     }
-    if (!lastName || !String(lastName).trim()) {
-      throw new ApiError(400, 'Tên là bắt buộc');
-    }
-    if (String(lastName).trim().length > NAME_MAX_LENGTH) {
-      throw new ApiError(400, `Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
-    }
-    if (firstName !== undefined && firstName !== null && String(firstName).trim().length > NAME_MAX_LENGTH) {
-      throw new ApiError(400, `Họ tối đa ${NAME_MAX_LENGTH} ký tự`);
-    }
+    const lastNameErr = getPersonNameError(lastName, { required: true, label: 'Tên' });
+    if (lastNameErr) throw new ApiError(400, lastNameErr);
+    const firstNameErr = getPersonNameError(firstName, { required: false, label: 'Họ' });
+    if (firstNameErr) throw new ApiError(400, firstNameErr);
     if (!phone || !String(phone).trim()) {
       throw new ApiError(400, 'Số điện thoại là bắt buộc');
     }
     if (!isValidPhone(phone)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10–11 chữ số');
+      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
     }
     if (scopeAllBranches !== true) {
       if (branchId === undefined || branchId === null || branchId === '') {
@@ -137,7 +128,7 @@ function validateUpdateUser(req, res, next) {
     if (phone !== undefined && phone !== null) {
       if (!String(phone).trim()) throw new ApiError(400, 'Số điện thoại là bắt buộc');
       if (!isValidPhone(phone)) {
-        throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10–11 chữ số');
+        throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
       }
     }
 
@@ -146,14 +137,13 @@ function validateUpdateUser(req, res, next) {
     }
 
     if (lastName !== undefined && lastName !== null) {
-      if (!String(lastName).trim()) throw new ApiError(400, 'Tên không được rỗng');
-      if (String(lastName).trim().length > NAME_MAX_LENGTH) {
-        throw new ApiError(400, `Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
-      }
+      const lastNameErr = getPersonNameError(lastName, { required: true, label: 'Tên' });
+      if (lastNameErr) throw new ApiError(400, lastNameErr);
     }
 
-    if (firstName !== undefined && firstName !== null && String(firstName).trim().length > NAME_MAX_LENGTH) {
-      throw new ApiError(400, `Họ tối đa ${NAME_MAX_LENGTH} ký tự`);
+    if (firstName !== undefined && firstName !== null) {
+      const firstNameErr = getPersonNameError(firstName, { required: false, label: 'Họ' });
+      if (firstNameErr) throw new ApiError(400, firstNameErr);
     }
 
     if (roleId !== undefined && roleId !== null && roleId !== '') {

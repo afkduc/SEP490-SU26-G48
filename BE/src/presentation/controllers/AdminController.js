@@ -26,7 +26,7 @@ class AdminController {
 
     const roleRepository = new RoleRepositoryImpl();
     const permissionService = new PermissionService({ roleRepository });
-    this.roleService = new RoleService({ roleRepository, permissionService });
+    this.roleService = new RoleService({ roleRepository });
 
     const userRoleRepository = new UserRoleRepositoryImpl();
     const roleRepo = new RoleRepositoryImpl();

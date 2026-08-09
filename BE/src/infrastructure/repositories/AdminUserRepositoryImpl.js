@@ -2,7 +2,32 @@ const { query } = require('../database/sqlServer');
 const {
   sqlAccentInsensitiveLike,
   bindNormalizedLikeParam,
+  bindPhoneDigitsLikeParam,
+  sqlPhoneDigitsLike,
+  sqlPhoneDigitsExpr,
+  phoneDigitsOnly,
 } = require('../../utils/vietnamese');
+
+/** Điều kiện search users: tên/email (bỏ dấu) + SĐT theo chữ số (contains). */
+function pushUserSearchCondition(conditions, params, paramIndex, search) {
+  const key = `p${paramIndex}`;
+  bindNormalizedLikeParam(params, key, search);
+  const parts = [
+    sqlAccentInsensitiveLike('u.user_name', key),
+    sqlAccentInsensitiveLike('u.email', key),
+    sqlAccentInsensitiveLike('u.first_name', key),
+    sqlAccentInsensitiveLike('u.last_name', key),
+    sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key),
+  ];
+  let next = paramIndex + 1;
+  const phoneKey = `p${next}`;
+  if (bindPhoneDigitsLikeParam(params, phoneKey, search)) {
+    parts.push(sqlPhoneDigitsLike('u.phone', phoneKey));
+    next += 1;
+  }
+  conditions.push(`(${parts.join(' OR ')})`);
+  return next;
+}
 
 const ADMIN_USER_COLUMNS = `
   u.id,
@@ -75,17 +100,7 @@ class AdminUserRepositoryImpl {
     let paramIndex = 1;
 
     if (search) {
-      const key = `p${paramIndex}`;
-      bindNormalizedLikeParam(params, key, search);
-      conditions.push(`(
-        ${sqlAccentInsensitiveLike('u.user_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.email', key)}
-        OR ${sqlAccentInsensitiveLike('u.first_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.last_name', key)}
-        OR ${sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
-        OR ${sqlAccentInsensitiveLike('u.phone', key)}
-      )`);
-      paramIndex++;
+      paramIndex = pushUserSearchCondition(conditions, params, paramIndex, search);
     }
 
     if (branchId) {
@@ -165,17 +180,7 @@ class AdminUserRepositoryImpl {
     let paramIndex = 1;
 
     if (search) {
-      const key = `p${paramIndex}`;
-      bindNormalizedLikeParam(params, key, search);
-      conditions.push(`(
-        ${sqlAccentInsensitiveLike('u.user_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.email', key)}
-        OR ${sqlAccentInsensitiveLike('u.first_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.last_name', key)}
-        OR ${sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
-        OR ${sqlAccentInsensitiveLike('u.phone', key)}
-      )`);
-      paramIndex++;
+      paramIndex = pushUserSearchCondition(conditions, params, paramIndex, search);
     }
 
     if (branchId) {
@@ -314,9 +319,12 @@ class AdminUserRepositoryImpl {
   }
 
   async findByPhone(phone) {
+    const digits = phoneDigitsOnly(phone);
+    if (!digits) return null;
     const result = await query(
-      'SELECT TOP 1 id, phone FROM users WHERE phone = @p1',
-      { p1: phone }
+      `SELECT TOP 1 id, phone FROM users
+       WHERE ${sqlPhoneDigitsExpr('phone')} = @p1`,
+      { p1: digits }
     );
     return result.recordset[0] || null;
   }

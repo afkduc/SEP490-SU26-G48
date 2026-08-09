@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { adminUsersApi } from '../../../services/adminApi';
+import { isValidPassword } from '../../../utils/validation';
 import './ResetPasswordModal.css';
 
 const PASSWORD_MIN_LENGTH = 6;
@@ -29,23 +30,12 @@ function PasswordEyeToggle({ show, onToggle }) {
 
 /**
  * Modal "Đặt lại mật khẩu" cho admin.
- * Có 2 chế độ:
- *   - 'random': BE sinh MK ngẫu nhiên, modal hiển thị MK cho admin copy
- *   - 'manual': admin nhập MK mới (>=6 ký tự) + xác nhận, modal chỉ báo thành công
- *
- * Flow 3 pha:
- *   - Pha 1 (confirm): chọn mode + điền thông tin + cảnh báo
- *   - Pha 2 (loading): đang gửi request
- *   - Pha 3 (result): hiển thị MK (random) hoặc thông báo (manual)
- *
- * Props:
- *   - user: { id, name, email } | null
- *   - onClose: () => void
- *   - onSuccess?: () => void
+ *   - 'random': BE sinh MK ngẫu nhiên
+ *   - 'manual': admin nhập MK (>=6, có chữ và số) + xác nhận
  */
 export default function ResetPasswordModal({ user, onClose, onSuccess }) {
-  const [phase, setPhase] = useState('confirm'); // 'confirm' | 'loading' | 'result' | 'error'
-  const [mode, setMode] = useState('random'); // 'random' | 'manual'
+  const [phase, setPhase] = useState('confirm');
+  const [mode, setMode] = useState('random');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -56,8 +46,8 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
   const manualError = useMemo(() => {
     if (mode !== 'manual') return null;
     if (!newPassword) return 'Mật khẩu mới là bắt buộc';
-    if (newPassword.length < PASSWORD_MIN_LENGTH) {
-      return `Mật khẩu phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự`;
+    if (!isValidPassword(newPassword, PASSWORD_MIN_LENGTH)) {
+      return `Mật khẩu tối thiểu ${PASSWORD_MIN_LENGTH} ký tự, gồm chữ và số`;
     }
     if (newPassword !== confirmPassword) return 'Mật khẩu xác nhận không khớp';
     return null;
@@ -70,10 +60,7 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
     setPhase('loading');
     setError(null);
     try {
-      const payload =
-        mode === 'manual'
-          ? { newPassword }
-          : {};
+      const payload = mode === 'manual' ? { newPassword } : {};
       const res = await adminUsersApi.resetPassword(user.id, payload);
       setResult(res);
       setPhase('result');
@@ -121,7 +108,6 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
     }
   }, []);
 
-  // Loading
   if (phase === 'loading') {
     return (
       <div className="reset-pw-overlay" onClick={onClose}>
@@ -135,7 +121,6 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
     );
   }
 
-  // Result
   if (phase === 'result' && result) {
     const isManual = result.isManual === true;
     return (
@@ -154,7 +139,7 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
                 Mật khẩu mới cho <strong>{user?.name || user?.email}</strong>
               </p>
             </div>
-            <button className="reset-pw-close" onClick={handleClose}>×</button>
+            <button type="button" className="reset-pw-close" onClick={handleClose}>×</button>
           </div>
 
           <div className="reset-pw-body">
@@ -185,11 +170,7 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
                   <label className="reset-pw-password-label">Mật khẩu mới</label>
                   <div className="reset-pw-password-row">
                     <code className="reset-pw-password-value">{result.newPassword}</code>
-                    <button
-                      className="reset-pw-copy-btn"
-                      onClick={handleCopy}
-                      type="button"
-                    >
+                    <button className="reset-pw-copy-btn" onClick={handleCopy} type="button">
                       {copied ? (
                         <>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -217,7 +198,9 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
 
           <div className="reset-pw-footer">
             <div className="reset-pw-footer__actions">
-              <button className="btn-cancel" onClick={handleClose}>Đóng</button>
+              <button type="button" className="reset-pw-btn reset-pw-btn--primary" onClick={handleClose}>
+                Đóng
+              </button>
             </div>
           </div>
         </div>
@@ -225,7 +208,6 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
     );
   }
 
-  // Confirm / Error
   return (
     <div className="reset-pw-overlay" onClick={onClose}>
       <div className="reset-pw-modal" onClick={(e) => e.stopPropagation()}>
@@ -242,7 +224,7 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
               {user ? `${user.name || user.email}` : 'Người dùng'}
             </p>
           </div>
-          <button className="reset-pw-close" onClick={handleClose}>×</button>
+          <button type="button" className="reset-pw-close" onClick={handleClose}>×</button>
         </div>
 
         <div className="reset-pw-body">
@@ -256,7 +238,6 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
             </p>
           </div>
 
-          {/* Mode switcher */}
           <div className="reset-pw-mode-switcher" role="tablist">
             <button
               type="button"
@@ -301,7 +282,7 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
                     type={showPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder={`Ít nhất ${PASSWORD_MIN_LENGTH} ký tự`}
+                    placeholder={`Ít nhất ${PASSWORD_MIN_LENGTH} ký tự, gồm chữ và số`}
                     autoComplete="new-password"
                   />
                   <PasswordEyeToggle
@@ -334,8 +315,8 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
               )}
 
               <p className="reset-pw-form-hint">
-                Mật khẩu phải có ít nhất {PASSWORD_MIN_LENGTH} ký tự. Hãy gửi mật khẩu mới
-                cho người dùng qua kênh an toàn.
+                Mật khẩu tối thiểu {PASSWORD_MIN_LENGTH} ký tự, gồm chữ và số.
+                Hãy gửi mật khẩu mới cho người dùng qua kênh an toàn.
               </p>
             </div>
           )}
@@ -343,9 +324,12 @@ export default function ResetPasswordModal({ user, onClose, onSuccess }) {
 
         <div className="reset-pw-footer">
           <div className="reset-pw-footer__actions">
-            <button className="btn-cancel" onClick={handleClose}>Hủy</button>
+            <button type="button" className="reset-pw-btn reset-pw-btn--ghost" onClick={handleClose}>
+              Hủy
+            </button>
             <button
-              className="btn-danger"
+              type="button"
+              className="reset-pw-btn reset-pw-btn--primary"
               onClick={handleSubmit}
               disabled={!user?.id || (mode === 'manual' && !!manualError)}
             >
