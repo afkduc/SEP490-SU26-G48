@@ -125,6 +125,25 @@ class ExportRequestService {
 
     return ExportRequestResponseDto.fromEntity(result.request, result.items);
   }
+
+  /**
+   * Danh dau phieu la "da xem" boi Manager (dung cho thong bao dom).
+   */
+  async markSeenByManager(id) {
+    const numId = Number(id);
+    if (!Number.isFinite(numId) || numId <= 0) {
+      throw new ApiError(400, 'id khong hop le');
+    }
+    await this.exportRequestRepository.markSeenByManager(numId);
+  }
+
+  /**
+   * Dem so phieu xuat chua duoc Manager xem trong 1 chi nhanh.
+   */
+  async countNewForManager(branchId) {
+    if (!branchId) throw new ApiError(400, 'branchId is required');
+    return this.exportRequestRepository.countNewForManager(Number(branchId));
+  }
 }
 
 module.exports = ExportRequestService;

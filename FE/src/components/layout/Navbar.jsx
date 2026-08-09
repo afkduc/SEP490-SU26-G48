@@ -129,7 +129,7 @@ const ROLES_WITH_DROPDOWN = new Set([
 // truoc, roi click lai dong ngay lai - nen chi bat 1 trong 2 tuy kich thuoc man hinh.
 const NAV_DROPDOWN_COMPACT_QUERY = '(max-width: 1024px)';
 
-function NavDropdownItem({ item, currentPath, badgeCount, inventoryNewCount, onNavigate }) {
+function NavDropdownItem({ item, currentPath, badgeCount, childBadgeCounts, onNavigate }) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef(null);
   const [isCompact, setIsCompact] = useState(
@@ -229,6 +229,7 @@ function NavDropdownItem({ item, currentPath, badgeCount, inventoryNewCount, onN
         <div className="navbar__nav-dropdown">
           {item.children.map((child) => {
             const childActive = isPathMatch(child.path);
+            const childCount = childBadgeCounts?.[child.path] || 0;
             return (
               <NavLink
                 key={child.path}
@@ -239,8 +240,8 @@ function NavDropdownItem({ item, currentPath, badgeCount, inventoryNewCount, onN
                 onClick={() => { setOpen(false); onNavigate?.(); }}
               >
                 {child.label}
-                {child.path === '/manager/inventory' && inventoryNewCount > 0 && (
-                  <span className="navbar__badge">{inventoryNewCount > 9 ? '9+' : inventoryNewCount}</span>
+                {childCount > 0 && (
+                  <span className="navbar__badge">{childCount > 9 ? '9+' : childCount}</span>
                 )}
               </NavLink>
             );
@@ -253,7 +254,7 @@ function NavDropdownItem({ item, currentPath, badgeCount, inventoryNewCount, onN
 
 export default function Navbar() {
   const { pendingCount } = useServiceRequests();
-  const { newProductCount } = useManagerInventoryNotify();
+  const { newProductCount, newImportRequestCount, newExportRequestCount } = useManagerInventoryNotify();
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -288,7 +289,11 @@ export default function Navbar() {
                 item={item}
                 currentPath={location.pathname}
                 badgeCount={pendingCount}
-                inventoryNewCount={newProductCount}
+                childBadgeCounts={{
+                  '/manager/inventory': newProductCount,
+                  '/manager/import-requests': newImportRequestCount,
+                  '/manager/export-requests': newExportRequestCount,
+                }}
                 onNavigate={closeMobileNav}
               />
             ))
