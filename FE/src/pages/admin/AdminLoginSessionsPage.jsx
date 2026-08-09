@@ -1,16 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useAuth } from '../../contexts/AppContext';
-import SessionDetailDrawer from './SessionDetailDrawer';
 import AdminPagination from './components/AdminPagination';
 import { formatDateSafe } from '../../utils/dateUtils';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { pickLatestSession } from './securityAlertFocus';
 import { normalizeVietnamese } from '../../utils/vietnamese';
-import { formatPhoneDisplay } from '../../utils/validation';
+import {
+  formatPhoneDisplay,
+  formatPhoneInput,
+  phoneDigitsForSearch,
+  PHONE_INPUT_MAX_LENGTH,
+} from '../../utils/validation';
+import DateRangeInputs from '../../components/common/DateRangeInputs';
 import './LoginSessionsPage.css';
 
 const ACTION_OPTIONS = [
@@ -366,8 +372,9 @@ export default function AdminLoginSessionsPage({
   seedFocusIp = '',
   seedFocusLoginTime = '',
   seedKey = 0,
-  onOpenDevicesToProcess,
 } = {}) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const sessions = useLoginSessions(
     seedKey
       ? {
@@ -383,7 +390,6 @@ export default function AdminLoginSessionsPage({
   );
   const { branches, branchesError } = useSharedBranches();
   const { token } = useAuth();
-  const [detailSession, setDetailSession] = useState(null);
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -394,6 +400,16 @@ export default function AdminLoginSessionsPage({
     ip: '',
     loginTime: '',
   });
+
+  const openSessionDetail = useCallback((item) => {
+    if (!item?.id) return;
+    navigate(`/admin/login-sessions/${item.id}`, {
+      state: {
+        session: item,
+        fromListSearch: location.search || '?tab=sessions',
+      },
+    });
+  }, [navigate, location.search]);
 
   // Seed từ panel cảnh báo ("Lịch sử") — khi đổi cảnh báo trong lúc tab đang mở
   useEffect(() => {
@@ -483,21 +499,30 @@ export default function AdminLoginSessionsPage({
     const sessionId = eventData && eventData.sessionId;
     const deviceId = eventData && eventData.deviceId;
 
-    // Filter matching (de khong patch khi event khong thuoc filter hien tai)
+    // Filter matching (AND — khong patch khi event khong thuoc filter hien tai)
     const p = paramsRef.current;
     const filterUserName = normalizeVietnamese(p.userName || '').trim();
+    const filterPhoneDigits = String(p.phone || '').replace(/\D/g, '');
     const filterActionType = p.actionType || '';
     const filterStatus = p.status || '';
     const filterBranchId = p.branchId;
 
     if (filterUserName) {
       const haystack = normalizeVietnamese(
-        [sessionUserName, eventData?.phone, eventData?.phoneNumber, eventData?.email]
+        [sessionUserName, eventData?.email, eventData?.userName]
           .filter(Boolean)
           .join(' ')
       );
       if (!haystack.includes(filterUserName)) {
-        return; // Khong match filter -> bo qua
+        return; // Khong match filter userName -> bo qua
+      }
+    }
+    if (filterPhoneDigits) {
+      const eventPhoneDigits = String(
+        eventData?.phone || eventData?.phoneNumber || ''
+      ).replace(/\D/g, '');
+      if (!eventPhoneDigits.includes(filterPhoneDigits)) {
+        return;
       }
     }
     if (filterActionType && eventType) {
@@ -598,6 +623,7 @@ export default function AdminLoginSessionsPage({
     (sessions.params.branchId != null);
 
   function resetFilters() {
+    // Xóa mọi điều kiện lọc + sessionId seed → trả về full danh sách
     sessions.setParams(() => ({
       userName: '',
       phone: '',
@@ -612,6 +638,7 @@ export default function AdminLoginSessionsPage({
       pageSize: 10,
     }));
     setFocusedSessionId(null);
+    focusScrollPendingRef.current = false;
   }
 
   const headerActions = (
@@ -712,10 +739,13 @@ export default function AdminLoginSessionsPage({
             <label className="filter-field__label">Số điện thoại</label>
             <input
               className="filter-field__input"
-              type="text"
-              placeholder="Nhập SĐT..."
-              value={sessions.params.phone || ''}
-              onChange={(e) => sessions.updateParam('phone', e.target.value)}
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              placeholder="0123-456-789"
+              maxLength={PHONE_INPUT_MAX_LENGTH}
+              value={formatPhoneInput(sessions.params.phone || '')}
+              onChange={(e) => sessions.updateParam('phone', phoneDigitsForSearch(e.target.value).slice(0, 11))}
             />
           </div>
 
@@ -764,39 +794,43 @@ export default function AdminLoginSessionsPage({
 
           <div className="filter-field">
             <label className="filter-field__label">Khoảng ngày</label>
-            <div className="filter-field__date-group">
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={sessions.params.startDate || ''}
-                onChange={(e) => sessions.updateParam('startDate', e.target.value)}
-                title="Từ ngày"
-              />
-              <span className="filter-field__date-sep">—</span>
-              <input
-                className="filter-field__input filter-field__input--date"
-                type="date"
-                value={sessions.params.endDate || ''}
-                onChange={(e) => sessions.updateParam('endDate', e.target.value)}
-                title="Đến ngày"
-              />
-            </div>
+            <DateRangeInputs
+              startDate={sessions.params.startDate || ''}
+              endDate={sessions.params.endDate || ''}
+              onChange={({ startDate, endDate }) => {
+                sessions.setParams((p) => ({
+                  ...p,
+                  startDate,
+                  endDate,
+                  page: 1,
+                }));
+              }}
+              className="filter-field__date-group"
+              inputClassName="filter-field__input filter-field__input--date"
+              sepClassName="filter-field__date-sep"
+            />
           </div>
         </div>
 
         <div className="admin-sessions__filter-actions">
           <div className="admin-sessions__filter-results">
-            {sessions.data.total > 0 && (
+            {sessions.loading ? (
+              <>Đang lọc...</>
+            ) : (
               <>Tìm thấy <strong>{sessions.data.total}</strong> phiên đăng nhập</>
             )}
           </div>
           <div className="admin-sessions__filter-btns">
-            {hasFilters && (
-              <button className="btn btn--ghost btn--sm" onClick={resetFilters}>
-                <IconRefresh />
-                Đặt lại
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={resetFilters}
+              disabled={!hasFilters && !sessions.loading}
+              title="Xóa bộ lọc và tải lại danh sách đầy đủ"
+            >
+              <IconRefresh />
+              Đặt lại
+            </button>
           </div>
         </div>
       </div>
@@ -823,7 +857,7 @@ export default function AdminLoginSessionsPage({
             <div className="admin-sessions__table-wrapper">
               <SessionTable
                 items={sessions.data.items}
-                onViewSession={setDetailSession}
+                onViewSession={openSessionDetail}
                 focusedSessionId={focusedSessionId}
               />
             </div>
@@ -837,26 +871,6 @@ export default function AdminLoginSessionsPage({
           </>
         )}
       </div>
-
-      {detailSession && (
-        <SessionDetailDrawer
-          session={detailSession}
-          onClose={() => setDetailSession(null)}
-          onOpenDevicesToProcess={
-            typeof onOpenDevicesToProcess === 'function'
-              ? () => {
-                  onOpenDevicesToProcess({
-                    userId: detailSession.user_id,
-                    userName: detailSession.user_name,
-                    ipAddress: detailSession.ip_address,
-                    loginTime: detailSession.login_time,
-                  });
-                  setDetailSession(null);
-                }
-              : undefined
-          }
-        />
-      )}
     </div>
   );
 }

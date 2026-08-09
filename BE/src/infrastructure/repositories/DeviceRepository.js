@@ -2,6 +2,8 @@ const { query } = require('../database/sqlServer');
 const {
   sqlAccentInsensitiveLike,
   bindNormalizedLikeParam,
+  bindPhoneDigitsLikeParam,
+  sqlPhoneDigitsLike,
 } = require('../../utils/vietnamese');
 
 /**
@@ -151,19 +153,24 @@ class DeviceRepository {
     if (search) {
       const key = `p${idx}`;
       bindNormalizedLikeParam(params, key, search);
-      conditions.push(`(
-        ${sqlAccentInsensitiveLike('u.user_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.email', key)}
-        OR ${sqlAccentInsensitiveLike('u.first_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.last_name', key)}
-        OR ${sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
-        OR ${sqlAccentInsensitiveLike('u.phone', key)}
-        OR ${sqlAccentInsensitiveLike('d.device_name', key)}
-        OR d.ip_address LIKE @${key}
-        OR ${sqlAccentInsensitiveLike('d.browser', key)}
-        OR ${sqlAccentInsensitiveLike('d.os', key)}
-      )`);
-      idx++;
+      const parts = [
+        sqlAccentInsensitiveLike('u.user_name', key),
+        sqlAccentInsensitiveLike('u.email', key),
+        sqlAccentInsensitiveLike('u.first_name', key),
+        sqlAccentInsensitiveLike('u.last_name', key),
+        sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key),
+        sqlAccentInsensitiveLike('d.device_name', key),
+        `d.ip_address LIKE @${key}`,
+        sqlAccentInsensitiveLike('d.browser', key),
+        sqlAccentInsensitiveLike('d.os', key),
+      ];
+      idx += 1;
+      const phoneKey = `p${idx}`;
+      if (bindPhoneDigitsLikeParam(params, phoneKey, search)) {
+        parts.push(sqlPhoneDigitsLike('u.phone', phoneKey));
+        idx += 1;
+      }
+      conditions.push(`(${parts.join(' OR ')})`);
     }
 
     if (browser) {

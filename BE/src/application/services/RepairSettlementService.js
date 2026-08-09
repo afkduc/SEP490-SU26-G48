@@ -6,6 +6,11 @@ const { PublicVehicleHistoryDto } = RepairSettlementResponseDto;
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
 const { auditCrud } = require('../../utils/auditHelper');
 const { settlementSnapshot } = require('../../utils/auditSnapshots');
+const { isValidPhone, isValidEmail, EMAIL_HINT } = require('../../utils/fieldValidation');
+
+// CCCD (12 so, mau moi) hoac CMND cu (9 so) - chap nhan ca 2 vi du lieu cu
+// van con luu CMND 9 so.
+const CCCD_REGEX = /^[0-9]{9}([0-9]{3})?$/;
 
 let payosClient = null;
 function getPayOS() {
@@ -30,7 +35,39 @@ const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB', 'HUY'];
 // REPAIR_CATEGORY = "Loai hinh sua chua" THAT (dung nhu thuc te tai dai ly xe -
 // khac voi LHSC o tren, vi LHSC da bi dung nham thanh "loai hang muc").
 const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
+const EXEMPT_HTTT_VALUES = new Set(['BHH', 'BH', 'NB', 'HUY']);
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
+
+// Tinh lai toan bo tong tien tu CHINH danh sach hang muc - khong tin theo
+// subtotal/discountAmount/vat/total FE gui len trong payload (truoc day BE
+// lay thang, ai goi API truc tiep bo qua FE co the tu khai total thap hon
+// gia tri hang muc that, PayOS lai thu dung theo so nay - xem
+// createPayosPaymentLink ben duoi). PHAI khop chinh xac cong thuc voi
+// RepairSettlementPage.jsx calcTotals() de khong lech so voi so CVDV nhin
+// thay tren man hinh truoc khi bam Luu.
+function calcTotalsFromItems(items) {
+  let subtotal = 0;
+  let discountAmount = 0;
+  let freeAmount = 0;
+  for (const item of items) {
+    const qty = Number(item.qty) || 0;
+    const unitPrice = Number(item.unitPrice) || 0;
+    const base = qty * unitPrice;
+    if (item.isFree) {
+      freeAmount += base;
+      continue;
+    }
+    if (EXEMPT_HTTT_VALUES.has(item.httt)) continue;
+    const discountPct = Number(item.discount) || 0;
+    subtotal += base * (1 - discountPct / 100);
+    discountAmount += base * (discountPct / 100);
+  }
+  subtotal = Math.round(subtotal);
+  discountAmount = Math.round(discountAmount);
+  freeAmount = Math.round(freeAmount);
+  const vat = Math.round(subtotal * 0.08);
+  return { subtotal, discountAmount, afterDiscount: subtotal, vat, freeAmount, total: subtotal + vat };
+}
 const ACTIVE_STATUS_LABELS = {
   waiting_repair: 'chờ sửa chữa',
   inprogress: 'đang sửa chữa',
@@ -105,6 +142,18 @@ class RepairSettlementService {
     if (!(vehicle.licensePlate || '').trim()) {
       throw new ApiError(400, 'Phải nhập biển số xe');
     }
+    if (!isValidPhone(customer.phone)) {
+      throw new ApiError(400, 'Số điện thoại khách hàng không hợp lệ');
+    }
+    if ((customer.contactPhone || '').trim() && !isValidPhone(customer.contactPhone)) {
+      throw new ApiError(400, 'Số điện thoại người liên hệ không hợp lệ');
+    }
+    if ((customer.email || '').trim() && !isValidEmail(customer.email)) {
+      throw new ApiError(400, EMAIL_HINT);
+    }
+    if ((customer.cccd || '').trim() && !CCCD_REGEX.test(customer.cccd.trim())) {
+      throw new ApiError(400, 'Số CCCD/CMND không hợp lệ (phải là 9 hoặc 12 chữ số)');
+    }
 
     const { customerId, vehicleId } = await this.customerRepository.findOrCreateForSettlement({
       fullName: customer.fullName.trim(),
@@ -121,6 +170,7 @@ class RepairSettlementService {
       frameNumber: vehicle.frameNumber || null,
       engineNumber: vehicle.engineNumber || null,
       currentKm: payload.currentKm || null,
+      purchaseDate: vehicle.purchaseDate || null,
     });
 
     return { ...payload, customerId, vehicleId };
@@ -226,7 +276,26 @@ class RepairSettlementService {
       }
     }
 
-    const entity = await this.repairSettlementRepository.updateStatus(id, status, { issuedBy, cancelReason });
+    // Xuat hoa don qua duong nay (khong phai webhook PayOS) chi co the la CVDV
+    // bam "Xac nhan da thu tien mat" tren man In phieu, nen luon ghi nhan CASH
+    // - duong PayOS (chuyen khoan that) di rieng qua handlePayosWebhook() ben
+    // duoi, khong bao gio goi ham nay.
+    if (status === 'invoiced' && existing.status !== 'waiting_payment') {
+      throw new ApiError(409, 'Phiếu phải ở trạng thái chờ thanh toán mới có thể xác nhận thanh toán');
+    }
+
+    const entity = await this.repairSettlementRepository.updateStatus(id, status, {
+      issuedBy,
+      cancelReason,
+      paymentMethod: status === 'invoiced' ? 'CASH' : undefined,
+    });
+
+    // CVDV vua xac nhan thu tien mat - bao realtime giong het duong PayOS
+    // webhook (xem handlePayosWebhook), de danh sach/modal dang mo tu chuyen
+    // sang tab "Đã xuất hóa đơn" ngay, khong doi F5.
+    if (status === 'invoiced') {
+      emitRepairOrderEvent(existing.branchId, 'invoiced', { settlementId: entity.id });
+    }
 
     // Huy giua chung - neu da co to truong nhan (existing.repairOrderId), BE
     // da tu dong huy luon lenh sua chua cascade (xem
@@ -352,7 +421,7 @@ class RepairSettlementService {
     const settlement = await this.repairSettlementRepository.findById(tx.service_order_id);
     if (!settlement || settlement.status !== 'waiting_payment') return;
 
-    await this.repairSettlementRepository.updateStatus(tx.service_order_id, 'invoiced', { issuedBy: settlement.advisorId });
+    await this.repairSettlementRepository.updateStatus(tx.service_order_id, 'invoiced', { issuedBy: settlement.advisorId, paymentMethod: 'TRANSFER' });
     emitRepairOrderEvent(settlement.branchId, 'invoiced', { settlementId: tx.service_order_id });
 
     // Ghi audit sau khi xuat hoa don — khong doi logic thanh toan.
@@ -405,6 +474,22 @@ class RepairSettlementService {
       if (!REPAIR_CATEGORY_VALUES.includes(item.repairCategory)) {
         throw new ApiError(400, `Loại hình sửa chữa không hợp lệ: ${item.repairCategory}`);
       }
+      // So luong: phu tung (PT) hoac hang muc DA HUY duoc phep = 0 (huy giua
+      // chung luon ve 0, xem FE handleCancelItem) - dich vu (DV) con hieu luc
+      // thi phai >= 1, khong co "0 cong" ma van tinh la 1 dau muc that.
+      const minQty = (item.lhsc === 'PT' || item.httt === 'HUY') ? 0 : 1;
+      const qtyNum = Number(item.qty);
+      if (!Number.isFinite(qtyNum) || qtyNum < minQty) {
+        throw new ApiError(400, `Số lượng không hợp lệ ở hạng mục "${item.description}"`);
+      }
+      const unitPriceNum = Number(item.unitPrice);
+      if (!Number.isFinite(unitPriceNum) || unitPriceNum < 0) {
+        throw new ApiError(400, `Đơn giá không hợp lệ ở hạng mục "${item.description}"`);
+      }
+      const discountNum = Number(item.discount) || 0;
+      if (discountNum < 0 || discountNum > 100) {
+        throw new ApiError(400, `Chiết khấu phải trong khoảng 0-100% ở hạng mục "${item.description}"`);
+      }
     }
 
     return {
@@ -413,12 +498,7 @@ class RepairSettlementService {
       customerRequest: payload.customerRequest || null,
       note: payload.note || null,
       currentKm: payload.currentKm ? Number(payload.currentKm) : null,
-      subtotal: payload.subtotal,
-      discountAmount: payload.discountAmount,
-      afterDiscount: payload.afterDiscount,
-      vat: payload.vat,
-      freeAmount: payload.freeAmount,
-      total: payload.total,
+      ...calcTotalsFromItems(items),
       items,
       intakeChecklist: payload.intakeChecklist || null,
     };

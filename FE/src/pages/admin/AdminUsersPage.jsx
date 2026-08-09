@@ -8,7 +8,14 @@ import {
   adminUsersApi,
 } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
-import { formatPhoneDisplay } from '../../utils/validation';
+import {
+  formatPhoneDisplay,
+  formatPhoneInput,
+  isPhoneLikeInput,
+  phoneDigitsForSearch,
+  PHONE_INPUT_MAX_LENGTH,
+} from '../../utils/validation';
+import { navigateWithCrm, writeCrmBrowserUrl } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
 import PermissionGate from '../../components/PermissionGate';
 import AdminPagination from './components/AdminPagination';
@@ -123,7 +130,7 @@ export default function AdminUsersPage() {
     if (roles && roles.length > 0) setLocalRoles(roles);
   }, [roles]);
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [togglingId, setTogglingId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -133,12 +140,11 @@ export default function AdminUsersPage() {
   // Xóa tab=roles cũ trên URL (màn vai trò đã bỏ)
   useEffect(() => {
     if (searchParams.get('tab') !== 'roles') return;
-    setSearchParams((prev) => {
-      const sp = new URLSearchParams(prev);
-      sp.delete('tab');
-      return sp;
-    }, { replace: true });
-  }, [searchParams, setSearchParams]);
+    const next = new URLSearchParams(searchParams);
+    next.delete('tab');
+    const qs = next.toString();
+    writeCrmBrowserUrl('/admin/users', qs ? `?${qs}` : '');
+  }, [searchParams]);
 
   // Không gọi setState trong render — chuyển sang effect (tránh vỡ hooks / action buttons)
   useEffect(() => {
@@ -147,46 +153,42 @@ export default function AdminUsersPage() {
     }
   }, [hasReadPermission, set403Error]);
 
+  // Đồng bộ filter → URL: /crm + /admin/users + ?search=&roleId=&status=&branchId=
+  // Chỉ ghi History — KHÔNG navigate (tránh Router ghi đè mất /crm).
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      const sp = new URLSearchParams(window.location.search);
       const urlParams = {};
-      if (sp.get('search')) urlParams.search = sp.get('search');
-      if (sp.get('branchId')) urlParams.branchId = Number(sp.get('branchId'));
-      if (sp.get('roleId')) urlParams.roleId = Number(sp.get('roleId'));
-      if (sp.get('status')) urlParams.status = sp.get('status');
-      if (sp.get('page')) urlParams.page = Number(sp.get('page'));
+      if (searchParams.get('search')) urlParams.search = searchParams.get('search');
+      if (searchParams.get('branchId')) urlParams.branchId = Number(searchParams.get('branchId'));
+      if (searchParams.get('roleId')) urlParams.roleId = Number(searchParams.get('roleId'));
+      if (searchParams.get('status')) urlParams.status = searchParams.get('status');
+      if (searchParams.get('page')) urlParams.page = Number(searchParams.get('page'));
       if (Object.keys(urlParams).length > 0) {
         setParams((p) => ({ ...p, ...urlParams }));
       }
       return;
     }
 
-    const sp = new URLSearchParams(window.location.search);
     const next = new URLSearchParams();
     if (params.search) next.set('search', params.search);
-    if (params.branchId) next.set('branchId', params.branchId);
-    if (params.roleId) next.set('roleId', params.roleId);
+    if (params.branchId) next.set('branchId', String(params.branchId));
+    if (params.roleId) next.set('roleId', String(params.roleId));
     if (params.status) next.set('status', params.status);
-    if (params.page > 1) next.set('page', params.page);
+    if (params.page > 1) next.set('page', String(params.page));
     const qs = next.toString();
-    const newUrl = qs ? `${location.pathname}?${qs}` : location.pathname;
-    window.history.replaceState(null, '', newUrl);
-  }, [params.search, params.branchId, params.roleId, params.status, params.page, location.pathname]);
+    writeCrmBrowserUrl('/admin/users', qs ? `?${qs}` : '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.search, params.branchId, params.roleId, params.status, params.page]);
 
   useEffect(() => {
     if (searchParams.get('create') === 'true') {
-      navigate('/admin/users/new', { replace: true });
+      navigateWithCrm(navigate, '/admin/users/new', {
+        replace: true,
+        state: { fromListSearch: location.search },
+      });
     }
-  }, [searchParams, navigate]);
-
-  useEffect(() => {
-    if (location.pathname === '/admin/users' && !window.location.search) {
-      setParams((p) => ({ ...p, page: 1 }));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, window.location.search]);
+  }, [searchParams, navigate, location.search]);
 
   function resetFilters() {
     setParams(() => ({
@@ -195,6 +197,7 @@ export default function AdminUsersPage() {
       roleId: undefined,
       status: undefined,
       page: 1,
+      pageSize: params.pageSize || 10,
     }));
   }
 
@@ -209,7 +212,7 @@ export default function AdminUsersPage() {
   async function handleToggleStatus(userId, newStatus) {
     const isDeactivate = newStatus === 'inactive';
     const confirmMsg = isDeactivate
-      ? 'Khóa tài khoản này? User sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
+      ? 'Khóa tài khoản này? Người dùng sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
       : 'Kích hoạt lại tài khoản này?';
     if (!window.confirm(confirmMsg)) return;
 
@@ -282,7 +285,7 @@ export default function AdminUsersPage() {
             <PermissionGate permission="admin:users:create">
               <button
                 className="btn btn--primary admin-page__btn-icon-text"
-                onClick={() => navigate('/admin/users/new')}
+                onClick={() => navigate('/admin/users/new', { state: { fromListSearch: location.search } })}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -304,9 +307,21 @@ export default function AdminUsersPage() {
           <input
             className="input input--search"
             type="text"
+            inputMode={isPhoneLikeInput(params.search) ? 'numeric' : 'search'}
             placeholder="Tìm theo tên, email, SĐT (có/không dấu)..."
-            value={params.search || ''}
-            onChange={(e) => updateParam('search', e.target.value)}
+            maxLength={isPhoneLikeInput(params.search) ? PHONE_INPUT_MAX_LENGTH : undefined}
+            value={
+              isPhoneLikeInput(params.search)
+                ? formatPhoneInput(params.search)
+                : (params.search || '')
+            }
+            onChange={(e) => {
+              const v = e.target.value;
+              updateParam(
+                'search',
+                isPhoneLikeInput(v) ? phoneDigitsForSearch(v).slice(0, 11) : v
+              );
+            }}
           />
 
           <select
@@ -472,7 +487,7 @@ export default function AdminUsersPage() {
                             <button
                               type="button"
                               className="btn btn--sm btn--view"
-                              onClick={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: window.location.search } })}
+                              onClick={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: location.search } })}
                             >
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -484,7 +499,7 @@ export default function AdminUsersPage() {
                               <button
                                 type="button"
                                 className="btn btn--sm btn--edit"
-                                onClick={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: window.location.search } })}
+                                onClick={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: location.search } })}
                               >
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -496,8 +511,8 @@ export default function AdminUsersPage() {
                           </div>
                           <UserActionMenu
                             user={u}
-                            onView={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: window.location.search } })}
-                            onEdit={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: window.location.search } })}
+                            onView={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: location.search } })}
+                            onEdit={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: location.search } })}
                           />
                         </td>
                       </tr>
