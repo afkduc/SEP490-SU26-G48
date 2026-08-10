@@ -337,6 +337,7 @@ class AuthController {
 
       return success(res, {
         sent: result.sent,
+        registered: result.registered !== false,
         mode: result.mode || null,
         ...(result.emailPreviewUrl ? { emailPreviewUrl: result.emailPreviewUrl } : {}),
         ...(result.devResetUrl ? { devResetUrl: result.devResetUrl } : {}),
