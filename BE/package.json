@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node --max-http-header-size=65536 src/index.js",
     "dev": "nodemon -- --max-http-header-size=65536 src/index.js",
-    "test": "node --test src/**/*.test.js"
+    "test": "node --test tests/**/*.test.js src/**/*.test.js"
   },
   "keywords": [],
   "author": "",

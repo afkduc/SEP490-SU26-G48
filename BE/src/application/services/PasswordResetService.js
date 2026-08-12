@@ -73,8 +73,13 @@ class PasswordResetService {
 
     const user = await this.authRepository.findUserByEmail(normalizedEmail);
     if (!user || (user.status && user.status !== 'active')) {
-      // Không tiết lộ — trả success giả
-      return { message: GENERIC_MSG, sent: false, auditUserId: null, auditBranchId: null };
+      return {
+        message: 'Hiện tại tài khoản của bạn chưa được đăng ký trên hệ thống.',
+        sent: false,
+        registered: false,
+        auditUserId: null,
+        auditBranchId: null,
+      };
     }
 
     // Vô hiệu token cũ chưa dùng
@@ -129,6 +134,7 @@ class PasswordResetService {
     return {
       message: GENERIC_MSG,
       sent: Boolean(mailResult.sent),
+      registered: true,
       mode: mailResult.mode || null,
       // Chi dung noi bo cho audit (controller khong dua ra response)
       auditUserId: user.id,

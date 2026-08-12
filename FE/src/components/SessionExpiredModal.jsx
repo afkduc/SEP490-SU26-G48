@@ -66,13 +66,19 @@ export default function SessionExpiredModal() {
 
   if (!visible) return null;
 
-  const replaced = detail?.code === 'SESSION_REPLACED';
+  const code = detail?.code || '';
+  const replaced = code === 'SESSION_REPLACED';
+  const timedOut = code === 'SESSION_TIMEOUT';
   const title = replaced
     ? 'Đã có người đăng nhập tài khoản của bạn'
-    : 'Phiên đăng nhập đã hết hạn';
+    : timedOut
+      ? 'Phiên đăng nhập đã hết hạn'
+      : 'Phiên đăng nhập đã hết hạn';
   const message = replaced
-    ? 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.'
-    : 'Phiên đăng nhập của bạn đã hết hiệu lực. Vui lòng đăng nhập lại để tiếp tục sử dụng hệ thống.';
+    ? (detail?.message || 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.')
+    : timedOut
+      ? (detail?.message || 'Bạn đã không hoạt động một lúc (ví dụ tắt web mà chưa đăng xuất). Vui lòng đăng nhập lại.')
+      : (detail?.message || 'Phiên đăng nhập của bạn đã hết hiệu lực. Vui lòng đăng nhập lại để tiếp tục sử dụng hệ thống.');
 
   return (
     <div className="modal-overlay">

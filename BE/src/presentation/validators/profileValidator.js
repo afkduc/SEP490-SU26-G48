@@ -2,9 +2,9 @@ const ApiError = require('../../utils/ApiError');
 const {
   EMAIL_HINT,
   EMAIL_MAX_LENGTH,
-  NAME_MAX_LENGTH,
   isValidEmail,
   isValidPhone,
+  getPersonNameError,
 } = require('../../utils/fieldValidation');
 
 function validateUpdateProfile(req, res, next) {
@@ -25,11 +25,13 @@ function validateUpdateProfile(req, res, next) {
       }
     }
 
-    if (firstName !== undefined && firstName !== null && String(firstName).trim().length > NAME_MAX_LENGTH) {
-      throw new ApiError(400, `Họ tối đa ${NAME_MAX_LENGTH} ký tự`);
+    if (firstName !== undefined && firstName !== null) {
+      const firstNameErr = getPersonNameError(firstName, { required: false, label: 'Họ' });
+      if (firstNameErr) throw new ApiError(400, firstNameErr);
     }
-    if (lastName !== undefined && lastName !== null && String(lastName).trim().length > NAME_MAX_LENGTH) {
-      throw new ApiError(400, `Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
+    if (lastName !== undefined && lastName !== null) {
+      const lastNameErr = getPersonNameError(lastName, { required: false, label: 'Tên' });
+      if (lastNameErr) throw new ApiError(400, lastNameErr);
     }
 
     next();

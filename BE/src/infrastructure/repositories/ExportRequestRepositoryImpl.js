@@ -542,6 +542,27 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const itemEntities = itemsRows.map((r) => ExportRequestItem.fromPersistence(r));
     return { request, items: itemEntities };
   }
+
+  /**
+   * Danh dau 1 phieu xuat la "da xem" boi Manager (dung cho thong bao dom).
+   */
+  async markSeenByManager(id) {
+    await query(
+      `UPDATE export_requests SET seen_by_manager_at = GETDATE() WHERE id = @id AND seen_by_manager_at IS NULL`,
+      { id }
+    );
+  }
+
+  /**
+   * Dem so phieu xuat chua duoc Manager xem (dung cho badge do tren Navbar).
+   */
+  async countNewForManager(branchId) {
+    const result = await query(
+      `SELECT COUNT(*) AS total FROM export_requests WHERE branch_id = @branchId AND seen_by_manager_at IS NULL`,
+      { branchId }
+    );
+    return result.recordset[0].total;
+  }
 }
 
 module.exports = ExportRequestRepositoryImpl;

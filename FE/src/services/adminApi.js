@@ -3,18 +3,13 @@ import { API_BASE_URL } from '../config';
 import { fetchBlob } from '../utils/downloadBlob';
 
 /**
- * Legacy named exports (giu de backward compat voi code cu)
+ * Legacy named exports (giữ tương thích code cũ).
  *
- * httpClient.get() da unwrap boi wrapper { success, message, data },
- * tra ve thang phan data (object). Nen KHONG goi them .data o day.
- * Tuong tu cho listAdminUsers.
+ * httpClient.get() đã unwrap wrapper { success, message, data },
+ * trả về thẳng phần data — không gọi thêm .data ở đây.
  */
 export async function getAdminDashboardStats(params = {}) {
   return httpClient.get(`/admin/dashboard${buildQuery(params)}`);
-}
-
-export async function listAdminUsers() {
-  return httpClient.get('/admin/users');
 }
 
 /**

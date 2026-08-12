@@ -7,7 +7,8 @@ const PermissionService = require('./PermissionService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const PendingLoginStore = require('./PendingLoginStore');
 
-const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '5', 10);
+// Khớp loginSessionCleanupJob: mặc định 30 phút không heartbeat = đóng tab / hết phiên.
+const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '30', 10);
 /** Giữ flag cũ: chỉ bật Approve/Reject nếu LOGIN_CHALLENGE_ENABLED=true (mặc định tắt). */
 const LOGIN_CHALLENGE_ENABLED = process.env.LOGIN_CHALLENGE_ENABLED === 'true';
 

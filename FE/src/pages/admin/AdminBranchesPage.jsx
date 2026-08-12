@@ -115,24 +115,27 @@ function BranchCard({ branch, onOpen, onEdit, onDeactivate, onReactivate }) {
       </div>
 
       <div className="branch-card__body">
-        {branch.address && (
+        {/* Luôn render đủ 3 hàng để card cao đều dù thiếu địa chỉ / SĐT / email */}
+        <div className="branch-card__info">
           <div className="branch-card__info-row">
             <IconMapPin />
-            <span>{branch.address}</span>
+            <span className={branch.address ? undefined : 'branch-card__info-empty'}>
+              {branch.address || 'Chưa có địa chỉ'}
+            </span>
           </div>
-        )}
-        {branch.phone && (
           <div className="branch-card__info-row">
             <IconPhone />
-            <span>{formatPhoneDisplay(branch.phone)}</span>
+            <span className={branch.phone ? undefined : 'branch-card__info-empty'}>
+              {branch.phone ? formatPhoneDisplay(branch.phone) : 'Chưa có số điện thoại'}
+            </span>
           </div>
-        )}
-        {branch.email && (
           <div className="branch-card__info-row">
             <IconMail />
-            <span>{branch.email}</span>
+            <span className={branch.email ? undefined : 'branch-card__info-empty'}>
+              {branch.email || 'Chưa có email'}
+            </span>
           </div>
-        )}
+        </div>
 
         <div className="branch-card__manager">
           <div className="branch-card__manager-avatar">{initials}</div>

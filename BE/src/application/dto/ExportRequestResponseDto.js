@@ -29,6 +29,7 @@ class ExportRequestResponseDto {
       itemCount: header.itemCount ?? items.length,
       totalQuantity: header.totalQuantity
         ?? items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0),
+      isNewForManager: !!header.isNewForManager,
       items: items.map((it) => ExportRequestResponseDto.fromItemEntity(it)),
     };
   }

@@ -13,13 +13,20 @@ import {
   formatAuditTime,
   getAuditActionLabel,
 } from '../../utils/auditDisplay';
+import {
+  formatPhoneInput,
+  isPhoneLikeInput,
+  phoneDigitsForSearch,
+  PHONE_INPUT_MAX_LENGTH,
+} from '../../utils/validation';
 import './AuditLogsPage.css';
 
 const ACTION_OPTIONS = [
   { value: '', label: 'Tất cả hành động' },
   { value: 'CREATE', label: 'Tạo mới', color: 'success' },
   { value: 'UPDATE', label: 'Cập nhật', color: 'info' },
-  { value: 'DELETE', label: 'Xóa', color: 'danger' },
+  // action DELETE trong DB = log cũ / vô hiệu hóa — hệ thống không còn xóa cứng user/chi nhánh
+  { value: 'DELETE', label: 'Vô hiệu hóa', color: 'danger' },
   { value: 'READ', label: 'Xem dữ liệu', color: 'slate' },
   { value: 'LOGIN', label: 'Đăng nhập', color: 'purple' },
   { value: 'FAILED_LOGIN', label: 'Đăng nhập thất bại', color: 'danger' },
@@ -162,18 +169,32 @@ const IconSearch = () => (
 
 // ─── Stats Cards ────────────────────────────────────────────────────
 
-function StatsCards({ stats, loading }) {
+function StatsCards({ stats, loading, onFilterAction }) {
   const cards = [
-    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: stats?.total || 0, label: 'Tổng bản ghi' },
-    { icon: <IconCreate />, iconCls: 'stat-card__icon--green', value: stats?.create || 0, label: 'Tạo mới' },
-    { icon: <IconUpdate />, iconCls: 'stat-card__icon--blue', value: stats?.update || 0, label: 'Cập nhật' },
-    { icon: <IconDelete />, iconCls: 'stat-card__icon--red', value: stats?.delete || 0, label: 'Xóa' },
+    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: stats?.total || 0, label: 'Tổng bản ghi', action: '' },
+    { icon: <IconCreate />, iconCls: 'stat-card__icon--green', value: stats?.create || 0, label: 'Tạo mới', action: 'CREATE' },
+    { icon: <IconUpdate />, iconCls: 'stat-card__icon--blue', value: stats?.update || 0, label: 'Cập nhật', action: 'UPDATE' },
+    // Không còn chức năng xóa cứng — thẻ này phản ánh log action DELETE/REMOVE (thường là dữ liệu cũ hoặc vô hiệu hóa)
+    { icon: <IconDelete />, iconCls: 'stat-card__icon--red', value: stats?.delete || 0, label: 'Vô hiệu hóa', action: 'DELETE', hint: 'Gồm log cũ action DELETE (không phải xóa cứng hiện tại)' },
   ];
 
   return (
     <div className="admin-logs__stats">
       {cards.map((c, i) => (
-        <div key={i} className="stat-card">
+        <div
+          key={i}
+          className={`stat-card${c.action !== undefined && onFilterAction ? ' stat-card--clickable' : ''}`}
+          role={onFilterAction ? 'button' : undefined}
+          tabIndex={onFilterAction ? 0 : undefined}
+          title={c.hint || (c.action ? `Lọc theo: ${c.label}` : undefined)}
+          onClick={onFilterAction ? () => onFilterAction(c.action) : undefined}
+          onKeyDown={onFilterAction ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onFilterAction(c.action);
+            }
+          } : undefined}
+        >
           <div className={`stat-card__icon ${c.iconCls}`}>{c.icon}</div>
           <div className="stat-card__content">
             <span className="stat-card__value">
@@ -308,14 +329,20 @@ export default function AuditLogsPage() {
     return () => clearInterval(t);
   }, []);
 
-  // Làm mới danh sách định kỳ để thời gian / log mới gần realtime
+  // Làm mới định kỳ — tạm dừng khi đang gõ tìm kiếm / đang load (tránh chồng request nặng)
   useEffect(() => {
     const refreshFn = audit.refresh || audit.refetch;
     if (typeof refreshFn !== 'function') return undefined;
+    const searching = Boolean(
+      String(audit.params.keyword || '').trim()
+      || String(audit.params.userName || '').trim()
+      || String(audit.params.phone || '').trim()
+    );
+    if (searching || audit.loading) return undefined;
     const t = setInterval(() => refreshFn(), 20_000);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ gắn theo hàm refresh ổn định
-  }, [audit.refresh, audit.refetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audit.refresh, audit.refetch, audit.loading, audit.params.keyword, audit.params.userName, audit.params.phone]);
 
   async function handleExportExcel() {
     setExporting(true);
@@ -392,7 +419,14 @@ export default function AuditLogsPage() {
       )}
 
       {/* Stats Cards */}
-      <StatsCards stats={audit.data.stats} loading={audit.loading} />
+      <StatsCards
+        stats={audit.data.stats}
+        loading={audit.loading}
+        onFilterAction={(action) => {
+          audit.updateParam('action', action || '');
+          audit.updateParam('page', 1);
+        }}
+      />
 
       {/* Filter Card */}
       <div className="admin-logs__filters">
@@ -416,9 +450,21 @@ export default function AuditLogsPage() {
             <input
               className="filter-field__input"
               type="text"
+              inputMode={isPhoneLikeInput(audit.params.keyword) ? 'numeric' : 'search'}
               placeholder="Tìm nhanh (tên, SĐT, mã, mô tả...)"
-              value={audit.params.keyword || ''}
-              onChange={(e) => audit.updateParam('keyword', e.target.value)}
+              maxLength={isPhoneLikeInput(audit.params.keyword) ? PHONE_INPUT_MAX_LENGTH : undefined}
+              value={
+                isPhoneLikeInput(audit.params.keyword)
+                  ? formatPhoneInput(audit.params.keyword)
+                  : (audit.params.keyword || '')
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                audit.updateParam(
+                  'keyword',
+                  isPhoneLikeInput(v) ? phoneDigitsForSearch(v).slice(0, 11) : v
+                );
+              }}
             />
           </div>
           <label className="admin-logs__auth-toggle" title="Mặc định ẩn đăng nhập / thất bại (xem ở Lịch sử đăng nhập)">
@@ -454,10 +500,13 @@ export default function AuditLogsPage() {
               <label className="filter-field__label">Số điện thoại</label>
               <input
                 className="filter-field__input"
-                type="text"
-                placeholder="Nhập SĐT..."
-                value={audit.params.phone || ''}
-                onChange={(e) => audit.updateParam('phone', e.target.value)}
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="0123-456-789"
+                maxLength={PHONE_INPUT_MAX_LENGTH}
+                value={formatPhoneInput(audit.params.phone || '')}
+                onChange={(e) => audit.updateParam('phone', phoneDigitsForSearch(e.target.value).slice(0, 11))}
               />
             </div>
 
@@ -541,12 +590,16 @@ export default function AuditLogsPage() {
             )}
           </div>
           <div className="admin-logs__filter-btns">
-            {hasFilters && (
-              <button className="btn btn--ghost btn--sm" onClick={resetFilters}>
-                <IconRefresh />
-                Đặt lại
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={resetFilters}
+              disabled={!hasFilters && !audit.loading}
+              title="Xóa bộ lọc và tải lại danh sách đầy đủ"
+            >
+              <IconRefresh />
+              Đặt lại
+            </button>
           </div>
         </div>
       </div>

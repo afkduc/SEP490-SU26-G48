@@ -194,17 +194,24 @@ class RepairSettlementController {
       if (!item) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
       const isWorklist = String(req.body?.kind || 'settlement').toLowerCase() === 'worklist';
       const kind = isWorklist ? 'danh sách công việc' : 'phiếu quyết toán';
-      await auditCrud.lifecycle(req, {
-        tableName: 'repair_settlements',
-        entityName: 'Phiếu quyết toán',
-        entityCode: item.code || `ID-${req.params.id}`,
-        recordId: item.id || Number(req.params.id) || null,
-        step: isWorklist ? 'print_worklist' : 'print_settlement',
-        stepLabel: `In ${kind}`,
-        action: 'EXPORT',
-        description: `Phiếu quyết toán ${item.code || req.params.id}: in ${kind}`,
-        snapshot: settlementSnapshot(item, { lastPrintKind: kind }),
-      });
+      // Lưu request_body tiếng Việt để admin đọc log không thấy Kind/settlement
+      const prevBody = req.body;
+      req.body = { loaiBanIn: kind };
+      try {
+        await auditCrud.lifecycle(req, {
+          tableName: 'repair_settlements',
+          entityName: 'Phiếu quyết toán',
+          entityCode: item.code || `ID-${req.params.id}`,
+          recordId: item.id || Number(req.params.id) || null,
+          step: isWorklist ? 'print_worklist' : 'print_settlement',
+          stepLabel: `In ${kind}`,
+          action: 'EXPORT',
+          description: `Phiếu quyết toán ${item.code || req.params.id}: in ${kind}`,
+          snapshot: settlementSnapshot(item, { lastPrintKind: kind }),
+        });
+      } finally {
+        req.body = prevBody;
+      }
       return success(res, { ok: true }, 'Print logged');
     } catch (err) {
       next(err);

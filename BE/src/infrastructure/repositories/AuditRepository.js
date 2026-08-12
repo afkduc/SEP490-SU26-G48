@@ -2,6 +2,8 @@ const { query } = require('../database/sqlServer');
 const {
   sqlAccentInsensitiveLike,
   bindNormalizedLikeParam,
+  bindPhoneDigitsLikeParam,
+  sqlPhoneDigitsLike,
 } = require('../../utils/vietnamese');
 
 /** Auth noise — có trang Lịch sử đăng nhập riêng; mặc định ẩn khỏi nhật ký thao tác. */
@@ -26,6 +28,14 @@ function likeAccentInsensitive(columnExpr, paramName) {
   return sqlAccentInsensitiveLike(columnExpr, paramName);
 }
 
+/** Thêm OR khớp SĐT theo chữ số (nếu needle có số). Trả về paramIndex mới. */
+function appendPhoneDigitsOr(parts, params, paramIndex, columnExpr, rawValue) {
+  const key = `p${paramIndex}`;
+  if (!bindPhoneDigitsLikeParam(params, key, rawValue)) return paramIndex;
+  parts.push(sqlPhoneDigitsLike(columnExpr, key));
+  return paramIndex + 1;
+}
+
 function toIsoUtc(value) {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString();
@@ -36,6 +46,20 @@ function toIsoUtc(value) {
   return value;
 }
 
+const AUDIT_LOG_BRANCH_NAME = `
+  COALESCE(
+    b.branch_name,
+    ub.branch_name,
+    CASE
+      WHEN al.user_id IS NULL OR LOWER(LTRIM(RTRIM(ISNULL(al.user_name, N'')))) = N'system'
+        THEN N'Hệ thống'
+      WHEN u.id IS NOT NULL AND u.branch_id IS NULL THEN N'Tất cả chi nhánh'
+      ELSE NULL
+    END
+  ) AS branch_name
+`;
+
+/** Cột đủ cho chi tiết / export (có JSON lớn). */
 const AUDIT_LOG_COLUMNS = `
   al.id,
   al.user_id,
@@ -53,20 +77,34 @@ const AUDIT_LOG_COLUMNS = `
   al.response_status,
   al.duration_ms,
   COALESCE(al.branch_id, u.branch_id) AS branch_id,
-  COALESCE(
-    b.branch_name,
-    ub.branch_name,
-    CASE
-      -- Thao tac he thong (quen mat khau cong khai, job, ...) — khong gan chi nhanh
-      WHEN al.user_id IS NULL OR LOWER(LTRIM(RTRIM(ISNULL(al.user_name, N'')))) = N'system'
-        THEN N'Hệ thống'
-      -- Admin / GD all-scope
-      WHEN u.id IS NOT NULL AND u.branch_id IS NULL THEN N'Tất cả chi nhánh'
-      ELSE NULL
-    END
-  ) AS branch_name,
+  ${AUDIT_LOG_BRANCH_NAME},
   al.description,
   al.old_value,
+  al.new_value,
+  al.logged_at
+`;
+
+/** Cột list — bỏ request_body/old_value để giảm IO; giữ new_value cho humanize mô tả. */
+const AUDIT_LOG_LIST_COLUMNS = `
+  al.id,
+  al.user_id,
+  al.user_name,
+  al.phone_number,
+  al.action,
+  al.table_name,
+  al.entity_name,
+  al.entity_code,
+  al.record_id,
+  al.ip_address,
+  al.request_method,
+  al.request_url,
+  NULL AS request_body,
+  al.response_status,
+  al.duration_ms,
+  COALESCE(al.branch_id, u.branch_id) AS branch_id,
+  ${AUDIT_LOG_BRANCH_NAME},
+  al.description,
+  NULL AS old_value,
   al.new_value,
   al.logged_at
 `;
@@ -84,6 +122,9 @@ const AUDIT_LOG_FROM = `
   LEFT JOIN branches b ON b.id = al.branch_id
   LEFT JOIN branches ub ON ub.id = u.branch_id
 `;
+
+/** FROM nhẹ cho COUNT/STATS khi không lọc theo chi nhánh (không cần join). */
+const AUDIT_LOG_FROM_LIGHT = `audit_logs al`;
 
 const LOGIN_SESSION_COLUMNS = `
   ls.id,
@@ -274,35 +315,33 @@ async function getAuditLogs(filters = {}) {
   const params = {};
   let paramIndex = 1;
 
-  // Keyword search — tên / SĐT / mô tả / mã… (không phân biệt hoa thường & dấu)
+  // Keyword: chỉ cột ngắn (tên / SĐT / mã / entity) — tránh LIKE bỏ dấu trên description/URL (rất chậm)
   if (keyword) {
     const { key, nextIndex } = bindNormalizedLike(params, paramIndex, keyword);
-    conditions.push(`(
-      ${likeAccentInsensitive('al.user_name', key)} OR
-      ${likeAccentInsensitive('al.phone_number', key)} OR
-      ${likeAccentInsensitive('al.description', key)} OR
-      ${likeAccentInsensitive('al.entity_name', key)} OR
-      ${likeAccentInsensitive('al.entity_code', key)} OR
-      ${likeAccentInsensitive('al.table_name', key)} OR
-      ${likeAccentInsensitive('al.request_url', key)}
-    )`);
-    paramIndex = nextIndex;
+    const parts = [
+      likeAccentInsensitive('al.user_name', key),
+      likeAccentInsensitive('al.entity_code', key),
+      likeAccentInsensitive('al.entity_name', key),
+    ];
+    paramIndex = appendPhoneDigitsOr(parts, params, nextIndex, 'al.phone_number', keyword);
+    conditions.push(`(${parts.join(' OR ')})`);
   }
 
-  // Ô "Người dùng": khớp tên hoặc SĐT
+  // Ô "Người dùng": khớp tên hoặc SĐT (SĐT theo chữ số)
   if (userName) {
     const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
-    conditions.push(`(
-      ${likeAccentInsensitive('al.user_name', key)} OR
-      ${likeAccentInsensitive('al.phone_number', key)}
-    )`);
-    paramIndex = nextIndex;
+    const parts = [likeAccentInsensitive('al.user_name', key)];
+    paramIndex = appendPhoneDigitsOr(parts, params, nextIndex, 'al.phone_number', userName);
+    conditions.push(`(${parts.join(' OR ')})`);
   }
 
-  if (phone) {
-    conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${phone}%`;
-    paramIndex++;
+  // SĐT: so khớp theo chữ số (bỏ '-', khoảng trắng). "-" chỉ là format UI.
+  if (phone && String(phone).trim()) {
+    const key = `p${paramIndex}`;
+    if (bindPhoneDigitsLikeParam(params, key, phone)) {
+      conditions.push(sqlPhoneDigitsLike('al.phone_number', key));
+      paramIndex++;
+    }
   }
 
   if (action) {
@@ -387,28 +426,24 @@ async function getAuditLogs(filters = {}) {
   const safePageSize = Math.max(1, Math.min(parseInt(pageSize, 10) || 20, 100));
   const offset = (safePage - 1) * safePageSize;
 
-  // Get count and stats in parallel
-  const [countResult, statsResult] = await Promise.all([
-    query(
-      `SELECT COUNT(*) AS total FROM ${AUDIT_LOG_FROM} WHERE ${whereClause}`,
-      params
-    ),
-    query(
-      `SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN al.action IN ('CREATE', 'INSERT') THEN 1 ELSE 0 END) AS create_count,
-        SUM(CASE WHEN al.action IN ('UPDATE', 'EDIT') THEN 1 ELSE 0 END) AS update_count,
-        SUM(CASE WHEN al.action IN ('DELETE', 'REMOVE') THEN 1 ELSE 0 END) AS delete_count
-       FROM ${AUDIT_LOG_FROM} WHERE ${whereClause}`,
-      params
-    ),
-  ]);
+  // Stats đủ lấy total — không chạy COUNT riêng (tránh scan filter 2 lần)
+  // Không lọc branch → FROM nhẹ (không join users/branches)
+  const statsFrom = branchId ? AUDIT_LOG_FROM : AUDIT_LOG_FROM_LIGHT;
+  const statsResult = await query(
+    `SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN al.action IN ('CREATE', 'INSERT') THEN 1 ELSE 0 END) AS create_count,
+      SUM(CASE WHEN al.action IN ('UPDATE', 'EDIT') THEN 1 ELSE 0 END) AS update_count,
+      SUM(CASE WHEN al.action IN ('DELETE', 'REMOVE') THEN 1 ELSE 0 END) AS delete_count
+     FROM ${statsFrom} WHERE ${whereClause}`,
+    params
+  );
 
-  const total = countResult.recordset[0].total;
-  const stats = statsResult.recordset[0];
+  const stats = statsResult.recordset[0] || {};
+  const total = stats.total || 0;
 
   const dataResult = await query(
-    `SELECT ${AUDIT_LOG_COLUMNS}
+    `SELECT ${AUDIT_LOG_LIST_COLUMNS}
      FROM   ${AUDIT_LOG_FROM}
      WHERE  ${whereClause}
      ORDER  BY al.logged_at DESC, al.id DESC
@@ -475,30 +510,28 @@ async function getAuditLogsForExport(filters = {}) {
 
   if (keyword) {
     const { key, nextIndex } = bindNormalizedLike(params, paramIndex, keyword);
-    conditions.push(`(
-      ${likeAccentInsensitive('al.user_name', key)} OR
-      ${likeAccentInsensitive('al.phone_number', key)} OR
-      ${likeAccentInsensitive('al.description', key)} OR
-      ${likeAccentInsensitive('al.entity_name', key)} OR
-      ${likeAccentInsensitive('al.entity_code', key)} OR
-      ${likeAccentInsensitive('al.table_name', key)} OR
-      ${likeAccentInsensitive('al.request_url', key)}
-    )`);
-    paramIndex = nextIndex;
+    const parts = [
+      likeAccentInsensitive('al.user_name', key),
+      likeAccentInsensitive('al.entity_code', key),
+      likeAccentInsensitive('al.entity_name', key),
+    ];
+    paramIndex = appendPhoneDigitsOr(parts, params, nextIndex, 'al.phone_number', keyword);
+    conditions.push(`(${parts.join(' OR ')})`);
   }
 
   if (userName) {
     const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
-    conditions.push(`(
-      ${likeAccentInsensitive('al.user_name', key)} OR
-      ${likeAccentInsensitive('al.phone_number', key)}
-    )`);
-    paramIndex = nextIndex;
+    const parts = [likeAccentInsensitive('al.user_name', key)];
+    paramIndex = appendPhoneDigitsOr(parts, params, nextIndex, 'al.phone_number', userName);
+    conditions.push(`(${parts.join(' OR ')})`);
   }
-  if (phone) {
-    conditions.push(`LOWER(al.phone_number) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${phone}%`;
-    paramIndex++;
+  // SĐT: so khớp theo chữ số (bỏ '-', khoảng trắng). "-" chỉ là format UI.
+  if (phone && String(phone).trim()) {
+    const key = `p${paramIndex}`;
+    if (bindPhoneDigitsLikeParam(params, key, phone)) {
+      conditions.push(sqlPhoneDigitsLike('al.phone_number', key));
+      paramIndex++;
+    }
   }
   if (action) {
     conditions.push(`al.action = @p${paramIndex}`);
@@ -612,17 +645,17 @@ async function getLoginSessions(filters = {}) {
     }
   }
 
-  // Tên người dùng: khớp tên trên phiên hoặc SĐT / email / họ tên trên bảng users
-  if (userName) {
-    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, userName);
+  // Người dùng: contains + không phân biệt dấu (vd "son" → sơn/sớn/sonn...)
+  // Khớp tên phiên hoặc email / username / họ tên trên users (không OR sang SĐT —
+  // SĐT dùng field phone riêng và AND với điều kiện này).
+  if (userName && String(userName).trim()) {
+    const { key, nextIndex } = bindNormalizedLike(params, paramIndex, String(userName).trim());
     conditions.push(`(
       ${likeAccentInsensitive('ls.user_name', key)}
-      OR ${likeAccentInsensitive('ls.phone', key)}
       OR EXISTS (
         SELECT 1 FROM users u
         WHERE u.id = ls.user_id AND (
           ${likeAccentInsensitive('u.email', key)}
-          OR ${likeAccentInsensitive('u.phone', key)}
           OR ${likeAccentInsensitive('u.user_name', key)}
           OR ${likeAccentInsensitive('u.first_name', key)}
           OR ${likeAccentInsensitive('u.last_name', key)}
@@ -633,10 +666,20 @@ async function getLoginSessions(filters = {}) {
     paramIndex = nextIndex;
   }
 
-  if (phone) {
-    conditions.push(`LOWER(ls.phone) LIKE LOWER(@p${paramIndex})`);
-    params[`p${paramIndex}`] = `%${phone}%`;
-    paramIndex++;
+  // SĐT: AND — khớp số trên phiên HOẶC trên user (bỏ dấu cách / gạch)
+  if (phone && String(phone).trim()) {
+    const key = `p${paramIndex}`;
+    if (bindPhoneDigitsLikeParam(params, key, phone)) {
+      conditions.push(`(
+        ${sqlPhoneDigitsLike('ls.phone', key)}
+        OR EXISTS (
+          SELECT 1 FROM users u
+          WHERE u.id = ls.user_id
+            AND ${sqlPhoneDigitsLike('u.phone', key)}
+        )
+      )`);
+      paramIndex++;
+    }
   }
 
   if (actionType) {

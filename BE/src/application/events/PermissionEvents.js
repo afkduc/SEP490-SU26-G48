@@ -1,28 +1,13 @@
 /**
- * PermissionEvents - Event emitter singleton cho permission matrix changes.
+ * PermissionEvents - Event emitter cho thay doi quyen user (SSE).
  *
- * Dung cho SSE (Server-Sent Events) de push realtime updates den cac user
- * dang online khi admin thay doi ma tran quyen (role_permissions).
+ * Push realtime den user dang online khi role cua ho bi gan/thu hoi
+ * (assignRoles / revokeRole). Ma tran role_permissions UI da go.
  *
  * Flow:
- *   1. Admin goi PUT /api/admin/roles/matrix/permissions -> controller luu DB
- *   2. Controller emit event 'permission-changed' voi danh sach userIds bi
- *      anh huong (collect tu role_users).
- *   3. SSE route /api/sse/permissions lang nghe event, push toi TUNG user
- *      dang co connection (filter theo userId trong JWT).
- *   4. FE nhan event -> goi GET /api/auth/me -> cap nhat token/permissions
- *      moi vao localStorage -> React re-render PermissionGate.
- *
- * Khi nao emit:
- *   - Sau khi saveRolePermissionsMatrix thanh cong.
- *   - Sau khi assignRole / revokeRole (thay doi role cua user -> quyen doi).
- *   - Sau khi admin/user_role:assign (tu UserRoleService).
- *
- * Tai sao can thiet (vs F5):
- *   - JWT co cache permissions trong payload, het han sau 24h hoac khi
- *     reissue. Neu admin revoke permission -> user token cu van co quyen
- *     do cho den khi reissue / logout / het han.
- *   - SSE dong stream giup client refresh ngay lap tuc.
+ *   1. Admin gan/thu role user -> controller emit 'permission-changed'
+ *   2. SSE /api/sse/permissions push theo userId
+ *   3. FE nhan event -> refresh token/permissions
  */
 
 const { EventEmitter } = require('events');
@@ -43,7 +28,7 @@ function getEmitter() {
  * @param {object} payload
  * @param {number[]} payload.userIds - danh sach userId can refresh permission
  * @param {number[]} [payload.roleIds] - roleId bi thay doi (audit/debug)
- * @param {string} [payload.action] - 'matrix_updated' | 'role_assigned' | 'role_revoked'
+ * @param {string} [payload.action] - 'role_assigned' | 'role_revoked' | 'permissions_changed'
  * @param {number} [payload.actorUserId] - nguoi thuc hien thay doi
  */
 function emitPermissionChanged(payload) {
@@ -52,7 +37,7 @@ function emitPermissionChanged(payload) {
     return;
   }
   getEmitter().emit('permission-changed', {
-    action: payload.action || 'matrix_updated',
+    action: payload.action || 'permissions_changed',
     userIds: payload.userIds,
     roleIds: payload.roleIds || [],
     actorUserId: payload.actorUserId || null,

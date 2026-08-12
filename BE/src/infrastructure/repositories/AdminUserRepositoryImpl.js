@@ -1,8 +1,37 @@
 const { query } = require('../database/sqlServer');
 const {
+  assignedBranchCountSql,
+  resolveAssignedBranchIds,
+} = require('../../utils/userBranchScope');
+const {
   sqlAccentInsensitiveLike,
   bindNormalizedLikeParam,
+  bindPhoneDigitsLikeParam,
+  sqlPhoneDigitsLike,
+  sqlPhoneDigitsExpr,
+  phoneDigitsOnly,
 } = require('../../utils/vietnamese');
+
+/** Điều kiện search users: tên/email (bỏ dấu) + SĐT theo chữ số (contains). */
+function pushUserSearchCondition(conditions, params, paramIndex, search) {
+  const key = `p${paramIndex}`;
+  bindNormalizedLikeParam(params, key, search);
+  const parts = [
+    sqlAccentInsensitiveLike('u.user_name', key),
+    sqlAccentInsensitiveLike('u.email', key),
+    sqlAccentInsensitiveLike('u.first_name', key),
+    sqlAccentInsensitiveLike('u.last_name', key),
+    sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key),
+  ];
+  let next = paramIndex + 1;
+  const phoneKey = `p${next}`;
+  if (bindPhoneDigitsLikeParam(params, phoneKey, search)) {
+    parts.push(sqlPhoneDigitsLike('u.phone', phoneKey));
+    next += 1;
+  }
+  conditions.push(`(${parts.join(' OR ')})`);
+  return next;
+}
 
 const ADMIN_USER_COLUMNS = `
   u.id,
@@ -15,7 +44,7 @@ const ADMIN_USER_COLUMNS = `
   b.branch_name,
   u.status,
   u.created_at,
-  (SELECT COUNT(*) FROM user_branches ub WHERE ub.user_id = u.id) AS assigned_branch_count,
+  ${assignedBranchCountSql('u')},
   (SELECT MAX(ud.last_login_at) FROM user_devices ud WHERE ud.user_id = u.id) AS last_login_at
 `;
 
@@ -42,32 +71,6 @@ function toAdminUserRow(row) {
   };
 }
 
-/**
- * Load (userId -> array of branchId) tu bang user_branches.
- * Chi dung cho tap user IDs da biet (tranh query toan bang).
- */
-async function loadUserBranches(userIds) {
-  if (!userIds || userIds.length === 0) return {};
-  const params = {};
-  const placeholders = userIds.map((_, i) => {
-    const key = `p${i + 1}`;
-    params[key] = userIds[i];
-    return `@${key}`;
-  }).join(',');
-  const r = await query(
-    `SELECT user_id, branch_id
-     FROM   user_branches
-     WHERE  user_id IN (${placeholders})`,
-    params
-  );
-  const out = {};
-  for (const row of r.recordset) {
-    if (!out[row.user_id]) out[row.user_id] = [];
-    out[row.user_id].push(row.branch_id);
-  }
-  return out;
-}
-
 class AdminUserRepositoryImpl {
   async findAll({ search, branchId, roleId, status, page = 1, pageSize = 10 }) {
     const conditions = ['1=1'];
@@ -75,17 +78,7 @@ class AdminUserRepositoryImpl {
     let paramIndex = 1;
 
     if (search) {
-      const key = `p${paramIndex}`;
-      bindNormalizedLikeParam(params, key, search);
-      conditions.push(`(
-        ${sqlAccentInsensitiveLike('u.user_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.email', key)}
-        OR ${sqlAccentInsensitiveLike('u.first_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.last_name', key)}
-        OR ${sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
-        OR ${sqlAccentInsensitiveLike('u.phone', key)}
-      )`);
-      paramIndex++;
+      paramIndex = pushUserSearchCondition(conditions, params, paramIndex, search);
     }
 
     if (branchId) {
@@ -165,17 +158,7 @@ class AdminUserRepositoryImpl {
     let paramIndex = 1;
 
     if (search) {
-      const key = `p${paramIndex}`;
-      bindNormalizedLikeParam(params, key, search);
-      conditions.push(`(
-        ${sqlAccentInsensitiveLike('u.user_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.email', key)}
-        OR ${sqlAccentInsensitiveLike('u.first_name', key)}
-        OR ${sqlAccentInsensitiveLike('u.last_name', key)}
-        OR ${sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key)}
-        OR ${sqlAccentInsensitiveLike('u.phone', key)}
-      )`);
-      paramIndex++;
+      paramIndex = pushUserSearchCondition(conditions, params, paramIndex, search);
     }
 
     if (branchId) {
@@ -298,9 +281,7 @@ class AdminUserRepositoryImpl {
       roleName: r.role_name,
     }));
 
-    // Lay assignedBranchIds tu junction user_branches
-    const branchesMap = await loadUserBranches([Number(id)]);
-    user.assignedBranchIds = branchesMap[Number(id)] || [];
+    user.assignedBranchIds = await resolveAssignedBranchIds(user.branchId);
 
     return user;
   }
@@ -314,9 +295,12 @@ class AdminUserRepositoryImpl {
   }
 
   async findByPhone(phone) {
+    const digits = phoneDigitsOnly(phone);
+    if (!digits) return null;
     const result = await query(
-      'SELECT TOP 1 id, phone FROM users WHERE phone = @p1',
-      { p1: phone }
+      `SELECT TOP 1 id, phone FROM users
+       WHERE ${sqlPhoneDigitsExpr('phone')} = @p1`,
+      { p1: digits }
     );
     return result.recordset[0] || null;
   }
@@ -366,14 +350,8 @@ class AdminUserRepositoryImpl {
   }
 
   async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId, scopeAllBranches = false }) {
-    // Generate pseudo_id automatically (e.g., NV001, NV002, ...)
     const pseudoId = await this.nextPseudoId();
-    // scopeAllBranches = true (admin cap cao chon "Tat ca chi nhanh") ->
-    //   - users.branch_id = NULL (khong co branch chinh cu the)
-    //   - insert 1 row vao user_branches cho moi branch active
-    // scopeAllBranches = false + branchId la so ->
-    //   - users.branch_id = branchId (branch chinh)
-    //   - insert 1 row vao user_branches (de query thong nhat)
+    // scopeAllBranches => users.branch_id NULL; nguoc lai => branch_id cu the
     const userBranchId = scopeAllBranches ? null : branchId;
 
     const result = await query(
@@ -390,58 +368,7 @@ class AdminUserRepositoryImpl {
       );
     }
 
-    // Gan branch(es) cho user
-    if (scopeAllBranches) {
-      await this.assignAllBranchesToUser(userId);
-    } else if (branchId) {
-      await query(
-        'INSERT INTO user_branches (user_id, branch_id) VALUES (@p1, @p2)',
-        { p1: userId, p2: branchId }
-      );
-    }
-
     return { id: userId, email };
-  }
-
-  /**
-   * Lay danh sach id cac branch dang active (is_active = 1).
-   * Dung khi admin muon gan user vao "Tat ca chi nhanh".
-   */
-  async getActiveBranchIds() {
-    const r = await query('SELECT id FROM branches WHERE is_active = 1');
-    return r.recordset.map((row) => row.id);
-  }
-
-  /**
-   * Gan user vao TAT CA branch active (admin cap cao).
-   * Xoa het row cu trong user_branches (neu co) truoc khi insert moi.
-   */
-  async assignAllBranchesToUser(userId) {
-    const branchIds = await this.getActiveBranchIds();
-    await query('DELETE FROM user_branches WHERE user_id = @p1', { p1: userId });
-    if (branchIds.length === 0) return 0;
-    const values = branchIds.map((_, i) => `(@p1, @p${i + 2})`).join(',');
-    const params = { p1: userId };
-    branchIds.forEach((id, i) => { params[`p${i + 2}`] = id; });
-    await query(
-      `INSERT INTO user_branches (user_id, branch_id) VALUES ${values}`,
-      params
-    );
-    return branchIds.length;
-  }
-
-  /**
-   * Gan user vao 1 branch cu the (giu nguyen semantics).
-   * Neu user da co nhieu branch (admin all), se thu hep con 1 branch.
-   */
-  async assignSingleBranchToUser(userId, branchId) {
-    await query('DELETE FROM user_branches WHERE user_id = @p1', { p1: userId });
-    if (!branchId) return 0;
-    await query(
-      'INSERT INTO user_branches (user_id, branch_id) VALUES (@p1, @p2)',
-      { p1: userId, p2: branchId }
-    );
-    return 1;
   }
 
   async updateUser({ userId, firstName, lastName, email, phone, status, roleId, branchId, shouldUpdateBranchId = false, scopeAllBranches = false }) {
@@ -476,11 +403,7 @@ class AdminUserRepositoryImpl {
       paramIndex++;
     }
     // Chi update branch_id khi service co gui len (shouldUpdateBranchId === true).
-    // - scopeAllBranches === true -> gan user vao TAT CA branch active
-    //   (users.branch_id = NULL + assignAllBranchesToUser)
-    // - scopeAllBranches === false + branchId la so -> gan user vao 1 branch
-    //   (users.branch_id = branchId + assignSingleBranchToUser)
-    // Khi shouldUpdateBranchId === false -> KHONG dong vao SET -> giu nguyen branch_id hien tai.
+    // scopeAllBranches => NULL; nguoc lai => branchId cu the.
     if (shouldUpdateBranchId) {
       updates.push(`branch_id = @p${paramIndex}`);
       params[`p${paramIndex}`] = scopeAllBranches ? null : branchId;
@@ -493,15 +416,6 @@ class AdminUserRepositoryImpl {
         `UPDATE users SET ${updates.join(', ')} WHERE id = @p${paramIndex}`,
         params
       );
-    }
-
-    // Cap nhat junction user_branches neu co yeu cau
-    if (shouldUpdateBranchId) {
-      if (scopeAllBranches) {
-        await this.assignAllBranchesToUser(userId);
-      } else if (branchId) {
-        await this.assignSingleBranchToUser(userId, branchId);
-      }
     }
 
     if (roleId !== undefined) {

@@ -24,7 +24,7 @@ class ProfileController {
    * assignedBranches (do ProfileBranchService xu ly rieng).
    *
    * Truoc day: ProfileRepositoryImpl.findById tu LEFT JOIN branches +
-   * query user_branches. Loi: repository biet qua nhieu thu, kho test.
+   * assignedBranches (ProfileBranchService — users.branch_id).
    * Sau nay: Repository chi tra row user, Controller goi them
    * branchService.getProfileBranches() de lay primary + assigned.
    */

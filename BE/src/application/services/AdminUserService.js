@@ -3,13 +3,13 @@ const ApiError = require('../../utils/ApiError');
 const {
   EMAIL_HINT,
   EMAIL_MAX_LENGTH,
-  NAME_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   isValidEmail,
   isValidPhone,
   phoneDigitsOnly,
-  isValidUsername,
   isValidPassword,
+  getUsernameError,
+  getPersonNameError,
 } = require('../../utils/fieldValidation');
 
 class AdminUserService {
@@ -109,16 +109,18 @@ class AdminUserService {
 
     const nameTrimmed = String(name).trim();
     const emailTrimmed = String(email).trim();
-    const lastNameTrimmed = lastName !== undefined && lastName !== null ? String(lastName).trim() : '';
-    if (!isValidUsername(nameTrimmed)) {
-      throw new ApiError(400, 'Tên đăng nhập 3–50 ký tự, chỉ gồm chữ, số, dấu chấm, gạch dưới, gạch ngang');
-    }
-    if (!lastNameTrimmed) {
-      throw new ApiError(400, 'Tên là bắt buộc');
-    }
-    if (lastNameTrimmed.length > NAME_MAX_LENGTH) {
-      throw new ApiError(400, `Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
-    }
+    const lastNameTrimmed = lastName !== undefined && lastName !== null
+      ? String(lastName).trim().replace(/\s+/g, ' ')
+      : '';
+    const firstNameTrimmed = firstName !== undefined && firstName !== null
+      ? String(firstName).trim().replace(/\s+/g, ' ')
+      : '';
+    const usernameErr = getUsernameError(nameTrimmed, { required: true });
+    if (usernameErr) throw new ApiError(400, usernameErr);
+    const lastNameErr = getPersonNameError(lastNameTrimmed, { required: true, label: 'Tên' });
+    if (lastNameErr) throw new ApiError(400, lastNameErr);
+    const firstNameErr = getPersonNameError(firstNameTrimmed, { required: false, label: 'Họ' });
+    if (firstNameErr) throw new ApiError(400, firstNameErr);
 
     const phoneTrimmed = phone !== undefined && phone !== null
       ? phoneDigitsOnly(phone)
@@ -173,7 +175,7 @@ class AdminUserService {
         name: nameTrimmed,
         email: emailTrimmed,
         passwordHash,
-        firstName: (firstName && String(firstName).trim()) || nameTrimmed,
+        firstName: firstNameTrimmed || nameTrimmed,
         lastName: lastNameTrimmed,
         phone: phoneTrimmed,
         branchId: parsedBranchId,
@@ -258,20 +260,17 @@ class AdminUserService {
       payload.phone = phoneTrimmed;
     }
 
-    if (lastName !== undefined && lastName !== null && !String(lastName).trim()) {
-      throw new ApiError(400, 'Tên không được rỗng');
-    }
     if (lastName !== undefined && lastName !== null) {
-      payload.lastName = String(lastName).trim();
-      if (payload.lastName.length > NAME_MAX_LENGTH) {
-        throw new ApiError(400, `Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
-      }
+      const lastNameTrimmed = String(lastName).trim().replace(/\s+/g, ' ');
+      const lastNameErr = getPersonNameError(lastNameTrimmed, { required: true, label: 'Tên' });
+      if (lastNameErr) throw new ApiError(400, lastNameErr);
+      payload.lastName = lastNameTrimmed;
     }
     if (firstName !== undefined && firstName !== null) {
-      payload.firstName = String(firstName).trim();
-      if (payload.firstName.length > NAME_MAX_LENGTH) {
-        throw new ApiError(400, `Họ tối đa ${NAME_MAX_LENGTH} ký tự`);
-      }
+      const firstNameTrimmed = String(firstName).trim().replace(/\s+/g, ' ');
+      const firstNameErr = getPersonNameError(firstNameTrimmed, { required: false, label: 'Họ' });
+      if (firstNameErr) throw new ApiError(400, firstNameErr);
+      payload.firstName = firstNameTrimmed;
     }
 
     let parsedBranchId;

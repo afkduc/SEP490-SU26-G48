@@ -138,7 +138,7 @@ const STATUS_LABELS = {
 const ACTION_LABELS = {
   CREATE: 'Tạo mới',
   UPDATE: 'Cập nhật',
-  DELETE: 'Xóa',
+  DELETE: 'Vô hiệu hóa',
   LOGIN: 'Đăng nhập',
   LOGIN_FAILED: 'Đăng nhập thất bại',
   LOGOUT: 'Đăng xuất',
@@ -242,7 +242,7 @@ function mapAuditRow(log, idx) {
   if (!label) {
     if (actionKey.includes('CREATE')) label = 'Tạo mới';
     else if (actionKey.includes('UPDATE')) label = 'Cập nhật';
-    else if (actionKey.includes('DELETE')) label = 'Xóa';
+    else if (actionKey.includes('DELETE')) label = 'Vô hiệu hóa';
     else label = actionKey;
   }
   return [

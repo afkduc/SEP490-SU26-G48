@@ -78,10 +78,13 @@ export function useHeartbeat(options = {}) {
         if (result?.unauthorized) {
           if (!sessionExpiredFiredRef.current) {
             sessionExpiredFiredRef.current = true;
-            showSessionExpired({
-              code: 'SESSION_REPLACED',
-              message: 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.',
-            });
+            // Dùng code từ BE — tránh gán SESSION_REPLACED khi chỉ hết hạn/timeout.
+            const code = result.code || 'SESSION_EXPIRED';
+            const message = result.message
+              || (code === 'SESSION_REPLACED'
+                ? 'Đã có người đăng nhập tài khoản của bạn. Phiên hiện tại sẽ bị đăng xuất.'
+                : 'Phiên đăng nhập của bạn đã hết hiệu lực. Vui lòng đăng nhập lại.');
+            showSessionExpired({ code, message });
           }
           backoffRef.current = Math.min(backoffRef.current + 1, 4);
         } else if (result && result.serverTime) {

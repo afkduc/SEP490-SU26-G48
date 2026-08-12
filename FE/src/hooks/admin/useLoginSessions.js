@@ -17,14 +17,18 @@ const DEFAULT_PARAMS = {
 
 /**
  * Hook lấy danh sách phiên đăng nhập (login sessions) cho admin.
- * `userName` và `phone` được debounce 200ms thông qua usePaginatedList.
+ * `userName`, `phone`, `ipAddress` được debounce 350ms thông qua usePaginatedList.
+ * Các field lọc kết hợp theo AND trên backend.
  */
+/** Keys debounce ổn định theo identity (tránh recreate updateParam mỗi render). */
+const LOGIN_SESSION_DEBOUNCE_KEYS = ['userName', 'phone', 'ipAddress'];
+
 export function useLoginSessions(seedDefaults = {}) {
   const list = usePaginatedList({
     apiFn: adminLoginSessionsApi.list,
     defaultParams: { ...DEFAULT_PARAMS, ...seedDefaults },
-    debounceKeys: ['userName', 'phone', 'ipAddress'],
-    debounceMs: 200,
+    debounceKeys: LOGIN_SESSION_DEBOUNCE_KEYS,
+    debounceMs: 350,
   });
 
   return {

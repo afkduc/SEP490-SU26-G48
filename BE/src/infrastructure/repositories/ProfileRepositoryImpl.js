@@ -1,7 +1,7 @@
 const { query } = require('../database/sqlServer');
 
 // Cot chinh cua user (khong bao gom branchName - do ProfileBranchService
-// se lay rieng tu users.branch_id va user_branches).
+// Branch scope: users.branch_id (+ ProfileBranchService).
 const PROFILE_COLUMNS = `
   u.id,
   u.user_name,

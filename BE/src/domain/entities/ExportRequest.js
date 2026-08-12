@@ -28,6 +28,8 @@ class ExportRequest {
     this.performedByName = data.performed_by_name ?? data.performedByName ?? null;
     this.totalQuantity = data.total_quantity ?? data.totalQuantity ?? null;
     this.itemCount = data.item_count ?? data.itemCount ?? null;
+    this.seenByManagerAt = data.seen_by_manager_at ?? data.seenByManagerAt ?? null;
+    this.isNewForManager = !this.seenByManagerAt;
   }
 
   static fromPersistence(row) {
@@ -50,6 +52,7 @@ class ExportRequest {
       performed_by_name: row.performed_by_name,
       total_quantity: row.total_quantity,
       item_count: row.item_count,
+      seen_by_manager_at: row.seen_by_manager_at,
     });
   }
 

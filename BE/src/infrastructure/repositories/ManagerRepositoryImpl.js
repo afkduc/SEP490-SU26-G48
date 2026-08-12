@@ -82,6 +82,11 @@ function mapSettlementRow(row) {
     completedDate: normalizeDate(row.completed_date),
     cancelledAt: normalizeDate(row.cancelled_at),
     paidAt: normalizeDate(row.invoice_issued_at),
+    // 'transfer' = thanh toan qua PayOS (co giao dich paid trong payos_transactions),
+    // 'cash' = xuat hoa don thu cong (CVDV xac nhan tien mat), null = chua xuat hoa don.
+    paymentMethod: row.paid_via_payos === undefined
+      ? null
+      : (row.paid_via_payos ? 'transfer' : (row.status === 'invoiced' ? 'cash' : null)),
     total: Number(row.total || 0),
     subtotal: Number(row.subtotal || 0),
     discountAmount: Number(row.discount_amount || 0),
@@ -804,7 +809,11 @@ class ManagerRepositoryImpl {
           so.intake_date,
           so.completed_date,
           so.cancelled_at,
-          inv.issued_at AS invoice_issued_at
+          inv.issued_at AS invoice_issued_at,
+          CASE WHEN EXISTS (
+            SELECT 1 FROM payos_transactions pt
+            WHERE pt.service_order_id = so.id AND pt.status = 'paid'
+          ) THEN 1 ELSE 0 END AS paid_via_payos
        FROM service_orders so
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id

@@ -2,9 +2,9 @@ const ApiError = require('../../utils/ApiError');
 const {
   EMAIL_HINT,
   EMAIL_MAX_LENGTH,
-  NAME_MAX_LENGTH,
   isValidEmail,
   isValidPhone,
+  getPersonNameError,
 } = require('../../utils/fieldValidation');
 
 class ProfileService {
@@ -54,21 +54,17 @@ class ProfileService {
     }
 
     if (payload.firstName !== undefined && payload.firstName !== null) {
-      const firstName = String(payload.firstName).trim();
-      if (firstName.length > NAME_MAX_LENGTH) {
-        errors.push(`Họ tối đa ${NAME_MAX_LENGTH} ký tự`);
-      } else {
-        payload.firstName = firstName;
-      }
+      const firstName = String(payload.firstName).trim().replace(/\s+/g, ' ');
+      const firstNameErr = getPersonNameError(firstName, { required: false, label: 'Họ' });
+      if (firstNameErr) errors.push(firstNameErr);
+      else payload.firstName = firstName;
     }
 
     if (payload.lastName !== undefined && payload.lastName !== null) {
-      const lastName = String(payload.lastName).trim();
-      if (lastName.length > NAME_MAX_LENGTH) {
-        errors.push(`Tên tối đa ${NAME_MAX_LENGTH} ký tự`);
-      } else {
-        payload.lastName = lastName;
-      }
+      const lastName = String(payload.lastName).trim().replace(/\s+/g, ' ');
+      const lastNameErr = getPersonNameError(lastName, { required: false, label: 'Tên' });
+      if (lastNameErr) errors.push(lastNameErr);
+      else payload.lastName = lastName;
     }
 
     if (errors.length > 0) {

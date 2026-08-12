@@ -91,7 +91,12 @@ export async function heartbeatApi() {
   } catch (err) {
     const status = err?.status;
     if (status === 401 || status === 403) {
-      return { unauthorized: true, status };
+      return {
+        unauthorized: true,
+        status,
+        code: err?.code || err?.payload?.code || null,
+        message: err?.message || err?.payload?.message || null,
+      };
     }
     if (typeof console !== 'undefined') {
       console.debug('[heartbeat] skipped:', err && err.message);
