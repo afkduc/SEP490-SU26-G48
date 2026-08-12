@@ -169,3 +169,49 @@ test('create keeps pending flow when auto-approve is disabled', async () => {
   ]);
   assert.deepEqual(calls[2][2], { branchId: 1 });
 });
+
+test('list scopes filters, normalizes pagination, and maps results', async () => {
+  let findFilters;
+  let countFilters;
+  const repository = buildRepository([]);
+  repository.findAll = async (filters) => { findFilters = filters; return []; };
+  repository.count = async (filters) => { countFilters = filters; return 0; };
+  const service = new ImportRequestService({ importRequestRepository: repository });
+  const result = await service.list({ branchId: '1', supplierId: '2', status: 'pending', search: 'IRB', page: 0, limit: 1000 });
+  assert.deepEqual(result, { items: [], total: 0, page: 1, limit: 100 });
+  assert.deepEqual(findFilters, { branchId: 1, status: 'pending', supplierId: 2, fromDate: undefined, toDate: undefined, search: 'IRB', page: 1, limit: 100 });
+  assert.deepEqual(countFilters, { branchId: 1, status: 'pending', supplierId: 2, fromDate: undefined, toDate: undefined, search: 'IRB' });
+});
+
+test('gets an import request by valid scoped id and rejects invalid or missing ids', async () => {
+  const calls = [];
+  const service = new ImportRequestService({ importRequestRepository: buildRepository(calls) });
+  assert.equal((await service.getById('4', { branchId: '1' })).id, 4);
+  assert.deepEqual(calls[0], ['findById', 4, { branchId: 1 }]);
+  await assert.rejects(() => service.getById('bad'), (err) => err.statusCode === 400);
+  const missing = new ImportRequestService({ importRequestRepository: { findById: async () => null } });
+  await assert.rejects(() => missing.getById(4), (err) => err.statusCode === 404);
+});
+
+test('gets the next import request code for the active branch', async () => {
+  let received;
+  const service = new ImportRequestService({ importRequestRepository: { getNextRequestCode: async (...args) => { received = args; return 'IRB-1-20260809-0002'; } } });
+  const result = await service.getNextRequestCode({ branchId: '1' });
+  assert.equal(result.requestCode, 'IRB-1-20260809-0002');
+  assert.equal(received[0], 1);
+  assert.ok(received[1] instanceof Date);
+  await assert.rejects(() => service.getNextRequestCode({}), (err) => err.statusCode === 400);
+});
+
+test('approves and rejects pending imports in a transaction', async () => {
+  const calls = [];
+  const repository = buildRepository(calls, 'approved');
+  repository.reject = async (tx, id, rejectedBy, reason, options) => {
+    calls.push(['reject', tx, id, rejectedBy, reason, options]); return true;
+  };
+  const service = new ImportRequestService({ importRequestRepository: repository, transactionRunner: async (callback) => callback({ id: 'tx-3' }) });
+  assert.equal((await service.approve(5, { approvedBy: 7, branchId: 1 })).id, 5);
+  assert.equal((await service.reject(6, { rejectReason: 'Sai hoa don' }, { branchId: 1 })).id, 6);
+  assert.equal(calls.find((x) => x[0] === 'approve')[1].id, 'tx-3');
+  assert.deepEqual(calls.find((x) => x[0] === 'reject').slice(2), [6, null, 'Sai hoa don', { branchId: 1 }]);
+});
