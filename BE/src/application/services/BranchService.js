@@ -28,8 +28,8 @@ function validateOptionalContact({ phone, email }) {
 }
 
 class BranchService {
-  constructor() {
-    this.branchRepository = new BranchRepositoryImpl();
+  constructor({ branchRepository } = {}) {
+    this.branchRepository = branchRepository || new BranchRepositoryImpl();
   }
 
   async list() {
