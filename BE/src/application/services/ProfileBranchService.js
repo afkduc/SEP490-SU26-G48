@@ -1,16 +1,8 @@
 const { query } = require('../../infrastructure/database/sqlServer');
+const { resolveAssignedBranches } = require('../../utils/userBranchScope');
 
 /**
- * ProfileBranchService
- *
- * Gom cac query lien quan den chi nhanh cua user, phuc vu cho
- * ProfileController. Truoc day logic nay nam trong
- * ProfileRepositoryImpl.findById (goi leftJoinUserBranches).
- *
- * Tach ra service rieng de:
- *   - Repository chi chiu trach nhiem lay row user (Single Responsibility).
- *   - Controller co the gọi tuy ý khi can, khong phai mutate repository.
- *   - De test va sua sau (VD: cache, sort, filter is_active).
+ * ProfileBranchService — chi nhánh user từ users.branch_id (NULL = tất cả CN active).
  */
 class ProfileBranchService {
   /**
@@ -31,32 +23,20 @@ class ProfileBranchService {
   }
 
   /**
-   * Lay danh sach chi nhanh user duoc gan qua bang user_branches.
-   * Tra ve [{ branchId, branchName }] (co the rong neu user chua duoc gan).
+   * Lay danh sach chi nhanh user duoc gan (tu users.branch_id).
    */
   async getAssignedBranches(userId) {
     const result = await query(
-      `SELECT ub.branch_id, b.branch_name
-       FROM   user_branches ub
-       LEFT   JOIN branches b ON b.id = ub.branch_id
-       WHERE  ub.user_id = @p1
-       ORDER  BY b.branch_name ASC`,
+      'SELECT branch_id FROM users WHERE id = @p1',
       { p1: userId }
     );
-    return result.recordset.map((row) => ({
-      branchId: row.branch_id,
-      branchName: row.branch_name || null,
-    }));
+    const row = result.recordset[0];
+    if (!row) return [];
+    return resolveAssignedBranches(row.branch_id);
   }
 
   /**
-   * Ham tien ich: tra ve profile-branch payload day du cho 1 user.
-   * - primary: { branchId, branchName } tu users.branch_id
-   * - assignedBranches: [{ branchId, branchName }] tu user_branches
-   * - branchName (display string): "Ten1, Ten2" neu co nhieu row,
-   *   nguoc lai dung ten primary neu assignedBranches rong.
-   *
-   * Tra ve object luon co assignedBranches (co the la []).
+   * Profile-branch payload: primary + assignedBranches + branchName hien thi.
    */
   async getProfileBranches(userId) {
     const [primary, assignedBranches] = await Promise.all([
