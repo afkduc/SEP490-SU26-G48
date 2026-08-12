@@ -14,6 +14,7 @@ export default function ForgotPasswordPage() {
   const [emailPreviewUrl, setEmailPreviewUrl] = useState('');
   const [mailError, setMailError] = useState('');
   const [mailSent, setMailSent] = useState(false);
+  const [registered, setRegistered] = useState(true);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,6 +28,7 @@ export default function ForgotPasswordPage() {
       const res = await forgotPasswordApi(email.trim());
       setDone(true);
       setMailSent(Boolean(res?.sent));
+      setRegistered(res?.registered !== false);
       if (res?.emailPreviewUrl) setEmailPreviewUrl(res.emailPreviewUrl);
       if (res?.devResetUrl) setDevResetUrl(res.devResetUrl);
       if (res?.mailError) setMailError(res.mailError);
@@ -54,12 +56,15 @@ export default function ForgotPasswordPage() {
           </p>
 
           {done ? (
-            <div className={mailSent ? 'login-success-box' : 'login-success-box login-success-box--warn'}>
-              {mailSent ? (
+            <div className={mailSent && registered ? 'login-success-box' : 'login-success-box login-success-box--warn'}>
+              {!registered ? (
+                <p>
+                  Hiện tại tài khoản của bạn <strong>chưa được đăng ký</strong> trên hệ thống.
+                </p>
+              ) : mailSent ? (
                 <>
                   <p>
-                    Chúng tôi đã gửi <strong>email xác nhận đổi mật khẩu</strong> tới hộp thư của bạn
-                    (nếu email tồn tại trong hệ thống).
+                    Chúng tôi đã gửi <strong>email xác nhận đổi mật khẩu</strong> tới hộp thư của bạn.
                   </p>
                   <ol className="login-next-steps">
                     <li>Mở Gmail (và thư mục Spam / Quảng cáo).</li>
@@ -71,7 +76,7 @@ export default function ForgotPasswordPage() {
                 <>
                   <p>
                     <strong>Chưa gửi được email thật.</strong> Hệ thống chưa cấu hình SMTP
-                    (hoặc tài khoản email không tồn tại / không active trong DB).
+                    hoặc gửi thư thất bại. Tài khoản vẫn tồn tại — thử lại sau hoặc liên hệ Admin.
                   </p>
                   {mailError && <p className="login-hint">{mailError}</p>}
                 </>

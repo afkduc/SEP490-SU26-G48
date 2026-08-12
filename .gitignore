@@ -18,4 +18,5 @@ Landing/.env.production
 *.md
 docs/
 
+# Bao cao/tai lieu test tu sinh - khong day len git
 Test/
