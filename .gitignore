@@ -17,3 +17,5 @@ Landing/.env.production
 
 *.md
 docs/
+
+Test/
