@@ -39,6 +39,36 @@ class ManagerExportRequestController {
       next(err);
     }
   };
+
+  /**
+   * GET /api/manager/export-requests/new-count
+   * So phieu xuat chua duoc Manager xem (dung cho badge do tren Navbar).
+   */
+  getNewCount = async (req, res, next) => {
+    try {
+      const branchIdToUse = req.query.branchId ? Number(req.query.branchId) : req.user?.branchId;
+      if (!branchIdToUse) {
+        return success(res, { count: 0 }, 'No branch context');
+      }
+      const count = await this.exportRequestService.countNewForManager(branchIdToUse);
+      return success(res, { count }, 'Lay so luong phieu xuat moi thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * PATCH /api/manager/export-requests/:id/mark-seen
+   * Danh dau 1 phieu xuat la "da xem" (goi khi Manager mo trang chi tiet).
+   */
+  markSeen = async (req, res, next) => {
+    try {
+      await this.exportRequestService.markSeenByManager(req.params.id);
+      return success(res, { id: Number(req.params.id) }, 'Da danh dau da xem');
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 module.exports = ManagerExportRequestController;
