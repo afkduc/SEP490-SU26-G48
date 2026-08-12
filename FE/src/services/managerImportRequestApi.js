@@ -35,3 +35,19 @@ export async function approveManagerImportRequestApi(id) {
 export async function rejectManagerImportRequestApi(id, payload) {
   return httpClient.put(`/manager/import-requests/${id}/reject`, payload);
 }
+
+/**
+ * So phieu nhap chua duoc Manager xem (badge do tren Navbar).
+ * BE: GET /api/manager/import-requests/new-count
+ */
+export async function getNewImportRequestsCountApi() {
+  return httpClient.get('/manager/import-requests/new-count');
+}
+
+/**
+ * Danh dau 1 phieu nhap la "da xem" (goi khi Manager mo trang chi tiet).
+ * BE: PATCH /api/manager/import-requests/:id/mark-seen
+ */
+export async function markImportRequestSeenApi(id) {
+  return httpClient.patch(`/manager/import-requests/${id}/mark-seen`);
+}

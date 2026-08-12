@@ -312,6 +312,14 @@ class RepairSettlementService {
       });
     }
 
+    // Xuat hoa don thu cong (CVDV xac nhan thanh toan tien mat qua nut doi
+    // trang thai) - khac voi handlePayosWebhook() o duoi, truong hop nay
+    // truoc gio CHUA bao realtime cho ai (Dashboard/cac man theo doi khac se
+    // khong tu cap nhat neu thieu dong nay).
+    if (status === 'invoiced') {
+      emitRepairOrderEvent(existing.branchId, 'invoiced', { settlementId: entity.id });
+    }
+
     return RepairSettlementResponseDto.fromEntity(entity);
   }
 

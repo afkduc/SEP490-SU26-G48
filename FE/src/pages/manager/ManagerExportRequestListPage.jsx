@@ -133,7 +133,18 @@ export default function ManagerExportRequestListPage() {
                 requests.map((r) => {
                   return (
                     <tr key={r.id}>
-                      <td><span className="font-mono">{r.requestCode}</span></td>
+                      <td>
+                        {r.isNewForManager && (
+                          <span
+                            title="Phiếu mới"
+                            style={{
+                              display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                              background: '#DC2626', marginRight: 6,
+                            }}
+                          />
+                        )}
+                        <span className="font-mono">{r.requestCode}</span>
+                      </td>
                       <td>{formatDateTime(r.createdAt)}</td>
                       <td><span className="font-mono">{r.serviceOrderCode || '—'}</span></td>
                       <td>{r.customerName || '—'}</td>
