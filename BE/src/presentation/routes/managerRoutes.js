@@ -1,13 +1,12 @@
 const express = require('express');
 const { authenticate, authorize } = require('../../middlewares/auth');
-const { trackActivity } = require('../../middlewares');
+const { trackActivity, requirePerm } = require('../../middlewares');
 const ManagerController = require('../controllers/ManagerController');
 const ManagerService = require('../../application/services/ManagerService');
 const ManagerRepositoryImpl = require('../../infrastructure/repositories/ManagerRepositoryImpl');
 const ManagerImportRequestController = require('../controllers/ManagerImportRequestController');
 const ManagerExportRequestController = require('../controllers/ManagerExportRequestController');
 const { makeImportRequestService, makeExportRequestService } = require('../../application/services');
-const { requirePerm } = require('../../middlewares/inventory/rbac');
 
 function buildManagerRouter() {
   const router = express.Router();

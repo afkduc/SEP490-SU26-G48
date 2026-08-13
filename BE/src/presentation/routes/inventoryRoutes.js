@@ -2,8 +2,7 @@ const express = require('express');
 const { makeInventoryService } = require('../../application/services');
 const InventoryController = require('../controllers/InventoryController');
 const { authenticate } = require('../../middlewares/auth');
-const { trackActivity } = require('../../middlewares');
-const { requirePerm } = require('../../middlewares/inventory/rbac');
+const { trackActivity, requirePerm } = require('../../middlewares');
 
 function makeInventoryController() {
   return new InventoryController({ inventoryService: makeInventoryService() });
