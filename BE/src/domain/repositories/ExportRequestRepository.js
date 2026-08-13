@@ -93,6 +93,23 @@ class ExportRequestRepository {
   async create(tx, requestData, items) {
     throw new Error('Method create() must be implemented');
   }
+
+  /**
+   * Danh dau 1 phieu la "da xem" boi Manager.
+   * @param {number} id
+   */
+  async markSeenByManager(id) {
+    throw new Error('Method markSeenByManager() must be implemented');
+  }
+
+  /**
+   * Dem so phieu chua duoc Manager xem trong 1 chi nhanh.
+   * @param {number} branchId
+   * @returns {Promise<number>}
+   */
+  async countNewForManager(branchId) {
+    throw new Error('Method countNewForManager() must be implemented');
+  }
 }
 
 module.exports = ExportRequestRepository;
