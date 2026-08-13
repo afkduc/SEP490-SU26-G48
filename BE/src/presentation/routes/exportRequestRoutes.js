@@ -2,7 +2,7 @@ const express = require('express');
 const ExportRequestController = require('../controllers/ExportRequestController');
 const { makeExportRequestService } = require('../../application/services');
 const { authenticate } = require('../../middlewares/auth');
-const { requirePerm } = require('../../middlewares/inventory/rbac');
+const { requirePerm } = require('../../middlewares');
 
 function makeExportRequestController() {
   return new ExportRequestController({
