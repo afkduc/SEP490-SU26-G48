@@ -11,6 +11,7 @@ const {
   sqlPhoneDigitsExpr,
   phoneDigitsOnly,
 } = require('../../utils/vietnamese');
+const { parseUtcRangeFromVnDates, startOfDayVN, todayYmdVN } = require('../../utils/dateVN');
 
 /** Điều kiện search users: tên/email (bỏ dấu) + SĐT theo chữ số (contains). */
 function pushUserSearchCondition(conditions, params, paramIndex, search) {
@@ -452,17 +453,12 @@ class AdminUserRepositoryImpl {
    * Tra ve counts theo status cua users, so branches, so roles
    */
   async getDashboardStats(filters = {}) {
-    const fromDate = filters.fromDate ? new Date(filters.fromDate) : null;
-    const toDate = filters.toDate ? new Date(filters.toDate) : null;
-    const hasRange = fromDate && !Number.isNaN(fromDate.getTime())
-      && toDate && !Number.isNaN(toDate.getTime());
-
-    // Inclusive end-of-day when client sends date-only (YYYY-MM-DD)
-    let rangeEnd = toDate;
-    if (hasRange && typeof filters.toDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(filters.toDate)) {
-      rangeEnd = new Date(filters.toDate);
-      rangeEnd.setHours(23, 59, 59, 999);
-    }
+    // YYYY-MM-DD = ngày lịch VN (UTC+7), không phải nửa đêm UTC — tránh "Hôm nay"
+    // lúc 00:00–07:00 VN bị trống dù đã có nhật ký (logged_at / login_time là SYSUTCDATETIME).
+    const { from: fromDate, to: rangeEnd, hasRange } = parseUtcRangeFromVnDates(
+      filters.fromDate,
+      filters.toDate
+    );
 
     const [userStats, branchCount, roleCount] = await Promise.all([
       query(`
@@ -567,9 +563,7 @@ class AdminUserRepositoryImpl {
         status: row.status,
       }));
 
-      const periodStart = hasRange
-        ? fromDate
-        : (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+      const periodStart = hasRange ? fromDate : startOfDayVN(todayYmdVN());
       const periodEnd = hasRange ? rangeEnd : new Date();
 
       const todayResult = await query(`
