@@ -17,6 +17,7 @@ function mockRepo(overrides = {}) {
     listAssignableRoles: async () => ROLES,
     listEmployees: async () => [],
     findByEmail: async () => null,
+    findByPhone: async () => null,
     nextPseudoId: async () => 'NV-001',
     createEmployee: async (data) => ({ id: 100, ...data }),
     updateEmployee: async (branchId, id, data) => ({ id, ...data }),
@@ -171,6 +172,48 @@ test('createEmployee rejects duplicate email and invalid role', async () => {
   );
 });
 
+test('createEmployee rejects duplicate phone', async () => {
+  const serviceDup = new ManagerService(mockRepo({ findByPhone: async () => ({ id: 9, phone: '0912345678' }) }));
+  await assert.rejects(
+    () => serviceDup.createEmployee(1, baseEmployeePayload()),
+    (err) => err.statusCode === 409 && /Số điện thoại đã tồn tại/i.test(err.message),
+  );
+});
+
+test('updateEmployee rejects duplicate phone of another user', async () => {
+  const service = new ManagerService(mockRepo({
+    getEmployeeById: async () => ({
+      id: 1,
+      email: 'a@autogara.com',
+      phone: '0901111111',
+      status: 'active',
+    }),
+    findByPhone: async () => ({ id: 99, phone: '0912345678' }),
+  }));
+  await assert.rejects(
+    () => service.updateEmployee(1, 1, baseEmployeePayload({ password: undefined, confirmPassword: undefined })),
+    (err) => err.statusCode === 409 && /Số điện thoại đã tồn tại/i.test(err.message),
+  );
+});
+
+test('createTechnician rejects duplicate phone', async () => {
+  const service = new ManagerService(mockRepo({
+    findByPhone: async () => ({ id: 7 }),
+  }));
+  await assert.rejects(
+    () => service.createTechnician(1, {
+      fullName: 'Tho A',
+      email: 'tho@autogara.com',
+      phone: '0912345678',
+      password: 'Password1',
+      confirmPassword: 'Password1',
+      teamLeaderId: 900,
+      specialtyIds: [1],
+    }),
+    (err) => err.statusCode === 409 && /Số điện thoại đã tồn tại/i.test(err.message),
+  );
+});
+
 test('createEmployee validates specialtyIds only for team_leader role', async () => {
   const calls = [];
   const service = new ManagerService(mockRepo({
@@ -229,17 +272,23 @@ test('updateEmployee password is optional but validated when provided', async ()
 
 test('updateEmployee rejects duplicate email only when changed to someone else\'s', async () => {
   const service = new ManagerService(mockRepo({
-    getEmployeeById: async () => ({ id: 1, email: 'old@x.com', status: 'active' }),
-    findByEmail: async () => ({ id: 2 }),
+    getEmployeeById: async () => ({
+      id: 1,
+      email: 'old@autogara.com',
+      phone: '0912345678',
+      status: 'active',
+    }),
+    findByEmail: async (email) => (String(email).toLowerCase() === 'old@autogara.com'
+      ? { id: 1 }
+      : { id: 2 }),
   }));
   await assert.rejects(
-    () => service.updateEmployee(1, 1, baseEmployeePayload({ email: 'new@x.com' })),
+    () => service.updateEmployee(1, 1, baseEmployeePayload({ email: 'new@autogara.com' })),
     (err) => err.statusCode === 409,
   );
 
-  // Email khong doi (van la old@x.com) -> khong can check trung
-  const same = await service.updateEmployee(1, 1, baseEmployeePayload({ email: 'old@x.com' }));
-  assert.equal(same.email, 'old@x.com');
+  const same = await service.updateEmployee(1, 1, baseEmployeePayload({ email: 'old@autogara.com' }));
+  assert.equal(same.email, 'old@autogara.com');
 });
 
 test('setTeamMembers validates branchId, employee, and array; normalizes ids', async () => {
@@ -633,14 +682,21 @@ test('updateTechnician does not require/change password even if payload has one 
 
 test('updateTechnician rejects duplicate email only when changed', async () => {
   const service = new ManagerService(mockRepo({
-    getTechnicianById: async () => ({ id: 1, email: 'tech@x.com', status: 'active' }),
-    findByEmail: async () => ({ id: 2 }),
+    getTechnicianById: async () => ({
+      id: 1,
+      email: 'tech@autogara.com',
+      phone: '0912345678',
+      status: 'active',
+    }),
+    findByEmail: async (email) => (String(email).toLowerCase() === 'tech@autogara.com'
+      ? { id: 1 }
+      : { id: 2 }),
   }));
   await assert.rejects(
-    () => service.updateTechnician(1, 1, baseTechnicianPayload({ email: 'new@x.com' })),
+    () => service.updateTechnician(1, 1, baseTechnicianPayload({ email: 'other@autogara.com' })),
     (err) => err.statusCode === 409,
   );
 
-  const same = await service.updateTechnician(1, 1, baseTechnicianPayload({ email: 'tech@x.com' }));
-  assert.equal(same.email, 'tech@x.com');
+  const same = await service.updateTechnician(1, 1, baseTechnicianPayload({ email: 'tech@autogara.com' }));
+  assert.equal(same.email, 'tech@autogara.com');
 });

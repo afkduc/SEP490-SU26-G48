@@ -1,5 +1,7 @@
 const { query, sql } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const { phoneDigitsOnly } = require('../../utils/fieldValidation');
+const { sqlPhoneDigitsExpr } = require('../../utils/vietnamese');
 
 // Tổ trưởng đã gộp vào module Nhân viên (dùng chung listEmployees/createEmployee/...),
 // nên phải nằm trong EMPLOYEE_ROLES để hiện ra trong danh sách/tìm kiếm nhân viên.
@@ -315,6 +317,17 @@ class ManagerRepositoryImpl {
 
   async findByEmail(email) {
     const result = await query('SELECT TOP 1 id, email FROM users WHERE email = @email', { email });
+    return result.recordset[0] || null;
+  }
+
+  async findByPhone(phone) {
+    const digits = phoneDigitsOnly(phone);
+    if (!digits) return null;
+    const result = await query(
+      `SELECT TOP 1 id, phone FROM users
+       WHERE ${sqlPhoneDigitsExpr('phone')} = @p1`,
+      { p1: digits }
+    );
     return result.recordset[0] || null;
   }
 

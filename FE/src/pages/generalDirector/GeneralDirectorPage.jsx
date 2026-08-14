@@ -5,6 +5,12 @@ import { usePermission } from '../../contexts/PermissionContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
+import {
+  isValidEmail,
+  getPhoneError,
+  phoneDigitsOnly,
+  EMAIL_HINT,
+} from '../../utils/validation';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -1896,7 +1902,8 @@ function BranchManagerCreatePage() {
   }, []);
 
   const handleChange = (field) => (event) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+    const value = field === 'phone' ? phoneDigitsOnly(event.target.value) : event.target.value;
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (event) => {
@@ -1905,7 +1912,22 @@ function BranchManagerCreatePage() {
     setError('');
 
     try {
-      const created = await generalDirectorApi.createBranchManager(form);
+      if (!form.fullName.trim()) throw new Error('Vui lòng nhập họ tên');
+      if (!form.email.trim()) throw new Error('Vui lòng nhập email');
+      if (!isValidEmail(form.email.trim())) throw new Error(EMAIL_HINT);
+      const phoneErr = getPhoneError(form.phone);
+      if (phoneErr) throw new Error(phoneErr);
+      if (!form.branchId) throw new Error('Vui lòng chọn chi nhánh');
+      if (!form.password) throw new Error('Vui lòng nhập mật khẩu');
+      if (form.password.length < 8) throw new Error('Mật khẩu phải có ít nhất 8 ký tự');
+      if (form.confirmPassword !== form.password) throw new Error('Xác nhận mật khẩu không khớp');
+
+      const created = await generalDirectorApi.createBranchManager({
+        ...form,
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        phone: phoneDigitsOnly(form.phone),
+      });
       navigate(`/general-director/branch-managers/${created.id}`);
     } catch (err) {
       setError(err.message || 'Thêm giám đốc chi nhánh thất bại');
@@ -2045,7 +2067,8 @@ function BranchManagerEditPage() {
   }, [id]);
 
   const handleChange = (field) => (event) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+    const value = field === 'phone' ? phoneDigitsOnly(event.target.value) : event.target.value;
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (event) => {
@@ -2053,7 +2076,19 @@ function BranchManagerEditPage() {
     setSaving(true);
     setError('');
     try {
-      await generalDirectorApi.updateBranchManager(id, form);
+      if (!form.fullName.trim()) throw new Error('Vui lòng nhập họ tên');
+      if (!form.email.trim()) throw new Error('Vui lòng nhập email');
+      if (!isValidEmail(form.email.trim())) throw new Error(EMAIL_HINT);
+      const phoneErr = getPhoneError(form.phone);
+      if (phoneErr) throw new Error(phoneErr);
+      if (!form.branchId) throw new Error('Vui lòng chọn chi nhánh');
+
+      await generalDirectorApi.updateBranchManager(id, {
+        ...form,
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        phone: phoneDigitsOnly(form.phone),
+      });
       navigate(`/general-director/branch-managers/${id}`);
     } catch (err) {
       setError(err.message || 'Cập nhật giám đốc chi nhánh thất bại');

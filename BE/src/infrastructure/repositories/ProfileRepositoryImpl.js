@@ -1,4 +1,6 @@
 const { query } = require('../database/sqlServer');
+const { phoneDigitsOnly } = require('../../utils/fieldValidation');
+const { sqlPhoneDigitsExpr } = require('../../utils/vietnamese');
 
 // Cot chinh cua user (khong bao gom branchName - do ProfileBranchService
 // Branch scope: users.branch_id (+ ProfileBranchService).
@@ -89,11 +91,13 @@ class ProfileRepositoryImpl {
   }
 
   async findByPhone(phone) {
+    const digits = phoneDigitsOnly(phone);
+    if (!digits) return null;
     const result = await query(
       `SELECT id, phone
        FROM   users
-       WHERE  phone = @p1`,
-      { p1: phone }
+       WHERE  ${sqlPhoneDigitsExpr('phone')} = @p1`,
+      { p1: digits }
     );
     return result.recordset[0] || null;
   }

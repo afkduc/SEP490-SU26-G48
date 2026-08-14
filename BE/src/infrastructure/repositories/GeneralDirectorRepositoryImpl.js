@@ -2,6 +2,8 @@ const GeneralDirectorRepository = require('../../domain/repositories/GeneralDire
 const { query } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
 const ApiError = require('../../utils/ApiError');
+const { phoneDigitsOnly } = require('../../utils/fieldValidation');
+const { sqlPhoneDigitsExpr } = require('../../utils/vietnamese');
 
 function normalizeDate(value) {
   if (!value) return null;
@@ -256,6 +258,17 @@ const BRANCH_MANAGER_BRANCH_APPLY = `
 class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
   async findUserByEmail(email) {
     const result = await query('SELECT TOP 1 id, email FROM users WHERE email = @email', { email });
+    return result.recordset[0] || null;
+  }
+
+  async findUserByPhone(phone) {
+    const digits = phoneDigitsOnly(phone);
+    if (!digits) return null;
+    const result = await query(
+      `SELECT TOP 1 id, phone FROM users
+       WHERE ${sqlPhoneDigitsExpr('phone')} = @p1`,
+      { p1: digits }
+    );
     return result.recordset[0] || null;
   }
 
@@ -1102,6 +1115,11 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
       throw new ApiError(409, 'Email đã tồn tại');
     }
 
+    const existedPhone = await this.findUserByPhone(phone);
+    if (existedPhone) {
+      throw new ApiError(409, 'Số điện thoại đã tồn tại');
+    }
+
     const conflict = await this.getBranchManagerConflict(branchId);
     if (conflict && conflict.status !== 'inactive') {
       throw new ApiError(409, 'Chỉ có thể thêm giám đốc mới khi giám đốc hiện tại đã ở trạng thái nghỉ');
@@ -1161,6 +1179,11 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
     const existed = await this.findUserByEmail(email);
     if (existed && Number(existed.id) !== Number(id)) {
       throw new ApiError(409, 'Email đã tồn tại');
+    }
+
+    const existedPhone = await this.findUserByPhone(phone);
+    if (existedPhone && Number(existedPhone.id) !== Number(id)) {
+      throw new ApiError(409, 'Số điện thoại đã tồn tại');
     }
 
     const conflict = await this.getBranchManagerConflict(branchId, id);

@@ -12,6 +12,12 @@ import ManagerExportRequestDetailPage from './ManagerExportRequestDetailPage';
 import ManagerDashboardPage from './ManagerDashboardPage';
 import ManagerInventoryPage from './ManagerInventoryPage';
 import SettlementDetailModal, { settlementStatusBadge } from './SettlementDetailModal';
+import {
+  isValidEmail,
+  getPhoneError,
+  phoneDigitsOnly,
+  EMAIL_HINT,
+} from '../../utils/validation';
 
 const SERVICE_STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -133,8 +139,6 @@ const STATUS_BADGE = {
 
 const AVATAR_COLORS = ['#2563EB', '#059669', '#D97706', '#DB2777', '#7C3AED', '#0891B2'];
 const PAGE_SIZE = 10;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^0[0-9]{9,10}$/;
 // Email nhan vien moi luon thuoc domain cong ty - chi cho nhap phan ten,
 // duoi @autogara.com duoc tu dong gan vao khi tao moi.
 const EMPLOYEE_EMAIL_DOMAIN = '@autogara.com';
@@ -650,9 +654,9 @@ function EmployeeFormPage({ mode }) {
     const errors = {};
     if (!form.fullName.trim()) errors.fullName = 'Vui lòng nhập họ và tên';
     if (!form.email.trim()) errors.email = 'Vui lòng nhập email';
-    else if (!EMAIL_REGEX.test(form.email.trim())) errors.email = 'Email không đúng định dạng';
-    if (!form.phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại';
-    else if (!PHONE_REGEX.test(form.phone.trim())) errors.phone = 'Số điện thoại không hợp lệ';
+    else if (!isValidEmail(form.email.trim())) errors.email = EMAIL_HINT;
+    const phoneErr = getPhoneError(form.phone);
+    if (phoneErr) errors.phone = phoneErr;
     if (!form.roleId) errors.roleId = 'Vui lòng chọn vai trò';
     if (!isEdit || changePassword) {
       if (!form.password) errors.password = 'Vui lòng nhập mật khẩu';
@@ -679,7 +683,7 @@ function EmployeeFormPage({ mode }) {
       const payload = {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
+        phone: phoneDigitsOnly(form.phone),
         roleId: Number(form.roleId),
         status: form.status,
         specialtyIds: isTeamLeaderRole ? form.specialtyIds : [],
@@ -796,7 +800,7 @@ function EmployeeFormPage({ mode }) {
 
             <div className="form-group">
               <label className="form-label required">Số điện thoại</label>
-              <input className="form-input" value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="0xxxxxxxxx" />
+              <input className="form-input" value={form.phone} onChange={(e) => setField('phone', phoneDigitsOnly(e.target.value))} placeholder="0xxxxxxxxx" inputMode="numeric" />
               {fieldErrors.phone && <span className="form-error">{fieldErrors.phone}</span>}
             </div>
 
@@ -2650,9 +2654,9 @@ function TechnicianFormPage({ mode }) {
     const errors = {};
     if (!form.fullName.trim()) errors.fullName = 'Vui lòng nhập họ và tên';
     if (!form.email.trim()) errors.email = 'Vui lòng nhập email';
-    else if (!EMAIL_REGEX.test(form.email.trim())) errors.email = 'Email không đúng định dạng';
-    if (!form.phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại';
-    else if (!PHONE_REGEX.test(form.phone.trim())) errors.phone = 'Số điện thoại không hợp lệ';
+    else if (!isValidEmail(form.email.trim())) errors.email = EMAIL_HINT;
+    const phoneErr = getPhoneError(form.phone);
+    if (phoneErr) errors.phone = phoneErr;
     if (!form.teamLeaderId) errors.teamLeaderId = 'Vui lòng chọn tổ trưởng phụ trách';
     if (!isEdit) {
       if (!form.password) errors.password = 'Vui lòng nhập mật khẩu tạm thời';
@@ -2673,7 +2677,7 @@ function TechnicianFormPage({ mode }) {
       const payload = {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
+        phone: phoneDigitsOnly(form.phone),
         teamLeaderId: Number(form.teamLeaderId),
         status: form.status,
         specialtyIds: form.specialtyIds,
@@ -2752,7 +2756,7 @@ function TechnicianFormPage({ mode }) {
 
             <div className="form-group">
               <label className="form-label required">Số điện thoại</label>
-              <input className="form-input" value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="0xxxxxxxxx" />
+              <input className="form-input" value={form.phone} onChange={(e) => setField('phone', phoneDigitsOnly(e.target.value))} placeholder="0xxxxxxxxx" inputMode="numeric" />
               {fieldErrors.phone && <span className="form-error">{fieldErrors.phone}</span>}
             </div>
 

@@ -4,8 +4,12 @@ const {
   EMAIL_MAX_LENGTH,
   isValidEmail,
   isValidPhone,
+  phoneDigitsOnly,
   getPersonNameError,
 } = require('../../utils/fieldValidation');
+
+const PHONE_FORMAT_HINT =
+  'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)';
 
 class ProfileService {
   constructor(profileRepository) {
@@ -39,15 +43,15 @@ class ProfileService {
     }
 
     if (payload.phone !== undefined && payload.phone !== null) {
-      const phone = String(payload.phone).trim();
+      const phone = phoneDigitsOnly(payload.phone);
       if (!phone) {
         errors.push('Số điện thoại là bắt buộc');
       } else if (!isValidPhone(phone)) {
-        errors.push('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+        errors.push(PHONE_FORMAT_HINT);
       } else {
         const phoneOwner = await this.profileRepository.findByPhone(phone);
         if (phoneOwner && Number(phoneOwner.id) !== Number(userId)) {
-          errors.push('Số điện thoại đã được sử dụng bởi người khác');
+          errors.push('Số điện thoại đã tồn tại');
         }
         payload.phone = phone;
       }

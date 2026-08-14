@@ -2,6 +2,8 @@ const bcrypt = require('bcryptjs');
 const UserRepository = require('../../domain/repositories/UserRepository');
 const { query } = require('../database/sqlServer');
 const User = require('../../domain/entities/User');
+const { phoneDigitsOnly } = require('../../utils/fieldValidation');
+const { sqlPhoneDigitsExpr } = require('../../utils/vietnamese');
 
 const USER_BASE_COLUMNS = `
   id,
@@ -65,6 +67,17 @@ class UserRepositoryImpl extends UserRepository {
     const result = await query(
       `SELECT id FROM users WHERE email = @email`,
       { email }
+    );
+    return result.recordset[0] || null;
+  }
+
+  async findByPhone(phone) {
+    const digits = phoneDigitsOnly(phone);
+    if (!digits) return null;
+    const result = await query(
+      `SELECT TOP 1 id, phone FROM users
+       WHERE ${sqlPhoneDigitsExpr('phone')} = @p1`,
+      { p1: digits }
     );
     return result.recordset[0] || null;
   }

@@ -1,8 +1,14 @@
 const ApiError = require('../../utils/ApiError');
 const UserResponseDto = require('../dto/UserResponseDto');
+const {
+  isValidEmail,
+  isValidPhone,
+  phoneDigitsOnly,
+  EMAIL_HINT,
+} = require('../../utils/fieldValidation');
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^(0[0-9]{9,10})$/;
+const PHONE_FORMAT_HINT =
+  'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)';
 
 class UserService {
   constructor({ userRepository }) {
@@ -30,15 +36,31 @@ class UserService {
     if (!payload?.name || !payload?.email || !payload?.password) {
       throw new ApiError(400, 'Name, email va password la bat buoc');
     }
+    if (!isValidEmail(payload.email)) {
+      throw new ApiError(400, EMAIL_HINT);
+    }
+
     const existed = await this.userRepository.findByEmail(payload.email);
-    if (existed) throw new ApiError(409, 'Email da ton tai');
+    if (existed) throw new ApiError(409, 'Email đã tồn tại');
+
+    let phone = null;
+    if (payload.phone != null && String(payload.phone).trim() !== '') {
+      phone = phoneDigitsOnly(payload.phone);
+      if (!isValidPhone(phone)) {
+        throw new ApiError(400, PHONE_FORMAT_HINT);
+      }
+      if (typeof this.userRepository.findByPhone === 'function') {
+        const phoneOwner = await this.userRepository.findByPhone(phone);
+        if (phoneOwner) throw new ApiError(409, 'Số điện thoại đã tồn tại');
+      }
+    }
 
     const user = await this.userRepository.create({
       name: payload.name,
-      email: payload.email,
+      email: String(payload.email).trim(),
       user_password: payload.password,
       fullName: payload.fullName,
-      phone: payload.phone,
+      phone,
       branchId: payload.branchId,
       status: payload.status,
       createdBy,
@@ -59,18 +81,26 @@ class UserService {
     if (!existed) throw new ApiError(404, 'User not found');
 
     if (payload.email) {
-      if (!EMAIL_REGEX.test(payload.email)) {
-        throw new ApiError(400, 'Email khong dung dinh dang');
+      if (!isValidEmail(payload.email)) {
+        throw new ApiError(400, EMAIL_HINT);
       }
       const emailOwner = await this.userRepository.findByEmail(payload.email);
       if (emailOwner && emailOwner.id !== Number(id)) {
-        throw new ApiError(409, 'Email da duoc su dung boi nguoi khac');
+        throw new ApiError(409, 'Email đã tồn tại');
       }
     }
 
-    if (payload.phone) {
-      if (!PHONE_REGEX.test(payload.phone)) {
-        throw new ApiError(400, 'So dien thoai phai bat dau bang 0, 10-11 chu so');
+    let phone = payload.phone;
+    if (payload.phone != null && String(payload.phone).trim() !== '') {
+      phone = phoneDigitsOnly(payload.phone);
+      if (!isValidPhone(phone)) {
+        throw new ApiError(400, PHONE_FORMAT_HINT);
+      }
+      if (typeof this.userRepository.findByPhone === 'function') {
+        const phoneOwner = await this.userRepository.findByPhone(phone);
+        if (phoneOwner && Number(phoneOwner.id) !== Number(id)) {
+          throw new ApiError(409, 'Số điện thoại đã tồn tại');
+        }
       }
     }
 
@@ -78,7 +108,7 @@ class UserService {
       name: payload.name ?? existed.name,
       email: payload.email ?? existed.email,
       fullName: payload.fullName,
-      phone: payload.phone,
+      phone,
       branchId: payload.branchId,
       status: payload.status,
     });

@@ -1,10 +1,16 @@
 const bcrypt = require('bcryptjs');
 const ApiError = require('../../utils/ApiError');
 const BranchRepositoryImpl = require('../../infrastructure/repositories/BranchRepositoryImpl');
+const {
+  isValidEmail,
+  isValidPhone,
+  phoneDigitsOnly,
+  EMAIL_HINT,
+} = require('../../utils/fieldValidation');
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^(0[0-9]{9,10})$/;
 const VALID_STATUSES = ['active', 'inactive'];
+const PHONE_FORMAT_HINT =
+  'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)';
 
 class GeneralDirectorService {
   constructor(generalDirectorRepository) {
@@ -141,12 +147,12 @@ class GeneralDirectorService {
       throw new ApiError(400, 'Họ tên, email, số điện thoại, mật khẩu và chi nhánh là bắt buộc');
     }
 
-    if (!EMAIL_REGEX.test(email)) {
-      throw new ApiError(400, 'Email không đúng định dạng');
+    if (!isValidEmail(email)) {
+      throw new ApiError(400, EMAIL_HINT);
     }
 
-    if (!PHONE_REGEX.test(phone)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+    if (!isValidPhone(phone)) {
+      throw new ApiError(400, PHONE_FORMAT_HINT);
     }
 
     if (password.length < 8) {
@@ -162,8 +168,8 @@ class GeneralDirectorService {
 
     return this.generalDirectorRepository.createBranchManager({
       fullName: fullName.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
+      email: String(email).trim(),
+      phone: phoneDigitsOnly(phone),
       passwordHash,
       branchId: Number(branchId),
       status: normalizedStatus,
@@ -181,12 +187,12 @@ class GeneralDirectorService {
       throw new ApiError(400, 'Họ tên, email, số điện thoại và chi nhánh là bắt buộc');
     }
 
-    if (!EMAIL_REGEX.test(email)) {
-      throw new ApiError(400, 'Email không đúng định dạng');
+    if (!isValidEmail(email)) {
+      throw new ApiError(400, EMAIL_HINT);
     }
 
-    if (!PHONE_REGEX.test(phone)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+    if (!isValidPhone(phone)) {
+      throw new ApiError(400, PHONE_FORMAT_HINT);
     }
 
     const normalizedStatus = VALID_STATUSES.includes(status) ? status : 'active';
@@ -198,8 +204,8 @@ class GeneralDirectorService {
 
     return this.generalDirectorRepository.updateBranchManager(id, {
       fullName: fullName.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
+      email: String(email).trim(),
+      phone: phoneDigitsOnly(phone),
       branchId: Number(branchId),
       status: normalizedStatus,
     });

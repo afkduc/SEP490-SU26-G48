@@ -1,13 +1,20 @@
 const bcrypt = require('bcryptjs');
 const ApiError = require('../../utils/ApiError');
+const {
+  isValidEmail,
+  isValidPhone,
+  phoneDigitsOnly,
+  EMAIL_HINT,
+} = require('../../utils/fieldValidation');
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^(0[0-9]{9,10})$/;
 const VALID_STATUSES = ['active', 'inactive'];
 // Phai giu dong bo voi REPAIR_CATEGORY_VALUES trong RepairSettlementService.js -
 // khai bao san Loai hinh sua chua cho dich vu/goi tai day de man tao phieu
 // quyet toan tu dong dien theo, khong phai chon tay tung lan.
 const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
+
+const PHONE_FORMAT_HINT =
+  'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)';
 
 let vehicleBayRepository = null;
 function getVehicleBayRepository() {
@@ -21,6 +28,23 @@ function getVehicleBayRepository() {
 class ManagerService {
   constructor(managerRepository) {
     this.managerRepository = managerRepository;
+  }
+
+  async _assertEmailAvailable(email, excludeUserId = null) {
+    const existed = await this.managerRepository.findByEmail(email);
+    if (!existed) return;
+    if (excludeUserId != null && Number(existed.id) === Number(excludeUserId)) return;
+    throw new ApiError(409, 'Email đã tồn tại');
+  }
+
+  async _assertPhoneAvailable(phone, excludeUserId = null) {
+    if (typeof this.managerRepository.findByPhone !== 'function') {
+      throw new ApiError(500, 'Thiếu kiểm tra trùng số điện thoại');
+    }
+    const existed = await this.managerRepository.findByPhone(phone);
+    if (!existed) return;
+    if (excludeUserId != null && Number(existed.id) === Number(excludeUserId)) return;
+    throw new ApiError(409, 'Số điện thoại đã tồn tại');
   }
 
   // To truong quan ly 1 doi tho (users.team_leader_id) - dong bo lai toan bo
@@ -103,12 +127,12 @@ class ManagerService {
       throw new ApiError(400, 'Họ tên, email, số điện thoại, vai trò và mật khẩu là bắt buộc');
     }
 
-    if (!EMAIL_REGEX.test(email)) {
-      throw new ApiError(400, 'Email không đúng định dạng');
+    if (!isValidEmail(email)) {
+      throw new ApiError(400, EMAIL_HINT);
     }
 
-    if (!PHONE_REGEX.test(phone)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+    if (!isValidPhone(phone)) {
+      throw new ApiError(400, PHONE_FORMAT_HINT);
     }
 
     if (password.length < 8) {
@@ -120,11 +144,11 @@ class ManagerService {
     }
 
     const normalizedStatus = status && VALID_STATUSES.includes(status) ? status : 'active';
+    const emailTrimmed = String(email).trim();
+    const phoneTrimmed = phoneDigitsOnly(phone);
 
-    const existed = await this.managerRepository.findByEmail(email);
-    if (existed) {
-      throw new ApiError(409, 'Email đã tồn tại');
-    }
+    await this._assertEmailAvailable(emailTrimmed);
+    await this._assertPhoneAvailable(phoneTrimmed);
 
     const roles = await this.managerRepository.listAssignableRoles();
     const selectedRole = roles.find((role) => Number(role.id) === Number(roleId));
@@ -143,8 +167,8 @@ class ManagerService {
       branchId,
       pseudoId,
       fullName: fullName.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
+      email: emailTrimmed,
+      phone: phoneTrimmed,
       passwordHash,
       roleId: Number(roleId),
       status: normalizedStatus,
@@ -165,12 +189,12 @@ class ManagerService {
       throw new ApiError(400, 'Họ tên, email, số điện thoại và vai trò là bắt buộc');
     }
 
-    if (!EMAIL_REGEX.test(email)) {
-      throw new ApiError(400, 'Email không đúng định dạng');
+    if (!isValidEmail(email)) {
+      throw new ApiError(400, EMAIL_HINT);
     }
 
-    if (!PHONE_REGEX.test(phone)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+    if (!isValidPhone(phone)) {
+      throw new ApiError(400, PHONE_FORMAT_HINT);
     }
 
     if (status && !VALID_STATUSES.includes(status)) {
@@ -190,11 +214,16 @@ class ManagerService {
       passwordHash = bcrypt.hashSync(password, 10);
     }
 
-    if (email !== existing.email) {
-      const existed = await this.managerRepository.findByEmail(email);
-      if (existed && Number(existed.id) !== Number(id)) {
-        throw new ApiError(409, 'Email đã tồn tại');
-      }
+    const emailTrimmed = String(email).trim();
+    const phoneTrimmed = phoneDigitsOnly(phone);
+    const existingEmail = String(existing.email || '').trim().toLowerCase();
+    const existingPhone = phoneDigitsOnly(existing.phone);
+
+    if (emailTrimmed.toLowerCase() !== existingEmail) {
+      await this._assertEmailAvailable(emailTrimmed, id);
+    }
+    if (phoneTrimmed !== existingPhone) {
+      await this._assertPhoneAvailable(phoneTrimmed, id);
     }
 
     const roles = await this.managerRepository.listAssignableRoles();
@@ -209,8 +238,8 @@ class ManagerService {
 
     return this.managerRepository.updateEmployee(branchId, id, {
       fullName: fullName.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
+      email: emailTrimmed,
+      phone: phoneTrimmed,
       roleId: Number(roleId),
       status: status || existing.status,
       specialtyIds: specialtyIds || [],
@@ -499,12 +528,12 @@ class ManagerService {
       throw new ApiError(400, 'Họ tên, email, số điện thoại' + (requirePassword ? ' và mật khẩu' : '') + ' là bắt buộc');
     }
 
-    if (!EMAIL_REGEX.test(email)) {
-      throw new ApiError(400, 'Email không đúng định dạng');
+    if (!isValidEmail(email)) {
+      throw new ApiError(400, EMAIL_HINT);
     }
 
-    if (!PHONE_REGEX.test(phone)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
+    if (!isValidPhone(phone)) {
+      throw new ApiError(400, PHONE_FORMAT_HINT);
     }
 
     if (requirePassword) {
@@ -574,8 +603,10 @@ class ManagerService {
 
     const normalizedStatus = payload.status && VALID_STATUSES.includes(payload.status) ? payload.status : 'active';
 
-    const existed = await this.managerRepository.findByEmail(payload.email);
-    if (existed) throw new ApiError(409, 'Email đã tồn tại');
+    const emailTrimmed = String(payload.email).trim();
+    const phoneTrimmed = phoneDigitsOnly(payload.phone);
+    await this._assertEmailAvailable(emailTrimmed);
+    await this._assertPhoneAvailable(phoneTrimmed);
 
     const passwordHash = bcrypt.hashSync(payload.password, 10);
     const pseudoId = await this.managerRepository.nextPseudoId();
@@ -584,8 +615,8 @@ class ManagerService {
       branchId,
       pseudoId,
       fullName: payload.fullName.trim(),
-      email: payload.email.trim(),
-      phone: payload.phone.trim(),
+      email: emailTrimmed,
+      phone: phoneTrimmed,
       passwordHash,
       status: normalizedStatus,
       teamLeaderId: Number(payload.teamLeaderId),
@@ -608,17 +639,22 @@ class ManagerService {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
     }
 
-    if (payload.email !== existing.email) {
-      const existed = await this.managerRepository.findByEmail(payload.email);
-      if (existed && Number(existed.id) !== Number(id)) {
-        throw new ApiError(409, 'Email đã tồn tại');
-      }
+    const emailTrimmed = String(payload.email).trim();
+    const phoneTrimmed = phoneDigitsOnly(payload.phone);
+    const existingEmail = String(existing.email || '').trim().toLowerCase();
+    const existingPhone = phoneDigitsOnly(existing.phone);
+
+    if (emailTrimmed.toLowerCase() !== existingEmail) {
+      await this._assertEmailAvailable(emailTrimmed, id);
+    }
+    if (phoneTrimmed !== existingPhone) {
+      await this._assertPhoneAvailable(phoneTrimmed, id);
     }
 
     return this.managerRepository.updateTechnician(branchId, id, {
       fullName: payload.fullName.trim(),
-      email: payload.email.trim(),
-      phone: payload.phone.trim(),
+      email: emailTrimmed,
+      phone: phoneTrimmed,
       status: payload.status || existing.status,
       teamLeaderId: Number(payload.teamLeaderId),
       specialtyIds,
