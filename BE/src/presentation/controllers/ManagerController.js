@@ -101,6 +101,13 @@ class ManagerController {
 
   async updateEmployee(req, res, next) {
     try {
+      const employeeId = Number(req.params.id);
+      let before = null;
+      try {
+        before = await this.managerService.getEmployeeById(req.user.branchId, employeeId);
+      } catch (_) {
+        before = null;
+      }
       const data = await this.managerService.updateEmployee(req.user.branchId, req.params.id, req.body);
       const status = req.body?.status || data?.status;
       const name = data?.fullName || data?.employeeId || req.params.id;
@@ -110,11 +117,24 @@ class ManagerController {
       const specialtyNames = (data?.specialties || [])
         .map((s) => s.name || s.specialty_name)
         .filter(Boolean);
+      const beforeSpecialtyNames = (before?.specialties || [])
+        .map((s) => s.name || s.specialty_name)
+        .filter(Boolean);
       await auditCrud.update(req, {
         tableName: 'users',
         entityCode: data?.employeeId || data?.fullName || `ID-${req.params.id}`,
-        recordId: data?.id || Number(req.params.id) || null,
+        recordId: data?.id || employeeId || null,
         entityName: 'Nhân viên chi nhánh',
+        oldData: before ? {
+          fullName: before.fullName,
+          email: before.email,
+          phone: before.phone,
+          status: before.status,
+          roleId: before.primaryRoleId,
+          roleName: before.primaryRoleLabel || before.primaryRole || null,
+          specialtyIds: (before.specialties || []).map((s) => s.id),
+          specialtyNames: beforeSpecialtyNames.length ? beforeSpecialtyNames.join(', ') : '—',
+        } : null,
         newData: {
           fullName: data?.fullName,
           email: data?.email,
@@ -156,6 +176,13 @@ class ManagerController {
         entityCode: refreshed?.employeeId || label,
         recordId: employeeId,
         entityName: 'Nhân viên chi nhánh',
+        oldData: {
+          memberIds: prevIds,
+          memberNames: (before?.members || [])
+            .map((m) => m.fullName || m.employeeId || `#${m.id}`)
+            .filter(Boolean)
+            .join(', ') || '—',
+        },
         newData: {
           memberIds: nextIds,
           memberNames: (refreshed?.members || [])
@@ -193,6 +220,9 @@ class ManagerController {
         entityCode: refreshed?.employeeId || label,
         recordId: employeeId,
         entityName: 'Nhân viên chi nhánh',
+        oldData: {
+          bayNumbers: prevBays,
+        },
         newData: {
           bayNumbers: nextBays,
         },
@@ -436,6 +466,13 @@ class ManagerController {
 
   async updateTechnician(req, res, next) {
     try {
+      const techId = Number(req.params.id);
+      let before = null;
+      try {
+        before = await this.managerService.getTechnicianById(req.user.branchId, techId);
+      } catch (_) {
+        before = null;
+      }
       const data = await this.managerService.updateTechnician(req.user.branchId, req.params.id, req.body);
       const status = req.body?.status || data?.status;
       const name = data?.fullName || data?.employeeId || req.params.id;
@@ -443,11 +480,24 @@ class ManagerController {
         ? `Khóa / nghỉ việc thợ máy ${name}`
         : `Cập nhật thợ máy ${name}`;
       const specialtyNames = (data?.specialties || []).map((s) => s.name || s.specialty_name).filter(Boolean);
+      const beforeSpecialtyNames = (before?.specialties || [])
+        .map((s) => s.name || s.specialty_name)
+        .filter(Boolean);
       await auditCrud.update(req, {
         tableName: 'users',
         entityCode: data?.employeeId || `ID-${req.params.id}`,
-        recordId: data?.id || Number(req.params.id) || null,
+        recordId: data?.id || techId || null,
         entityName: 'Thợ máy',
+        oldData: before ? {
+          fullName: before.fullName,
+          email: before.email,
+          phone: before.phone,
+          status: before.status,
+          teamLeaderId: before.teamLeaderId,
+          teamLeaderName: before.teamLeaderName,
+          specialtyIds: (before.specialties || []).map((s) => s.id),
+          specialtyNames: beforeSpecialtyNames.length ? beforeSpecialtyNames.join(', ') : '—',
+        } : null,
         newData: {
           fullName: data?.fullName,
           email: data?.email,

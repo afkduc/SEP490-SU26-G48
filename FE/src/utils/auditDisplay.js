@@ -1331,6 +1331,74 @@ export function getLifecycleSteps(newValue) {
   return [];
 }
 
+/**
+ * Lay map thay doi cua buoc gan nhat (hoac buoc chi dinh) — dung de highlight dung.
+ * @returns {Record<string, {old:any,new:any}>|null}
+ */
+export function getLifecycleStepChanges(newValue, stepIndex = null) {
+  const obj = parseAuditJson(newValue);
+  if (!obj || typeof obj !== 'object') return null;
+  const steps = Array.isArray(obj.steps) ? obj.steps : [];
+  if (stepIndex != null && stepIndex >= 0 && stepIndex < steps.length) {
+    const ch = steps[stepIndex]?.changes;
+    if (ch && typeof ch === 'object' && !Array.isArray(ch) && Object.keys(ch).length) return ch;
+  }
+  if (obj.lastChanges && typeof obj.lastChanges === 'object' && !Array.isArray(obj.lastChanges)
+    && Object.keys(obj.lastChanges).length) {
+    return obj.lastChanges;
+  }
+  if (steps.length) {
+    const last = steps[steps.length - 1];
+    if (last?.changes && typeof last.changes === 'object' && Object.keys(last.changes).length) {
+      return last.changes;
+    }
+  }
+  return null;
+}
+
+/** Snapshot phang tu lifecycle (bo lastChanges/steps) — dung so sanh fallback. */
+export function getAuditSnapshotForDiff(value) {
+  const obj = parseAuditJson(value);
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  if (obj.lifecycle && obj.snapshot && typeof obj.snapshot === 'object') {
+    return { ...flattenIntakeChecklistFields(obj.snapshot), ...obj.snapshot };
+  }
+  return obj;
+}
+
+/**
+ * Tao hang diff tu lastChanges / step.changes.
+ */
+export function buildDiffRowsFromChanges(changes) {
+  if (!changes || typeof changes !== 'object' || Array.isArray(changes)) return [];
+  return Object.entries(changes).map(([key, pair]) => {
+    const oldRaw = pair && typeof pair === 'object' ? pair.old : null;
+    const newRaw = pair && typeof pair === 'object' ? pair.new : pair;
+    const kind = getAuditFieldDisplayKind(key, newRaw ?? oldRaw);
+    const label = getAuditFieldLabel(key);
+    return {
+      key,
+      label,
+      kind,
+      changed: true,
+      oldRow: {
+        key,
+        label,
+        kind,
+        raw: oldRaw,
+        value: formatAuditFieldValue(key, oldRaw),
+      },
+      newRow: {
+        key,
+        label,
+        kind,
+        raw: newRaw,
+        value: formatAuditFieldValue(key, newRaw),
+      },
+    };
+  });
+}
+
 export function formatSettlementItems(items) {
   const list = Array.isArray(items) ? items : parseAuditJson(items);
   if (!Array.isArray(list) || !list.length) return '—';
@@ -1761,6 +1829,8 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
       || key === 'snapshot'
       || key === 'currentStepLabel'
       || key === 'currentStep'
+      || key === 'lastChanges'
+      || key === 'changes'
       || key === 'intakeChecklist'
       || key === 'intake_checklist'
       || key === 'customer'
@@ -1771,6 +1841,10 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
     if (key === 'isWarranty' && (merged.warrantyVehicle != null)) return;
     if ((key === 'specialtyIds' || key === 'specialty_ids') && merged.specialtyNames) return;
     if ((key === 'memberIds' || key === 'member_ids') && merged.memberNames) return;
+    if ((key === 'roleId' || key === 'role_id') && merged.roleName) return;
+    if ((key === 'branchId' || key === 'branch_id') && merged.branchName) return;
+    if ((key === 'teamLeaderId' || key === 'team_leader_id') && merged.teamLeaderName) return;
+    if ((key === 'productId' || key === 'product_id') && merged.productName) return;
     if (merged[key] === undefined || merged[key] === null || merged[key] === '') return;
     if ((key === 'l1Granted' || key === 'l1Revoked') && Number(merged[key]) === 0) return;
     // Ẩn ID thô nếu đã có tên thợ

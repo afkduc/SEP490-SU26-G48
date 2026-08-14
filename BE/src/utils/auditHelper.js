@@ -4,6 +4,8 @@ const {
   inferEntityLifecycleStep,
   seedLifecycleFromExisting,
   buildLifecycleDescription,
+  diffAuditFields,
+  shouldSkipUnchangedLifecycleStep,
 } = require('./auditLifecycleStep');
 
 const ACTION_TYPES = {
@@ -236,6 +238,11 @@ function sanitizeAuditSnapshot(data) {
   const out = {};
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined) continue;
+    const keyLower = String(key).toLowerCase();
+    if (SENSITIVE_FIELDS.some((f) => f === keyLower || f === key)) {
+      out[key] = '***';
+      continue;
+    }
     if (key === 'signatureData' || key === 'signature_data') {
       if (value) out.hasSignature = true;
       continue;
@@ -312,6 +319,8 @@ function sanitizeAuditSnapshot(data) {
  * @param {string} [opts.description]
  * @param {object} [opts.snapshot] - trang thai day du hien tai cua phieu
  * @param {object} [opts.meta] - them vao snapshot (status, amount,...)
+ * @param {object} [opts.oldSnapshot] - gia tri truoc (tu controller) de tinh diff chinh xac
+ * @param {boolean} [opts.skipIfUnchanged=true] - bo qua neu khong co field nao doi (tru buoc luon ghi)
  */
 async function auditLifecycle(req, opts = {}) {
   const {
@@ -325,6 +334,8 @@ async function auditLifecycle(req, opts = {}) {
     description = null,
     snapshot = null,
     meta = null,
+    oldSnapshot = null,
+    skipIfUnchanged = true,
     responseStatus = 200,
     branchId: branchIdOverride = null,
   } = opts;
@@ -371,6 +382,9 @@ async function auditLifecycle(req, opts = {}) {
       ...sanitizeAuditSnapshot(snapshot || {}),
       ...(meta && typeof meta === 'object' ? sanitizeAuditSnapshot(meta) : {}),
     };
+    const cleanOldSnapshot = oldSnapshot != null
+      ? sanitizeAuditSnapshot(oldSnapshot)
+      : null;
 
     const existing = await AuditRepository.findLifecycleAuditLog(tableName, recordId);
     const siblings = typeof AuditRepository.listCrudAuditLogs === 'function'
@@ -378,12 +392,26 @@ async function auditLifecycle(req, opts = {}) {
       : (existing ? [existing] : []);
     const seeded = seedLifecycleFromExisting(existing, siblings);
 
+    const changes = diffAuditFields(seeded.snapshot, cleanSnapshot, cleanOldSnapshot);
+    if (
+      skipIfUnchanged
+      && existing?.id
+      && shouldSkipUnchangedLifecycleStep(step, changes)
+    ) {
+      if (req && typeof req === 'object') {
+        req._manualAuditWritten = true;
+        req._lastAuditLogId = existing.id;
+      }
+      return existing.id;
+    }
+
     const stepEntry = {
       step,
       label,
       at: new Date().toISOString(),
       by: userName,
       description: description || label,
+      changes,
     };
     const steps = [...seeded.steps, stepEntry];
     const stepLabels = steps.map((s) => s.label || s.step).filter(Boolean);
@@ -397,6 +425,7 @@ async function auditLifecycle(req, opts = {}) {
       currentStep: step,
       currentStepLabel: label,
       steps,
+      lastChanges: changes,
       snapshot: {
         ...seeded.snapshot,
         ...cleanSnapshot,
@@ -491,7 +520,7 @@ const auditCrud = {
     });
   },
 
-  async update(req, { tableName, entityCode, recordId, entityName, oldData, newData, description }) {
+  async update(req, { tableName, entityCode, recordId, entityName, oldData, newData, description, skipIfUnchanged }) {
     const inferred = inferEntityLifecycleStep({ kind: 'update', data: newData, description });
     const desc =
       description ||
@@ -507,6 +536,8 @@ const auditCrud = {
         action: inferred.action === 'DELETE' ? ACTION_TYPES.DELETE : ACTION_TYPES.UPDATE,
         description: desc,
         snapshot: newData,
+        oldSnapshot: oldData || null,
+        skipIfUnchanged: skipIfUnchanged !== false,
       });
     }
     return auditLog({

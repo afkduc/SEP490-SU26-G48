@@ -4,6 +4,9 @@ const {
   inferEntityLifecycleStep,
   seedLifecycleFromExisting,
   buildLifecycleDescription,
+  diffAuditFields,
+  shouldSkipUnchangedLifecycleStep,
+  auditValuesEqual,
 } = require('../../src/utils/auditLifecycleStep');
 
 test('inferEntityLifecycleStep: create / delete / update mac dinh', () => {
@@ -110,4 +113,46 @@ test('buildLifecycleDescription: them lich su khi co nhieu buoc', () => {
     buildLifecycleDescription('X — Lịch sử: Tạo mới → Cập nhật', ['Tạo mới', 'Cập nhật', 'Khóa']),
     'X — Lịch sử: Tạo mới → Cập nhật',
   );
+});
+
+test('diffAuditFields: chi field doi, uu tien ten hon ID', () => {
+  const changes = diffAuditFields(
+    { specialtyIds: [1], specialtyNames: 'Động cơ', fullName: 'A', email: 'a@x' },
+    { specialtyIds: [4], specialtyNames: 'Gầm phanh', fullName: 'A', email: 'a@x' },
+  );
+  assert.deepEqual(Object.keys(changes).sort(), ['specialtyNames']);
+  assert.equal(changes.specialtyNames.old, 'Động cơ');
+  assert.equal(changes.specialtyNames.new, 'Gầm phanh');
+});
+
+test('diffAuditFields: mang so khong phu thuoc thu tu', () => {
+  const changes = diffAuditFields(
+    { bayNumbers: [18, 16, 17] },
+    { bayNumbers: [16, 17, 18] },
+  );
+  assert.deepEqual(changes, {});
+});
+
+test('diffAuditFields: dung oldSnapshot khi snapshot lifecycle thieu field', () => {
+  const changes = diffAuditFields(
+    { fullName: 'A' },
+    { specialtyNames: 'Gầm phanh' },
+    { specialtyNames: 'Động cơ' },
+  );
+  assert.equal(changes.specialtyNames.old, 'Động cơ');
+  assert.equal(changes.specialtyNames.new, 'Gầm phanh');
+});
+
+test('shouldSkipUnchangedLifecycleStep', () => {
+  assert.equal(shouldSkipUnchangedLifecycleStep('updated', {}), true);
+  assert.equal(shouldSkipUnchangedLifecycleStep('updated', { a: { old: 1, new: 2 } }), false);
+  assert.equal(shouldSkipUnchangedLifecycleStep('created', {}), false);
+  assert.equal(shouldSkipUnchangedLifecycleStep('password_changed', {}), false);
+});
+
+test('auditValuesEqual: boolean / number string', () => {
+  assert.equal(auditValuesEqual(true, 1), true);
+  assert.equal(auditValuesEqual(false, 0), true);
+  assert.equal(auditValuesEqual('16', 16), true);
+  assert.equal(auditValuesEqual(null, ''), true);
 });

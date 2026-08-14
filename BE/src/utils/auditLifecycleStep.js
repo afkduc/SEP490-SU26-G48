@@ -139,10 +139,149 @@ function buildLifecycleDescription(baseDescription, stepLabels) {
   return `${base} — Lịch sử: ${labels.join(' → ')}`;
 }
 
+/** Khi co ten thi khong dua ID thô vao diff (tranh highlight rac). */
+const ID_TO_NAME_FIELD = {
+  specialtyIds: 'specialtyNames',
+  specialty_ids: 'specialtyNames',
+  memberIds: 'memberNames',
+  member_ids: 'memberNames',
+  roleId: 'roleName',
+  role_id: 'roleName',
+  branchId: 'branchName',
+  branch_id: 'branchName',
+  productId: 'productName',
+  product_id: 'productName',
+  teamLeaderId: 'teamLeaderName',
+  team_leader_id: 'teamLeaderName',
+  technicianIds: 'technicianNames',
+  technician_ids: 'technicianNames',
+  categoryId: 'categoryName',
+  category_id: 'categoryName',
+  newCustomerId: 'newCustomerName',
+  brandId: 'brandName',
+  brand_id: 'brandName',
+};
+
+/** Buoc luon ghi log du snapshot khong doi (hanh dong co nghia). */
+const ALWAYS_WRITE_LIFECYCLE_STEPS = new Set([
+  'created',
+  'signed',
+  'paid',
+  'printed',
+  'assigned',
+  'reassigned',
+  'completed',
+  'password_changed',
+  'password_reset',
+  'force_logout',
+  'role_assigned',
+  'role_revoked',
+  'approved',
+  'rejected',
+  'manager_assigned',
+  'deleted',
+]);
+
+function stableSerialize(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return 'null';
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+  if (typeof value === 'string') return JSON.stringify(value.trim());
+  if (Array.isArray(value)) {
+    const allScalar = value.every(
+      (v) => v == null || ['string', 'number', 'boolean'].includes(typeof v),
+    );
+    if (allScalar) {
+      const norm = value
+        .map((v) => (v == null ? '' : String(v).trim()))
+        .filter((v) => v !== '')
+        .map((v) => {
+          const n = Number(v);
+          return Number.isFinite(n) && String(n) === v ? n : v;
+        });
+      const sorted = [...norm].sort((a, b) => String(a).localeCompare(String(b), 'en'));
+      return JSON.stringify(sorted);
+    }
+    return JSON.stringify(value);
+  }
+  if (typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${stableSerialize(value[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function auditValuesEqual(a, b) {
+  if (a === b) return true;
+  const empty = (v) => v == null || v === '' || (Array.isArray(v) && v.length === 0);
+  if (empty(a) && empty(b)) return true;
+  if (empty(a) || empty(b)) return false;
+  if (typeof a === 'boolean' || typeof b === 'boolean') {
+    return Boolean(a) === Boolean(b);
+  }
+  const na = Number(a);
+  const nb = Number(b);
+  if (
+    Number.isFinite(na)
+    && Number.isFinite(nb)
+    && String(a).trim() !== ''
+    && String(b).trim() !== ''
+    && !Number.isNaN(na)
+    && !Number.isNaN(nb)
+    && (typeof a === 'number' || typeof b === 'number' || /^-?\d+(\.\d+)?$/.test(String(a).trim()))
+  ) {
+    return na === nb;
+  }
+  return stableSerialize(a) === stableSerialize(b);
+}
+
+/**
+ * Diff chi cac field co trong afterPartial (payload buoc nay), so voi beforeSnap.
+ * Bo ID khi da co truong ten tuong ung.
+ * @returns {Record<string, { old: any, new: any }>}
+ */
+function diffAuditFields(beforeSnap, afterPartial, explicitOld = null) {
+  const after = afterPartial && typeof afterPartial === 'object' && !Array.isArray(afterPartial)
+    ? afterPartial
+    : {};
+  const before = beforeSnap && typeof beforeSnap === 'object' && !Array.isArray(beforeSnap)
+    ? beforeSnap
+    : {};
+  const oldBase = explicitOld && typeof explicitOld === 'object' && !Array.isArray(explicitOld)
+    ? { ...before, ...explicitOld }
+    : before;
+
+  const changes = {};
+  for (const key of Object.keys(after)) {
+    if (after[key] === undefined) continue;
+    if (key.startsWith('_')) continue;
+    const nameTwin = ID_TO_NAME_FIELD[key];
+    if (nameTwin && after[nameTwin] !== undefined && after[nameTwin] !== null && after[nameTwin] !== '') {
+      continue;
+    }
+    const oldVal = Object.prototype.hasOwnProperty.call(oldBase, key) ? oldBase[key] : null;
+    const newVal = after[key];
+    if (auditValuesEqual(oldVal, newVal)) continue;
+    changes[key] = { old: oldVal == null ? null : oldVal, new: newVal == null ? null : newVal };
+  }
+  return changes;
+}
+
+function shouldSkipUnchangedLifecycleStep(step, changes) {
+  if (ALWAYS_WRITE_LIFECYCLE_STEPS.has(String(step || ''))) return false;
+  return !changes || Object.keys(changes).length === 0;
+}
+
 module.exports = {
   inferEntityLifecycleStep,
   seedLifecycleFromExisting,
   buildLifecycleDescription,
   parseJsonSafe,
   actionToStep,
+  auditValuesEqual,
+  diffAuditFields,
+  shouldSkipUnchangedLifecycleStep,
+  ALWAYS_WRITE_LIFECYCLE_STEPS,
+  ID_TO_NAME_FIELD,
+  stableSerialize,
 };

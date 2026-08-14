@@ -62,7 +62,14 @@ class ProductController {
         entityCode: product?.product_code || product?.code || null,
         recordId: product?.id || null,
         entityName: 'Phụ tùng / Sản phẩm',
-        data: req.body,
+        data: {
+          productCode: product?.product_code || product?.code || req.body?.productCode || null,
+          productName: product?.name || product?.product_name || req.body?.name || null,
+          status: product?.status || req.body?.status || 'active',
+          category: product?.category || req.body?.category || null,
+          unit: product?.unit || req.body?.unit || null,
+          price: product?.price ?? req.body?.price ?? null,
+        },
       });
       await this.notificationService.notifyAdmins('PRODUCT_CREATED', {
         auditLogId: req._lastAuditLogId,
@@ -83,13 +90,34 @@ class ProductController {
 
   update = async (req, res, next) => {
     try {
+      const productId = Number(req.params.id);
+      let before = null;
+      try {
+        before = await this.productService.getProductById(productId);
+      } catch (_) {
+        before = null;
+      }
       const product = await this.productService.updateProduct(req.params.id, req.body);
+      const toSnap = (p) => (p ? {
+        productCode: p.product_code || p.code || null,
+        productName: p.name || p.product_name || null,
+        status: p.status,
+        category: p.category || p.category_name || null,
+        unit: p.unit || p.unit_name || null,
+        price: p.price ?? p.unit_price ?? null,
+        minStock: p.minStock ?? p.min_stock ?? null,
+      } : null);
       await auditCrud.update(req, {
         tableName: 'products',
-        entityCode: product?.product_code || `ID-${req.params.id}`,
-        recordId: product?.id || Number(req.params.id) || null,
+        entityCode: product?.product_code || product?.code || `ID-${req.params.id}`,
+        recordId: product?.id || productId || null,
         entityName: 'Phụ tùng / Sản phẩm',
-        newData: req.body,
+        oldData: toSnap(before),
+        newData: {
+          ...toSnap(product),
+          ...(req.body?.name != null ? { productName: req.body.name } : {}),
+          ...(req.body?.status != null ? { status: req.body.status } : {}),
+        },
       });
       await this.notificationService.notifyAdmins('PRODUCT_UPDATED', {
         auditLogId: req._lastAuditLogId,

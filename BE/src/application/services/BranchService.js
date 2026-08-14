@@ -129,8 +129,30 @@ class BranchService {
       entityCode: existing.branchCode || null,
       recordId: existing.id || Number(id),
       entityName: 'Chi nhánh',
-      oldData: existing,
-      newData: payload,
+      oldData: {
+        branchCode: existing.branchCode,
+        branchName: existing.branchName,
+        address: existing.address,
+        phone: existing.phone,
+        email: existing.email,
+        managerId: existing.managerId,
+        managerName: existing.managerName || existing.manager_name || null,
+        isActive: existing.isActive,
+      },
+      newData: {
+        branchCode: updated?.branchCode ?? existing.branchCode,
+        branchName: updated?.branchName ?? branchNameTrimmed ?? existing.branchName,
+        address: updated?.address ?? (address !== undefined
+          ? (address ? String(address).trim().slice(0, 255) : null)
+          : existing.address),
+        phone: updated?.phone ?? (phone !== undefined ? normalizeOptionalPhone(phone) : existing.phone),
+        email: updated?.email ?? (email !== undefined ? (email ? String(email).trim() : null) : existing.email),
+        managerId: updated?.managerId ?? (managerId !== undefined
+          ? (managerId ? Number(managerId) : null)
+          : existing.managerId),
+        managerName: updated?.managerName || updated?.manager_name || null,
+        isActive: updated?.isActive ?? existing.isActive,
+      },
     });
     return updated;
   }

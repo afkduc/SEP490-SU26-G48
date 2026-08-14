@@ -493,7 +493,19 @@ class AdminController {
         entityCode: user?.user_code || user?.userName || null,
         recordId: user?.id || null,
         entityName: 'Người dùng',
-        data: req.body,
+        data: {
+          firstName: req.body?.firstName,
+          lastName: req.body?.lastName,
+          email: req.body?.email,
+          phone: req.body?.phone,
+          status: req.body?.status || user?.status,
+          roleId: req.body?.roleId,
+          branchId: req.body?.branchId,
+          name: [req.body?.firstName, req.body?.lastName].filter(Boolean).join(' ').trim()
+            || user?.full_name
+            || user?.userName
+            || null,
+        },
       });
       await this.notificationService
         .notifyAdmins(
@@ -564,15 +576,18 @@ class AdminController {
         entityCode: displayName,
         recordId: updated?.id || userId,
         entityName: 'Người dùng',
-        oldData,
+        oldData: {
+          ...oldData,
+          name: [oldData.firstName, oldData.lastName].filter(Boolean).join(' ').trim() || null,
+        },
         newData: {
           firstName: firstName ?? updated?.firstName,
           lastName: lastName ?? updated?.lastName,
           email: email ?? updated?.email,
-          phone,
-          status,
-          roleId,
-          branchId,
+          phone: phone ?? updated?.phone,
+          status: status ?? updated?.status,
+          roleId: roleId ?? updated?.roleId,
+          branchId: branchId ?? updated?.branchId,
           scopeAllBranches,
           name: displayName,
         },

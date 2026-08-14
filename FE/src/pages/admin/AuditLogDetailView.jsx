@@ -18,6 +18,9 @@ import {
   isAuditSignatureValue,
   getLifecycleSteps,
   getLifecycleStepLabel,
+  getLifecycleStepChanges,
+  getAuditSnapshotForDiff,
+  buildDiffRowsFromChanges,
   enrichAuditDisplaySource,
   AUDIT_TABLE_LABELS,
 } from '../../utils/auditDisplay';
@@ -277,9 +280,12 @@ function AuditItemsDiffBlock({ row, showAll }) {
   );
 }
 
-function AuditSideBySideDiff({ oldRows, newRows, summary }) {
+function AuditSideBySideDiff({ oldRows, newRows, summary, premergedRows = null }) {
   const [showAll, setShowAll] = useState(false);
-  const rows = useMemo(() => mergeAuditDiffRows(oldRows, newRows), [oldRows, newRows]);
+  const rows = useMemo(
+    () => (premergedRows?.length ? premergedRows : mergeAuditDiffRows(oldRows, newRows)),
+    [premergedRows, oldRows, newRows],
+  );
   if (!rows.length) return null;
   const simpleRows = rows.filter((r) => r.kind !== 'items' && r.kind !== 'signature');
   const itemsRow = rows.find((r) => r.kind === 'items');
@@ -419,18 +425,33 @@ function HumanizedDataView({ data }) {
 }
 
 /**
- * Format old/new value thành dạng human-readable
+ * Format old/new value thành dạng human-readable.
+ * Uu tien lastChanges / step.changes (diff that su), khong so blob lifecycle day du.
  */
-function DiffView({ oldValue, newValue, action, requestBody }) {
-  const oldObj = parseAuditJson(oldValue);
-  const newObj = parseAuditJson(newValue);
-  const newEnriched = enrichAuditDisplaySource(newValue, requestBody);
-  const summary = summarizeAuditNewValue(newEnriched, action);
+function DiffView({ oldValue, newValue, action, requestBody, stepIndex = null }) {
+  const changeRows = useMemo(() => {
+    const changeMap = getLifecycleStepChanges(newValue, stepIndex);
+    return changeMap ? buildDiffRowsFromChanges(changeMap) : [];
+  }, [newValue, stepIndex]);
+
+  if (changeRows.length > 0) {
+    return (
+      <AuditSideBySideDiff
+        premergedRows={changeRows}
+        summary={`Tô màu ${changeRows.length} phần đã thay đổi — trái giá trị cũ, phải giá trị mới.`}
+      />
+    );
+  }
+
+  const oldObj = getAuditSnapshotForDiff(oldValue);
+  const newEnrichedRaw = enrichAuditDisplaySource(newValue, requestBody);
+  const newObj = getAuditSnapshotForDiff(newEnrichedRaw);
+  const summary = summarizeAuditNewValue(newEnrichedRaw, action);
 
   if (!oldObj && !newObj) return <span className="audit-detail__json-empty">—</span>;
 
-  const oldRows = summarizeAuditObjectRows(oldValue) || [];
-  const newRows = summarizeAuditObjectRows(newEnriched) || [];
+  const oldRows = summarizeAuditObjectRows(oldObj) || [];
+  const newRows = summarizeAuditObjectRows(newObj) || [];
 
   if (oldObj && newObj && (oldRows.length > 0 || newRows.length > 0)) {
     return (
@@ -447,13 +468,13 @@ function DiffView({ oldValue, newValue, action, requestBody }) {
       {oldObj && (
         <div className="audit-detail__diff-col">
           <label>Giá trị cũ</label>
-          <HumanizedDataView data={oldValue} />
+          <HumanizedDataView data={oldObj} />
         </div>
       )}
       {newObj && (
         <div className="audit-detail__diff-col">
           <label>Giá trị mới</label>
-          <HumanizedDataView data={newValue} />
+          <HumanizedDataView data={newObj} />
         </div>
       )}
     </div>
@@ -485,6 +506,11 @@ function isEmptyRequestBody(body) {
 
 /** Nội dung chi tiết nhật ký (dùng cho trang riêng). */
 export function AuditLogDetailContent({ log }) {
+  const lifecycleSteps = getLifecycleSteps(log?.new_value);
+  const [selectedStepIndex, setSelectedStepIndex] = useState(
+    () => (lifecycleSteps.length ? lifecycleSteps.length - 1 : null),
+  );
+
   if (!log) return null;
   const t = formatLocal(log.logged_at);
   const userName = log.user_name || 'Hệ thống';
@@ -508,7 +534,10 @@ export function AuditLogDetailContent({ log }) {
       : statusTone === 'danger'
         ? 'badge--danger'
         : 'badge--secondary';
-  const lifecycleSteps = getLifecycleSteps(log.new_value);
+  const activeStepIndex =
+    selectedStepIndex != null && selectedStepIndex >= 0 && selectedStepIndex < lifecycleSteps.length
+      ? selectedStepIndex
+      : (lifecycleSteps.length ? lifecycleSteps.length - 1 : null);
 
   return (
     <div className="audit-detail-page__body">
@@ -517,19 +546,41 @@ export function AuditLogDetailContent({ log }) {
       {lifecycleSteps.length > 0 && (
         <div className="audit-detail__lifecycle" style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-            Lịch sử các bước trên đối tượng này
+            Lịch sử các bước trên đối tượng này — bấm một bước để xem phần đã đổi
           </label>
           <ol style={{ margin: 0, paddingLeft: 18, display: 8 }}>
             {lifecycleSteps.map((s, i) => {
               const when = s?.at ? formatLocal(s.at) : null;
+              const active = i === activeStepIndex;
+              const changeCount = s?.changes && typeof s.changes === 'object'
+                ? Object.keys(s.changes).length
+                : 0;
               return (
                 <li key={`${s?.step || 's'}-${i}`} style={{ fontSize: 13, color: '#334155' }}>
-                  <strong>{s?.label || getLifecycleStepLabel(s?.step) || `Bước ${i + 1}`}</strong>
-                  {s?.by ? <span style={{ color: '#64748b' }}> — {s.by}</span> : null}
-                  {when?.main ? <span style={{ color: '#94a3b8' }}> · {when.main}</span> : null}
-                  {s?.description && s.description !== (s.label || s.step) ? (
-                    <div style={{ color: '#64748b', fontSize: 12 }}>{s.description}</div>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStepIndex(i)}
+                    style={{
+                      all: 'unset',
+                      cursor: 'pointer',
+                      display: 'block',
+                      width: '100%',
+                      padding: '4px 6px',
+                      borderRadius: 6,
+                      background: active ? '#e0f2fe' : 'transparent',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <strong>{s?.label || getLifecycleStepLabel(s?.step) || `Bước ${i + 1}`}</strong>
+                    {s?.by ? <span style={{ color: '#64748b' }}> — {s.by}</span> : null}
+                    {when?.main ? <span style={{ color: '#94a3b8' }}> · {when.main}</span> : null}
+                    {changeCount > 0 ? (
+                      <span style={{ color: '#0369a1', marginLeft: 6 }}>({changeCount} thay đổi)</span>
+                    ) : null}
+                    {s?.description && s.description !== (s.label || s.step) ? (
+                      <div style={{ color: '#64748b', fontSize: 12 }}>{s.description}</div>
+                    ) : null}
+                  </button>
                 </li>
               );
             })}
@@ -642,6 +693,7 @@ export function AuditLogDetailContent({ log }) {
             newValue={log.new_value}
             action={log.action}
             requestBody={log.request_body}
+            stepIndex={activeStepIndex}
           />
         </div>
       )}
