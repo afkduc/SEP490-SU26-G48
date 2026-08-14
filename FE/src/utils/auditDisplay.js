@@ -276,6 +276,23 @@ export const AUDIT_FIELD_LABELS = {
   service_ids: 'Danh sách dịch vụ trong gói',
   vehicleBrandId: 'Hãng xe',
   vehicle_brand_id: 'Hãng xe',
+  managerId: 'Mã giám đốc / quản lý',
+  manager_id: 'Mã giám đốc / quản lý',
+  managerName: 'Tên giám đốc / quản lý',
+  manager_name: 'Tên giám đốc / quản lý',
+  managerCode: 'Mã giám đốc chi nhánh',
+  manager_code: 'Mã giám đốc chi nhánh',
+  managerStatus: 'Trạng thái giám đốc',
+  manager_status: 'Trạng thái giám đốc',
+  modelName: 'Tên dòng xe',
+  model_name: 'Tên dòng xe',
+  passwordChanged: 'Đã đổi mật khẩu',
+  password_changed: 'Đã đổi mật khẩu',
+  passwordReset: 'Đã đặt lại mật khẩu',
+  password_reset: 'Đã đặt lại mật khẩu',
+  appointmentId: 'Mã lịch hẹn',
+  appointment_id: 'Mã lịch hẹn',
+  revoked: 'Số thiết bị đã đăng xuất',
   isConfirmed: 'Đã xác nhận',
   is_confirmed: 'Đã xác nhận',
   confirmedDate: 'Ngày xác nhận',
@@ -393,6 +410,7 @@ export const AUDIT_FIELD_LABELS = {
 export const AUDIT_TABLE_LABELS = {
   customers: 'Khách hàng',
   vehicles: 'Phương tiện',
+  vehicle_models: 'Dòng xe',
   brands: 'Hãng xe',
   branches: 'Chi nhánh',
   users: 'Người dùng',
@@ -1265,6 +1283,38 @@ export function unwrapLifecycleAuditValue(newValue) {
     ...obj.snapshot,
     _lifecycleSteps: Array.isArray(obj.steps) ? obj.steps : [],
   };
+}
+
+/** Nhãn bước lifecycle (fallback khi thiếu label tiếng Việt). */
+export const LIFECYCLE_STEP_LABELS = {
+  created: 'Tạo mới',
+  updated: 'Cập nhật',
+  locked: 'Khóa / ngừng hoạt động',
+  reactivated: 'Kích hoạt lại',
+  deleted: 'Xóa',
+  approved: 'Duyệt',
+  rejected: 'Từ chối',
+  assigned: 'Nhận việc & phân công',
+  reassigned: 'Cập nhật phân công thợ',
+  completed: 'Hoàn thành',
+  status: 'Cập nhật trạng thái',
+  signed: 'Khách đã ký',
+  paid: 'Đã thanh toán',
+  printed: 'In phiếu',
+  team_members: 'Cập nhật thành viên đội',
+  bays: 'Cập nhật khoang xe phụ trách',
+  role_assigned: 'Gán vai trò',
+  role_revoked: 'Thu hồi vai trò',
+  password_reset: 'Đặt lại mật khẩu',
+  password_changed: 'Đổi mật khẩu',
+  force_logout: 'Đăng xuất thiết bị',
+  manager_assigned: 'Gán giám đốc chi nhánh',
+};
+
+export function getLifecycleStepLabel(step) {
+  if (!step) return 'Bước';
+  const key = String(step).trim();
+  return LIFECYCLE_STEP_LABELS[key] || LIFECYCLE_STEP_LABELS[key.toLowerCase()] || key;
 }
 
 export function getLifecycleSteps(newValue) {

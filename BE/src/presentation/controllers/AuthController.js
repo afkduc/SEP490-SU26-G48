@@ -364,7 +364,8 @@ class AuthController {
 
       try {
         await auditCrud.changePassword(req, {
-          targetUserName: `user#${result.userId}`,
+          targetUserName: result.userId ? `người dùng #${result.userId}` : null,
+          recordId: result.userId,
         });
       } catch (_) { /* non-blocking */ }
 

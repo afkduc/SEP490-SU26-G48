@@ -1,4 +1,5 @@
 const { query } = require('../infrastructure/database/sqlServer');
+const { auditLifecycle } = require('../utils/auditHelper');
 
 const METHOD_TO_ACTION = {
   POST: 'CREATE',
@@ -52,6 +53,20 @@ function sanitizeBody(body) {
     }
   }
   return sanitized;
+}
+
+function shouldSkipAuditPath(pathOnly) {
+  if (!pathOnly) return true;
+  if (SKIP_PATHS.has(pathOnly) || pathOnly.startsWith('/api/audit')) return true;
+  // Hover / danh dau da xem — khong phai thao tac nghiep vu, gay log rac
+  if (/\/mark-seen\/?$/i.test(pathOnly)) return true;
+  // Tick dau muc cong viec tai khoang — chi ghi khi bam Hoan thanh
+  if (/\/repair-orders\/[^/]+\/tasks\/[^/]+\/?$/i.test(pathOnly)) return true;
+  // Doc thong bao / cai dat thong bao — khong can nhat ky
+  if (/\/notifications\/settings\/?$/i.test(pathOnly)) return true;
+  if (/\/notifications\/[^/]+\/read\/?$/i.test(pathOnly)) return true;
+  if (/\/notifications\/read-all\/?$/i.test(pathOnly)) return true;
+  return false;
 }
 
 function parsePath(url) {
@@ -201,6 +216,8 @@ const TABLE_LABEL = {
   customer: 'khách hàng',
   vehicles: 'xe',
   vehicle: 'xe',
+  vehicle_models: 'dòng xe',
+  vehicle_model: 'dòng xe',
   orders: 'đơn hàng',
   order: 'đơn hàng',
   invoices: 'hóa đơn',
@@ -297,7 +314,7 @@ function auditLogger(req, res, next) {
 
       // 2. Skip auth endpoints — those are recorded by loginSession middleware.
       const pathOnly = originalUrl.split('?')[0];
-      if (SKIP_PATHS.has(pathOnly) || (pathOnly.startsWith('/api/audit'))) return;
+      if (shouldSkipAuditPath(pathOnly)) return;
 
       // 3. Map HTTP method → audit action.
       const action = METHOD_TO_ACTION[method];
@@ -336,8 +353,37 @@ function auditLogger(req, res, next) {
       const userRoles = user && Array.isArray(user.roles) ? user.roles : [];
       const description = buildDescription(action, tableName, entityCode, userName, new Date(), userRoles);
 
-      // 11. Fire-and-forget insert — never block the response cycle.
-      const entityName = tableName; // use tableName as fallback entity name
+      // 11. Fire-and-forget — never block the response cycle.
+      // Neu co record_id: gop vao 1 log / 1 doi tuong (giong phieu quyet toan).
+      const entityName = TABLE_LABEL[tableName] || tableName;
+      if (
+        recordId != null
+        && responseStatus >= 200
+        && responseStatus < 300
+        && tableName !== 'login_sessions'
+        && tableName !== 'audit_logs'
+      ) {
+        const step = action === 'CREATE' ? 'created' : action === 'DELETE' ? 'locked' : 'updated';
+        const stepLabel = action === 'CREATE'
+          ? 'Tạo mới'
+          : action === 'DELETE'
+            ? 'Khóa / ngừng hoạt động'
+            : 'Cập nhật';
+        auditLifecycle(req, {
+          tableName,
+          recordId,
+          entityCode,
+          entityName,
+          step,
+          stepLabel,
+          action,
+          description,
+          snapshot: sanitizedBody,
+          responseStatus,
+        }).catch((e) => console.error('[auditLogger] lifecycle failed:', e.message));
+        return;
+      }
+
       query(
         `INSERT INTO audit_logs (
            user_id, user_name, phone_number, action, table_name,

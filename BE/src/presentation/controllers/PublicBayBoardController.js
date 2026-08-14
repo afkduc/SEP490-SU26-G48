@@ -59,6 +59,7 @@ class PublicBayBoardController {
         { userId: bay.teamLeaderId, branchId: bay.branchId }
       );
       // Không ghi audit từng đầu mục — chỉ ghi khi bấm Hoàn thành (updateStatus)
+      req._manualAuditWritten = true;
       return success(res, item, 'Task status updated');
     } catch (err) {
       next(err);

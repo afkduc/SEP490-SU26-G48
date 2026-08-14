@@ -136,18 +136,41 @@ class GeneralDirectorController {
   async createBranchManager(req, res, next) {
     try {
       const data = await this.generalDirectorService.createBranchManager(req.body || {});
+      const managerCode = data?.managerId || data?.email || null;
       await auditCrud.create(req, {
         tableName: 'users',
-        entityCode: data?.user_code || data?.employee_code || null,
+        entityCode: managerCode,
         recordId: data?.id || null,
         entityName: 'Giám đốc chi nhánh',
-        data: req.body,
+        data: {
+          fullName: data?.fullName,
+          email: data?.email,
+          phone: data?.phone,
+          status: data?.status,
+          branchId: data?.branch?.id || req.body?.branchId,
+          managerId: managerCode,
+        },
+        description: `Thêm giám đốc chi nhánh ${data?.fullName || managerCode || ''}`.trim(),
       });
+      if (data?.branch?.id) {
+        await auditCrud.update(req, {
+          tableName: 'branches',
+          entityCode: data.branch.code || `ID-${data.branch.id}`,
+          recordId: data.branch.id,
+          entityName: 'Chi nhánh',
+          newData: {
+            managerId: data.id,
+            managerName: data.fullName,
+            managerCode,
+          },
+          description: `Gán giám đốc chi nhánh ${data.fullName || managerCode} cho ${data.branch.name || data.branch.code}`,
+        });
+      }
       await this.notificationService.notifyAdmins('BRANCH_MANAGER_CREATED', {
         auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Giám đốc',
-        targetName: data?.full_name || data?.userName || '',
-        targetCode: data?.user_code || '',
+        targetName: data?.fullName || data?.email || '',
+        targetCode: managerCode || '',
         userId: data?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[GeneralDirectorController] notifyAdmins:', e.message));
       return success(res, data, 'Thêm giám đốc chi nhánh thành công');
@@ -159,18 +182,45 @@ class GeneralDirectorController {
   async updateBranchManager(req, res, next) {
     try {
       const data = await this.generalDirectorService.updateBranchManager(req.params.id, req.body || {});
+      const managerCode = data?.managerId || data?.email || `ID-${req.params.id}`;
+      const status = req.body?.status || data?.status;
+      const auditDescription = status === 'inactive'
+        ? `Khóa tài khoản giám đốc chi nhánh ${data?.fullName || managerCode}`
+        : `Cập nhật giám đốc chi nhánh ${data?.fullName || managerCode}`;
       await auditCrud.update(req, {
         tableName: 'users',
-        entityCode: data?.user_code || `ID-${req.params.id}`,
+        entityCode: managerCode,
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Giám đốc chi nhánh',
-        newData: req.body,
+        newData: {
+          fullName: data?.fullName,
+          email: data?.email,
+          phone: data?.phone,
+          status: data?.status,
+          branchId: data?.branch?.id,
+          managerId: managerCode,
+        },
+        description: auditDescription,
       });
+      if (data?.branch?.id) {
+        await auditCrud.update(req, {
+          tableName: 'branches',
+          entityCode: data.branch.code || `ID-${data.branch.id}`,
+          recordId: data.branch.id,
+          entityName: 'Chi nhánh',
+          newData: {
+            managerId: data.id,
+            managerName: data.fullName,
+            managerStatus: data.status,
+          },
+          description: `Cập nhật giám đốc phụ trách chi nhánh ${data.branch.name || data.branch.code}`,
+        });
+      }
       await this.notificationService.notifyAdmins('BRANCH_MANAGER_UPDATED', {
         auditLogId: req._lastAuditLogId,
         actorName: req.user?.name || req.user?.email || 'Giám đốc',
-        targetName: data?.full_name || data?.userName || `ID-${req.params.id}`,
-        targetCode: data?.user_code || '',
+        targetName: data?.fullName || data?.email || `ID-${req.params.id}`,
+        targetCode: managerCode || '',
         userId: data?.id,
       }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[GeneralDirectorController] notifyAdmins:', e.message));
       return success(res, data, 'Cập nhật giám đốc chi nhánh thành công');
@@ -182,6 +232,14 @@ class GeneralDirectorController {
   async deactivateBranch(req, res, next) {
     try {
       const data = await this.generalDirectorService.deactivateBranch(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'branches',
+        entityCode: data?.branchCode || data?.branch_code || `ID-${req.params.id}`,
+        recordId: data?.id || Number(req.params.id) || null,
+        entityName: 'Chi nhánh',
+        newData: { isActive: false },
+        description: `Vô hiệu hóa chi nhánh ${data?.branchCode || data?.branchName || req.params.id}`,
+      });
       return success(res, data, 'Ngưng hoạt động chi nhánh thành công');
     } catch (err) {
       next(err);
@@ -191,6 +249,14 @@ class GeneralDirectorController {
   async reactivateBranch(req, res, next) {
     try {
       const data = await this.generalDirectorService.reactivateBranch(req.params.id);
+      await auditCrud.update(req, {
+        tableName: 'branches',
+        entityCode: data?.branchCode || data?.branch_code || `ID-${req.params.id}`,
+        recordId: data?.id || Number(req.params.id) || null,
+        entityName: 'Chi nhánh',
+        newData: { isActive: true },
+        description: `Kích hoạt lại chi nhánh ${data?.branchCode || data?.branchName || req.params.id}`,
+      });
       return success(res, data, 'Kích hoạt lại chi nhánh thành công');
     } catch (err) {
       next(err);

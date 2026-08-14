@@ -18,6 +18,22 @@ const AUTH_AUDIT_ACTIONS = [
   'SEND_OTP',
 ];
 
+/** 1 doi tuong (table + record_id) chi hien 1 dong CRUD moi nhat — an log rac them/sua/khoa. */
+const DEDUPE_ENTITY_CRUD_SQL = `(
+  al.record_id IS NULL
+  OR al.action NOT IN ('CREATE','UPDATE','DELETE','DISABLE','REACTIVATE')
+  OR NOT EXISTS (
+    SELECT 1 FROM audit_logs newer
+    WHERE newer.table_name = al.table_name
+      AND newer.record_id = al.record_id
+      AND newer.action IN ('CREATE','UPDATE','DELETE','DISABLE','REACTIVATE')
+      AND (
+        newer.logged_at > al.logged_at
+        OR (newer.logged_at = al.logged_at AND newer.id > al.id)
+      )
+  )
+)`;
+
 function bindNormalizedLike(params, paramIndex, rawValue) {
   const key = `p${paramIndex}`;
   bindNormalizedLikeParam(params, key, rawValue);
@@ -311,7 +327,7 @@ async function getAuditLogs(filters = {}) {
     pageSize = 20,
   } = filters;
 
-  const conditions = ['1=1'];
+  const conditions = ['1=1', DEDUPE_ENTITY_CRUD_SQL];
   const params = {};
   let paramIndex = 1;
 
@@ -504,7 +520,7 @@ async function getAuditLogsForExport(filters = {}) {
     limit = 10000,
   } = filters;
 
-  const conditions = ['1=1'];
+  const conditions = ['1=1', DEDUPE_ENTITY_CRUD_SQL];
   const params = {};
   let paramIndex = 1;
 
@@ -821,13 +837,15 @@ async function getAuditLogsByUser(userId, limit = 10) {
 }
 
 /**
- * Tim ban ghi lifecycle (1 log / 1 phieu) theo table_name + record_id.
- * Uu tien dong co marker "lifecycle":true; neu chua co thi lay dong dau tien.
+ * Tim ban ghi lifecycle (1 log / 1 doi tuong) theo table_name + record_id.
+ * Uu tien dong co marker "lifecycle":true; neu chua co thi lay dong CRUD dau tien.
  */
+const CRUD_AUDIT_ACTIONS = "('CREATE','UPDATE','DELETE','DISABLE','REACTIVATE')";
+
 async function findLifecycleAuditLog(tableName, recordId) {
   if (!tableName || recordId == null || recordId === '') return null;
   const result = await query(
-    `SELECT TOP 1 id, action, description, new_value, entity_code, logged_at
+    `SELECT TOP 1 id, action, description, new_value, entity_code, user_name, logged_at
      FROM audit_logs
      WHERE table_name = @p1 AND record_id = @p2
        AND (
@@ -840,13 +858,42 @@ async function findLifecycleAuditLog(tableName, recordId) {
   if (result.recordset?.[0]) return result.recordset[0];
 
   const fallback = await query(
-    `SELECT TOP 1 id, action, description, new_value, entity_code, logged_at
+    `SELECT TOP 1 id, action, description, new_value, entity_code, user_name, logged_at
      FROM audit_logs
      WHERE table_name = @p1 AND record_id = @p2
+       AND action IN ${CRUD_AUDIT_ACTIONS}
      ORDER BY id ASC`,
     { p1: String(tableName).slice(0, 50), p2: Number(recordId) || recordId }
   );
   return fallback.recordset?.[0] || null;
+}
+
+/** Cac dong CRUD cung doi tuong — dung de gom lich su roi xoa log rac. */
+async function listCrudAuditLogs(tableName, recordId) {
+  if (!tableName || recordId == null || recordId === '') return [];
+  const result = await query(
+    `SELECT id, action, description, new_value, entity_code, user_name, logged_at
+     FROM audit_logs
+     WHERE table_name = @p1 AND record_id = @p2
+       AND action IN ${CRUD_AUDIT_ACTIONS}
+     ORDER BY id ASC`,
+    { p1: String(tableName).slice(0, 50), p2: Number(recordId) || recordId }
+  );
+  return result.recordset || [];
+}
+
+async function deleteAuditLogsByIds(ids) {
+  const list = (Array.isArray(ids) ? ids : [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  if (!list.length) return 0;
+  // Xoa tung id de tranh IN dong qua dai; so dong rac moi entity thuong < 10.
+  let deleted = 0;
+  for (const id of list) {
+    const result = await query('DELETE FROM audit_logs WHERE id = @p1', { p1: id });
+    deleted += result.rowsAffected?.[0] || 0;
+  }
+  return deleted;
 }
 
 /** Cap nhat ban ghi lifecycle + bump logged_at de len dau danh sach. */
@@ -904,6 +951,8 @@ module.exports = {
   getEntityDefinitions,
   getAuditLogsByUser,
   findLifecycleAuditLog,
+  listCrudAuditLogs,
+  deleteAuditLogsByIds,
   updateAuditLog,
   AUTH_AUDIT_ACTIONS,
 };

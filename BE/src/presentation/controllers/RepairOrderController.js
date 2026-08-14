@@ -35,6 +35,8 @@ class RepairOrderController {
         bayId: req.body.bayId,
         bayNumber: req.body.bayNumber,
       });
+      // Chan middleware ghi log trung — doi setTechnicians moi ghi 1 dong lifecycle.
+      req._manualAuditWritten = true;
       return success(res, item, 'Repair order claimed', 201);
     } catch (err) {
       next(err);

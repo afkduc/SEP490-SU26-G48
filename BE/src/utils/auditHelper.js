@@ -1,5 +1,10 @@
 const { query } = require('../infrastructure/database/sqlServer');
 const AuditRepository = require('../infrastructure/repositories/AuditRepository');
+const {
+  inferEntityLifecycleStep,
+  seedLifecycleFromExisting,
+  buildLifecycleDescription,
+} = require('./auditLifecycleStep');
 
 const ACTION_TYPES = {
   CREATE: 'CREATE',
@@ -73,8 +78,8 @@ function buildDescription(action, entityName, entityCode, userName) {
   if (action) parts.push(action);
   if (entityName) parts.push(entityName);
   if (entityCode) parts.push(`(${entityCode})`);
-  if (userName) parts.push(`by ${userName}`);
-  return parts.join(' ') || 'Unknown action';
+  if (userName) parts.push(`bởi ${userName}`);
+  return parts.join(' ') || 'Thao tác không xác định';
 }
 
 /**
@@ -368,18 +373,11 @@ async function auditLifecycle(req, opts = {}) {
     };
 
     const existing = await AuditRepository.findLifecycleAuditLog(tableName, recordId);
-    let prevPayload = null;
-    if (existing?.new_value) {
-      try {
-        prevPayload = typeof existing.new_value === 'string'
-          ? JSON.parse(existing.new_value)
-          : existing.new_value;
-      } catch {
-        prevPayload = null;
-      }
-    }
+    const siblings = typeof AuditRepository.listCrudAuditLogs === 'function'
+      ? await AuditRepository.listCrudAuditLogs(tableName, recordId)
+      : (existing ? [existing] : []);
+    const seeded = seedLifecycleFromExisting(existing, siblings);
 
-    const prevSteps = Array.isArray(prevPayload?.steps) ? prevPayload.steps : [];
     const stepEntry = {
       step,
       label,
@@ -387,12 +385,12 @@ async function auditLifecycle(req, opts = {}) {
       by: userName,
       description: description || label,
     };
-    const steps = [...prevSteps, stepEntry];
+    const steps = [...seeded.steps, stepEntry];
     const stepLabels = steps.map((s) => s.label || s.step).filter(Boolean);
-    const desc =
+    const baseDesc =
       description ||
-      `${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}: ${label}`
-        + (stepLabels.length > 1 ? ` — Lịch sử: ${stepLabels.join(' → ')}` : '');
+      `${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}: ${label}`;
+    const desc = buildLifecycleDescription(baseDesc, stepLabels);
 
     const newValue = {
       lifecycle: true,
@@ -400,7 +398,7 @@ async function auditLifecycle(req, opts = {}) {
       currentStepLabel: label,
       steps,
       snapshot: {
-        ...(prevPayload?.snapshot && typeof prevPayload.snapshot === 'object' ? prevPayload.snapshot : {}),
+        ...seeded.snapshot,
         ...cleanSnapshot,
       },
     };
@@ -427,6 +425,12 @@ async function auditLifecycle(req, opts = {}) {
         branch_id: branchId,
         description: desc,
       });
+      const extraIds = siblings.map((row) => row.id).filter((id) => id && id !== existing.id);
+      if (extraIds.length && typeof AuditRepository.deleteAuditLogsByIds === 'function') {
+        await AuditRepository.deleteAuditLogsByIds(extraIds).catch((e) => {
+          console.warn('[auditHelper] collapse duplicate logs failed:', e.message);
+        });
+      }
       if (req && typeof req === 'object') {
         req._manualAuditWritten = true;
         req._lastAuditLogId = updatedId;
@@ -458,6 +462,23 @@ const auditCrud = {
   lifecycle: auditLifecycle,
 
   async create(req, { tableName, entityCode, recordId, entityName, data, description }) {
+    const inferred = inferEntityLifecycleStep({ kind: 'create', data, description });
+    const desc =
+      description ||
+      `Tạo mới ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`;
+    if (recordId != null && recordId !== '') {
+      return auditLifecycle(req, {
+        tableName,
+        entityCode,
+        recordId,
+        entityName,
+        step: inferred.step,
+        stepLabel: inferred.stepLabel,
+        action: ACTION_TYPES.CREATE,
+        description: desc,
+        snapshot: data,
+      });
+    }
     return auditLog({
       req,
       action: ACTION_TYPES.CREATE,
@@ -466,13 +487,28 @@ const auditCrud = {
       recordId,
       entityName,
       newValue: data,
-      description:
-        description ||
-        `Tạo mới ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`,
+      description: desc,
     });
   },
 
   async update(req, { tableName, entityCode, recordId, entityName, oldData, newData, description }) {
+    const inferred = inferEntityLifecycleStep({ kind: 'update', data: newData, description });
+    const desc =
+      description ||
+      `Cập nhật ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`;
+    if (recordId != null && recordId !== '') {
+      return auditLifecycle(req, {
+        tableName,
+        entityCode,
+        recordId,
+        entityName,
+        step: inferred.step,
+        stepLabel: inferred.stepLabel,
+        action: inferred.action === 'DELETE' ? ACTION_TYPES.DELETE : ACTION_TYPES.UPDATE,
+        description: desc,
+        snapshot: newData,
+      });
+    }
     return auditLog({
       req,
       action: ACTION_TYPES.UPDATE,
@@ -482,13 +518,26 @@ const auditCrud = {
       entityName,
       oldValue: oldData,
       newValue: newData,
-      description:
-        description ||
-        `Cập nhật ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`,
+      description: desc,
     });
   },
 
   async delete(req, { tableName, entityCode, recordId, entityName, oldData }) {
+    const inferred = inferEntityLifecycleStep({ kind: 'delete', data: oldData });
+    const desc = `Xóa ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`;
+    if (recordId != null && recordId !== '') {
+      return auditLifecycle(req, {
+        tableName,
+        entityCode,
+        recordId,
+        entityName,
+        step: inferred.step,
+        stepLabel: inferred.stepLabel,
+        action: ACTION_TYPES.DELETE,
+        description: desc,
+        snapshot: oldData,
+      });
+    }
     return auditLog({
       req,
       action: ACTION_TYPES.DELETE,
@@ -497,7 +546,7 @@ const auditCrud = {
       recordId,
       entityName,
       oldValue: oldData,
-      description: `Xóa ${entityName || tableName}${entityCode ? ` ${entityCode}` : ''}`,
+      description: desc,
     });
   },
 
@@ -531,43 +580,99 @@ const auditCrud = {
     });
   },
 
-  async changePassword(req, { targetUserName }) {
+  async changePassword(req, { targetUserName, recordId = null }) {
+    const desc = `Đổi mật khẩu${targetUserName ? ` người dùng ${targetUserName}` : ''}`;
+    if (recordId != null && recordId !== '') {
+      return auditLifecycle(req, {
+        tableName: 'users',
+        entityCode: targetUserName,
+        recordId,
+        entityName: 'Người dùng',
+        step: 'password_changed',
+        stepLabel: 'Đổi mật khẩu',
+        action: ACTION_TYPES.CHANGE_PASSWORD,
+        description: desc,
+        snapshot: { passwordChanged: true },
+      });
+    }
     return auditLog({
       req,
       action: ACTION_TYPES.CHANGE_PASSWORD,
       tableName: 'users',
       entityCode: targetUserName,
-      description: `Đổi mật khẩu${targetUserName ? ` user ${targetUserName}` : ''}`,
+      description: desc,
     });
   },
 
-  async resetPassword(req, { targetUserName, newPassword }) {
+  async resetPassword(req, { targetUserName, newPassword, recordId = null }) {
+    const desc = `Đặt lại mật khẩu${targetUserName ? ` người dùng ${targetUserName}` : ''}`;
+    if (recordId != null && recordId !== '') {
+      return auditLifecycle(req, {
+        tableName: 'users',
+        entityCode: targetUserName,
+        recordId,
+        entityName: 'Người dùng',
+        step: 'password_reset',
+        stepLabel: 'Đặt lại mật khẩu',
+        action: ACTION_TYPES.RESET_PASSWORD,
+        description: desc,
+        snapshot: { passwordReset: true },
+      });
+    }
     return auditLog({
       req,
       action: ACTION_TYPES.RESET_PASSWORD,
       tableName: 'users',
       entityCode: targetUserName,
-      description: `Đặt lại mật khẩu${targetUserName ? ` user ${targetUserName}` : ''}`,
+      description: desc,
     });
   },
 
-  async assignRole(req, { userName, roleName }) {
+  async assignRole(req, { userName, roleName, recordId = null }) {
+    const desc = `Gán vai trò "${roleName}" cho người dùng ${userName}`;
+    if (recordId != null && recordId !== '') {
+      return auditLifecycle(req, {
+        tableName: 'users',
+        entityCode: userName,
+        recordId,
+        entityName: 'Người dùng',
+        step: 'role_assigned',
+        stepLabel: 'Gán vai trò',
+        action: ACTION_TYPES.ASSIGN_ROLE,
+        description: desc,
+        snapshot: { roleName },
+      });
+    }
     return auditLog({
       req,
       action: ACTION_TYPES.ASSIGN_ROLE,
       tableName: 'user_role',
       entityCode: userName,
-      description: `Gán vai trò "${roleName}" cho user ${userName}`,
+      description: desc,
     });
   },
 
-  async removeRole(req, { userName, roleName }) {
+  async removeRole(req, { userName, roleName, recordId = null }) {
+    const desc = `Xóa vai trò "${roleName}" của người dùng ${userName}`;
+    if (recordId != null && recordId !== '') {
+      return auditLifecycle(req, {
+        tableName: 'users',
+        entityCode: userName,
+        recordId,
+        entityName: 'Người dùng',
+        step: 'role_revoked',
+        stepLabel: 'Thu hồi vai trò',
+        action: ACTION_TYPES.REMOVE_ROLE,
+        description: desc,
+        snapshot: { roleName },
+      });
+    }
     return auditLog({
       req,
       action: ACTION_TYPES.REMOVE_ROLE,
       tableName: 'user_role',
       entityCode: userName,
-      description: `Xóa vai trò "${roleName}" của user ${userName}`,
+      description: desc,
     });
   },
 

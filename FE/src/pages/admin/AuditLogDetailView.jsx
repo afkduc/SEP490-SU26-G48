@@ -17,6 +17,7 @@ import {
   isSameAuditPayload,
   isAuditSignatureValue,
   getLifecycleSteps,
+  getLifecycleStepLabel,
   enrichAuditDisplaySource,
   AUDIT_TABLE_LABELS,
 } from '../../utils/auditDisplay';
@@ -516,14 +517,14 @@ export function AuditLogDetailContent({ log }) {
       {lifecycleSteps.length > 0 && (
         <div className="audit-detail__lifecycle" style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-            Lịch sử các bước trên phiếu này
+            Lịch sử các bước trên đối tượng này
           </label>
           <ol style={{ margin: 0, paddingLeft: 18, display: 8 }}>
             {lifecycleSteps.map((s, i) => {
               const when = s?.at ? formatLocal(s.at) : null;
               return (
                 <li key={`${s?.step || 's'}-${i}`} style={{ fontSize: 13, color: '#334155' }}>
-                  <strong>{s?.label || s?.step || `Bước ${i + 1}`}</strong>
+                  <strong>{s?.label || getLifecycleStepLabel(s?.step) || `Bước ${i + 1}`}</strong>
                   {s?.by ? <span style={{ color: '#64748b' }}> — {s.by}</span> : null}
                   {when?.main ? <span style={{ color: '#94a3b8' }}> · {when.main}</span> : null}
                   {s?.description && s.description !== (s.label || s.step) ? (

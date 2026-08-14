@@ -136,7 +136,19 @@ class ProfileController {
   async logoutAllMyDevices(req, res, next) {
     try {
       const DeviceService = require('../../application/services/DeviceService');
+      const { auditLifecycle } = require('../../utils/auditHelper');
       const result = await new DeviceService().forceLogoutAllDevices(req.user.userId);
+      await auditLifecycle(req, {
+        tableName: 'users',
+        recordId: req.user.userId,
+        entityCode: req.user.email || `ID-${req.user.userId}`,
+        entityName: 'Người dùng',
+        step: 'force_logout',
+        stepLabel: 'Đăng xuất mọi thiết bị',
+        action: 'FORCE_LOGO',
+        description: 'Đăng xuất mọi thiết bị của tôi',
+        snapshot: { revoked: result?.revoked ?? null },
+      });
       return success(
         res,
         result,

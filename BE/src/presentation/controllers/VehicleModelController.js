@@ -1,5 +1,6 @@
 const { success } = require('../../utils/response');
 const ApiError = require('../../utils/ApiError');
+const { auditCrud } = require('../../utils/auditHelper');
 
 // Goi y "Tên xe" (doi xe) luc CVDV go tay cho xe MOI trong form tao phieu
 // quyet toan - xem RepairSettlementPage.jsx. Chi la du lieu tham khao de go
@@ -25,6 +26,14 @@ class VehicleModelController {
       const modelName = String(req.body?.modelName || '').trim();
       if (!modelName) throw new ApiError(400, 'Phải nhập tên xe');
       const item = await this.vehicleModelRepository.create({ brandId: req.body?.brandId, modelName });
+      await auditCrud.create(req, {
+        tableName: 'vehicle_models',
+        entityCode: item?.modelName || modelName,
+        recordId: item?.id || null,
+        entityName: 'Dòng xe',
+        data: { brandId: req.body?.brandId, modelName },
+        description: `Thêm dòng xe ${modelName}`,
+      });
       return success(res, item, 'Vehicle model created');
     } catch (err) {
       next(err);

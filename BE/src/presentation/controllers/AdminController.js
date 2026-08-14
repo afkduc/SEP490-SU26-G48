@@ -315,10 +315,25 @@ class AdminController {
   forceLogoutDevice = async (req, res, next) => {
     try {
       const result = await this.deviceService.forceLogoutDevice(req.params.deviceId);
-      await auditCrud.forceLogout(req, {
-        targetUserName: result?.userName || null,
-        reason: 'Đăng xuất thiết bị',
-      });
+      if (result?.userId) {
+        const { auditLifecycle } = require('../../utils/auditHelper');
+        await auditLifecycle(req, {
+          tableName: 'users',
+          recordId: result.userId,
+          entityCode: result.userName || `ID-${result.userId}`,
+          entityName: 'Người dùng',
+          step: 'force_logout',
+          stepLabel: 'Đăng xuất thiết bị',
+          action: 'FORCE_LOGO',
+          description: `Đăng xuất thiết bị của ${result.userName || result.userId}`,
+          snapshot: { deviceId: Number(req.params.deviceId) || null },
+        });
+      } else {
+        await auditCrud.forceLogout(req, {
+          targetUserName: result?.userName || null,
+          reason: 'Đăng xuất thiết bị',
+        });
+      }
       return success(res, result, 'Da dang xuat khoi thiet bi');
     } catch (err) {
       next(err);
@@ -415,6 +430,7 @@ class AdminController {
       await auditCrud.assignRole(req, {
         userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
         roleName: roles?.[0]?.roleName || roleIds?.join(','),
+        recordId: Number(req.params.userId) || null,
       });
       // SSE push: user vua duoc gan role moi -> can refresh permission ngay.
       try {
@@ -446,7 +462,8 @@ class AdminController {
       );
       await auditCrud.removeRole(req, {
         userName: roles?.[0]?.userName || `ID-${req.params.userId}`,
-        roleName: `role-${req.params.roleId}`,
+        roleName: roles?.[0]?.roleName || `vai trò #${req.params.roleId}`,
+        recordId: Number(req.params.userId) || null,
       });
       // SSE push: user vua bi revoke role -> mat quyen, can refresh ngay.
       try {
@@ -536,6 +553,12 @@ class AdminController {
         updated?.name ||
         updated?.email ||
         `ID-${userId}`;
+      const statusChanged = status != null && oldData.status && status !== oldData.status;
+      const auditDescription = status === 'inactive' && (statusChanged || Object.keys(oldData).length === 0)
+        ? `Khóa tài khoản ${displayName}`
+        : status === 'active' && oldData.status === 'inactive'
+          ? `Kích hoạt lại ${displayName}`
+          : `Cập nhật người dùng ${displayName}`;
       await auditCrud.update(req, {
         tableName: 'users',
         entityCode: displayName,
@@ -553,7 +576,7 @@ class AdminController {
           scopeAllBranches,
           name: displayName,
         },
-        description: `Cập nhật người dùng ${displayName}`,
+        description: auditDescription,
       });
       const eventType = status === 'inactive' ? 'USER_DISABLED' : 'USER_UPDATED';
 
@@ -625,6 +648,7 @@ class AdminController {
 
       await auditCrud.resetPassword(req, {
         targetUserName: result?.userName || result?.user_code || `ID-${targetUserId}`,
+        recordId: targetUserId,
       });
       await this.notificationService
         .notifyAdmins(

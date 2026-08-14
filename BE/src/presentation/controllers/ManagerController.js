@@ -92,13 +92,18 @@ class ManagerController {
   async updateEmployee(req, res, next) {
     try {
       const data = await this.managerService.updateEmployee(req.user.branchId, req.params.id, req.body);
+      const status = req.body?.status || data?.status;
+      const name = data?.fullName || data?.employeeId || req.params.id;
+      const description = status === 'inactive'
+        ? `Khóa / nghỉ việc nhân viên ${name}`
+        : `Cập nhật nhân viên ${name}`;
       await auditCrud.update(req, {
         tableName: 'users',
         entityCode: data?.employeeId || `ID-${req.params.id}`,
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Nhân viên chi nhánh',
         newData: req.body,
-        description: `Cập nhật nhân viên ${data?.fullName || data?.employeeId || req.params.id}`,
+        description,
       });
       return success(res, data, 'Cập nhật nhân viên thành công');
     } catch (err) {
@@ -116,7 +121,7 @@ class ManagerController {
         tableName: 'users',
         entityCode: `NV-ID-${req.params.id}`,
         recordId: Number(req.params.id) || null,
-        entityName: 'Thành viên đội',
+        entityName: 'Nhân viên chi nhánh',
         newData: { memberIds: req.body.memberIds || [] },
         description: `Cập nhật thành viên đội của tổ trưởng #${req.params.id}`,
       });
@@ -132,10 +137,10 @@ class ManagerController {
     try {
       const data = await this.managerService.setBayNumbers(req.user.branchId, req.params.id, req.body.bayNumbers || []);
       await auditCrud.update(req, {
-        tableName: 'vehicle_bays',
+        tableName: 'users',
         entityCode: `NV-ID-${req.params.id}`,
         recordId: Number(req.params.id) || null,
-        entityName: 'Khoang xe phụ trách',
+        entityName: 'Nhân viên chi nhánh',
         newData: { bayNumbers: req.body.bayNumbers || [] },
         description: `Cập nhật khoang xe phụ trách của tổ trưởng #${req.params.id}`,
       });
@@ -205,13 +210,19 @@ class ManagerController {
   async updateService(req, res, next) {
     try {
       const data = await this.managerService.updateService(req.user.branchId, req.params.id, req.body);
+      const isActive = req.body?.isActive;
+      const description = isActive === false
+        ? `Ngừng áp dụng dịch vụ ${data?.code || req.params.id}`
+        : isActive === true
+          ? `Kích hoạt lại dịch vụ ${data?.code || req.params.id}`
+          : `Cập nhật dịch vụ ${data?.code || req.params.id}`;
       await auditCrud.update(req, {
         tableName: 'services',
         entityCode: data?.code || `ID-${req.params.id}`,
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Dịch vụ',
         newData: req.body,
-        description: `Cập nhật dịch vụ ${data?.code || req.params.id}`,
+        description,
       });
       return success(res, data, 'Cập nhật dịch vụ thành công');
     } catch (err) {
@@ -261,13 +272,19 @@ class ManagerController {
   async updateServicePackage(req, res, next) {
     try {
       const data = await this.managerService.updateServicePackage(req.user.branchId, req.params.id, req.body);
+      const isActive = req.body?.isActive;
+      const description = isActive === false
+        ? `Ngừng áp dụng gói dịch vụ ${data?.code || req.params.id}`
+        : isActive === true
+          ? `Kích hoạt lại gói dịch vụ ${data?.code || req.params.id}`
+          : `Cập nhật gói dịch vụ ${data?.code || req.params.id}`;
       await auditCrud.update(req, {
         tableName: 'service_packages',
         entityCode: data?.code || `ID-${req.params.id}`,
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Gói dịch vụ',
         newData: req.body,
-        description: `Cập nhật gói dịch vụ ${data?.code || req.params.id}`,
+        description,
       });
       return success(res, data, 'Cập nhật gói dịch vụ thành công');
     } catch (err) {
@@ -356,13 +373,18 @@ class ManagerController {
   async updateTechnician(req, res, next) {
     try {
       const data = await this.managerService.updateTechnician(req.user.branchId, req.params.id, req.body);
+      const status = req.body?.status || data?.status;
+      const name = data?.fullName || data?.employeeId || req.params.id;
+      const description = status === 'inactive'
+        ? `Khóa / nghỉ việc thợ máy ${name}`
+        : `Cập nhật thợ máy ${name}`;
       await auditCrud.update(req, {
         tableName: 'users',
         entityCode: data?.employeeId || `ID-${req.params.id}`,
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Thợ máy',
         newData: req.body,
-        description: `Cập nhật thợ máy ${data?.fullName || data?.employeeId || req.params.id}`,
+        description,
       });
       return success(res, data, 'Cập nhật thợ máy thành công');
     } catch (err) {

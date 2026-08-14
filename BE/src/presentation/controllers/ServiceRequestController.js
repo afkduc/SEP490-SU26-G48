@@ -123,12 +123,12 @@ class ServiceRequestController {
         branchId: req.user.branchId,
       });
       const appointmentAt = req.body?.appointmentAt || item?.appointment?.appointmentAt || null;
-      await auditCrud.create(req, {
-        tableName: 'service_request_appointments',
+      await auditCrud.update(req, {
+        tableName: 'service_requests',
         entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
-        recordId: item?.appointment?.id || item?.id || Number(req.params.id) || null,
-        entityName: 'Lịch hẹn dịch vụ',
-        data: req.body,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Yêu cầu dịch vụ',
+        newData: { appointmentAt, appointmentId: item?.appointment?.id || null },
         description: `Cố vấn tạo lịch hẹn${appointmentAt ? ` lúc ${appointmentAt}` : ''} cho yêu cầu của ${item?.fullName || 'khách'} (${serviceRequestCode(item) || req.params.id})`,
       });
       return success(res, item, 'Appointment created', 201);
@@ -147,11 +147,11 @@ class ServiceRequestController {
       );
       const appointmentAt = req.body?.appointmentAt || item?.appointment?.appointmentAt || null;
       await auditCrud.update(req, {
-        tableName: 'service_request_appointments',
+        tableName: 'service_requests',
         entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
-        recordId: Number(req.params.appointmentId) || item?.appointment?.id || null,
-        entityName: 'Lịch hẹn dịch vụ',
-        newData: req.body,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Yêu cầu dịch vụ',
+        newData: { ...req.body, appointmentId: Number(req.params.appointmentId) || item?.appointment?.id || null },
         description: `Cố vấn cập nhật lịch hẹn${appointmentAt ? ` sang ${appointmentAt}` : ''} của yêu cầu ${serviceRequestCode(item) || req.params.id}`,
       });
       return success(res, item, 'Appointment updated');
@@ -169,11 +169,11 @@ class ServiceRequestController {
         { userId: req.user.userId, branchId: req.user.branchId }
       );
       await auditCrud.update(req, {
-        tableName: 'service_request_appointments',
+        tableName: 'service_requests',
         entityCode: serviceRequestCode(item) || serviceRequestCode(req.params.id),
-        recordId: Number(req.params.appointmentId) || item?.appointment?.id || null,
-        entityName: 'Lịch hẹn dịch vụ',
-        newData: { cancelled: true, reason: req.body.reason },
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Yêu cầu dịch vụ',
+        newData: { cancelled: true, reason: req.body.reason, appointmentId: Number(req.params.appointmentId) || null },
         description: `Cố vấn hủy lịch hẹn của yêu cầu ${serviceRequestCode(item) || req.params.id}${req.body.reason ? ` — lý do: ${req.body.reason}` : ''}`,
       });
       return success(res, item, 'Appointment cancelled');
