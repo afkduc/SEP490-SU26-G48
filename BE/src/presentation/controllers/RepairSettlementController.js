@@ -63,8 +63,24 @@ class RepairSettlementController {
     try {
       const branchId = Number(req.body.branchId);
       if (!branchId) throw new ApiError(400, 'Thiếu chi nhánh');
-      const result = await this.repairSettlementService.confirmGateExit(req.params.id, branchId);
-      return success(res, result, 'Gate exit confirmed');
+      const item = await this.repairSettlementService.confirmGateExit(req.params.id, branchId);
+      // Man cong khong dang nhap — ghi vao CUNG 1 log lifecycle cua phieu QT.
+      req.user = { name: 'Bảo vệ (cổng)', branchId };
+      await auditCrud.lifecycle(req, {
+        tableName: 'repair_settlements',
+        entityCode: item?.code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Phiếu quyết toán',
+        step: 'gate_exit',
+        stepLabel: 'Bảo vệ mở cổng / xe ra cổng',
+        action: 'UPDATE',
+        description: 'Phiếu quyết toán: bảo vệ xác nhận đúng xe — đã mở cổng, xe ra khỏi xưởng',
+        snapshot: settlementSnapshot(item, {
+          deliveryDate: item?.deliveryDate || new Date().toISOString().slice(0, 10),
+        }),
+        branchId,
+      });
+      return success(res, { id: Number(req.params.id) }, 'Gate exit confirmed');
     } catch (err) {
       next(err);
     }

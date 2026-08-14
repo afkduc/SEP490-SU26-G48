@@ -285,6 +285,39 @@ test('getPublicHistoryByPlateOrFrame rejects empty identifier', async () => {
   );
 });
 
+test('confirmGateExit rejects when repository cannot confirm', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      confirmGateExit: async () => false,
+    }),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.confirmGateExit(50, 1),
+    (err) => err.statusCode === 409 && /ra cổng/i.test(err.message),
+  );
+});
+
+test('confirmGateExit returns settlement after setting delivery', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      confirmGateExit: async () => true,
+      findById: async () => ({
+        id: 50,
+        code: 'RO-2026-106',
+        status: 'invoiced',
+        deliveryDate: '2026-08-15',
+        customer: { fullName: 'Nguyễn Minh Tâm' },
+        vehicle: { licensePlate: '30A-123.45' },
+      }),
+    }),
+    customerRepository: {},
+  });
+  const item = await service.confirmGateExit(50, 1);
+  assert.equal(item.code, 'RO-2026-106');
+  assert.equal(item.deliveryDate, '2026-08-15');
+});
+
 test('getPublicHistoryByPlateOrFrame returns null when not found (no 404 leak)', async () => {
   const service = new RepairSettlementService({
     repairSettlementRepository: mockRepos({

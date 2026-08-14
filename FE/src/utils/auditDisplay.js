@@ -2,7 +2,7 @@
  * Hiển thị nhật ký hoạt động bằng tiếng Việt dễ hiểu (không cần biết code).
  */
 import { getPermissionScreenLabel, getScreenLabel } from './screenLabels';
-import { formatDateSafeWithOffset, secondsSince, getClockOffsetMs } from './dateUtils';
+import { formatDateSafeWithOffset, formatDateOnly, secondsSince, getClockOffsetMs } from './dateUtils';
 import { formatPhoneDisplay } from './validation';
 
 export const AUDIT_ACTION_LABELS = {
@@ -263,6 +263,8 @@ export const AUDIT_FIELD_LABELS = {
   signer_name: 'Người ký',
   signedAt: 'Thời điểm ký',
   signed_at: 'Thời điểm ký',
+  deliveryDate: 'Ngày giao xe',
+  delivery_date: 'Ngày giao xe',
   unitPrice: 'Đơn giá',
   unit_price: 'Đơn giá',
   qty: 'Số lượng',
@@ -796,6 +798,8 @@ export function humanizeRequestUrl(url) {
   if (/\/auth\/forgot|\/auth\/reset/.test(path)) return 'Quên / đặt lại mật khẩu';
   if (/\/repair-orders|\/repairorders/.test(path)) return 'Thao tác lệnh sửa chữa';
   if (/\/repair-settlements|\/service-orders/.test(path)) return 'Thao tác phiếu quyết toán';
+  if (/\/public\/gate\/[^/]+\/confirm-exit/.test(path)) return 'Bảo vệ mở cổng / xe ra cổng';
+  if (/\/public\/gate/.test(path)) return 'Màn hình bảo vệ tại cổng';
   if (/\/service-requests/.test(path)) return 'Thao tác yêu cầu dịch vụ';
   if (/\/vehicle-bays/.test(path)) return 'Thao tác khoang xe';
   if (/\/payos/.test(path)) return 'Thanh toán PayOS';
@@ -1296,6 +1300,9 @@ export function formatAuditFieldValue(key, value) {
   if (kind === 'items') return formatSettlementItems(value);
   if (kind === 'money') return formatMoneyVi(value);
   if (kind === 'km') return formatKmVi(value);
+  if (k === 'deliveryDate' || k === 'delivery_date' || k === 'intakeDate' || k === 'intake_date') {
+    return formatDateOnly(value) || String(value);
+  }
 
   // Hash xác thực PayOS (không phải ảnh chữ ký tay)
   if (
@@ -1475,6 +1482,7 @@ const SETTLEMENT_PREFERRED_KEYS = [
   'hasSignature',
   'signatureData',
   'signedAt',
+  'deliveryDate',
   'performedByName',
   'status',
   'taskNames',

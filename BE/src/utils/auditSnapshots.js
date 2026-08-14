@@ -43,6 +43,7 @@ function settlementSnapshot(item, extra = {}) {
     signerName: item.signerName || null,
     hasSignature: Boolean(item.signatureData || item.hasSignature || item.signerName),
     paymentMethod: item.paymentMethod || extra.paymentMethod || null,
+    deliveryDate: item.deliveryDate || extra.deliveryDate || null,
     items: item.items || [],
     ...extra,
   };

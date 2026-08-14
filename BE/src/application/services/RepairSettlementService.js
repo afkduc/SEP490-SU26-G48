@@ -342,7 +342,8 @@ class RepairSettlementService {
     const ok = await this.repairSettlementRepository.confirmGateExit(id, branchId);
     if (!ok) throw new ApiError(409, 'Phiếu không tồn tại, không thuộc chi nhánh này, hoặc đã được xác nhận ra cổng trước đó');
     emitRepairOrderEvent(branchId, 'gate-exit-confirmed', { settlementId: Number(id) });
-    return { id: Number(id) };
+    const entity = await this.repairSettlementRepository.findById(id);
+    return entity;
   }
 
   // ─── PayOS ───────────────────────────────────────────────────────
