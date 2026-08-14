@@ -149,12 +149,42 @@ export const AUDIT_FIELD_LABELS = {
   totalQuantity: 'Tổng số lượng',
   currentStepLabel: 'Bước hiện tại',
   repairRedo: 'Xe sửa chữa lại',
+  repair_redo: 'Xe sửa chữa lại',
   hasAppointment: 'Xe có đặt hẹn',
+  has_appointment: 'Xe có đặt hẹn',
   warrantyVehicle: 'Xe bảo hành',
+  warranty_vehicle: 'Xe bảo hành',
+  isWarranty: 'Xe bảo hành',
+  is_warranty: 'Xe bảo hành',
   dealerKeepsOldParts: 'Đại lý giữ phụ tùng cũ',
+  dealer_keeps_old_parts: 'Đại lý giữ phụ tùng cũ',
   returnOldPartsToCustomer: 'Trả phụ tùng cũ cho khách',
+  return_old_parts_to_customer: 'Trả phụ tùng cũ cho khách',
   carWash: 'Rửa xe',
+  car_wash: 'Rửa xe',
   customerWaitsAtShop: 'Khách hàng chờ tại xưởng',
+  customer_waits_at_shop: 'Khách hàng chờ tại xưởng',
+  frameNumber: 'Số khung',
+  frame_number: 'Số khung',
+  engineNumber: 'Số máy',
+  engine_number: 'Số máy',
+  purchaseDate: 'Ngày mua xe',
+  purchase_date: 'Ngày mua xe',
+  taxCode: 'Mã số thuế',
+  tax_code: 'Mã số thuế',
+  cccd: 'CCCD / CMND',
+  contactPerson: 'Người liên hệ',
+  contact_person: 'Người liên hệ',
+  contactPhone: 'SĐT người liên hệ',
+  contact_phone: 'SĐT người liên hệ',
+  advisorId: 'Mã cố vấn dịch vụ',
+  advisor_id: 'Mã cố vấn dịch vụ',
+  lastKnownKm: 'Số km lần trước',
+  last_known_km: 'Số km lần trước',
+  warrantyEndDate: 'Hết hạn bảo hành',
+  warranty_end_date: 'Hết hạn bảo hành',
+  warrantyKmLimit: 'Hạn định km bảo hành',
+  warranty_km_limit: 'Hạn định km bảo hành',
   repairOrderCode: 'Mã lệnh sửa chữa',
   memberIds: 'Danh sách thành viên (ID)',
   teamLeaderId: 'Mã tổ trưởng',
@@ -496,12 +526,67 @@ const FIELD_TOKEN_VI = {
   nearest: 'gần nhất',
   other: 'khác',
   car: 'xe',
-  brand: 'hãng',
   checksum: 'kiểm tra',
   currency: 'tiền tệ',
   account: 'tài khoản',
   paid: 'đã thanh toán',
+  has: 'có',
+  have: 'có',
+  warranty: 'bảo hành',
+  dealer: 'đại lý',
+  keep: 'giữ',
+  keeps: 'giữ',
+  part: 'phụ tùng',
+  parts: 'phụ tùng',
+  return: 'trả',
+  to: 'cho',
+  for: 'cho',
+  of: 'của',
+  from: 'từ',
+  with: 'kèm',
+  and: 'và',
+  or: 'hoặc',
+  in: 'trong',
+  on: 'trên',
+  wash: 'rửa',
+  wait: 'chờ',
+  waits: 'chờ',
+  waiting: 'chờ',
+  shop: 'xưởng',
+  redo: 'sửa lại',
+  limit: 'hạn mức',
+  end: 'kết thúc',
+  known: 'đã biết',
+  frame: 'khung',
+  engine: 'máy',
+  tax: 'thuế',
+  contact: 'liên hệ',
+  advisor: 'cố vấn',
+  intake: 'tiếp nhận',
+  checklist: 'danh mục kiểm tra',
+  priority: 'mức độ ưu tiên',
+  info: 'thông tin',
+  wash: 'rửa',
 };
+
+function normalizeAuditFieldKey(key) {
+  return String(key || '')
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[-\s]+/g, '_')
+    .toLowerCase();
+}
+
+const FIELD_LABEL_BY_NORM = (() => {
+  const map = Object.create(null);
+  Object.entries(AUDIT_FIELD_LABELS).forEach(([key, label]) => {
+    map[key] = label;
+    map[key.toLowerCase()] = label;
+    map[normalizeAuditFieldKey(key)] = label;
+    map[normalizeAuditFieldKey(key).replace(/_/g, '')] = label;
+  });
+  return map;
+})();
 
 /**
  * Nhãn tiếng Việt cho khóa field trong nhật ký (ưu tiên từ điển, có fallback dễ đọc).
@@ -509,17 +594,13 @@ const FIELD_TOKEN_VI = {
 export function getAuditFieldLabel(key) {
   if (key == null || key === '') return '—';
   const raw = String(key).trim();
-  if (AUDIT_FIELD_LABELS[raw]) return AUDIT_FIELD_LABELS[raw];
-
-  const camel = raw.replace(/_([a-z])/gi, (_, c) => c.toUpperCase());
-  if (AUDIT_FIELD_LABELS[camel]) return AUDIT_FIELD_LABELS[camel];
-
-  const snake = raw
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/[-\s]+/g, '_')
-    .toLowerCase();
-  if (AUDIT_FIELD_LABELS[snake]) return AUDIT_FIELD_LABELS[snake];
-  if (AUDIT_FIELD_LABELS[raw.toLowerCase()]) return AUDIT_FIELD_LABELS[raw.toLowerCase()];
+  if (FIELD_LABEL_BY_NORM[raw]) return FIELD_LABEL_BY_NORM[raw];
+  const lower = raw.toLowerCase();
+  if (FIELD_LABEL_BY_NORM[lower]) return FIELD_LABEL_BY_NORM[lower];
+  const snake = normalizeAuditFieldKey(raw);
+  if (FIELD_LABEL_BY_NORM[snake]) return FIELD_LABEL_BY_NORM[snake];
+  const compact = snake.replace(/_/g, '');
+  if (FIELD_LABEL_BY_NORM[compact]) return FIELD_LABEL_BY_NORM[compact];
 
   const parts = snake.split('_').filter(Boolean);
   if (!parts.length) return raw;
@@ -1038,6 +1119,28 @@ export function flattenIntakeChecklistFields(source) {
   take('returnOldPartsToCustomer', o.returnOldPartsToCustomer);
   take('carWash', o.carWash);
   take('customerWaitsAtShop', o.customerWaitsAtShop);
+  if (obj.isWarranty != null && out.warrantyVehicle == null) {
+    out.warrantyVehicle = Boolean(obj.isWarranty);
+  }
+  const customer = obj.customer;
+  if (customer && typeof customer === 'object' && !Array.isArray(customer)) {
+    if (customer.fullName || customer.name) out.customerName = customer.fullName || customer.name;
+    if (customer.phone || customer.phoneNumber) out.customerPhone = customer.phone || customer.phoneNumber;
+    if (customer.address) out.address = customer.address;
+    if (customer.taxCode) out.taxCode = customer.taxCode;
+    if (customer.cccd) out.cccd = customer.cccd;
+    if (customer.email) out.email = customer.email;
+    if (customer.contactPerson) out.contactPerson = customer.contactPerson;
+    if (customer.contactPhone) out.contactPhone = customer.contactPhone;
+  }
+  const vehicle = obj.vehicle;
+  if (vehicle && typeof vehicle === 'object' && !Array.isArray(vehicle)) {
+    if (vehicle.licensePlate) out.licensePlate = vehicle.licensePlate;
+    if (vehicle.vehicleModel || vehicle.model) out.vehicleModel = vehicle.vehicleModel || vehicle.model;
+    if (vehicle.currentKm != null) out.currentKm = vehicle.currentKm;
+    if (vehicle.frameNumber) out.frameNumber = vehicle.frameNumber;
+    if (vehicle.engineNumber) out.engineNumber = vehicle.engineNumber;
+  }
   return out;
 }
 
@@ -1176,8 +1279,12 @@ export function getAuditFieldDisplayKind(key, value) {
 
 /** Format 1 giá trị field cho DiffView */
 export function formatAuditFieldValue(key, value) {
-  if (value === null || value === undefined || value === '') return '—';
   const k = String(key || '');
+  if (value === null || value === undefined || value === '') {
+    if (/paymentMethod|payment_method|httt/i.test(k)) return 'Chưa chọn';
+    if (/signature|signer/i.test(k)) return 'Chưa ký';
+    return '—';
+  }
   const kind = getAuditFieldDisplayKind(k, value);
 
   if (/password/i.test(k)) return '••••••••';
@@ -1454,7 +1561,14 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
       || key === 'snapshot'
       || key === 'currentStepLabel'
       || key === 'currentStep'
+      || key === 'intakeChecklist'
+      || key === 'intake_checklist'
+      || key === 'customer'
+      || key === 'vehicle'
+      || key === 'priority'
+      || key === 'otherInfo'
     ) return;
+    if (key === 'isWarranty' && (merged.warrantyVehicle != null)) return;
     if (merged[key] === undefined || merged[key] === null || merged[key] === '') return;
     if ((key === 'l1Granted' || key === 'l1Revoked') && Number(merged[key]) === 0) return;
     // Ẩn ID thô nếu đã có tên thợ

@@ -1281,10 +1281,10 @@
   word-break: break-all;
 }
 
-.audit-detail__json-empty {
+.audit-detail__placeholder {
   color: #94a3b8;
   font-style: italic;
-  font-size: 0.82rem;
+  font-weight: 500;
 }
 
 .audit-detail__section {

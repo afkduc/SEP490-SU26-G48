@@ -201,11 +201,32 @@ function auditRawEqual(a, b, kind) {
   }
 }
 
-function AuditDiffValue({ row }) {
-  if (!row) return '—';
-  if (row.kind === 'signature') return <AuditSignatureBlock raw={row.raw} />;
-  if (row.kind === 'items') return <SettlementItemsTable items={row.raw} />;
-  return row.value ?? '—';
+function emptyAuditPlaceholder(key) {
+  const k = String(key || '');
+  if (/paymentMethod|payment_method|httt/i.test(k)) return 'Chưa chọn';
+  if (/signature|signer/i.test(k)) return 'Chưa ký';
+  return 'Chưa có';
+}
+
+function isBlankAuditRow(row) {
+  if (!row) return true;
+  if (row.raw === false || row.raw === 0) return false;
+  if (row.raw == null || row.raw === '') return true;
+  const v = row.value;
+  return v == null || v === '' || v === '—';
+}
+
+function AuditDiffValue({ row, fieldKey }) {
+  if (row?.kind === 'signature') return <AuditSignatureBlock raw={row.raw} />;
+  if (row?.kind === 'items') return <SettlementItemsTable items={row.raw} />;
+  if (isBlankAuditRow(row)) {
+    return (
+      <span className="audit-detail__placeholder">
+        {emptyAuditPlaceholder(fieldKey || row?.key)}
+      </span>
+    );
+  }
+  return row.value;
 }
 
 function mergeAuditDiffRows(oldRows, newRows) {
@@ -301,10 +322,10 @@ function AuditSideBySideDiff({ oldRows, newRows, summary }) {
             >
               <div className="diff-label">{row.label}</div>
               <div className={row.changed ? 'diff-old' : 'diff-same'}>
-                <AuditDiffValue row={row.oldRow} />
+                <AuditDiffValue row={row.oldRow} fieldKey={row.key} />
               </div>
               <div className={row.changed ? 'diff-new' : 'diff-same'}>
-                <AuditDiffValue row={row.newRow} />
+                <AuditDiffValue row={row.newRow} fieldKey={row.key} />
               </div>
             </div>
           ))}
@@ -329,10 +350,10 @@ function AuditSideBySideDiff({ oldRows, newRows, summary }) {
             <div className="audit-detail__split-row is-changed">
               <div className="diff-label">{sigRow.label}</div>
               <div className="diff-old">
-                <AuditDiffValue row={sigRow.oldRow} />
+                <AuditDiffValue row={sigRow.oldRow} fieldKey={sigRow.key} />
               </div>
               <div className="diff-new">
-                <AuditDiffValue row={sigRow.newRow} />
+                <AuditDiffValue row={sigRow.newRow} fieldKey={sigRow.key} />
               </div>
             </div>
           </div>

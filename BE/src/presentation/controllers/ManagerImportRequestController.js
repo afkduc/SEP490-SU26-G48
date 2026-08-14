@@ -88,7 +88,7 @@ class ManagerImportRequestController {
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Phiếu nhập kho',
         newData: { status: 'approved' },
-        description: `Duyệt phiếu nhập kho ${data?.requestCode || req.params.id} (Manager)`,
+        description: `Duyệt phiếu nhập kho ${data?.requestCode || req.params.id} (quản lý chi nhánh)`,
       });
       await this.notificationService.notifyAdmins('IMPORT_REQUEST_APPROVED', {
         auditLogId: req._lastAuditLogId,
@@ -127,7 +127,7 @@ class ManagerImportRequestController {
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Phiếu nhập kho',
         newData: { status: 'rejected', reason: req.body?.rejectReason },
-        description: `Từ chối phiếu nhập kho ${data?.requestCode || req.params.id} (Manager)`,
+        description: `Từ chối phiếu nhập kho ${data?.requestCode || req.params.id} (quản lý chi nhánh)`,
       });
       await this.notificationService.notifyAdmins('IMPORT_REQUEST_REJECTED', {
         auditLogId: req._lastAuditLogId,
