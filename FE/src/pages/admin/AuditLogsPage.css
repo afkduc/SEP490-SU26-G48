@@ -1434,6 +1434,25 @@
   font-weight: 600;
 }
 
+.audit-detail__diff-hint {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.audit-detail__diff-table tr.diff-row--changed td.diff-label {
+  color: #0f172a;
+}
+
+.audit-detail__diff-table tr.diff-row--same td {
+  color: #94a3b8;
+}
+
+.audit-detail__diff-table .diff-same {
+  color: #94a3b8;
+  background: transparent;
+}
+
 .audit-detail__diff-table .diff-old {
   color: #94a3b8;
   text-decoration: line-through;

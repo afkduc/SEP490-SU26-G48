@@ -1,7 +1,5 @@
 import {
-  getAuditFieldLabel,
   humanizeAuditDescription,
-  formatAuditFieldValue,
   summarizeAuditNewValue,
   summarizeAuditObjectRows,
   formatAuditTime,
@@ -137,6 +135,97 @@ function AuditFieldCell({ row, className = 'diff-new' }) {
   return <td className={`${className}${kind === 'money' ? ' diff-money' : ''}`}>{row.value}</td>;
 }
 
+function auditRawEqual(a, b) {
+  if (a === b) return true;
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  if (typeof a !== 'object' && typeof b !== 'object') {
+    return String(a) === String(b);
+  }
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
+
+function AuditDiffValue({ row }) {
+  if (!row) return '—';
+  if (row.kind === 'signature') return <AuditSignatureBlock raw={row.raw} />;
+  if (row.kind === 'items') return <SettlementItemsTable items={row.raw} />;
+  return row.value ?? '—';
+}
+
+function mergeAuditDiffRows(oldRows, newRows) {
+  const map = new Map();
+  (oldRows || []).forEach((r) => {
+    if (!r?.key) return;
+    map.set(r.key, { key: r.key, label: r.label, kind: r.kind, oldRow: r, newRow: null });
+  });
+  (newRows || []).forEach((r) => {
+    if (!r?.key) return;
+    const prev = map.get(r.key) || {
+      key: r.key,
+      label: r.label,
+      kind: r.kind,
+      oldRow: null,
+      newRow: null,
+    };
+    prev.newRow = r;
+    prev.label = r.label || prev.label;
+    prev.kind = r.kind || prev.kind;
+    map.set(r.key, prev);
+  });
+  return [...map.values()]
+    .map((row) => ({
+      ...row,
+      changed: !auditRawEqual(row.oldRow?.raw, row.newRow?.raw),
+    }))
+    .sort((a, b) => Number(b.changed) - Number(a.changed));
+}
+
+function AuditSideBySideDiff({ oldRows, newRows, summary }) {
+  const rows = mergeAuditDiffRows(oldRows, newRows);
+  if (!rows.length) return null;
+  const changedCount = rows.filter((r) => r.changed).length;
+
+  return (
+    <div className="audit-detail__diff-table">
+      {summary ? <p className="audit-detail__diff-summary">{summary}</p> : null}
+      <p className="audit-detail__diff-hint">
+        {changedCount > 0
+          ? `Tô màu ${changedCount} trường đã thay đổi (cũ gạch ngang, mới nền xanh).`
+          : 'Không có trường nào thay đổi so với giá trị cũ.'}
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Thông tin</th>
+            <th>Giá trị cũ</th>
+            <th>Giá trị mới</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={row.key}
+              className={row.changed ? 'diff-row--changed' : 'diff-row--same'}
+            >
+              <td className="diff-label">{row.label}</td>
+              <td className={row.changed ? 'diff-old' : 'diff-same'}>
+                <AuditDiffValue row={row.oldRow} />
+              </td>
+              <td className={row.changed ? 'diff-new' : 'diff-same'}>
+                <AuditDiffValue row={row.newRow} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /** Bảng key-value + khối hạng mục / chữ ký full chiều ngang */
 function AuditRowsView({ rows, summary }) {
   if (!rows?.length) return null;
@@ -201,80 +290,17 @@ function DiffView({ oldValue, newValue, action }) {
 
   if (!oldObj && !newObj) return <span className="audit-detail__json-empty">—</span>;
 
-  // Ưu tiên bảng tóm tắt dễ đọc cho giá trị mới
-  if (summary?.rows?.length) {
+  const oldRows = summarizeAuditObjectRows(oldValue) || [];
+  const newRows = summarizeAuditObjectRows(newValue) || [];
+
+  if (oldObj && newObj && (oldRows.length > 0 || newRows.length > 0)) {
     return (
-      <div>
-        <AuditRowsView rows={summary.rows} summary={summary.summary} />
-        {oldObj && (
-          <details style={{ marginTop: 12 }}>
-            <summary style={{ cursor: 'pointer', color: '#64748b', fontSize: 13 }}>
-              Xem giá trị cũ
-            </summary>
-            <HumanizedDataView data={oldValue} />
-          </details>
-        )}
-      </div>
+      <AuditSideBySideDiff oldRows={oldRows} newRows={newRows} summary={summary?.summary} />
     );
   }
 
-  const isSimpleObject = (obj) =>
-    obj && typeof obj === 'object' && !Array.isArray(obj) && Object.keys(obj).length <= 10;
-
-  if (isSimpleObject(oldObj) && isSimpleObject(newObj)) {
-    const allKeys = [...new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})])];
-    const changes = allKeys.filter((k) => oldObj?.[k] !== newObj?.[k]);
-
-    if (changes.length > 0) {
-      return (
-        <div className="audit-detail__diff-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Thông tin</th>
-                <th>Giá trị cũ</th>
-                <th>Giá trị mới</th>
-              </tr>
-            </thead>
-            <tbody>
-              {changes.map((key) => {
-                const label = getAuditFieldLabel(key);
-                return (
-                  <tr key={key}>
-                    <td className="diff-label">{label}</td>
-                    <td className="diff-old">{formatAuditFieldValue(key, oldObj?.[key])}</td>
-                    <td className="diff-new">{formatAuditFieldValue(key, newObj?.[key])}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-
-    if (Object.keys(newObj || {}).length > 0) {
-      return (
-        <div className="audit-detail__diff-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Thông tin</th>
-                <th>Giá trị</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(newObj).map(([key, value]) => (
-                <tr key={key}>
-                  <td className="diff-label">{getAuditFieldLabel(key)}</td>
-                  <td>{formatAuditFieldValue(key, value)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
+  if (summary?.rows?.length) {
+    return <AuditRowsView rows={summary.rows} summary={summary.summary} />;
   }
 
   return (

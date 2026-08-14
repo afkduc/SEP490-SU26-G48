@@ -156,12 +156,16 @@ class RepairSettlementController {
       const status = String(req.body.status || '').toLowerCase();
       const stepMap = {
         waiting_payment: { step: 'waiting_payment', label: 'Chờ thanh toán' },
-        invoiced: { step: 'paid', label: 'Thanh toán / xuất hóa đơn' },
+        invoiced: { step: 'paid', label: 'Thanh toán tiền mặt / xuất hóa đơn' },
         cancelled: { step: 'cancelled', label: 'Hủy phiếu' },
         inprogress: { step: 'inprogress', label: 'Đang sửa chữa' },
         waiting_repair: { step: 'waiting_repair', label: 'Chờ sửa chữa' },
       };
       const mapped = stepMap[status] || { step: 'status', label: `Trạng thái: ${req.body.status}` };
+      const isCashInvoice = status === 'invoiced';
+      const description = isCashInvoice
+        ? 'Phiếu quyết toán: xác nhận thu tiền mặt — đã xuất hóa đơn'
+        : `Phiếu quyết toán: ${mapped.label}` + (req.body.reason ? ` — ${req.body.reason}` : '');
       await auditCrud.lifecycle(req, {
         tableName: 'repair_settlements',
         entityCode: item?.code || `ID-${req.params.id}`,
@@ -170,9 +174,12 @@ class RepairSettlementController {
         step: mapped.step,
         stepLabel: mapped.label,
         action: 'UPDATE',
-        description: `Phiếu quyết toán ${item?.code || req.params.id}: ${mapped.label}`
-          + (req.body.reason ? ` — ${req.body.reason}` : ''),
-        snapshot: settlementSnapshot(item, { status: req.body.status, reason: req.body.reason || null }),
+        description,
+        snapshot: settlementSnapshot(item, {
+          status: req.body.status,
+          reason: req.body.reason || null,
+          ...(isCashInvoice ? { paymentMethod: item?.paymentMethod || 'CASH' } : {}),
+        }),
       });
       await this.notificationService.notifyAdmins('SETTLEMENT_UPDATED', {
         auditLogId: req._lastAuditLogId,
