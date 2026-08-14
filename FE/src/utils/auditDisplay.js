@@ -257,6 +257,14 @@ export const AUDIT_FIELD_LABELS = {
   employee_id: 'Mã nhân viên',
   specialtyIds: 'Danh sách chuyên môn',
   specialty_ids: 'Danh sách chuyên môn',
+  specialtyNames: 'Chuyên môn',
+  specialty_names: 'Chuyên môn',
+  memberNames: 'Thành viên đội',
+  member_names: 'Thành viên đội',
+  bayNumbers: 'Danh sách số khoang',
+  bay_numbers: 'Danh sách số khoang',
+  teamLeaderName: 'Tên tổ trưởng',
+  team_leader_name: 'Tên tổ trưởng',
   appointmentAt: 'Thời điểm hẹn',
   appointment_at: 'Thời điểm hẹn',
   fileName: 'Tên tệp',
@@ -1711,6 +1719,11 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
     'memberIds',
     'permissionKey',
     'screenKey',
+    'specialtyNames',
+    'specialtyIds',
+    'memberNames',
+    'memberIds',
+    'bayNumbers',
     'roleName',
     'role',
     'targetUserName',
@@ -1756,6 +1769,8 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
       || key === 'otherInfo'
     ) return;
     if (key === 'isWarranty' && (merged.warrantyVehicle != null)) return;
+    if ((key === 'specialtyIds' || key === 'specialty_ids') && merged.specialtyNames) return;
+    if ((key === 'memberIds' || key === 'member_ids') && merged.memberNames) return;
     if (merged[key] === undefined || merged[key] === null || merged[key] === '') return;
     if ((key === 'l1Granted' || key === 'l1Revoked') && Number(merged[key]) === 0) return;
     // Ẩn ID thô nếu đã có tên thợ

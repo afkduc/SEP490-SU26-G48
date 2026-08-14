@@ -75,12 +75,22 @@ class ManagerController {
   async createEmployee(req, res, next) {
     try {
       const data = await this.managerService.createEmployee(req.user.branchId, req.body);
+      const specialtyNames = (data?.specialties || []).map((s) => s.name || s.specialty_name).filter(Boolean);
       await auditCrud.create(req, {
         tableName: 'users',
         entityCode: data?.employeeId || data?.email || null,
         recordId: data?.id || null,
         entityName: 'Nhân viên chi nhánh',
-        data: req.body,
+        data: {
+          fullName: data?.fullName,
+          email: data?.email,
+          phone: data?.phone,
+          status: data?.status,
+          roleId: data?.primaryRoleId || req.body?.roleId,
+          roleName: data?.primaryRoleLabel || data?.primaryRole || null,
+          specialtyIds: (data?.specialties || []).map((s) => s.id),
+          specialtyNames: specialtyNames.length ? specialtyNames.join(', ') : '—',
+        },
         description: `Thêm nhân viên ${data?.fullName || data?.employeeId || ''}`.trim(),
       });
       return success(res, data, 'Thêm nhân viên thành công', 201);
@@ -97,12 +107,24 @@ class ManagerController {
       const description = status === 'inactive'
         ? `Khóa / nghỉ việc nhân viên ${name}`
         : `Cập nhật nhân viên ${name}`;
+      const specialtyNames = (data?.specialties || [])
+        .map((s) => s.name || s.specialty_name)
+        .filter(Boolean);
       await auditCrud.update(req, {
         tableName: 'users',
-        entityCode: data?.employeeId || `ID-${req.params.id}`,
+        entityCode: data?.employeeId || data?.fullName || `ID-${req.params.id}`,
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Nhân viên chi nhánh',
-        newData: req.body,
+        newData: {
+          fullName: data?.fullName,
+          email: data?.email,
+          phone: data?.phone,
+          status: data?.status,
+          roleId: data?.primaryRoleId || req.body?.roleId,
+          roleName: data?.primaryRoleLabel || data?.primaryRole || null,
+          specialtyIds: (data?.specialties || []).map((s) => s.id),
+          specialtyNames: specialtyNames.length ? specialtyNames.join(', ') : '—',
+        },
         description,
       });
       return success(res, data, 'Cập nhật nhân viên thành công');
@@ -116,14 +138,32 @@ class ManagerController {
   // nhan vien - xem EmployeeFormPage.jsx.
   async setEmployeeTeamMembers(req, res, next) {
     try {
-      const data = await this.managerService.setTeamMembers(req.user.branchId, req.params.id, req.body.memberIds || []);
+      const employeeId = Number(req.params.id);
+      const before = await this.managerService.getEmployeeById(req.user.branchId, employeeId);
+      const nextIds = (req.body.memberIds || []).map(Number).sort((a, b) => a - b);
+      const prevIds = (before?.members || []).map((m) => Number(m.id)).sort((a, b) => a - b);
+      const changed = nextIds.length !== prevIds.length
+        || nextIds.some((id, i) => id !== prevIds[i]);
+      const data = await this.managerService.setTeamMembers(req.user.branchId, employeeId, req.body.memberIds || []);
+      if (!changed) {
+        req._manualAuditWritten = true;
+        return success(res, data, 'Cập nhật thành viên đội thành công');
+      }
+      const refreshed = await this.managerService.getEmployeeById(req.user.branchId, employeeId);
+      const label = refreshed?.fullName || refreshed?.employeeId || `#${employeeId}`;
       await auditCrud.update(req, {
         tableName: 'users',
-        entityCode: `NV-ID-${req.params.id}`,
-        recordId: Number(req.params.id) || null,
+        entityCode: refreshed?.employeeId || label,
+        recordId: employeeId,
         entityName: 'Nhân viên chi nhánh',
-        newData: { memberIds: req.body.memberIds || [] },
-        description: `Cập nhật thành viên đội của tổ trưởng #${req.params.id}`,
+        newData: {
+          memberIds: nextIds,
+          memberNames: (refreshed?.members || [])
+            .map((m) => m.fullName || m.employeeId || `#${m.id}`)
+            .filter(Boolean)
+            .join(', ') || '—',
+        },
+        description: `Cập nhật thành viên đội của tổ trưởng ${label}`,
       });
       return success(res, data, 'Cập nhật thành viên đội thành công');
     } catch (err) {
@@ -135,14 +175,28 @@ class ManagerController {
   // vehicle_bays) - goi tu khoi "Khoang xe phu trach".
   async setEmployeeBays(req, res, next) {
     try {
-      const data = await this.managerService.setBayNumbers(req.user.branchId, req.params.id, req.body.bayNumbers || []);
+      const employeeId = Number(req.params.id);
+      const before = await this.managerService.getEmployeeById(req.user.branchId, employeeId);
+      const nextBays = (req.body.bayNumbers || []).map(Number).sort((a, b) => a - b);
+      const prevBays = (before?.bays || []).map(Number).sort((a, b) => a - b);
+      const changed = nextBays.length !== prevBays.length
+        || nextBays.some((n, i) => n !== prevBays[i]);
+      const data = await this.managerService.setBayNumbers(req.user.branchId, employeeId, req.body.bayNumbers || []);
+      if (!changed) {
+        req._manualAuditWritten = true;
+        return success(res, data, 'Cập nhật khoang xe phụ trách thành công');
+      }
+      const refreshed = await this.managerService.getEmployeeById(req.user.branchId, employeeId);
+      const label = refreshed?.fullName || refreshed?.employeeId || `#${employeeId}`;
       await auditCrud.update(req, {
         tableName: 'users',
-        entityCode: `NV-ID-${req.params.id}`,
-        recordId: Number(req.params.id) || null,
+        entityCode: refreshed?.employeeId || label,
+        recordId: employeeId,
         entityName: 'Nhân viên chi nhánh',
-        newData: { bayNumbers: req.body.bayNumbers || [] },
-        description: `Cập nhật khoang xe phụ trách của tổ trưởng #${req.params.id}`,
+        newData: {
+          bayNumbers: nextBays,
+        },
+        description: `Cập nhật khoang xe phụ trách của tổ trưởng ${label}`,
       });
       return success(res, data, 'Cập nhật khoang xe phụ trách thành công');
     } catch (err) {
@@ -356,12 +410,22 @@ class ManagerController {
   async createTechnician(req, res, next) {
     try {
       const data = await this.managerService.createTechnician(req.user.branchId, req.body);
+      const specialtyNames = (data?.specialties || []).map((s) => s.name || s.specialty_name).filter(Boolean);
       await auditCrud.create(req, {
         tableName: 'users',
         entityCode: data?.employeeId || data?.email || null,
         recordId: data?.id || null,
         entityName: 'Thợ máy',
-        data: req.body,
+        data: {
+          fullName: data?.fullName,
+          email: data?.email,
+          phone: data?.phone,
+          status: data?.status,
+          teamLeaderId: data?.teamLeaderId,
+          teamLeaderName: data?.teamLeaderName,
+          specialtyIds: (data?.specialties || []).map((s) => s.id),
+          specialtyNames: specialtyNames.length ? specialtyNames.join(', ') : '—',
+        },
         description: `Thêm thợ máy ${data?.fullName || data?.employeeId || ''}`.trim(),
       });
       return success(res, data, 'Thêm thợ máy thành công', 201);
@@ -378,12 +442,22 @@ class ManagerController {
       const description = status === 'inactive'
         ? `Khóa / nghỉ việc thợ máy ${name}`
         : `Cập nhật thợ máy ${name}`;
+      const specialtyNames = (data?.specialties || []).map((s) => s.name || s.specialty_name).filter(Boolean);
       await auditCrud.update(req, {
         tableName: 'users',
         entityCode: data?.employeeId || `ID-${req.params.id}`,
         recordId: data?.id || Number(req.params.id) || null,
         entityName: 'Thợ máy',
-        newData: req.body,
+        newData: {
+          fullName: data?.fullName,
+          email: data?.email,
+          phone: data?.phone,
+          status: data?.status,
+          teamLeaderId: data?.teamLeaderId,
+          teamLeaderName: data?.teamLeaderName,
+          specialtyIds: (data?.specialties || []).map((s) => s.id),
+          specialtyNames: specialtyNames.length ? specialtyNames.join(', ') : '—',
+        },
         description,
       });
       return success(res, data, 'Cập nhật thợ máy thành công');

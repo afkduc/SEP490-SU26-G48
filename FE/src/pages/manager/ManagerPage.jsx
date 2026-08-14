@@ -552,6 +552,9 @@ function EmployeeFormPage({ mode }) {
   const [memberSuggestions, setMemberSuggestions] = useState([]);
   const [bayNumbers, setBayNumbers] = useState([]);
   const [bayNumberInput, setBayNumberInput] = useState('');
+  // Snapshot luc load — chi goi API doi/khoang khi that su doi (tranh log rac 3 buoc moi lan Luu).
+  const [initialMemberIds, setInitialMemberIds] = useState([]);
+  const [initialBayNumbers, setInitialBayNumbers] = useState([]);
 
   useEffect(() => {
     let mounted = true;
@@ -576,6 +579,8 @@ function EmployeeFormPage({ mode }) {
           });
           setMembers(data.members || []);
           setBayNumbers(data.bays || []);
+          setInitialMemberIds((data.members || []).map((m) => Number(m.id)));
+          setInitialBayNumbers([...(data.bays || []).map(Number)]);
         })
         .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin nhân viên'); })
         .finally(() => { if (mounted) setLoading(false); });
@@ -687,8 +692,19 @@ function EmployeeFormPage({ mode }) {
         }
         await managerApi.updateEmployee(id, payload);
         if (isTeamLeaderRole) {
-          await managerApi.setEmployeeTeamMembers(id, members.map((m) => m.id));
-          await managerApi.setEmployeeBays(id, bayNumbers);
+          const nextMemberIds = members.map((m) => Number(m.id));
+          const nextBays = bayNumbers.map(Number);
+          const sameIds = (a, b) => {
+            const sa = [...a].map(Number).sort((x, y) => x - y);
+            const sb = [...b].map(Number).sort((x, y) => x - y);
+            return sa.length === sb.length && sa.every((v, i) => v === sb[i]);
+          };
+          if (!sameIds(nextMemberIds, initialMemberIds)) {
+            await managerApi.setEmployeeTeamMembers(id, nextMemberIds);
+          }
+          if (!sameIds(nextBays, initialBayNumbers)) {
+            await managerApi.setEmployeeBays(id, nextBays);
+          }
         }
         navigate('/manager/employees');
       } else {
