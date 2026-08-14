@@ -8,6 +8,9 @@
  * Map này bù L2 (view/create/update/delete/export) + L1 (:access) tương ứng
  * để không làm mất nút Thao tác / ProtectedRoute của nhánh khác.
  * Admin vẫn lấy từ role_permissions (thường có '*').
+ *
+ * Cũng bù các key API (stock:read, import_requests:*, ...) mà route vẫn
+ * requirePerm — FE cho vào trang theo role, thiếu key này thì 403.
  */
 
 const ACTIONS = ['view', 'create', 'update', 'delete', 'export'];
@@ -29,11 +32,21 @@ const DEFAULT_SCREEN_PERMISSIONS_BY_ROLE = {
     ...expandScreen('manager:technicians'),
     // Manager thường cũng thao tác kho
     ...expandScreen('inventory:products'),
+    'stock:read',
+    'import_requests:read',
+    'import_requests:approve',
+    'export_requests:read',
   ],
 
   // Nhân viên kho
   warehouse_staff: [
     ...expandScreen('inventory:products'),
+    'stock:read',
+    'parts:read',
+    'import_requests:read',
+    'import_requests:create',
+    'export_requests:read',
+    'export_requests:create',
   ],
 
   // Giám đốc
