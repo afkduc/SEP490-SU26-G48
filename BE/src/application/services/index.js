@@ -1,4 +1,3 @@
-const UserService = require('./UserService');
 const ProductService = require('./ProductService');
 const RepairSettlementService = require('./RepairSettlementService');
 const RepairOrderService = require('./RepairOrderService');
@@ -12,7 +11,6 @@ const PermissionService = require('./PermissionService');
 const ServiceRequestService = require('./ServiceRequestService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const {
-  makeUserRepository,
   makeProductRepository,
   makeRepairSettlementRepository,
   makeRepairOrderRepository,
@@ -24,10 +22,6 @@ const {
   makeMaintenanceReminderRepository,
   makeServiceRequestRepository,
 } = require('../../infrastructure/repositories');
-
-function makeUserService() {
-  return new UserService({ userRepository: makeUserRepository() });
-}
 
 function makeProductService() {
   return new ProductService({ productRepository: makeProductRepository() });
@@ -79,7 +73,6 @@ function makeServiceRequestService() {
 }
 
 module.exports = {
-  UserService,
   ProductService,
   RepairSettlementService,
   RepairOrderService,
@@ -91,7 +84,6 @@ module.exports = {
   MaintenanceReminderService,
   PermissionService,
   ServiceRequestService,
-  makeUserService,
   makeProductService,
   makeRepairSettlementService,
   makeRepairOrderService,

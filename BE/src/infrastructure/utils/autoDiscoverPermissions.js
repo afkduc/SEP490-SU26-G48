@@ -40,7 +40,7 @@ const ROUTE_RE = /\b(router|app)\.(get|post|put|patch|delete)\s*\(\s*['"]([^'"]+
  * Ten file route -> module. Bo hau to 'Routes.js' (hoac 'Router.js').
  *   managerRoutes.js     -> "manager"
  *   adminRoutes.js       -> "admin"
- *   userRoutes.js        -> "users"
+ *   (legacy userRoutes.js da go)
  */
 function _moduleFromFilename(filename) {
   return filename.replace(/\.js$/, '').replace(/Rout(er|es)\.?$/i, '');
