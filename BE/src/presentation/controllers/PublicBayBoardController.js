@@ -72,8 +72,16 @@ class PublicBayBoardController {
         branchId: bay.branchId,
       });
       const doneTasks = (item?.tasks || []).filter((t) => t.isDone || t.is_done);
-      const isCompleted = String(req.body.status || '').toLowerCase() === 'completed';
-      const statusLabel = isCompleted ? 'Hoàn thành sửa chữa' : `Cập nhật trạng thái (${req.body.status})`;
+      const statusKey = String(req.body.status || '').toLowerCase();
+      const STATUS_STEP_LABEL = {
+        completed: 'Hoàn thành sửa chữa',
+        inprogress: 'Đang sửa chữa',
+        in_progress: 'Đang sửa chữa',
+        waiting_repair: 'Chờ sửa chữa',
+        waiting_payment: 'Chờ thanh toán',
+      };
+      const isCompleted = statusKey === 'completed';
+      const statusLabel = STATUS_STEP_LABEL[statusKey] || 'Cập nhật trạng thái lệnh';
       const { repairOrderSnapshot } = require('../../utils/auditSnapshots');
       await auditCrud.lifecycle(req, {
         tableName: 'repair_orders',

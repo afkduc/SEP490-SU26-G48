@@ -141,10 +141,12 @@ export const AUDIT_FIELD_LABELS = {
   signature: 'Mã xác thực',
   Signature: 'Mã xác thực',
   signerName: 'Người ký',
-  requestCode: 'Mã phiếu xuất kho',
+  requestCode: 'Mã phiếu',
   vehiclePlate: 'Biển số xe',
   exportDate: 'Ngày xuất kho',
   performedByName: 'Người xuất kho',
+  performedBy: 'Người thực hiện',
+  performed_by: 'Người thực hiện',
   itemCount: 'Số mặt hàng',
   totalQuantity: 'Tổng số lượng',
   currentStepLabel: 'Bước hiện tại',
@@ -226,6 +228,60 @@ export const AUDIT_FIELD_LABELS = {
   serviceName: 'Tên dịch vụ',
   categoryId: 'Mã danh mục',
   supplierId: 'Mã nhà cung cấp',
+  supplier_id: 'Mã nhà cung cấp',
+  supplierInvoiceNo: 'Số hóa đơn nhà cung cấp',
+  supplier_invoice_no: 'Số hóa đơn nhà cung cấp',
+  invoiceNo: 'Số hóa đơn',
+  invoice_no: 'Số hóa đơn',
+  productCode: 'Mã phụ tùng',
+  product_code: 'Mã phụ tùng',
+  importDate: 'Ngày nhập kho',
+  import_date: 'Ngày nhập kho',
+  requestedBy: 'Người tạo phiếu',
+  requested_by: 'Người tạo phiếu',
+  requestedByName: 'Người nhập kho',
+  requested_by_name: 'Người nhập kho',
+  minStock: 'Tồn tối thiểu',
+  min_stock: 'Tồn tối thiểu',
+  stockQuantity: 'Số lượng tồn',
+  stock_quantity: 'Số lượng tồn',
+  location: 'Vị trí kho',
+  unitId: 'Mã đơn vị',
+  unit_id: 'Mã đơn vị',
+  createdByRole: 'Vai trò người tạo',
+  created_by_role: 'Vai trò người tạo',
+  seenByManagerAt: 'Thời điểm quản lý đã xem',
+  confirmPassword: 'Xác nhận mật khẩu',
+  confirm_password: 'Xác nhận mật khẩu',
+  employeeId: 'Mã nhân viên',
+  employee_id: 'Mã nhân viên',
+  specialtyIds: 'Danh sách chuyên môn',
+  specialty_ids: 'Danh sách chuyên môn',
+  appointmentAt: 'Thời điểm hẹn',
+  appointment_at: 'Thời điểm hẹn',
+  fileName: 'Tên tệp',
+  file_name: 'Tên tệp',
+  dataType: 'Loại dữ liệu',
+  data_type: 'Loại dữ liệu',
+  recordCount: 'Số bản ghi',
+  record_count: 'Số bản ghi',
+  durationMs: 'Thời gian xử lý',
+  duration_ms: 'Thời gian xử lý',
+  durationMin: 'Thời gian thực hiện (phút)',
+  duration_min: 'Thời gian thực hiện (phút)',
+  purpose: 'Mục đích',
+  packageName: 'Tên gói dịch vụ',
+  package_name: 'Tên gói dịch vụ',
+  serviceIds: 'Danh sách dịch vụ trong gói',
+  service_ids: 'Danh sách dịch vụ trong gói',
+  vehicleBrandId: 'Hãng xe',
+  vehicle_brand_id: 'Hãng xe',
+  isConfirmed: 'Đã xác nhận',
+  is_confirmed: 'Đã xác nhận',
+  confirmedDate: 'Ngày xác nhận',
+  confirmed_date: 'Ngày xác nhận',
+  cancelled: 'Đã hủy',
+  category: 'Danh mục',
   createdAt: 'Thời gian tạo',
   updatedAt: 'Thời gian cập nhật',
   startedAt: 'Thời gian bắt đầu',
@@ -357,6 +413,7 @@ export const AUDIT_TABLE_LABELS = {
   service_package_items: 'Hạng mục gói dịch vụ',
   suppliers: 'Nhà cung cấp',
   products: 'Phụ tùng / Sản phẩm',
+  inventory: 'Tồn kho',
   inventory_transactions: 'Giao dịch kho',
   appointments: 'Lịch hẹn',
   work_orders: 'Phiếu sửa chữa',
@@ -386,6 +443,10 @@ export const AUDIT_TABLE_LABELS = {
   audit_logs: 'Nhật ký hệ thống',
   notifications: 'Thông báo',
   security_alerts: 'Cảnh báo bảo mật',
+  manager: 'Quản lý chi nhánh',
+  general_director: 'Giám đốc',
+  public: 'Thao tác công khai',
+  profile: 'Hồ sơ cá nhân',
 };
 
 export function getAuditTableLabel(tableName) {
@@ -463,6 +524,26 @@ const FIELD_TOKEN_VI = {
   package: 'gói',
   category: 'danh mục',
   supplier: 'nhà cung cấp',
+  invoice: 'hóa đơn',
+  no: 'số',
+  import: 'nhập',
+  export: 'xuất',
+  stock: 'tồn kho',
+  min: 'tối thiểu',
+  location: 'vị trí',
+  requested: 'yêu cầu',
+  employee: 'nhân viên',
+  confirm: 'xác nhận',
+  file: 'tệp',
+  data: 'dữ liệu',
+  record: 'bản ghi',
+  duration: 'thời gian',
+  performed: 'thực hiện',
+  seen: 'đã xem',
+  manager: 'quản lý',
+  confirmed: 'xác nhận',
+  cancelled: 'đã hủy',
+  purpose: 'mục đích',
   brand: 'hãng',
   model: 'dòng',
   year: 'năm',
@@ -800,6 +881,14 @@ export function humanizeRequestUrl(url) {
   if (/\/repair-settlements|\/service-orders/.test(path)) return 'Thao tác phiếu quyết toán';
   if (/\/public\/gate\/[^/]+\/confirm-exit/.test(path)) return 'Bảo vệ mở cổng / xe ra cổng';
   if (/\/public\/gate/.test(path)) return 'Màn hình bảo vệ tại cổng';
+  if (/\/import-requests/.test(path)) return 'Thao tác phiếu nhập kho';
+  if (/\/export-requests/.test(path)) return 'Thao tác phiếu xuất kho';
+  if (/\/inventory/.test(path)) return 'Thao tác tồn kho';
+  if (/\/products/.test(path)) return 'Thao tác phụ tùng';
+  if (/\/suppliers/.test(path)) return 'Thao tác nhà cung cấp';
+  if (/\/manager/.test(path)) return 'Thao tác quản lý chi nhánh';
+  if (/\/general-director/.test(path)) return 'Thao tác giám đốc';
+  if (/\/customers/.test(path)) return 'Thao tác khách hàng';
   if (/\/service-requests/.test(path)) return 'Thao tác yêu cầu dịch vụ';
   if (/\/vehicle-bays/.test(path)) return 'Thao tác khoang xe';
   if (/\/payos/.test(path)) return 'Thanh toán PayOS';
@@ -1292,6 +1381,36 @@ export function formatAuditFieldValue(key, value) {
   const kind = getAuditFieldDisplayKind(k, value);
 
   if (/password/i.test(k)) return '••••••••';
+  if (typeof value === 'boolean'
+    || value === 'true'
+    || value === 'false') {
+    const truthy = value === true || value === 'true';
+    if (k === 'isActive' || k === 'is_active') return truthy ? 'Hoạt động' : 'Ngừng hoạt động';
+    return truthy ? 'Có' : 'Không';
+  }
+  if (k === 'durationMin' || k === 'duration_min') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return `${n.toLocaleString('vi-VN')} phút`;
+  }
+  if (k === 'dataType' || k === 'data_type') {
+    const DATA_TYPE_LABELS = {
+      customers: 'Khách hàng',
+      vehicles: 'Xe',
+      products: 'Phụ tùng',
+    };
+    const norm = String(value).trim().toLowerCase();
+    return DATA_TYPE_LABELS[norm] || getAuditTableLabel(norm) || String(value);
+  }
+  if (
+    k === 'confirmedDate'
+    || k === 'confirmed_date'
+    || k === 'importDate'
+    || k === 'import_date'
+    || k === 'exportDate'
+    || k === 'export_date'
+  ) {
+    return formatDateOnly(value) || String(value);
+  }
   if (k === 'phone' || k === 'phoneNumber' || k === 'phone_number' || k === 'customerPhone') {
     const formatted = formatPhoneDisplay(value);
     return formatted || '—';
@@ -1493,6 +1612,16 @@ const SETTLEMENT_PREFERRED_KEYS = [
   'loaiBanIn',
   'paymentMethod',
   'paymentStatus',
+  'supplierId',
+  'supplierInvoiceNo',
+  'importDate',
+  'requestedBy',
+  'requestedByName',
+  'productCode',
+  'minStock',
+  'stockQuantity',
+  'location',
+  'requestCode',
 ];
 
 /**
