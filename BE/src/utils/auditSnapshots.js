@@ -2,8 +2,24 @@
  * Chuan hoa snapshot audit cho cac loai phieu (de FE hien thi day du, de doc).
  */
 
+function flattenIntakeChecklist(checklist) {
+  const cl = checklist && typeof checklist === 'object' ? checklist : {};
+  const p = cl.priority && typeof cl.priority === 'object' ? cl.priority : {};
+  const o = cl.otherInfo && typeof cl.otherInfo === 'object' ? cl.otherInfo : {};
+  return {
+    repairRedo: Boolean(p.repairRedo),
+    hasAppointment: Boolean(p.hasAppointment),
+    warrantyVehicle: Boolean(p.warranty),
+    dealerKeepsOldParts: Boolean(o.dealerKeepsOldParts),
+    returnOldPartsToCustomer: Boolean(o.returnOldPartsToCustomer),
+    carWash: Boolean(o.carWash),
+    customerWaitsAtShop: Boolean(o.customerWaitsAtShop),
+  };
+}
+
 function settlementSnapshot(item, extra = {}) {
   if (!item) return { ...extra };
+  const checklist = flattenIntakeChecklist(item.intakeChecklist);
   return {
     code: item.code || null,
     status: item.status || null,
@@ -14,6 +30,13 @@ function settlementSnapshot(item, extra = {}) {
     currentKm: item.currentKm ?? item.vehicle?.currentKm ?? null,
     customerRequest: item.customerRequest || null,
     notes: item.notes || item.note || null,
+    repairRedo: checklist.repairRedo,
+    hasAppointment: checklist.hasAppointment,
+    warrantyVehicle: checklist.warrantyVehicle || Boolean(item.isWarranty),
+    dealerKeepsOldParts: checklist.dealerKeepsOldParts,
+    returnOldPartsToCustomer: checklist.returnOldPartsToCustomer,
+    carWash: checklist.carWash,
+    customerWaitsAtShop: checklist.customerWaitsAtShop,
     subtotal: item.subtotal ?? null,
     vat: item.vat ?? null,
     total: item.total ?? item.totalAmount ?? null,

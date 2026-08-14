@@ -148,6 +148,13 @@ export const AUDIT_FIELD_LABELS = {
   itemCount: 'Số mặt hàng',
   totalQuantity: 'Tổng số lượng',
   currentStepLabel: 'Bước hiện tại',
+  repairRedo: 'Xe sửa chữa lại',
+  hasAppointment: 'Xe có đặt hẹn',
+  warrantyVehicle: 'Xe bảo hành',
+  dealerKeepsOldParts: 'Đại lý giữ phụ tùng cũ',
+  returnOldPartsToCustomer: 'Trả phụ tùng cũ cho khách',
+  carWash: 'Rửa xe',
+  customerWaitsAtShop: 'Khách hàng chờ tại xưởng',
   repairOrderCode: 'Mã lệnh sửa chữa',
   memberIds: 'Danh sách thành viên (ID)',
   teamLeaderId: 'Mã tổ trưởng',
@@ -1011,13 +1018,54 @@ function formatSettlementItemLine(item, index) {
   return parts.join(' ');
 }
 
+/** Flatten intake checklist JSON (phiếu QT) thành các cờ Có/Không để hiện trong nhật ký. */
+export function flattenIntakeChecklistFields(source) {
+  const obj = parseAuditJson(source);
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  const nested = obj.intakeChecklist || obj.intake_checklist;
+  const cl = nested && typeof nested === 'object' ? nested : obj;
+  const p = cl.priority && typeof cl.priority === 'object' ? cl.priority : {};
+  const o = cl.otherInfo && typeof cl.otherInfo === 'object' ? cl.otherInfo : {};
+  const out = {};
+  const take = (key, raw) => {
+    if (raw == null && obj[key] == null) return;
+    out[key] = Boolean(obj[key] ?? raw);
+  };
+  take('repairRedo', p.repairRedo);
+  take('hasAppointment', p.hasAppointment);
+  take('warrantyVehicle', p.warranty);
+  take('dealerKeepsOldParts', o.dealerKeepsOldParts);
+  take('returnOldPartsToCustomer', o.returnOldPartsToCustomer);
+  take('carWash', o.carWash);
+  take('customerWaitsAtShop', o.customerWaitsAtShop);
+  return out;
+}
+
+/**
+ * Bổ sung cờ checklist từ request_body (log cũ không lưu trong snapshot).
+ * Không ghi đè field đã có trong snapshot.
+ */
+export function enrichAuditDisplaySource(value, requestBody) {
+  const extra = flattenIntakeChecklistFields(requestBody);
+  if (!Object.keys(extra).length) return value;
+  const obj = parseAuditJson(value);
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return value;
+  if (obj.lifecycle && obj.snapshot && typeof obj.snapshot === 'object') {
+    return {
+      ...obj,
+      snapshot: { ...extra, ...obj.snapshot },
+    };
+  }
+  return { ...extra, ...obj };
+}
+
 /** Unwrap lifecycle payload { lifecycle, steps, snapshot } → object phẳng để hiển thị */
 export function unwrapLifecycleAuditValue(newValue) {
   const obj = parseAuditJson(newValue);
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
   if (!obj.lifecycle || !obj.snapshot || typeof obj.snapshot !== 'object') return obj;
   return {
-    currentStepLabel: obj.currentStepLabel || obj.currentStep || null,
+    ...flattenIntakeChecklistFields(obj.snapshot),
     ...obj.snapshot,
     _lifecycleSteps: Array.isArray(obj.steps) ? obj.steps : [],
   };
@@ -1278,7 +1326,6 @@ export function formatAuditFieldValue(key, value) {
 }
 
 const SETTLEMENT_PREFERRED_KEYS = [
-  'currentStepLabel',
   'requestCode',
   'code',
   'customerId',
@@ -1292,6 +1339,13 @@ const SETTLEMENT_PREFERRED_KEYS = [
   'customerRequest',
   'note',
   'notes',
+  'repairRedo',
+  'hasAppointment',
+  'warrantyVehicle',
+  'dealerKeepsOldParts',
+  'returnOldPartsToCustomer',
+  'carWash',
+  'customerWaitsAtShop',
   'currentKm',
   'exportDate',
   'repairOrderCode',
@@ -1336,6 +1390,7 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
     ? unwrapped
     : parseAuditJson(data);
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return [];
+  const merged = { ...flattenIntakeChecklistFields(obj), ...obj };
 
   const preferred = [
     ...SETTLEMENT_PREFERRED_KEYS,
@@ -1392,16 +1447,23 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
 
   const pushKey = (key) => {
     if (used.has(key)) return;
-    if (key === '_lifecycleSteps' || key === 'lifecycle' || key === 'steps' || key === 'snapshot') return;
-    if (obj[key] === undefined || obj[key] === null || obj[key] === '') return;
-    if ((key === 'l1Granted' || key === 'l1Revoked') && Number(obj[key]) === 0) return;
+    if (
+      key === '_lifecycleSteps'
+      || key === 'lifecycle'
+      || key === 'steps'
+      || key === 'snapshot'
+      || key === 'currentStepLabel'
+      || key === 'currentStep'
+    ) return;
+    if (merged[key] === undefined || merged[key] === null || merged[key] === '') return;
+    if ((key === 'l1Granted' || key === 'l1Revoked') && Number(merged[key]) === 0) return;
     // Ẩn ID thô nếu đã có tên thợ
-    if (key === 'technicianIds' && obj.technicianNames) return;
-    const raw = obj[key];
+    if (key === 'technicianIds' && merged.technicianNames) return;
+    const raw = merged[key];
     if (key === 'technicians' && Array.isArray(raw)) {
       used.add(key);
       const names = raw.map((t) => (typeof t === 'object' ? (t.name || t.fullName || `#${t.id}`) : String(t))).filter(Boolean).join(', ');
-      if (!names || obj.technicianNames) return;
+      if (!names || merged.technicianNames) return;
       rows.push({
         key,
         label: getAuditFieldLabel(key),
@@ -1446,7 +1508,7 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
   };
 
   preferred.forEach(pushKey);
-  Object.keys(obj).forEach((key) => {
+  Object.keys(merged).forEach((key) => {
     if (rows.length >= maxRows) return;
     pushKey(key);
   });

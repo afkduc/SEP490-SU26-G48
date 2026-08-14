@@ -1,7 +1,9 @@
+import { useMemo, useState } from 'react';
 import {
   humanizeAuditDescription,
   summarizeAuditNewValue,
   summarizeAuditObjectRows,
+  formatSettlementItems,
   formatAuditTime,
   parseAuditJson,
   getAuditActionLabel,
@@ -15,6 +17,7 @@ import {
   isSameAuditPayload,
   isAuditSignatureValue,
   getLifecycleSteps,
+  enrichAuditDisplaySource,
   AUDIT_TABLE_LABELS,
 } from '../../utils/auditDisplay';
 import { formatPhoneDisplay } from '../../utils/validation';
@@ -69,49 +72,95 @@ function formatMoneyCell(value) {
   return `${n.toLocaleString('vi-VN')} ₫`;
 }
 
+function parseItemsList(items) {
+  return Array.isArray(items) ? items : parseAuditJson(items) || [];
+}
+
+function itemFingerprint(item) {
+  if (!item || typeof item !== 'object') return String(item ?? '');
+  const name = item.description || item.productName || item.name || '';
+  const code = item.code || item.productCode || '';
+  const qty = item.qty ?? item.quantity ?? '';
+  const unit = item.unit || '';
+  const unitPrice = item.unitPrice ?? '';
+  const total = item.total ?? '';
+  return [name, code, qty, unit, unitPrice, total, item.isFree ? 1 : 0].join('|');
+}
+
+function SettlementItemCard({ item, index }) {
+  if (!item) return <div className="audit-detail__item-card is-empty">—</div>;
+  const name = item.description || item.productName || item.name || `Hạng mục ${index + 1}`;
+  const code = item.code || item.productCode || null;
+  const qty = item.qty != null ? item.qty : item.quantity;
+  const hasPrice = item.unitPrice != null || item.total != null;
+  return (
+    <div className={`audit-detail__item-card${item.isGroupParent ? ' is-group' : ''}`}>
+      <div className="audit-detail__item-card-name">
+        <span className="audit-detail__item-idx">{index + 1}.</span>
+        <span>{name}</span>
+        {item.isFree ? <span className="audit-detail__item-tag">Miễn phí</span> : null}
+      </div>
+      <div className="audit-detail__item-meta">
+        <span>Mã: {code || '—'}</span>
+        <span>
+          SL: {qty != null ? qty : '—'}
+          {item.unit ? ` ${item.unit}` : ''}
+        </span>
+        <span>Đơn giá: {hasPrice ? formatMoneyCell(item.unitPrice) : '—'}</span>
+        <span>Thành tiền: {hasPrice ? formatMoneyCell(item.total) : '—'}</span>
+      </div>
+    </div>
+  );
+}
+
 function SettlementItemsTable({ items }) {
-  const list = Array.isArray(items) ? items : parseAuditJson(items) || [];
+  const list = parseItemsList(items);
   if (!list.length) return <span className="audit-detail__json-empty">—</span>;
+  return (
+    <div className="audit-detail__item-list">
+      {list.map((item, index) => (
+        <SettlementItemCard key={`${item?.code || 'i'}-${index}`} item={item} index={index} />
+      ))}
+    </div>
+  );
+}
+
+function SettlementItemsSplit({ oldItems, newItems }) {
+  const oldList = parseItemsList(oldItems);
+  const newList = parseItemsList(newItems);
+  const max = Math.max(oldList.length, newList.length, 1);
+  const pairs = Array.from({ length: max }, (_, index) => {
+    const oldItem = oldList[index] || null;
+    const newItem = newList[index] || null;
+    return {
+      index,
+      oldItem,
+      newItem,
+      changed: itemFingerprint(oldItem) !== itemFingerprint(newItem),
+    };
+  });
 
   return (
-    <div className="audit-detail__items-wrap">
-      <table className="audit-detail__items-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Tên hạng mục</th>
-            <th>Mã</th>
-            <th>SL</th>
-            <th>Đơn vị</th>
-            <th>Đơn giá</th>
-            <th>Thành tiền</th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.map((item, index) => {
-            const name =
-              item?.description || item?.productName || item?.name || `Hạng mục ${index + 1}`;
-            const code = item?.code || item?.productCode || null;
-            const qty = item?.qty != null ? item.qty : item?.quantity;
-            const isParent = item?.isGroupParent;
-            const hasPrice = item?.unitPrice != null || item?.total != null;
-            return (
-              <tr key={`${code || 'i'}-${index}`} className={isParent ? 'is-group' : undefined}>
-                <td>{index + 1}</td>
-                <td>
-                  <span className="audit-detail__item-name">{name}</span>
-                  {item?.isFree ? <span className="audit-detail__item-tag">Miễn phí</span> : null}
-                </td>
-                <td>{code || '—'}</td>
-                <td>{qty != null ? qty : '—'}</td>
-                <td>{item?.unit || '—'}</td>
-                <td>{hasPrice ? formatMoneyCell(item?.unitPrice) : '—'}</td>
-                <td>{hasPrice ? formatMoneyCell(item?.total) : '—'}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="audit-detail__split audit-detail__split--items">
+      <div className="audit-detail__split-head">
+        <div>Hạng mục</div>
+        <div>Giá trị cũ</div>
+        <div>Giá trị mới</div>
+      </div>
+      {pairs.map((pair) => (
+        <div
+          key={pair.index}
+          className={`audit-detail__split-row${pair.changed ? ' is-changed' : ''}`}
+        >
+          <div className="diff-label">#{pair.index + 1}</div>
+          <div className={pair.changed ? 'diff-old' : 'diff-same'}>
+            <SettlementItemCard item={pair.oldItem} index={pair.index} />
+          </div>
+          <div className={pair.changed ? 'diff-new' : 'diff-same'}>
+            <SettlementItemCard item={pair.newItem} index={pair.index} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -135,7 +184,10 @@ function AuditFieldCell({ row, className = 'diff-new' }) {
   return <td className={`${className}${kind === 'money' ? ' diff-money' : ''}`}>{row.value}</td>;
 }
 
-function auditRawEqual(a, b) {
+function auditRawEqual(a, b, kind) {
+  if (kind === 'items') {
+    return formatSettlementItems(a) === formatSettlementItems(b);
+  }
   if (a === b) return true;
   if (a == null && b == null) return true;
   if (a == null || b == null) return false;
@@ -179,49 +231,113 @@ function mergeAuditDiffRows(oldRows, newRows) {
   return [...map.values()]
     .map((row) => ({
       ...row,
-      changed: !auditRawEqual(row.oldRow?.raw, row.newRow?.raw),
+      changed: !auditRawEqual(row.oldRow?.raw, row.newRow?.raw, row.kind),
     }))
     .sort((a, b) => Number(b.changed) - Number(a.changed));
 }
 
+function AuditItemsDiffBlock({ row, showAll }) {
+  if (!row) return null;
+  if (!row.changed && !showAll) return null;
+  if (!row.changed) {
+    return (
+      <div className="audit-detail__block">
+        <div className="audit-detail__block-title">{row.label} (không đổi)</div>
+        <SettlementItemsTable items={row.newRow?.raw || row.oldRow?.raw} />
+      </div>
+    );
+  }
+  return (
+    <div className="audit-detail__block audit-detail__block--changed">
+      <div className="audit-detail__block-title">{row.label}</div>
+      <SettlementItemsSplit oldItems={row.oldRow?.raw} newItems={row.newRow?.raw} />
+    </div>
+  );
+}
+
 function AuditSideBySideDiff({ oldRows, newRows, summary }) {
-  const rows = mergeAuditDiffRows(oldRows, newRows);
+  const [showAll, setShowAll] = useState(false);
+  const rows = useMemo(() => mergeAuditDiffRows(oldRows, newRows), [oldRows, newRows]);
   if (!rows.length) return null;
+  const simpleRows = rows.filter((r) => r.kind !== 'items' && r.kind !== 'signature');
+  const itemsRow = rows.find((r) => r.kind === 'items');
+  const sigRow = rows.find((r) => r.kind === 'signature');
   const changedCount = rows.filter((r) => r.changed).length;
+  const hiddenCount = simpleRows.filter((r) => !r.changed).length
+    + (itemsRow && !itemsRow.changed ? 1 : 0)
+    + (sigRow && !sigRow.changed ? 1 : 0);
+  const visibleSimple = showAll ? simpleRows : simpleRows.filter((r) => r.changed);
 
   return (
     <div className="audit-detail__diff-table">
       {summary ? <p className="audit-detail__diff-summary">{summary}</p> : null}
-      <p className="audit-detail__diff-hint">
-        {changedCount > 0
-          ? `Tô màu ${changedCount} trường đã thay đổi (cũ gạch ngang, mới nền xanh).`
-          : 'Không có trường nào thay đổi so với giá trị cũ.'}
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Thông tin</th>
-            <th>Giá trị cũ</th>
-            <th>Giá trị mới</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
+      <div className="audit-detail__diff-toolbar">
+        <p className="audit-detail__diff-hint">
+          {changedCount > 0
+            ? `Tô màu ${changedCount} phần đã thay đổi — trái giá trị cũ, phải giá trị mới.`
+            : 'Không có trường nào thay đổi so với giá trị cũ.'}
+        </p>
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            className="audit-detail__toggle"
+            onClick={() => setShowAll((v) => !v)}
+          >
+            {showAll ? 'Ẩn bớt' : 'Hiện đầy đủ'}
+          </button>
+        )}
+      </div>
+      {visibleSimple.length > 0 && (
+        <div className="audit-detail__split">
+          <div className="audit-detail__split-head">
+            <div>Thông tin</div>
+            <div>Giá trị cũ</div>
+            <div>Giá trị mới</div>
+          </div>
+          {visibleSimple.map((row) => (
+            <div
               key={row.key}
-              className={row.changed ? 'diff-row--changed' : 'diff-row--same'}
+              className={`audit-detail__split-row${row.changed ? ' is-changed' : ''}`}
             >
-              <td className="diff-label">{row.label}</td>
-              <td className={row.changed ? 'diff-old' : 'diff-same'}>
+              <div className="diff-label">{row.label}</div>
+              <div className={row.changed ? 'diff-old' : 'diff-same'}>
                 <AuditDiffValue row={row.oldRow} />
-              </td>
-              <td className={row.changed ? 'diff-new' : 'diff-same'}>
+              </div>
+              <div className={row.changed ? 'diff-new' : 'diff-same'}>
                 <AuditDiffValue row={row.newRow} />
-              </td>
-            </tr>
+              </div>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
+      <AuditItemsDiffBlock row={itemsRow} showAll={showAll} />
+      {sigRow && !sigRow.changed && showAll && (
+        <div className="audit-detail__block">
+          <div className="audit-detail__block-title">{sigRow.label} (không đổi)</div>
+          <AuditDiffValue row={sigRow.newRow || sigRow.oldRow} />
+        </div>
+      )}
+      {sigRow?.changed && (
+        <div className="audit-detail__block audit-detail__block--changed">
+          <div className="audit-detail__block-title">{sigRow.label}</div>
+          <div className="audit-detail__split">
+            <div className="audit-detail__split-head">
+              <div>Thông tin</div>
+              <div>Giá trị cũ</div>
+              <div>Giá trị mới</div>
+            </div>
+            <div className="audit-detail__split-row is-changed">
+              <div className="diff-label">{sigRow.label}</div>
+              <div className="diff-old">
+                <AuditDiffValue row={sigRow.oldRow} />
+              </div>
+              <div className="diff-new">
+                <AuditDiffValue row={sigRow.newRow} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -283,15 +399,16 @@ function HumanizedDataView({ data }) {
 /**
  * Format old/new value thành dạng human-readable
  */
-function DiffView({ oldValue, newValue, action }) {
+function DiffView({ oldValue, newValue, action, requestBody }) {
   const oldObj = parseAuditJson(oldValue);
   const newObj = parseAuditJson(newValue);
-  const summary = summarizeAuditNewValue(newValue, action);
+  const newEnriched = enrichAuditDisplaySource(newValue, requestBody);
+  const summary = summarizeAuditNewValue(newEnriched, action);
 
   if (!oldObj && !newObj) return <span className="audit-detail__json-empty">—</span>;
 
   const oldRows = summarizeAuditObjectRows(oldValue) || [];
-  const newRows = summarizeAuditObjectRows(newValue) || [];
+  const newRows = summarizeAuditObjectRows(newEnriched) || [];
 
   if (oldObj && newObj && (oldRows.length > 0 || newRows.length > 0)) {
     return (
@@ -498,7 +615,12 @@ export function AuditLogDetailContent({ log }) {
           <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#475569' }}>
             Chi tiết thay đổi
           </label>
-          <DiffView oldValue={log.old_value} newValue={log.new_value} action={log.action} />
+          <DiffView
+            oldValue={log.old_value}
+            newValue={log.new_value}
+            action={log.action}
+            requestBody={log.request_body}
+          />
         </div>
       )}
 

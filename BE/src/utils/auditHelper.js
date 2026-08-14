@@ -246,6 +246,18 @@ function sanitizeAuditSnapshot(data) {
       out.currentKm = value.currentKm != null ? value.currentKm : out.currentKm;
       continue;
     }
+    if (key === 'intakeChecklist' && value && typeof value === 'object' && !Array.isArray(value)) {
+      const p = value.priority && typeof value.priority === 'object' ? value.priority : {};
+      const o = value.otherInfo && typeof value.otherInfo === 'object' ? value.otherInfo : {};
+      out.repairRedo = Boolean(p.repairRedo);
+      out.hasAppointment = Boolean(p.hasAppointment);
+      out.warrantyVehicle = Boolean(p.warranty);
+      out.dealerKeepsOldParts = Boolean(o.dealerKeepsOldParts);
+      out.returnOldPartsToCustomer = Boolean(o.returnOldPartsToCustomer);
+      out.carWash = Boolean(o.carWash);
+      out.customerWaitsAtShop = Boolean(o.customerWaitsAtShop);
+      continue;
+    }
     if (key === 'items' && Array.isArray(value)) {
       out.items = value.map((it, index) => {
         if (!it || typeof it !== 'object') return it;
