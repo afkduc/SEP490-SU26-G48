@@ -2,7 +2,12 @@
 
 .admin-notifications {
   padding: 28px 32px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   color: #1e293b;
   display: flex;
   flex-direction: column;
@@ -100,7 +105,9 @@
 }
 
 @keyframes admin-notifications-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Alert ── */

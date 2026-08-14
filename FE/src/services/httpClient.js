@@ -32,46 +32,6 @@ const pendingControllers = new Map();
 let loggedOutFlag = false;
 
 /**
- * Module-level flag to skip the next incoming SSE permission-changed event
- * from triggering an automatic refresh-permissions call.
- *
- * Use case: when admin saves the permission matrix themselves, the BE
- * broadcasts `permission-changed`. The admin's own React state already
- * reflects the new permissions (just-and-saved), so auto-refreshing the JWT
- * would be redundant and could trigger a 403 storm on the next in-flight
- * request using the now-stale JWT (race condition between SSE save event
- * and the next request that already captured the old token).
- *
- * Set this flag from the page that just saved the matrix. The SSE hook
- * checks it once and resets the flag.
- */
-let skipNextPermissionChangeRef = false;
-
-/**
- * Mark the next 'permission-changed' SSE event as self-initiated, so the
- * SSE hook will NOT trigger an automatic refresh-permissions call.
- *
- * Should be called by the page that just saved the permission matrix,
- * BEFORE the BE has time to broadcast the SSE event (typically right after
- * the save API returns 200).
- */
-export function markNextPermissionChangeAsSelf() {
-  skipNextPermissionChangeRef = true;
-}
-
-/**
- * Internal: check & consume the skip flag. Returns true if the next event
- * should be skipped.
- */
-export function consumeSkipNextPermissionChange() {
-  if (skipNextPermissionChangeRef) {
-    skipNextPermissionChangeRef = false;
-    return true;
-  }
-  return false;
-}
-
-/**
  * Reset the "logged out" flag. Call this on successful login so subsequent
  * requests are allowed again.
  */
@@ -142,9 +102,11 @@ export function resetSessionExpiredFlag() {
  * - path/to: url dang goi (debug)
  */
 export function showForbidden({ permissionKey = null, message = '', path = '' } = {}) {
-  window.dispatchEvent(new CustomEvent(FORBIDDEN_KEY, {
-    detail: { permissionKey, message, path },
-  }));
+  window.dispatchEvent(
+    new CustomEvent(FORBIDDEN_KEY, {
+      detail: { permissionKey, message, path },
+    })
+  );
 }
 
 class HttpClient {
@@ -152,15 +114,18 @@ class HttpClient {
     this.baseURL = baseURL;
   }
 
-  async request(path, {
-    method = 'GET',
-    body,
-    headers = {},
-    isForm = false,
-    omitAuth = false,
-    skipSessionExpired = false,
-    signal: externalSignal = null,
-  } = {}) {
+  async request(
+    path,
+    {
+      method = 'GET',
+      body,
+      headers = {},
+      isForm = false,
+      omitAuth = false,
+      skipSessionExpired = false,
+      signal: externalSignal = null,
+    } = {}
+  ) {
     // If logout has fired, refuse to make new requests. We surface a tagged
     // AbortError so callers can detect and bail without spamming the console.
     if (loggedOutFlag) {
@@ -230,10 +195,7 @@ class HttpClient {
       if (response.status === 403 && belongsToCurrentSession) {
         const required = Array.isArray(payload?.required) ? payload.required : [];
         const permissionKey =
-          payload?.metadata?.permissionKey
-          || payload?.permissionKey
-          || required[0]
-          || null;
+          payload?.metadata?.permissionKey || payload?.permissionKey || required[0] || null;
         showForbidden({
           permissionKey,
           message: (payload && payload.message) || 'Bạn không có quyền thực hiện thao tác này',
@@ -262,10 +224,7 @@ class HttpClient {
       if (response.status === 403) {
         const required = Array.isArray(payload?.required) ? payload.required : [];
         error.permissionKey =
-          payload?.metadata?.permissionKey
-          || payload?.permissionKey
-          || required[0]
-          || null;
+          payload?.metadata?.permissionKey || payload?.permissionKey || required[0] || null;
       }
       throw error;
     }

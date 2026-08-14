@@ -17,50 +17,115 @@ import './AdminDevicesPage.css';
 // ─── Icons ────────────────────────────────────────────────────────────
 
 const IconDevice = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-    <line x1="8" y1="21" x2="16" y2="21"/>
-    <line x1="12" y1="17" x2="12" y2="21"/>
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+    <line x1="8" y1="21" x2="16" y2="21" />
+    <line x1="12" y1="17" x2="12" y2="21" />
   </svg>
 );
 
 const IconSearch = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
 
 const IconLogout = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-    <polyline points="16 17 21 12 16 7"/>
-    <line x1="21" y1="12" x2="9" y2="12"/>
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
   </svg>
 );
 
 const IconAlert = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );
 
 const IconRefresh = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="1 4 1 10 7 10"/>
-    <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
   </svg>
 );
 
 const IconFilter = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
   </svg>
 );
 
 const IconChevronDown = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="6 9 12 15 18 9"/>
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
@@ -116,16 +181,16 @@ const OS_OPTIONS = [
 function SelectFilter({ value, options, onChange, placeholder }) {
   return (
     <div className="admin-devices__select-wrap">
-      <select
-        className="admin-devices__select"
-        value={value}
-        onChange={onChange}
-      >
+      <select className="admin-devices__select" value={value} onChange={onChange}>
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
         ))}
       </select>
-      <span className="admin-devices__select-arrow"><IconChevronDown /></span>
+      <span className="admin-devices__select-arrow">
+        <IconChevronDown />
+      </span>
     </div>
   );
 }
@@ -134,16 +199,23 @@ function SelectFilter({ value, options, onChange, placeholder }) {
 
 function ConfirmForceLogoutModal({ device, onClose, onConfirm, loading }) {
   return (
-    <div className="confirm-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="confirm-modal-overlay"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="confirm-modal">
-        <div className="confirm-modal__icon"><IconLogout /></div>
+        <div className="confirm-modal__icon">
+          <IconLogout />
+        </div>
         <h3 className="confirm-modal__title">Đăng xuất thiết bị?</h3>
         <p className="confirm-modal__body">
-          Thiết bị <strong>{device?.deviceName}</strong> của <strong>{device?.displayName}</strong>
-          {' '}sẽ bị đăng xuất. Người dùng sẽ phải đăng nhập lại trên thiết bị này.
+          Thiết bị <strong>{device?.deviceName}</strong> của <strong>{device?.displayName}</strong>{' '}
+          sẽ bị đăng xuất. Người dùng sẽ phải đăng nhập lại trên thiết bị này.
         </p>
         <div className="confirm-modal__footer">
-          <button className="btn btn--secondary" onClick={onClose} disabled={loading}>Hủy</button>
+          <button className="btn btn--secondary" onClick={onClose} disabled={loading}>
+            Hủy
+          </button>
           <button className="btn btn--danger" onClick={onConfirm} disabled={loading}>
             {loading ? 'Đang xử lý...' : 'Đăng xuất'}
           </button>
@@ -171,30 +243,39 @@ function Pagination({ page, pageSize, total, onPageChange }) {
   return (
     <div className="admin-devices__pagination">
       <span className="pagination-info">
-        Hiển thị {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} trong {total} thiết bị
+        Hiển thị {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} trong {total} thiết
+        bị
       </span>
       <div className="pagination-controls">
         <button
           className="pagination-btn"
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
-        >‹</button>
+        >
+          ‹
+        </button>
         {pages.map((p, i) =>
           p === '...' ? (
-            <span key={`ellipsis-${i}`} style={{ color: '#94a3b8', padding: '0 4px' }}>…</span>
+            <span key={`ellipsis-${i}`} style={{ color: '#94a3b8', padding: '0 4px' }}>
+              …
+            </span>
           ) : (
             <button
               key={p}
               className={`pagination-btn ${p === page ? 'pagination-btn--active' : ''}`}
               onClick={() => onPageChange(p)}
-            >{p}</button>
+            >
+              {p}
+            </button>
           )
         )}
         <button
           className="pagination-btn"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
-        >›</button>
+        >
+          ›
+        </button>
       </div>
     </div>
   );
@@ -242,40 +323,43 @@ export default function AdminDevicesPage({
   /** Bỏ qua effect filter khi vừa seed / lần mount đầu — tránh loadData chồng → giật màn hình */
   const skipFilterReloadRef = useRef(true);
 
-  const loadData = useCallback(async (pageNum = 1, extraParams = {}) => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = {
-        page: pageNum,
-        pageSize: PAGE_SIZE,
-        search: (search || '').trim() || undefined,
-      };
-      if (userIdFilter) params.userId = userIdFilter;
-      if (statusFilter) params.isCurrent = statusFilter;
-      if (browserFilter) params.browser = browserFilter;
-      if (osFilter) params.os = osFilter;
-      if (dateFrom) params.dateFrom = dateFrom;
-      if (dateTo) params.dateTo = dateTo;
-      // Seed từ cảnh bảo: extraParams thắng state (tránh race setState)
-      Object.assign(params, extraParams);
-      // Chuẩn hóa: chuỗi rỗng / null = bỏ filter
-      Object.keys(params).forEach((k) => {
-        if (params[k] === '' || params[k] === null || params[k] === undefined) {
-          delete params[k];
-        }
-      });
+  const loadData = useCallback(
+    async (pageNum = 1, extraParams = {}) => {
+      setLoading(true);
+      setError('');
+      try {
+        const params = {
+          page: pageNum,
+          pageSize: PAGE_SIZE,
+          search: (search || '').trim() || undefined,
+        };
+        if (userIdFilter) params.userId = userIdFilter;
+        if (statusFilter) params.isCurrent = statusFilter;
+        if (browserFilter) params.browser = browserFilter;
+        if (osFilter) params.os = osFilter;
+        if (dateFrom) params.dateFrom = dateFrom;
+        if (dateTo) params.dateTo = dateTo;
+        // Seed từ cảnh bảo: extraParams thắng state (tránh race setState)
+        Object.assign(params, extraParams);
+        // Chuẩn hóa: chuỗi rỗng / null = bỏ filter
+        Object.keys(params).forEach((k) => {
+          if (params[k] === '' || params[k] === null || params[k] === undefined) {
+            delete params[k];
+          }
+        });
 
-      const data = await adminDevicesApi.list(params);
-      setDevices(data?.items || []);
-      setTotal(data?.total || 0);
-      setPage(pageNum);
-    } catch (err) {
-      setError(err.message || 'Không tải được danh sách thiết bị');
-    } finally {
-      setLoading(false);
-    }
-  }, [search, userIdFilter, statusFilter, browserFilter, osFilter, dateFrom, dateTo]);
+        const data = await adminDevicesApi.list(params);
+        setDevices(data?.items || []);
+        setTotal(data?.total || 0);
+        setPage(pageNum);
+      } catch (err) {
+        setError(err.message || 'Không tải được danh sách thiết bị');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [search, userIdFilter, statusFilter, browserFilter, osFilter, dateFrom, dateTo]
+  );
 
   // Mount: chỉ load mặc định khi KHÔNG có seed (seed effect sẽ load 1 lần)
   useEffect(() => {
@@ -373,52 +457,55 @@ export default function AdminDevicesPage({
 
   // SSE listener - chi cap nhat row bi anh huong (login/logout/force),
   // tranh loadData() gay giat man hinh khi user dang cuon/xem.
-  const handleSSEEvent = useCallback((eventData) => {
-    if (!eventData || !['login', 'logout', 'force'].includes(eventData.type)) return;
+  const handleSSEEvent = useCallback(
+    (eventData) => {
+      if (!eventData || !['login', 'logout', 'force'].includes(eventData.type)) return;
 
-    const changedDeviceId = Number(
-      eventData.deviceId ?? eventData.payload?.deviceId ?? eventData.device?.id
-    );
-    const userIdChanged = Number(
-      eventData.userId ?? eventData.payload?.userId ?? eventData.user?.id
-    );
-
-    if (eventData.type === 'force' || eventData.type === 'logout') {
-      setDevices((prev) =>
-        prev.map((d) => {
-          if (changedDeviceId && d.id === changedDeviceId) return { ...d, isCurrent: false };
-          if (!changedDeviceId && userIdChanged && d.userId === userIdChanged) {
-            return { ...d, isCurrent: false };
-          }
-          return d;
-        })
+      const changedDeviceId = Number(
+        eventData.deviceId ?? eventData.payload?.deviceId ?? eventData.device?.id
       );
-      // force/logout không có deviceId → refetch để đồng bộ với lịch sử đăng nhập
-      if (!changedDeviceId) loadData(page);
-      return;
-    }
+      const userIdChanged = Number(
+        eventData.userId ?? eventData.payload?.userId ?? eventData.user?.id
+      );
 
-    if (eventData.type === 'login' && (changedDeviceId || userIdChanged)) {
-      setDevices((prev) => {
-        let next = prev;
-        if (userIdChanged) {
-          next = next.map((d) =>
-            d.userId === userIdChanged && d.id !== changedDeviceId
-              ? { ...d, isCurrent: false }
-              : d
-          );
-        }
-        if (changedDeviceId) {
-          next = next.map((d) => (d.id === changedDeviceId ? { ...d, isCurrent: true } : d));
-        }
-        return next;
-      });
-      if (!changedDeviceId) loadData(page);
-      return;
-    }
+      if (eventData.type === 'force' || eventData.type === 'logout') {
+        setDevices((prev) =>
+          prev.map((d) => {
+            if (changedDeviceId && d.id === changedDeviceId) return { ...d, isCurrent: false };
+            if (!changedDeviceId && userIdChanged && d.userId === userIdChanged) {
+              return { ...d, isCurrent: false };
+            }
+            return d;
+          })
+        );
+        // force/logout không có deviceId → refetch để đồng bộ với lịch sử đăng nhập
+        if (!changedDeviceId) loadData(page);
+        return;
+      }
 
-    loadData(page);
-  }, [loadData, page]);
+      if (eventData.type === 'login' && (changedDeviceId || userIdChanged)) {
+        setDevices((prev) => {
+          let next = prev;
+          if (userIdChanged) {
+            next = next.map((d) =>
+              d.userId === userIdChanged && d.id !== changedDeviceId
+                ? { ...d, isCurrent: false }
+                : d
+            );
+          }
+          if (changedDeviceId) {
+            next = next.map((d) => (d.id === changedDeviceId ? { ...d, isCurrent: true } : d));
+          }
+          return next;
+        });
+        if (!changedDeviceId) loadData(page);
+        return;
+      }
+
+      loadData(page);
+    },
+    [loadData, page]
+  );
 
   // Truyen token de SSE auth (BE validate Bearer hoac ?token= query)
   useLoginSessionsSSE(handleSSEEvent, true, token);
@@ -447,9 +534,7 @@ export default function AdminDevicesPage({
   function handleSearchChange(e) {
     const raw = e.target.value;
     // Ô search: nếu đang gõ SĐT thì format UI có "-", state/API chỉ giữ chữ số.
-    const val = isPhoneLikeInput(raw)
-      ? phoneDigitsForSearch(raw).slice(0, 11)
-      : raw;
+    const val = isPhoneLikeInput(raw) ? phoneDigitsForSearch(raw).slice(0, 11) : raw;
     setSearch(val);
     if (searchTimerRef.current) {
       clearTimeout(searchTimerRef.current);
@@ -514,14 +599,10 @@ export default function AdminDevicesPage({
       await adminDevicesApi.forceLogout(targetId);
       toast.warning(`Đã đăng xuất thiết bị "${targetName}"`);
       setLogoutTarget(null);
-      
+
       // Smooth update - chi cap nhat device bi revoke, khong load lai toan bo trang
       // Đanh dau device thanh inactive (isCurrent = false)
-      setDevices(prev => prev.map(d => 
-        d.id === targetId 
-          ? { ...d, isCurrent: false } 
-          : d
-      ));
+      setDevices((prev) => prev.map((d) => (d.id === targetId ? { ...d, isCurrent: false } : d)));
     } catch (err) {
       toast.error(err.message || 'Lỗi khi đăng xuất thiết bị');
     } finally {
@@ -529,7 +610,8 @@ export default function AdminDevicesPage({
     }
   }
 
-  const hasActiveFilters = statusFilter || browserFilter || osFilter || dateFrom || dateTo || search || userIdFilter;
+  const hasActiveFilters =
+    statusFilter || browserFilter || osFilter || dateFrom || dateTo || search || userIdFilter;
 
   return (
     <div className={`admin-devices${embedded ? ' admin-devices--embedded' : ''}`}>
@@ -541,7 +623,9 @@ export default function AdminDevicesPage({
             </div>
             <div className="admin-devices__title-group">
               <h1>Thiết bị đăng nhập</h1>
-              <p className="admin-devices__subtitle">Quản lý thiết bị đang đăng nhập và buộc đăng xuất</p>
+              <p className="admin-devices__subtitle">
+                Quản lý thiết bị đang đăng nhập và buộc đăng xuất
+              </p>
             </div>
           </div>
         </div>
@@ -621,8 +705,15 @@ export default function AdminDevicesPage({
       {/* Content */}
       {loading && devices.length === 0 && (
         <div className="admin-devices__loading">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
-            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#64748b"
+            strokeWidth="2"
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           </svg>
           <span>Đang tải danh sách thiết bị...</span>
         </div>
@@ -632,14 +723,20 @@ export default function AdminDevicesPage({
         <div className="admin-devices__error">
           <IconAlert />
           <span>{error}</span>
-          <button className="btn btn--secondary btn--sm" onClick={() => loadData(page)}>Thử lại</button>
+          <button className="btn btn--secondary btn--sm" onClick={() => loadData(page)}>
+            Thử lại
+          </button>
         </div>
       )}
 
       {!loading && !error && devices.length === 0 && (
         <div className="admin-devices__empty">
           <IconDevice />
-          <p>{search || hasActiveFilters ? 'Không tìm thấy thiết bị nào' : 'Chưa có thiết bị nào được ghi nhận'}</p>
+          <p>
+            {search || hasActiveFilters
+              ? 'Không tìm thấy thiết bị nào'
+              : 'Chưa có thiết bị nào được ghi nhận'}
+          </p>
         </div>
       )}
 
@@ -674,18 +771,29 @@ export default function AdminDevicesPage({
                   <td>
                     <div className="admin-devices__cell-stack">
                       <span className="admin-devices__cell-title">
-                        {getBrowserIcon(device.browser)} {device.deviceName || 'Thiết bị không xác định'}
+                        {getBrowserIcon(device.browser)}{' '}
+                        {device.deviceName || 'Thiết bị không xác định'}
                       </span>
-                      <span className="admin-devices__cell-sub">{device.browser} · {device.os}</span>
+                      <span className="admin-devices__cell-sub">
+                        {device.browser} · {device.os}
+                      </span>
                     </div>
                   </td>
                   <td>
                     <div className="admin-devices__cell-stack">
-                      <span className="admin-devices__cell-title">{device.displayName || device.userName || '—'}</span>
-                      {device.userName && device.displayName && device.displayName !== device.userName && (
-                        <span className="admin-devices__cell-sub">@{String(device.userName).replace(/^@/, '')}</span>
+                      <span className="admin-devices__cell-title">
+                        {device.displayName || device.userName || '—'}
+                      </span>
+                      {device.userName &&
+                        device.displayName &&
+                        device.displayName !== device.userName && (
+                          <span className="admin-devices__cell-sub">
+                            @{String(device.userName).replace(/^@/, '')}
+                          </span>
+                        )}
+                      {device.branchName && (
+                        <span className="admin-devices__cell-sub">{device.branchName}</span>
                       )}
-                      {device.branchName && <span className="admin-devices__cell-sub">{device.branchName}</span>}
                     </div>
                   </td>
                   <td>
@@ -696,7 +804,9 @@ export default function AdminDevicesPage({
                   </td>
                   <td>
                     <div className="admin-devices__status-stack">
-                      <span className={`admin-devices__badge ${device.isCurrent ? 'admin-devices__badge--on' : 'admin-devices__badge--off'}`}>
+                      <span
+                        className={`admin-devices__badge ${device.isCurrent ? 'admin-devices__badge--on' : 'admin-devices__badge--off'}`}
+                      >
                         {device.isCurrent ? '● Hiện tại' : '○ Không hoạt động'}
                       </span>
                     </div>

@@ -50,7 +50,7 @@ function buildAuthRouter() {
    *
    * Use case:
    *   - FE nhan SSE event 'permission-changed' tu /api/sse/permissions
-   *     (admin vua thay doi ma tran quyen / gan role / revoke role).
+   *     (admin vua gan/thu hoi role).
    *   - Token hien tai van co permissions cu trong payload (24h cache).
    *   - FE goi endpoint nay de lay token moi + permissions moi -> luu vao
    *     localStorage -> PermissionGate re-render ngay.

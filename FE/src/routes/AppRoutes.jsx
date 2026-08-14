@@ -12,13 +12,13 @@ import { ROLES, INVENTORY_ACCESS_ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 import { BASE_PATH } from '../config';
 import { APP_PROFILE_ROUTE_CONFIGS } from '../config/roleProfileConfig';
-
-const LOGIN_PATH = `${BASE_PATH}/login`;
-const UNAUTHORIZED_PATH = `${BASE_PATH}/unauthorized`;
 import { SharedDataProvider } from '../contexts/SharedDataContext';
 import { ManagerInventoryNotifyProvider } from '../contexts/ManagerInventoryNotifyContext';
 import { useGlobalError } from '../contexts/GlobalErrorContext';
 import { useAuth } from '../contexts/AppContext';
+
+const LOGIN_PATH = `${BASE_PATH}/login`;
+const UNAUTHORIZED_PATH = `${BASE_PATH}/unauthorized`;
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
@@ -53,7 +53,9 @@ const AdminLoginSecurityPage = lazy(() =>
 const AdminAccountPage = lazy(() => import('../pages/admin/AdminAccountPage'));
 const DirectorProfilePage = lazy(() => import('../pages/generalDirector/DirectorProfilePage'));
 const ManagerProfilePage = lazy(() => import('../pages/manager/ManagerProfilePage'));
-const ServiceAdvisorProfilePage = lazy(() => import('../pages/dashboard/ServiceAdvisorProfilePage'));
+const ServiceAdvisorProfilePage = lazy(
+  () => import('../pages/dashboard/ServiceAdvisorProfilePage')
+);
 const TeamLeaderProfilePage = lazy(() => import('../pages/repairorder/TeamLeaderProfilePage'));
 const TechnicianProfilePage = lazy(() => import('../pages/technician/TechnicianProfilePage'));
 const WarehouseProfilePage = lazy(() => import('../pages/inventory/WarehouseProfilePage'));
@@ -118,13 +120,15 @@ function ErrorHandler() {
   if (!globalError) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 9999,
-      background: '#f9fafb',
-      overflow: 'auto',
-    }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: '#f9fafb',
+        overflow: 'auto',
+      }}
+    >
       <UnauthorizedPage
         permissionKey={globalError.permissionKey}
         customMessage={globalError.message}
@@ -135,7 +139,14 @@ function ErrorHandler() {
 
 function Loading() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+      }}
+    >
       Đang tải...
     </div>
   );
@@ -153,260 +164,277 @@ function AppRoutes() {
   return (
     <>
       <SharedDataProvider>
-      <ManagerInventoryNotifyProvider>
-        <SessionExpiredModal />
-        <SessionTakenOverPrompt />
-        <ForbiddenModal />
-        <ErrorHandler />
-        <Suspense fallback={<Loading />}>
-          <Routes>
-          {/* Public */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <ManagerInventoryNotifyProvider>
+          <SessionExpiredModal />
+          <SessionTakenOverPrompt />
+          <ForbiddenModal />
+          <ErrorHandler />
+          <Suspense fallback={<Loading />}>
+            <Routes>
+              {/* Public */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-        {/* Protected – wrapped in AppLayout (Navbar) */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute
-              roles={[
-                ROLES.MANAGER,
-                ROLES.GENERAL_DIRECTOR,
-                ROLES.TEAM_LEADER,
-                ROLES.TECHNICIAN,
-                ROLES.ADMIN,
-              ]}
-            >
-              <AppLayout>
-                <DashboardPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+              {/* Protected – wrapped in AppLayout (Navbar) */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute
+                    roles={[
+                      ROLES.MANAGER,
+                      ROLES.GENERAL_DIRECTOR,
+                      ROLES.TEAM_LEADER,
+                      ROLES.TECHNICIAN,
+                      ROLES.ADMIN,
+                    ]}
+                  >
+                    <AppLayout>
+                      <DashboardPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
 
-        {/* Admin */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminLayout>
-                <Outlet />
-              </AdminLayout>
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="users" element={<AdminUsersPage />} />
-          <Route path="users/new" element={<UserFormPage mode="create" />} />
-          <Route path="users/:id/edit" element={<UserFormPage mode="edit" />} />
-          <Route path="users/:id" element={<UserDetailPage />} />
-          <Route path="roles" element={<Navigate to="/admin/users" replace />} />
-          <Route path="catalog" element={<AdminCatalogPage />} />
-          <Route path="catalog/branches/new" element={<BranchFormPage mode="create" />} />
-          <Route path="catalog/branches/:id/edit" element={<BranchFormPage mode="edit" />} />
-          <Route path="catalog/branches/:id" element={<BranchDetailPage />} />
-          <Route path="branches" element={<Navigate to="/admin/catalog" replace />} />
-          <Route path="vehicle-brands" element={<Navigate to="/admin/catalog" replace />} />
-          <Route path="login-security" element={<AdminLoginSecurityPage />} />
-          <Route path="security-alerts" element={<Navigate to="/admin/login-security?alerts=1" replace />} />
-          <Route path="login-sessions/:id" element={<LoginSessionDetailPage />} />
-          <Route path="login-sessions" element={<Navigate to="/admin/login-security?tab=sessions" replace />} />
-          <Route path="devices" element={<Navigate to="/admin/login-security" replace />} />
-          <Route path="logs" element={<AuditLogsPage />} />
-          <Route path="logs/:id" element={<AuditLogDetailPage />} />
-          <Route path="profile" element={<AdminAccountPage />} />
-          <Route path="profile/edit" element={<AdminAccountPage />} />
-          <Route path="profile/notifications" element={<Navigate to="/admin/profile?tab=notifications" replace />} />
-        </Route>
+              {/* Admin */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <AdminLayout>
+                      <Outlet />
+                    </AdminLayout>
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<AdminDashboardPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+                <Route path="users/new" element={<UserFormPage mode="create" />} />
+                <Route path="users/:id/edit" element={<UserFormPage mode="edit" />} />
+                <Route path="users/:id" element={<UserDetailPage />} />
+                <Route path="roles" element={<Navigate to="/admin/users" replace />} />
+                <Route path="catalog" element={<AdminCatalogPage />} />
+                <Route path="catalog/branches/new" element={<BranchFormPage mode="create" />} />
+                <Route path="catalog/branches/:id/edit" element={<BranchFormPage mode="edit" />} />
+                <Route path="catalog/branches/:id" element={<BranchDetailPage />} />
+                <Route path="branches" element={<Navigate to="/admin/catalog" replace />} />
+                <Route path="vehicle-brands" element={<Navigate to="/admin/catalog" replace />} />
+                <Route path="login-security" element={<AdminLoginSecurityPage />} />
+                <Route
+                  path="security-alerts"
+                  element={<Navigate to="/admin/login-security?alerts=1" replace />}
+                />
+                <Route path="login-sessions/:id" element={<LoginSessionDetailPage />} />
+                <Route
+                  path="login-sessions"
+                  element={<Navigate to="/admin/login-security?tab=sessions" replace />}
+                />
+                <Route path="devices" element={<Navigate to="/admin/login-security" replace />} />
+                <Route path="logs" element={<AuditLogsPage />} />
+                <Route path="logs/:id" element={<AuditLogDetailPage />} />
+                <Route path="profile" element={<AdminAccountPage />} />
+                <Route path="profile/edit" element={<AdminAccountPage />} />
+                <Route
+                  path="profile/notifications"
+                  element={<Navigate to="/admin/profile?tab=notifications" replace />}
+                />
+              </Route>
 
-        {/* Hồ sơ cá nhân — page riêng theo từng role (không dùng chung AdminProfile) */}
-        {APP_PROFILE_ROUTE_CONFIGS.map(({ profilePath, allowedRoles, pageKey }) => {
-          const ProfilePage = ROLE_PROFILE_PAGES[pageKey];
-          if (!ProfilePage) return null;
-          return (
-            <Route
-              key={profilePath}
-              path={profilePath}
-              element={
-                <ProtectedRoute roles={allowedRoles}>
-                  <ProfilePageLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<ProfilePage />} />
-              <Route path="edit" element={<ProfilePage />} />
-            </Route>
-          );
-        })}
+              {/* Hồ sơ cá nhân — page riêng theo từng role (không dùng chung AdminProfile) */}
+              {APP_PROFILE_ROUTE_CONFIGS.map(({ profilePath, allowedRoles, pageKey }) => {
+                const ProfilePage = ROLE_PROFILE_PAGES[pageKey];
+                if (!ProfilePage) return null;
+                return (
+                  <Route
+                    key={profilePath}
+                    path={profilePath}
+                    element={
+                      <ProtectedRoute roles={allowedRoles}>
+                        <ProfilePageLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route index element={<ProfilePage />} />
+                    <Route path="edit" element={<ProfilePage />} />
+                  </Route>
+                );
+              })}
 
-        {/* Legacy /profile, /profile/edit → redirect theo role */}
-        <Route
-          path="/profile/edit"
-          element={
-            <ProtectedRoute>
-              <ProfileRedirect />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <ProfileRedirect />
-            </ProtectedRoute>
-          }
-        />
+              {/* Legacy /profile, /profile/edit → redirect theo role */}
+              <Route
+                path="/profile/edit"
+                element={
+                  <ProtectedRoute>
+                    <ProfileRedirect />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfileRedirect />
+                  </ProtectedRoute>
+                }
+              />
 
-        {/* General Director */}
-        <Route
-          path="/general-director/*"
-          element={
-            <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
-              <AppLayout>
-                <GeneralDirectorPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+              {/* General Director */}
+              <Route
+                path="/general-director/*"
+                element={
+                  <ProtectedRoute roles={[ROLES.GENERAL_DIRECTOR, ROLES.ADMIN]}>
+                    <AppLayout>
+                      <GeneralDirectorPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
 
-        {/* Quản lý chi nhánh */}
-        <Route
-          path="/manager/*"
-          element={
-            <ProtectedRoute roles={[ROLES.MANAGER, ROLES.ADMIN]}>
-              <AppLayout>
-                <ManagerPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+              {/* Quản lý chi nhánh */}
+              <Route
+                path="/manager/*"
+                element={
+                  <ProtectedRoute roles={[ROLES.MANAGER, ROLES.ADMIN]}>
+                    <AppLayout>
+                      <ManagerPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
 
-        {/* Phiếu quyết toán sửa chữa */}
-        <Route
-          path="/repair-settlement/*"
-          element={
-            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
-              <AppLayout>
-                <RepairSettlementPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+              {/* Phiếu quyết toán sửa chữa */}
+              <Route
+                path="/repair-settlement/*"
+                element={
+                  <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
+                    <AppLayout>
+                      <RepairSettlementPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
 
-        {/* Lệnh sửa chữa - bảng tin nhận việc của tổ trưởng, xem RepairOrderPage.jsx */}
-        <Route
-          path="/repair-orders/*"
-          element={
-            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.TECHNICIAN, ROLES.MANAGER, ROLES.ADMIN, ROLES.TEAM_LEADER]}>
-              <AppLayout>
-                <RepairOrderPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+              {/* Lệnh sửa chữa - bảng tin nhận việc của tổ trưởng, xem RepairOrderPage.jsx */}
+              <Route
+                path="/repair-orders/*"
+                element={
+                  <ProtectedRoute
+                    roles={[
+                      ROLES.SERVICE_ADVISOR,
+                      ROLES.TECHNICIAN,
+                      ROLES.MANAGER,
+                      ROLES.ADMIN,
+                      ROLES.TEAM_LEADER,
+                    ]}
+                  >
+                    <AppLayout>
+                      <RepairOrderPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
 
-        {/* Khách hàng - danh sách khách hàng, lịch sử dịch vụ, hợp đồng mua xe */}
-        <Route
-          path="/customers"
-          element={
-            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
-              <AppLayout>
-                <CustomerHistoryPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+              {/* Khách hàng - danh sách khách hàng, lịch sử dịch vụ, hợp đồng mua xe */}
+              <Route
+                path="/customers"
+                element={
+                  <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
+                    <AppLayout>
+                      <CustomerHistoryPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
 
-        {/* Yeu cau tu van tu landing page - CVDV tiep nhan + tao lich hen */}
-        <Route
-          path="/service-requests"
-          element={
-            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
-              <AppLayout>
-                <ServiceRequestsPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+              {/* Yeu cau tu van tu landing page - CVDV tiep nhan + tao lich hen */}
+              <Route
+                path="/service-requests"
+                element={
+                  <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.ADMIN]}>
+                    <AppLayout>
+                      <ServiceRequestsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
 
-        {/* Chăm sóc khách hàng - nhắc nhở bảo dưỡng */}
-        <Route
-          path="/customer-care"
-          element={
-            <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
-              <AppLayout>
-                <CustomerCarePage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+              {/* Chăm sóc khách hàng - nhắc nhở bảo dưỡng */}
+              <Route
+                path="/customer-care"
+                element={
+                  <ProtectedRoute roles={[ROLES.SERVICE_ADVISOR, ROLES.MANAGER, ROLES.ADMIN]}>
+                    <AppLayout>
+                      <CustomerCarePage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
 
-        {/* Inventory module */}
-        <Route
-          path={ROUTES.INVENTORY}
-          element={
-            <ProtectedRoute roles={[...INVENTORY_ACCESS_ROLES]}>
-              <AppLayout>
-                <InventoryLayout />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<InventoryDashboardPage />} />
-          <Route path="suppliers" element={<SupplierListPage />} />
-          <Route path="suppliers/:id" element={<SupplierDetailPage />} />
-          <Route path="parts" element={<PartListPage />} />
-          <Route path="parts/:id" element={<PartDetailPage />} />
-          <Route path="stock" element={<StockPage />} />
-          <Route path="import-requests" element={<ImportRequestListPage />} />
-          <Route
-            path="import-requests/new"
-            element={
-              <ProtectedRoute permission="import_requests:create">
-                <ImportRequestFormPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="import-requests/:id" element={<ImportRequestDetailPage />} />
-          <Route path="export-requests" element={<ExportRequestListPage />} />
-          <Route
-            path="export-requests/new"
-            element={
-              <ProtectedRoute permission="export_requests:create">
-                <ExportRequestFormPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="export-requests/:id" element={<ExportRequestDetailPage />} />
-        </Route>
+              {/* Inventory module */}
+              <Route
+                path={ROUTES.INVENTORY}
+                element={
+                  <ProtectedRoute roles={[...INVENTORY_ACCESS_ROLES]}>
+                    <AppLayout>
+                      <InventoryLayout />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<InventoryDashboardPage />} />
+                <Route path="suppliers" element={<SupplierListPage />} />
+                <Route path="suppliers/:id" element={<SupplierDetailPage />} />
+                <Route path="parts" element={<PartListPage />} />
+                <Route path="parts/:id" element={<PartDetailPage />} />
+                <Route path="stock" element={<StockPage />} />
+                <Route path="import-requests" element={<ImportRequestListPage />} />
+                <Route
+                  path="import-requests/new"
+                  element={
+                    <ProtectedRoute permission="import_requests:create">
+                      <ImportRequestFormPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="import-requests/:id" element={<ImportRequestDetailPage />} />
+                <Route path="export-requests" element={<ExportRequestListPage />} />
+                <Route
+                  path="export-requests/new"
+                  element={
+                    <ProtectedRoute permission="export_requests:create">
+                      <ExportRequestFormPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="export-requests/:id" element={<ExportRequestDetailPage />} />
+              </Route>
 
-        {/* Placeholder routes */}
-        {['/maintenance', '/services'].map((path) => (
-          <Route
-            key={path}
-            path={path}
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
-                    Trang đang phát triển...
-                  </div>
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-        ))}
+              {/* Placeholder routes */}
+              {['/maintenance', '/services'].map((path) => (
+                <Route
+                  key={path}
+                  path={path}
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
+                          Trang đang phát triển...
+                        </div>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+              ))}
 
-        {/* Redirects */}
-        <Route path="/" element={<RoleAwareRedirect />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-      </Suspense>
-      </ManagerInventoryNotifyProvider>
-    </SharedDataProvider>
+              {/* Redirects */}
+              <Route path="/" element={<RoleAwareRedirect />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
+        </ManagerInventoryNotifyProvider>
+      </SharedDataProvider>
     </>
   );
 }

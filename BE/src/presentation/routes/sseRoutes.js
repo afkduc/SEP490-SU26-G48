@@ -6,7 +6,7 @@
  * /api/sse/notifications: server push thong bao in-app + LOGIN_CHALLENGE.
  * /api/sse/service-requests: server push "Yeu cau" moi/duoc tiep nhan tu
  *   form Lien he cua landing page, scope theo branchId cua CVDV.
- * /api/sse/permissions: server push khi admin thay doi permission matrix.
+ * /api/sse/permissions: server push khi gan/thu hoi role (permission-changed).
  *   Push toi DUNG user dang bi anh huong (filter theo userId trong JWT).
  * /api/sse/repair-orders: server push khi co lenh sua chua moi duoc giao,
  *   dau muc cong viec duoc tich hoan thanh, hoac lenh hoan thanh toan bo -
@@ -90,9 +90,7 @@ function buildSSERouter() {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
-    res.write(
-      `event: connected\ndata: ${JSON.stringify({ status: 'connected', userId })}\n\n`
-    );
+    res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected', userId })}\n\n`);
 
     const unsubscribe = notificationEvents.onNotification(userId, (notification) => {
       try {
@@ -172,7 +170,9 @@ function buildSSERouter() {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
-    res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected', userId: decoded.userId })}\n\n`);
+    res.write(
+      `event: connected\ndata: ${JSON.stringify({ status: 'connected', userId: decoded.userId })}\n\n`
+    );
 
     const myUserId = Number(decoded.userId);
 

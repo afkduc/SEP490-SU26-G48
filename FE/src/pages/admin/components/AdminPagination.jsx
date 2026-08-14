@@ -47,7 +47,11 @@ export default function AdminPagination({
     }
     if (showLeftDots && !showRightDots) {
       const rightCount = 3 + 2 * siblingCount;
-      return [1, 'dots-left', ...Array.from({ length: rightCount }, (_, i) => totalPages - rightCount + 1 + i)];
+      return [
+        1,
+        'dots-left',
+        ...Array.from({ length: rightCount }, (_, i) => totalPages - rightCount + 1 + i),
+      ];
     }
     return [
       1,
@@ -64,8 +68,8 @@ export default function AdminPagination({
   return (
     <div className="admin-pagination">
       <span className="admin-pagination__info admin-pagination__info--desktop">
-        Tổng <strong>{total}</strong> bản ghi
-        &nbsp;— Trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
+        Tổng <strong>{total}</strong> bản ghi &nbsp;— Trang <strong>{currentPage}</strong> /{' '}
+        <strong>{totalPages}</strong>
       </span>
       <span className="admin-pagination__info admin-pagination__info--mobile">
         <strong>{currentPage}</strong> / <strong>{totalPages}</strong>
@@ -81,7 +85,14 @@ export default function AdminPagination({
           title="Trang đầu"
           aria-label="Trang đầu"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <polyline points="11 17 6 12 11 7" />
             <polyline points="18 17 13 12 18 7" />
           </svg>
@@ -94,7 +105,14 @@ export default function AdminPagination({
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={isFirst || loading}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <polyline points="15 18 9 12 15 6" />
           </svg>
           Trước
@@ -104,11 +122,7 @@ export default function AdminPagination({
         {paginationRange.map((p, idx) => {
           if (p === 'dots-left' || p === 'dots-right') {
             return (
-              <span
-                key={`${p}-${idx}`}
-                className="admin-pagination__dots"
-                aria-hidden="true"
-              >
+              <span key={`${p}-${idx}`} className="admin-pagination__dots" aria-hidden="true">
                 …
               </span>
             );
@@ -134,7 +148,14 @@ export default function AdminPagination({
           disabled={isLast || loading}
         >
           Sau
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
@@ -148,7 +169,14 @@ export default function AdminPagination({
           title="Trang cuối"
           aria-label="Trang cuối"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <polyline points="13 17 18 12 13 7" />
             <polyline points="6 17 11 12 6 7" />
           </svg>
@@ -163,7 +191,16 @@ export default function AdminPagination({
           disabled={isFirst || loading}
           aria-label="Trang trước"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="15 18 9 12 15 6" />
           </svg>
           Trước
@@ -176,7 +213,16 @@ export default function AdminPagination({
           aria-label="Trang sau"
         >
           Sau
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>

@@ -60,7 +60,17 @@ function validateListUsersQuery(req, res, next) {
 
 function validateCreateUser(req, res, next) {
   try {
-    const { name, email, password, roleId, branchId, scopeAllBranches, firstName, lastName, phone } = req.body || {};
+    const {
+      name,
+      email,
+      password,
+      roleId,
+      branchId,
+      scopeAllBranches,
+      firstName,
+      lastName,
+      phone,
+    } = req.body || {};
 
     const usernameErr = getUsernameError(name, { required: true });
     if (usernameErr) throw new ApiError(400, usernameErr);
@@ -91,7 +101,10 @@ function validateCreateUser(req, res, next) {
       throw new ApiError(400, 'Số điện thoại là bắt buộc');
     }
     if (!isValidPhone(phone)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
+      throw new ApiError(
+        400,
+        'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)'
+      );
     }
     if (scopeAllBranches !== true) {
       if (branchId === undefined || branchId === null || branchId === '') {
@@ -128,7 +141,10 @@ function validateUpdateUser(req, res, next) {
     if (phone !== undefined && phone !== null) {
       if (!String(phone).trim()) throw new ApiError(400, 'Số điện thoại là bắt buộc');
       if (!isValidPhone(phone)) {
-        throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
+        throw new ApiError(
+          400,
+          'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)'
+        );
       }
     }
 
@@ -153,7 +169,12 @@ function validateUpdateUser(req, res, next) {
       }
     }
 
-    if (scopeAllBranches !== true && branchId !== undefined && branchId !== null && branchId !== '') {
+    if (
+      scopeAllBranches !== true &&
+      branchId !== undefined &&
+      branchId !== null &&
+      branchId !== ''
+    ) {
       const parsedBranch = Number(branchId);
       if (!Number.isInteger(parsedBranch) || parsedBranch <= 0) {
         throw new ApiError(400, 'branchId phải là số nguyên dương');

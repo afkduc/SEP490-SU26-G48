@@ -89,7 +89,10 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .admin-hub__tab:hover {

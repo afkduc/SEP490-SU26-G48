@@ -15,7 +15,16 @@ const TABS = [
 
 function IconShield() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
   );
@@ -89,12 +98,15 @@ export default function AdminLoginSecurityPage() {
 
   useEffect(() => {
     if (searchParams.get('tab') !== 'alerts') return;
-    syncSearch((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('tab');
-      next.set('alerts', '1');
-      return next;
-    }, { replace: true });
+    syncSearch(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('tab');
+        next.set('alerts', '1');
+        return next;
+      },
+      { replace: true }
+    );
     setAlertsExpanded(true);
   }, [searchParams, syncSearch]);
 
@@ -128,36 +140,50 @@ export default function AdminLoginSecurityPage() {
       }));
     }
 
-    syncSearch((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('userId');
-      next.delete('search');
-      next.delete('ip');
-      return next;
-    }, { replace: true });
-  // Chi chay khi mount / khi query deep-link doi
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.get('userId'), searchParams.get('search'), searchParams.get('ip'), searchParams.get('tab')]);
+    syncSearch(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('userId');
+        next.delete('search');
+        next.delete('ip');
+        return next;
+      },
+      { replace: true }
+    );
+    // Chi chay khi mount / khi query deep-link doi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    searchParams.get('userId'),
+    searchParams.get('search'),
+    searchParams.get('ip'),
+    searchParams.get('tab'),
+  ]);
 
-  const setActiveTab = useCallback((tab) => {
-    syncSearch((prev) => {
-      const next = new URLSearchParams(prev);
-      if (tab === 'devices') next.delete('tab');
-      else next.set('tab', tab);
-      if (tab === 'sessions') next.delete('alerts');
-      return next;
-    });
-  }, [syncSearch]);
+  const setActiveTab = useCallback(
+    (tab) => {
+      syncSearch((prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === 'devices') next.delete('tab');
+        else next.set('tab', tab);
+        if (tab === 'sessions') next.delete('alerts');
+        return next;
+      });
+    },
+    [syncSearch]
+  );
 
-  const handleAlertsExpanded = useCallback((open) => {
-    setAlertsExpanded(open);
-    syncSearch((prev) => {
-      const next = new URLSearchParams(prev);
-      if (open) next.set('alerts', '1');
-      else next.delete('alerts');
-      return next;
-    });
-  }, [syncSearch]);
+  const handleAlertsExpanded = useCallback(
+    (open) => {
+      setAlertsExpanded(open);
+      syncSearch((prev) => {
+        const next = new URLSearchParams(prev);
+        if (open) next.set('alerts', '1');
+        else next.delete('alerts');
+        return next;
+      });
+    },
+    [syncSearch]
+  );
 
   const handleCounts = useCallback((countsOrTotal) => {
     if (countsOrTotal && typeof countsOrTotal === 'object') {
@@ -169,34 +195,37 @@ export default function AdminLoginSecurityPage() {
   }, []);
 
   /** Thẳng sang tab Lịch sử — lọc phiên theo cảnh báo. */
-  const handleOpenSessions = useCallback((alert) => {
-    const seed = buildSessionSeedFromAlert(alert);
-    if (!seed) {
+  const handleOpenSessions = useCallback(
+    (alert) => {
+      const seed = buildSessionSeedFromAlert(alert);
+      if (!seed) {
+        setSessionSeed((prev) => ({
+          ...prev,
+          key: prev.key + 1,
+          alert: alert || null,
+          context: alert?.title || '',
+        }));
+        setActiveTab('sessions');
+        return;
+      }
       setSessionSeed((prev) => ({
-        ...prev,
         key: prev.key + 1,
+        userName: seed.userName || '',
+        ipAddress: seed.ipAddress || '',
+        startDate: seed.startDate || '',
+        endDate: seed.endDate || '',
+        actionType: seed.actionType || '',
+        sessionId: seed.sessionId || null,
+        focusSessionId: seed.focusSessionId || seed.sessionId || null,
+        focusIp: seed.focusIp || '',
+        focusLoginTime: seed.focusLoginTime || '',
+        context: seed.context || '',
         alert: alert || null,
-        context: alert?.title || '',
       }));
       setActiveTab('sessions');
-      return;
-    }
-    setSessionSeed((prev) => ({
-      key: prev.key + 1,
-      userName: seed.userName || '',
-      ipAddress: seed.ipAddress || '',
-      startDate: seed.startDate || '',
-      endDate: seed.endDate || '',
-      actionType: seed.actionType || '',
-      sessionId: seed.sessionId || null,
-      focusSessionId: seed.focusSessionId || seed.sessionId || null,
-      focusIp: seed.focusIp || '',
-      focusLoginTime: seed.focusLoginTime || '',
-      context: seed.context || '',
-      alert: alert || null,
-    }));
-    setActiveTab('sessions');
-  }, [setActiveTab]);
+    },
+    [setActiveTab]
+  );
 
   const clearSessionFocus = useCallback(() => {
     setSessionSeed((prev) => ({
@@ -216,28 +245,30 @@ export default function AdminLoginSecurityPage() {
   }, []);
 
   /** Từ cảnh báo / phiên → tab Thiết bị để force logout. */
-  const handleOpenDevicesToProcess = useCallback((opts = {}) => {
-    const alert = opts.alert || sessionSeed.alert;
-    const userId = opts.userId || alert?.userId || null;
-    const userName = opts.userName || alert?.userName || alert?.displayName || '';
-    const rule = alert?.ruleKey || '';
-    // session_takeover: ưu tiên máy đang Hiện tại để đăng xuất.
-    // new_device_ip / còn lại: xem mọi thiết bị của user (máy mới có thể đã không còn is_current).
-    const isCurrent = opts.isCurrent != null
-      ? opts.isCurrent
-      : (rule === 'session_takeover' ? 'true' : '');
-    setDeviceSeed((prev) => ({
-      key: prev.key + 1,
-      userId: userId ? Number(userId) : null,
-      search: userId ? '' : (userName || ''),
-      focusIp: opts.ipAddress || sessionSeed.focusIp || sessionSeed.ipAddress || '',
-      focusLoginTime: opts.loginTime || sessionSeed.focusLoginTime || '',
-      isCurrent,
-    }));
-    // Thu gọn cảnh báo về banner — ưu tiên bảng thiết bị khi đang xử lý
-    handleAlertsExpanded(false);
-    setActiveTab('devices');
-  }, [sessionSeed, setActiveTab, handleAlertsExpanded]);
+  const handleOpenDevicesToProcess = useCallback(
+    (opts = {}) => {
+      const alert = opts.alert || sessionSeed.alert;
+      const userId = opts.userId || alert?.userId || null;
+      const userName = opts.userName || alert?.userName || alert?.displayName || '';
+      const rule = alert?.ruleKey || '';
+      // session_takeover: ưu tiên máy đang Hiện tại để đăng xuất.
+      // new_device_ip / còn lại: xem mọi thiết bị của user (máy mới có thể đã không còn is_current).
+      const isCurrent =
+        opts.isCurrent != null ? opts.isCurrent : rule === 'session_takeover' ? 'true' : '';
+      setDeviceSeed((prev) => ({
+        key: prev.key + 1,
+        userId: userId ? Number(userId) : null,
+        search: userId ? '' : userName || '',
+        focusIp: opts.ipAddress || sessionSeed.focusIp || sessionSeed.ipAddress || '',
+        focusLoginTime: opts.loginTime || sessionSeed.focusLoginTime || '',
+        isCurrent,
+      }));
+      // Thu gọn cảnh báo về banner — ưu tiên bảng thiết bị khi đang xử lý
+      handleAlertsExpanded(false);
+      setActiveTab('devices');
+    },
+    [sessionSeed, setActiveTab, handleAlertsExpanded]
+  );
 
   return (
     <div className="admin-page admin-hub">
@@ -249,7 +280,8 @@ export default function AdminLoginSecurityPage() {
           <div className="admin-hub__title-group">
             <h1>Bảo mật đăng nhập</h1>
             <p className="admin-hub__subtitle">
-              Xem cảnh báo → Đã xem hoặc Xem phiên. Xử lý đăng xuất trên danh sách thiết bị / chi tiết phiên.
+              Xem cảnh báo → Đã xem hoặc Xem phiên. Xử lý đăng xuất trên danh sách thiết bị / chi
+              tiết phiên.
             </p>
           </div>
         </div>
@@ -299,7 +331,7 @@ export default function AdminLoginSecurityPage() {
               text={sessionSeed.context}
               onClear={clearSessionFocus}
               onHandleDevices={
-                (sessionSeed.alert?.userId || sessionSeed.userName)
+                sessionSeed.alert?.userId || sessionSeed.userName
                   ? () => handleOpenDevicesToProcess()
                   : undefined
               }

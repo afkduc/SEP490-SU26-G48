@@ -37,7 +37,9 @@ export default function LoginSessionDetailPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   function handleOpenDevices() {
@@ -54,7 +56,11 @@ export default function LoginSessionDetailPage() {
     <div className="admin-page session-detail-page">
       <div className="admin-page__header">
         <div className="admin-page__title-block">
-          <button type="button" className="session-detail-page__back" onClick={() => navigate(backTo)}>
+          <button
+            type="button"
+            className="session-detail-page__back"
+            onClick={() => navigate(backTo)}
+          >
             ← Quay lại lịch sử đăng nhập
           </button>
           <div className="admin-page__title-group">
@@ -70,15 +76,14 @@ export default function LoginSessionDetailPage() {
           <div className="session-detail-page__state session-detail-page__state--error">
             {error}
             <div style={{ marginTop: 12 }}>
-              <Link to={backTo} className="btn btn--ghost">Về lịch sử</Link>
+              <Link to={backTo} className="btn btn--ghost">
+                Về lịch sử
+              </Link>
             </div>
           </div>
         )}
         {!loading && !error && session && (
-          <LoginSessionDetailContent
-            session={session}
-            onOpenDevicesToProcess={handleOpenDevices}
-          />
+          <LoginSessionDetailContent session={session} onOpenDevicesToProcess={handleOpenDevices} />
         )}
       </div>
     </div>

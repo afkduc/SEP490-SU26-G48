@@ -30,14 +30,20 @@ export default function AuditLogDetailPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   return (
     <div className="admin-page admin-logs audit-detail-page">
       <div className="admin-page__header">
         <div className="admin-page__title-block">
-          <button type="button" className="audit-detail-page__back" onClick={() => navigate(backTo)}>
+          <button
+            type="button"
+            className="audit-detail-page__back"
+            onClick={() => navigate(backTo)}
+          >
             ← Quay lại danh sách
           </button>
           <div className="admin-page__title-group">
@@ -53,7 +59,9 @@ export default function AuditLogDetailPage() {
           <div className="audit-detail-page__state audit-detail-page__state--error">
             {error}
             <div style={{ marginTop: 12 }}>
-              <Link to={backTo} className="btn btn--ghost">Về danh sách</Link>
+              <Link to={backTo} className="btn btn--ghost">
+                Về danh sách
+              </Link>
             </div>
           </div>
         )}

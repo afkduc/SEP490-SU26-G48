@@ -13,11 +13,6 @@
  *
  * Phuong phap static scan (khong execute router) de tranh circular dependency
  * giua controllers va routes/index.js.
- *
- * Controllers user-screen / permission-request /
-
- * UserScreenPermissionsController dung generatePermissionKeys() de build
- * ma tran screens cho role/user.
  */
 
 const fs = require('fs');
@@ -46,14 +41,9 @@ const ROUTE_RE = /\b(router|app)\.(get|post|put|patch|delete)\s*\(\s*['"]([^'"]+
  *   managerRoutes.js     -> "manager"
  *   adminRoutes.js       -> "admin"
  *   userRoutes.js        -> "users"
- *   permissionMatrixRoutes.js -> "permissionMatrix"
- *   roleScreenMatrixRoutes.js -> "roleScreenMatrix"
- *   userScreenPermissionsRoutes.js -> "userScreenPermissions"
  */
 function _moduleFromFilename(filename) {
-  return filename
-    .replace(/\.js$/, '')
-    .replace(/Rout(er|es)\.?$/i, '');
+  return filename.replace(/\.js$/, '').replace(/Rout(er|es)\.?$/i, '');
 }
 
 /**
@@ -90,9 +80,7 @@ let _cache = null;
 function generatePermissionKeys() {
   if (_cache) return _cache;
 
-  const files = fs.readdirSync(ROUTES_DIR).filter(
-    (f) => f.endsWith('.js') && f !== 'index.js'
-  );
+  const files = fs.readdirSync(ROUTES_DIR).filter((f) => f.endsWith('.js') && f !== 'index.js');
 
   const all = [];
   for (const f of files) {

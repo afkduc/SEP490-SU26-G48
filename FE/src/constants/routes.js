@@ -5,8 +5,7 @@ export const ROUTES = Object.freeze({
 
   DASHBOARD: '/dashboard',
   ADMIN_DASHBOARD: '/admin/dashboard',
-    GENERAL_DIRECTOR_SETTLEMENTS: '/general-director/reports/settlements',
-
+  GENERAL_DIRECTOR_SETTLEMENTS: '/general-director/reports/settlements',
 
   ADMIN_USERS: '/admin/users',
   ADMIN_USERS_NEW: '/admin/users/new',

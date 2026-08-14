@@ -10,7 +10,10 @@ const {
   validateResetPassword,
   validateAssignRoles,
 } = require('../validators/adminUserValidator');
-const { validateCreateBranch, validateUpdateBranch } = require('../validators/adminBranchValidator');
+const {
+  validateCreateBranch,
+  validateUpdateBranch,
+} = require('../validators/adminBranchValidator');
 
 /**
  * Admin routes — role admin only.
@@ -79,11 +82,7 @@ function buildAdminRouter() {
   router.get('/security-alerts', controller.listSecurityAlerts);
   router.get('/security-alerts/counts', controller.acknowledgeAlertCounts);
   router.patch('/security-alerts/ack-all', controller.acknowledgeAllAlerts);
-  router.patch(
-    '/security-alerts/:id/ack',
-    validateIdParam('id'),
-    controller.acknowledgeAlert
-  );
+  router.patch('/security-alerts/:id/ack', validateIdParam('id'), controller.acknowledgeAlert);
 
   router.post('/sessions/cleanup', controller.cleanupDuplicateSessions);
   router.get('/login-sessions/recent', controller.getRecentLoginSessions);

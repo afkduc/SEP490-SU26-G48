@@ -5,9 +5,20 @@
 function readAuditParamsFromSearch(sp) {
   const out = {};
   const keys = [
-    'keyword', 'userName', 'phone', 'action', 'tableName', 'entityName',
-    'entityCode', 'ipAddress', 'requestMethod', 'responseStatus',
-    'startDate', 'endDate', 'branchId', 'page',
+    'keyword',
+    'userName',
+    'phone',
+    'action',
+    'tableName',
+    'entityName',
+    'entityCode',
+    'ipAddress',
+    'requestMethod',
+    'responseStatus',
+    'startDate',
+    'endDate',
+    'branchId',
+    'page',
   ];
   keys.forEach((k) => {
     const v = sp.get(k);

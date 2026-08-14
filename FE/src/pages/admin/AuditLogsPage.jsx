@@ -87,83 +87,173 @@ function formatLocal(value) {
 // ─── Icons ────────────────────────────────────────────────────────────
 
 const IconLog = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-    <polyline points="14 2 14 8 20 8"/>
-    <line x1="16" y1="13" x2="8" y2="13"/>
-    <line x1="16" y1="17" x2="8" y2="17"/>
-    <polyline points="10 9 9 9 8 9"/>
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
   </svg>
 );
 
 const IconDownload = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-    <polyline points="7 10 12 15 17 10"/>
-    <line x1="12" y1="15" x2="12" y2="3"/>
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 
 const IconFilter = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
   </svg>
 );
 
 const IconRefresh = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="1 4 1 10 7 10"/>
-    <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
   </svg>
 );
 
 const IconTable = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-    <line x1="3" y1="9" x2="21" y2="9"/>
-    <line x1="3" y1="15" x2="21" y2="15"/>
-    <line x1="9" y1="3" x2="9" y2="21"/>
-    <line x1="15" y1="3" x2="15" y2="21"/>
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <line x1="3" y1="9" x2="21" y2="9" />
+    <line x1="3" y1="15" x2="21" y2="15" />
+    <line x1="9" y1="3" x2="9" y2="21" />
+    <line x1="15" y1="3" x2="15" y2="21" />
   </svg>
 );
 
 const IconCreate = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <line x1="12" y1="8" x2="12" y2="16"/>
-    <line x1="8" y1="12" x2="16" y2="12"/>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="16" />
+    <line x1="8" y1="12" x2="16" y2="12" />
   </svg>
 );
 
 const IconUpdate = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
 );
 
 const IconDelete = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"/>
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
   </svg>
 );
 
 const IconTotal = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="8" y1="6" x2="21" y2="6"/>
-    <line x1="8" y1="12" x2="21" y2="12"/>
-    <line x1="8" y1="18" x2="21" y2="18"/>
-    <line x1="3" y1="6" x2="3.01" y2="6"/>
-    <line x1="3" y1="12" x2="3.01" y2="12"/>
-    <line x1="3" y1="18" x2="3.01" y2="18"/>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="8" y1="6" x2="21" y2="6" />
+    <line x1="8" y1="12" x2="21" y2="12" />
+    <line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="6" x2="3.01" y2="6" />
+    <line x1="3" y1="12" x2="3.01" y2="12" />
+    <line x1="3" y1="18" x2="3.01" y2="18" />
   </svg>
 );
 
 const IconSearch = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8"/>
-    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
 
@@ -171,11 +261,36 @@ const IconSearch = () => (
 
 function StatsCards({ stats, loading, onFilterAction }) {
   const cards = [
-    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: stats?.total || 0, label: 'Tổng bản ghi', action: '' },
-    { icon: <IconCreate />, iconCls: 'stat-card__icon--green', value: stats?.create || 0, label: 'Tạo mới', action: 'CREATE' },
-    { icon: <IconUpdate />, iconCls: 'stat-card__icon--blue', value: stats?.update || 0, label: 'Cập nhật', action: 'UPDATE' },
+    {
+      icon: <IconTotal />,
+      iconCls: 'stat-card__icon--gray',
+      value: stats?.total || 0,
+      label: 'Tổng bản ghi',
+      action: '',
+    },
+    {
+      icon: <IconCreate />,
+      iconCls: 'stat-card__icon--green',
+      value: stats?.create || 0,
+      label: 'Tạo mới',
+      action: 'CREATE',
+    },
+    {
+      icon: <IconUpdate />,
+      iconCls: 'stat-card__icon--blue',
+      value: stats?.update || 0,
+      label: 'Cập nhật',
+      action: 'UPDATE',
+    },
     // Không còn chức năng xóa cứng — thẻ này phản ánh log action DELETE/REMOVE (thường là dữ liệu cũ hoặc vô hiệu hóa)
-    { icon: <IconDelete />, iconCls: 'stat-card__icon--red', value: stats?.delete || 0, label: 'Vô hiệu hóa', action: 'DELETE', hint: 'Gồm log cũ action DELETE (không phải xóa cứng hiện tại)' },
+    {
+      icon: <IconDelete />,
+      iconCls: 'stat-card__icon--red',
+      value: stats?.delete || 0,
+      label: 'Vô hiệu hóa',
+      action: 'DELETE',
+      hint: 'Gồm log cũ action DELETE (không phải xóa cứng hiện tại)',
+    },
   ];
 
   return (
@@ -188,12 +303,16 @@ function StatsCards({ stats, loading, onFilterAction }) {
           tabIndex={onFilterAction ? 0 : undefined}
           title={c.hint || (c.action ? `Lọc theo: ${c.label}` : undefined)}
           onClick={onFilterAction ? () => onFilterAction(c.action) : undefined}
-          onKeyDown={onFilterAction ? (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onFilterAction(c.action);
-            }
-          } : undefined}
+          onKeyDown={
+            onFilterAction
+              ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onFilterAction(c.action);
+                  }
+                }
+              : undefined
+          }
         >
           <div className={`stat-card__icon ${c.iconCls}`}>{c.icon}</div>
           <div className="stat-card__content">
@@ -228,9 +347,20 @@ function Pagination({ currentPage, totalPages, total, onChange, loading }) {
 function readAuditParamsFromSearch(sp) {
   const out = {};
   const keys = [
-    'keyword', 'userName', 'phone', 'action', 'tableName', 'entityName',
-    'entityCode', 'ipAddress', 'requestMethod', 'responseStatus',
-    'startDate', 'endDate', 'branchId', 'page',
+    'keyword',
+    'userName',
+    'phone',
+    'action',
+    'tableName',
+    'entityName',
+    'entityCode',
+    'ipAddress',
+    'requestMethod',
+    'responseStatus',
+    'startDate',
+    'endDate',
+    'branchId',
+    'page',
   ];
   keys.forEach((k) => {
     const v = sp.get(k);
@@ -284,13 +414,16 @@ export default function AuditLogsPage() {
     Boolean(urlSeed.userName || urlSeed.entityCode || urlSeed.keyword || urlSeed.action)
   );
 
-  const openDetail = useCallback((item) => {
-    if (!item?.id) return;
-    const qs = writeAuditParamsToSearch(audit.params);
-    navigate(`/admin/logs/${item.id}`, {
-      state: { fromListSearch: qs ? `?${qs}` : '' },
-    });
-  }, [navigate, audit.params]);
+  const openDetail = useCallback(
+    (item) => {
+      if (!item?.id) return;
+      const qs = writeAuditParamsToSearch(audit.params);
+      navigate(`/admin/logs/${item.id}`, {
+        state: { fromListSearch: qs ? `?${qs}` : '' },
+      });
+    },
+    [navigate, audit.params]
+  );
 
   // Đồng bộ filter — luôn giữ /crm (useCrmSearchSync).
   useEffect(() => {
@@ -334,15 +467,22 @@ export default function AuditLogsPage() {
     const refreshFn = audit.refresh || audit.refetch;
     if (typeof refreshFn !== 'function') return undefined;
     const searching = Boolean(
-      String(audit.params.keyword || '').trim()
-      || String(audit.params.userName || '').trim()
-      || String(audit.params.phone || '').trim()
+      String(audit.params.keyword || '').trim() ||
+      String(audit.params.userName || '').trim() ||
+      String(audit.params.phone || '').trim()
     );
     if (searching || audit.loading) return undefined;
     const t = setInterval(() => refreshFn(), 20_000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audit.refresh, audit.refetch, audit.loading, audit.params.keyword, audit.params.userName, audit.params.phone]);
+  }, [
+    audit.refresh,
+    audit.refetch,
+    audit.loading,
+    audit.params.keyword,
+    audit.params.userName,
+    audit.params.phone,
+  ]);
 
   async function handleExportExcel() {
     setExporting(true);
@@ -378,12 +518,19 @@ export default function AuditLogsPage() {
     }));
   }
 
-  const totalPages = audit.data.total > 0 ? Math.ceil(audit.data.total / (audit.data.pageSize || 10)) : 1;
-  const hasFilters = audit.params.keyword || audit.params.userName || audit.params.phone ||
-    audit.params.action || audit.params.entityName || audit.params.entityCode ||
+  const totalPages =
+    audit.data.total > 0 ? Math.ceil(audit.data.total / (audit.data.pageSize || 10)) : 1;
+  const hasFilters =
+    audit.params.keyword ||
+    audit.params.userName ||
+    audit.params.phone ||
+    audit.params.action ||
+    audit.params.entityName ||
+    audit.params.entityCode ||
     audit.params.ipAddress ||
-    audit.params.startDate || audit.params.endDate ||
-    (audit.params.branchId != null);
+    audit.params.startDate ||
+    audit.params.endDate ||
+    audit.params.branchId != null;
 
   return (
     <div className="admin-logs">
@@ -395,7 +542,9 @@ export default function AuditLogsPage() {
           </div>
           <div className="admin-logs__title-group">
             <h1>Nhật ký hoạt động</h1>
-            <p className="admin-logs__subtitle">Theo dõi tất cả thao tác của người dùng trên hệ thống</p>
+            <p className="admin-logs__subtitle">
+              Theo dõi tất cả thao tác của người dùng trên hệ thống
+            </p>
           </div>
         </div>
         <div className="admin-logs__actions">
@@ -435,10 +584,7 @@ export default function AuditLogsPage() {
             <IconFilter />
             Bộ lọc &amp; Tìm kiếm
           </div>
-          <button
-            className="btn btn--ghost btn--sm"
-            onClick={() => setShowFilters(!showFilters)}
-          >
+          <button className="btn btn--ghost btn--sm" onClick={() => setShowFilters(!showFilters)}>
             {showFilters ? 'Ẩn bộ lọc' : 'Mở rộng'}
           </button>
         </div>
@@ -452,11 +598,13 @@ export default function AuditLogsPage() {
               type="text"
               inputMode={isPhoneLikeInput(audit.params.keyword) ? 'numeric' : 'search'}
               placeholder="Tìm nhanh (tên, SĐT, mã, mô tả...)"
-              maxLength={isPhoneLikeInput(audit.params.keyword) ? PHONE_INPUT_MAX_LENGTH : undefined}
+              maxLength={
+                isPhoneLikeInput(audit.params.keyword) ? PHONE_INPUT_MAX_LENGTH : undefined
+              }
               value={
                 isPhoneLikeInput(audit.params.keyword)
                   ? formatPhoneInput(audit.params.keyword)
-                  : (audit.params.keyword || '')
+                  : audit.params.keyword || ''
               }
               onChange={(e) => {
                 const v = e.target.value;
@@ -467,10 +615,16 @@ export default function AuditLogsPage() {
               }}
             />
           </div>
-          <label className="admin-logs__auth-toggle" title="Mặc định ẩn đăng nhập / thất bại (xem ở Lịch sử đăng nhập)">
+          <label
+            className="admin-logs__auth-toggle"
+            title="Mặc định ẩn đăng nhập / thất bại (xem ở Lịch sử đăng nhập)"
+          >
             <input
               type="checkbox"
-              checked={audit.params.excludeAuthEvents !== false && audit.params.excludeAuthEvents !== 'false'}
+              checked={
+                audit.params.excludeAuthEvents !== false &&
+                audit.params.excludeAuthEvents !== 'false'
+              }
               onChange={(e) => {
                 audit.setParams((prev) => ({
                   ...prev,
@@ -506,7 +660,9 @@ export default function AuditLogsPage() {
                 placeholder="0123-456-789"
                 maxLength={PHONE_INPUT_MAX_LENGTH}
                 value={formatPhoneInput(audit.params.phone || '')}
-                onChange={(e) => audit.updateParam('phone', phoneDigitsForSearch(e.target.value).slice(0, 11))}
+                onChange={(e) =>
+                  audit.updateParam('phone', phoneDigitsForSearch(e.target.value).slice(0, 11))
+                }
               />
             </div>
 
@@ -529,7 +685,9 @@ export default function AuditLogsPage() {
                 onChange={(e) => audit.updateParam('action', e.target.value)}
               >
                 {ACTION_OPTIONS.map((o) => (
-                  <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+                  <option key={o.value || 'all'} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -550,14 +708,18 @@ export default function AuditLogsPage() {
               <select
                 className="filter-field__select"
                 value={audit.params.branchId ?? ''}
-                onChange={(e) => audit.updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)}
+                onChange={(e) =>
+                  audit.updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)
+                }
                 disabled={!!branchesError}
               >
                 <option value="">
                   {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
                 </option>
                 {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.branchName}</option>
+                  <option key={b.id} value={b.id}>
+                    {b.branchName}
+                  </option>
                 ))}
               </select>
             </div>
@@ -586,7 +748,9 @@ export default function AuditLogsPage() {
         <div className="admin-logs__filter-actions">
           <div className="admin-logs__filter-results">
             {audit.data.total > 0 && (
-              <>Tìm thấy <strong>{audit.data.total.toLocaleString('vi-VN')}</strong> nhật ký</>
+              <>
+                Tìm thấy <strong>{audit.data.total.toLocaleString('vi-VN')}</strong> nhật ký
+              </>
             )}
           </div>
           <div className="admin-logs__filter-btns">
@@ -636,7 +800,6 @@ export default function AuditLogsPage() {
           </>
         )}
       </div>
-
     </div>
   );
 }
@@ -646,9 +809,13 @@ export default function AuditLogsPage() {
 function TableSkeleton({ rows }) {
   return (
     <table className="table">
-        <colgroup>
-          <col /><col /><col /><col /><col />
-        </colgroup>
+      <colgroup>
+        <col />
+        <col />
+        <col />
+        <col />
+        <col />
+      </colgroup>
       <thead>
         <tr>
           <th>Người dùng</th>
@@ -678,7 +845,11 @@ function AuditTable({ items, onRowClick, now }) {
     return (
       <table className="table">
         <colgroup>
-          <col /><col /><col /><col /><col />
+          <col />
+          <col />
+          <col />
+          <col />
+          <col />
         </colgroup>
         <thead>
           <tr>
@@ -702,9 +873,13 @@ function AuditTable({ items, onRowClick, now }) {
 
   return (
     <table className="table">
-        <colgroup>
-          <col /><col /><col /><col /><col />
-        </colgroup>
+      <colgroup>
+        <col />
+        <col />
+        <col />
+        <col />
+        <col />
+      </colgroup>
       <thead>
         <tr>
           <th>Người dùng</th>
@@ -719,8 +894,14 @@ function AuditTable({ items, onRowClick, now }) {
           void now; // tick để cập nhật "vừa xong" realtime
           const t = formatLocal(item.logged_at);
           const userName = item.user_name || 'Hệ thống';
-          const initials = userName.split(' ').filter(Boolean).slice(-2)
-            .map((p) => p[0]).join('').toUpperCase() || '?';
+          const initials =
+            userName
+              .split(' ')
+              .filter(Boolean)
+              .slice(-2)
+              .map((p) => p[0])
+              .join('')
+              .toUpperCase() || '?';
           const description = humanizeAuditDescription(
             item.description,
             item.action,
@@ -728,10 +909,17 @@ function AuditTable({ items, onRowClick, now }) {
             { entityCode: item.entity_code, entityName: item.entity_name }
           );
           return (
-            <tr key={item.id} onClick={() => onRowClick && onRowClick(item)} style={{ cursor: 'pointer' }} title="Nhấp để xem chi tiết">
+            <tr
+              key={item.id}
+              onClick={() => onRowClick && onRowClick(item)}
+              style={{ cursor: 'pointer' }}
+              title="Nhấp để xem chi tiết"
+            >
               <td>
                 <div className="audit-logs__user-cell" title={userName}>
-                  <span className="audit-logs__user-avatar" aria-hidden="true">{initials}</span>
+                  <span className="audit-logs__user-avatar" aria-hidden="true">
+                    {initials}
+                  </span>
                   <div className="audit-logs__user-text">
                     <span className="audit-logs__user-name">{userName}</span>
                   </div>
@@ -742,7 +930,9 @@ function AuditTable({ items, onRowClick, now }) {
                   <span className={`badge ${ACTION_CLASS[item.action] || 'badge--secondary'}`}>
                     {getAuditActionLabel(item.action)}
                   </span>
-                ) : '—'}
+                ) : (
+                  '—'
+                )}
               </td>
               <td>
                 <span className="audit-logs__description" title={description}>
@@ -750,17 +940,19 @@ function AuditTable({ items, onRowClick, now }) {
                 </span>
               </td>
               <td className="audit-logs__cell--branch">
-                {item.branch_name
-                  || item.branchName
-                  || ((item.user_name || item.userName || '').toLowerCase() === 'system'
+                {item.branch_name ||
+                  item.branchName ||
+                  ((item.user_name || item.userName || '').toLowerCase() === 'system'
                     ? 'Hệ thống'
-                    : (item.branch_id != null || item.branchId != null
+                    : item.branch_id != null || item.branchId != null
                       ? `#${item.branch_id ?? item.branchId}`
-                      : '—'))}
+                      : '—')}
               </td>
               <td className="audit-logs__cell--time">
                 <div className="audit-logs__time-cell">
-                  <span className="audit-logs__time-main" title={t.main}>{t.main}</span>
+                  <span className="audit-logs__time-main" title={t.main}>
+                    {t.main}
+                  </span>
                   <span className="audit-logs__time-ago">{t.ago}</span>
                 </div>
               </td>

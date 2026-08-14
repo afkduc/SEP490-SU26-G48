@@ -112,11 +112,7 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
       >
         Đặt lại mặc định
       </button>
-      <button
-        className="btn btn--primary"
-        onClick={handleSave}
-        disabled={saving || !settings}
-      >
+      <button className="btn btn--primary" onClick={handleSave} disabled={saving || !settings}>
         {saving ? 'Đang lưu...' : 'Lưu cài đặt'}
       </button>
     </div>
@@ -125,11 +121,7 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
   if (loading) {
     return (
       <div className={`admin-notifications${embedded ? ' admin-notifications--embedded' : ''}`}>
-        {!embedded && (
-          <div className="admin-notifications__header">
-            {titleBlock}
-          </div>
-        )}
+        {!embedded && <div className="admin-notifications__header">{titleBlock}</div>}
         <div className="loading-state">
           <div className="loading-spinner"></div>
           <p>Đang tải cài đặt...</p>
@@ -141,11 +133,7 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
   if (error && !settings) {
     return (
       <div className={`admin-notifications${embedded ? ' admin-notifications--embedded' : ''}`}>
-        {!embedded && (
-          <div className="admin-notifications__header">
-            {titleBlock}
-          </div>
-        )}
+        {!embedded && <div className="admin-notifications__header">{titleBlock}</div>}
         <div className="error-state">
           <p>{error}</p>
           <button className="btn btn--secondary" onClick={loadSettings}>
@@ -165,11 +153,7 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
         </div>
       )}
 
-      {embedded && (
-        <div className="admin-hub__toolbar">
-          {actionButtons}
-        </div>
-      )}
+      {embedded && <div className="admin-hub__toolbar">{actionButtons}</div>}
 
       {error && (
         <div className="alert-banner alert-banner--error">
@@ -186,16 +170,21 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
       )}
 
       <div className="notifications-card">
-          <div className="notifications-card__section">
+        <div className="notifications-card__section">
           <div className="notifications-card__section-title">Kênh thông báo bảo mật</div>
-          <p className="notifications-card__section-hint" style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 12px' }}>
-            Các tùy chọn bên dưới bật/tắt thông báo <strong>trong hệ thống</strong> (chuông / danh sách).
-            Hiện chưa gửi email SMTP riêng cho các sự kiện này.
+          <p
+            className="notifications-card__section-hint"
+            style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 12px' }}
+          >
+            Các tùy chọn bên dưới bật/tắt thông báo <strong>trong hệ thống</strong> (chuông / danh
+            sách). Hiện chưa gửi email SMTP riêng cho các sự kiện này.
           </p>
           <label className="notification-row">
             <span className="notification-row__label">
               <span className="notification-row__title">Đăng nhập thành công</span>
-              <span className="notification-row__description">Nhận thông báo trong hệ thống khi có đăng nhập mới</span>
+              <span className="notification-row__description">
+                Nhận thông báo trong hệ thống khi có đăng nhập mới
+              </span>
             </span>
             <input
               type="checkbox"
@@ -206,7 +195,9 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
           <label className="notification-row">
             <span className="notification-row__label">
               <span className="notification-row__title">Đăng nhập thất bại</span>
-              <span className="notification-row__description">Nhận thông báo khi phát hiện đăng nhập không thành công</span>
+              <span className="notification-row__description">
+                Nhận thông báo khi phát hiện đăng nhập không thành công
+              </span>
             </span>
             <input
               type="checkbox"
@@ -217,7 +208,9 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
           <label className="notification-row">
             <span className="notification-row__label">
               <span className="notification-row__title">Thay đổi phân quyền</span>
-              <span className="notification-row__description">Nhận thông báo khi vai trò hoặc quyền truy cập thay đổi</span>
+              <span className="notification-row__description">
+                Nhận thông báo khi vai trò hoặc quyền truy cập thay đổi
+              </span>
             </span>
             <input
               type="checkbox"
@@ -233,7 +226,9 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
           <label className="notification-row">
             <span className="notification-row__label">
               <span className="notification-row__title">Thông báo đăng nhập</span>
-              <span className="notification-row__description">Hiển thị thông báo đăng nhập trong hệ thống (pop-up / bell)</span>
+              <span className="notification-row__description">
+                Hiển thị thông báo đăng nhập trong hệ thống (pop-up / bell)
+              </span>
             </span>
             <input
               type="checkbox"
@@ -245,7 +240,8 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
             <span className="notification-row__label">
               <span className="notification-row__title">Cảnh báo bảo mật & thay đổi quyền</span>
               <span className="notification-row__description">
-                Hiển thị thông báo đăng nhập thất bại, thiết bị lạ, đăng xuất bất thường, thay đổi vai trò trong hệ thống
+                Hiển thị thông báo đăng nhập thất bại, thiết bị lạ, đăng xuất bất thường, thay đổi
+                vai trò trong hệ thống
               </span>
             </span>
             <input
@@ -257,7 +253,9 @@ export default function AdminProfileNotificationsPage({ embedded = false } = {})
           <label className="notification-row">
             <span className="notification-row__label">
               <span className="notification-row__title">Thông báo thay đổi mật khẩu</span>
-              <span className="notification-row__description">Hiển thị thông báo trong hệ thống khi mật khẩu được thay đổi</span>
+              <span className="notification-row__description">
+                Hiển thị thông báo trong hệ thống khi mật khẩu được thay đổi
+              </span>
             </span>
             <input
               type="checkbox"

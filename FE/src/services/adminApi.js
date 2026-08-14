@@ -191,35 +191,13 @@ class AdminLoginSessionsApi {
   // Realtime polling - lay cac session moi tu moc since (ISO date hoac unix ms)
   recent(since) {
     const sinceMs = typeof since === 'number' ? new Date(since).toISOString() : since;
-    return httpClient.get(`/admin/login-sessions/recent?since=${encodeURIComponent(sinceMs || '')}&limit=50`);
+    return httpClient.get(
+      `/admin/login-sessions/recent?since=${encodeURIComponent(sinceMs || '')}&limit=50`
+    );
   }
 }
 
 const adminLoginSessionsApi = new AdminLoginSessionsApi();
-
-export async function getRecentLoginSessions() {
-  const res = await httpClient.get('/audit/login-sessions?page=1&pageSize=8');
-  return res;
-}
-
-/**
- * POST /api/admin/reissue-token
- * Cap lai JWT voi day du roles tu DB. Dung khi token cu thieu role admin
- * (vi du: user moi duoc them role admin nhung token cu van con cache).
- * Tra ve: { token, roles }
- */
-export async function reissueAdminToken() {
-  return httpClient.post('/admin/reissue-token', {});
-}
-
-/**
- * POST /api/admin/refresh-permissions
- * Lay permissions moi nhat tu DB.
- * Tra ve: { token, permissions }
- */
-export async function refreshPermissionsApi() {
-  return httpClient.post('/admin/refresh-permissions', {});
-}
 
 export {
   AdminUsersApi,
@@ -271,12 +249,14 @@ class AdminSecurityAlertsApi {
 
   /** Lịch sử đầy đủ cùng nhóm rule+user (cho popup chi tiết) */
   related({ ruleKey, userId, pageSize = 50 } = {}) {
-    return httpClient.get(`/admin/security-alerts${buildQuery({
-      related: '1',
-      ruleKey,
-      userId: userId ?? '',
-      pageSize,
-    })}`);
+    return httpClient.get(
+      `/admin/security-alerts${buildQuery({
+        related: '1',
+        ruleKey,
+        userId: userId ?? '',
+        pageSize,
+      })}`
+    );
   }
 
   getCounts() {

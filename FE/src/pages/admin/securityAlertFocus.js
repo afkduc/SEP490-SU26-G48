@@ -29,7 +29,11 @@ const RULE_LABEL = {
 export function describeAlertFocus(alert) {
   if (!alert) return '';
   const meta = parseAlertMeta(alert.metadata);
-  const who = alert.userName || meta.userName || alert.displayName || (alert.userId ? `#${alert.userId}` : '');
+  const who =
+    alert.userName ||
+    meta.userName ||
+    alert.displayName ||
+    (alert.userId ? `#${alert.userId}` : '');
   const ip = meta.ipAddress || meta.ip || '';
   const rule = RULE_LABEL[alert.ruleKey] || alert.title || alert.ruleKey || 'Cảnh báo';
   if (who && ip) return `${rule} · ${who} · IP ${ip}`;

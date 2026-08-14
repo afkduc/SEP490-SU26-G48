@@ -31,7 +31,11 @@ class AdminController {
     const userRoleRepository = new UserRoleRepositoryImpl();
     const roleRepo = new RoleRepositoryImpl();
     const userRepo = new UserRepositoryImpl();
-    this.userRoleService = new UserRoleService({ userRoleRepository, roleRepository: roleRepo, userRepository: userRepo });
+    this.userRoleService = new UserRoleService({
+      userRoleRepository,
+      roleRepository: roleRepo,
+      userRepository: userRepo,
+    });
 
     this.auditService = new AuditService(AuditRepository);
     this.branchService = new BranchService();
@@ -113,7 +117,10 @@ class AdminController {
       const dd = String(date.getDate()).padStart(2, '0');
       const filename = `users_${yyyy}${mm}${dd}.xlsx`;
 
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', buffer.length);
       return res.send(Buffer.from(buffer));
@@ -135,7 +142,11 @@ class AdminController {
   listBranchesFull = async (req, res, next) => {
     try {
       const branches = await this.branchService.list();
-      return success(res, { items: branches, total: branches.length }, 'Danh sach chi nhanh (admin)');
+      return success(
+        res,
+        { items: branches, total: branches.length },
+        'Danh sach chi nhanh (admin)'
+      );
     } catch (err) {
       next(err);
     }
@@ -171,13 +182,19 @@ class AdminController {
   createBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.create(req.body, req);
-      await this.notificationService.notifyAdmins('BRANCH_CREATED', {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: branch?.branchName || branch?.branch_name || branch?.name || '',
-        targetCode: branch?.branchCode || branch?.branch_code || '',
-        userId: branch?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_CREATED:', e.message));
+      await this.notificationService
+        .notifyAdmins(
+          'BRANCH_CREATED',
+          {
+            auditLogId: req._lastAuditLogId,
+            actorName: req.user?.name || req.user?.email || 'Admin',
+            targetName: branch?.branchName || branch?.branch_name || branch?.name || '',
+            targetCode: branch?.branchCode || branch?.branch_code || '',
+            userId: branch?.id,
+          },
+          { excludeUserId: req.user?.userId }
+        )
+        .catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_CREATED:', e.message));
       return success(res, branch, 'Tao chi nhanh thanh cong', 201);
     } catch (err) {
       next(err);
@@ -187,13 +204,19 @@ class AdminController {
   updateBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.update(req.params.id, req.body, req);
-      await this.notificationService.notifyAdmins('BRANCH_UPDATED', {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: branch?.branchName || branch?.branch_name || '',
-        targetCode: branch?.branchCode || branch?.branch_code || '',
-        userId: branch?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_UPDATED:', e.message));
+      await this.notificationService
+        .notifyAdmins(
+          'BRANCH_UPDATED',
+          {
+            auditLogId: req._lastAuditLogId,
+            actorName: req.user?.name || req.user?.email || 'Admin',
+            targetName: branch?.branchName || branch?.branch_name || '',
+            targetCode: branch?.branchCode || branch?.branch_code || '',
+            userId: branch?.id,
+          },
+          { excludeUserId: req.user?.userId }
+        )
+        .catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_UPDATED:', e.message));
       return success(res, branch, 'Cap nhat chi nhanh thanh cong');
     } catch (err) {
       next(err);
@@ -203,13 +226,21 @@ class AdminController {
   deactivateBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.deactivate(req.params.id, req);
-      await this.notificationService.notifyAdmins('BRANCH_DEACTIVATED', {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: branch?.branchName || branch?.branch_name || '',
-        targetCode: branch?.branchCode || branch?.branch_code || '',
-        userId: branch?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_DEACTIVATED:', e.message));
+      await this.notificationService
+        .notifyAdmins(
+          'BRANCH_DEACTIVATED',
+          {
+            auditLogId: req._lastAuditLogId,
+            actorName: req.user?.name || req.user?.email || 'Admin',
+            targetName: branch?.branchName || branch?.branch_name || '',
+            targetCode: branch?.branchCode || branch?.branch_code || '',
+            userId: branch?.id,
+          },
+          { excludeUserId: req.user?.userId }
+        )
+        .catch((e) =>
+          console.warn('[AdminController] notifyAdmins BRANCH_DEACTIVATED:', e.message)
+        );
       return success(res, branch, 'Ngung hoat dong chi nhanh');
     } catch (err) {
       next(err);
@@ -219,13 +250,21 @@ class AdminController {
   reactivateBranch = async (req, res, next) => {
     try {
       const branch = await this.branchService.reactivate(req.params.id, req);
-      await this.notificationService.notifyAdmins('BRANCH_REACTIVATED', {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: branch?.branchName || branch?.branch_name || '',
-        targetCode: branch?.branchCode || branch?.branch_code || '',
-        userId: branch?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins BRANCH_REACTIVATED:', e.message));
+      await this.notificationService
+        .notifyAdmins(
+          'BRANCH_REACTIVATED',
+          {
+            auditLogId: req._lastAuditLogId,
+            actorName: req.user?.name || req.user?.email || 'Admin',
+            targetName: branch?.branchName || branch?.branch_name || '',
+            targetCode: branch?.branchCode || branch?.branch_code || '',
+            userId: branch?.id,
+          },
+          { excludeUserId: req.user?.userId }
+        )
+        .catch((e) =>
+          console.warn('[AdminController] notifyAdmins BRANCH_REACTIVATED:', e.message)
+        );
       return success(res, branch, 'Kich hoat lai chi nhanh');
     } catch (err) {
       next(err);
@@ -245,7 +284,8 @@ class AdminController {
   // Devices
   listDevices = async (req, res, next) => {
     try {
-      const { userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize } = req.query;
+      const { userId, search, browser, os, isCurrent, dateFrom, dateTo, page, pageSize } =
+        req.query;
       const result = await this.deviceService.listAll({
         userId,
         search,
@@ -288,7 +328,8 @@ class AdminController {
   // Security Alerts
   listSecurityAlerts = async (req, res, next) => {
     try {
-      const { severity, isAcknowledged, page, pageSize, collapsed, ruleKey, userId, related } = req.query;
+      const { severity, isAcknowledged, page, pageSize, collapsed, ruleKey, userId, related } =
+        req.query;
 
       // ?related=1&ruleKey=...&userId=... → lịch sử đầy đủ nhóm (popup chi tiết)
       if (related === '1' || related === 'true') {
@@ -384,7 +425,10 @@ class AdminController {
           actorUserId: req.user?.userId || null,
         });
       } catch (eventErr) {
-        console.warn('[AdminController] emitPermissionChanged (assignRoles) failed:', eventErr.message);
+        console.warn(
+          '[AdminController] emitPermissionChanged (assignRoles) failed:',
+          eventErr.message
+        );
       }
       return success(res, roles, 'Gan role thanh cong');
     } catch (err) {
@@ -413,7 +457,10 @@ class AdminController {
           actorUserId: req.user?.userId || null,
         });
       } catch (eventErr) {
-        console.warn('[AdminController] emitPermissionChanged (revokeRole) failed:', eventErr.message);
+        console.warn(
+          '[AdminController] emitPermissionChanged (revokeRole) failed:',
+          eventErr.message
+        );
       }
       return success(res, roles, 'Xoa role thanh cong');
     } catch (err) {
@@ -431,13 +478,19 @@ class AdminController {
         entityName: 'Người dùng',
         data: req.body,
       });
-      await this.notificationService.notifyAdmins('USER_CREATED', {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: user?.full_name || user?.userName || '',
-        targetCode: user?.user_code || '',
-        userId: user?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_CREATED:', e.message));
+      await this.notificationService
+        .notifyAdmins(
+          'USER_CREATED',
+          {
+            auditLogId: req._lastAuditLogId,
+            actorName: req.user?.name || req.user?.email || 'Admin',
+            targetName: user?.full_name || user?.userName || '',
+            targetCode: user?.user_code || '',
+            userId: user?.id,
+          },
+          { excludeUserId: req.user?.userId }
+        )
+        .catch((e) => console.warn('[AdminController] notifyAdmins USER_CREATED:', e.message));
       return success(res, user, 'Tao nguoi dung thanh cong', 201);
     } catch (err) {
       next(err);
@@ -451,8 +504,8 @@ class AdminController {
         const ApiError = require('../../utils/ApiError');
         throw new ApiError(400, 'ID người dùng không hợp lệ');
       }
-      const { firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } = req.body;
-      console.log('[AdminController] updateUser - params.id:', userId, 'body:', JSON.stringify(req.body));
+      const { firstName, lastName, email, phone, status, roleId, branchId, scopeAllBranches } =
+        req.body;
       const oldData = {};
       try {
         const existing = await this.adminUserService.getUserDetail(userId);
@@ -505,21 +558,29 @@ class AdminController {
       const eventType = status === 'inactive' ? 'USER_DISABLED' : 'USER_UPDATED';
 
       // Gui notification cho chinh admin thuc hien
-      await this.notificationService.notify(eventType, {
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: displayName,
-        targetCode: updated?.name || '',
-        userId: req.user?.userId,
-      }).catch((e) => console.warn('[AdminController] notify USER_UPDATE:', e.message));
+      await this.notificationService
+        .notify(eventType, {
+          actorName: req.user?.name || req.user?.email || 'Admin',
+          targetName: displayName,
+          targetCode: updated?.name || '',
+          userId: req.user?.userId,
+        })
+        .catch((e) => console.warn('[AdminController] notify USER_UPDATE:', e.message));
 
       // Gui notification cho cac admin khac (exclude chinh minh)
-      await this.notificationService.notifyAdmins(eventType, {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: displayName,
-        targetCode: updated?.name || '',
-        userId: updated?.id,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_UPDATE:', e.message));
+      await this.notificationService
+        .notifyAdmins(
+          eventType,
+          {
+            auditLogId: req._lastAuditLogId,
+            actorName: req.user?.name || req.user?.email || 'Admin',
+            targetName: displayName,
+            targetCode: updated?.name || '',
+            userId: updated?.id,
+          },
+          { excludeUserId: req.user?.userId }
+        )
+        .catch((e) => console.warn('[AdminController] notifyAdmins USER_UPDATE:', e.message));
 
       return success(res, updated, 'Cap nhat nguoi dung thanh cong');
     } catch (err) {
@@ -547,10 +608,12 @@ class AdminController {
       const currentUserId = req.user?.userId;
 
       if (currentUserId && targetUserId === currentUserId) {
-        return next(new (require('../../utils/ApiError'))(
-          400,
-          'Khong the tu reset mat khau cua chinh minh. Hay lien he admin khac.'
-        ));
+        return next(
+          new (require('../../utils/ApiError'))(
+            400,
+            'Khong the tu reset mat khau cua chinh minh. Hay lien he admin khac.'
+          )
+        );
       }
 
       const newPassword = req.body?.newPassword;
@@ -563,13 +626,21 @@ class AdminController {
       await auditCrud.resetPassword(req, {
         targetUserName: result?.userName || result?.user_code || `ID-${targetUserId}`,
       });
-      await this.notificationService.notifyAdmins('USER_PASSWORD_RESET', {
-        auditLogId: req._lastAuditLogId,
-        actorName: req.user?.name || req.user?.email || 'Admin',
-        targetName: result?.full_name || result?.userName || '',
-        targetCode: result?.user_code || '',
-        userId: targetUserId,
-      }, { excludeUserId: req.user?.userId }).catch((e) => console.warn('[AdminController] notifyAdmins USER_PASSWORD_RESET:', e.message));
+      await this.notificationService
+        .notifyAdmins(
+          'USER_PASSWORD_RESET',
+          {
+            auditLogId: req._lastAuditLogId,
+            actorName: req.user?.name || req.user?.email || 'Admin',
+            targetName: result?.full_name || result?.userName || '',
+            targetCode: result?.user_code || '',
+            userId: targetUserId,
+          },
+          { excludeUserId: req.user?.userId }
+        )
+        .catch((e) =>
+          console.warn('[AdminController] notifyAdmins USER_PASSWORD_RESET:', e.message)
+        );
 
       return success(res, result, result.message);
     } catch (err) {
@@ -595,7 +666,7 @@ class AdminController {
       const roleNames = roles.map((r) => r.roleName).filter(Boolean);
 
       // Lay permissions tu DB (bo qua cache de lay gia tri moi nhat -
-      // tranh truong hop admin vua thay doi ma tran quyen nhung cache 60s
+      // tranh truong hop admin vua gan/thu hoi role nhung cache 60s
       // van con permission cu)
       const PermissionService = require('../../application/services/PermissionService');
       const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
@@ -620,7 +691,11 @@ class AdminController {
         { expiresIn: req.user.remember ? config.jwtRememberExpiresIn : config.jwtExpiresIn }
       );
 
-      return success(res, { token: newToken, roles: roleNames, permissions: permissionKeys }, 'Cap lai token thanh cong');
+      return success(
+        res,
+        { token: newToken, roles: roleNames, permissions: permissionKeys },
+        'Cap lai token thanh cong'
+      );
     } catch (err) {
       next(err);
     }
@@ -629,7 +704,7 @@ class AdminController {
   /**
    * POST /api/admin/refresh-permissions
    * Lay permissions moi nhat tu DB va tra ve token moi.
-   * Dung khi admin vua sua ma tran quyen — can cap nhat token de
+   * Dung khi admin vua gan/thu hoi role — can cap nhat token de
    * permission thay doi co hieu luc ngay lap tuc.
    */
   refreshPermissions = async (req, res, next) => {
@@ -710,12 +785,15 @@ class AdminController {
       const dbPermissionKeys = Array.from(dbPermissions);
 
       // 4. Kiểm tra user_role assignment
-      const roleResult = await query(`
+      const roleResult = await query(
+        `
         SELECT r.role_name, ur.is_active
         FROM user_role ur
         JOIN roles r ON r.id = ur.role_id
         WHERE ur.user_id = @p1
-      `, { p1: userId });
+      `,
+        { p1: userId }
+      );
 
       // 5. Kiểm tra role_permissions cho admin role
       const adminRoleResult = await query(`
@@ -727,20 +805,24 @@ class AdminController {
         AND p.permission_key LIKE 'admin:branches:%'
       `);
 
-      return success(res, {
-        userId,
-        jwt: {
-          roles: jwtRoles,
-          permissions: jwtPermissions,
-          hasAdminBranchesCreate: jwtPermissions.includes('admin:branches:create'),
+      return success(
+        res,
+        {
+          userId,
+          jwt: {
+            roles: jwtRoles,
+            permissions: jwtPermissions,
+            hasAdminBranchesCreate: jwtPermissions.includes('admin:branches:create'),
+          },
+          database: {
+            permissions: dbPermissionKeys,
+            hasAdminBranchesCreate: dbPermissionKeys.includes('admin:branches:create'),
+          },
+          userRoleAssignments: roleResult.recordset,
+          adminRoleBranchesPermissions: adminRoleResult.recordset.map((r) => r.permission_key),
         },
-        database: {
-          permissions: dbPermissionKeys,
-          hasAdminBranchesCreate: dbPermissionKeys.includes('admin:branches:create'),
-        },
-        userRoleAssignments: roleResult.recordset,
-        adminRoleBranchesPermissions: adminRoleResult.recordset.map(r => r.permission_key),
-      }, 'Debug permissions info');
+        'Debug permissions info'
+      );
     } catch (err) {
       next(err);
     }
@@ -795,17 +877,21 @@ class AdminController {
         );
       `);
 
-      return success(res, {
-        closedSessions,
-        message: closedSessions > 0
-          ? `Da dong ${closedSessions} session trung lap`
-          : 'Khong co session trung lap',
-      }, 'Don dep session thanh cong');
+      return success(
+        res,
+        {
+          closedSessions,
+          message:
+            closedSessions > 0
+              ? `Da dong ${closedSessions} session trung lap`
+              : 'Khong co session trung lap',
+        },
+        'Don dep session thanh cong'
+      );
     } catch (err) {
       next(err);
     }
   };
-
 }
 
 module.exports = AdminController;

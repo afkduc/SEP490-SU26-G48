@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import {
-  adminBranchesApi,
-  adminRolesApi,
-  adminUsersApi,
-} from '../../../services/adminApi';
+import { adminBranchesApi, adminRolesApi, adminUsersApi } from '../../../services/adminApi';
 import { useToast } from '../../../components/common/ToastContext';
 import {
   EMAIL_HINT,
@@ -46,9 +42,7 @@ function resolveRoleId(userRoles, allRoles) {
   const first = userRoles[0];
   let resolvedId = '';
   if (typeof first === 'object' && first !== null) {
-    resolvedId = first.roleId !== undefined && first.roleId !== null
-      ? String(first.roleId)
-      : '';
+    resolvedId = first.roleId !== undefined && first.roleId !== null ? String(first.roleId) : '';
   } else if (typeof first === 'string') {
     const match = allRoles.find((r) => r.roleName === first || String(r.id) === first);
     resolvedId = match ? String(match.id) : '';
@@ -100,10 +94,7 @@ export default function UserFormPage({ mode: modeProp }) {
     let cancelled = false;
     (async () => {
       try {
-        const [bRes, rRes] = await Promise.all([
-          adminBranchesApi.list(),
-          adminRolesApi.list(),
-        ]);
+        const [bRes, rRes] = await Promise.all([adminBranchesApi.list(), adminRolesApi.list()]);
         if (!cancelled) {
           setBranches(bRes?.items || []);
           setRoles(rRes?.items || []);
@@ -112,7 +103,9 @@ export default function UserFormPage({ mode: modeProp }) {
         /* dropdown optional on fail */
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -133,15 +126,16 @@ export default function UserFormPage({ mode: modeProp }) {
         if (!cancelled) setBootLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isEdit, id]);
 
   useEffect(() => {
     if (!user) return;
     const resolvedRoleId = resolveRoleId(user.roles, roles);
-    const isAllBranches = user.scopeAllBranches === true
-      || user.branchId === null
-      || user.branchId === undefined;
+    const isAllBranches =
+      user.scopeAllBranches === true || user.branchId === null || user.branchId === undefined;
     let branchIdValue = '';
     if (isAllBranches) {
       branchIdValue = ALL_BRANCHES_SENTINEL;
@@ -275,8 +269,12 @@ export default function UserFormPage({ mode: modeProp }) {
   if (bootError) {
     return (
       <div className="admin-page admin-user-form-page">
-        <div className="admin-user-form-page__state admin-user-form-page__state--error">{bootError}</div>
-        <Link to={backToList} className="btn btn--ghost">Quay lại danh sách</Link>
+        <div className="admin-user-form-page__state admin-user-form-page__state--error">
+          {bootError}
+        </div>
+        <Link to={backToList} className="btn btn--ghost">
+          Quay lại danh sách
+        </Link>
       </div>
     );
   }
@@ -306,7 +304,9 @@ export default function UserFormPage({ mode: modeProp }) {
             <div className="form__section-title">Thông tin đăng nhập</div>
             <div className="form__row">
               <div className="form__field">
-                <label className="form__label">Tên đăng nhập <span className="required">*</span></label>
+                <label className="form__label">
+                  Tên đăng nhập <span className="required">*</span>
+                </label>
                 <input
                   className={`input ${errors.name ? 'input--error' : ''}`}
                   value={form.name}
@@ -320,7 +320,9 @@ export default function UserFormPage({ mode: modeProp }) {
                 {errors.name && <span className="form__err">{errors.name}</span>}
               </div>
               <div className="form__field">
-                <label className="form__label">Email <span className="required">*</span></label>
+                <label className="form__label">
+                  Email <span className="required">*</span>
+                </label>
                 <input
                   className={`input ${errors.email ? 'input--error' : ''}`}
                   type="email"
@@ -336,7 +338,9 @@ export default function UserFormPage({ mode: modeProp }) {
 
             {!isEdit && (
               <div className="form__field">
-                <label className="form__label">Mật khẩu <span className="required">*</span></label>
+                <label className="form__label">
+                  Mật khẩu <span className="required">*</span>
+                </label>
                 <input
                   className={`input ${errors.password ? 'input--error' : ''}`}
                   type="password"
@@ -358,31 +362,43 @@ export default function UserFormPage({ mode: modeProp }) {
                 <input
                   className={`input ${errors.firstName ? 'input--error' : ''}`}
                   value={form.firstName}
-                  onChange={(e) => handleChange('firstName', e.target.value.slice(0, NAME_MAX_LENGTH))}
+                  onChange={(e) =>
+                    handleChange('firstName', e.target.value.slice(0, NAME_MAX_LENGTH))
+                  }
                   placeholder="Nguyễn"
                   autoComplete="off"
                   maxLength={NAME_MAX_LENGTH}
                 />
-                <span className="form__hint">{PERSON_NAME_HINT} · tối đa {NAME_MAX_LENGTH} ký tự</span>
+                <span className="form__hint">
+                  {PERSON_NAME_HINT} · tối đa {NAME_MAX_LENGTH} ký tự
+                </span>
                 {errors.firstName && <span className="form__err">{errors.firstName}</span>}
               </div>
               <div className="form__field">
-                <label className="form__label">Tên <span className="required">*</span></label>
+                <label className="form__label">
+                  Tên <span className="required">*</span>
+                </label>
                 <input
                   className={`input ${errors.lastName ? 'input--error' : ''}`}
                   value={form.lastName}
-                  onChange={(e) => handleChange('lastName', e.target.value.slice(0, NAME_MAX_LENGTH))}
+                  onChange={(e) =>
+                    handleChange('lastName', e.target.value.slice(0, NAME_MAX_LENGTH))
+                  }
                   placeholder="Văn A"
                   autoComplete="off"
                   maxLength={NAME_MAX_LENGTH}
                 />
-                <span className="form__hint">{PERSON_NAME_HINT} · tối đa {NAME_MAX_LENGTH} ký tự</span>
+                <span className="form__hint">
+                  {PERSON_NAME_HINT} · tối đa {NAME_MAX_LENGTH} ký tự
+                </span>
                 {errors.lastName && <span className="form__err">{errors.lastName}</span>}
               </div>
             </div>
 
             <div className="form__field">
-              <label className="form__label">Số điện thoại <span className="required">*</span></label>
+              <label className="form__label">
+                Số điện thoại <span className="required">*</span>
+              </label>
               <input
                 className={`input ${errors.phone ? 'input--error' : ''}`}
                 value={form.phone}
@@ -409,7 +425,8 @@ export default function UserFormPage({ mode: modeProp }) {
                 Tài khoản này đang có <b>{user.roles.length} vai trò</b>:{' '}
                 {user.roles.map((r) => r.roleName).join(', ')}.
                 <br />
-                Nếu bạn <b>không thay đổi</b> dropdown Vai trò thì các vai trò hiện tại được giữ nguyên.
+                Nếu bạn <b>không thay đổi</b> dropdown Vai trò thì các vai trò hiện tại được giữ
+                nguyên.
                 <br />
                 Nếu bạn <b>chọn vai trò khác</b>, các vai trò còn lại sẽ bị thay thế.
               </div>
@@ -417,7 +434,9 @@ export default function UserFormPage({ mode: modeProp }) {
 
             <div className="form__row">
               <div className="form__field">
-                <label className="form__label">Chi nhánh <span className="required">*</span></label>
+                <label className="form__label">
+                  Chi nhánh <span className="required">*</span>
+                </label>
                 <select
                   className={`input input--select ${errors.branchId ? 'input--error' : ''}`}
                   value={form.branchId}
@@ -429,13 +448,17 @@ export default function UserFormPage({ mode: modeProp }) {
                     <option value={ALL_BRANCHES_SENTINEL}>Tất cả chi nhánh (Admin)</option>
                   )}
                   {branches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.branchName}</option>
+                    <option key={b.id} value={b.id}>
+                      {b.branchName}
+                    </option>
                   ))}
                 </select>
                 {errors.branchId && <span className="form__err">{errors.branchId}</span>}
               </div>
               <div className="form__field">
-                <label className="form__label">Vai trò <span className="required">*</span></label>
+                <label className="form__label">
+                  Vai trò <span className="required">*</span>
+                </label>
                 <select
                   className={`input input--select ${errors.roleId ? 'input--error' : ''}`}
                   value={form.roleId}
@@ -443,7 +466,9 @@ export default function UserFormPage({ mode: modeProp }) {
                 >
                   <option value="">-- Chọn vai trò --</option>
                   {roles.map((r) => (
-                    <option key={r.id} value={r.id}>{r.roleName}</option>
+                    <option key={r.id} value={r.id}>
+                      {r.roleName}
+                    </option>
                   ))}
                 </select>
                 {errors.roleId && <span className="form__err">{errors.roleId}</span>}
@@ -459,10 +484,14 @@ export default function UserFormPage({ mode: modeProp }) {
                   onChange={(e) => handleChange('status', e.target.value)}
                 >
                   {STATUS_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
                   ))}
                 </select>
-                <p className="form__hint">Không có chức năng xóa tài khoản — chỉ khóa hoặc kích hoạt lại.</p>
+                <p className="form__hint">
+                  Không có chức năng xóa tài khoản — chỉ khóa hoặc kích hoạt lại.
+                </p>
               </div>
             )}
           </div>
@@ -492,7 +521,7 @@ export default function UserFormPage({ mode: modeProp }) {
               Hủy
             </button>
             <button type="submit" className="btn btn--primary" disabled={loading}>
-              {loading ? 'Đang xử lý...' : (isEdit ? 'Lưu thay đổi' : 'Tạo người dùng')}
+              {loading ? 'Đang xử lý...' : isEdit ? 'Lưu thay đổi' : 'Tạo người dùng'}
             </button>
           </div>
         </form>

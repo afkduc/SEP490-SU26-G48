@@ -93,7 +93,12 @@ export function usePaginatedList({
     } catch (err) {
       if (seq !== fetchSeqRef.current) return;
       setError(err);
-      setData({ items: [], total: 0, page: p.page || 1, pageSize: p.pageSize || DEFAULT_PAGE_SIZE });
+      setData({
+        items: [],
+        total: 0,
+        page: p.page || 1,
+        pageSize: p.pageSize || DEFAULT_PAGE_SIZE,
+      });
     } finally {
       if (seq === fetchSeqRef.current) setLoading(false);
     }
@@ -119,56 +124,62 @@ export function usePaginatedList({
    * - Ô text (debounceKeys): chờ debounceMs rồi mới gọi API (tránh gọi API mỗi phím)
    * - Filter khác: gọi API ngay
    */
-  const updateParam = useCallback((key, value) => {
-    const isDebounceKey = debounceKeysRef.current.includes(key);
+  const updateParam = useCallback(
+    (key, value) => {
+      const isDebounceKey = debounceKeysRef.current.includes(key);
 
-    setParamsState((prev) => {
-      const next = { ...prev, [key]: value, page: key === 'page' ? value : 1 };
-      paramsRef.current = next;
-      return next;
-    });
-
-    if (isDebounceKey) {
-      // Đồng bộ ngay để API luôn dùng đúng chuỗi đang nhập (AND với các field khác)
-      debouncedRef.current[key] = value ?? '';
-      if (timerRefs.current[key]) clearTimeout(timerRefs.current[key]);
-      timerRefs.current[key] = setTimeout(() => {
-        timerRefs.current[key] = null;
-        callApi(getEffectiveParams(paramsRef.current));
-      }, debounceMsRef.current);
-      return;
-    }
-
-    // Đổi page / filter select: hủy debounce text đang chờ rồi fetch ngay với giá trị UI hiện tại
-    Object.keys(timerRefs.current).forEach((k) => {
-      clearTimeout(timerRefs.current[k]);
-      delete timerRefs.current[k];
-    });
-    // Đồng bộ debounce keys từ params (tránh mất chữ đang gõ)
-    debounceKeysRef.current.forEach((k) => {
-      debouncedRef.current[k] = paramsRef.current[k] ?? '';
-    });
-    setTimeout(() => callApi(getEffectiveParams(paramsRef.current)), 0);
-  }, [callApi]);
-
-  const setParams = useCallback((updater) => {
-    setParamsState((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      paramsRef.current = next;
-      debounceKeysRef.current.forEach((k) => {
-        if (Object.prototype.hasOwnProperty.call(next, k)) {
-          debouncedRef.current[k] = next[k] ?? '';
-        }
+      setParamsState((prev) => {
+        const next = { ...prev, [key]: value, page: key === 'page' ? value : 1 };
+        paramsRef.current = next;
+        return next;
       });
-      return next;
-    });
-    // Hủy debounce đang chờ — setParams (reset/seed) phải fetch ngay
-    Object.keys(timerRefs.current).forEach((k) => {
-      clearTimeout(timerRefs.current[k]);
-      delete timerRefs.current[k];
-    });
-    setTimeout(() => callApi(getEffectiveParams(paramsRef.current)), 0);
-  }, [callApi]);
+
+      if (isDebounceKey) {
+        // Đồng bộ ngay để API luôn dùng đúng chuỗi đang nhập (AND với các field khác)
+        debouncedRef.current[key] = value ?? '';
+        if (timerRefs.current[key]) clearTimeout(timerRefs.current[key]);
+        timerRefs.current[key] = setTimeout(() => {
+          timerRefs.current[key] = null;
+          callApi(getEffectiveParams(paramsRef.current));
+        }, debounceMsRef.current);
+        return;
+      }
+
+      // Đổi page / filter select: hủy debounce text đang chờ rồi fetch ngay với giá trị UI hiện tại
+      Object.keys(timerRefs.current).forEach((k) => {
+        clearTimeout(timerRefs.current[k]);
+        delete timerRefs.current[k];
+      });
+      // Đồng bộ debounce keys từ params (tránh mất chữ đang gõ)
+      debounceKeysRef.current.forEach((k) => {
+        debouncedRef.current[k] = paramsRef.current[k] ?? '';
+      });
+      setTimeout(() => callApi(getEffectiveParams(paramsRef.current)), 0);
+    },
+    [callApi]
+  );
+
+  const setParams = useCallback(
+    (updater) => {
+      setParamsState((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        paramsRef.current = next;
+        debounceKeysRef.current.forEach((k) => {
+          if (Object.prototype.hasOwnProperty.call(next, k)) {
+            debouncedRef.current[k] = next[k] ?? '';
+          }
+        });
+        return next;
+      });
+      // Hủy debounce đang chờ — setParams (reset/seed) phải fetch ngay
+      Object.keys(timerRefs.current).forEach((k) => {
+        clearTimeout(timerRefs.current[k]);
+        delete timerRefs.current[k];
+      });
+      setTimeout(() => callApi(getEffectiveParams(paramsRef.current)), 0);
+    },
+    [callApi]
+  );
 
   const refresh = useCallback(async () => {
     debounceKeysRef.current.forEach((key) => {

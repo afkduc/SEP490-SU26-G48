@@ -105,10 +105,22 @@
   text-transform: uppercase;
 }
 
-.sec-related-hist__sev--critical { background: #fee2e2; color: #b91c1c; }
-.sec-related-hist__sev--high { background: #ffedd5; color: #c2410c; }
-.sec-related-hist__sev--medium { background: #fef3c7; color: #a16207; }
-.sec-related-hist__sev--info { background: #e0f2fe; color: #0369a1; }
+.sec-related-hist__sev--critical {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.sec-related-hist__sev--high {
+  background: #ffedd5;
+  color: #c2410c;
+}
+.sec-related-hist__sev--medium {
+  background: #fef3c7;
+  color: #a16207;
+}
+.sec-related-hist__sev--info {
+  background: #e0f2fe;
+  color: #0369a1;
+}
 
 .sec-related-hist__tag {
   display: inline-flex;

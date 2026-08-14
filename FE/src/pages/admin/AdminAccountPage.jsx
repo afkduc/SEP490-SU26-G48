@@ -12,7 +12,16 @@ const TABS = [
 
 function IconUser() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
@@ -33,21 +42,24 @@ export default function AdminAccountPage() {
   const isEditMode = location.pathname.endsWith('/edit');
   const activeTab = isEditMode ? 'profile' : resolveTab(searchParams.get('tab'));
 
-  const setActiveTab = useCallback((tab) => {
-    if (tab === activeTab) return;
-    // Route /admin/profile/edit không đọc query 'tab', nên phải rời route này
-    // trước, nếu không tab vừa chọn sẽ không hiển thị.
-    if (isEditMode) {
-      navigate(tab === 'notifications' ? '/admin/profile?tab=notifications' : '/admin/profile');
-      return;
-    }
-    syncSearch((prev) => {
-      const next = new URLSearchParams(prev);
-      if (tab === 'profile') next.delete('tab');
-      else next.set('tab', tab);
-      return next;
-    });
-  }, [activeTab, isEditMode, navigate, syncSearch]);
+  const setActiveTab = useCallback(
+    (tab) => {
+      if (tab === activeTab) return;
+      // Route /admin/profile/edit không đọc query 'tab', nên phải rời route này
+      // trước, nếu không tab vừa chọn sẽ không hiển thị.
+      if (isEditMode) {
+        navigate(tab === 'notifications' ? '/admin/profile?tab=notifications' : '/admin/profile');
+        return;
+      }
+      syncSearch((prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === 'profile') next.delete('tab');
+        else next.set('tab', tab);
+        return next;
+      });
+    },
+    [activeTab, isEditMode, navigate, syncSearch]
+  );
 
   return (
     <div className="admin-page admin-hub">

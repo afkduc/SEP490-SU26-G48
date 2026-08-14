@@ -1,8 +1,5 @@
 const { query } = require('../database/sqlServer');
-const {
-  assignedBranchCountSql,
-  resolveAssignedBranchIds,
-} = require('../../utils/userBranchScope');
+const { assignedBranchCountSql, resolveAssignedBranchIds } = require('../../utils/userBranchScope');
 const {
   sqlAccentInsensitiveLike,
   bindNormalizedLikeParam,
@@ -22,7 +19,10 @@ function pushUserSearchCondition(conditions, params, paramIndex, search) {
     sqlAccentInsensitiveLike('u.email', key),
     sqlAccentInsensitiveLike('u.first_name', key),
     sqlAccentInsensitiveLike('u.last_name', key),
-    sqlAccentInsensitiveLike(`(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`, key),
+    sqlAccentInsensitiveLike(
+      `(COALESCE(u.first_name, N'') + N' ' + COALESCE(u.last_name, N''))`,
+      key
+    ),
   ];
   let next = paramIndex + 1;
   const phoneKey = `p${next}`;
@@ -288,10 +288,9 @@ class AdminUserRepositoryImpl {
   }
 
   async findByEmail(email) {
-    const result = await query(
-      'SELECT TOP 1 id, email FROM users WHERE email = @p1',
-      { p1: email }
-    );
+    const result = await query('SELECT TOP 1 id, email FROM users WHERE email = @p1', {
+      p1: email,
+    });
     return result.recordset[0] || null;
   }
 
@@ -350,7 +349,17 @@ class AdminUserRepositoryImpl {
     return `NV${String(nextNum).padStart(3, '0')}`;
   }
 
-  async create({ name, email, passwordHash, firstName, lastName, phone, branchId, roleId, scopeAllBranches = false }) {
+  async create({
+    name,
+    email,
+    passwordHash,
+    firstName,
+    lastName,
+    phone,
+    branchId,
+    roleId,
+    scopeAllBranches = false,
+  }) {
     const pseudoId = await this.nextPseudoId();
     // scopeAllBranches => users.branch_id NULL; nguoc lai => branch_id cu the
     const userBranchId = scopeAllBranches ? null : branchId;
@@ -359,20 +368,40 @@ class AdminUserRepositoryImpl {
       `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, team_size, status, created_at)
        OUTPUT INSERTED.id
        VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 0, 'active', GETDATE())`,
-      { p1: pseudoId, p2: name, p3: email, p4: passwordHash, p5: firstName || name, p6: lastName || '', p7: phone, p8: userBranchId }
+      {
+        p1: pseudoId,
+        p2: name,
+        p3: email,
+        p4: passwordHash,
+        p5: firstName || name,
+        p6: lastName || '',
+        p7: phone,
+        p8: userBranchId,
+      }
     );
     const userId = result.recordset[0].id;
     if (roleId) {
-      await query(
-        'INSERT INTO user_role (user_id, role_id) VALUES (@p1, @p2)',
-        { p1: userId, p2: roleId }
-      );
+      await query('INSERT INTO user_role (user_id, role_id) VALUES (@p1, @p2)', {
+        p1: userId,
+        p2: roleId,
+      });
     }
 
     return { id: userId, email };
   }
 
-  async updateUser({ userId, firstName, lastName, email, phone, status, roleId, branchId, shouldUpdateBranchId = false, scopeAllBranches = false }) {
+  async updateUser({
+    userId,
+    firstName,
+    lastName,
+    email,
+    phone,
+    status,
+    roleId,
+    branchId,
+    shouldUpdateBranchId = false,
+    scopeAllBranches = false,
+  }) {
     // Build dynamic UPDATE query
     const updates = [];
     const params = {};
@@ -413,19 +442,16 @@ class AdminUserRepositoryImpl {
 
     if (updates.length > 0) {
       params[`p${paramIndex}`] = userId;
-      await query(
-        `UPDATE users SET ${updates.join(', ')} WHERE id = @p${paramIndex}`,
-        params
-      );
+      await query(`UPDATE users SET ${updates.join(', ')} WHERE id = @p${paramIndex}`, params);
     }
 
     if (roleId !== undefined) {
       await query('DELETE FROM user_role WHERE user_id = @p1', { p1: userId });
       if (roleId) {
-        await query(
-          'INSERT INTO user_role (user_id, role_id) VALUES (@p1, @p2)',
-          { p1: userId, p2: roleId }
-        );
+        await query('INSERT INTO user_role (user_id, role_id) VALUES (@p1, @p2)', {
+          p1: userId,
+          p2: roleId,
+        });
       }
     }
 
@@ -455,10 +481,11 @@ class AdminUserRepositoryImpl {
   async getDashboardStats(filters = {}) {
     // YYYY-MM-DD = ngày lịch VN (UTC+7), không phải nửa đêm UTC — tránh "Hôm nay"
     // lúc 00:00–07:00 VN bị trống dù đã có nhật ký (logged_at / login_time là SYSUTCDATETIME).
-    const { from: fromDate, to: rangeEnd, hasRange } = parseUtcRangeFromVnDates(
-      filters.fromDate,
-      filters.toDate
-    );
+    const {
+      from: fromDate,
+      to: rangeEnd,
+      hasRange,
+    } = parseUtcRangeFromVnDates(filters.fromDate, filters.toDate);
 
     const [userStats, branchCount, roleCount] = await Promise.all([
       query(`
@@ -471,7 +498,7 @@ class AdminUserRepositoryImpl {
       query('SELECT COUNT(*) AS total FROM branches WHERE is_active = 1'),
       query('SELECT COUNT(*) AS total FROM roles'),
     ]);
-    
+
     const users = userStats.recordset[0];
 
     // Recent audit logs (general activity) — ưu tiên trong khoảng lọc
@@ -566,20 +593,26 @@ class AdminUserRepositoryImpl {
       const periodStart = hasRange ? fromDate : startOfDayVN(todayYmdVN());
       const periodEnd = hasRange ? rangeEnd : new Date();
 
-      const todayResult = await query(`
+      const todayResult = await query(
+        `
         SELECT COUNT(*) AS total
         FROM login_sessions
         WHERE action_type = 'LOGIN'
           AND login_time >= @p1 AND login_time <= @p2
-      `, { p1: periodStart, p2: periodEnd });
+      `,
+        { p1: periodStart, p2: periodEnd }
+      );
       todayLogins = Number(todayResult.recordset[0].total);
 
-      const failedResult = await query(`
+      const failedResult = await query(
+        `
         SELECT COUNT(*) AS total
         FROM login_sessions
         WHERE action_type = 'LOGIN_FAILED'
           AND login_time >= @p1 AND login_time <= @p2
-      `, { p1: periodStart, p2: periodEnd });
+      `,
+        { p1: periodStart, p2: periodEnd }
+      );
       failedLogins = Number(failedResult.recordset[0].total);
 
       const recentFailedResult = await query(`
@@ -651,15 +684,27 @@ class AdminUserRepositoryImpl {
       );
       alerts = alertsResult.recordset.map((row) => ({
         id: String(row.id),
-        type: row.severity === 'critical' ? 'danger' : row.severity === 'high' ? 'danger' : row.severity === 'medium' ? 'warning' : 'info',
+        type:
+          row.severity === 'critical'
+            ? 'danger'
+            : row.severity === 'high'
+              ? 'danger'
+              : row.severity === 'medium'
+                ? 'warning'
+                : 'info',
         title: row.title,
         message: row.message,
         severity: row.severity,
-        icon: row.rule_key === 'failed_login_burst' ? 'alert'
-            : row.rule_key === 'new_admin_role' ? 'shield'
-            : row.rule_key === 'inactive_admin' ? 'user'
-            : row.rule_key === 'session_takeover' ? 'alert'
-            : 'info',
+        icon:
+          row.rule_key === 'failed_login_burst'
+            ? 'alert'
+            : row.rule_key === 'new_admin_role'
+              ? 'shield'
+              : row.rule_key === 'inactive_admin'
+                ? 'user'
+                : row.rule_key === 'session_takeover'
+                  ? 'alert'
+                  : 'info',
         time: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
         alertId: row.id,
       }));

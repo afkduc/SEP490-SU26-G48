@@ -27,7 +27,8 @@ class AdminUserService {
   async assertActiveBranch(branchId) {
     const branch = await this.adminUserRepository.findBranchById(branchId);
     if (!branch) throw new ApiError(400, `Chi nhánh id=${branchId} không tồn tại`);
-    if (!branch.isActive) throw new ApiError(400, `Chi nhánh "${branch.branchCode}" đang ngừng hoạt động`);
+    if (!branch.isActive)
+      throw new ApiError(400, `Chi nhánh "${branch.branchCode}" đang ngừng hoạt động`);
     return branch;
   }
 
@@ -101,7 +102,17 @@ class AdminUserService {
   }
 
   async createUser(payload) {
-    const { name, email, password, branchId, roleId, firstName, lastName, phone, scopeAllBranches } = payload;
+    const {
+      name,
+      email,
+      password,
+      branchId,
+      roleId,
+      firstName,
+      lastName,
+      phone,
+      scopeAllBranches,
+    } = payload;
 
     if (!name || !email || !password || !roleId) {
       throw new ApiError(400, 'name, email, password, roleId là bắt buộc');
@@ -109,12 +120,14 @@ class AdminUserService {
 
     const nameTrimmed = String(name).trim();
     const emailTrimmed = String(email).trim();
-    const lastNameTrimmed = lastName !== undefined && lastName !== null
-      ? String(lastName).trim().replace(/\s+/g, ' ')
-      : '';
-    const firstNameTrimmed = firstName !== undefined && firstName !== null
-      ? String(firstName).trim().replace(/\s+/g, ' ')
-      : '';
+    const lastNameTrimmed =
+      lastName !== undefined && lastName !== null
+        ? String(lastName).trim().replace(/\s+/g, ' ')
+        : '';
+    const firstNameTrimmed =
+      firstName !== undefined && firstName !== null
+        ? String(firstName).trim().replace(/\s+/g, ' ')
+        : '';
     const usernameErr = getUsernameError(nameTrimmed, { required: true });
     if (usernameErr) throw new ApiError(400, usernameErr);
     const lastNameErr = getPersonNameError(lastNameTrimmed, { required: true, label: 'Tên' });
@@ -122,14 +135,15 @@ class AdminUserService {
     const firstNameErr = getPersonNameError(firstNameTrimmed, { required: false, label: 'Họ' });
     if (firstNameErr) throw new ApiError(400, firstNameErr);
 
-    const phoneTrimmed = phone !== undefined && phone !== null
-      ? phoneDigitsOnly(phone)
-      : '';
+    const phoneTrimmed = phone !== undefined && phone !== null ? phoneDigitsOnly(phone) : '';
     if (!phoneTrimmed) {
       throw new ApiError(400, 'Số điện thoại là bắt buộc');
     }
     if (!isValidPhone(phoneTrimmed)) {
-      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
+      throw new ApiError(
+        400,
+        'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)'
+      );
     }
 
     let parsedBranchId = null;
@@ -222,10 +236,10 @@ class AdminUserService {
 
     // Không cho tự khóa / tự inactive chính mình
     if (
-      status === 'inactive'
-      && actorUserId !== undefined
-      && actorUserId !== null
-      && Number(actorUserId) === Number(userId)
+      status === 'inactive' &&
+      actorUserId !== undefined &&
+      actorUserId !== null &&
+      Number(actorUserId) === Number(userId)
     ) {
       throw new ApiError(400, 'Không thể tự khóa tài khoản của chính mình');
     }
@@ -251,7 +265,10 @@ class AdminUserService {
         throw new ApiError(400, 'Số điện thoại là bắt buộc');
       }
       if (!isValidPhone(phoneTrimmed)) {
-        throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)');
+        throw new ApiError(
+          400,
+          'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số (không tính dấu gạch)'
+        );
       }
       const phoneOwner = await this.adminUserRepository.findByPhone(phoneTrimmed);
       if (phoneOwner && Number(phoneOwner.id) !== Number(userId)) {
@@ -408,10 +425,7 @@ class AdminUserService {
     const passwordHash = bcrypt.hashSync(plainPassword, 10);
 
     // Update DB
-    const ok = await this.adminUserRepository.updatePassword(
-      Number(userId),
-      passwordHash
-    );
+    const ok = await this.adminUserRepository.updatePassword(Number(userId), passwordHash);
 
     if (!ok) {
       throw new ApiError(500, 'Reset mat khau that bai');
@@ -437,7 +451,10 @@ class AdminUserService {
       // .catch() bat buoc - notify() la async, khong await o day (fire-and-
       // forget) nen reject se thanh unhandled rejection lam crash ca process.
       ns.notify('PASSWORD_CHANGED', { userId, resetByAdmin: true }).catch((err) => {
-        console.error('[AdminUserService] Failed to send password reset notification:', err.message);
+        console.error(
+          '[AdminUserService] Failed to send password reset notification:',
+          err.message
+        );
       });
     } catch (err) {
       console.error('[AdminUserService] Failed to send password reset notification:', err.message);

@@ -49,9 +49,7 @@ export function useLoginSessionsSSE(onEvent, enabled = true, token = null) {
     }
 
     // Append token vao query (tranh undefined/null)
-    const qs = tokenRef.current
-      ? `?token=${encodeURIComponent(tokenRef.current)}`
-      : '';
+    const qs = tokenRef.current ? `?token=${encodeURIComponent(tokenRef.current)}` : '';
     const url = `${API_BASE_URL}/sse/login-sessions${qs}`;
 
     try {

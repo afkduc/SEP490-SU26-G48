@@ -114,7 +114,7 @@ function requireAnyPerm(...permKeys) {
 /**
  * Middleware factory: kiem tra user co quyen vao 1 SCREEN (UI page) hay khong.
  *
- * Su dung cho permission matrix: moi UI page tuong ung voi 1 permission_key
+ * Moi UI page tuong ung voi 1 permission_key
  *   `screen:<module>:<resource>:access` (vd: `screen:dashboard:access`,
  *   `screen:admin:users:access`).
  *
@@ -145,8 +145,7 @@ function requireScreen(module, resource) {
     // PLAN A: Luôn check DB (skipCache=true) để đảm bảo permission mới nhất.
     //
     // Lý do KHÔNG check JWT trước:
-    //   - JWT có thể chứa permission cũ (admin vừa revoke qua Permission Matrix
-    //     hoặc Role Screen Matrix).
+    //   - JWT có thể chứa permission cũ (admin vừa gán/thu hồi role).
     //   - Layer 1 (screen:<x>:access) và Layer 2b (screen:<x>:<action>) là 2 bảng
     //     RIÊNG BIỆT - JWT compact chỉ chứa Layer 1 + 2a.
     //   - Nếu dựa JWT → admin gỡ Layer 2b nhưng JWT cũ vẫn có Layer 1 → user
@@ -208,7 +207,9 @@ function requireScreenAction(screenKey, action) {
   // action = "view" | "create" | "update" | "delete" | "export"
   const validActions = ['view', 'create', 'update', 'delete', 'export'];
   if (!validActions.includes(action)) {
-    throw new Error(`requireScreenAction: invalid action "${action}". Must be one of ${validActions.join(', ')}`);
+    throw new Error(
+      `requireScreenAction: invalid action "${action}". Must be one of ${validActions.join(', ')}`
+    );
   }
   const permKey = `screen:${screenKey}:${action}`;
 
@@ -251,4 +252,10 @@ function invalidateUserCache(userId) {
   ps.invalidateCache(userId);
 }
 
-module.exports = { requirePerm, requireAnyPerm, requireScreen, requireScreenAction, invalidateUserCache };
+module.exports = {
+  requirePerm,
+  requireAnyPerm,
+  requireScreen,
+  requireScreenAction,
+  invalidateUserCache,
+};

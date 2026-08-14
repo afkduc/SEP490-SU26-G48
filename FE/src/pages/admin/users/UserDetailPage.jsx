@@ -85,15 +85,16 @@ export default function UserDetailPage() {
 
   useEffect(() => {
     load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function handleToggleStatus() {
     if (!user) return;
     const next = user.status === 'active' ? 'inactive' : 'active';
-    const confirmMsg = next === 'inactive'
-      ? 'Khóa tài khoản này? Người dùng sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
-      : 'Kích hoạt lại tài khoản này?';
+    const confirmMsg =
+      next === 'inactive'
+        ? 'Khóa tài khoản này? Người dùng sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
+        : 'Kích hoạt lại tài khoản này?';
     if (!window.confirm(confirmMsg)) return;
     setToggling(true);
     try {
@@ -135,11 +136,7 @@ export default function UserDetailPage() {
         {user && (
           <div className="admin-page__actions">
             <PermissionGate permission="admin:users:update">
-              <button
-                type="button"
-                className="btn btn--outline"
-                onClick={() => setShowReset(true)}
-              >
+              <button type="button" className="btn btn--outline" onClick={() => setShowReset(true)}>
                 Đặt lại mật khẩu
               </button>
               <button
@@ -148,12 +145,16 @@ export default function UserDetailPage() {
                 onClick={handleToggleStatus}
                 disabled={toggling}
               >
-                {toggling ? '...' : (user.status === 'active' ? 'Khóa tài khoản' : 'Kích hoạt')}
+                {toggling ? '...' : user.status === 'active' ? 'Khóa tài khoản' : 'Kích hoạt'}
               </button>
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={() => navigate(`/admin/users/${user.id}/edit`, { state: { fromListSearch: listSearch } })}
+                onClick={() =>
+                  navigate(`/admin/users/${user.id}/edit`, {
+                    state: { fromListSearch: listSearch },
+                  })
+                }
               >
                 Sửa
               </button>
@@ -169,7 +170,9 @@ export default function UserDetailPage() {
           <div className="admin-user-detail-page__state admin-user-detail-page__state--error">
             {error}
             <div style={{ marginTop: 12 }}>
-              <Link to={backToList} className="btn btn--ghost">Về danh sách</Link>
+              <Link to={backToList} className="btn btn--ghost">
+                Về danh sách
+              </Link>
             </div>
           </div>
         ) : user ? (
@@ -187,12 +190,13 @@ export default function UserDetailPage() {
                 {user.roles?.length > 0 && (
                   <div className="user-detail-hero__roles">
                     {user.roles.map((r) => {
-                      const name = typeof r === 'object' && r !== null
-                        ? (r.roleLabel || r.roleName)
-                        : r;
+                      const name =
+                        typeof r === 'object' && r !== null ? r.roleLabel || r.roleName : r;
                       const key = typeof r === 'object' && r !== null ? r.roleId : r;
                       return (
-                        <span key={key} className="badge badge--info">{name}</span>
+                        <span key={key} className="badge badge--info">
+                          {name}
+                        </span>
                       );
                     })}
                   </div>
@@ -225,7 +229,10 @@ export default function UserDetailPage() {
                 <div className="user-detail-grid">
                   <Field label="Họ" value={user.firstName || '—'} />
                   <Field label="Tên" value={user.lastName || '—'} />
-                  <Field label="Số điện thoại" value={user.phone ? formatPhoneDisplay(user.phone) : '—'} />
+                  <Field
+                    label="Số điện thoại"
+                    value={user.phone ? formatPhoneDisplay(user.phone) : '—'}
+                  />
                 </div>
               </section>
 
@@ -234,17 +241,15 @@ export default function UserDetailPage() {
                 <div className="user-detail-grid">
                   <Field
                     label="Chi nhánh"
-                    value={
-                      user.scopeAllBranches
-                        ? 'Tất cả chi nhánh'
-                        : (user.branchName || '—')
-                    }
+                    value={user.scopeAllBranches ? 'Tất cả chi nhánh' : user.branchName || '—'}
                   />
                   <Field
                     label="Vai trò"
                     value={
                       user.roles?.length
-                        ? user.roles.map((r) => (typeof r === 'object' ? (r.roleLabel || r.roleName) : r)).join(', ')
+                        ? user.roles
+                            .map((r) => (typeof r === 'object' ? r.roleLabel || r.roleName : r))
+                            .join(', ')
                         : '—'
                     }
                   />

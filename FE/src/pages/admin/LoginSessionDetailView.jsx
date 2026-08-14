@@ -20,8 +20,12 @@ function formatDateTime(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleString('vi-VN', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
   });
 }
 
@@ -59,7 +63,7 @@ function parseOs(ua) {
   if (!ua) return '—';
   if (/Windows NT/.test(ua)) {
     const m = ua.match(/Windows NT ([\d.]+)/);
-    const map = { '10.0': 'Windows 10/11', '6.3': 'Windows 8.1', '6.2': 'Windows 8', '6.1': 'Windows 7' };
+    const map = { '10.0': 'Windows 10/11', 6.3: 'Windows 8.1', 6.2: 'Windows 8', 6.1: 'Windows 7' };
     return map[m?.[1]] || `Windows NT ${m?.[1]}`;
   }
   if (/Mac OS X/.test(ua)) {
@@ -90,18 +94,24 @@ function parseDevice(ua) {
 function ActionBadge({ action }) {
   if (!action) return null;
   const upper = String(action).toUpperCase();
-  if (upper.includes('FORCE')) return <span className="badge badge--orange">{ACTION_LABELS.FORCE_LOGOUT}</span>;
-  if (upper.includes('LOGOUT') || upper.includes('SIGNOUT')) return <span className="badge badge--secondary">{ACTION_LABELS.LOGOUT}</span>;
-  if (upper.includes('LOGIN')) return <span className="badge badge--success">{ACTION_LABELS.LOGIN}</span>;
+  if (upper.includes('FORCE'))
+    return <span className="badge badge--orange">{ACTION_LABELS.FORCE_LOGOUT}</span>;
+  if (upper.includes('LOGOUT') || upper.includes('SIGNOUT'))
+    return <span className="badge badge--secondary">{ACTION_LABELS.LOGOUT}</span>;
+  if (upper.includes('LOGIN'))
+    return <span className="badge badge--success">{ACTION_LABELS.LOGIN}</span>;
   return <span className="badge badge--secondary">{ACTION_LABELS[upper] || 'Thao tác khác'}</span>;
 }
 
 function StatusBadge({ status }) {
   if (!status) return null;
   const cls =
-    status === 'active' ? 'badge--success'
-      : status === 'ended' ? 'badge--secondary'
-        : status === 'failed' ? 'badge--danger'
+    status === 'active'
+      ? 'badge--success'
+      : status === 'ended'
+        ? 'badge--secondary'
+        : status === 'failed'
+          ? 'badge--danger'
           : 'badge--secondary';
   return <span className={`badge ${cls}`}>{STATUS_LABELS[status] || 'Không xác định'}</span>;
 }
@@ -143,7 +153,10 @@ export function LoginSessionDetailContent({ session, onOpenDevicesToProcess }) {
   let durationText = '—';
   let isLive = false;
   if (session.status === 'active' && session.login_time) {
-    const seconds = Math.max(0, Math.floor((Date.now() - new Date(session.login_time).getTime()) / 1000));
+    const seconds = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(session.login_time).getTime()) / 1000)
+    );
     durationText = formatDuration(seconds);
     isLive = true;
   } else if (session.session_duration_seconds != null) {
@@ -155,7 +168,14 @@ export function LoginSessionDetailContent({ session, onOpenDevicesToProcess }) {
   if (!session.user_id) warnings.push('Không xác định được người dùng');
   if (!session.ip_address) warnings.push('Không ghi nhận địa chỉ IP');
 
-  const initials = fullName.split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase() || '?';
+  const initials =
+    fullName
+      .split(' ')
+      .filter(Boolean)
+      .slice(-2)
+      .map((p) => p[0])
+      .join('')
+      .toUpperCase() || '?';
 
   return (
     <div className="session-detail-page__body">
@@ -188,7 +208,9 @@ export function LoginSessionDetailContent({ session, onOpenDevicesToProcess }) {
                   <span className="session-detail-live">
                     {durationText} <span className="session-detail-live__hint">(đang chạy…)</span>
                   </span>
-                ) : durationText
+                ) : (
+                  durationText
+                )
               }
             />
             <Field label="Hành động" value={<ActionBadge action={session.action_type} />} />
@@ -201,8 +223,18 @@ export function LoginSessionDetailContent({ session, onOpenDevicesToProcess }) {
           <div className="session-detail-grid">
             <Field label="Họ tên" value={fullName} />
             <Field label="Số điện thoại" value={phone} />
-            <Field label="Mã người dùng" value={session.user_id != null ? `#${session.user_id}` : null} mono />
-            <Field label="Chi nhánh" value={session.branch_name || (session.branch_id ? `Chi nhánh #${session.branch_id}` : null)} />
+            <Field
+              label="Mã người dùng"
+              value={session.user_id != null ? `#${session.user_id}` : null}
+              mono
+            />
+            <Field
+              label="Chi nhánh"
+              value={
+                session.branch_name ||
+                (session.branch_id ? `Chi nhánh #${session.branch_id}` : null)
+              }
+            />
           </div>
         </section>
 
@@ -212,7 +244,10 @@ export function LoginSessionDetailContent({ session, onOpenDevicesToProcess }) {
             <Field label="Địa chỉ IP" value={session.ip_address} mono />
             <Field label="Thiết bị" value={device} />
             <Field label="Hệ điều hành" value={os} />
-            <Field label="Trình duyệt" value={browser.version ? `${browser.name} ${browser.version}` : browser.name} />
+            <Field
+              label="Trình duyệt"
+              value={browser.version ? `${browser.name} ${browser.version}` : browser.name}
+            />
             <Field label="Thông tin trình duyệt" value={session.user_agent} mono multiline />
           </div>
         </section>
@@ -230,7 +265,9 @@ export function LoginSessionDetailContent({ session, onOpenDevicesToProcess }) {
           <section className="session-detail-section session-detail-section--warn">
             <h3 className="session-detail-section__title">Cảnh báo bất thường</h3>
             <ul className="session-detail-warnings">
-              {warnings.map((w) => (<li key={w}>{w}</li>))}
+              {warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
             </ul>
           </section>
         )}

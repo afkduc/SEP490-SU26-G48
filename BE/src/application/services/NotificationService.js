@@ -19,10 +19,10 @@ const EMAIL_ON_ROLE_CHANGE = 'emailOnRoleChange';
 // error    = đỏ        (#ef4444) — disable/delete/thất bại
 // critical = đỏ đậm   (#dc2626) — cảnh báo nghiêm trọng
 const SEVERITY = {
-  SUCCESS:  'success',
-  INFO:     'info',
-  WARNING:  'warning',
-  ERROR:    'error',
+  SUCCESS: 'success',
+  INFO: 'info',
+  WARNING: 'warning',
+  ERROR: 'error',
   CRITICAL: 'critical',
 };
 
@@ -50,7 +50,8 @@ const NOTIFICATION_EVENTS = {
     title: 'Yêu cầu đăng nhập mới',
     severity: SEVERITY.WARNING,
     messageTemplates: {
-      default: 'Có thiết bị khác đang cố đăng nhập tài khoản của bạn ({device}). Hãy xác nhận đó có phải là bạn không.',
+      default:
+        'Có thiết bị khác đang cố đăng nhập tài khoản của bạn ({device}). Hãy xác nhận đó có phải là bạn không.',
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
@@ -66,7 +67,8 @@ const NOTIFICATION_EVENTS = {
     title: 'Đăng nhập từ thiết bị mới',
     severity: SEVERITY.WARNING,
     messageTemplates: {
-      default: 'Phát hiện đăng nhập từ thiết bị mới: {device} (IP {location}). Nếu không phải bạn, hãy đổi mật khẩu ngay.',
+      default:
+        'Phát hiện đăng nhập từ thiết bị mới: {device} (IP {location}). Nếu không phải bạn, hãy đổi mật khẩu ngay.',
     },
     affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
@@ -253,33 +255,6 @@ const NOTIFICATION_EVENTS = {
       default: '{actorName} đã từ chối yêu cầu quyền "{permissionKey}"{reason}.',
     },
     affectsSettings: [EMAIL_ON_ROLE_CHANGE, IN_APP_SYSTEM_ALERT],
-  },
-  PERMISSION_MATRIX_UPDATED: {
-    title: 'Quyền truy cập đã cập nhật',
-    severity: SEVERITY.WARNING,
-    messageTemplates: {
-      default: '{actorName} đã cập nhật quyền: {permissionKey}.',
-      bulk: '{actorName} đã cập nhật hàng loạt quyền ({count} ô).',
-      roleScreen: '{actorName} đã lưu quyền màn hình cho vai trò {targetName} ({count} mục).',
-      userOverride: '{actorName} đã cập nhật quyền riêng cho {targetName}.',
-    },
-    affectsSettings: [IN_APP_SYSTEM_ALERT],
-  },
-  IMPORT_REQUEST_APPROVED: {
-    title: 'Phiếu nhập kho được duyệt',
-    severity: SEVERITY.SUCCESS,
-    messageTemplates: {
-      default: '{actorName} đã duyệt phiếu nhập kho: {targetName}.',
-    },
-    affectsSettings: [IN_APP_SYSTEM_ALERT],
-  },
-  IMPORT_REQUEST_REJECTED: {
-    title: 'Phiếu nhập kho bị từ chối',
-    severity: SEVERITY.ERROR,
-    messageTemplates: {
-      default: '{actorName} đã từ chối phiếu nhập kho: {targetName}.',
-    },
-    affectsSettings: [IN_APP_SYSTEM_ALERT],
   },
 
   // Branch management
@@ -509,7 +484,7 @@ class NotificationService {
     let shouldNotify = skipSettings;
     if (!skipSettings) {
       const settings = await this.settingsRepo.findByUserId(userId);
-      shouldNotify = event.affectsSettings.some(setting => {
+      shouldNotify = event.affectsSettings.some((setting) => {
         if (!settings || typeof settings[setting] !== 'boolean') {
           return false;
         }
@@ -518,13 +493,16 @@ class NotificationService {
     }
 
     if (!shouldNotify) {
-      console.log(`[NotificationService] Notification disabled for ${eventType} for user ${userId}`);
+      console.log(
+        `[NotificationService] Notification disabled for ${eventType} for user ${userId}`
+      );
       return null;
     }
 
     // Tạo title và message
     let title = event.title;
-    let message = event.messageTemplates.default || Object.values(event.messageTemplates)[0] || event.title;
+    let message =
+      event.messageTemplates.default || Object.values(event.messageTemplates)[0] || event.title;
 
     // Handle different message templates based on data (trước replace placeholder)
     if (eventType === 'SECURITY_ALERT' || eventType.startsWith('SECURITY_')) {
@@ -556,14 +534,9 @@ class NotificationService {
     if (eventType === 'PERMISSION_GRANTED' && data.fromMatrix) {
       message = event.messageTemplates.matrix || message;
     }
-    if (eventType === 'PERMISSION_MATRIX_UPDATED') {
-      if (data.bulk) message = event.messageTemplates.bulk || message;
-      else if (data.roleScreen) message = event.messageTemplates.roleScreen || message;
-      else if (data.userOverride) message = event.messageTemplates.userOverride || message;
-    }
 
     const permissionLabel = data.permissionKey
-      ? (getPermissionScreenLabel(data.permissionKey) || data.permissionKey)
+      ? getPermissionScreenLabel(data.permissionKey) || data.permissionKey
       : '';
     message = interpolateMessage(message, {
       ...data,
@@ -625,7 +598,7 @@ class NotificationService {
       title,
       message,
       type: eventType,
-      severity: (data.severity || event.severity) || null,
+      severity: data.severity || event.severity || null,
       metadata: { ...metadata, ...(data.metadata || {}) },
     });
 
@@ -655,15 +628,17 @@ class NotificationService {
         AND u.status = 'active'
     `);
 
-    const adminIds = adminsResult.recordset
-      .map((r) => r.id)
-      .filter((id) => id !== excludeUserId);
+    const adminIds = adminsResult.recordset.map((r) => r.id).filter((id) => id !== excludeUserId);
 
     const results = [];
     for (const adminId of adminIds) {
       try {
         // skipSettings: true -> luôn gửi notification cho admin, không bị settings block
-        const result = await this.notify(eventType, { ...data, userId: adminId }, { skipSettings: true });
+        const result = await this.notify(
+          eventType,
+          { ...data, userId: adminId },
+          { skipSettings: true }
+        );
         results.push({ adminId, notification: result });
       } catch (err) {
         console.warn(`[NotificationService] Failed to notify admin ${adminId}:`, err.message);

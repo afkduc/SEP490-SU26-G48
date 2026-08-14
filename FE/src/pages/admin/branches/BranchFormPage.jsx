@@ -50,7 +50,9 @@ export default function BranchFormPage({ mode: modeProp }) {
         /* ignore */
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -78,7 +80,9 @@ export default function BranchFormPage({ mode: modeProp }) {
         if (!cancelled) setBootLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isEdit, id]);
 
   function set(key, value) {
@@ -151,14 +155,20 @@ export default function BranchFormPage({ mode: modeProp }) {
   }
 
   if (bootLoading) {
-    return <div className="admin-page branch-page"><div className="branch-page__state">Đang tải...</div></div>;
+    return (
+      <div className="admin-page branch-page">
+        <div className="branch-page__state">Đang tải...</div>
+      </div>
+    );
   }
 
   if (bootError) {
     return (
       <div className="admin-page branch-page">
         <div className="branch-page__state branch-page__state--error">{bootError}</div>
-        <Link to={backToList} className="btn btn--ghost">Quay lại danh mục</Link>
+        <Link to={backToList} className="btn btn--ghost">
+          Quay lại danh mục
+        </Link>
       </div>
     );
   }
@@ -167,11 +177,7 @@ export default function BranchFormPage({ mode: modeProp }) {
     <div className="admin-page branch-page">
       <div className="admin-page__header">
         <div className="admin-page__title-block">
-          <button
-            type="button"
-            className="branch-page__back"
-            onClick={() => navigate(backToList)}
-          >
+          <button type="button" className="branch-page__back" onClick={() => navigate(backToList)}>
             ← Quay lại
           </button>
           <div className="admin-page__title-group">
@@ -182,7 +188,9 @@ export default function BranchFormPage({ mode: modeProp }) {
 
       <form className="branch-page__card" onSubmit={handleSubmit}>
         <div className="form-group">
-          <label>Mã chi nhánh <span>*</span></label>
+          <label>
+            Mã chi nhánh <span>*</span>
+          </label>
           <input
             type="text"
             value={form.branchCode}
@@ -195,7 +203,9 @@ export default function BranchFormPage({ mode: modeProp }) {
         </div>
 
         <div className="form-group">
-          <label>Tên chi nhánh <span>*</span></label>
+          <label>
+            Tên chi nhánh <span>*</span>
+          </label>
           <input
             type="text"
             value={form.branchName}

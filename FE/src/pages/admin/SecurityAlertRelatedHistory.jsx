@@ -76,9 +76,7 @@ export default function SecurityAlertRelatedHistory({ alert, onClear, minCount =
           <h2 className="sec-related-hist__title">Các lần cảnh báo cùng loại</h2>
           <p className="sec-related-hist__sub">
             {alert.title || 'Cảnh báo'}
-            {alert.displayName || alert.userName
-              ? ` · ${alert.displayName || alert.userName}`
-              : ''}
+            {alert.displayName || alert.userName ? ` · ${alert.displayName || alert.userName}` : ''}
             {!loading && !error ? ` · ${items.length} lần` : ''}
           </p>
         </div>
@@ -118,7 +116,9 @@ export default function SecurityAlertRelatedHistory({ alert, onClear, minCount =
                   >
                     <td className="sec-related-hist__time">{formatDateTime(row.createdAt)}</td>
                     <td>
-                      <span className={`sec-related-hist__sev sec-related-hist__sev--${row.severity || 'info'}`}>
+                      <span
+                        className={`sec-related-hist__sev sec-related-hist__sev--${row.severity || 'info'}`}
+                      >
                         {SEVERITY_LABEL[row.severity] || row.severity || '—'}
                       </span>
                     </td>
@@ -127,10 +127,18 @@ export default function SecurityAlertRelatedHistory({ alert, onClear, minCount =
                       <div className="sec-related-hist__msg">{row.message || '—'}</div>
                     </td>
                     <td>
-                      {isCurrent && <span className="sec-related-hist__tag sec-related-hist__tag--current">Đang xem</span>}
-                      {row.isAcknowledged
-                        ? <span className="sec-related-hist__tag">Đã xem</span>
-                        : <span className="sec-related-hist__tag sec-related-hist__tag--open">Chưa xử lý</span>}
+                      {isCurrent && (
+                        <span className="sec-related-hist__tag sec-related-hist__tag--current">
+                          Đang xem
+                        </span>
+                      )}
+                      {row.isAcknowledged ? (
+                        <span className="sec-related-hist__tag">Đã xem</span>
+                      ) : (
+                        <span className="sec-related-hist__tag sec-related-hist__tag--open">
+                          Chưa xử lý
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -141,8 +149,8 @@ export default function SecurityAlertRelatedHistory({ alert, onClear, minCount =
       )}
 
       <p className="sec-related-hist__hint">
-        Đối chiếu với bảng phiên phía trên. Muốn đăng xuất thiết bị: dùng nút
-        «Xử lý trên tab Thiết bị» hoặc Chi tiết phiên → Buộc đăng xuất.
+        Đối chiếu với bảng phiên phía trên. Muốn đăng xuất thiết bị: dùng nút «Xử lý trên tab Thiết
+        bị» hoặc Chi tiết phiên → Buộc đăng xuất.
       </p>
     </section>
   );

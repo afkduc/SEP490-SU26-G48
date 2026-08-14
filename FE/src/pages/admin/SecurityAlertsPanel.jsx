@@ -213,13 +213,25 @@ export default function SecurityAlertsPanel({
   const urgent = (Number(counts.critical) || 0) + (Number(counts.high) || 0);
 
   return (
-    <section className={`sec-panel${expanded ? ' sec-panel--open' : ''}${total > 0 ? ' sec-panel--has-alerts' : ''}`}>
+    <section
+      className={`sec-panel${expanded ? ' sec-panel--open' : ''}${total > 0 ? ' sec-panel--has-alerts' : ''}`}
+    >
       <div className="sec-panel__banner">
         <div className="sec-panel__banner-main">
           <span className="sec-panel__icon" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
           </span>
           <div className="sec-panel__banner-text">
@@ -227,24 +239,30 @@ export default function SecurityAlertsPanel({
               {countsError
                 ? 'Không tải được số lượng cảnh báo'
                 : total > 0
-                ? `${total > 100 ? '99+' : total} cảnh báo chưa xử lý`
-                : 'Không có cảnh báo chưa xử lý'}
+                  ? `${total > 100 ? '99+' : total} cảnh báo chưa xử lý`
+                  : 'Không có cảnh báo chưa xử lý'}
             </strong>
             <span>
               {countsError
                 ? 'Vui lòng bấm Làm mới hoặc kiểm tra kết nối API.'
                 : urgent > 0
-                ? `${urgent} mức Nghiêm trọng/Cao — bấm Xem phiên để đối chiếu, xử lý trên bảng thiết bị`
-                : 'Mức Trung bình/Thông tin chỉ theo dõi; thao tác đăng xuất nằm ở bảng thiết bị'}
+                  ? `${urgent} mức Nghiêm trọng/Cao — bấm Xem phiên để đối chiếu, xử lý trên bảng thiết bị`
+                  : 'Mức Trung bình/Thông tin chỉ theo dõi; thao tác đăng xuất nằm ở bảng thiết bị'}
             </span>
           </div>
         </div>
 
         <div className="sec-panel__chips" aria-label="Thống kê mức độ">
-          <span className="sec-panel__chip sec-panel__chip--critical">Nghiêm trọng {counts.critical || 0}</span>
+          <span className="sec-panel__chip sec-panel__chip--critical">
+            Nghiêm trọng {counts.critical || 0}
+          </span>
           <span className="sec-panel__chip sec-panel__chip--high">Cao {counts.high || 0}</span>
-          <span className="sec-panel__chip sec-panel__chip--medium">Trung bình {counts.medium || 0}</span>
-          <span className="sec-panel__chip sec-panel__chip--info">Thông tin {counts.info || 0}</span>
+          <span className="sec-panel__chip sec-panel__chip--medium">
+            Trung bình {counts.medium || 0}
+          </span>
+          <span className="sec-panel__chip sec-panel__chip--info">
+            Thông tin {counts.info || 0}
+          </span>
         </div>
 
         <button
@@ -285,11 +303,24 @@ export default function SecurityAlertsPanel({
                 <button
                   type="button"
                   className="sec-panel__refresh"
-                  onClick={() => { loadList(); loadCounts(); }}
+                  onClick={() => {
+                    loadList();
+                    loadCounts();
+                  }}
                   title="Làm mới"
                   aria-label="Làm mới danh sách cảnh báo"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
                     <polyline points="23 4 23 10 17 10" />
                     <polyline points="1 20 1 14 7 14" />
                     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
@@ -331,12 +362,12 @@ export default function SecurityAlertsPanel({
                   <div className="sec-panel__item-meta">
                     <span>{RULE_LABEL[alert.ruleKey] || alert.ruleKey || '—'}</span>
                     {alert.userId && (
-                      <span>
-                        · {alert.displayName || alert.userName || `#${alert.userId}`}
-                      </span>
+                      <span>· {alert.displayName || alert.userName || `#${alert.userId}`}</span>
                     )}
                     {Number(alert.duplicateCount) > 1 && (
-                      <span className="sec-panel__dup">· {alert.duplicateCount} lần (chỉ hiện mới nhất)</span>
+                      <span className="sec-panel__dup">
+                        · {alert.duplicateCount} lần (chỉ hiện mới nhất)
+                      </span>
                     )}
                   </div>
                   <div className="sec-panel__item-actions">
@@ -390,8 +421,8 @@ export default function SecurityAlertsPanel({
 
           <p className="sec-panel__hint">
             <strong>Đã xem</strong> đánh dấu xử lý.
-            <strong> Xem phiên</strong> mở tab Lịch sử (lọc theo cảnh báo, highlight phiên mới nhất).
-            Đăng xuất thiết bị ở bảng bên dưới.
+            <strong> Xem phiên</strong> mở tab Lịch sử (lọc theo cảnh báo, highlight phiên mới
+            nhất). Đăng xuất thiết bị ở bảng bên dưới.
           </p>
         </div>
       )}

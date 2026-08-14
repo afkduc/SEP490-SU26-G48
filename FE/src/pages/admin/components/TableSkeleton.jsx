@@ -3,9 +3,10 @@ import './TableSkeleton.css';
 const ROWS = 6;
 
 export default function TableSkeleton({ rows = ROWS, columns }) {
-  const cols = Array.isArray(columns) && columns.length > 0 ? columns : [
-    'Người dùng', 'Chi nhánh', 'Vai trò', 'Trạng thái', 'Hành động'
-  ];
+  const cols =
+    Array.isArray(columns) && columns.length > 0
+      ? columns
+      : ['Người dùng', 'Chi nhánh', 'Vai trò', 'Trạng thái', 'Hành động'];
   return (
     <div className="table-skeleton-wrap">
       <div className="table-scroll">
@@ -26,7 +27,10 @@ export default function TableSkeleton({ rows = ROWS, columns }) {
                     <div className="skeleton table-skeleton__avatar" />
                     <div style={{ flex: 1 }}>
                       <div className="skeleton table-skeleton__text table-skeleton__text--md" />
-                      <div className="skeleton table-skeleton__text table-skeleton__text--sm" style={{ marginTop: 4 }} />
+                      <div
+                        className="skeleton table-skeleton__text table-skeleton__text--sm"
+                        style={{ marginTop: 4 }}
+                      />
                     </div>
                   </div>
                 </td>
@@ -36,7 +40,10 @@ export default function TableSkeleton({ rows = ROWS, columns }) {
                 </td>
                 {/* Branch */}
                 <td data-label={cols[2] || 'Col 3'}>
-                  <div className="skeleton table-skeleton__text table-skeleton__text--sm" style={{ width: '70%' }} />
+                  <div
+                    className="skeleton table-skeleton__text table-skeleton__text--sm"
+                    style={{ width: '70%' }}
+                  />
                 </td>
                 {/* Role */}
                 <td data-label={cols[3] || 'Col 4'}>
@@ -53,7 +60,10 @@ export default function TableSkeleton({ rows = ROWS, columns }) {
                 </td>
                 {/* Date */}
                 <td data-label={cols[5] || 'Col 6'}>
-                  <div className="skeleton table-skeleton__text table-skeleton__text--sm" style={{ width: '80%' }} />
+                  <div
+                    className="skeleton table-skeleton__text table-skeleton__text--sm"
+                    style={{ width: '80%' }}
+                  />
                 </td>
                 {/* Actions */}
                 <td data-label={cols[6] || 'Col 7'}>

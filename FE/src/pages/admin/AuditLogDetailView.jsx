@@ -59,9 +59,7 @@ function JsonView({ data }) {
   if (!data) return <span className="audit-detail__json-empty">—</span>;
   try {
     const obj = typeof data === 'string' ? JSON.parse(data) : data;
-    return (
-      <pre className="audit-detail__json">{JSON.stringify(obj, null, 2)}</pre>
-    );
+    return <pre className="audit-detail__json">{JSON.stringify(obj, null, 2)}</pre>;
   } catch {
     return <span className="audit-detail__json-empty">{String(data)}</span>;
   }
@@ -74,9 +72,7 @@ function formatMoneyCell(value) {
 }
 
 function SettlementItemsTable({ items }) {
-  const list = Array.isArray(items)
-    ? items
-    : (parseAuditJson(items) || []);
+  const list = Array.isArray(items) ? items : parseAuditJson(items) || [];
   if (!list.length) return <span className="audit-detail__json-empty">—</span>;
 
   return (
@@ -95,7 +91,8 @@ function SettlementItemsTable({ items }) {
         </thead>
         <tbody>
           {list.map((item, index) => {
-            const name = item?.description || item?.productName || item?.name || `Hạng mục ${index + 1}`;
+            const name =
+              item?.description || item?.productName || item?.name || `Hạng mục ${index + 1}`;
             const code = item?.code || item?.productCode || null;
             const qty = item?.qty != null ? item.qty : item?.quantity;
             const isParent = item?.isGroupParent;
@@ -123,9 +120,7 @@ function SettlementItemsTable({ items }) {
 
 function AuditSignatureBlock({ raw }) {
   if (!isAuditSignatureValue(raw)) return <span>Đã ký</span>;
-  const src = String(raw).startsWith('data:image/')
-    ? String(raw)
-    : `data:image/png;base64,${raw}`;
+  const src = String(raw).startsWith('data:image/') ? String(raw) : `data:image/png;base64,${raw}`;
   return (
     <div className="audit-detail__signature">
       <img src={src} alt="Chữ ký khách hàng" />
@@ -139,11 +134,7 @@ function AuditFieldCell({ row, className = 'diff-new' }) {
   if (kind === 'items' || kind === 'signature') {
     return <td className={className}>{row.value}</td>;
   }
-  return (
-    <td className={`${className}${kind === 'money' ? ' diff-money' : ''}`}>
-      {row.value}
-    </td>
-  );
+  return <td className={`${className}${kind === 'money' ? ' diff-money' : ''}`}>{row.value}</td>;
 }
 
 /** Bảng key-value + khối hạng mục / chữ ký full chiều ngang */
@@ -155,9 +146,7 @@ function AuditRowsView({ rows, summary }) {
 
   return (
     <div className="audit-detail__diff-table">
-      {summary ? (
-        <p className="audit-detail__diff-summary">{summary}</p>
-      ) : null}
+      {summary ? <p className="audit-detail__diff-summary">{summary}</p> : null}
 
       {simpleRows.length > 0 && (
         <table>
@@ -219,7 +208,9 @@ function DiffView({ oldValue, newValue, action }) {
         <AuditRowsView rows={summary.rows} summary={summary.summary} />
         {oldObj && (
           <details style={{ marginTop: 12 }}>
-            <summary style={{ cursor: 'pointer', color: '#64748b', fontSize: 13 }}>Xem giá trị cũ</summary>
+            <summary style={{ cursor: 'pointer', color: '#64748b', fontSize: 13 }}>
+              Xem giá trị cũ
+            </summary>
             <HumanizedDataView data={oldValue} />
           </details>
         )}
@@ -227,8 +218,8 @@ function DiffView({ oldValue, newValue, action }) {
     );
   }
 
-  const isSimpleObject = (obj) => obj && typeof obj === 'object' && !Array.isArray(obj) &&
-    Object.keys(obj).length <= 10;
+  const isSimpleObject = (obj) =>
+    obj && typeof obj === 'object' && !Array.isArray(obj) && Object.keys(obj).length <= 10;
 
   if (isSimpleObject(oldObj) && isSimpleObject(newObj)) {
     const allKeys = [...new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})])];
@@ -312,7 +303,8 @@ function isEmptyRequestBody(body) {
     try {
       const parsed = JSON.parse(t);
       if (parsed == null) return true;
-      if (typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length === 0) return true;
+      if (typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length === 0)
+        return true;
       if (Array.isArray(parsed) && parsed.length === 0) return true;
     } catch {
       return false;
@@ -326,7 +318,6 @@ function isEmptyRequestBody(body) {
   return false;
 }
 
-
 /** Nội dung chi tiết nhật ký (dùng cho trang riêng). */
 export function AuditLogDetailContent({ log }) {
   if (!log) return null;
@@ -336,18 +327,21 @@ export function AuditLogDetailContent({ log }) {
   const objectLabel = TABLE_NAME_VI[log.table_name] || log.entity_name || 'hệ thống';
   const entityCodeInfo = formatEntityCodeDisplay(log.entity_code, log.table_name, log.entity_name);
   const descMeta = { entityCode: log.entity_code, entityName: log.entity_name || objectLabel };
-  const summary = humanizeAuditDescription(log.description, log.action, log.new_value, descMeta)
-    || `${userName} đã ${String(actionLabel).toLowerCase()} trên ${String(objectLabel).toLowerCase()}.`;
+  const summary =
+    humanizeAuditDescription(log.description, log.action, log.new_value, descMeta) ||
+    `${userName} đã ${String(actionLabel).toLowerCase()} trên ${String(objectLabel).toLowerCase()}.`;
   const methodLabel = getHttpMethodLabel(log.request_method);
   const statusLabel = getResponseStatusLabel(log.response_status);
   const statusDetail = getResponseStatusDetail(log.response_status);
   const statusTone = getResponseStatusTone(log.response_status);
   const urlLabel = humanizeRequestUrl(log.request_url);
-  const showRequestBody = !isEmptyRequestBody(log.request_body)
-    && !isSameAuditPayload(log.request_body, log.new_value);
+  const showRequestBody =
+    !isEmptyRequestBody(log.request_body) && !isSameAuditPayload(log.request_body, log.new_value);
   const statusBadgeClass =
-    statusTone === 'success' ? 'badge--success'
-      : statusTone === 'danger' ? 'badge--danger'
+    statusTone === 'success'
+      ? 'badge--success'
+      : statusTone === 'danger'
+        ? 'badge--danger'
         : 'badge--secondary';
   const lifecycleSteps = getLifecycleSteps(log.new_value);
 
@@ -383,10 +377,18 @@ export function AuditLogDetailContent({ log }) {
           <label>Người thực hiện</label>
           <div className="audit-detail__value">
             <span className="audit-detail__avatar">
-              {(userName || '?').split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase()}
+              {(userName || '?')
+                .split(' ')
+                .filter(Boolean)
+                .slice(-2)
+                .map((p) => p[0])
+                .join('')
+                .toUpperCase()}
             </span>
             <strong>{userName}</strong>
-            {log.phone_number && <span className="audit-detail__phone">{formatPhoneDisplay(log.phone_number)}</span>}
+            {log.phone_number && (
+              <span className="audit-detail__phone">{formatPhoneDisplay(log.phone_number)}</span>
+            )}
           </div>
         </div>
         <div className="audit-detail__field">
@@ -420,7 +422,9 @@ export function AuditLogDetailContent({ log }) {
       <div className="audit-detail__row audit-detail__row--secondary">
         <div className="audit-detail__field">
           <label>Kết quả</label>
-          <span className={`badge ${statusBadgeClass}`} title={statusDetail}>{statusLabel}</span>
+          <span className={`badge ${statusBadgeClass}`} title={statusDetail}>
+            {statusLabel}
+          </span>
         </div>
         {log.request_method && (
           <div className="audit-detail__field">

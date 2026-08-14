@@ -77,10 +77,26 @@
   color: #475569;
 }
 
-.sec-panel__chip--critical { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
-.sec-panel__chip--high { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
-.sec-panel__chip--medium { background: #fffbeb; border-color: #fde68a; color: #b45309; }
-.sec-panel__chip--info { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+.sec-panel__chip--critical {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+.sec-panel__chip--high {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+.sec-panel__chip--medium {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+.sec-panel__chip--info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
 
 .sec-panel__toggle {
   margin-left: auto;
@@ -152,7 +168,10 @@
   color: #475569;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .sec-panel__refresh:hover {
@@ -289,10 +308,22 @@
   font-weight: 700;
   text-transform: uppercase;
 }
-.sec-panel .sec-sev--critical { background: #fee2e2; color: #b91c1c; }
-.sec-panel .sec-sev--high { background: #ffedd5; color: #c2410c; }
-.sec-panel .sec-sev--medium { background: #fef3c7; color: #b45309; }
-.sec-panel .sec-sev--info { background: #dbeafe; color: #1d4ed8; }
+.sec-panel .sec-sev--critical {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.sec-panel .sec-sev--high {
+  background: #ffedd5;
+  color: #c2410c;
+}
+.sec-panel .sec-sev--medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+.sec-panel .sec-sev--info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
 
 @media (max-width: 720px) {
   .sec-panel__toggle {

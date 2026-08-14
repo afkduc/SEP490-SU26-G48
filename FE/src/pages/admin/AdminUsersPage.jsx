@@ -4,9 +4,7 @@ import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useGlobalError } from '../../contexts/GlobalErrorContext';
 import { usePermission } from '../../contexts';
-import {
-  adminUsersApi,
-} from '../../services/adminApi';
+import { adminUsersApi } from '../../services/adminApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import {
   formatPhoneDisplay,
@@ -77,16 +75,44 @@ function UserActionMenu({ user, onView, onEdit }) {
       </button>
       {open && (
         <div className="user-action-menu__dropdown" role="menu">
-          <button type="button" onClick={() => { setOpen(false); onView(); }} role="menuitem">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onView();
+            }}
+            role="menuitem"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
             Chi tiet
           </button>
           <PermissionGate permission="admin:users:update">
-            <button type="button" onClick={() => { setOpen(false); onEdit(); }} role="menuitem">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+              role="menuitem"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
@@ -107,17 +133,10 @@ export default function AdminUsersPage() {
   const location = useLocation();
   const isInitialMount = useRef(true);
 
-  const {
-    data,
-    loading,
-    error,
-    params,
-    setParams,
-    updateParam,
-    refresh,
-  } = useAdminUsers();
+  const { data, loading, error, params, setParams, updateParam, refresh } = useAdminUsers();
 
-  const { branches, roles, branchesLoading, rolesLoading, branchesError, rolesError } = useSharedBranches();
+  const { branches, roles, branchesLoading, rolesLoading, branchesError, rolesError } =
+    useSharedBranches();
 
   const [localBranches, setLocalBranches] = useState([]);
   const [localRoles, setLocalRoles] = useState([]);
@@ -178,7 +197,7 @@ export default function AdminUsersPage() {
     if (params.page > 1) next.set('page', String(params.page));
     const qs = next.toString();
     writeCrmBrowserUrl('/admin/users', qs ? `?${qs}` : '');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.search, params.branchId, params.roleId, params.status, params.page]);
 
   useEffect(() => {
@@ -250,11 +269,20 @@ export default function AdminUsersPage() {
       <div className="admin-page__header">
         <div className="admin-page__title-block">
           <div className="admin-page__title-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
           </div>
           <div className="admin-page__title-group">
@@ -265,35 +293,56 @@ export default function AdminUsersPage() {
           </div>
         </div>
         <div className="admin-page__actions">
-            <span className="admin-page__total-badge" title="Tổng số người dùng">
-              {loading ? '...' : data.total} tài khoản
-            </span>
-            <button
-              className="btn btn--secondary admin-page__btn-icon-text"
-              onClick={handleExportExcel}
-              disabled={exporting || loading}
-              title="Xuất danh sách người dùng"
-              aria-label="Xuất Excel"
+          <span className="admin-page__total-badge" title="Tổng số người dùng">
+            {loading ? '...' : data.total} tài khoản
+          </span>
+          <button
+            className="btn btn--secondary admin-page__btn-icon-text"
+            onClick={handleExportExcel}
+            disabled={exporting || loading}
+            title="Xuất danh sách người dùng"
+            aria-label="Xuất Excel"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-              <span className="admin-page__btn-label">{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
-            </button>
-            <PermissionGate permission="admin:users:create">
-              <button
-                className="btn btn--primary admin-page__btn-icon-text"
-                onClick={() => navigate('/admin/users/new', { state: { fromListSearch: location.search } })}
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span className="admin-page__btn-label">
+              {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+            </span>
+          </button>
+          <PermissionGate permission="admin:users:create">
+            <button
+              className="btn btn--primary admin-page__btn-icon-text"
+              onClick={() =>
+                navigate('/admin/users/new', { state: { fromListSearch: location.search } })
+              }
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-                <span className="admin-page__btn-label">Tạo người dùng</span>
-              </button>
-            </PermissionGate>
-          </div>
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span className="admin-page__btn-label">Tạo người dùng</span>
+            </button>
+          </PermissionGate>
+        </div>
         {exportError && (
           <div className="admin-users__error" style={{ marginTop: 12, width: '100%' }}>
             <strong>Xuất Excel thất bại:</strong> {exportError}
@@ -313,14 +362,11 @@ export default function AdminUsersPage() {
             value={
               isPhoneLikeInput(params.search)
                 ? formatPhoneInput(params.search)
-                : (params.search || '')
+                : params.search || ''
             }
             onChange={(e) => {
               const v = e.target.value;
-              updateParam(
-                'search',
-                isPhoneLikeInput(v) ? phoneDigitsForSearch(v).slice(0, 11) : v
-              );
+              updateParam('search', isPhoneLikeInput(v) ? phoneDigitsForSearch(v).slice(0, 11) : v);
             }}
           />
 
@@ -333,10 +379,12 @@ export default function AdminUsersPage() {
             disabled={!!branchesError}
           >
             <option value="">
-              {(branchesError || branchesLoading) ? `Đang tải...` : 'Tất cả chi nhánh'}
+              {branchesError || branchesLoading ? `Đang tải...` : 'Tất cả chi nhánh'}
             </option>
             {localBranches.map((b) => (
-              <option key={b.id} value={b.id}>{b.branchName}</option>
+              <option key={b.id} value={b.id}>
+                {b.branchName}
+              </option>
             ))}
           </select>
 
@@ -347,10 +395,12 @@ export default function AdminUsersPage() {
             disabled={!!rolesError}
           >
             <option value="">
-              {(rolesError || rolesLoading) ? `Đang tải...` : 'Tất cả vai trò'}
+              {rolesError || rolesLoading ? `Đang tải...` : 'Tất cả vai trò'}
             </option>
             {localRoles.map((r) => (
-              <option key={r.id} value={r.id}>{r.roleLabel || r.roleName}</option>
+              <option key={r.id} value={r.id}>
+                {r.roleLabel || r.roleName}
+              </option>
             ))}
           </select>
 
@@ -360,13 +410,23 @@ export default function AdminUsersPage() {
             onChange={(e) => updateParam('status', e.target.value || undefined)}
           >
             {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value || 'all'} value={opt.value}>{opt.label}</option>
+              <option key={opt.value || 'all'} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
 
           <button className="btn btn--ghost filter-row__reset" onClick={resetFilters}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
             </svg>
             <span>Đặt lại</span>
           </button>
@@ -380,7 +440,9 @@ export default function AdminUsersPage() {
         </div>
 
         {loading && data.total === 0 ? (
-          <TableSkeleton columns={['Người dùng', 'Chi nhánh', 'Vai trò', 'Trạng thái', 'Hành động']} />
+          <TableSkeleton
+            columns={['Người dùng', 'Chi nhánh', 'Vai trò', 'Trạng thái', 'Hành động']}
+          />
         ) : error ? (
           <div className="admin-users__error">
             <strong>Lỗi:</strong> {error.message || 'Không thể tải danh sách'}
@@ -399,7 +461,7 @@ export default function AdminUsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(!data.items || data.items.length === 0) ? (
+                  {!data.items || data.items.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="table__empty">
                         Không có người dùng nào phù hợp với bộ lọc
@@ -440,9 +502,7 @@ export default function AdminUsersPage() {
                               Tất cả chi nhánh
                             </span>
                           ) : u.branchName ? (
-                            <span className="badge badge--branch">
-                              {u.branchName}
-                            </span>
+                            <span className="badge badge--branch">{u.branchName}</span>
                           ) : (
                             <span className="user-table__empty">—</span>
                           )}
@@ -474,11 +534,22 @@ export default function AdminUsersPage() {
                               className={`badge admin-users__toggle-badge ${
                                 u.status === 'active' ? 'badge--danger' : 'badge--success'
                               }`}
-                              title={u.status === 'active' ? 'Khóa tài khoản' : 'Kích hoạt lại tài khoản'}
-                              onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'inactive' : 'active')}
+                              title={
+                                u.status === 'active' ? 'Khóa tài khoản' : 'Kích hoạt lại tài khoản'
+                              }
+                              onClick={() =>
+                                handleToggleStatus(
+                                  u.id,
+                                  u.status === 'active' ? 'inactive' : 'active'
+                                )
+                              }
                               disabled={togglingId === u.id}
                             >
-                              {togglingId === u.id ? '...' : (u.status === 'active' ? 'Khóa' : 'Kích hoạt')}
+                              {togglingId === u.id
+                                ? '...'
+                                : u.status === 'active'
+                                  ? 'Khóa'
+                                  : 'Kích hoạt'}
                             </button>
                           </div>
                         </td>
@@ -487,11 +558,22 @@ export default function AdminUsersPage() {
                             <button
                               type="button"
                               className="btn btn--sm btn--view"
-                              onClick={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: location.search } })}
+                              onClick={() =>
+                                navigate(`/admin/users/${u.id}`, {
+                                  state: { fromListSearch: location.search },
+                                })
+                              }
                             >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
                               </svg>
                               <span>Chi tiết</span>
                             </button>
@@ -499,11 +581,22 @@ export default function AdminUsersPage() {
                               <button
                                 type="button"
                                 className="btn btn--sm btn--edit"
-                                onClick={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: location.search } })}
+                                onClick={() =>
+                                  navigate(`/admin/users/${u.id}/edit`, {
+                                    state: { fromListSearch: location.search },
+                                  })
+                                }
                               >
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                <svg
+                                  width="13"
+                                  height="13"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
                                 <span>Sửa</span>
                               </button>
@@ -511,8 +604,16 @@ export default function AdminUsersPage() {
                           </div>
                           <UserActionMenu
                             user={u}
-                            onView={() => navigate(`/admin/users/${u.id}`, { state: { fromListSearch: location.search } })}
-                            onEdit={() => navigate(`/admin/users/${u.id}/edit`, { state: { fromListSearch: location.search } })}
+                            onView={() =>
+                              navigate(`/admin/users/${u.id}`, {
+                                state: { fromListSearch: location.search },
+                              })
+                            }
+                            onEdit={() =>
+                              navigate(`/admin/users/${u.id}/edit`, {
+                                state: { fromListSearch: location.search },
+                              })
+                            }
                           />
                         </td>
                       </tr>

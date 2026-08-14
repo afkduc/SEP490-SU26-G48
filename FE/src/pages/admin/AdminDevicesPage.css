@@ -1,7 +1,12 @@
 /* ── Page wrapper ──────────────────────────────────────────────────── */
 .admin-devices {
   padding: 28px 32px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   color: #1e293b;
   display: flex;
   flex-direction: column;
@@ -101,7 +106,9 @@
   border-radius: 8px;
   background: #fff;
   overflow: hidden;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .admin-devices__search-wrap:focus-within {
@@ -197,7 +204,9 @@
   color: #475569;
   background: #fff;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   font-family: inherit;
   font-weight: 500;
   min-width: 148px;
@@ -232,7 +241,9 @@
   color: #475569;
   background: #fff;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   font-family: inherit;
   height: 36px;
   box-sizing: border-box;
@@ -311,8 +322,12 @@
   color: #334155;
 }
 
-.admin-devices__table tbody tr:last-child td { border-bottom: none; }
-.admin-devices__table tbody tr:hover td { background: #f8fafc; }
+.admin-devices__table tbody tr:last-child td {
+  border-bottom: none;
+}
+.admin-devices__table tbody tr:hover td {
+  background: #f8fafc;
+}
 .admin-devices__table tbody tr.admin-devices__row--focused td {
   background: rgba(8, 145, 178, 0.08) !important;
   box-shadow: inset 0 0 0 2px rgba(8, 145, 178, 0.55);
@@ -426,12 +441,20 @@
   color: #64748b;
 }
 
-.admin-devices__loading svg { animation: spin 1s linear infinite; }
-.admin-devices__error { color: #dc2626; }
+.admin-devices__loading svg {
+  animation: spin 1s linear infinite;
+}
+.admin-devices__error {
+  color: #dc2626;
+}
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Pagination ────────────────────────────────────────────────────── */
@@ -472,9 +495,19 @@
   transition: all 0.15s;
 }
 
-.admin-devices .pagination-btn:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
-.admin-devices .pagination-btn--active { background: #0891b2; color: #fff; border-color: #0891b2; }
-.admin-devices .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.admin-devices .pagination-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.admin-devices .pagination-btn--active {
+  background: #0891b2;
+  color: #fff;
+  border-color: #0891b2;
+}
+.admin-devices .pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 /* ── Confirm Modal ────────────────────────────────────────────── */
 .admin-devices .confirm-modal-overlay {
@@ -491,8 +524,12 @@
 }
 
 @keyframes overlayIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .admin-devices .confirm-modal {
@@ -509,8 +546,14 @@
 }
 
 @keyframes modalIn {
-  from { opacity: 0; transform: scale(0.94) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .admin-devices .confirm-modal__icon {
@@ -551,4 +594,3 @@
   gap: 10px;
   justify-content: flex-end;
 }
-

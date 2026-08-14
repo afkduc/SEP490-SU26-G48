@@ -4,359 +4,25 @@ import { useLoginSessions } from '../../hooks/admin/useLoginSessions';
 import { useLoginSessionsSSE } from '../../hooks/admin/useLoginSessionsSSE';
 import { useSharedBranches } from '../../contexts/SharedDataContext';
 import { useAuth } from '../../contexts/AppContext';
-import AdminPagination from './components/AdminPagination';
-import { formatDateSafe } from '../../utils/dateUtils';
 import { auditApi } from '../../services/auditApi';
 import { downloadBlob } from '../../utils/downloadBlob';
 import { pickLatestSession } from './securityAlertFocus';
 import { normalizeVietnamese } from '../../utils/vietnamese';
 import {
-  formatPhoneDisplay,
   formatPhoneInput,
   phoneDigitsForSearch,
   PHONE_INPUT_MAX_LENGTH,
 } from '../../utils/validation';
 import DateRangeInputs from '../../components/common/DateRangeInputs';
+import { ACTION_OPTIONS, STATUS_OPTIONS } from './components/loginSessionFormatters';
+import { IconSession, IconFilter, IconRefresh, IconTable } from './components/LoginSessionIcons';
+import {
+  StatsCards,
+  Pagination,
+  TableSkeleton,
+  SessionTable,
+} from './components/LoginSessionWidgets';
 import './LoginSessionsPage.css';
-
-const ACTION_OPTIONS = [
-  { value: '', label: 'Tất cả hành động' },
-  { value: 'LOGIN', label: 'Đăng nhập' },
-  { value: 'LOGIN_FAILED', label: 'Đăng nhập thất bại' },
-  { value: 'LOGOUT', label: 'Đăng xuất' },
-  { value: 'FORCE_LOGOUT', label: 'Buộc đăng xuất' },
-];
-
-const ACTION_CLASS = {
-  LOGIN: 'badge--success',
-  LOGIN_FAILED: 'badge--danger',
-  LOGOUT: 'badge--secondary',
-  FORCE_LOGOUT: 'badge--orange',
-};
-const ACTION_LABEL = {
-  LOGIN: 'Đăng nhập',
-  LOGIN_FAILED: 'Đăng nhập thất bại',
-  LOGOUT: 'Đăng xuất',
-  FORCE_LOGOUT: 'Buộc đăng xuất',
-};
-
-const STATUS_OPTIONS = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'active', label: 'Đang hoạt động' },
-  { value: 'ended', label: 'Đã đăng xuất' },
-  { value: 'failed', label: 'Thất bại' },
-];
-
-const STATUS_CLASS = { active: 'badge--success', ended: 'badge--secondary', failed: 'badge--danger' };
-const STATUS_LABEL = { active: 'Đang hoạt động', ended: 'Đã đăng xuất', failed: 'Thất bại' };
-
-function formatDate(value) {
-  // Su dung formatDateSafe de parse an toan va hien thi VN timezone
-  // (khop voi server tra ve UTC). Cu: khong co timeZone nen dung browser local.
-  return formatDateSafe(value, {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    locale: 'vi-VN',
-    withSeconds: true,
-  });
-}
-
-function formatDuration(seconds) {
-  if (seconds === undefined || seconds === null) return null;
-  if (seconds < 0) return null;
-  if (seconds < 60) return `${seconds} giây`;
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  const h = Math.floor(m / 60);
-  const remM = m % 60;
-  const parts = [];
-  if (h > 0) parts.push(`${h} giờ`);
-  if (remM > 0) parts.push(`${remM} phút`);
-  if (s > 0 && h === 0) parts.push(`${s} giây`);
-  return parts.join(' ') || '0 phút';
-}
-
-function liveDurationSeconds(loginTime) {
-  if (!loginTime) return null;
-  const t = new Date(loginTime).getTime();
-  if (Number.isNaN(t)) return null;
-  return Math.max(0, Math.floor((Date.now() - t) / 1000));
-}
-
-function useDurationTicker(intervalMs = 30000) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick((n) => n + 1), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-}
-
-// ─── Icons ────────────────────────────────────────────────────────────
-
-const IconSession = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-  </svg>
-);
-
-const IconFilter = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-  </svg>
-);
-
-const IconRefresh = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="1 4 1 10 7 10"/>
-    <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
-  </svg>
-);
-
-const IconUser = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
-  </svg>
-);
-
-const IconTable = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-    <line x1="3" y1="9" x2="21" y2="9"/>
-    <line x1="3" y1="15" x2="21" y2="15"/>
-    <line x1="9" y1="3" x2="9" y2="21"/>
-    <line x1="15" y1="3" x2="15" y2="21"/>
-  </svg>
-);
-
-const IconTotal = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="8" y1="6" x2="21" y2="6"/>
-    <line x1="8" y1="12" x2="21" y2="12"/>
-    <line x1="8" y1="18" x2="21" y2="18"/>
-    <line x1="3" y1="6" x2="3.01" y2="6"/>
-    <line x1="3" y1="12" x2="3.01" y2="12"/>
-    <line x1="3" y1="18" x2="3.01" y2="18"/>
-  </svg>
-);
-
-const IconLogin = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-    <polyline points="10 17 15 12 10 7"/>
-    <line x1="15" y1="12" x2="3" y2="12"/>
-  </svg>
-);
-
-const IconLogout = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-    <polyline points="16 17 21 12 16 7"/>
-    <line x1="21" y1="12" x2="9" y2="12"/>
-  </svg>
-);
-
-const IconActive = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-    <polyline points="22 4 12 14.01 9 11.01"/>
-  </svg>
-);
-
-const IconFailed = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <line x1="15" y1="9" x2="9" y2="15"/>
-    <line x1="9" y1="9" x2="15" y2="15"/>
-  </svg>
-);
-
-// ─── Stats Cards ────────────────────────────────────────────────────
-
-function StatsCards({ stats, loading }) {
-  const counts = stats || { total: 0, loginCount: 0, failedCount: 0, activeCount: 0 };
-
-  const cards = [
-    { icon: <IconTotal />, iconCls: 'stat-card__icon--gray', value: counts.total, label: 'Tổng phiên' },
-    { icon: <IconLogin />, iconCls: 'stat-card__icon--green', value: counts.loginCount, label: 'Đăng nhập thành công' },
-    { icon: <IconActive />, iconCls: 'stat-card__icon--cyan', value: counts.activeCount, label: 'Đang hoạt động' },
-    { icon: <IconFailed />, iconCls: 'stat-card__icon--red', value: counts.failedCount, label: 'Thất bại' },
-  ];
-
-  return (
-    <div className="admin-sessions__stats">
-      {cards.map((c, i) => (
-        <div key={i} className="stat-card">
-          <div className={`stat-card__icon ${c.iconCls}`}>{c.icon}</div>
-          <div className="stat-card__content">
-            <span className="stat-card__value">
-              {loading ? '—' : c.value}
-            </span>
-            <span className="stat-card__label">{c.label}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Pagination ────────────────────────────────────────────────────
-
-function Pagination({ currentPage, totalPages, total, onChange, loading }) {
-  return (
-    <AdminPagination
-      currentPage={currentPage}
-      totalPages={totalPages}
-      total={total}
-      onChange={onChange}
-      loading={loading}
-      accent="cyan"
-    />
-  );
-}
-
-// ─── Table Skeleton ────────────────────────────────────────────────
-
-const SESSION_COLS = (
-  <colgroup>
-    <col style={{ width: '20%' }} />
-    <col style={{ width: '20%' }} />
-    <col style={{ width: '20%' }} />
-    <col style={{ width: '20%' }} />
-    <col style={{ width: '20%' }} />
-  </colgroup>
-);
-
-function TableSkeleton({ rows }) {
-  return (
-    <table className="table admin-sessions__table">
-      {SESSION_COLS}
-      <thead>
-        <tr>
-          <th>Thời gian</th>
-          <th>Người dùng</th>
-          <th>Sự kiện</th>
-          <th>Thời lượng</th>
-          <th>Thao tác</th>
-        </tr>
-      </thead>
-      <tbody>
-        {Array.from({ length: rows }).map((_, i) => (
-          <tr key={i}>
-            {[...Array(5)].map((__, j) => (
-              <td key={j}>
-                <div className="skeleton-line" style={{ width: `${50 + ((i * 7 + j * 13) % 40)}%` }} />
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-// ─── Session Table ─────────────────────────────────────────────────
-
-function SessionTable({ items, onViewSession, focusedSessionId = null }) {
-  useDurationTicker(30000);
-
-  const head = (
-    <thead>
-      <tr>
-        <th>Thời gian</th>
-        <th>Người dùng</th>
-        <th>Sự kiện</th>
-        <th>Thời lượng</th>
-        <th>Thao tác</th>
-      </tr>
-    </thead>
-  );
-
-  if (!items || items.length === 0) {
-    return (
-      <table className="table admin-sessions__table">
-        {SESSION_COLS}
-        {head}
-        <tbody>
-          <tr>
-            <td colSpan={5} className="table__empty">
-              Không có lịch sử đăng nhập nào phù hợp với bộ lọc
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    );
-  }
-
-  return (
-    <table className="table admin-sessions__table">
-      {SESSION_COLS}
-      {head}
-      <tbody>
-        {items.map((item) => (
-          <tr
-            key={item.id}
-            id={`admin-session-row-${item.id}`}
-            className={Number(focusedSessionId) === Number(item.id) ? 'admin-sessions__row--focused' : ''}
-          >
-            <td>
-              <span className="admin-sessions__date">{formatDate(item.login_time)}</span>
-            </td>
-            <td>
-              <div className="admin-sessions__user-cell">
-                <span className="admin-sessions__user-name">{item.user_name || '—'}</span>
-                <span className="admin-sessions__phone">{item.phone_number ? formatPhoneDisplay(item.phone_number) : '—'}</span>
-              </div>
-            </td>
-            <td>
-              <div className="admin-sessions__event-cell">
-                {item.action_type ? (
-                  <span className={`badge ${ACTION_CLASS[item.action_type] || 'badge--secondary'}`}>
-                    {ACTION_LABEL[item.action_type] || item.action_type}
-                  </span>
-                ) : (
-                  <span className="badge badge--secondary">—</span>
-                )}
-                {item.status ? (
-                  <span className={`badge ${STATUS_CLASS[item.status] || 'badge--secondary'}`}>
-                    {STATUS_LABEL[item.status] || item.status}
-                  </span>
-                ) : null}
-              </div>
-            </td>
-            <td>
-              <span className="admin-sessions__duration">
-                {item.status === 'active' ? (
-                  <span style={{ color: '#0891b2', fontWeight: 600 }}>
-                    {formatDuration(liveDurationSeconds(item.login_time)) || '—'}
-                  </span>
-                ) : (
-                  formatDuration(item.session_duration_seconds) || '—'
-                )}
-              </span>
-            </td>
-            <td>
-              <div className="admin-sessions__row-actions">
-                <button
-                  type="button"
-                  className="admin-sessions__action-btn admin-sessions__action-btn--primary"
-                  onClick={() => onViewSession?.(item)}
-                  title="Xem chi tiết phiên"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                  <span className="admin-sessions__action-label">Chi tiết</span>
-                </button>
-              </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
 
 // ─── Main Component ──────────────────────────────────────────────────
 
@@ -401,15 +67,18 @@ export default function AdminLoginSessionsPage({
     loginTime: '',
   });
 
-  const openSessionDetail = useCallback((item) => {
-    if (!item?.id) return;
-    navigate(`/admin/login-sessions/${item.id}`, {
-      state: {
-        session: item,
-        fromListSearch: location.search || '?tab=sessions',
-      },
-    });
-  }, [navigate, location.search]);
+  const openSessionDetail = useCallback(
+    (item) => {
+      if (!item?.id) return;
+      navigate(`/admin/login-sessions/${item.id}`, {
+        state: {
+          session: item,
+          fromListSearch: location.search || '?tab=sessions',
+        },
+      });
+    },
+    [navigate, location.search]
+  );
 
   // Seed từ panel cảnh báo ("Lịch sử") — khi đổi cảnh báo trong lúc tab đang mở
   useEffect(() => {
@@ -445,8 +114,8 @@ export default function AdminLoginSessionsPage({
 
     const payload = focusPayloadRef.current;
     const seeded = Boolean(
-      seedKey
-      && (seedUserName || seedIpAddress || seedFocusIp || seedFocusSessionId || seedSessionId)
+      seedKey &&
+      (seedUserName || seedIpAddress || seedFocusIp || seedFocusSessionId || seedSessionId)
     );
     const hasFocus = seeded || String(payload.ip || '').trim();
     if (!hasFocus) {
@@ -470,7 +139,16 @@ export default function AdminLoginSessionsPage({
       });
     });
     focusScrollPendingRef.current = false;
-  }, [sessions.data?.items, sessions.loading, seedKey, seedUserName, seedIpAddress, seedFocusIp, seedFocusSessionId, seedSessionId]);
+  }, [
+    sessions.data?.items,
+    sessions.loading,
+    seedKey,
+    seedUserName,
+    seedIpAddress,
+    seedFocusIp,
+    seedFocusSessionId,
+    seedSessionId,
+  ]);
 
   // Debounce refetch SSE - gom nhieu event thanh 1 lan refetch
   // (tranh nhap nhay khi user click nhieu action cung luc)
@@ -509,31 +187,40 @@ export default function AdminLoginSessionsPage({
 
     if (filterUserName) {
       const haystack = normalizeVietnamese(
-        [sessionUserName, eventData?.email, eventData?.userName]
-          .filter(Boolean)
-          .join(' ')
+        [sessionUserName, eventData?.email, eventData?.userName].filter(Boolean).join(' ')
       );
       if (!haystack.includes(filterUserName)) {
         return; // Khong match filter userName -> bo qua
       }
     }
     if (filterPhoneDigits) {
-      const eventPhoneDigits = String(
-        eventData?.phone || eventData?.phoneNumber || ''
-      ).replace(/\D/g, '');
+      const eventPhoneDigits = String(eventData?.phone || eventData?.phoneNumber || '').replace(
+        /\D/g,
+        ''
+      );
       if (!eventPhoneDigits.includes(filterPhoneDigits)) {
         return;
       }
     }
     if (filterActionType && eventType) {
-      const actionMap = { login: 'LOGIN', logout: 'LOGOUT', force: 'FORCE_LOGOUT', login_failed: 'LOGIN_FAILED' };
+      const actionMap = {
+        login: 'LOGIN',
+        logout: 'LOGOUT',
+        force: 'FORCE_LOGOUT',
+        login_failed: 'LOGIN_FAILED',
+      };
       const expectedAction = actionMap[eventType] || eventType.toUpperCase();
       if (filterActionType !== expectedAction && filterActionType !== eventType) {
         return; // Khong match action filter
       }
     }
     if (filterStatus) {
-      const statusByEvent = { login: 'active', logout: 'ended', force: 'ended', login_failed: 'failed' };
+      const statusByEvent = {
+        login: 'active',
+        logout: 'ended',
+        force: 'ended',
+        login_failed: 'failed',
+      };
       const eventStatus = statusByEvent[eventType];
       if (eventStatus && filterStatus !== eventStatus) return;
     }
@@ -614,13 +301,18 @@ export default function AdminLoginSessionsPage({
 
   const { connected } = useLoginSessionsSSE(handleSessionEvent, realtimeEnabled, token);
 
-  const sessionTotalPages = sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
-  const hasFilters = sessions.params.userName || sessions.params.phone ||
-    sessions.params.actionType || sessions.params.status ||
-    sessions.params.startDate || sessions.params.endDate ||
+  const sessionTotalPages =
+    sessions.data.total > 0 ? Math.ceil(sessions.data.total / (sessions.data.pageSize || 10)) : 1;
+  const hasFilters =
+    sessions.params.userName ||
+    sessions.params.phone ||
+    sessions.params.actionType ||
+    sessions.params.status ||
+    sessions.params.startDate ||
+    sessions.params.endDate ||
     sessions.params.ipAddress ||
     sessions.params.sessionId ||
-    (sessions.params.branchId != null);
+    sessions.params.branchId != null;
 
   function resetFilters() {
     // Xóa mọi điều kiện lọc + sessionId seed → trả về full danh sách
@@ -642,8 +334,20 @@ export default function AdminLoginSessionsPage({
   }
 
   const headerActions = (
-    <div className="admin-page__header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
+    <div
+      className="admin-page__header-actions"
+      style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+    >
+      <label
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: '0.8rem',
+          color: '#475569',
+          cursor: 'pointer',
+        }}
+      >
         <input
           type="checkbox"
           checked={realtimeEnabled}
@@ -678,26 +382,32 @@ export default function AdminLoginSessionsPage({
       {!embedded && (
         <div className="admin-page__header">
           <div className="admin-page__title-block">
-            <div className="admin-page__title-icon" style={{ background: 'linear-gradient(135deg, #0891b2, #06b6d4)', boxShadow: '0 6px 20px rgba(8, 145, 178, 0.35)' }}>
+            <div
+              className="admin-page__title-icon"
+              style={{
+                background: 'linear-gradient(135deg, #0891b2, #06b6d4)',
+                boxShadow: '0 6px 20px rgba(8, 145, 178, 0.35)',
+              }}
+            >
               <IconSession />
             </div>
             <div className="admin-page__title-group">
               <h1>Lịch sử đăng nhập</h1>
-              <p className="admin-page__subtitle">Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống</p>
+              <p className="admin-page__subtitle">
+                Theo dõi tất cả lượt đăng nhập và đăng xuất trên hệ thống
+              </p>
             </div>
           </div>
           {headerActions}
         </div>
       )}
 
-      {embedded && (
-        <div className="admin-hub__toolbar">
-          {headerActions}
-        </div>
-      )}
+      {embedded && <div className="admin-hub__toolbar">{headerActions}</div>}
 
       {exportError && (
-        <div className="admin-page__error" style={{ marginBottom: 12 }}>{exportError}</div>
+        <div className="admin-page__error" style={{ marginBottom: 12 }}>
+          {exportError}
+        </div>
       )}
 
       {/* Stats Cards */}
@@ -745,7 +455,9 @@ export default function AdminLoginSessionsPage({
               placeholder="0123-456-789"
               maxLength={PHONE_INPUT_MAX_LENGTH}
               value={formatPhoneInput(sessions.params.phone || '')}
-              onChange={(e) => sessions.updateParam('phone', phoneDigitsForSearch(e.target.value).slice(0, 11))}
+              onChange={(e) =>
+                sessions.updateParam('phone', phoneDigitsForSearch(e.target.value).slice(0, 11))
+              }
             />
           </div>
 
@@ -757,7 +469,9 @@ export default function AdminLoginSessionsPage({
               onChange={(e) => sessions.updateParam('actionType', e.target.value)}
             >
               {ACTION_OPTIONS.map((o) => (
-                <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+                <option key={o.value || 'all'} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </div>
@@ -770,7 +484,9 @@ export default function AdminLoginSessionsPage({
               onChange={(e) => sessions.updateParam('status', e.target.value)}
             >
               {STATUS_OPTIONS.map((o) => (
-                <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+                <option key={o.value || 'all'} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </div>
@@ -780,14 +496,21 @@ export default function AdminLoginSessionsPage({
             <select
               className="filter-field__select"
               value={sessions.params.branchId ?? ''}
-              onChange={(e) => sessions.updateParam('branchId', e.target.value ? Number(e.target.value) : undefined)}
+              onChange={(e) =>
+                sessions.updateParam(
+                  'branchId',
+                  e.target.value ? Number(e.target.value) : undefined
+                )
+              }
               disabled={!!branchesError}
             >
               <option value="">
                 {branchesError ? `Lỗi: ${branchesError}` : 'Tất cả chi nhánh'}
               </option>
               {branches.map((b) => (
-                <option key={b.id} value={b.id}>{b.branchName}</option>
+                <option key={b.id} value={b.id}>
+                  {b.branchName}
+                </option>
               ))}
             </select>
           </div>
@@ -817,7 +540,9 @@ export default function AdminLoginSessionsPage({
             {sessions.loading ? (
               <>Đang lọc...</>
             ) : (
-              <>Tìm thấy <strong>{sessions.data.total}</strong> phiên đăng nhập</>
+              <>
+                Tìm thấy <strong>{sessions.data.total}</strong> phiên đăng nhập
+              </>
             )}
           </div>
           <div className="admin-sessions__filter-btns">

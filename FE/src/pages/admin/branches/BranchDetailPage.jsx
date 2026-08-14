@@ -48,14 +48,17 @@ export default function BranchDetailPage() {
 
   useEffect(() => {
     load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function handleDeactivate() {
     if (!branch) return;
-    if (!window.confirm(
-      `Ngưng hoạt động chi nhánh "${branch.branchName}"? Nhân viên tại chi nhánh sẽ không thể đăng nhập. (Không xóa cứng.)`
-    )) return;
+    if (
+      !window.confirm(
+        `Ngưng hoạt động chi nhánh "${branch.branchName}"? Nhân viên tại chi nhánh sẽ không thể đăng nhập. (Không xóa cứng.)`
+      )
+    )
+      return;
     setActionLoading(true);
     try {
       await adminBranchesApi.deactivate(branch.id);
@@ -108,7 +111,11 @@ export default function BranchDetailPage() {
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={() => navigate(`/admin/catalog/branches/${branch.id}/edit`, { state: { fromListSearch: listSearch } })}
+                onClick={() =>
+                  navigate(`/admin/catalog/branches/${branch.id}/edit`, {
+                    state: { fromListSearch: listSearch },
+                  })
+                }
               >
                 Sửa
               </button>
@@ -146,7 +153,9 @@ export default function BranchDetailPage() {
           <div className="branch-page__state branch-page__state--error">
             {error}
             <div style={{ marginTop: 12 }}>
-              <Link to={`/admin/catalog${listSearch}`} className="btn btn--ghost">Về danh mục</Link>
+              <Link to={`/admin/catalog${listSearch}`} className="btn btn--ghost">
+                Về danh mục
+              </Link>
             </div>
           </div>
         )}
@@ -155,14 +164,22 @@ export default function BranchDetailPage() {
             <div className="branch-detail__head">
               <span className="branch-card__code">{branch.branchCode}</span>
               <h2 className="branch-detail__name">{branch.branchName}</h2>
-              <span className={`branch-card__status-badge branch-card__status-badge--${branch.isActive ? 'active' : 'inactive'}`}>
+              <span
+                className={`branch-card__status-badge branch-card__status-badge--${branch.isActive ? 'active' : 'inactive'}`}
+              >
                 {branch.isActive ? 'Hoạt động' : 'Dừng hoạt động'}
               </span>
             </div>
 
             <dl className="branch-detail__list">
-              <div><dt>Địa chỉ</dt><dd>{branch.address || '—'}</dd></div>
-              <div><dt>Điện thoại</dt><dd>{branch.phone ? formatPhoneDisplay(branch.phone) : '—'}</dd></div>
+              <div>
+                <dt>Địa chỉ</dt>
+                <dd>{branch.address || '—'}</dd>
+              </div>
+              <div>
+                <dt>Điện thoại</dt>
+                <dd>{branch.phone ? formatPhoneDisplay(branch.phone) : '—'}</dd>
+              </div>
               <div>
                 <dt>Email</dt>
                 <dd>
@@ -175,7 +192,10 @@ export default function BranchDetailPage() {
                   })()}
                 </dd>
               </div>
-              <div><dt>Quản lý</dt><dd>{branch.managerName || 'Chưa có quản lý'}</dd></div>
+              <div>
+                <dt>Quản lý</dt>
+                <dd>{branch.managerName || 'Chưa có quản lý'}</dd>
+              </div>
             </dl>
 
             <h3 className="branch-detail__stats-title">Thống kê nhanh</h3>
@@ -191,12 +211,15 @@ export default function BranchDetailPage() {
                     <span className="branch-stat-card__label">Đơn hàng</span>
                   </div>
                   <div className="branch-stat-card">
-                    <span className="branch-stat-card__value">{formatCurrency(stats.revenue30Days)}</span>
+                    <span className="branch-stat-card__value">
+                      {formatCurrency(stats.revenue30Days)}
+                    </span>
                     <span className="branch-stat-card__label">Doanh thu 30 ngày</span>
                   </div>
                 </div>
                 <p className="form-hint">
-                  * Doanh thu theo tổng đơn hoàn thành trong 30 ngày gần nhất (thông tin phụ — tổng quan Admin chính là IAM/bảo mật).
+                  * Doanh thu theo tổng đơn hoàn thành trong 30 ngày gần nhất (thông tin phụ — tổng
+                  quan Admin chính là IAM/bảo mật).
                 </p>
               </>
             ) : (

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../../config';
-import { LOGOUT_KEY, consumeSkipNextPermissionChange } from '../../services/httpClient';
+import { LOGOUT_KEY } from '../../services/httpClient';
 import { mergeAuthRefreshUser } from '../../utils/profileSession';
 
 const SSE_RECONNECT_DELAY_MS = 5000;
@@ -12,7 +12,7 @@ const REFRESH_COOLDOWN_MS = 1500;
 /**
  * Hook SSE lang nghe permission-changed events tu server.
  *
- * Flow khi admin thay doi ma tran quyen:
+ * Flow khi admin gan/thu hoi role (permission-changed):
  *   1. BE emit 'permission-changed' qua /api/sse/permissions (filter theo userId)
  *   2. Hook nhan event -> goi POST /api/auth/refresh-permissions (BE re-issue JWT)
  *   3. Nhan token moi + user moi -> luu vao storage + cap nhat React state
@@ -29,7 +29,11 @@ const REFRESH_COOLDOWN_MS = 1500;
  *   dung de hien toast "Quyen cua ban vua duoc cap nhat"). Mac dinh: chi silent refresh.
  * @returns {{ connected: boolean, refreshing: boolean, lastRefreshAt: number|null, error: string|null }}
  */
-export function usePermissionEventsSSE({ enabled = true, token = null, onPermissionChanged = null } = {}) {
+export function usePermissionEventsSSE({
+  enabled = true,
+  token = null,
+  onPermissionChanged = null,
+} = {}) {
   const [connected, setConnected] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState(null);
@@ -75,7 +79,7 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
 
     // Chong loop: neu co refresh khac dang chay, hoac refresh gan day
     // (trong REFRESH_COOLDOWN_MS), bo qua. Day fix tinh trang BE broadcast
-    // lien tuc nhieu event (VD: admin luu matrix -> trigger 1 refresh ->
+    // lien tuc nhieu event (VD: gan/thu hoi role -> trigger 1 refresh ->
     // refresh xong set state -> ProtectedRoute re-mount -> ...).
     if (refreshInFlightRef.current) {
       return;
@@ -131,7 +135,9 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
       // Ưu tiên effectivePermissions (full L2); fallback user.permissions (BE đã gắn full khi refresh).
       const newPermissions = Array.isArray(payload?.effectivePermissions)
         ? payload.effectivePermissions
-        : (Array.isArray(newUser.permissions) ? newUser.permissions : []);
+        : Array.isArray(newUser.permissions)
+          ? newUser.permissions
+          : [];
 
       // Xac dinh storage (local hay session) dua vao token hien tai
       const inLocal = localStorage.getItem('token');
@@ -168,11 +174,13 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
       // chi fire cross-tab). AppContext cung co BroadcastChannel listener,
       // nhung mot so component khac co the chi nghe storage event.
       try {
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: 'user',
-          newValue: JSON.stringify(mergedUser),
-          storageArea: storage,
-        }));
+        window.dispatchEvent(
+          new StorageEvent('storage', {
+            key: 'user',
+            newValue: JSON.stringify(mergedUser),
+            storageArea: storage,
+          })
+        );
       } catch {
         /* ignore (browser cu khong ho tro) */
       }
@@ -211,7 +219,11 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
         reconnectTimerRef.current = null;
       }
       if (eventSourceRef.current) {
-        try { eventSourceRef.current.close(); } catch { /* ignore */ }
+        try {
+          eventSourceRef.current.close();
+        } catch {
+          /* ignore */
+        }
         eventSourceRef.current = null;
       }
       setConnected(false);
@@ -231,9 +243,7 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
         eventSourceRef.current = null;
       }
 
-      const qs = tokenRef.current
-        ? `?token=${encodeURIComponent(tokenRef.current)}`
-        : '';
+      const qs = tokenRef.current ? `?token=${encodeURIComponent(tokenRef.current)}` : '';
       const url = `${API_BASE_URL}/sse/permissions${qs}`;
 
       try {
@@ -258,13 +268,6 @@ export function usePermissionEventsSSE({ enabled = true, token = null, onPermiss
               onEventRef.current && onEventRef.current(data);
             } catch (cbErr) {
               console.warn('[usePermissionEventsSSE] onPermissionChanged threw:', cbErr);
-            }
-            // Neu chinh admin vua SELF_LU matrix (co skip flag), KHONG
-            // refresh permissions: admin da biet permission moi va state
-            // FE da duoc cap nhat qua response API. Refresh chi gay them
-            // 1 round-trip + co the 403 neu token cu dang in-flight.
-            if (consumeSkipNextPermissionChange()) {
-              return;
             }
             // Refresh permission ngay (co cooldown/in-flight check ben trong).
             refreshPermissions();

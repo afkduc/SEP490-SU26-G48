@@ -1,8 +1,12 @@
 /* ── Table Skeleton Loading ─────────────────────────────────────── */
 
 @keyframes shimmer {
-  0% { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
 }
 
 .skeleton {
@@ -51,9 +55,18 @@
   border-radius: 6px;
 }
 
-.table-skeleton__text--sm { height: 10px; width: 60%; }
-.table-skeleton__text--md { height: 12px; width: 80%; }
-.table-skeleton__text--lg { height: 14px; width: 90%; }
+.table-skeleton__text--sm {
+  height: 10px;
+  width: 60%;
+}
+.table-skeleton__text--md {
+  height: 12px;
+  width: 80%;
+}
+.table-skeleton__text--lg {
+  height: 14px;
+  width: 90%;
+}
 
 /* Badge skeleton */
 .table-skeleton__badge {
