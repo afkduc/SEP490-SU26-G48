@@ -657,7 +657,7 @@ class ManagerService {
       phone: phoneTrimmed,
       status: payload.status || existing.status,
       teamLeaderId: Number(payload.teamLeaderId),
-      specialtyIds,
+      specialtyIds: specialtyIds === undefined ? [] : specialtyIds,
     });
   }
 

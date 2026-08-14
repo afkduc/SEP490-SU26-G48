@@ -133,7 +133,7 @@ function mapSettlementRow(row) {
 
 function mapTechnicianRow(row) {
   return {
-    id: row.id,
+    id: Number(row.id),
     employeeId: row.pseudo_id || String(row.id),
     fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
     email: row.email,
@@ -143,9 +143,9 @@ function mapTechnicianRow(row) {
     notes: row.notes,
     createdAt: normalizeDate(row.created_at),
     branch: row.branch_id
-      ? { id: row.branch_id, code: row.branch_code, name: row.branch_name }
+      ? { id: Number(row.branch_id), code: row.branch_code, name: row.branch_name }
       : null,
-    teamLeaderId: row.team_leader_id,
+    teamLeaderId: row.team_leader_id != null ? Number(row.team_leader_id) : null,
     teamLeaderName: row.team_leader_name || null,
     specialties: [],
   };
@@ -890,7 +890,11 @@ class ManagerRepositoryImpl {
 
   async listSpecialties() {
     const result = await query('SELECT id, specialty_code, specialty_name FROM specialties ORDER BY specialty_name ASC');
-    return result.recordset.map((row) => ({ id: row.id, code: row.specialty_code, name: row.specialty_name }));
+    return result.recordset.map((row) => ({
+      id: Number(row.id),
+      code: row.specialty_code,
+      name: row.specialty_name,
+    }));
   }
 
   async listTeamLeaderOptions(branchId) {
@@ -926,8 +930,15 @@ class ManagerRepositoryImpl {
 
     const map = new Map();
     result.recordset.forEach((row) => {
-      if (!map.has(row.user_id)) map.set(row.user_id, []);
-      map.get(row.user_id).push({ id: row.id, code: row.specialty_code, name: row.specialty_name });
+      // SQL Server BIGINT co the tra ve string — luon Number de get(t.id) khong miss.
+      const userId = Number(row.user_id);
+      if (!Number.isFinite(userId)) return;
+      if (!map.has(userId)) map.set(userId, []);
+      map.get(userId).push({
+        id: Number(row.id),
+        code: row.specialty_code,
+        name: row.specialty_name,
+      });
     });
     return map;
   }
@@ -981,7 +992,7 @@ class ManagerRepositoryImpl {
 
     const technicians = result.recordset.map(mapTechnicianRow);
     const specialtiesByUser = await this._fetchSpecialtiesByUserIds(technicians.map((t) => t.id));
-    technicians.forEach((t) => { t.specialties = specialtiesByUser.get(t.id) || []; });
+    technicians.forEach((t) => { t.specialties = specialtiesByUser.get(Number(t.id)) || []; });
     return technicians;
   }
 
@@ -1007,7 +1018,7 @@ class ManagerRepositoryImpl {
 
     const technician = mapTechnicianRow(row);
     const specialtiesByUser = await this._fetchSpecialtiesByUserIds([technician.id]);
-    technician.specialties = specialtiesByUser.get(technician.id) || [];
+    technician.specialties = specialtiesByUser.get(Number(technician.id)) || [];
     return technician;
   }
 

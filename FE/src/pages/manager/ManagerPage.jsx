@@ -603,11 +603,14 @@ function EmployeeFormPage({ mode }) {
   };
 
   const toggleSpecialty = (specialtyId) => {
+    const sid = Number(specialtyId);
     setForm((prev) => {
-      const exists = prev.specialtyIds.includes(specialtyId);
+      const exists = prev.specialtyIds.some((id) => Number(id) === sid);
       return {
         ...prev,
-        specialtyIds: exists ? prev.specialtyIds.filter((sid) => sid !== specialtyId) : [...prev.specialtyIds, specialtyId],
+        specialtyIds: exists
+          ? prev.specialtyIds.filter((id) => Number(id) !== sid)
+          : [...prev.specialtyIds.map(Number), sid],
       };
     });
   };
@@ -838,7 +841,7 @@ function EmployeeFormPage({ mode }) {
                       key={s.id}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, cursor: 'pointer' }}
                     >
-                      <input type="checkbox" checked={form.specialtyIds.includes(s.id)} onChange={() => toggleSpecialty(s.id)} />
+                      <input type="checkbox" checked={form.specialtyIds.some((id) => Number(id) === Number(s.id))} onChange={() => toggleSpecialty(s.id)} />
                       <span>{s.name}</span>
                     </label>
                   ))}
@@ -2624,7 +2627,7 @@ function TechnicianFormPage({ mode }) {
             status: data.status || 'active',
             password: '',
             confirmPassword: '',
-            specialtyIds: (data.specialties || []).map((s) => s.id),
+            specialtyIds: (data.specialties || []).map((s) => Number(s.id)),
           });
         })
         .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin thợ máy'); })
@@ -2641,11 +2644,14 @@ function TechnicianFormPage({ mode }) {
   };
 
   const toggleSpecialty = (specialtyId) => {
+    const sid = Number(specialtyId);
     setForm((prev) => {
-      const exists = prev.specialtyIds.includes(specialtyId);
+      const exists = prev.specialtyIds.some((id) => Number(id) === sid);
       return {
         ...prev,
-        specialtyIds: exists ? prev.specialtyIds.filter((sid) => sid !== specialtyId) : [...prev.specialtyIds, specialtyId],
+        specialtyIds: exists
+          ? prev.specialtyIds.filter((id) => Number(id) !== sid)
+          : [...prev.specialtyIds.map(Number), sid],
       };
     });
   };
@@ -2680,7 +2686,7 @@ function TechnicianFormPage({ mode }) {
         phone: phoneDigitsOnly(form.phone),
         teamLeaderId: Number(form.teamLeaderId),
         status: form.status,
-        specialtyIds: form.specialtyIds,
+        specialtyIds: form.specialtyIds.map(Number).filter((n) => Number.isInteger(n) && n > 0),
       };
 
       if (isEdit) {
@@ -2793,7 +2799,7 @@ function TechnicianFormPage({ mode }) {
                     key={s.id}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, cursor: 'pointer' }}
                   >
-                    <input type="checkbox" checked={form.specialtyIds.includes(s.id)} onChange={() => toggleSpecialty(s.id)} />
+                    <input type="checkbox" checked={form.specialtyIds.some((id) => Number(id) === Number(s.id))} onChange={() => toggleSpecialty(s.id)} />
                     <span>{s.name}</span>
                   </label>
                 ))}
