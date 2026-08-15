@@ -19,6 +19,8 @@ class RepairOrder {
     this.createdBy = data.createdBy ?? null;
     this.createdByName = data.createdByName ?? null;
     this.advisorId = data.advisorId ?? null; // co van dich vu cua phieu quyet toan goc (service_orders.advisor_id)
+    this.advisorName = data.advisorName ?? null;
+    this.intakeChecklist = data.intakeChecklist ?? null; // "Tiep nhan va ban giao xe" - so.intake_checklist
     this.status = data.status ?? 'inprogress';
     this.notes = data.notes ?? null;
     this.createdAt = data.createdAt ?? null;
@@ -48,6 +50,8 @@ class RepairOrder {
       createdBy: headerRow.created_by,
       createdByName: headerRow.created_by_name,
       advisorId: headerRow.advisor_id,
+      advisorName: headerRow.advisor_name,
+      intakeChecklist: headerRow.intake_checklist ? JSON.parse(headerRow.intake_checklist) : null,
       status: headerRow.status,
       notes: headerRow.notes,
       createdAt: headerRow.created_at,

@@ -17,6 +17,7 @@ import {
   searchTechniciansApi,
   setRepairOrderTechniciansApi,
 } from '../../services/repairOrderApi';
+import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
 import './TeamLeaderDashboard.css';
 
 const POLL_INTERVAL_MS = 15000;
@@ -89,24 +90,15 @@ function TaskNameLabel({ t }) {
   );
 }
 
-// Sau khi chon khoang (da claim() thanh cong o BE - khong the huy giua
-// chung), bat buoc phai gan xong tho moi duoc dong modal - khop voi viec
-// man hinh khoang xe cong khai (BayScreen.jsx) tu nay chi con hien
-// ActiveJobPanel, khong con TechnicianPickerModal rieng nua.
-function ClaimModal({ settlement, bays, onClose, onDone }) {
-  const [step, setStep] = useState('bay'); // 'bay' | 'technicians'
-  const [selectedBay, setSelectedBay] = useState(null);
-  const [claimedOrder, setClaimedOrder] = useState(null);
-  const [claiming, setClaiming] = useState(false);
-  const [error, setError] = useState('');
-
+// Chon (nhieu) tho cho 1 lenh sua chua - tach rieng khoi ClaimModal de dung
+// chung duoc voi AssignTechniciansModal (gan BO SUNG tho cho 1 khoang DA
+// claim() tu truoc nhung dang khong co tho nao, xem comment o do).
+function TechnicianPicker({ selectedTechs, setSelectedTechs }) {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
-  const [selectedTechs, setSelectedTechs] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (step !== 'technicians' || !query.trim()) { setSuggestions([]); return undefined; }
+    if (!query.trim()) { setSuggestions([]); return undefined; }
     let alive = true;
     const timer = setTimeout(() => {
       searchTechniciansApi(query.trim())
@@ -119,7 +111,93 @@ function ClaimModal({ settlement, bays, onClose, onDone }) {
     }, 300);
     return () => { alive = false; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedTechs, step]);
+  }, [query, selectedTechs]);
+
+  const addTechnician = (tech) => {
+    if (tech.busy) return;
+    setSelectedTechs((prev) => (prev.some((t) => t.id === tech.id) ? prev : [...prev, tech]));
+    setQuery('');
+    setSuggestions([]);
+  };
+
+  const removeTechnician = (techId) => {
+    setSelectedTechs((prev) => prev.filter((t) => t.id !== techId));
+  };
+
+  return (
+    <>
+      {selectedTechs.length > 0 && (
+        <div className="tld-tech-chips">
+          {selectedTechs.map((t) => (
+            <span key={t.id} className="tld-tech-chip">
+              <b>{t.fullName}</b>
+              {t.phone && <span className="tld-tech-chip__phone"> · {t.phone}</span>}
+              {!t.sameTeam && <span className="tld-tech-chip__other-team"> (Tổ khác - điều động)</span>}
+              <button type="button" className="tld-tech-chip__remove" onClick={() => removeTechnician(t.id)}>✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={{ position: 'relative' }}>
+        <input
+          autoFocus
+          className="form-input"
+          placeholder="Gõ tên thợ máy để thêm…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {suggestions.length > 0 && (
+          <div className="tld-tech-suggestions">
+            {suggestions.map((t) => (
+              <div
+                key={t.id}
+                className={`tld-tech-suggestions__item ${t.busy ? 'tld-tech-suggestions__item--busy' : ''}`}
+                onMouseDown={() => addTechnician(t)}
+              >
+                <b>{t.fullName}</b>
+                {t.phone && <span className="tld-tech-suggestions__phone"> — {t.phone}</span>}
+                {!t.sameTeam && <span className="tld-tech-suggestions__other-team"> (Tổ khác - điều động)</span>}
+                {t.busy && <span className="tld-tech-suggestions__busy"> (Đang bận lệnh khác)</span>}
+              </div>
+            ))}
+          </div>
+        )}
+        {query.trim() && suggestions.length === 0 && (
+          <div className="form-hint">Không tìm thấy thợ nào khớp tên.</div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// Sau khi chon khoang (da claim() thanh cong o BE - khong the huy giua
+// chung), bat buoc phai gan xong tho moi duoc dong modal - khop voi viec
+// man hinh khoang xe cong khai (BayScreen.jsx) tu nay chi con hien
+// ActiveJobPanel, khong con TechnicianPickerModal rieng nua. Neu to truong
+// dong tab/F5 giua chung o buoc nay (da claim() nhung chua gan tho), lenh se
+// "ket" o Khoang xe cua toi voi 0 tho - xem AssignTechniciansModal ben duoi
+// de go ket tiep sau, khong bi mat luon kha nang gan tho.
+function ClaimModal({ settlement, bays, onClose, onDone }) {
+  const [step, setStep] = useState('bay'); // 'bay' | 'technicians'
+  const [selectedBay, setSelectedBay] = useState(null);
+  const [claimedOrder, setClaimedOrder] = useState(null);
+  const [claiming, setClaiming] = useState(false);
+  const [error, setError] = useState('');
+
+  const [selectedTechs, setSelectedTechs] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Canh bao truoc khi dong tab/F5 luc da claim() xong nhung chua gan tho -
+  // vao thoi diem nay lenh da that su "inprogress" tren BE roi, roi trang se
+  // mat het state wizard va khong con nut Xac nhan nao de bam nua (van go ket
+  // duoc sau qua "Gan tho" o tab Khoang xe cua toi, nhung tot hon la canh bao
+  // som de to truong khong vo tinh roi trang som).
+  useEffect(() => {
+    if (step !== 'technicians') return undefined;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [step]);
 
   const handlePickBay = async (bay) => {
     setClaiming(true);
@@ -134,17 +212,6 @@ function ClaimModal({ settlement, bays, onClose, onDone }) {
     } finally {
       setClaiming(false);
     }
-  };
-
-  const addTechnician = (tech) => {
-    if (tech.busy) return;
-    setSelectedTechs((prev) => (prev.some((t) => t.id === tech.id) ? prev : [...prev, tech]));
-    setQuery('');
-    setSuggestions([]);
-  };
-
-  const removeTechnician = (techId) => {
-    setSelectedTechs((prev) => prev.filter((t) => t.id !== techId));
   };
 
   const handleConfirmTechnicians = async () => {
@@ -203,48 +270,7 @@ function ClaimModal({ settlement, bays, onClose, onDone }) {
               <p className="form-hint" style={{ marginTop: 0 }}>
                 Đã nhận vào Khoang {selectedBay?.bayNumber}. Nhập tên thợ thực hiện (có thể chọn nhiều thợ).
               </p>
-
-              {selectedTechs.length > 0 && (
-                <div className="tld-tech-chips">
-                  {selectedTechs.map((t) => (
-                    <span key={t.id} className="tld-tech-chip">
-                      <b>{t.fullName}</b>
-                      {t.phone && <span className="tld-tech-chip__phone"> · {t.phone}</span>}
-                      {!t.sameTeam && <span className="tld-tech-chip__other-team"> (Tổ khác - điều động)</span>}
-                      <button type="button" className="tld-tech-chip__remove" onClick={() => removeTechnician(t.id)}>✕</button>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ position: 'relative' }}>
-                <input
-                  autoFocus
-                  className="form-input"
-                  placeholder="Gõ tên thợ máy để thêm…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                {suggestions.length > 0 && (
-                  <div className="tld-tech-suggestions">
-                    {suggestions.map((t) => (
-                      <div
-                        key={t.id}
-                        className={`tld-tech-suggestions__item ${t.busy ? 'tld-tech-suggestions__item--busy' : ''}`}
-                        onMouseDown={() => addTechnician(t)}
-                      >
-                        <b>{t.fullName}</b>
-                        {t.phone && <span className="tld-tech-suggestions__phone"> — {t.phone}</span>}
-                        {!t.sameTeam && <span className="tld-tech-suggestions__other-team"> (Tổ khác - điều động)</span>}
-                        {t.busy && <span className="tld-tech-suggestions__busy"> (Đang bận lệnh khác)</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {query.trim() && suggestions.length === 0 && (
-                  <div className="form-hint">Không tìm thấy thợ nào khớp tên.</div>
-                )}
-              </div>
+              <TechnicianPicker selectedTechs={selectedTechs} setSelectedTechs={setSelectedTechs} />
             </>
           )}
 
@@ -267,10 +293,67 @@ function ClaimModal({ settlement, bays, onClose, onDone }) {
   );
 }
 
+// Gan BO SUNG tho cho 1 khoang DA claim() tu truoc nhung dang khong co tho
+// nao (vd to truong dong tab/F5 giua chung o buoc chon tho cua ClaimModal -
+// claim() da khong the huy giua chung, nen lenh "ket" o Khoang xe cua toi
+// voi 0 tho, khong con wizard nao mo san de hoan tat nua). BE cho gan tho
+// vao bat ky luc nao lenh con "inprogress" (khong bat buoc phai la lan gan
+// dau tien - xem RepairOrderService.setTechnicians), nen mo lai duoc o day
+// bang chinh TechnicianPicker dung chung voi ClaimModal.
+function AssignTechniciansModal({ order, onClose, onDone }) {
+  const [selectedTechs, setSelectedTechs] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleConfirm = async () => {
+    if (selectedTechs.length === 0) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await setRepairOrderTechniciansApi(order.id, selectedTechs.map((t) => t.id));
+      onDone();
+    } catch (err) {
+      setError(err.message || 'Không gán được thợ thực hiện');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <span className="modal-title">Gán thợ — Khoang {order.bayNumber}</span>
+          <button type="button" className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <p className="form-hint" style={{ marginTop: 0 }}>
+            {order.customer?.fullName} — {order.vehicle?.licensePlate}. Nhập tên thợ thực hiện (có thể chọn nhiều thợ).
+          </p>
+          <TechnicianPicker selectedTechs={selectedTechs} setSelectedTechs={setSelectedTechs} />
+          {error && <div className="tld-error" style={{ marginTop: 12 }}>{error}</div>}
+        </div>
+        <div className="modal-footer">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={selectedTechs.length === 0 || submitting}
+            onClick={handleConfirm}
+          >
+            {submitting ? 'Đang lưu…' : 'Xác nhận'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Xem (khong tick duoc) - tick that su dien ra tai man hinh cong khai cua
 // dung khoang do (Landing), o day chi phan anh lai realtime qua SSE
 // 'task-updated'/danh sach orders duoc nap lai.
-function BayStatusGrid({ bays, orders }) {
+function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
+  const [intakeOrder, setIntakeOrder] = useState(null);
+
   if (bays.length === 0) {
     return <div className="tld-empty">Bạn chưa được gán khoang xe nào. Liên hệ Quản lý chi nhánh.</div>;
   }
@@ -302,10 +385,24 @@ function BayStatusGrid({ bays, orders }) {
 
             {busy && order && (
               <>
-                <div className="tld-bay-status-card__customer">{order.customer?.fullName} — {order.vehicle?.licensePlate}</div>
-                {order.technicians?.length > 0 && (
+                <div className="tld-bay-status-card__customer">Khách hàng: {order.customer?.fullName} — {order.vehicle?.licensePlate}</div>
+                {order.advisorName && (
+                  <div className="tld-bay-status-card__advisor">CVDV: <b>{order.advisorName}</b></div>
+                )}
+                {order.technicians?.length > 0 ? (
                   <div className="tld-bay-status-card__tech">
                     Thợ: <b>{order.technicians.map((t) => (t.sameTeam ? t.fullName : `${t.fullName} (điều động)`)).join(', ')}</b>
+                  </div>
+                ) : (
+                  // Da claim() bay nhung chua co tho nao - thuong xay ra khi to
+                  // truong dong tab/F5 giua chung o buoc chon tho luc Nhan viec.
+                  // Khong tu bien mat, phai chu dong Gan tho moi tick/hoan
+                  // thanh duoc (xem cac guard o RepairOrderService).
+                  <div className="tld-bay-status-card__no-tech">
+                    <span>Chưa gán thợ thực hiện!</span>
+                    <button type="button" className="btn btn-warning btn-sm" onClick={() => onAssignTechnicians(order)}>
+                      Gán thợ
+                    </button>
                   </div>
                 )}
                 {serviceTasks.length > 0 && (
@@ -343,11 +440,38 @@ function BayStatusGrid({ bays, orders }) {
                     </div>
                   </>
                 )}
+
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}
+                  onClick={() => setIntakeOrder(order)}
+                >
+                  Xem tình trạng xe ban đầu
+                </button>
               </>
             )}
           </div>
         );
       })}
+
+      {intakeOrder && (
+        <div className="modal-overlay" onClick={() => setIntakeOrder(null)}>
+          <div
+            className="modal modal-xl no-scrollbar"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 'min(680px, 54vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+          >
+            <div className="modal-header">
+              <span className="modal-title">Tiếp nhận và bàn giao xe — {intakeOrder.customer?.fullName}</span>
+              <button type="button" className="modal-close" onClick={() => setIntakeOrder(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <IntakeChecklistView value={intakeOrder.intakeChecklist} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -457,6 +581,7 @@ export default function TeamLeaderDashboard() {
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState('');
   const [claimingSettlement, setClaimingSettlement] = useState(null);
+  const [assigningOrder, setAssigningOrder] = useState(null);
   const [claimedElsewhere, setClaimedElsewhere] = useState({});
   // So do goc tab - dem viec "chua xem": pendingSeenCount la mo (baseline) so
   // luong pending tai lan cuoi mo tab "Viec cho nhan" (null = chua seed lan
@@ -625,7 +750,7 @@ export default function TeamLeaderDashboard() {
         )
       )}
 
-      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} />}
+      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} />}
 
       {activeTab === 'history' && <HistoryPanel orders={orders} />}
 
@@ -635,6 +760,14 @@ export default function TeamLeaderDashboard() {
           bays={bays}
           onClose={() => setClaimingSettlement(null)}
           onDone={handleClaimDone}
+        />
+      )}
+
+      {assigningOrder && (
+        <AssignTechniciansModal
+          order={assigningOrder}
+          onClose={() => setAssigningOrder(null)}
+          onDone={() => { setAssigningOrder(null); loadOrders(); loadBays(); }}
         />
       )}
     </div>
