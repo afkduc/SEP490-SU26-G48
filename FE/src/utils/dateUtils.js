@@ -95,6 +95,22 @@ export function formatDateOnly(value, options = {}) {
 }
 
 /**
+ * Ghep 1 cap { date: 'YYYY-MM-DD', time: 'HH:mm' } (nguoi dung chon theo
+ * gio VN tren form) thanh 1 chuoi ISO8601 CO OFFSET RO RANG (+07:00), dung
+ * khi GUI datetime nguoi dung nhap len BE (nguoc voi formatDateSafe - dung
+ * khi NHAN datetime tu BE ve).
+ *
+ * Bug lich su: ghep thanh chuoi "YYYY-MM-DDTHH:mm:00" (khong co offset) roi
+ * gui thang len BE khien `new Date(...)` o server (container chay theo UTC)
+ * hieu nham gio VN nguoi dung nhap la gio UTC - lech 7 tieng khi hien thi
+ * lai (vd nhap lich hen 07:20 nhung xem chi tiet lai ra 14:20). Viet Nam
+ * khong co DST nen offset +07:00 luon co dinh, an toan de hardcode.
+ */
+export function vnPartsToIsoUtc(dateStr, timeStr) {
+  return `${dateStr}T${timeStr}:00+07:00`;
+}
+
+/**
  * Khoang cach tu bay gio den value (giay). Am neu value la tuong lai.
  * Tra ve null neu value invalid.
  */

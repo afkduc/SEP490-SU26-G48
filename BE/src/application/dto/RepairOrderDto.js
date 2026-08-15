@@ -40,6 +40,8 @@ class RepairOrderResponseDto {
       bayNumber: entity.bayNumber,
       technicians: entity.technicians,
       createdByName: entity.createdByName,
+      advisorName: entity.advisorName,
+      intakeChecklist: entity.intakeChecklist,
       customer: entity.customer,
       vehicle: entity.vehicle,
       status: entity.status,

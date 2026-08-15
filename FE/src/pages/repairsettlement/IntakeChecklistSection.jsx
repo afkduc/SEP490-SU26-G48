@@ -53,14 +53,6 @@ export const ENGINE_BAY_FIELDS = [
   ['washerFluid', 'Nước rửa kính'], ['brakeClutchFluid', 'Dầu phanh/ly hợp'],
   ['powerSteeringFluid', 'Dầu trợ lực lái'], ['hoseCondition', 'Tình trạng các đường ống'], ['driveBelt', 'Dây đai dẫn động'],
 ];
-export const PRIORITY_FIELDS = [
-  ['repairRedo', 'Xe sửa chữa lại'], ['hasAppointment', 'Xe có đặt hẹn'], ['warranty', 'Xe bảo hành'],
-];
-export const OTHER_INFO_FIELDS = [
-  ['dealerKeepsOldParts', 'Đại lý giữ phụ tùng cũ trả bảo hành/bảo hiểm'],
-  ['returnOldPartsToCustomer', 'Trả phụ tùng cũ cho khách hàng'],
-  ['carWash', 'Rửa xe'], ['customerWaitsAtShop', 'Khách hàng chờ tại xưởng'],
-];
 export const FUEL_GAUGE_OPTIONS = ['E', '1/4', '1/2', '3/4', 'F'];
 
 // Cac group dung OkNgField/CoKhongField - value mac dinh null (chua bam),
@@ -261,20 +253,6 @@ function FuelGauge({ value, onChange }) {
   );
 }
 
-function CheckField({ label, checked, onToggle }) {
-  return (
-    <label
-      style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 12.5, cursor: 'pointer',
-        borderBottom: '1px solid var(--gray-100)', color: '#334155',
-      }}
-    >
-      <input type="checkbox" checked={Boolean(checked)} onChange={() => onToggle(!checked)} />
-      {label}
-    </label>
-  );
-}
-
 export default function IntakeChecklistSection({ value, onChange }) {
   const v = value || DEFAULT_INTAKE_CHECKLIST;
 
@@ -296,7 +274,7 @@ export default function IntakeChecklistSection({ value, onChange }) {
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="card-header" style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-        <span className="card-title">Phiếu tiếp nhận và bàn giao xe</span>
+        <span className="card-title">Tiếp nhận và bàn giao xe</span>
         <span style={{ fontSize: 12, color: '#000' }}>(Diễn giải: OK: Tốt / NG: Không tốt / K: Không)</span>
       </div>
       <div className="card-body">
@@ -339,21 +317,10 @@ export default function IntakeChecklistSection({ value, onChange }) {
           </div>
         </div>
 
+        <div className="form-section-title">Kiểm tra khoang động cơ</div>
         <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
-          <div>
-            <div className="form-section-title" style={{ marginTop: 0 }}>Kiểm tra khoang động cơ</div>
-            {renderOkNgGroup('engineBay', ENGINE_BAY_FIELDS)}
-          </div>
-          <div>
-            <div className="form-section-title" style={{ marginTop: 0 }}>Mức độ ưu tiên</div>
-            {PRIORITY_FIELDS.map(([key, label]) => (
-              <CheckField key={key} label={label} checked={v.priority?.[key]} onToggle={(val) => setGroupField('priority', key, val)} />
-            ))}
-            <div className="form-section-title">Thông tin khác</div>
-            {OTHER_INFO_FIELDS.map(([key, label]) => (
-              <CheckField key={key} label={label} checked={v.otherInfo?.[key]} onToggle={(val) => setGroupField('otherInfo', key, val)} />
-            ))}
-          </div>
+          <div>{renderOkNgGroup('engineBay', ENGINE_BAY_FIELDS.slice(0, 4))}</div>
+          <div>{renderOkNgGroup('engineBay', ENGINE_BAY_FIELDS.slice(4))}</div>
         </div>
 
         <div className="form-group">

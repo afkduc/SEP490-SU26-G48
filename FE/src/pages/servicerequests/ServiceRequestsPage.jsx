@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
-import { formatDateSafe } from '../../utils/dateUtils';
+import { formatDateSafe, vnPartsToIsoUtc } from '../../utils/dateUtils';
 import {
   acceptServiceRequest,
   createAppointment,
@@ -410,7 +410,7 @@ function AppointmentModal({ target, onClose, onSave }) {
       setError('Vui lòng chọn đầy đủ ngày và giờ hẹn');
       return;
     }
-    const appointmentAt = `${date}T${time}:00`;
+    const appointmentAt = vnPartsToIsoUtc(date, time);
     if (new Date(appointmentAt).getTime() < Date.now()) {
       setError('Không thể chọn ngày giờ hẹn trong quá khứ');
       return;

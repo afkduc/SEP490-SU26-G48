@@ -141,6 +141,36 @@ class ManagerImportRequestController {
       next(err);
     }
   };
+
+  /**
+   * GET /api/manager/import-requests/new-count
+   * So phieu nhap chua duoc Manager xem (dung cho badge do tren Navbar).
+   */
+  getNewCount = async (req, res, next) => {
+    try {
+      const branchIdToUse = resolveManagerBranchId(req.user, req.query.branchId);
+      if (!branchIdToUse) {
+        return success(res, { count: 0 }, 'No branch context');
+      }
+      const count = await this.importRequestService.countNewForManager(branchIdToUse);
+      return success(res, { count }, 'Lay so luong phieu nhap moi thanh cong');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * PATCH /api/manager/import-requests/:id/mark-seen
+   * Danh dau 1 phieu nhap la "da xem" (goi khi Manager mo trang chi tiet).
+   */
+  markSeen = async (req, res, next) => {
+    try {
+      await this.importRequestService.markSeenByManager(req.params.id);
+      return success(res, { id: Number(req.params.id) }, 'Da danh dau da xem');
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 module.exports = ManagerImportRequestController;

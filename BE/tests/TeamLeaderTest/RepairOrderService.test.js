@@ -28,6 +28,7 @@ const inProgressOrder = {
   bayNumber: 2,
   status: 'inprogress',
   cancelReason: null,
+  technicians: [{ id: 900, fullName: 'Thợ A' }],
   tasks: [
     { id: 500, taskType: 'service', isDone: false, isCancelled: false },
     { id: 501, taskType: 'product', isDone: false, isCancelled: false },
@@ -194,6 +195,34 @@ test('updateTaskStatus only allows service tasks one-way tick', async () => {
   await assert.rejects(
     () => service.updateTaskStatus(70, 500, false, { userId: 8, branchId: 1 }),
     (err) => err.statusCode === 400 && /Không thể bỏ tích/.test(err.message),
+  );
+});
+
+test('updateTaskStatus rejects when no technician assigned yet', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({ ...inProgressOrder, technicians: [] }),
+    }),
+  });
+  await assert.rejects(
+    () => service.updateTaskStatus(70, 500, true, { userId: 8, branchId: 1 }),
+    (err) => err.statusCode === 409 && /chưa được gán thợ/.test(err.message),
+  );
+});
+
+test('updateStatus rejects completing order when no technician assigned yet', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({
+        ...inProgressOrder,
+        technicians: [],
+        tasks: [{ id: 500, taskType: 'service', isDone: true, isCancelled: false }],
+      }),
+    }),
+  });
+  await assert.rejects(
+    () => service.updateStatus(70, 'completed', { branchId: 1 }),
+    (err) => err.statusCode === 409 && /chưa được gán thợ/.test(err.message),
   );
 });
 
