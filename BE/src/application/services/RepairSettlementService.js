@@ -199,6 +199,16 @@ class RepairSettlementService {
     if (existing.status === 'invoiced') {
       throw new ApiError(409, 'Phiếu đã xuất hóa đơn, không thể chỉnh sửa');
     }
+    // Truoc day chi chan 'invoiced' - 'waiting_payment' (to truong/tho da
+    // hoan thanh xong lenh sua chua, dang cho khach thanh toan) va 'cancelled'
+    // lot qua khong bi chan, cho phep sua hang muc/tong tien sau khi da
+    // "chot" xong (vd CVDV van dang mo san man Chinh sua tu luc phieu con
+    // 'inprogress', luc luu thi phieu da tu chuyen 'waiting_payment' o phia
+    // to truong roi) - de lai sai lech tien voi QR/lien ket PayOS da tao
+    // truoc do. Chi cho sua khi con dang xu ly ('waiting_repair'/'inprogress').
+    if (existing.status !== 'waiting_repair' && existing.status !== 'inprogress') {
+      throw new ApiError(409, 'Phiếu đã hoàn thành sửa chữa hoặc đã hủy, không thể chỉnh sửa nữa');
+    }
 
     const data = this._validateAndNormalize(payload);
     await this._assertNoActiveDuplicate(data.customerId, data.vehicleId, id);
@@ -310,6 +320,14 @@ class RepairSettlementService {
         settlementId: entity.id,
         cancelReason,
       });
+    }
+
+    // Xuat hoa don thu cong (CVDV xac nhan thanh toan tien mat qua nut doi
+    // trang thai) - khac voi handlePayosWebhook() o duoi, truong hop nay
+    // truoc gio CHUA bao realtime cho ai (Dashboard/cac man theo doi khac se
+    // khong tu cap nhat neu thieu dong nay).
+    if (status === 'invoiced') {
+      emitRepairOrderEvent(existing.branchId, 'invoiced', { settlementId: entity.id });
     }
 
     return RepairSettlementResponseDto.fromEntity(entity);

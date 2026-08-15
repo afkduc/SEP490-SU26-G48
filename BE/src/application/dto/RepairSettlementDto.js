@@ -24,8 +24,13 @@ function toDDMMYYYYHHmm(value) {
 }
 
 // Format ve yyyy-mm-dd (khop voi vehicleInfo.purchaseDate FE dang dung).
+// Bug lich su: String(value) tren 1 Date object goi Date.prototype.toString()
+// (vd "Wed May 10 2023 07:00:00 GMT+0700 ...") chu KHONG phai ISO, khien
+// slice(0,10) ra chuoi rac ("Wed May 10") - input type=date o FE render rong
+// dù DB co du lieu. Phai check instanceof Date va goi toISOString() truoc.
 function toISODate(value) {
   if (!value) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value).slice(0, 10);
 }
 

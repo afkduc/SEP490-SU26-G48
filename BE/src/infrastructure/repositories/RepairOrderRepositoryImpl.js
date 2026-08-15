@@ -18,6 +18,8 @@ const HEADER_SELECT = `
          c.id           AS customer_id,
          c.full_name    AS customer_full_name,
          so.advisor_id  AS advisor_id,
+         adv.user_name  AS advisor_name,
+         so.intake_checklist AS intake_checklist,
          vb.bay_number  AS vb_bay_number
   FROM   repair_orders ro
   JOIN   branches b      ON b.id = ro.branch_id
@@ -26,6 +28,7 @@ const HEADER_SELECT = `
   LEFT JOIN vehicles v       ON v.id = ro.vehicle_id
   LEFT JOIN service_orders so ON so.id = ro.service_order_id
   LEFT JOIN customers c       ON c.id = so.customer_id
+  LEFT JOIN users     adv    ON adv.id = so.advisor_id
   LEFT JOIN vehicle_bays vb  ON vb.id = ro.bay_id
   OUTER APPLY (
       SELECT STRING_AGG(sp.specialty_name, ', ') AS names
@@ -261,7 +264,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
       await tx.request().input('id', sql.BigInt, id).input('code', sql.VarChar(30), genCode('LSC', id))
         .query(`UPDATE repair_orders SET repair_code = @code WHERE id = @id`);
 
-      const insertTask = async ({ taskName, taskType, productId, quantity, unitPrice }) => {
+      const insertTask = async ({ taskName, taskType, productId, quantity, unitPrice, note }) => {
         await tx
           .request()
           .input('repairOrderId', sql.BigInt, id)
@@ -270,9 +273,10 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
           .input('productId', sql.BigInt, productId || null)
           .input('quantity', sql.Int, quantity || 0)
           .input('unitPrice', sql.Decimal(18, 2), unitPrice || 0)
+          .input('note', sql.NVarChar(500), note || null)
           .query(`
-            INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done)
-            VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0)
+            INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done, note)
+            VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0, @note)
           `);
       };
       for (const t of desiredTasks) {

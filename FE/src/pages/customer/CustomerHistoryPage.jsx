@@ -225,7 +225,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
           }}
         >
           <div className="modal-header">
-            <h3 className="modal-title">Phiếu tiếp nhận và bàn giao xe</h3>
+            <h3 className="modal-title">Tiếp nhận và bàn giao xe</h3>
             <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
           </div>
           <div className="modal-body">

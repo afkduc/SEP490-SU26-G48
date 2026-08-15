@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { API_BASE_URL } from "../../../config";
 import { apiFetch } from "../../apiClient";
 import { BRANCH_SLUGS } from "../../branchSlugs";
+import IntakeChecklistView from "../../IntakeChecklistView";
 import styles from "../../kiosk.module.css";
 
 const POLL_INTERVAL_MS = 15000;
@@ -87,6 +88,7 @@ function TaskNameLabel({ t }) {
 }
 
 function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing }) {
+  const [showIntake, setShowIntake] = useState(false);
   const tasks = order.tasks || [];
   const serviceTasks = tasks.filter((t) => t.taskType === "service");
   const partTasks = tasks.filter((t) => t.taskType !== "service");
@@ -100,6 +102,9 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
         <div>
           <div className={styles.jobCustomer}>Khách hàng: <b>{order.customer?.fullName}</b></div>
           <div className={styles.jobVehicle}>{order.vehicle?.licensePlate} · {order.vehicle?.vehicleModel}</div>
+          {order.advisorName && (
+            <div className={styles.jobTechnician}>CVDV: <b>{order.advisorName}</b></div>
+          )}
           {order.technicians?.length > 0 && (
             <div className={styles.jobTechnician}>
               Thợ thực hiện: <b>{order.technicians.map((t) => (t.sameTeam ? t.fullName : `${t.fullName} (Tổ khác - điều động)`)).join(", ")}</b>
@@ -145,6 +150,9 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
                     <TaskNameLabel t={task} />
                   </div>
                   {task.note && <div className={styles.taskNote}>{task.note}</div>}
+                  {task.isCancelled && (
+                    <div className={styles.taskReturnNote}>Số lượng trả lại kho x{task.quantity}</div>
+                  )}
                 </div>
                 {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
               </div>
@@ -155,12 +163,35 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
 
       <button
         type="button"
+        className={`${styles.btn} ${styles.btnSecondary}`}
+        style={{ width: "100%", justifyContent: "center", marginTop: 10 }}
+        onClick={() => setShowIntake(true)}
+      >
+        Xem tình trạng xe ban đầu
+      </button>
+
+      <button
+        type="button"
         className={`${styles.btn} ${styles.btnPrimary} ${styles.jobComplete}`}
         disabled={!allDone || completing}
         onClick={onComplete}
       >
         {completing ? "Đang xử lý…" : "Hoàn thành"}
       </button>
+
+      {showIntake && (
+        <div className={styles.modalOverlay} onClick={() => setShowIntake(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <span className={styles.modalTitle}>Tiếp nhận và bàn giao xe</span>
+              <button type="button" className={`${styles.btn} ${styles.btnSecondary} ${styles.btnSm}`} onClick={() => setShowIntake(false)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              <IntakeChecklistView value={order.intakeChecklist} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -180,6 +211,14 @@ export default function BayScreen({ slug, bayNumber }) {
   const [cancelledInfo, setCancelledInfo] = useState("");
   const [busyTaskId, setBusyTaskId] = useState(null);
   const [completing, setCompleting] = useState(false);
+
+  // Tu an thong bao loi sau 5s (moi setError() o duoi deu qua day) - tranh
+  // banner do nam lai man hinh kiosk mai khong ai bam tat.
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(""), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   // Buoc 1: slug -> chi nhanh (branchId).
   useEffect(() => {
