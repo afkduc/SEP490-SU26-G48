@@ -4,7 +4,7 @@
 import {
   DEFAULT_INTAKE_CHECKLIST,
   INTERIOR_FIELDS, ITEMS_IN_CAR_FIELDS, EXTERIOR_LEFT_FIELDS, EXTERIOR_RIGHT_FIELDS,
-  ENGINE_BAY_FIELDS, PRIORITY_FIELDS, OTHER_INFO_FIELDS, FUEL_GAUGE_OPTIONS,
+  ENGINE_BAY_FIELDS, FUEL_GAUGE_OPTIONS,
 } from './IntakeChecklistSection';
 
 const BADGE_COLORS = {
@@ -41,15 +41,6 @@ function CoKhongRow({ label, value }) {
       {value === true && <ValueBadge styleKey="CO" text="Có" />}
       {value === false && <ValueBadge styleKey="KHONG" text="K" />}
       {value !== true && value !== false && <span style={{ fontSize: 12, color: 'var(--gray-400)' }}>—</span>}
-    </div>
-  );
-}
-
-function CheckRow({ label, checked }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', fontSize: 12.5, color: '#334155', borderBottom: '1px solid var(--gray-100)' }}>
-      <span style={{ width: 16, textAlign: 'center', color: checked ? '#16a34a' : 'var(--gray-300)', fontWeight: 700 }}>{checked ? '✓' : '—'}</span>
-      {label}
     </div>
   );
 }
@@ -127,16 +118,6 @@ export default function IntakeChecklistView({ value }) {
 
       <div className="form-section-title">Kiểm tra khoang động cơ</div>
       {renderOkNgGroup('engineBay', ENGINE_BAY_FIELDS)}
-
-      <div className="form-section-title">Mức độ ưu tiên</div>
-      {PRIORITY_FIELDS.map(([key, label]) => (
-        <CheckRow key={key} label={label} checked={v.priority?.[key]} />
-      ))}
-
-      <div className="form-section-title">Thông tin khác</div>
-      {OTHER_INFO_FIELDS.map(([key, label]) => (
-        <CheckRow key={key} label={label} checked={v.otherInfo?.[key]} />
-      ))}
 
       <div className="form-group" style={{ marginTop: 12 }}>
         <label className="form-label">Lưu ý (hạng mục cần làm sớm, ghi chú)</label>

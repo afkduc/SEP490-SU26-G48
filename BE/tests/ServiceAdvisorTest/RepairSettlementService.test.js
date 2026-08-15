@@ -1,5 +1,36 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+
+// Mock PayOS + audit BEFORE loading service (module cache)
+const Module = require('module');
+const originalRequire = Module.prototype.require;
+Module.prototype.require = function mockRequire(id) {
+  if (id === '@payos/node') {
+    return {
+      PayOS: class PayOS {
+        constructor() {}
+        paymentRequests = {
+          create: async () => ({
+            paymentLinkId: 'plink_1',
+            qrCode: 'qr-data',
+            checkoutUrl: 'https://pay.example/checkout',
+          }),
+        };
+        webhooks = {
+          verify: async (raw) => ({
+            orderCode: (raw && raw.orderCode) || 123456,
+            reference: 'REF-1',
+          }),
+        };
+      },
+    };
+  }
+  return originalRequire.apply(this, arguments);
+};
+
+const auditHelper = require('../../src/utils/auditHelper');
+auditHelper.auditCrud.lifecycle = async () => ({});
+
 const RepairSettlementService = require('../../src/application/services/RepairSettlementService');
 
 const validItem = {
@@ -209,6 +240,30 @@ test('update blocks invoiced and completed-task loss', async () => {
   );
 });
 
+test('update blocks waiting_payment and cancelled (order already closed elsewhere)', async () => {
+  const serviceWaitingPayment = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findById: async () => ({ id: 50, status: 'waiting_payment', branchId: 1 }),
+    }),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => serviceWaitingPayment.update(50, basePayload()),
+    (err) => err.statusCode === 409 && /hoàn thành sửa chữa hoặc đã hủy/i.test(err.message),
+  );
+
+  const serviceCancelled = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findById: async () => ({ id: 50, status: 'cancelled', branchId: 1 }),
+    }),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => serviceCancelled.update(50, basePayload()),
+    (err) => err.statusCode === 409 && /hoàn thành sửa chữa hoặc đã hủy/i.test(err.message),
+  );
+});
+
 test('updateStatus cancel rules', async () => {
   const service = new RepairSettlementService({
     repairSettlementRepository: mockRepos({
@@ -294,4 +349,227 @@ test('getPublicHistoryByPlateOrFrame returns null when not found (no 404 leak)',
   });
   const dto = await service.getPublicHistoryByPlateOrFrame('99Z-00000');
   assert.equal(dto, null);
+});
+
+
+test('getAll returns paginated items', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findAll: async () => [{
+        id: 50,
+        code: 'RO-1',
+        status: 'waiting_repair',
+        branchId: 1,
+        items: [],
+        tasks: [],
+        customer: { fullName: 'A' },
+        vehicle: { licensePlate: '30A' },
+      }],
+      count: async () => 1,
+    }),
+    customerRepository: {},
+  });
+  const result = await service.getAll({ branchId: 1, page: 1, limit: 20 });
+  assert.equal(result.total, 1);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.page, 1);
+});
+
+test('getById 404 when missing', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.getById(999),
+    (err) => err.statusCode === 404,
+  );
+});
+
+test('getById returns DTO', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findById: async () => ({
+        id: 50,
+        code: 'RO-1',
+        status: 'waiting_repair',
+        branchId: 1,
+        items: [],
+        tasks: [],
+        customer: { fullName: 'A' },
+        vehicle: { licensePlate: '30A' },
+      }),
+    }),
+    customerRepository: {},
+  });
+  const dto = await service.getById(50);
+  assert.equal(dto.id, 50);
+});
+
+test('checkActiveDuplicate returns null when missing ids or no conflict', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(),
+    customerRepository: {},
+  });
+  assert.equal(await service.checkActiveDuplicate(null, 1), null);
+  assert.equal(await service.checkActiveDuplicate(1, 2), null);
+});
+
+test('checkActiveDuplicate returns conflict payload', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findActiveByCustomerVehicle: async () => ({ code: 'RO-OLD', status: 'waiting_repair' }),
+    }),
+    customerRepository: {},
+  });
+  const conflict = await service.checkActiveDuplicate(1, 2);
+  assert.equal(conflict.code, 'RO-OLD');
+  assert.match(conflict.message, /đang có phiếu quyết toán/i);
+});
+
+test('getGatePending maps pending exit rows', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findGatePending: async (branchId) => {
+        assert.equal(branchId, 1);
+        return [{
+          id: 50,
+          order_code: 'RO-1',
+          customer_full_name: 'A',
+          vehicle_license_plate: '30A-12345',
+          vehicle_model_text: 'Kia',
+        }];
+      },
+    }),
+    customerRepository: {},
+  });
+  const rows = await service.getGatePending(1);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].code, 'RO-1');
+  assert.equal(rows[0].vehiclePlate, '30A-12345');
+});
+
+test('confirmGateExit 409 when repo returns false', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      confirmGateExit: async () => false,
+    }),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.confirmGateExit(50, 1),
+    (err) => err.statusCode === 409,
+  );
+});
+
+test('confirmGateExit succeeds', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      confirmGateExit: async (id, branchId) => {
+        assert.equal(Number(id), 50);
+        assert.equal(branchId, 1);
+        return true;
+      },
+    }),
+    customerRepository: {},
+  });
+  const result = await service.confirmGateExit(50, 1);
+  assert.deepEqual(result, { id: 50 });
+});
+
+test('createPayosPaymentLink 404 / 409 validation', async () => {
+  const missing = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => missing.createPayosPaymentLink(999),
+    (err) => err.statusCode === 404,
+  );
+
+  const wrongStatus = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findById: async () => ({ id: 50, status: 'waiting_repair', branchId: 1, code: 'RO-1', total: 1000 }),
+    }),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => wrongStatus.createPayosPaymentLink(50),
+    (err) => err.statusCode === 409 && /chờ thanh toán/i.test(err.message),
+  );
+});
+
+test('createPayosPaymentLink creates QR for waiting_payment', async () => {
+  let savedTx = null;
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findById: async () => ({
+        id: 50,
+        status: 'waiting_payment',
+        branchId: 1,
+        code: 'RO-2026-001',
+        total: 972000,
+        customer: { fullName: 'A' },
+      }),
+      createPayosTransaction: async (id, data) => {
+        savedTx = { id, ...data };
+      },
+    }),
+    customerRepository: {},
+  });
+  const link = await service.createPayosPaymentLink(50, {});
+  assert.equal(link.qrCode, 'qr-data');
+  assert.equal(link.checkoutUrl, 'https://pay.example/checkout');
+  assert.equal(savedTx.amount, 972000);
+});
+
+test('handlePayosWebhook invoices waiting_payment settlement', async () => {
+  let marked = false;
+  let invoiced = false;
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findPayosTransactionByOrderCode: async (orderCode) => ({
+        orderCode,
+        status: 'pending',
+        service_order_id: 50,
+        amount: 972000,
+      }),
+      markPayosTransactionPaid: async () => {
+        marked = true;
+      },
+      findById: async () => ({
+        id: 50,
+        status: 'waiting_payment',
+        branchId: 1,
+        code: 'RO-1',
+        advisorId: 5,
+      }),
+      updateStatus: async (id, status, opts) => {
+        invoiced = status === 'invoiced' && opts.paymentMethod === 'TRANSFER';
+        return { id, status, branchId: 1 };
+      },
+    }),
+    customerRepository: {},
+  });
+  await service.handlePayosWebhook({ orderCode: 123456 }, {});
+  assert.equal(marked, true);
+  assert.equal(invoiced, true);
+});
+
+test('handlePayosWebhook is idempotent when already paid', async () => {
+  let updateCalled = false;
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findPayosTransactionByOrderCode: async () => ({
+        status: 'paid',
+        service_order_id: 50,
+      }),
+      updateStatus: async () => {
+        updateCalled = true;
+      },
+    }),
+    customerRepository: {},
+  });
+  await service.handlePayosWebhook({ orderCode: 1 }, {});
+  assert.equal(updateCalled, false);
 });

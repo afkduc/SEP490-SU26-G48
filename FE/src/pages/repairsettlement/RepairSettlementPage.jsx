@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AppContext';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { ROLES } from '../../constants/roles';
 import { formatCurrency } from '../../utils';
-import { searchVehiclesApi, listVehicleBrandsApi, searchVehicleModelsApi, createVehicleModelApi } from '../../services/vehicleApi';
+import { searchVehiclesApi, listVehicleBrandsApi } from '../../services/vehicleApi';
 import { searchCatalogApi } from '../../services/catalogApi';
 import { searchProductsApi } from '../../services/productApi';
 import {
@@ -1071,7 +1071,7 @@ function DetailModal({ order, onClose, onPreview }) {
           }}
         >
           <div className="modal-header">
-            <h3 className="modal-title">Phiếu tiếp nhận và bàn giao xe</h3>
+            <h3 className="modal-title">Tiếp nhận và bàn giao xe</h3>
             <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
           </div>
           <div className="modal-body">
@@ -1601,8 +1601,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const [isFromLookup, setIsFromLookup] = useState(Boolean(existingOrder?.customer?.phone));
   const searchSeq = useRef(0);
 
-  const [customerInfo, setCustomerInfo] = useState(existingOrder?.customer || {
-    fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '',
+  // Fallback contactPerson/contactPhone ve fullName/phone cua khach hang khi
+  // customer chua tung nhap rieng nguoi lien he - dong bo voi selectSuggestion
+  // ben duoi (luc CVDV tra cuu chon khach hang co san luc TAO moi), tranh 2
+  // duong nap du lieu (tao moi vs sua) cho ra ket qua khac nhau.
+  const [customerInfo, setCustomerInfo] = useState(() => {
+    const c = existingOrder?.customer;
+    if (!c) return { fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' };
+    return { ...c, contactPerson: c.contactPerson || c.fullName || '', contactPhone: c.contactPhone || c.phone || '' };
   });
   const [vehicleInfo, setVehicleInfo] = useState(() => {
     const base = existingOrder?.vehicle || {
@@ -1621,43 +1627,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     if (isEdit) return;
     listVehicleBrandsApi().then(setVehicleBrands).catch(() => {});
   }, [isEdit]);
-
-  // Goi y "Tên xe" (doi xe) khi go tay cho xe MOI - tim theo dung Hang xe da
-  // chon (neu co) de goi y sat hon, kem nut "+ Thêm tên xe mới" khi khong
-  // khop dong nao san (vd doi xe that su chua co trong danh sach).
-  const [modelSuggestions, setModelSuggestions] = useState([]);
-  const [showModelSuggestions, setShowModelSuggestions] = useState(false);
-  const [creatingModel, setCreatingModel] = useState(false);
-  useEffect(() => {
-    if (isFromLookup || isEdit) return undefined;
-    const term = (vehicleInfo.vehicleModel || '').trim();
-    let alive = true;
-    const timer = setTimeout(() => {
-      searchVehicleModelsApi(term, vehicleInfo.brandId)
-        .then((data) => { if (alive) setModelSuggestions(data || []); })
-        .catch(() => { if (alive) setModelSuggestions([]); });
-    }, 300);
-    return () => { alive = false; clearTimeout(timer); };
-  }, [vehicleInfo.vehicleModel, vehicleInfo.brandId, isFromLookup, isEdit]);
-
-  const hasExactModelMatch = modelSuggestions.some(
-    (m) => m.modelName.trim().toLowerCase() === (vehicleInfo.vehicleModel || '').trim().toLowerCase()
-  );
-
-  const handleCreateModel = async () => {
-    const name = (vehicleInfo.vehicleModel || '').trim();
-    if (!name || creatingModel) return;
-    setCreatingModel(true);
-    try {
-      const created = await createVehicleModelApi(name, vehicleInfo.brandId);
-      if (created) vInfoSet('vehicleModel', created.modelName);
-      setShowModelSuggestions(false);
-    } catch {
-      /* im lang - CVDV van dung duoc ten vua go, chi la khong luu vao goi y */
-    } finally {
-      setCreatingModel(false);
-    }
-  };
 
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
   const [note, setNote] = useState(existingOrder?.note || '');
@@ -1708,26 +1677,28 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // bản ghi vừa lưu để cho in lại ngay tại chỗ, không bắt quay về danh sách
   // rồi tìm lại phiếu để in.
   const [savedOrder, setSavedOrder] = useState(null);
-  // Vua luu thanh cong trong phien nay (chua bam "Chinh sua lai phieu") -
-  // khoa toan bo form lai, tranh go them ma khong con nut Luu nao de bam nua
-  // (xem fieldset disabled ben duoi va nut trong Tong ket thanh toan).
-  const locked = Boolean(savedOrder);
 
-  // Tien do (tasks/thợ/khoang) cua lenh sua chua - tach RIENG khoi
+  // Tien do (tasks/thợ/khoang/status) cua lenh sua chua - tach RIENG khoi
   // existingOrder (prop bat dong, chi nap 1 lan luc mount) vi to
   // truong/tho co the tick/hoan thanh NGAY LUC CVDV dang mo trang nay -
   // phai nap lai realtime, khong thi cac kiem tra "da hoan thanh chua"
   // (canOfferCancel/canRemoveGroup) se dung du lieu cu, cho phep Huy/Xoa
-  // nham 1 hang muc vua duoc tick that ra ngoai doi.
+  // nham 1 hang muc vua duoc tick that ra ngoai doi. status cung phai theo
+  // doi realtime (khong chi tasks/thợ/khoang) - to truong/tho co the vua
+  // tick xong dau muc CUOI CUNG va lenh tu chuyen "Cho thanh toan" (xem
+  // RepairOrderRepositoryImpl.updateStatus) NGAY luc CVDV dang mo san man
+  // Chinh sua nay - phai khoa form lai ngay, khong thi CVDV van bam Luu duoc
+  // (BE tu 08/2026 da chan roi nhung FE nen khoa som, khong doi loi 409).
   const [liveOrderInfo, setLiveOrderInfo] = useState({
     tasks: existingOrder?.tasks || [],
     technicians: existingOrder?.technicians || [],
     bayNumber: existingOrder?.bayNumber || null,
+    status: existingOrder?.status || null,
   });
   const refreshLiveOrderInfo = useCallback(() => {
     if (!isEdit || !existingOrder?.id) return;
     getRepairSettlementApi(existingOrder.id)
-      .then((o) => setLiveOrderInfo({ tasks: o.tasks || [], technicians: o.technicians || [], bayNumber: o.bayNumber || null }))
+      .then((o) => setLiveOrderInfo({ tasks: o.tasks || [], technicians: o.technicians || [], bayNumber: o.bayNumber || null, status: o.status || null }))
       .catch(() => {});
   }, [isEdit, existingOrder?.id]);
   useEffect(() => {
@@ -1740,8 +1711,25 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     if (event.type === 'task-updated' && Number(event.orderId) === Number(existingOrder.repairOrderId)) {
       refreshLiveOrderInfo();
     }
+    // 'order-completed': to truong bam Hoan thanh lenh sua chua -> phieu
+    // quyet toan tu chuyen "waiting_payment" (xem RepairOrderService.updateStatus).
+    // Phai nap lai NGAY (khong doi 15s poll) de khoa form kip thoi.
+    if (event.type === 'order-completed' && Number(event.orderId) === Number(existingOrder.repairOrderId)) {
+      refreshLiveOrderInfo();
+    }
   }, [existingOrder?.repairOrderId, refreshLiveOrderInfo]);
   useRepairOrderEventsSSE(handleOrderInfoSSE, isEdit);
+
+  // Phieu da roi khoi trang thai cho sua ("waiting_repair"/"inprogress") o
+  // NOI KHAC (to truong hoan thanh lenh, hoac CVDV khac huy/xuat hoa don)
+  // trong luc man Chinh sua nay van dang mo - khong the sua tiep duoc nua,
+  // xem comment liveOrderInfo o tren. Vua luu thanh cong trong phien nay
+  // (savedOrder, chua bam "Chinh sua lai phieu") cung khoa form tuong tu.
+  const closedElsewhere = isEdit && Boolean(liveOrderInfo.status)
+    && liveOrderInfo.status !== 'waiting_repair' && liveOrderInfo.status !== 'inprogress';
+  // khoa toan bo form lai, tranh go them ma khong con nut Luu nao de bam nua
+  // (xem fieldset disabled ben duoi va nut trong Tong ket thanh toan).
+  const locked = Boolean(savedOrder) || closedElsewhere;
 
   // Lỗi lưu phiếu hiện giữa màn hình dạng mockup, tự ẩn sau ~4s (không cần
   // đóng tay) - thay cho banner cố định trên đầu trang như trước.
@@ -2279,7 +2267,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       }
 
       const groupId = nextGroupId();
-      const newHead = recalcItem({ ...emptyItem(), code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', httt: 'KHT', discount: 0, repairCategory, groupId, isGroupParent: true });
+      // note: giu lai ghi chu CVDV da go tren dong nay TRUOC khi tra cuu/chon
+      // dich vu (vd go "Lưu ý cho thợ..." roi moi go ten dich vu de tim trong
+      // catalog) - truoc day spread ...emptyItem() lam mat trang ghi chu nay,
+      // trong khi selectCatalogPackage/selectProduct (2 duong chon catalog
+      // con lai) da spread dung tu dong hien co nen khong bi mat.
+      const newHead = recalcItem({ ...emptyItem(), note: prev[idx]?.note || '', code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', httt: 'KHT', discount: 0, repairCategory, groupId, isGroupParent: true });
       const partRows = buildPartRows(svc.parts, repairCategory).map((r) => ({ ...r, groupId }));
       const next = [...withoutCurrent];
       next.splice(idx, 0, newHead, ...partRows);
@@ -2424,6 +2417,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   });
 
   const handleSave = async () => {
+    if (closedElsewhere) {
+      setSaveError('Lệnh sửa chữa của phiếu này vừa hoàn thành (hoặc phiếu đã bị hủy/xuất hóa đơn) - không thể lưu chỉnh sửa nữa.');
+      return;
+    }
     if (!canSave) {
       setSaveError(isFromLookup
         ? 'Vui lòng chọn khách hàng và xe từ gợi ý tra cứu trước khi lưu.'
@@ -2467,7 +2464,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       return;
     }
     if (!isEdit && !isIntakeChecklistComplete(intakeChecklist)) {
-      setSaveError('Vui lòng hoàn thành tất cả các mục trong Phiếu tiếp nhận và bàn giao xe (trừ các ô nhập văn bản) trước khi lưu.');
+      setSaveError('Vui lòng hoàn thành tất cả các mục trong Tiếp nhận và bàn giao xe (trừ các ô nhập văn bản) trước khi lưu.');
       return;
     }
     if (!isEdit && signatureEmpty) {
@@ -2532,7 +2529,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
       {locked && (
         <div style={{ background: '#FFF7E6', border: '1px solid #FFE0A3', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#8A6100' }}>
-          Phiếu đã lưu - đang ở chế độ chỉ xem. Bấm "Chỉnh sửa lại phiếu" nếu muốn sửa thêm.
+          {closedElsewhere
+            ? 'Lệnh sửa chữa của phiếu này vừa hoàn thành (hoặc phiếu đã bị hủy/xuất hóa đơn) - không thể chỉnh sửa nữa. Vui lòng quay lại danh sách.'
+            : 'Phiếu đã lưu - đang ở chế độ chỉ xem. Bấm "Chỉnh sửa lại phiếu" nếu muốn sửa thêm.'}
         </div>
       )}
 
@@ -2683,30 +2682,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   </select>
                 </div>
               )}
-              <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
+              <div className="form-group" style={{ marginBottom: 12 }}>
                 <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Tên xe</label>
                 <input className="form-input" value={vehicleInfo.vehicleModel}
                   readOnly={isFromLookup || isEdit}
-                  onChange={(e) => { vInfoSet('vehicleModel', e.target.value); setShowModelSuggestions(true); }}
-                  onFocus={() => { if (!isFromLookup && !isEdit) setShowModelSuggestions(true); }}
-                  onBlur={() => setTimeout(() => setShowModelSuggestions(false), 180)}
+                  onChange={(e) => vInfoSet('vehicleModel', e.target.value)}
                   placeholder={isFromLookup || isEdit ? ' ' : 'VD: K3 1.6 Deluxe 2024'} />
-                {!isFromLookup && !isEdit && showModelSuggestions && (vehicleInfo.vehicleModel || '').trim() && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
-                    {modelSuggestions.map((m) => (
-                      <div key={m.id} onMouseDown={() => { vInfoSet('vehicleModel', m.modelName); setShowModelSuggestions(false); }}
-                        style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)', fontSize: 13, fontWeight: 600 }}>
-                        {m.modelName}
-                      </div>
-                    ))}
-                    {!hasExactModelMatch && (
-                      <div onMouseDown={handleCreateModel}
-                        style={{ padding: '8px 14px', cursor: 'pointer', color: 'var(--primary)', fontSize: 13, fontWeight: 600 }}>
-                        {creatingModel ? 'Đang thêm…' : `+ Thêm tên xe mới: "${(vehicleInfo.vehicleModel || '').trim()}"`}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group" style={{ position: 'relative' }}>
@@ -3123,7 +3104,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               Bằng chữ: {numberToVietnamese(totals.total)}
             </div>
 
-            {!canSave && (
+            {!canSave && !closedElsewhere && (
               <div style={{ fontSize: 12, color: '#E65100', marginBottom: 8 }}>
                 {isFromLookup
                   ? 'Vui lòng chọn khách hàng và xe từ gợi ý tra cứu để có thể lưu.'
@@ -3131,7 +3112,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               </div>
             )}
 
-            {savedOrder ? (
+            {closedElsewhere ? (
+              <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => navigate('/repair-settlement')}>
+                Quay lại danh sách
+              </button>
+            ) : savedOrder ? (
               <>
                 <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
                   onClick={() => setSavedOrder(null)}>
@@ -3145,7 +3131,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             ) : (
               <>
                 <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
-                  disabled={!canSave || saving || (!isEdit && signatureEmpty)}
+                  disabled={!canSave || saving || locked || (!isEdit && signatureEmpty)}
                   onClick={handleSave}>
                   {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
                 </button>
@@ -3166,17 +3152,24 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 export default function RepairSettlementPage() {
   const { user } = useAuth();
   const canManage = user?.primaryRole !== ROLES.ADMIN;
+  const location = useLocation();
 
+  // key={location.pathname}: "create" va "edit/:id" deu render cung 1
+  // component RepairSettlementForm o cung vi tri trong cay - React Router
+  // khong tu unmount/remount khi chi doi Route nao khop (cung type, cung
+  // cho), nen state cu (fetchedOrder, form da nhap...) bi giu lai khi tu
+  // Sua chuyen sang Tao moi qua navbar. Key theo pathname (khac nhau giua
+  // create/edit/:id) ep remount that su moi lan doi mode hoac doi id.
   return (
     <Routes>
       <Route index element={<RepairSettlementList />} />
       <Route
         path="create"
-        element={canManage ? <RepairSettlementForm /> : <Navigate to="/repair-settlement" replace />}
+        element={canManage ? <RepairSettlementForm key={location.pathname} /> : <Navigate to="/repair-settlement" replace />}
       />
       <Route
         path="edit/:id"
-        element={canManage ? <RepairSettlementForm isEdit /> : <Navigate to="/repair-settlement" replace />}
+        element={canManage ? <RepairSettlementForm key={location.pathname} isEdit /> : <Navigate to="/repair-settlement" replace />}
       />
     </Routes>
   );

@@ -164,6 +164,9 @@ class RepairOrderService {
     // updateTaskStatus/FE khoa checkbox) nen cung phai loai khoi dieu kien nay,
     // neu khong lenh se vinh vien khong hoan thanh duoc sau khi CVDV huy 1
     // hang muc - xem BayScreen.jsx/TeamLeaderDashboard.jsx allDone.
+    if (status === 'completed' && !(existing.technicians || []).length) {
+      throw new ApiError(409, 'Lệnh sửa chữa chưa được gán thợ thực hiện, không thể kết thúc lệnh');
+    }
     if (status === 'completed' && existing.tasks.some((t) => t.taskType === 'service' && !t.isCancelled && !t.isDone)) {
       throw new ApiError(409, 'Cần tích hoàn thành tất cả đầu mục công việc trước khi kết thúc lệnh');
     }
@@ -194,6 +197,14 @@ class RepairOrderService {
     if (existing.status !== 'inprogress') {
       if (existing.status === 'cancelled') throw cancelledOrderError(existing);
       throw new ApiError(409, 'Lệnh đã kết thúc, không thể cập nhật đầu mục công việc');
+    }
+    // claim() da chuyen phieu sang 'inprogress' ngay luc chon khoang, TRUOC
+    // khi co tho (xem setTechnicians() ben duoi) - man CVDV chi HIEN THI
+    // "Đang sửa chữa" tu luc co tho, nhung status thuc su o DB da la
+    // 'inprogress' tu som hon. Neu khong chan o day, khoang xe van tich duoc
+    // dau muc (va sau do hoan thanh ca lenh) du chua tung gan tho nao.
+    if (!(existing.technicians || []).length) {
+      throw new ApiError(409, 'Lệnh sửa chữa chưa được gán thợ thực hiện, không thể tích hoàn thành đầu mục');
     }
     const task = existing.tasks.find((t) => String(t.id) === String(taskId));
     if (!task) throw new ApiError(404, 'Không tìm thấy đầu mục công việc');
