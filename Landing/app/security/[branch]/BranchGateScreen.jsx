@@ -98,7 +98,7 @@ export default function BranchGateScreen({ slug }) {
       <div className={styles.centerFill}>
         <div style={{ textAlign: "center" }}>
           <p className={styles.emptyText}>Không tìm thấy chi nhánh này</p>
-          <Link href="/bao-ve" style={{ color: "var(--accent)", fontWeight: 600 }}>
+          <Link href="/security" style={{ color: "var(--accent)", fontWeight: 600 }}>
             ← Chọn lại chi nhánh
           </Link>
         </div>

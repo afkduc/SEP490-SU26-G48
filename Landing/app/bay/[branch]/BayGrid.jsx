@@ -57,7 +57,7 @@ export default function BayGrid({ slug }) {
     return (
       <div className={styles.center}>
         <p className={styles.empty}>Không tìm thấy chi nhánh này</p>
-        <Link href="/khoang" className={styles.leaderName}>← Chọn lại chi nhánh</Link>
+        <Link href="/bay" className={styles.leaderName}>← Chọn lại chi nhánh</Link>
       </div>
     );
   }
@@ -75,7 +75,7 @@ export default function BayGrid({ slug }) {
             return (
               <Link
                 key={b.id}
-                href={`/khoang/${slug}/${b.bayNumber}`}
+                href={`/bay/${slug}/${b.bayNumber}`}
                 className={`${styles.bayTile} ${busy ? styles.bayTileBusy : ""}`}
               >
                 <span className={styles.bayTileNumber}>Khoang {b.bayNumber}</span>

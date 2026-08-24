@@ -106,7 +106,7 @@ export default async function MaintenanceTipDetailPage({ params }) {
             {others.map((o) => {
               const OtherIcon = ICONS[o.icon];
               return (
-                <Link key={o.slug} href={`/kinh-nghiem/${o.slug}`} className={styles.relatedCard}>
+                <Link key={o.slug} href={`/blog/${o.slug}`} className={styles.relatedCard}>
                   <div className={styles.relatedIconWrap}>
                     <OtherIcon className={styles.relatedIcon} />
                   </div>

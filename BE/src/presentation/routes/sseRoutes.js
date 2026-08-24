@@ -274,7 +274,7 @@ function buildSSERouter() {
   /**
    * GET /api/sse/bay-board?branchId=1
    *
-   * Public (khong dang nhap) - man khoang xe "/khoang/<chi nhanh>/<so
+   * Public (khong dang nhap) - man khoang xe "/bay/<chi nhanh>/<so
    * khoang>" tren Landing (xem publicRoutes.js /public/bays/*). Forward
    * nguyen payload cho 'new-pending' | 'claimed' | 'order-cancelled' |
    * 'task-updated' - cac event nay von khong chua SDT/tong tien (chi

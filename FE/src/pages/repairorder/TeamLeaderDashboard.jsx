@@ -4,7 +4,7 @@
 //   khoang dang ranh) roi bat buoc chon tho thuc hien ngay.
 // - Khoang xe cua toi: khoang nao dang ranh/dang ban, dang ban thi lam don
 //   gi, tien do tick dau muc ra sao - phan anh dung realtime nhung gi dang
-//   duoc tick tai man hinh cong khai cua khoang do (Landing /khoang/<chi
+//   duoc tick tai man hinh cong khai cua khoang do (Landing /bay/<chi
 //   nhanh>/<so khoang>), chi xem, khong tick duoc tu day.
 // - Lich su: cac lenh da hoan thanh cua to truong, loc theo ngay.
 import { useCallback, useEffect, useRef, useState } from 'react';

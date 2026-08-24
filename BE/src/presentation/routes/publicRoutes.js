@@ -88,7 +88,7 @@ function buildPublicRouter() {
   router.get('/gate/pending', gateRateLimiter, repairSettlementController.getGatePending);
   router.post('/gate/:id/confirm-exit', gateRateLimiter, repairSettlementController.confirmGateExit);
 
-  // Man khoang xe cong khai (khong dang nhap) - "/khoang/<chi nhanh>/<so
+  // Man khoang xe cong khai (khong dang nhap) - "/bay/<chi nhanh>/<so
   // khoang>" tren Landing, xem PublicBayBoardController.js. Chi con "lam
   // viec tai khoang" (xem/tick/hoan thanh) - "nhan viec" va "lich su" da
   // chuyen ve tai khoan cua chinh to truong (xem repairOrderRoutes.js, authenticated).

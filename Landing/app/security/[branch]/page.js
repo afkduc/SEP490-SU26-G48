@@ -7,7 +7,7 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-// URL co dinh theo tung chi nhanh (vd /bao-ve/hanoi) - khong dang nhap, khong
+// URL co dinh theo tung chi nhanh (vd /security/hanoi) - khong dang nhap, khong
 // can chon lai chi nhanh moi lan mo (bookmark 1 lan la xong). Xem
 // branchSlugs.js o thu muc cha cho danh sach slug hop le.
 export default async function LandingPageForSecurityBranch({ params }) {

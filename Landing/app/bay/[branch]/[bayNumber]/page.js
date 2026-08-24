@@ -6,7 +6,7 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-// URL co dinh theo tung khoang (vd /khoang/hanoi/13) - khong dang nhap, danh
+// URL co dinh theo tung khoang (vd /bay/hanoi/13) - khong dang nhap, danh
 // tinh (khoang nao, thuoc to truong nao) den tu chinh URL nay, khong phai tu
 // session dang nhap nhu truoc.
 export default async function KhoangBayPage({ params }) {
