@@ -6,9 +6,9 @@ function mockRepo(overrides = {}) {
   return {
     findAll: async () => [],
     findById: async () => null,
-    findByServiceOrderCode: async () => null,
+    findPublicProgressByCode: async () => null,
     findByCode: async () => null,
-    findEligibleServiceOrder: async () => null,
+    findEligibleRepairOrder: async () => null,
     claim: async () => null,
     searchTechnicians: async () => [],
     setTechnicians: async () => true,
@@ -23,7 +23,6 @@ const inProgressOrder = {
   code: 'LSC-2026-001',
   branchId: 1,
   teamLeaderId: 8,
-  serviceOrderId: 50,
   bayId: 3,
   bayNumber: 2,
   status: 'inprogress',
@@ -43,26 +42,20 @@ test('getPublicProgressByCode rejects empty code', async () => {
   );
 });
 
-test('getPublicProgressByCode finds by settlement order_code first', async () => {
-  const entity = { id: 1, code: 'LSC-1', serviceOrderCode: 'RO-2026-068', status: 'inprogress', tasks: [] };
+// Sau khi gop bang chi con DUY NHAT 1 ma "RO-..." - truoc day phai tra cuu 2
+// lan (order_code cua phieu, roi fallback sang repair_code "LSC-..." cua lenh
+// sua chua) vi 1 viec co 2 ma. Xem ensureRepairOrderMerge.
+test('getPublicProgressByCode tim theo ma RO duy nhat (da trim)', async () => {
+  const entity = { id: 1, code: 'RO-2026-068', status: 'inprogress', tasks: [] };
+  let asked = null;
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
-      findByServiceOrderCode: async (code) => (code === 'RO-2026-068' ? entity : null),
+      findPublicProgressByCode: async (code) => { asked = code; return code === 'RO-2026-068' ? entity : null; },
     }),
   });
   const dto = await service.getPublicProgressByCode('  RO-2026-068  ');
   assert.ok(dto);
-});
-
-test('getPublicProgressByCode falls back to repair_code', async () => {
-  const entity = { id: 2, code: 'LSC-2026-001', status: 'inprogress', tasks: [] };
-  const service = new RepairOrderService({
-    repairOrderRepository: mockRepo({
-      findByCode: async (code) => (code === 'LSC-2026-001' ? entity : null),
-    }),
-  });
-  const dto = await service.getPublicProgressByCode('LSC-2026-001');
-  assert.ok(dto);
+  assert.equal(asked, 'RO-2026-068');
 });
 
 test('getPublicProgressByCode 404 when not found', async () => {
@@ -73,7 +66,7 @@ test('getPublicProgressByCode 404 when not found', async () => {
   );
 });
 
-test('claim requires serviceOrderId and teamLeader/bay', async () => {
+test('claim requires repairOrderId and teamLeader/bay', async () => {
   const service = new RepairOrderService({ repairOrderRepository: mockRepo() });
   await assert.rejects(
     () => service.claim(null, { branchId: 1, teamLeaderId: 8, bayId: 3 }),
@@ -88,7 +81,7 @@ test('claim requires serviceOrderId and teamLeader/bay', async () => {
 test('claim rejects when settlement not waiting_repair', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
-      findEligibleServiceOrder: async () => ({ id: 50, vehicle_id: 1, status: 'inprogress' }),
+      findEligibleRepairOrder: async () => ({ id: 50, vehicle_id: 1, status: 'inprogress' }),
     }),
   });
   await assert.rejects(
@@ -103,7 +96,6 @@ test('claim succeeds and returns DTO', async () => {
     code: 'LSC-1',
     branchId: 1,
     teamLeaderId: 8,
-    serviceOrderId: 50,
     bayId: 3,
     bayNumber: 2,
     status: 'inprogress',
@@ -111,7 +103,7 @@ test('claim succeeds and returns DTO', async () => {
   };
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
-      findEligibleServiceOrder: async () => ({ id: 50, vehicle_id: 9, status: 'waiting_repair' }),
+      findEligibleRepairOrder: async () => ({ id: 50, vehicle_id: 9, status: 'waiting_repair' }),
       claim: async () => claimed,
     }),
   });
@@ -122,7 +114,7 @@ test('claim succeeds and returns DTO', async () => {
 test('claim 409 on race (repo returns null)', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
-      findEligibleServiceOrder: async () => ({ id: 50, vehicle_id: 9, status: 'waiting_repair' }),
+      findEligibleRepairOrder: async () => ({ id: 50, vehicle_id: 9, status: 'waiting_repair' }),
       claim: async () => null,
     }),
   });

@@ -11,17 +11,17 @@ class RepairOrderRepository {
     throw new Error('Method findByCode() must be implemented');
   }
 
-  async findByServiceOrderCode(code) {
-    throw new Error('Method findByServiceOrderCode() must be implemented');
+  async findPublicProgressByCode(code) {
+    throw new Error('Method findPublicProgressByCode() must be implemented');
   }
 
-  async findEligibleServiceOrder(serviceOrderId, branchId) {
-    throw new Error('Method findEligibleServiceOrder() must be implemented');
+  async findEligibleRepairOrder(repairOrderId, branchId) {
+    throw new Error('Method findEligibleRepairOrder() must be implemented');
   }
 
   // Tho tu nhan viec qua khoang xe (xem VehicleBayService) - tra ve null neu
   // phieu vua bi khoang khac nhan truoc (thua race).
-  async claim(serviceOrderId, { branchId, teamLeaderId, bayId, createdBy }) {
+  async claim(repairOrderId, { branchId, teamLeaderId, bayId, createdBy }) {
     throw new Error('Method claim() must be implemented');
   }
 

@@ -16,7 +16,7 @@ class CustomerRepositoryImpl extends CustomerRepository {
     const [customersResult, vehiclesResult, countsResult] = await Promise.all([
       query(`SELECT * FROM customers ORDER BY full_name`),
       query(`SELECT * FROM vehicles ORDER BY id`),
-      query(`SELECT customer_id, COUNT(*) AS cnt FROM service_orders GROUP BY customer_id`),
+      query(`SELECT customer_id, COUNT(*) AS cnt FROM repair_orders GROUP BY customer_id`),
     ]);
 
     const vehiclesByCustomer = new Map();
@@ -39,7 +39,7 @@ class CustomerRepositoryImpl extends CustomerRepository {
 
     const [vehiclesResult, countResult] = await Promise.all([
       query(`SELECT * FROM vehicles WHERE customer_id = @id ORDER BY id`, { id }),
-      query(`SELECT COUNT(*) AS cnt FROM service_orders WHERE customer_id = @id`, { id }),
+      query(`SELECT COUNT(*) AS cnt FROM repair_orders WHERE customer_id = @id`, { id }),
     ]);
 
     return Customer.fromPersistence(row, vehiclesResult.recordset, countResult.recordset[0].cnt);
@@ -129,16 +129,17 @@ class CustomerRepositoryImpl extends CustomerRepository {
             .input('customerId', sql.BigInt, customerId)
             .input('vehicleModelText', sql.NVarChar(200), data.vehicleModelText || null)
             .input('brandId', sql.BigInt, data.brandId || null)
+            .input('modelId', sql.BigInt, data.modelId || null)
             .input('frameNumber', sql.VarChar(50), data.frameNumber || null)
             .input('engineNumber', sql.VarChar(50), data.engineNumber || null)
             .input('currentKm', sql.Int, data.currentKm || 0)
             .query(`
               INSERT INTO vehicles (
-                license_plate, customer_id, vehicle_model_text, brand_id, frame_number, engine_number, current_km
+                license_plate, customer_id, vehicle_model_text, brand_id, model_id, frame_number, engine_number, current_km
               )
               OUTPUT inserted.id
               VALUES (
-                @licensePlate, @customerId, @vehicleModelText, @brandId, @frameNumber, @engineNumber, @currentKm
+                @licensePlate, @customerId, @vehicleModelText, @brandId, @modelId, @frameNumber, @engineNumber, @currentKm
               )
             `);
           vehicleId = insertedVehicle.recordset[0].id;

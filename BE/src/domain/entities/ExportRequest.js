@@ -13,7 +13,6 @@ class ExportRequest {
     this.requestCode = data.request_code ?? data.requestCode ?? null;
     this.branchId = data.branch_id ?? data.branchId ?? null;
     this.repairOrderId = data.repair_order_id ?? data.repairOrderId ?? null;
-    this.serviceOrderId = data.service_order_id ?? data.serviceOrderId ?? null;
     this.performedBy = data.performed_by ?? data.performedBy ?? null;
     this.exportDate = data.export_date ?? data.exportDate ?? null;
     this.status = data.status ?? 'completed';
@@ -22,7 +21,6 @@ class ExportRequest {
     // Thong tin mo rong (join)
     this.items = data.items ?? null;
     this.repairOrderCode = data.repair_order_code ?? data.repairOrderCode ?? null;
-    this.serviceOrderCode = data.service_order_code ?? data.serviceOrderCode ?? null;
     this.customerName = data.customer_name ?? data.customerName ?? null;
     this.vehiclePlate = data.vehicle_plate ?? data.vehiclePlate ?? null;
     this.performedByName = data.performed_by_name ?? data.performedByName ?? null;
@@ -39,14 +37,12 @@ class ExportRequest {
       request_code: row.request_code,
       branch_id: row.branch_id,
       repair_order_id: row.repair_order_id,
-      service_order_id: row.service_order_id,
       performed_by: row.performed_by,
       export_date: row.export_date,
       status: row.status,
       notes: row.notes,
       created_at: row.created_at,
       repair_order_code: row.repair_order_code,
-      service_order_code: row.service_order_code,
       customer_name: row.customer_name,
       vehicle_plate: row.vehicle_plate,
       performed_by_name: row.performed_by_name,

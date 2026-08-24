@@ -120,13 +120,11 @@ export const AUDIT_FIELD_LABELS = {
   id: 'Mã hệ thống',
 
   // Lệnh sửa chữa / yêu cầu dịch vụ / khoang
-  serviceOrderId: 'Mã phiếu tiếp nhận',
-  service_order_id: 'Mã phiếu tiếp nhận',
   serviceRequestId: 'Mã yêu cầu dịch vụ',
   service_request_id: 'Mã yêu cầu dịch vụ',
-  repairOrderId: 'Mã lệnh sửa chữa',
-  repair_order_id: 'Mã lệnh sửa chữa',
-  repairOrderCode: 'Mã lệnh sửa chữa',
+  repairOrderId: 'Mã phiếu sửa chữa',
+  repair_order_id: 'Mã phiếu sửa chữa',
+  repairOrderCode: 'Mã phiếu sửa chữa',
   bayId: 'Mã khoang',
   bay_id: 'Mã khoang',
   bayNumber: 'Số khoang',
@@ -148,7 +146,6 @@ export const AUDIT_FIELD_LABELS = {
   itemCount: 'Số mặt hàng',
   totalQuantity: 'Tổng số lượng',
   currentStepLabel: 'Bước hiện tại',
-  repairOrderCode: 'Mã lệnh sửa chữa',
   memberIds: 'Danh sách thành viên (ID)',
   teamLeaderId: 'Mã tổ trưởng',
   taskId: 'Mã đầu mục công việc',
@@ -247,8 +244,6 @@ export const AUDIT_FIELD_LABELS = {
   customer_phone: 'SĐT khách hàng',
   vehicleModel: 'Dòng xe',
   vehicle_model: 'Dòng xe',
-  serviceOrderCode: 'Mã phiếu tiếp nhận',
-  service_order_code: 'Mã phiếu tiếp nhận',
   taskNames: 'Tên đầu mục công việc',
   completedTaskCount: 'Số đầu mục đã xong',
   paymentStatus: 'Trạng thái thanh toán',
@@ -322,12 +317,14 @@ export const AUDIT_TABLE_LABELS = {
   appointments: 'Lịch hẹn',
   work_orders: 'Phiếu sửa chữa',
   work_order_items: 'Hạng mục phiếu sửa',
-  repair_orders: 'Lệnh sửa chữa',
+  repair_orders: 'Phiếu quyết toán',
   repair_order_tasks: 'Đầu mục công việc',
+  repair_order_items: 'Hạng mục phiếu quyết toán',
+  repair_order_technicians: 'Thợ thực hiện',
   repair_settlements: 'Phiếu quyết toán',
   payos_transactions: 'Giao dịch thanh toán PayOS',
-  service_orders: 'Phiếu quyết toán',
-  service_order_items: 'Hạng mục phiếu quyết toán',
+  service_orders: 'Phiếu quyết toán (tên bảng cũ)',
+  service_order_items: 'Hạng mục phiếu quyết toán (tên bảng cũ)',
   service_requests: 'Yêu cầu dịch vụ',
   service_request_appointments: 'Lịch hẹn dịch vụ',
   vehicle_bays: 'Khoang xe',
@@ -656,7 +653,7 @@ export function formatEntityCodeDisplay(entityCode, tableName, entityName) {
   if (/^YCDV-/i.test(code) || table.includes('service_request') || /yêu cầu dịch vụ/.test(name)) {
     return { label: 'Mã yêu cầu dịch vụ', value: code, hint: 'Mã yêu cầu khách gửi / CVDV tiếp nhận' };
   }
-  if (table.includes('repair_settlement') || table === 'service_orders' || /quyết toán/.test(name)) {
+  if (table.includes('repair_settlement') || table === 'service_orders' || table === 'repair_orders' || /quyết toán/.test(name)) {
     return { label: 'Mã phiếu quyết toán', value: code, hint: 'Mã phiếu quyết toán / tiếp nhận xe' };
   }
   if (table.includes('payos') || /thanh toán|payos/.test(name)) {
@@ -1295,7 +1292,6 @@ const SETTLEMENT_PREFERRED_KEYS = [
   'currentKm',
   'exportDate',
   'repairOrderCode',
-  'serviceOrderCode',
   'bayNumber',
   'technicianNames',
   'technicians',
@@ -1339,8 +1335,6 @@ export function buildAuditDisplayRows(data, { maxRows = 40 } = {}) {
 
   const preferred = [
     ...SETTLEMENT_PREFERRED_KEYS,
-    'serviceOrderId',
-    'service_order_id',
     'repairOrderId',
     'repairOrderCode',
     'bayId',

@@ -5,6 +5,13 @@ const { runInTransaction } = require('../../utils/sqlTransaction');
 const { nowVN } = require('../../utils/dateVN');
 const { buildDesiredTasks, computeDesiredTasks, loadPackageServiceNames, packageCodesNeeding, PACKAGE_SERVICES_SQL } = require('./repairOrderTaskBuilder');
 
+// So giay khoa "dang mo phieu" con hieu luc sau lan nhip gia han gan nhat -
+// FE gui nhip 20s/lan trong luc dang mo (xem RepairSettlementPage.jsx), qua
+// 60s (3 nhip) khong thay gia han thi coi nhu khoa da het han, ai khac cung
+// duoc chiem lai (xem acquireLock ben duoi - PHAI dung chung 1 con so voi
+// CASE WHEN trong HEADER_SELECT de 2 noi tinh nhat quan).
+const LOCK_TTL_SECONDS = 60;
+
 // Cot join dung chung cho findAll/findById - lay du thong tin khach hang,
 // xe (kem ngay mua tu warranty_records), co van dich vu va to truong.
 const HEADER_SELECT = `
@@ -31,14 +38,13 @@ const HEADER_SELECT = `
          tl.user_name  AS team_leader_name,
          inv.issued_at AS invoice_issued_at,
          inv.payment_method,
-         ro.id         AS repair_order_id,
          vb.bay_number AS bay_number,
          -- Da co it nhat 1 dau muc duoc tick hoan thanh chua - dung de FE
          -- khoa nut "Huy" o man danh sach (xem RepairSettlementService
          -- .updateStatus, BE cung tu chan lai neu co goi thang API).
          CASE WHEN EXISTS (
            SELECT 1 FROM repair_order_tasks rot
-           WHERE rot.repair_order_id = ro.id AND rot.is_done = 1
+           WHERE rot.repair_order_id = so.id AND rot.is_done = 1
          ) THEN 1 ELSE 0 END AS has_completed_task,
          -- Da gan tho thuc hien chua - claim() chuyen status sang 'inprogress'
          -- ngay luc chon khoang (truoc ca khi gan tho, de khoa khong cho to
@@ -46,15 +52,29 @@ const HEADER_SELECT = `
          -- chữa" tu luc THUC SU co tho cam may - xem FE displayStatus().
          CASE WHEN EXISTS (
            SELECT 1 FROM repair_order_technicians rot2
-           WHERE rot2.repair_order_id = ro.id
-         ) THEN 1 ELSE 0 END AS has_technicians
-  FROM   service_orders so
+           WHERE rot2.repair_order_id = so.id
+         ) THEN 1 ELSE 0 END AS has_technicians,
+         -- Khoa "dang mo phieu" - chi tra ve neu con hieu luc (chua qua
+         -- LOCK_TTL_SECONDS ke tu nhip gia han gan nhat), qua han thi coi nhu
+         -- khong ai mo (NULL) du cot goc trong DB co the van con gia tri cu -
+         -- xem acquireLock, chi thuc su xoa cot khi co nguoi khac chiem lai.
+         CASE WHEN so.lock_heartbeat_at IS NOT NULL
+                   AND so.lock_heartbeat_at > DATEADD(SECOND, -${LOCK_TTL_SECONDS}, SYSUTCDATETIME())
+              THEN so.locked_by_user_id ELSE NULL END AS active_locked_by_user_id,
+         CASE WHEN so.lock_heartbeat_at IS NOT NULL
+                   AND so.lock_heartbeat_at > DATEADD(SECOND, -${LOCK_TTL_SECONDS}, SYSUTCDATETIME())
+              THEN lockUser.user_name ELSE NULL END AS active_locked_by_name,
+         CASE WHEN so.lock_heartbeat_at IS NOT NULL
+                   AND so.lock_heartbeat_at > DATEADD(SECOND, -${LOCK_TTL_SECONDS}, SYSUTCDATETIME())
+              THEN so.locked_at ELSE NULL END AS active_locked_at
+  FROM   repair_orders so
   JOIN   branches  b   ON b.id = so.branch_id
   JOIN   customers c   ON c.id = so.customer_id
   JOIN   vehicles  v   ON v.id = so.vehicle_id
   LEFT JOIN brands vbrand ON vbrand.id = v.brand_id
   JOIN   users     adv ON adv.id = so.advisor_id
   LEFT JOIN users  tl  ON tl.id = so.team_leader_id
+  LEFT JOIN users  lockUser ON lockUser.id = so.locked_by_user_id
   OUTER APPLY (
       SELECT TOP 1 w.purchase_date
       FROM   warranty_records w
@@ -64,20 +84,13 @@ const HEADER_SELECT = `
   OUTER APPLY (
       SELECT TOP 1 i.issued_at, i.payment_method
       FROM   invoices i
-      WHERE  i.service_order_id = so.id
+      WHERE  i.repair_order_id = so.id
       ORDER  BY i.issued_at DESC
   ) inv
-  OUTER APPLY (
-      -- Lenh sua chua DANG HIEN HANH cua phieu nay (bo qua lenh da huy - xem
-      -- RepairOrderRepositoryImpl.findByServiceOrderCode ly do tuong tu) -
-      -- dung de CVDV huy truc tiep tu man Phieu quyet toan khi phieu dang
-      -- "inprogress", khong can qua man "Lenh sua chua" (da bo).
-      SELECT TOP 1 r.id, r.bay_id
-      FROM   repair_orders r
-      WHERE  r.service_order_id = so.id AND r.status <> 'cancelled'
-      ORDER  BY r.id DESC
-  ) ro
-  LEFT JOIN vehicle_bays vb ON vb.id = ro.bay_id
+  -- Khoang xe truoc day nam o bang lenh sua chua rieng, gio la cot bay_id
+  -- ngay tren phieu (xem ensureRepairOrderMerge) - het canh phai OUTER APPLY
+  -- tim "lenh dang hien hanh" roi loc bo lenh da huy.
+  LEFT JOIN vehicle_bays vb ON vb.id = so.bay_id
 `;
 
 function genCode(prefix, id) {
@@ -124,7 +137,7 @@ function buildConditions({ branchId, status, search, customerId, vehicleId, from
   }
   if (search) {
     params.search = `%${search}%`;
-    conditions.push('(so.order_code LIKE @search OR c.full_name LIKE @search OR v.license_plate LIKE @search)');
+    conditions.push('(so.repair_code LIKE @search OR c.full_name LIKE @search OR v.license_plate LIKE @search)');
   }
   if (fromDate) {
     params.fromDate = fromDate;
@@ -156,7 +169,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
 
     const sqlText = `
       SELECT COUNT(*) AS total
-      FROM   service_orders so
+      FROM   repair_orders so
       JOIN   customers c ON c.id = so.customer_id
       JOIN   vehicles  v ON v.id = so.vehicle_id
       WHERE  ${conditions.join(' AND ')}
@@ -172,38 +185,33 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     if (!header) return null;
 
     const itemsResult = await query(
-      `SELECT * FROM service_order_items WHERE service_order_id = @id ORDER BY id`,
+      `SELECT * FROM repair_order_items WHERE repair_order_id = @id ORDER BY id`,
       { id }
     );
 
-    // Chi co khi phieu da duoc gan to truong (co repair_order) - de co van xem
-    // duoc tien do tung dau viec To truong da tich, khong can qua man rieng.
+    // Chi co khi phieu da duoc to truong nhan viec - de co van xem duoc tien
+    // do tung dau viec To truong da tich, khong can qua man rieng.
     const tasksResult = await query(
       `SELECT rot.id, rot.task_name, rot.task_type, rot.quantity, rot.is_done, rot.is_cancelled, rot.is_added_later, rot.is_qty_increased, rot.prev_quantity, rot.note
        FROM   repair_order_tasks rot
-       JOIN   repair_orders ro ON ro.id = rot.repair_order_id
-       WHERE  ro.service_order_id = @id
+       WHERE  rot.repair_order_id = @id
        ORDER  BY rot.id`,
       { id }
     );
 
-    // Tho thuc hien (co the nhieu tho) - dung DUNG lenh sua chua dang hien
-    // hanh (header.repair_order_id, xem HEADER_SELECT OUTER APPLY) de khop
-    // voi "To truong" hien cung tren man, tranh gop nham tho tu 1 lenh cu da huy.
-    // same_team: tho nay co cung to voi to truong dang phu trach lenh sua
-    // chua nay khong (khac to nghia la duoc dieu dong sang giup - xem FE
+    // Tho thuc hien (co the nhieu tho).
+    // same_team: tho nay co cung to voi to truong dang phu trach phieu nay
+    // khong (khac to nghia la duoc dieu dong sang giup - xem FE
     // formatTechnicianLabel).
-    const techniciansResult = header.repair_order_id
-      ? await query(
-          `SELECT u.id, u.user_name, u.phone,
-                  CASE WHEN u.team_leader_id = @teamLeaderId THEN 1 ELSE 0 END AS same_team
-           FROM   repair_order_technicians rot
-           JOIN   users u ON u.id = rot.technician_id
-           WHERE  rot.repair_order_id = @repairOrderId
-           ORDER  BY u.user_name ASC`,
-          { repairOrderId: header.repair_order_id, teamLeaderId: header.team_leader_id }
-        )
-      : { recordset: [] };
+    const techniciansResult = await query(
+      `SELECT u.id, u.user_name, u.phone,
+              CASE WHEN u.team_leader_id = @teamLeaderId THEN 1 ELSE 0 END AS same_team
+       FROM   repair_order_technicians rot
+       JOIN   users u ON u.id = rot.technician_id
+       WHERE  rot.repair_order_id = @id
+       ORDER  BY u.user_name ASC`,
+      { id, teamLeaderId: header.team_leader_id }
+    );
 
     return RepairSettlement.fromPersistence(header, itemsResult.recordset, tasksResult.recordset, techniciansResult.recordset);
   }
@@ -225,15 +233,15 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
   // (pm_items, gop bang STRING_AGG), thay vi co doan ten 1 goi trong catalog.
   async findPublicHistoryByVehicleIdentifier(identifier) {
     const result = await query(
-      `SELECT so.order_code, so.status, so.intake_date, so.completed_date,
+      `SELECT so.repair_code, so.status, so.intake_date, so.completed_date,
               b.branch_name, v.license_plate, v.vehicle_model_text, pm.items AS pm_items
-       FROM   service_orders so
+       FROM   repair_orders so
        JOIN   vehicles  v ON v.id = so.vehicle_id
        JOIN   branches  b ON b.id = so.branch_id
        CROSS APPLY (
          SELECT STRING_AGG(soi.item_description, ', ') AS items
-         FROM   service_order_items soi
-         WHERE  soi.service_order_id = so.id AND soi.repair_category = 'PM'
+         FROM   repair_order_items soi
+         WHERE  soi.repair_order_id = so.id AND soi.repair_category = 'PM'
        ) pm
        WHERE  (v.license_plate = @identifier OR v.frame_number = @identifier)
          AND  so.status <> 'cancelled'
@@ -249,8 +257,8 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
   // hoac xuat hoa don (invoiced) xong moi duoc tao phieu moi cho cap nay.
   async findActiveByCustomerVehicle(customerId, vehicleId, excludeId) {
     const result = await query(
-      `SELECT TOP 1 id, order_code, status
-       FROM   service_orders
+      `SELECT TOP 1 id, repair_code, status
+       FROM   repair_orders
        WHERE  customer_id = @customerId
          AND  vehicle_id = @vehicleId
          AND  status IN ('waiting_repair', 'inprogress', 'waiting_payment')
@@ -259,7 +267,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
       { customerId, vehicleId, excludeId: excludeId || null }
     );
     const row = result.recordset[0];
-    return row ? { id: row.id, code: row.order_code, status: row.status } : null;
+    return row ? { id: row.id, code: row.repair_code, status: row.status } : null;
   }
 
   async create(data, { branchId, advisorId }) {
@@ -289,8 +297,8 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('signerName', sql.NVarChar(255), data.signerName || null)
         .input('signedAt', sql.DateTime, nowVN())
         .query(`
-          INSERT INTO service_orders (
-            order_code, branch_id, vehicle_id, customer_id, advisor_id,
+          INSERT INTO repair_orders (
+            repair_code, branch_id, vehicle_id, customer_id, advisor_id,
             customer_request, note, current_km, status,
             subtotal, discount_amount, after_discount, vat, free_amount, total,
             is_warranty, intake_date, intake_checklist,
@@ -308,7 +316,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
 
       const id = headerResult.recordset[0].id;
       await tx.request().input('id', sql.BigInt, id).input('code', sql.VarChar(30), genCode('RO', id))
-        .query(`UPDATE service_orders SET order_code = @code WHERE id = @id`);
+        .query(`UPDATE repair_orders SET repair_code = @code WHERE id = @id`);
 
       await this._insertItems(tx, id, data.items);
       await this._bumpVehicleKm(tx, data.vehicleId, data.currentKm);
@@ -338,7 +346,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('isWarranty', sql.Bit, isWarranty)
         .input('intakeChecklist', sql.NVarChar(sql.MAX), JSON.stringify(data.intakeChecklist || {}))
         .query(`
-          UPDATE service_orders SET
+          UPDATE repair_orders SET
             customer_request = @customerRequest,
             note = @note,
             current_km = @currentKm,
@@ -353,7 +361,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
           WHERE id = @id
         `);
 
-      await tx.request().input('id', sql.BigInt, id).query(`DELETE FROM service_order_items WHERE service_order_id = @id`);
+      await tx.request().input('id', sql.BigInt, id).query(`DELETE FROM repair_order_items WHERE repair_order_id = @id`);
       await this._insertItems(tx, id, data.items);
       await this._syncRepairOrderTasks(tx, id);
 
@@ -370,17 +378,16 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
   // that (RepairSettlementService.update), khong tin rieng validation phia
   // FE. Chi co y nghia khi phieu dang co lenh sua chua "inprogress" (da co
   // tasks) - tra ve false neu chua ai nhan hoac chua tick gi (khong co gi de mat).
-  async wouldLoseCompletedTasks(serviceOrderId, newItems) {
+  async wouldLoseCompletedTasks(repairOrderId, newItems) {
     const roResult = await query(
-      `SELECT id FROM repair_orders WHERE service_order_id = @serviceOrderId AND status = 'inprogress'`,
-      { serviceOrderId }
+      `SELECT id FROM repair_orders WHERE id = @repairOrderId AND status = 'inprogress'`,
+      { repairOrderId }
     );
-    const repairOrder = roResult.recordset[0];
-    if (!repairOrder) return false;
+    if (!roResult.recordset[0]) return false;
 
     const doneResult = await query(
       `SELECT task_name, task_type, product_id FROM repair_order_tasks WHERE repair_order_id = @repairOrderId AND is_done = 1`,
-      { repairOrderId: repairOrder.id }
+      { repairOrderId }
     );
     if (doneResult.recordset.length === 0) return false;
 
@@ -418,22 +425,21 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
 
   // Co van sua phieu quyet toan (them/bot hang muc) sau khi da gan to truong
   // -> dong bo lai checklist ben To truong (repair_order_tasks) cho khop, thay
-  // vi de nguyen danh sach cu tu luc gan viec. Chi dong bo khi lenh sua chua
-  // con "inprogress" (chua hoan thanh/huy) - task nao van con trong danh sach
+  // vi de nguyen danh sach cu tu luc gan viec. Chi dong bo khi phieu con
+  // "inprogress" (chua hoan thanh/huy) - task nao van con trong danh sach
   // moi thi GIU NGUYEN is_done (khong reset ve chua tich).
-  async _syncRepairOrderTasks(tx, serviceOrderId) {
+  async _syncRepairOrderTasks(tx, repairOrderId) {
     const roResult = await tx
       .request()
-      .input('serviceOrderId', sql.BigInt, serviceOrderId)
-      .query(`SELECT id FROM repair_orders WHERE service_order_id = @serviceOrderId AND status = 'inprogress'`);
-    const repairOrder = roResult.recordset[0];
-    if (!repairOrder) return;
+      .input('repairOrderId', sql.BigInt, repairOrderId)
+      .query(`SELECT id FROM repair_orders WHERE id = @repairOrderId AND status = 'inprogress'`);
+    if (!roResult.recordset[0]) return;
 
-    const desired = await buildDesiredTasks(tx, serviceOrderId);
+    const desired = await buildDesiredTasks(tx, repairOrderId);
 
     const existingResult = await tx
       .request()
-      .input('repairOrderId', sql.BigInt, repairOrder.id)
+      .input('repairOrderId', sql.BigInt, repairOrderId)
       .query(`SELECT id, task_name, task_type, product_id, quantity, is_cancelled, note FROM repair_order_tasks WHERE repair_order_id = @repairOrderId`);
     const existing = existingResult.recordset;
 
@@ -476,7 +482,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     for (const t of toInsert) {
       await tx
         .request()
-        .input('repairOrderId', sql.BigInt, repairOrder.id)
+        .input('repairOrderId', sql.BigInt, repairOrderId)
         .input('taskName', sql.NVarChar(300), t.taskName)
         .input('taskType', sql.VarChar(10), t.taskType)
         .input('productId', sql.BigInt, t.productId || null)
@@ -530,48 +536,42 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     await runInTransaction(async (tx) => {
       if (status === 'waiting_payment') {
         await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
-          .query(`UPDATE service_orders SET status = @status, completed_date = GETDATE() WHERE id = @id`);
+          .query(`UPDATE repair_orders SET status = @status, completed_date = GETDATE() WHERE id = @id`);
         return;
       }
 
       if (status === 'cancelled') {
         await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
           .input('cancelReason', sql.NVarChar(500), cancelReason || null)
-          .query(`UPDATE service_orders SET status = @status, cancel_reason = @cancelReason, cancelled_at = GETDATE() WHERE id = @id`);
+          .query(`UPDATE repair_orders SET status = @status, cancel_reason = @cancelReason, cancelled_at = GETDATE() WHERE id = @id`);
 
-        // Khach huy giua chung, khi da co to truong nhan (lenh sua chua dang
-        // "inprogress") - huy luon lenh do CHO DUT DIEM (khong revert ve
-        // "waiting_repair" de nhan lai nhu truoc, vi khach da huy thi khong
-        // con gi de lam nua) - xem RepairSettlementService.updateStatus emit
-        // SSE bao rieng cho khoang dang hien lenh nay.
-        await tx.request().input('id', sql.BigInt, id).input('cancelReason', sql.NVarChar(500), cancelReason || null)
-          .query(`
-            UPDATE repair_orders
-            SET    status = 'cancelled', cancel_reason = @cancelReason
-            WHERE  service_order_id = @id AND status = 'inprogress'
-          `);
+        // Truoc day con phai cascade sang bang lenh sua chua rieng de huy
+        // luon dong 'inprogress' ben do. Gio phieu va lenh la MOT, dong
+        // UPDATE ngay tren da huy dut diem - khong con gi de cascade.
+        // (Khach da huy thi khong revert ve "waiting_repair" de nhan lai -
+        // xem RepairSettlementService.updateStatus emit SSE bao cho khoang.)
         return;
       }
 
       if (status === 'invoiced') {
         await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
-          .query(`UPDATE service_orders SET status = @status WHERE id = @id`);
+          .query(`UPDATE repair_orders SET status = @status WHERE id = @id`);
 
         const orderResult = await tx.request().input('id', sql.BigInt, id)
-          .query(`SELECT branch_id, customer_id, total FROM service_orders WHERE id = @id`);
+          .query(`SELECT branch_id, customer_id, total FROM repair_orders WHERE id = @id`);
         const order = orderResult.recordset[0];
 
         const invResult = await tx
           .request()
-          .input('serviceOrderId', sql.BigInt, id)
+          .input('repairOrderId', sql.BigInt, id)
           .input('branchId', sql.BigInt, order.branch_id)
           .input('customerId', sql.BigInt, order.customer_id)
           .input('amount', sql.Decimal(18, 2), order.total)
           .input('issuedBy', sql.BigInt, issuedBy)
           .input('paymentMethod', sql.NVarChar(20), paymentMethod || 'TRANSFER')
           .query(`
-            INSERT INTO invoices (invoice_code, service_order_id, branch_id, customer_id, amount, paid, status, issued_at, issued_by, payment_method)
-            VALUES ('', @serviceOrderId, @branchId, @customerId, @amount, @amount, 'issued', GETDATE(), @issuedBy, @paymentMethod);
+            INSERT INTO invoices (invoice_code, repair_order_id, branch_id, customer_id, amount, paid, status, issued_at, issued_by, payment_method)
+            VALUES ('', @repairOrderId, @branchId, @customerId, @amount, @amount, 'issued', GETDATE(), @issuedBy, @paymentMethod);
             SELECT SCOPE_IDENTITY() AS id;
           `);
         const invId = invResult.recordset[0].id;
@@ -581,7 +581,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
       }
 
       await tx.request().input('id', sql.BigInt, id).input('status', sql.VarChar(30), status)
-        .query(`UPDATE service_orders SET status = @status WHERE id = @id`);
+        .query(`UPDATE repair_orders SET status = @status WHERE id = @id`);
     });
 
     return this.findById(id);
@@ -592,10 +592,10 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
   // thong tin de doi chieu xe/khach, khong lo so dien thoai/tong tien.
   async findGatePending(branchId) {
     const result = await query(
-      `SELECT so.id, so.order_code,
+      `SELECT so.id, so.repair_code,
               c.full_name AS customer_full_name,
               v.license_plate AS vehicle_license_plate, v.vehicle_model_text
-       FROM   service_orders so
+       FROM   repair_orders so
        JOIN   customers c ON c.id = so.customer_id
        JOIN   vehicles  v ON v.id = so.vehicle_id
        WHERE  so.branch_id = @branchId AND so.status = 'invoiced' AND so.delivery_date IS NULL
@@ -610,7 +610,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
   // chua xac nhan lan nao (tranh bam 2 lan/2 man hinh cung luc).
   async confirmGateExit(id, branchId) {
     const result = await query(
-      `UPDATE service_orders
+      `UPDATE repair_orders
        SET    delivery_date = CAST(GETDATE() AS DATE)
        WHERE  id = @id AND branch_id = @branchId AND status = 'invoiced' AND delivery_date IS NULL`,
       { id, branchId }
@@ -618,11 +618,11 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.rowsAffected[0] > 0;
   }
 
-  async _insertItems(tx, serviceOrderId, items) {
+  async _insertItems(tx, repairOrderId, items) {
     for (const item of items) {
       await tx
         .request()
-        .input('serviceOrderId', sql.BigInt, serviceOrderId)
+        .input('repairOrderId', sql.BigInt, repairOrderId)
         .input('itemType', sql.VarChar(10), itemTypeFor(item.lhsc))
         .input('productId', sql.BigInt, item.productId || null)
         .input('serviceId', sql.BigInt, item.serviceId || null)
@@ -639,12 +639,12 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('total', sql.Decimal(18, 2), item.total || 0)
         .input('note', sql.NVarChar(500), (item.note || '').trim() || null)
         .query(`
-          INSERT INTO service_order_items (
-            service_order_id, item_type, product_id, service_id, item_code, item_description,
+          INSERT INTO repair_order_items (
+            repair_order_id, item_type, product_id, service_id, item_code, item_description,
             lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total, note
           )
           VALUES (
-            @serviceOrderId, @itemType, @productId, @serviceId, @itemCode, @itemDescription,
+            @repairOrderId, @itemType, @productId, @serviceId, @itemCode, @itemDescription,
             @lhsc, @httt, @repairCategory, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total, @note
           )
         `);
@@ -681,12 +681,12 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
   }
 
   // ─── PayOS ───────────────────────────────────────────────────────
-  async createPayosTransaction(serviceOrderId, { orderCode, paymentLinkId, qrCode, checkoutUrl, amount, expiredAt }) {
+  async createPayosTransaction(repairOrderId, { orderCode, paymentLinkId, qrCode, checkoutUrl, amount, expiredAt }) {
     await query(
-      `INSERT INTO payos_transactions (service_order_id, order_code, payment_link_id, qr_code, checkout_url, amount, expired_at)
-       VALUES (@serviceOrderId, @orderCode, @paymentLinkId, @qrCode, @checkoutUrl, @amount, @expiredAt)`,
+      `INSERT INTO payos_transactions (repair_order_id, order_code, payment_link_id, qr_code, checkout_url, amount, expired_at)
+       VALUES (@repairOrderId, @orderCode, @paymentLinkId, @qrCode, @checkoutUrl, @amount, @expiredAt)`,
       {
-        serviceOrderId,
+        repairOrderId,
         orderCode,
         paymentLinkId: paymentLinkId || null,
         qrCode: qrCode || null,
@@ -706,6 +706,57 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     await query(
       `UPDATE payos_transactions SET status = 'paid', webhook_reference = @reference, paid_at = @paidAt WHERE order_code = @orderCode`,
       { orderCode, reference: reference || null, paidAt }
+    );
+  }
+
+  // Chiem/gia han khoa "dang mo phieu" - dieu kien WHERE cho phep chiem khi:
+  // chua ai khoa, hoac chinh minh dang giu (gia han), hoac khoa cu da qua
+  // LOCK_TTL_SECONDS (het han). OUTPUT deleted.* de biet nguoi giu TRUOC do
+  // la ai, tu do phan biet duoc "chiem moi" (fresh - can ghi audit "Truy cap
+  // phieu") voi "chi la nhip gia han cua chinh minh" (khong ghi log lap lai).
+  async acquireLock(id, userId) {
+    const result = await query(
+      `UPDATE repair_orders
+       SET    locked_by_user_id = @userId, locked_at = SYSUTCDATETIME(), lock_heartbeat_at = SYSUTCDATETIME()
+       OUTPUT deleted.locked_by_user_id AS prev_locked_by_user_id
+       WHERE  id = @id
+         AND  (
+           locked_by_user_id IS NULL
+           OR locked_by_user_id = @userId
+           OR lock_heartbeat_at IS NULL
+           OR lock_heartbeat_at < DATEADD(SECOND, -${LOCK_TTL_SECONDS}, SYSUTCDATETIME())
+         )`,
+      { id: Number(id), userId: Number(userId) }
+    );
+    if (result.recordset.length > 0) {
+      const prevUserId = result.recordset[0].prev_locked_by_user_id;
+      return { ok: true, fresh: prevUserId == null || Number(prevUserId) !== Number(userId) };
+    }
+    const holderResult = await query(
+      `SELECT so.locked_by_user_id, so.locked_at, u.user_name AS locked_by_name
+       FROM   repair_orders so
+       LEFT JOIN users u ON u.id = so.locked_by_user_id
+       WHERE  so.id = @id`,
+      { id: Number(id) }
+    );
+    const holder = holderResult.recordset[0] || {};
+    return {
+      ok: false,
+      lockedByUserId: holder.locked_by_user_id ?? null,
+      lockedByName: holder.locked_by_name ?? null,
+      lockedAt: holder.locked_at ?? null,
+    };
+  }
+
+  // Chi nha khoa neu dung nguoi dang giu - tranh truong hop request nha khoa
+  // den tre (sau khi nguoi khac da chiem duoc, vd tab cu dong muon) lai xoa
+  // nham khoa cua nguoi dang giu that.
+  async releaseLock(id, userId) {
+    await query(
+      `UPDATE repair_orders
+       SET    locked_by_user_id = NULL, locked_at = NULL, lock_heartbeat_at = NULL
+       WHERE  id = @id AND locked_by_user_id = @userId`,
+      { id: Number(id), userId: Number(userId) }
     );
   }
 }

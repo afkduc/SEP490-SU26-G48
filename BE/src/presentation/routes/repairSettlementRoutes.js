@@ -20,6 +20,9 @@ function buildRepairSettlementRouter() {
   router.put('/:id', controller.update);
   router.patch('/:id/status', controller.updateStatus);
   router.post('/:id/print-log', controller.logPrint);
+  router.post('/:id/lock', controller.lock);
+  router.delete('/:id/lock', controller.unlock);
+  router.get('/:id/activity-log', controller.getActivityLog);
   router.post('/:id/payos/create-payment-link', controller.createPaymentLink);
 
   return router;

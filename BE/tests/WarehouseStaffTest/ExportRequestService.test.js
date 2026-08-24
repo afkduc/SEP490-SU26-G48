@@ -40,7 +40,7 @@ test('lists export requests with normalized filters and pagination', async () =>
   } });
   const result = await service.list({ branchId: '1', repairOrderId: '8', page: -1, limit: 999 });
   assert.deepEqual(result, { items: [], total: 0, page: 1, limit: 100 });
-  assert.deepEqual(findFilters, { branchId: 1, status: undefined, repairOrderId: 8, serviceOrderId: undefined, fromDate: undefined, toDate: undefined, search: undefined, page: 1, limit: 100 });
+  assert.deepEqual(findFilters, { branchId: 1, status: undefined, repairOrderId: 8, fromDate: undefined, toDate: undefined, search: undefined, page: 1, limit: 100 });
   await assert.rejects(() => service.list({}), (err) => err.statusCode === 400);
 });
 

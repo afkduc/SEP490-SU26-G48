@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { useToast } from '../../components/common/ToastContext';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { ROLES } from '../../constants/roles';
 import { formatCurrency } from '../../utils';
-import { searchVehiclesApi, listVehicleBrandsApi } from '../../services/vehicleApi';
+import { searchVehiclesApi, listVehicleBrandsApi, listVehicleModelsApi } from '../../services/vehicleApi';
 import { searchCatalogApi } from '../../services/catalogApi';
 import { searchProductsApi } from '../../services/productApi';
 import {
@@ -17,6 +18,9 @@ import {
   updateRepairSettlementStatusApi,
   logRepairSettlementPrintApi,
   createPayosPaymentLinkApi,
+  lockSettlementApi,
+  unlockSettlementApi,
+  getSettlementActivityLogApi,
 } from '../../services/repairSettlementApi';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
@@ -442,7 +446,7 @@ function printSettlement(order, payosQrCode) {
   <tr>
     <td width="30%"><b>Tên khách hàng:</b> ${order.customer?.fullName}</td>
     <td width="20%"><b>Biển số xe:</b> ${order.vehicle?.licensePlate}</td>
-    <td width="30%"><b>Tên xe:</b> ${order.vehicle?.vehicleModel}</td>
+    <td width="30%"><b>Loại xe:</b> ${order.vehicle?.vehicleModel}</td>
   </tr>
   <tr>
     <td><b>Địa chỉ:</b> ${order.customer?.address}</td>
@@ -611,7 +615,7 @@ function SettlementPreviewModal({ order, onClose }) {
                 <tr>
                   <td className="detail-cell"><b>Tên khách hàng:</b> {order.customer?.fullName}</td>
                   <td className="detail-cell"><b>Biển số xe:</b> {order.vehicle?.licensePlate}</td>
-                  <td className="detail-cell"><b>Tên xe:</b> {order.vehicle?.vehicleModel}</td>
+                  <td className="detail-cell"><b>Loại xe:</b> {order.vehicle?.vehicleModel}</td>
                 </tr>
                 <tr>
                   <td className="detail-cell"><b>Địa chỉ:</b> {order.customer?.address || '—'}</td>
@@ -866,7 +870,7 @@ function DetailModal({ order, onClose, onPreview }) {
               <div className="form-section-title">Thông tin xe</div>
               {[
                 ['Biển số xe', order.vehicle?.licensePlate],
-                ['Tên xe', order.vehicle?.vehicleModel],
+                ['Loại xe', order.vehicle?.vehicleModel],
                 ['Số khung', order.vehicle?.frameNumber],
                 ['Số máy', order.vehicle?.engineNumber],
                 ['Số Km', `${(order.vehicle?.currentKm || 0).toLocaleString()} km`],
@@ -1075,7 +1079,7 @@ function DetailModal({ order, onClose, onPreview }) {
             <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
           </div>
           <div className="modal-body">
-            <IntakeChecklistView value={order.intakeChecklist} />
+            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} />
           </div>
         </div>
       )}
@@ -1106,10 +1110,39 @@ function RepairSettlementList() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
   const canManage = user?.primaryRole !== ROLES.ADMIN;
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  // Menu 2 lua chon (Truy cap phieu / Nhat ky hoat dong) tren tung dong - chi
+  // 1 dong mo cung luc, luu id phieu dang mo menu. Render qua portal (xem
+  // menuRect - toa do viewport cua nut vua bam) ra NGOAI .table-wrapper (von
+  // overflow:auto de cuon ngang bang, xem catalogDropdownRect o form Tao/Sua
+  // cho 1 truong hop tuong tu) de khong bi cat mat o cot cuoi cung ben phai.
+  const [menuOpenId, setMenuOpenId] = useState(null);
+  const [menuRect, setMenuRect] = useState(null);
+  // Phieu dang xem "Nhat ky hoat dong" (modal rieng, khong lien quan view/khoa).
+  const [activityLogFor, setActivityLogFor] = useState(null);
+  // Khoa "dang mo phieu" (xem lockSettlementApi) - id phieu dang giu khoa +
+  // interval gia han 20s/lan trong luc con mo view. Dung ref (khong phai
+  // state) vi chi doc/ghi trong callback/cleanup, khong can re-render.
+  const lockedIdRef = useRef(null);
+  const lockIntervalRef = useRef(null);
+  const releaseLockIfHeld = useCallback(() => {
+    if (lockIntervalRef.current) {
+      clearInterval(lockIntervalRef.current);
+      lockIntervalRef.current = null;
+    }
+    if (lockedIdRef.current) {
+      unlockSettlementApi(lockedIdRef.current).catch(() => {});
+      lockedIdRef.current = null;
+    }
+  }, []);
+  // Nha khoa neu con giu luc roi khoi man hinh (chuyen tab/route khac) ma
+  // chua bam nut dong view - luoi an toan cuoi cung truoc khi cho TTL 60s tu
+  // het han (xem RepairSettlementRepositoryImpl.acquireLock).
+  useEffect(() => () => releaseLockIfHeld(), [releaseLockIfHeld]);
   // Sau khi phan cong to truong xong (RepairOrderCreate) hoac tu cac luong
   // dieu huong khac muon mo san 1 tab cu the, co the truyen state: { tab }
   // khi navigate() toi day - vd chuyen thang sang "Dang sua chua" sau khi
@@ -1138,7 +1171,11 @@ function RepairSettlementList() {
   const loadAll = ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     if (!silent) setLoadError('');
-    return listRepairSettlementsApi({ limit: 200 })
+    // scope=branch: bo loc "chi phieu cua chinh minh" - moi CVDV trong chi
+    // nhanh deu thay het phieu cua nhau (kem "dang mo boi ai" tren tung dong,
+    // xem cot lockedByName/lockedAt tra ve). BE da ho tro san co nay (dung
+    // chung voi man "Lenh sua chua").
+    return listRepairSettlementsApi({ limit: 200, scope: 'branch' })
       .then((result) => setOrders(result.items || []))
       .catch((err) => { if (!silent) setLoadError(err.message || 'Không tải được danh sách phiếu quyết toán'); })
       .finally(() => { if (!silent) setLoading(false); });
@@ -1183,7 +1220,7 @@ function RepairSettlementList() {
   //     nhanh vua tao) -> nap lai danh sach ngay, tranh phai doi poll/F5 moi
   //     thay phieu moi.
   const handleRepairOrderEvent = (event) => {
-    if (event.type === 'task-updated' && view && String(view.id) === String(event.settlementId)) {
+    if (event.type === 'task-updated' && view && String(view.id) === String(event.orderId)) {
       getRepairSettlementApi(view.id).then(setView).catch(() => { });
     }
     if (event.type === 'new-pending') {
@@ -1191,26 +1228,31 @@ function RepairSettlementList() {
     }
     if (event.type === 'claimed') {
       loadAll({ silent: true });
-      if (view && String(view.id) === String(event.settlementId)) {
+      if (view && String(view.id) === String(event.orderId)) {
         getRepairSettlementApi(view.id).then(setView).catch(() => { });
       }
     }
     if (event.type === 'order-completed') {
       loadAll({ silent: true });
-      if (view && String(view.id) === String(event.settlementId)) {
+      if (view && String(view.id) === String(event.orderId)) {
         setView(null);
         setTab('waiting_payment');
       }
     }
     if (event.type === 'invoiced') {
       loadAll({ silent: true });
-      if (previewOrder && String(previewOrder.id) === String(event.settlementId)) {
+      if (previewOrder && String(previewOrder.id) === String(event.orderId)) {
         setPreviewOrder(null);
         setView(null);
         setTab('invoiced');
       }
     }
     if (event.type === 'order-cancelled') {
+      loadAll({ silent: true });
+    }
+    // 1 CVDV khac vua chiem/nha khoa "dang mo phieu" - nap lai danh sach de
+    // cot "Đang mở bởi" cap nhat ngay, khong can cho poll 20s.
+    if (event.type === 'locked' || event.type === 'unlocked') {
       loadAll({ silent: true });
     }
   };
@@ -1256,7 +1298,7 @@ function RepairSettlementList() {
   useEffect(() => { setPage(1); }, [tab, search, filterTeamLeader, filterPaymentMethod, filterDateFrom, filterDateTo]);
 
   // Danh sach chi tra ve thong tin tom tat (khong co items - de tranh phai
-  // gop them bang service_order_items cho tung dong khi hien thi danh sach) -
+  // gop them bang repair_order_items cho tung dong khi hien thi danh sach) -
   // moi cho can hang muc day du (xem chi tiet, in danh sach CV, xem/in phieu
   // quyet toan) phai goi rieng getById de lay day du, khong dung truc tiep
   // dong danh sach.
@@ -1276,6 +1318,34 @@ function RepairSettlementList() {
   const handlePreview = async (o) => {
     setPreviewOrder(await fetchFullOrder(o));
   };
+
+  // "Truy cập phiếu" (thay cho nut "Xem chi tiet" cu) - chiem khoa truoc khi
+  // mo, chan 2 CVDV cung vao sua 1 phieu 1 luc. Neu dang bi nguoi khac giu
+  // (409) thi bao ro ten + gio, khong mo view. Sau khi mo thanh cong, cu 20s
+  // gui 1 nhip gia han (khop chu ky poll 20s da co san) de khoa khong tu het
+  // han trong luc van con dang xem - xem RepairSettlementRepositoryImpl
+  // .acquireLock (LOCK_TTL_SECONDS = 60, gap 3 lan chu ky nay).
+  const handleAccessSettlement = async (o) => {
+    try {
+      await lockSettlementApi(o.id);
+    } catch (err) {
+      if (err.status === 409) {
+        const name = err.details?.lockedByName || 'người khác';
+        toast.warning(`Phiếu đang được ${name} mở, vui lòng thử lại sau.`);
+      } else {
+        toast.error(err.message || 'Không thể mở phiếu, vui lòng thử lại');
+      }
+      return;
+    }
+    releaseLockIfHeld(); // phong khi truoc do dang giu khoa 1 phieu khac chua nha.
+    lockedIdRef.current = o.id;
+    lockIntervalRef.current = setInterval(() => {
+      lockSettlementApi(o.id).catch(() => {});
+    }, 20000);
+    await handleViewDetail(o);
+  };
+
+  const handleOpenActivityLog = (o) => setActivityLogFor(o);
 
   // Huy phieu quyet toan la MOT chieu du dang o trang thai nao (chua nhan
   // hay dang sua chua deu duoc) - BE tu cascade huy luon lenh sua chua neu
@@ -1377,7 +1447,7 @@ function RepairSettlementList() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Số RO</th><th>Khách hàng</th><th>Xe</th><th>Tổ trưởng</th>
+              <th>Số RO</th><th>Người tạo</th><th>Khách hàng</th><th>Xe</th><th>Tổ trưởng</th>
               <th>Ngày tiếp nhận</th><th>Tổng tiền</th><th>Trạng thái</th>
               {tab === 'invoiced' && <><th>Hình thức TT</th><th>Thời gian TT</th></>}
               <th>Thao tác</th>
@@ -1385,14 +1455,14 @@ function RepairSettlementList() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={tab === 'invoiced' ? 10 : 8}>
+              <tr><td colSpan={tab === 'invoiced' ? 11 : 9}>
                 <div className="empty-state">
                   <p>Đang tải danh sách phiếu…</p>
                 </div>
               </td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={tab === 'invoiced' ? 10 : 8}>
+              <tr><td colSpan={tab === 'invoiced' ? 11 : 9}>
                 <div className="empty-state">
                   <h3>Chưa có phiếu quyết toán nào</h3>
                   <p>Không có phiếu nào ở trạng thái này.</p>
@@ -1402,8 +1472,37 @@ function RepairSettlementList() {
             {paginated.map((o) => {
               const st = STATUS_LABELS[displayStatus(o)];
               return (
-                <tr key={o.id} style={{ background: o.status === 'waiting_payment' ? '#F9FBE7' : undefined }}>
+                <tr key={o.id}
+                  style={{ background: o.status === 'waiting_payment' ? '#F9FBE7' : undefined, cursor: 'pointer' }}
+                  onClick={(e) => {
+                    // Menu dang mo (neu co) luon bi lop phu toan man hinh (xem duoi) bat
+                    // truoc, nen luc handler nay thuc su chay thi chua co menu nao mo -
+                    // chi can mo menu cua dong vua bam, khong can toggle-dong lai o day.
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setMenuRect({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                    setMenuOpenId(o.id);
+                  }}>
+                  {menuOpenId === o.id && menuRect && createPortal(
+                    <>
+                      {/* Lop phu toan man hinh - bam ra ngoai (tab/bo loc/dong trong) se dong
+                          menu, vi <tr> khong tu nhien nhan duoc su kien blur nhu button truoc day. */}
+                      <div style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                        onClick={() => { setMenuOpenId(null); setMenuRect(null); }} />
+                      <div style={{ position: 'fixed', top: menuRect.top, right: menuRect.right, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000, minWidth: 180 }}>
+                        <div onMouseDown={() => { setMenuOpenId(null); handleAccessSettlement(o); }}
+                          style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)', whiteSpace: 'nowrap' }}>
+                          Truy cập phiếu
+                        </div>
+                        <div onMouseDown={() => { setMenuOpenId(null); handleOpenActivityLog(o); }}
+                          style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}>
+                          Nhật ký hoạt động phiếu
+                        </div>
+                      </div>
+                    </>,
+                    document.body
+                  )}
                   <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{o.code}</span></td>
+                  <td style={{ fontSize: 12 }}>{o.advisor || <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>—</span>}</td>
                   <td>
                     <div style={{ fontWeight: 700 }}>{o.customer?.fullName}</div>
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{o.customer?.phone}</div>
@@ -1417,7 +1516,14 @@ function RepairSettlementList() {
                   </td>
                   <td style={{ fontSize: 12 }}>{o.date}</td>
                   <td style={{ fontWeight: 700, color: '#C62828' }}>{formatCurrency(o.total)}</td>
-                  <td><span className={`badge ${st?.badge}`}>{st?.label}</span></td>
+                  <td>
+                    <span className={`badge ${st?.badge}`}>{st?.label}</span>
+                    {o.lockedByName && (
+                      <div style={{ fontSize: 10, color: 'var(--gray-500)', marginTop: 3, fontStyle: 'italic' }}>
+                        Đang mở: {o.lockedByName}{o.lockedAt ? ` lúc ${o.lockedAt.slice(-5)}` : ''}
+                      </div>
+                    )}
+                  </td>
                   {tab === 'invoiced' && (
                     <>
                       <td style={{ fontSize: 12 }}>
@@ -1426,10 +1532,8 @@ function RepairSettlementList() {
                       <td style={{ fontSize: 12 }}>{o.paidDate || '—'}</td>
                     </>
                   )}
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <div className="table-actions">
-                      <button className="btn btn-info btn-sm" style={{ fontSize: 11 }} onClick={() => handleViewDetail(o)}>Xem chi tiết</button>
-
                       {o.status === 'waiting_repair' && (
                         <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'settlement', id: o.id, code: o.code })}>Hủy</button>
                       )}
@@ -1475,8 +1579,15 @@ function RepairSettlementList() {
       {view && (
         <DetailModal
           order={view}
-          onClose={() => setView(null)}
+          onClose={() => { releaseLockIfHeld(); setView(null); }}
           onPreview={setPreviewOrder}
+        />
+      )}
+
+      {activityLogFor && (
+        <ActivityLogModal
+          order={activityLogFor}
+          onClose={() => setActivityLogFor(null)}
         />
       )}
 
@@ -1496,6 +1607,120 @@ function RepairSettlementList() {
           onClose={() => setCancelTarget(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Modal "Nhật ký hoạt động phiếu" - hien lai cac buoc (tao/truy cap/sua/
+// doi trang thai/in...) cua 1 phieu, ai lam luc nao. Tai su dung dung audit
+// log dang "lifecycle" da co san o BE (1 dong/1 phieu, xem
+// RepairSettlementService.getActivityLog), khong tao nguon du lieu rieng ──
+// Hien 1 gia tri truoc/sau trong bang so sanh - trong/null hien "(trống)" de
+// phan biet voi chuoi rong that su, khong dung formatCurrency o day vi ap
+// dung chung cho ca so km/CK%/chuoi (chi rieng unitPrice moi format tien te,
+// xem renderChangeLine).
+function formatDiffValue(v) {
+  if (v === null || v === undefined || v === '') return '(trống)';
+  if (typeof v === 'boolean') return v ? 'Có' : 'Không';
+  return String(v);
+}
+
+// "Bản ghi so sánh" cho 1 buoc "Cập nhật nội dung phiếu" - liet ke tung thay
+// doi cu the (truoc -> sau) thay vi chi 1 dong mo ta chung chung, de phieu
+// nhieu hang muc van biet ro sua CAI GI (xem RepairSettlementService
+// .diffSettlementForActivityLog o BE, noi tinh ra mang changes nay).
+function ChangesList({ changes }) {
+  return (
+    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {changes.map((c, i) => {
+        if (c.type === 'field') {
+          return (
+            <div key={i} style={{ fontSize: 12, color: 'var(--gray-700)' }}>
+              <b>{c.label}:</b> {formatDiffValue(c.before)} → {formatDiffValue(c.after)}
+            </div>
+          );
+        }
+        if (c.type === 'item_added') {
+          return (
+            <div key={i} style={{ fontSize: 12, color: '#2E7D32' }}>
+              + Thêm: {c.label} ({c.qty} × {formatCurrency(c.unitPrice)})
+            </div>
+          );
+        }
+        if (c.type === 'item_removed') {
+          return (
+            <div key={i} style={{ fontSize: 12, color: '#C62828' }}>
+              − Xóa: {c.label} ({c.qty} × {formatCurrency(c.unitPrice)})
+            </div>
+          );
+        }
+        if (c.type === 'item_changed') {
+          return (
+            <div key={i} style={{ fontSize: 12, color: '#B45309' }}>
+              <div>± Sửa: {c.label}</div>
+              <div style={{ marginLeft: 12 }}>
+                {(c.fields || []).map((f, j) => (
+                  <div key={j}>
+                    {f.label}: {f.key === 'unitPrice' ? formatCurrency(f.before) : formatDiffValue(f.before)}
+                    {' → '}
+                    {f.key === 'unitPrice' ? formatCurrency(f.after) : formatDiffValue(f.after)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })}
+    </div>
+  );
+}
+
+function ActivityLogModal({ order, onClose }) {
+  const [steps, setSteps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getSettlementActivityLogApi(order.id)
+      .then((data) => { if (!cancelled) setSteps(data?.steps || []); })
+      .catch((err) => { if (!cancelled) setError(err.message || 'Không tải được nhật ký hoạt động'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [order.id]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="modal-header">
+          <h3 className="modal-title">Nhật ký hoạt động — {order.code}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          {loading && <p style={{ fontSize: 13, color: 'var(--gray-500)' }}>Đang tải…</p>}
+          {!loading && error && <p style={{ fontSize: 13, color: 'var(--danger)' }}>{error}</p>}
+          {!loading && !error && steps.length === 0 && (
+            <p style={{ fontSize: 13, color: 'var(--gray-500)' }}>Chưa có hoạt động nào được ghi nhận.</p>
+          )}
+          {!loading && !error && steps.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto' }}>
+              {[...steps].reverse().map((s, i) => {
+                const at = s.at ? new Date(s.at) : null;
+                return (
+                  <div key={i} style={{ borderLeft: '3px solid var(--primary)', paddingLeft: 10 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{s.label || s.step}</div>
+                    <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+                      {s.by || 'Hệ thống'}{at && !Number.isNaN(at.getTime()) ? ` · ${at.toLocaleString('vi-VN')}` : ''}
+                    </div>
+                    {Array.isArray(s.changes) && s.changes.length > 0 && <ChangesList changes={s.changes} />}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1613,7 +1838,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const [vehicleInfo, setVehicleInfo] = useState(() => {
     const base = existingOrder?.vehicle || {
       licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '',
-      warrantyEndDate: '', warrantyKmLimit: null, brandId: null,
+      warrantyEndDate: '', warrantyKmLimit: null, brandId: null, modelId: null, modelYear: '',
     };
     // Km luc mo trang (man Sua) - dung lam moc doi chieu canh bao neu CVDV
     // sua currentKm xuong THAP HON, xem handleSave.
@@ -1627,6 +1852,26 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     if (isEdit) return;
     listVehicleBrandsApi().then(setVehicleBrands).catch(() => {});
   }, [isEdit]);
+  // Catalog dong+doi xe that (vehicle_models) - de o "Loai xe" chon dung tu
+  // danh sach that (gan duoc model_id) thay vi go tu do khong lien ket duoc
+  // voi catalog. Chi vai chuc dong nen tai het 1 lan, loc ngay tren FE.
+  const [vehicleModels, setVehicleModels] = useState([]);
+  const [showModelSuggestions, setShowModelSuggestions] = useState(false);
+  useEffect(() => {
+    if (isEdit) return;
+    listVehicleModelsApi().then(setVehicleModels).catch(() => {});
+  }, [isEdit]);
+  const currentYear = new Date().getFullYear();
+  // Catalog o muc do doi xe (yearFrom-yearTo), khong phai tung nam cu the -
+  // xe that cua khach van can 1 nam san xuat rieng (giong du lieu that dang
+  // co: "Mazda CX-5 2.0 Premium 2023"), nen sau khi chon mau xe van can nhap
+  // them nam nay, gan vao cuoi vehicleModel.
+  const selectedModel = vehicleInfo.modelId ? vehicleModels.find((m) => m.id === vehicleInfo.modelId) : null;
+  const modelSuggestions = (() => {
+    const term = (vehicleInfo.vehicleModel || '').trim().toLowerCase();
+    if (!term) return [];
+    return vehicleModels.filter((m) => m.displayName.toLowerCase().includes(term)).slice(0, 8);
+  })();
 
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
   const [note, setNote] = useState(existingOrder?.note || '');
@@ -1845,7 +2090,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // khi autofill nen khong the sua tay duoc nua.
   const resetLookup = () => {
     setCustomerInfo({ fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' });
-    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, brandId: null, lastKnownKm: null });
+    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, brandId: null, modelId: null, modelYear: '', lastKnownKm: null });
     setCustomerQuery('');
     setPlateQuery('');
     setIsFromLookup(false);
@@ -2393,7 +2638,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       && Boolean((customerInfo.phone || '').trim())
       && Boolean((vehicleInfo.licensePlate || '').trim())
       && Boolean(vehicleInfo.brandId)
-      && Boolean((vehicleInfo.vehicleModel || '').trim()));
+      && Boolean((vehicleInfo.vehicleModel || '').trim())
+      && (!vehicleInfo.modelId || Boolean((vehicleInfo.modelYear || '').toString().trim())));
 
   const buildPayload = () => ({
     customerId: customerInfo.id || null,
@@ -2480,7 +2726,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         setSaving(false);
         setSaved(true);
         setSavedOrder(result);
-        // BE xoa het + ghi lai toan bo service_order_items moi lan luu (xem
+        // BE xoa het + ghi lai toan bo repair_order_items moi lan luu (xem
         // RepairSettlementService.update) nen result.items co id THAT moi -
         // nap lai items local theo id nay de "Xoa" tu dong khoa lai (chi con
         // "Huy") cho MOI dong, ke ca dong vua moi them trong phien nay -
@@ -2682,13 +2928,49 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   </select>
                 </div>
               )}
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Tên xe</label>
+              <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
+                <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Loại xe</label>
                 <input className="form-input" value={vehicleInfo.vehicleModel}
                   readOnly={isFromLookup || isEdit}
-                  onChange={(e) => vInfoSet('vehicleModel', e.target.value)}
-                  placeholder={isFromLookup || isEdit ? ' ' : 'VD: K3 1.6 Deluxe 2024'} />
+                  onChange={(e) => {
+                    setVehicleInfo((p) => ({ ...p, vehicleModel: e.target.value, modelId: null, modelYear: '' }));
+                    setShowModelSuggestions(true);
+                  }}
+                  onFocus={() => { if (!isFromLookup && !isEdit) setShowModelSuggestions(true); }}
+                  onBlur={() => setTimeout(() => setShowModelSuggestions(false), 180)}
+                  placeholder={isFromLookup || isEdit ? ' ' : 'VD: CX-5 2.0 Luxury 2023'} />
+                {!isFromLookup && !isEdit && showModelSuggestions && modelSuggestions.length > 0 && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100, maxHeight: 260, overflowY: 'auto' }}>
+                    {modelSuggestions.map((m) => (
+                      <div key={m.id} onMouseDown={() => {
+                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id, brandId: m.brandId || p.brandId, modelYear: '' }));
+                        setShowModelSuggestions(false);
+                      }}
+                        style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{m.displayName}</div>
+                        <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>Đời {m.yearFrom}{m.yearTo ? ` – ${m.yearTo}` : ' – hiện tại'}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+              {!isFromLookup && !isEdit && vehicleInfo.modelId && (
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label required">Năm sản xuất</label>
+                  <input className="form-input" type="number"
+                    min={selectedModel?.yearFrom || 2015} max={selectedModel?.yearTo || currentYear}
+                    value={vehicleInfo.modelYear}
+                    placeholder={`VD: ${selectedModel?.yearFrom || ''}`}
+                    onChange={(e) => {
+                      const year = e.target.value;
+                      setVehicleInfo((p) => ({
+                        ...p,
+                        modelYear: year,
+                        vehicleModel: year ? `${selectedModel?.displayName} ${year}` : (selectedModel?.displayName || ''),
+                      }));
+                    }} />
+                </div>
+              )}
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Số khung</label>
@@ -2777,7 +3059,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       </div>
 
       {/* SECTION 1b: Phiếu tiếp nhận và bàn giao xe */}
-      <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist} />
+      <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
 
       {/* SECTION 2: Hạng mục công việc */}
       <div className="card" style={{ marginBottom: 16 }}>

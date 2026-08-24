@@ -187,7 +187,7 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
               <button type="button" className={`${styles.btn} ${styles.btnSecondary} ${styles.btnSm}`} onClick={() => setShowIntake(false)}>✕</button>
             </div>
             <div className={styles.modalBody}>
-              <IntakeChecklistView value={order.intakeChecklist} />
+              <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} />
             </div>
           </div>
         </div>
