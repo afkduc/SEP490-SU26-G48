@@ -827,7 +827,7 @@ function displayStatus(o) {
 }
 
 // ─── Modal xem chi tiết phiếu ────────────────────────────────────────
-function DetailModal({ order, onClose, onPreview }) {
+function DetailModal({ order, onClose, onPreview, canEdit, onEdit }) {
   const st = STATUS_LABELS[displayStatus(order)];
   const [showIntake, setShowIntake] = useState(false);
   return (
@@ -1052,6 +1052,9 @@ function DetailModal({ order, onClose, onPreview }) {
             {showIntake ? 'Ẩn xem tình trạng xe ban đầu' : 'Xem tình trạng xe ban đầu'}
           </button>
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
+          {canEdit && (
+            <button className="btn btn-warning" onClick={onEdit}>Chỉnh sửa phiếu</button>
+          )}
           {(order.status === 'waiting_payment' || order.status === 'invoiced') && (
             <button className="btn btn-primary" style={{ background: '#2E7D32', borderColor: '#2E7D32' }}
               onClick={() => { onClose(); onPreview(order); }}>
@@ -1549,13 +1552,10 @@ function RepairSettlementList() {
                         </button>
                       )}
 
-                      {canManage && o.status !== 'invoiced' && o.status !== 'waiting_payment' && o.status !== 'cancelled' && (
-                        // Khong truyen state={{ order: o }} - dong o lay tu danh sach KHONG co
-                        // items day du (xem fetchFullOrder), truyen thang vao se lam form luu
-                        // ghi de mat het hang muc cong viec cua phieu. De trang Chinh sua tu
-                        // goi getRepairSettlementApi(id) lay day du.
-                        <Link to={`/repair-settlement/edit/${o.id}`} className="btn btn-warning btn-sm" style={{ fontSize: 11 }}>Chỉnh sửa</Link>
-                      )}
+                      {/* "Chinh sua" da chuyen vao trong modal "Truy cap phieu"
+                          (xem DetailModal) - de thao tac sua phieu luon di qua
+                          buoc mo phieu, tranh 2 nguoi cung sua ma khong ai biet
+                          (khoa "dang mo phieu" chi duoc dat khi truy cap phieu). */}
                     </div>
                   </td>
                 </tr>
@@ -1581,6 +1581,20 @@ function RepairSettlementList() {
           order={view}
           onClose={() => { releaseLockIfHeld(); setView(null); }}
           onPreview={setPreviewOrder}
+          canEdit={canManage && view.status !== 'invoiced' && view.status !== 'waiting_payment' && view.status !== 'cancelled'}
+          // Nha khoa "dang mo phieu" truoc khi roi sang trang Chinh sua - trang
+          // do khong gui nhip gia han khoa, giu lai se thanh khoa "ma" treo den
+          // khi het han (xem LOCK_TTL_SECONDS ben BE).
+          //
+          // KHONG truyen state={{ order: view }} - dong lay tu danh sach KHONG
+          // co items day du (xem fetchFullOrder), truyen thang vao se lam form
+          // luu ghi de mat het hang muc cua phieu. De trang Chinh sua tu goi
+          // getRepairSettlementApi(id) lay ban day du.
+          onEdit={() => {
+            releaseLockIfHeld();
+            setView(null);
+            navigate(`/repair-settlement/edit/${view.id}`);
+          }}
         />
       )}
 
