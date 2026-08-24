@@ -104,6 +104,16 @@ async function start() {
       process.exit(1);
     }
 
+    // Dat lai ten rang buoc/index cho khop ten bang moi - THUAN THAM MY, hong
+    // cung khong sao nen chi canh bao (khac buoc gop bang o tren).
+    try {
+      const { ensureRepairOrderConstraintNames } = require('./infrastructure/database/ensureRepairOrderConstraintNames');
+      const r = await ensureRepairOrderConstraintNames();
+      if (r.renamed > 0) console.log(`[BE] doi ten ${r.renamed} rang buoc/index cho khop bang repair_orders`);
+    } catch (nameErr) {
+      console.warn('[BE] ensureRepairOrderConstraintNames:', nameErr.message);
+    }
+
     try {
       await require('./infrastructure/database/ensureAuditLogsUnicode').ensureAuditLogsUnicodeColumns();
       console.log('[BE] audit_logs unicode columns ready');
