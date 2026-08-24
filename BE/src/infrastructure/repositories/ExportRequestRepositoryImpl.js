@@ -383,23 +383,24 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       throw new ApiError(409, 'Lenh sua chua nay da duoc xuat kho');
     }
 
-    // 1) Insert header (repair_order_id, khong con repair_order_id)
+    // 1) Insert header. Truoc khi gop bang o day ghi 2 cot rieng
+    // (repair_order_id tro bang lenh sua chua + service_order_id tro phieu
+    // quyet toan) - gio ca 2 la mot nen chi con 1 cot repair_order_id.
     const insertReq = await tx.request()
       .input('request_code', sql.VarChar(30), requestData.request_code)
       .input('branch_id', sql.BigInt, requestData.branch_id)
       .input('repair_order_id', sql.BigInt, requestData.repair_order_id)
-      .input('repair_order_id', sql.BigInt, requestData.repair_order_id ?? null)
       .input('performed_by', sql.BigInt, requestData.performed_by)
       .input('export_date', sql.Date, requestData.export_date ?? new Date())
       .input('notes', sql.NVarChar(500), requestData.notes ?? null)
       .query(`
         INSERT INTO export_requests (
-          request_code, branch_id, repair_order_id, repair_order_id,
+          request_code, branch_id, repair_order_id,
           performed_by, export_date, status, notes, created_at
         )
         OUTPUT INSERTED.id
         VALUES (
-          @request_code, @branch_id, @repair_order_id, @repair_order_id,
+          @request_code, @branch_id, @repair_order_id,
           @performed_by, @export_date, 'completed', @notes, GETDATE()
         )
       `);
