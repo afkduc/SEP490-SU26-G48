@@ -5,6 +5,8 @@ const VehicleSearchRepositoryImpl = require('../../infrastructure/repositories/V
 const VehicleOwnershipController = require('../controllers/VehicleOwnershipController');
 const VehicleOwnershipService = require('../../application/services/VehicleOwnershipService');
 const VehicleOwnershipRepositoryImpl = require('../../infrastructure/repositories/VehicleOwnershipRepositoryImpl');
+const VehicleModelController = require('../controllers/VehicleModelController');
+const VehicleModelRepository = require('../../infrastructure/repositories/VehicleModelRepository');
 const { authenticate } = require('../../middlewares/auth');
 const { trackActivity } = require('../../middlewares');
 
@@ -19,8 +21,12 @@ function buildVehicleRouter() {
   const ownershipService = new VehicleOwnershipService({ vehicleOwnershipRepository: ownershipRepo });
   const ownershipController = new VehicleOwnershipController({ vehicleOwnershipService: ownershipService });
 
+  const modelRepo = new VehicleModelRepository();
+  const modelController = new VehicleModelController({ vehicleModelRepository: modelRepo });
+
   router.use(authenticate, trackActivity);
   router.get('/search', searchController.search);
+  router.get('/models', modelController.list);
   router.get('/:id/owners', ownershipController.getHistory);
   router.post('/:id/transfer', ownershipController.transfer);
 

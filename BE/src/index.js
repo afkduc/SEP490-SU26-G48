@@ -84,6 +84,26 @@ async function start() {
       console.warn('[BE] ensureTrustedSchema:', schemaErr.message);
     }
 
+    // PHAI chay TRUOC cac buoc ensure* khac vi no doi ten bang
+    // (service_orders -> repair_orders, service_order_items ->
+    // repair_order_items) - cac buoc sau deu tham chieu ten MOI.
+    //
+    // Va KHAC cac buoc ensure* o duoi: doi ten bang/cot chu khong chi them
+    // cot, nen KHONG duoc nuot loi. Neu no hong (da rollback) thi schema van
+    // la ban cu trong khi code da la ban moi - chay tiep chi tao ra loi 500
+    // kho hieu o khap noi. Dung han cho de con biet duong sua.
+    try {
+      const { ensureRepairOrderMerge } = require('./infrastructure/database/ensureRepairOrderMerge');
+      const result = await ensureRepairOrderMerge();
+      console.log(result.skipped
+        ? '[BE] repair_orders merge: da gop tu truoc, bo qua'
+        : `[BE] repair_orders merge: DA GOP XONG (${result.steps} buoc)`);
+    } catch (mergeErr) {
+      console.error('[BE] KHONG THE KHOI DONG - gop bang repair_orders that bai:');
+      console.error(mergeErr.message);
+      process.exit(1);
+    }
+
     try {
       await require('./infrastructure/database/ensureAuditLogsUnicode').ensureAuditLogsUnicodeColumns();
       console.log('[BE] audit_logs unicode columns ready');
@@ -100,7 +120,7 @@ async function start() {
 
     try {
       await require('./infrastructure/database/ensureRepairOrderTasksColumns').ensureRepairOrderTasksColumns();
-      console.log('[BE] repair_order_tasks/service_order_items note+prev_quantity columns ready');
+      console.log('[BE] repair_order_tasks/repair_order_items note+prev_quantity columns ready');
     } catch (schemaErr) {
       console.warn('[BE] ensureRepairOrderTasksColumns:', schemaErr.message);
     }

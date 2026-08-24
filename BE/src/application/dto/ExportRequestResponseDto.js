@@ -16,8 +16,6 @@ class ExportRequestResponseDto {
       branchId: header.branchId,
       repairOrderId: header.repairOrderId,
       repairOrderCode: header.repairOrderCode,
-      serviceOrderId: header.serviceOrderId,
-      serviceOrderCode: header.serviceOrderCode,
       customerName: header.customerName,
       vehiclePlate: header.vehiclePlate,
       performedBy: header.performedBy,

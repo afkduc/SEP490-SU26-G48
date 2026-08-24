@@ -55,7 +55,7 @@ export default function ExportRequestDetailPage() {
           <dl className="info-list">
             <InfoRow label="Mã phiếu xuất" value={data.requestCode} />
             <InfoRow label="Lệnh sửa chữa" value={data.repairOrderCode} />
-            <InfoRow label="Phiếu sửa chữa" value={data.serviceOrderCode} />
+            <InfoRow label="Phiếu sửa chữa" value={data.repairOrderCode} />
             <InfoRow label="Khách hàng" value={data.customerName} />
             <InfoRow label="Xe" value={data.vehiclePlate} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />

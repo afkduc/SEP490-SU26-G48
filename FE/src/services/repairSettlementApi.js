@@ -45,3 +45,20 @@ export async function createPayosPaymentLinkApi(id) {
   return httpClient.post(`/repair-settlements/${id}/payos/create-payment-link`);
 }
 
+// Khoa "dang mo phieu" (man danh sach) - chiem/gia han khi bam "Truy cập
+// phiếu" (goi lai moi 20s trong luc con mo), nha khi dong. Xem
+// RepairSettlementService.acquireLock/releaseLock. 409 kem err.details =
+// { lockedByUserId, lockedByName, lockedAt } khi dang bi nguoi khac giu.
+export async function lockSettlementApi(id) {
+  return httpClient.post(`/repair-settlements/${id}/lock`);
+}
+
+export async function unlockSettlementApi(id) {
+  return httpClient.delete(`/repair-settlements/${id}/lock`);
+}
+
+/** Nhat ky hoat dong 1 phieu (ai truy cap/tao/sua/doi trang thai, luc nao). */
+export async function getSettlementActivityLogApi(id) {
+  return httpClient.get(`/repair-settlements/${id}/activity-log`);
+}
+

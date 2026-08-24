@@ -83,7 +83,6 @@ export default function ExportRequestFormPage() {
       setSelectedRo({
         id: detail.id,
         repairOrderCode: detail.repairOrderCode,
-        serviceOrderCode: detail.serviceOrderCode,
         status: detail.status,
         customerName: detail.customerName,
         vehiclePlate: detail.vehiclePlate,
@@ -237,7 +236,7 @@ export default function ExportRequestFormPage() {
                     <tbody>
                       {repairOrders.map((ro) => (
                         <tr key={ro.id}>
-                          <td><span className="font-mono">{ro.serviceOrderCode || '—'}</span></td>
+                          <td><span className="font-mono">{ro.repairOrderCode || '—'}</span></td>
                           <td>{ro.customerName || '—'}</td>
                           <td>{ro.vehiclePlate || '—'}</td>
                           <td className="text-right">{ro.partTaskCount ?? 0}</td>
@@ -260,7 +259,7 @@ export default function ExportRequestFormPage() {
           ) : (
             <div className="er-form__so-summary">
               <div className="er-form__info-grid">
-                <div><strong>Mã RO:</strong> <span className="font-mono">{selectedRo.serviceOrderCode || '—'}</span></div>
+                <div><strong>Mã RO:</strong> <span className="font-mono">{selectedRo.repairOrderCode || '—'}</span></div>
                 <div><strong>Khách hàng:</strong> {selectedRo.customerName || '—'}</div>
                 <div><strong>Xe:</strong> {selectedRo.vehiclePlate || '—'}</div>
                 <div><strong>Tổ trưởng:</strong> {selectedRo.teamLeaderName || '—'}</div>

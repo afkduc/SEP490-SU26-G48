@@ -27,7 +27,7 @@ class RepairSettlementRepository {
     throw new Error('Method update() must be implemented');
   }
 
-  async wouldLoseCompletedTasks(serviceOrderId, newItems) {
+  async wouldLoseCompletedTasks(newItems) {
     throw new Error('Method wouldLoseCompletedTasks() must be implemented');
   }
 
@@ -43,7 +43,7 @@ class RepairSettlementRepository {
     throw new Error('Method confirmGateExit() must be implemented');
   }
 
-  async createPayosTransaction(serviceOrderId, { orderCode, paymentLinkId, qrCode, checkoutUrl, amount, expiredAt }) {
+  async createPayosTransaction(repairOrderId, { orderCode, paymentLinkId, qrCode, checkoutUrl, amount, expiredAt }) {
     throw new Error('Method createPayosTransaction() must be implemented');
   }
 
@@ -53,6 +53,14 @@ class RepairSettlementRepository {
 
   async markPayosTransactionPaid(orderCode, { reference, paidAt }) {
     throw new Error('Method markPayosTransactionPaid() must be implemented');
+  }
+
+  async acquireLock(id, userId) {
+    throw new Error('Method acquireLock() must be implemented');
+  }
+
+  async releaseLock(id, userId) {
+    throw new Error('Method releaseLock() must be implemented');
   }
 }
 

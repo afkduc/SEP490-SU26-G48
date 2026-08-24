@@ -4,7 +4,8 @@
 import {
   DEFAULT_INTAKE_CHECKLIST,
   INTERIOR_FIELDS, ITEMS_IN_CAR_FIELDS, EXTERIOR_LEFT_FIELDS, EXTERIOR_RIGHT_FIELDS,
-  ENGINE_BAY_FIELDS, FUEL_GAUGE_OPTIONS,
+  ENGINE_BAY_FIELDS, PRIORITY_FIELDS, OTHER_INFO_FIELDS, FUEL_GAUGE_OPTIONS,
+  SEGMENT_OPTIONS, SEGMENT_DIAGRAMS, detectSegmentFromModelText,
 } from './IntakeChecklistSection';
 
 const BADGE_COLORS = {
@@ -74,7 +75,59 @@ function FuelGaugeView({ value }) {
   );
 }
 
-export default function IntakeChecklistView({ value }) {
+const DIAGRAM_LABELS = { left: 'Trái', right: 'Phải', front: 'Trước', rear: 'Sau', top: 'Trên' };
+
+// Anh tinh (khong bam danh dau duoc, chi xem lai vi tri da danh dau).
+function DiagramImage({ img, label, marks }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <img src={`/vehicle-diagrams/${img}.png`} alt={label} style={{ width: '100%', height: 'auto', display: 'block' }} />
+      {marks.filter((m) => m.diagram === img).map((m) => (
+        <span
+          key={m.id}
+          style={{
+            position: 'absolute', left: `${m.xPct}%`, top: `${m.yPct}%`, transform: 'translate(-50%, -50%)',
+            color: '#dc2626', fontSize: 22, fontWeight: 900, lineHeight: 1,
+            textShadow: '0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff',
+          }}
+        >
+          ✕
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ExteriorBodyView({ exteriorBody, vehicleModelText }) {
+  const segment = detectSegmentFromModelText(vehicleModelText);
+  const images = SEGMENT_DIAGRAMS[segment] || SEGMENT_DIAGRAMS.sedan;
+  const segmentLabel = SEGMENT_OPTIONS.find(([key]) => key === segment)?.[1] || segment;
+  const marks = exteriorBody?.marks || [];
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 10 }}>Phân khúc xe: <b>{segmentLabel}</b></div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 12 }}>
+        {images.map((img, i) => {
+          const angle = img.split('-')[1];
+          const isLoneLast = i === images.length - 1 && images.length % 2 === 1;
+          const cardStyle = isLoneLast ? { gridColumn: '1 / -1', width: 'calc(50% - 5px)', margin: '0 auto' } : undefined;
+          return (
+            <div key={img} style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: 8, textAlign: 'center', background: '#fff', ...cardStyle }}>
+              <DiagramImage img={img} label={DIAGRAM_LABELS[angle] || angle} marks={marks} />
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-700)', marginTop: 6 }}>{DIAGRAM_LABELS[angle] || angle}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="form-group">
+        <label className="form-label">Ghi chú tình trạng thân vỏ</label>
+        <div style={{ fontSize: 12.5, color: exteriorBody?.notes ? '#334155' : 'var(--gray-400)', whiteSpace: 'pre-wrap' }}>{exteriorBody?.notes || '—'}</div>
+      </div>
+    </div>
+  );
+}
+
+export default function IntakeChecklistView({ value, vehicleModelText }) {
   const v = value || DEFAULT_INTAKE_CHECKLIST;
 
   const renderOkNgGroup = (group, fields) => (
@@ -116,8 +169,21 @@ export default function IntakeChecklistView({ value }) {
       <div className="form-section-title">Kiểm tra bên phải, phía sau xe</div>
       {renderOkNgGroup('exteriorRightRear', EXTERIOR_RIGHT_FIELDS)}
 
+      <div className="form-section-title">Kiểm tra thân vỏ xe bên ngoài</div>
+      <ExteriorBodyView exteriorBody={v.exteriorBody} vehicleModelText={vehicleModelText} />
+
       <div className="form-section-title">Kiểm tra khoang động cơ</div>
       {renderOkNgGroup('engineBay', ENGINE_BAY_FIELDS)}
+
+      <div className="form-section-title">Mức độ ưu tiên</div>
+      {PRIORITY_FIELDS.map(([key, label]) => (
+        <CoKhongRow key={key} label={label} value={v.priority?.[key] ?? null} />
+      ))}
+
+      <div className="form-section-title">Thông tin khác</div>
+      {OTHER_INFO_FIELDS.map(([key, label]) => (
+        <CoKhongRow key={key} label={label} value={v.otherInfo?.[key] ?? null} />
+      ))}
 
       <div className="form-group" style={{ marginTop: 12 }}>
         <label className="form-label">Lưu ý (hạng mục cần làm sớm, ghi chú)</label>

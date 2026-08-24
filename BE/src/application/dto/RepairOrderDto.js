@@ -1,4 +1,4 @@
-// task_type sao chep tu service_order_items.item_type ('service' | 'product').
+// task_type sao chep tu repair_order_items.item_type ('service' | 'product').
 const TASK_TYPE_LABELS = {
   service: 'Dịch vụ',
   product: 'Phụ tùng',
@@ -31,7 +31,6 @@ class RepairOrderResponseDto {
     return {
       id: entity.id,
       code: entity.code,
-      serviceOrderId: entity.serviceOrderId,
       branch: entity.branchName,
       teamLeader: entity.teamLeaderId
         ? { id: entity.teamLeaderId, fullName: entity.teamLeaderName, specialty: entity.teamLeaderSpecialty }

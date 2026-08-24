@@ -467,7 +467,7 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
               <button type="button" className="modal-close" onClick={() => setIntakeOrder(null)}>✕</button>
             </div>
             <div className="modal-body">
-              <IntakeChecklistView value={intakeOrder.intakeChecklist} />
+              <IntakeChecklistView value={intakeOrder.intakeChecklist} vehicleModelText={intakeOrder.vehicle?.vehicleModel} />
             </div>
           </div>
         </div>
@@ -635,17 +635,17 @@ export default function TeamLeaderDashboard() {
     if (event.type === 'order-cancelled') {
       // Phieu con dang o bang tin (chua ai nhan) vua bi huy - tu xoa dong
       // tuong ung, khong can F5.
-      setPending((prev) => (prev ? prev.filter((s) => s.id !== event.settlementId) : prev));
+      setPending((prev) => (prev ? prev.filter((s) => s.id !== event.orderId) : prev));
     }
     if (event.type === 'claimed') {
       // Doi dong tuong ung thanh "Khoang X da nhan" (ke ca khi chinh minh vua
       // nhan) roi tu bien mat sau 10s, khong xoa ngay de kip doc.
-      setClaimedElsewhere((prev) => ({ ...prev, [event.settlementId]: event.bayNumber }));
+      setClaimedElsewhere((prev) => ({ ...prev, [event.orderId]: event.bayNumber }));
       setTimeout(() => {
-        setPending((prev) => (prev ? prev.filter((s) => s.id !== event.settlementId) : prev));
+        setPending((prev) => (prev ? prev.filter((s) => s.id !== event.orderId) : prev));
         setClaimedElsewhere((prev) => {
           const next = { ...prev };
-          delete next[event.settlementId];
+          delete next[event.orderId];
           return next;
         });
       }, 10000);

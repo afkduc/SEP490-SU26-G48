@@ -218,7 +218,7 @@ class BranchRepositoryImpl {
   }
 
   /**
-   * Thong ke chi nhanh: so user, so service_order, doanh thu 30 ngay
+   * Thong ke chi nhanh: so user, so repair_order, doanh thu 30 ngay
    */
   async getBranchStats(branchId) {
     const [userCount, orderCount, revenue] = await Promise.all([
@@ -228,12 +228,12 @@ class BranchRepositoryImpl {
       ),
       query(`
         SELECT COUNT(*) AS total
-        FROM   service_orders so
+        FROM   repair_orders so
         WHERE  so.branch_id = @p1
       `, { p1: branchId }),
       query(`
         SELECT ISNULL(SUM(so.total), 0) AS revenue
-        FROM   service_orders so
+        FROM   repair_orders so
         WHERE  so.branch_id = @p1
           AND  so.completed_date >= DATEADD(DAY, -30, GETDATE())
       `, { p1: branchId }),

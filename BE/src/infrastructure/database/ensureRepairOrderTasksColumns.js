@@ -5,7 +5,7 @@ const { getPool } = require('./sqlServer');
 // RepairSettlementRepositoryImpl._syncRepairOrderTasks va FE TaskNameLabel
 // ("Khách thêm số lượng"/"Khách trả lại SL xN").
 // note: ghi chu rieng cho dau muc (vd luu y cua khach cho tho) - CVDV nhap
-// tren phieu quyet toan (service_order_items.note), dong bo sang day de man
+// tren phieu quyet toan (repair_order_items.note), dong bo sang day de man
 // Khoang xe/Landing cua to truong/tho cung thay duoc.
 async function ensureRepairOrderTasksColumns() {
   const pool = await getPool();
@@ -16,8 +16,8 @@ async function ensureRepairOrderTasksColumns() {
     IF COL_LENGTH('dbo.repair_order_tasks', 'note') IS NULL
       ALTER TABLE dbo.repair_order_tasks ADD note NVARCHAR(500) NULL;
 
-    IF COL_LENGTH('dbo.service_order_items', 'note') IS NULL
-      ALTER TABLE dbo.service_order_items ADD note NVARCHAR(500) NULL;
+    IF COL_LENGTH('dbo.repair_order_items', 'note') IS NULL
+      ALTER TABLE dbo.repair_order_items ADD note NVARCHAR(500) NULL;
   `);
 }
 
