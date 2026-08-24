@@ -6,7 +6,7 @@ import { useToast } from '../../components/common/ToastContext';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { ROLES } from '../../constants/roles';
 import { formatCurrency } from '../../utils';
-import { searchVehiclesApi, listVehicleBrandsApi, listVehicleModelsApi } from '../../services/vehicleApi';
+import { searchVehiclesApi, listVehicleModelsApi } from '../../services/vehicleApi';
 import { searchCatalogApi } from '../../services/catalogApi';
 import { searchProductsApi } from '../../services/productApi';
 import {
@@ -1874,20 +1874,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const [vehicleInfo, setVehicleInfo] = useState(() => {
     const base = existingOrder?.vehicle || {
       licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '',
-      warrantyEndDate: '', warrantyKmLimit: null, brandId: null, modelId: null, modelYear: '',
+      warrantyEndDate: '', warrantyKmLimit: null, modelId: null, modelYear: '',
     };
     // Km luc mo trang (man Sua) - dung lam moc doi chieu canh bao neu CVDV
     // sua currentKm xuong THAP HON, xem handleSave.
     return { ...base, lastKnownKm: base.currentKm || null };
   });
-  // Hang xe (Kia/Mazda) cho dropdown "Hãng xe" khi tao xe MOI (khong tu tra
-  // cuu) - xem listVehicleBrandsApi. Khong can cho man Sua (isEdit luon khoa
-  // toan bo vung khach hang/xe, xem readOnly={isFromLookup || isEdit}).
-  const [vehicleBrands, setVehicleBrands] = useState([]);
-  useEffect(() => {
-    if (isEdit) return;
-    listVehicleBrandsApi().then(setVehicleBrands).catch(() => {});
-  }, [isEdit]);
   // Catalog dong+doi xe that (vehicle_models) - de o "Loai xe" chon dung tu
   // danh sach that (gan duoc model_id) thay vi go tu do khong lien ket duoc
   // voi catalog. Chi vai chuc dong nen tai het 1 lan, loc ngay tren FE.
@@ -2126,7 +2118,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // khi autofill nen khong the sua tay duoc nua.
   const resetLookup = () => {
     setCustomerInfo({ fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' });
-    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, brandId: null, modelId: null, modelYear: '', lastKnownKm: null });
+    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, modelId: null, modelYear: '', lastKnownKm: null });
     setCustomerQuery('');
     setPlateQuery('');
     setIsFromLookup(false);
@@ -2684,7 +2676,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       && Boolean((customerInfo.fullName || '').trim())
       && Boolean((customerInfo.phone || '').trim())
       && Boolean((vehicleInfo.licensePlate || '').trim())
-      && Boolean(vehicleInfo.brandId)
       && Boolean((vehicleInfo.vehicleModel || '').trim())
       && (!vehicleInfo.modelId || Boolean((vehicleInfo.modelYear || '').toString().trim())));
 
@@ -2967,15 +2958,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 )}
               </div>
 
-              {!isFromLookup && !isEdit && (
-                <div className="form-group" style={{ marginBottom: 12 }}>
-                  <label className="form-label required">Hãng xe</label>
-                  <select className="form-select" value={vehicleInfo.brandId || ''} onChange={(e) => vInfoSet('brandId', e.target.value ? Number(e.target.value) : null)}>
-                    <option value="">-- Chọn hãng xe --</option>
-                    {vehicleBrands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                </div>
-              )}
               <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
                 <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Loại xe</label>
                 <input className="form-input" value={vehicleInfo.vehicleModel}
@@ -2991,7 +2973,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100, maxHeight: 260, overflowY: 'auto' }}>
                     {modelSuggestions.map((m) => (
                       <div key={m.id} onMouseDown={() => {
-                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id, brandId: m.brandId || p.brandId, modelYear: '' }));
+                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id, modelYear: '' }));
                         setShowModelSuggestions(false);
                       }}
                         style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>

@@ -29,8 +29,6 @@ class ServiceRequestResponseDto {
       purchaseBranchId: entity.purchaseBranchId,
       purchaseBranchName: entity.purchaseBranchName,
       purchaseBranchOther: entity.purchaseBranchOther,
-      vehicleBrandId: entity.vehicleBrandId,
-      vehicleBrandName: entity.vehicleBrandName,
       vehicleBrandOther: entity.vehicleBrandOther,
       nearestBranchId: entity.nearestBranchId,
       nearestBranchName: entity.nearestBranchName,

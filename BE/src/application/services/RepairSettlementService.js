@@ -302,7 +302,6 @@ class RepairSettlementService {
       contactPhone: customer.contactPhone || null,
       licensePlate: vehicle.licensePlate.trim(),
       vehicleModelText: vehicle.vehicleModel || null,
-      brandId: vehicle.brandId || null,
       modelId: vehicle.modelId || null,
       frameNumber: vehicle.frameNumber || null,
       engineNumber: vehicle.engineNumber || null,

@@ -21,14 +21,6 @@ class ServiceRequestController {
     }
   };
 
-  getPublicVehicleBrands = async (req, res, next) => {
-    try {
-      const brands = await this.serviceRequestService.getPublicVehicleBrands();
-      return success(res, brands, 'Vehicle brands retrieved');
-    } catch (err) {
-      next(err);
-    }
-  };
 
   getPublicServicePackages = async (req, res, next) => {
     try {

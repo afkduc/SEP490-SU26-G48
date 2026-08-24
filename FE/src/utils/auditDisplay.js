@@ -293,7 +293,7 @@ export const AUDIT_FIELD_LABELS = {
 export const AUDIT_TABLE_LABELS = {
   customers: 'Khách hàng',
   vehicles: 'Phương tiện',
-  brands: 'Hãng xe',
+  brands: 'Hãng xe (bảng cũ, đã bỏ)',
   branches: 'Chi nhánh',
   users: 'Người dùng',
   user_role: 'Phân quyền người dùng',
