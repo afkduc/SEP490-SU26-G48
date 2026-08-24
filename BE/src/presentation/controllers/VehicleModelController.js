@@ -7,8 +7,7 @@ class VehicleModelController {
 
   list = async (req, res, next) => {
     try {
-      const brandId = req.query.brandId ? Number(req.query.brandId) : undefined;
-      const items = await this.vehicleModelRepository.list({ brandId });
+      const items = await this.vehicleModelRepository.list();
       return success(res, items, 'Vehicle models retrieved');
     } catch (err) {
       next(err);

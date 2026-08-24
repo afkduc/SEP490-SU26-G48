@@ -25,22 +25,6 @@ class ServiceRequestService {
       .map((b) => ({ id: b.id, code: b.branchCode, name: b.branchName, address: b.address, phone: b.phone }));
   }
 
-  // Public - danh sach hang xe cho dropdown tren landing page. AutoGara chi
-  // nhan bao duong/sua chua Kia va Mazda nen loc cung ngay tai day.
-  async getPublicVehicleBrands() {
-    const VehicleBrandRepository = require('../../infrastructure/repositories/VehicleBrandRepository');
-    const repo = new VehicleBrandRepository();
-    try {
-      const items = await repo.list({ includeInactive: false });
-      return items.map((b) => ({ id: b.id, name: b.brandName }));
-    } catch (_) {
-      const result = await query(
-        'SELECT id, brand_name FROM brands ORDER BY brand_name ASC'
-      );
-      return result.recordset.map((row) => ({ id: row.id, name: row.brand_name }));
-    }
-  }
-
   // Public - vai goi dich vu tieu bieu cho section "Goi dich vu" tren landing
   // page. service_packages luu rieng theo tung chi nhanh (gia co the khac
   // nhau) - lay tam theo chi nhanh id=1 (Ha Noi, chi nhanh dang co du lieu
@@ -121,7 +105,6 @@ class ServiceRequestService {
       issueDescription: issue,
       purchaseBranchId: payload.purchaseBranchId || null,
       purchaseBranchOther: payload.purchaseBranchOther || null,
-      vehicleBrandId: payload.vehicleBrandId || null,
       vehicleBrandOther: payload.vehicleBrandOther || null,
       nearestBranchId,
     });

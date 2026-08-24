@@ -54,7 +54,7 @@ export default async function ServicePackageDetailPage({ params }) {
       <Header />
       <main className={styles.main}>
         <article className={`container ${styles.article}`}>
-          <Link href="/#goi-dich-vu" className={styles.back}>
+          <Link href="/#service-packages" className={styles.back}>
             <ArrowLeft className={styles.backIcon} />
             Gói dịch vụ
           </Link>
@@ -120,7 +120,7 @@ export default async function ServicePackageDetailPage({ params }) {
             <h3>Gói dịch vụ khác</h3>
             <div className={styles.relatedGrid}>
               {others.map((o) => (
-                <Link key={o.code} href={`/goi-dich-vu/${o.code}`} className={styles.relatedCard}>
+                <Link key={o.code} href={`/service-packages/${o.code}`} className={styles.relatedCard}>
                   <span className={styles.relatedName}>{o.name}</span>
                   <span className={styles.relatedPrice}>{formatPrice(o.totalPrice)}</span>
                   <ArrowRight className={styles.relatedArrow} />

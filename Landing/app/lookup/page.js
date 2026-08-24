@@ -1,6 +1,6 @@
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import TraCuuTabs from "./TraCuuTabs";
+import LookupTabs from "./LookupTabs";
 import styles from "./page.module.css";
 
 export const metadata = {
@@ -22,7 +22,7 @@ export default function LookupPage() {
             xem tiến độ, hoặc tra cứu theo biển số/số khung để xem lại lịch sử
             bảo dưỡng xe của bạn.
           </p>
-          <TraCuuTabs />
+          <LookupTabs />
         </div>
       </main>
       <Footer />

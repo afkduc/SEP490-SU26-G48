@@ -7,7 +7,7 @@ export const metadata = {
 };
 
 // Trang chi de CHON dung link chi nhanh 1 lan roi bookmark lai - man hinh
-// hoat dong that su nam o /bao-ve/[branch] (vd /bao-ve/hanoi), xem
+// hoat dong that su nam o /security/[branch] (vd /security/hanoi), xem
 // BranchGateScreen.jsx trong thu muc do.
 export default function LandingPageForSecurity() {
   return <BranchChooser />;

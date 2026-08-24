@@ -114,6 +114,21 @@ async function start() {
       console.warn('[BE] ensureRepairOrderConstraintNames:', nameErr.message);
     }
 
+    // Bo bang `brands` (chi con Mazda) - doi cot nen KHONG duoc nuot loi:
+    // hong ma van chay tiep thi code moi (da bo brand_id) gap schema cu se
+    // loi kho hieu. Dung han cho de con biet duong sua.
+    try {
+      const { ensureDropBrands } = require('./infrastructure/database/ensureDropBrands');
+      const r = await ensureDropBrands();
+      console.log(r.skipped
+        ? '[BE] brands: da bo tu truoc, bo qua'
+        : `[BE] brands: DA BO XONG (${r.steps} buoc)`);
+    } catch (brandErr) {
+      console.error('[BE] KHONG THE KHOI DONG - bo bang brands that bai:');
+      console.error(brandErr.message);
+      process.exit(1);
+    }
+
     try {
       await require('./infrastructure/database/ensureAuditLogsUnicode').ensureAuditLogsUnicodeColumns();
       console.log('[BE] audit_logs unicode columns ready');

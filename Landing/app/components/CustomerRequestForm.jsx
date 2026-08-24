@@ -21,14 +21,12 @@ const initialForm = {
   issue: "",
   purchaseBranchId: "",
   purchaseBranchOther: "",
-  vehicleBrandId: "",
   nearestBranchId: "",
 };
 
 export default function CustomerRequestForm() {
   const [form, setForm] = useState(initialForm);
   const [branches, setBranches] = useState([]);
-  const [vehicleBrands, setVehicleBrands] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -44,12 +42,6 @@ export default function CustomerRequestForm() {
         // con lai (khach van dien duoc cac truong khac).
       });
 
-    fetch(`${API_BASE_URL}/public/vehicle-brands`)
-      .then((res) => res.json())
-      .then((body) => {
-        if (body?.success) setVehicleBrands(body.data);
-      })
-      .catch(() => { });
   }, []);
 
   function handleChange(e) {
@@ -88,7 +80,6 @@ export default function CustomerRequestForm() {
               ? Number(form.purchaseBranchId)
               : null,
           purchaseBranchOther: form.purchaseBranchId === "other" ? form.purchaseBranchOther : null,
-          vehicleBrandId: form.vehicleBrandId ? Number(form.vehicleBrandId) : null,
           nearestBranchId: Number(form.nearestBranchId),
         }),
       });
@@ -199,19 +190,6 @@ export default function CustomerRequestForm() {
                   )}
                 </div>
 
-                <label className={styles.field}>
-                  <span>Hãng xe</span>
-                  <select name="vehicleBrandId" value={form.vehicleBrandId} onChange={handleChange}>
-                    <option value="" disabled>
-                      Chọn hãng xe của bạn?
-                    </option>
-                    {vehicleBrands.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
 
                 <label className={styles.field}>
                   <span>Vị trí *</span>

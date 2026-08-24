@@ -26,9 +26,7 @@ const HEADER_SELECT = `
          c.contact_name  AS customer_contact_name,
          c.contact_phone AS customer_contact_phone,
          v.license_plate      AS vehicle_license_plate,
-         CASE WHEN vbrand.brand_name IS NOT NULL AND vbrand.brand_name <> N''
-              THEN vbrand.brand_name + N' ' + v.vehicle_model_text
-              ELSE v.vehicle_model_text END AS vehicle_model_text,
+         v.vehicle_model_text,
          v.frame_number       AS vehicle_frame_number,
          v.engine_number      AS vehicle_engine_number,
          v.current_km         AS vehicle_current_km,
@@ -70,9 +68,7 @@ const HEADER_SELECT = `
   FROM   repair_orders so
   JOIN   branches  b   ON b.id = so.branch_id
   JOIN   customers c   ON c.id = so.customer_id
-  JOIN   vehicles  v   ON v.id = so.vehicle_id
-  LEFT JOIN brands vbrand ON vbrand.id = v.brand_id
-  JOIN   users     adv ON adv.id = so.advisor_id
+  JOIN   vehicles  v   ON v.id = so.vehicle_id  JOIN   users     adv ON adv.id = so.advisor_id
   LEFT JOIN users  tl  ON tl.id = so.team_leader_id
   LEFT JOIN users  lockUser ON lockUser.id = so.locked_by_user_id
   OUTER APPLY (

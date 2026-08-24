@@ -38,7 +38,7 @@ function splitFeatured(packages) {
 
 function PackageRow({ p }) {
   return (
-    <Link href={`/goi-dich-vu/${p.code}`} className={styles.row}>
+    <Link href={`/service-packages/${p.code}`} className={styles.row}>
       <div className={styles.rowInfo}>
         <div className={styles.rowName}>{p.name}</div>
         <div className={styles.rowDesc}>{p.description}</div>
@@ -77,7 +77,7 @@ export default function ServicePackages() {
   const { featured, others } = splitFeatured(packages);
 
   return (
-    <section id="goi-dich-vu" className={`snap-section ${styles.section}`}>
+    <section id="service-packages" className={`snap-section ${styles.section}`}>
       <div className="container">
         <Reveal className={styles.heading}>
           <span className={styles.eyebrow}>Gói dịch vụ</span>
