@@ -242,9 +242,11 @@ async function ensureRepairOrderMerge() {
   return { skipped: false, steps: done.length };
 }
 
-// Buoc 2 - CHAY TAY sau khi da xac nhan he thong chay on voi schema moi.
-// Khong dua vao ensureRepairOrderMerge() de con duong quay lai neu phat hien
-// thieu du lieu gi do sau khi doi ten.
+// Buoc 2 - DA CHAY XONG ngay 25/08/2026: bang `repair_orders_legacy` (50 dong,
+// khong bang nao tro vao) da duoc DROP. Giu lai ham nay de neu co moi truong
+// khac (may thanh vien khac, DB dung thu) van con ket bang legacy thi don not.
+// Muon lay lai du lieu cu: restore ban backup truoc khi gop, file
+// /var/opt/mssql/data/AutoGaraDB_premerge_20260824162018.bak
 function dropLegacySql() {
   return `
     IF OBJECT_ID('dbo.repair_orders_legacy','U') IS NOT NULL
