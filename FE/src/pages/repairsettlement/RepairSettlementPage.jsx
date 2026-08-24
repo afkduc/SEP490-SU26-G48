@@ -1125,6 +1125,27 @@ function RepairSettlementList() {
   // cho 1 truong hop tuong tu) de khong bi cat mat o cot cuoi cung ben phai.
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [menuRect, setMenuRect] = useState(null);
+  // Menu nao dang mo NGAY TRUOC cu bam hien tai - dung de bam lai dung dong
+  // dang mo thi dong menu (toggle), xem handler mousedown ben duoi.
+  const menuOpenBeforeClickRef = useRef(null);
+
+  // Dong menu khi bam ra ngoai. Truoc day dung 1 lop phu toan man hinh
+  // (position:fixed; inset:0) - no dong menu that, nhung NUOT luon cu bam:
+  // bam nut "Huy" thi menu dong ma nut khong chay, bam sang dong khac thi menu
+  // cua dong do khong mo len. Nghe o tang document (pha capture, chay TRUOC
+  // onClick cua React) thi menu van dong ma cu bam van toi duoc dich that su.
+  useEffect(() => {
+    if (menuOpenId === null) return undefined;
+    const onDocMouseDown = (e) => {
+      // Bam trong chinh menu: de cac muc tu xu ly (chung tu dong menu).
+      if (e.target.closest?.('[data-row-menu]')) return;
+      menuOpenBeforeClickRef.current = menuOpenId;
+      setMenuOpenId(null);
+      setMenuRect(null);
+    };
+    document.addEventListener('mousedown', onDocMouseDown, true);
+    return () => document.removeEventListener('mousedown', onDocMouseDown, true);
+  }, [menuOpenId]);
   // Phieu dang xem "Nhat ky hoat dong" (modal rieng, khong lien quan view/khoa).
   const [activityLogFor, setActivityLogFor] = useState(null);
   // Khoa "dang mo phieu" (xem lockSettlementApi) - id phieu dang giu khoa +
@@ -1478,30 +1499,31 @@ function RepairSettlementList() {
                 <tr key={o.id}
                   style={{ background: o.status === 'waiting_payment' ? '#F9FBE7' : undefined, cursor: 'pointer' }}
                   onClick={(e) => {
-                    // Menu dang mo (neu co) luon bi lop phu toan man hinh (xem duoi) bat
-                    // truoc, nen luc handler nay thuc su chay thi chua co menu nao mo -
-                    // chi can mo menu cua dong vua bam, khong can toggle-dong lai o day.
+                    // Handler mousedown o tang document da dong menu truoc do va ghi lai
+                    // no vua mo cho dong nao. Bam lai dung dong dang mo = y muon DONG,
+                    // nen khong mo lai; bam dong khac thi mo menu cua dong do.
+                    const wasOpen = menuOpenBeforeClickRef.current;
+                    menuOpenBeforeClickRef.current = null;
+                    if (wasOpen === o.id) return;
                     const rect = e.currentTarget.getBoundingClientRect();
                     setMenuRect({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
                     setMenuOpenId(o.id);
                   }}>
                   {menuOpenId === o.id && menuRect && createPortal(
-                    <>
-                      {/* Lop phu toan man hinh - bam ra ngoai (tab/bo loc/dong trong) se dong
-                          menu, vi <tr> khong tu nhien nhan duoc su kien blur nhu button truoc day. */}
-                      <div style={{ position: 'fixed', inset: 0, zIndex: 999 }}
-                        onClick={() => { setMenuOpenId(null); setMenuRect(null); }} />
-                      <div style={{ position: 'fixed', top: menuRect.top, right: menuRect.right, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000, minWidth: 180 }}>
-                        <div onMouseDown={() => { setMenuOpenId(null); handleAccessSettlement(o); }}
-                          style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)', whiteSpace: 'nowrap' }}>
-                          Truy cập phiếu
-                        </div>
-                        <div onMouseDown={() => { setMenuOpenId(null); handleOpenActivityLog(o); }}
-                          style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}>
-                          Nhật ký hoạt động phiếu
-                        </div>
+                    // Khong con lop phu chan click - viec dong menu do handler mousedown
+                    // o tang document lo (xem useEffect ben tren), nho vay cu bam van
+                    // toi duoc nut/dong ben duoi.
+                    <div data-row-menu
+                      style={{ position: 'fixed', top: menuRect.top, right: menuRect.right, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000, minWidth: 180 }}>
+                      <div onMouseDown={() => { setMenuOpenId(null); setMenuRect(null); handleAccessSettlement(o); }}
+                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)', whiteSpace: 'nowrap' }}>
+                        Truy cập phiếu
                       </div>
-                    </>,
+                      <div onMouseDown={() => { setMenuOpenId(null); setMenuRect(null); handleOpenActivityLog(o); }}
+                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}>
+                        Nhật ký hoạt động phiếu
+                      </div>
+                    </div>,
                     document.body
                   )}
                   <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{o.code}</span></td>
@@ -2217,8 +2239,19 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // coi nhu da la 1 ban ghi chinh thuc trong he thong - bat buoc phai di qua
   // "Huy" (giu lai lam ho so, van tinh tien cong da lam neu co) thay vi xoa
   // trang, KE CA khi dong do van chua co viec lam gi (chua tick hoan thanh).
+  // NGOAI LE: phieu con o "Chờ sửa chữa" thi chua ai nhan viec - chua co lenh
+  // sua chua, chua sinh dau muc nao ben To truong, khong tho nao nhin thay
+  // hang muc nay. Xoa han luc do an toan y het luc dang tao phieu, khong co gi
+  // de "giu lam ho so".
+  //
+  // Truoc day chan cung theo item.id nen sua 1 phieu "Chờ sửa chữa" khong con
+  // duong nao bo bot hang muc: nut "Xóa" bi an vi dong da co id, con nut "Hủy"
+  // lai chi hien khi phieu DA sang "Đang sửa chữa" (xem canOfferCancel) - o
+  // truong hop nay 2 dieu kien loai tru nhau, o thao tac trong tron.
+  const notStartedYet = !isEdit || existingOrder?.status === 'waiting_repair';
+
   const canRemoveGroup = (item) => {
-    if (item.id) return false;
+    if (item.id && !notStartedYet) return false;
     if (item.httt === HTTT_CANCELLED_VALUE) return false;
     if (item.lhsc !== 'DV' || !item.isGroupParent || !item.groupId) return true;
     return !isItemOrGroupDone(item, items, liveOrderInfo.tasks);
@@ -2742,9 +2775,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         setSavedOrder(result);
         // BE xoa het + ghi lai toan bo repair_order_items moi lan luu (xem
         // RepairSettlementService.update) nen result.items co id THAT moi -
-        // nap lai items local theo id nay de "Xoa" tu dong khoa lai (chi con
-        // "Huy") cho MOI dong, ke ca dong vua moi them trong phien nay -
-        // xem canRemoveGroup.
+        // nap lai items local theo id nay. Voi phieu DA sang "Đang sửa chữa",
+        // co id nghia la "Xoa" tu dong khoa lai (chi con "Huy") cho MOI dong,
+        // ke ca dong vua them trong phien nay; con phieu van o "Chờ sửa chữa"
+        // thi van xoa han duoc - xem canRemoveGroup/notStartedYet.
         setItems(assignGroupIds(
           (result.items || []).map((it) => ({ ...it, originalQty: it.qty })),
           nextGroupId
@@ -3072,8 +3106,26 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         </div>
       </div>
 
-      {/* SECTION 1b: Phiếu tiếp nhận và bàn giao xe */}
-      <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
+      {/* SECTION 1b: Phiếu tiếp nhận và bàn giao xe.
+          Khi SUA phieu thi CHI XEM - phan nay ghi lai tinh trang xe DUNG LUC
+          tiep nhan, kem chu ky xac nhan cua khach (chu ky cung da khoa khi sua,
+          xem ben duoi). Sua lai sau do se lam sai lech ban ghi goc va khien chu
+          ky khong con khop voi noi dung khach da ky. */}
+      {isEdit ? (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header" style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <span className="card-title">Tiếp nhận và bàn giao xe</span>
+            <span style={{ fontSize: 12, color: 'var(--gray-500)', fontStyle: 'italic' }}>
+              (Chỉ xem — ghi nhận lúc tiếp nhận xe, không sửa được)
+            </span>
+          </div>
+          <div className="card-body">
+            <IntakeChecklistView value={intakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
+          </div>
+        </div>
+      ) : (
+        <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
+      )}
 
       {/* SECTION 2: Hạng mục công việc */}
       <div className="card" style={{ marginBottom: 16 }}>
