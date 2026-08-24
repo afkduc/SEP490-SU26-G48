@@ -20,3 +20,6 @@ docs/
 
 # Bao cao/tai lieu test tu sinh - khong day len git
 Test/
+
+# File khoa tam cua Office (sinh ra khi dang mo file .xlsx/.docx)
+~$*
