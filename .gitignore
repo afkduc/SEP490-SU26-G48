@@ -23,3 +23,6 @@ Test/
 
 # File khoa tam cua Office (sinh ra khi dang mo file .xlsx/.docx)
 ~$*
+
+# Tai lieu tham chieu (file mau .xlsx tu ben nghiep vu) - giu o may, khong day len git
+Reference/
