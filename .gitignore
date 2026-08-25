@@ -16,10 +16,18 @@ FE/.env.production
 Landing/.env.production
 
 *.md
+# Thu muc that ten la "Docs" (D hoa). Chi viet "docs/" thi tren Windows van
+# an nho core.ignorecase=true, nhung tren Linux/macOS (phan biet hoa thuong)
+# se KHONG khop - ai clone tren 2 he do rat de lo commit ca 37 MB tai lieu.
+# Ghi ca 2 cach cho chac.
 docs/
+Docs/
 
 # Bao cao/tai lieu test tu sinh - khong day len git
 Test/
 
 # File khoa tam cua Office (sinh ra khi dang mo file .xlsx/.docx)
 ~$*
+
+# Tai lieu tham chieu (file mau .xlsx tu ben nghiep vu) - giu o may, khong day len git
+Reference/
