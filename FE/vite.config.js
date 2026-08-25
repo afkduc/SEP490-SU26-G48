@@ -43,8 +43,17 @@ export default defineConfig(({ command }) => ({
               }
             }
           });
-          proxy.on('error', (err, req, res) => {
-            console.error('[Vite Proxy Error]', err.message);
+          proxy.on('error', (err, req) => {
+            // ECONNRESET tren cac endpoint SSE (/api/sse/*, ket noi mo lien
+            // tuc de push thong bao realtime) la binh thuong: xay ra moi khi
+            // trang reload (Vite HMR) hoac tab dong trong luc dang giu stream
+            // mo - EventSource cua trinh duyet tu dong ket noi lai ngay sau
+            // do, khong anh huong gi. Chi log do (nhu loi that su) cho cac
+            // truong hop khac.
+            const isBenignSseReset = err.code === 'ECONNRESET' && req.url?.startsWith('/api/sse/');
+            if (!isBenignSseReset) {
+              console.error('[Vite Proxy Error]', err.message);
+            }
           });
         },
       },

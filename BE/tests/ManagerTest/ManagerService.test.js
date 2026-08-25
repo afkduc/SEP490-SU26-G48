@@ -547,7 +547,7 @@ function baseTechnicianPayload(overrides = {}) {
   };
 }
 
-test('createTechnician requires contact fields + password and validates format', async () => {
+test('createTechnician requires contact fields and validates format (no account/password needed)', async () => {
   const service = new ManagerService(mockRepo());
   await assert.rejects(
     () => service.createTechnician(1, baseTechnicianPayload({ fullName: '' })),
@@ -561,10 +561,8 @@ test('createTechnician requires contact fields + password and validates format',
     () => service.createTechnician(1, baseTechnicianPayload({ phone: '123' })),
     (err) => err.statusCode === 400 && /điện thoại/i.test(err.message),
   );
-  await assert.rejects(
-    () => service.createTechnician(1, baseTechnicianPayload({ password: '123' })),
-    (err) => err.statusCode === 400 && /ít nhất 8/i.test(err.message),
-  );
+  // Khong con bat buoc mat khau - manager khong nhap, BE tu sinh ngau nhien.
+  await assert.doesNotReject(() => service.createTechnician(1, baseTechnicianPayload({ password: undefined })));
 });
 
 test('createTechnician requires a valid team leader belonging to the branch', async () => {

@@ -531,9 +531,8 @@ function EmployeeFormPage({ mode }) {
 
   const [branch, setBranch] = useState(null);
   const [roles, setRoles] = useState([]);
-  const [specialtyOptions, setSpecialtyOptions] = useState([]);
   const [form, setForm] = useState({
-    fullName: '', email: '', phone: '', roleId: '', status: 'active', password: '', confirmPassword: '', specialtyIds: [],
+    fullName: '', email: '', phone: '', roleId: '', status: 'active', password: '', confirmPassword: '',
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -557,7 +556,6 @@ function EmployeeFormPage({ mode }) {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
     managerApi.getRoles().then((data) => { if (mounted) setRoles(data || []); }).catch(() => {});
-    managerApi.getSpecialties().then((data) => { if (mounted) setSpecialtyOptions(data || []); }).catch(() => {});
 
     if (isEdit && id) {
       managerApi
@@ -572,7 +570,6 @@ function EmployeeFormPage({ mode }) {
             status: data.status || 'active',
             password: '',
             confirmPassword: '',
-            specialtyIds: (data.specialties || []).map((s) => s.id),
           });
           setMembers(data.members || []);
           setBayNumbers(data.bays || []);
@@ -591,16 +588,6 @@ function EmployeeFormPage({ mode }) {
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
-  };
-
-  const toggleSpecialty = (specialtyId) => {
-    setForm((prev) => {
-      const exists = prev.specialtyIds.includes(specialtyId);
-      return {
-        ...prev,
-        specialtyIds: exists ? prev.specialtyIds.filter((sid) => sid !== specialtyId) : [...prev.specialtyIds, specialtyId],
-      };
-    });
   };
 
   // Go ten tim tho may de them vao doi - loc san nhung nguoi da co trong
@@ -677,7 +664,6 @@ function EmployeeFormPage({ mode }) {
         phone: form.phone.trim(),
         roleId: Number(form.roleId),
         status: form.status,
-        specialtyIds: isTeamLeaderRole ? form.specialtyIds : [],
       };
 
       if (isEdit) {
@@ -806,26 +792,6 @@ function EmployeeFormPage({ mode }) {
             )}
           </div>
 
-          {isTeamLeaderRole && (
-            <div className="form-group" style={{ marginTop: 14 }}>
-              <label className="form-label">Chuyên môn</label>
-              {specialtyOptions.length === 0 ? (
-                <p className="form-hint">Chưa có danh mục chuyên môn nào trong hệ thống.</p>
-              ) : (
-                <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', maxHeight: 220, overflowY: 'auto' }}>
-                  {specialtyOptions.map((s) => (
-                    <label
-                      key={s.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, cursor: 'pointer' }}
-                    >
-                      <input type="checkbox" checked={form.specialtyIds.includes(s.id)} onChange={() => toggleSpecialty(s.id)} />
-                      <span>{s.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {isTeamLeaderRole && isEdit && (
             <div className="form-group" style={{ marginTop: 14, position: 'relative' }}>
@@ -2417,10 +2383,9 @@ function TechnicianListPage() {
               className="btn btn-secondary"
               onClick={() => exportCsv(
                 'danh-sach-tho-may.csv',
-                ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Chuyên môn', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
+                ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
                 technicians.map((t) => [
                   t.employeeId, t.fullName, t.email, t.teamLeaderName,
-                  (t.specialties || []).map((s) => s.name).join('; '),
                   t.phone, formatDate(t.createdAt), statusBadge(t.status).label,
                 ])
               )}
@@ -2478,7 +2443,6 @@ function TechnicianListPage() {
               <th>Mã NV</th>
               <th>Thợ máy</th>
               <th>Tổ trưởng</th>
-              <th>Chuyên môn</th>
               <th>Số điện thoại</th>
               <th>Ngày vào</th>
               <th>Trạng thái</th>
@@ -2487,7 +2451,7 @@ function TechnicianListPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8}>
+              <tr><td colSpan={7}>
                 <div className="empty-state">
                   <div className="empty-state-icon">⏳</div>
                   <h3>Đang tải danh sách thợ máy</h3>
@@ -2496,7 +2460,7 @@ function TechnicianListPage() {
             )}
 
             {!loading && pageItems.length === 0 && !error && (
-              <tr><td colSpan={8}>
+              <tr><td colSpan={7}>
                 <div className="empty-state">
                   <div className="empty-state-icon">📭</div>
                   <h3>Không có thợ máy phù hợp</h3>
@@ -2520,15 +2484,6 @@ function TechnicianListPage() {
                     </div>
                   </td>
                   <td>{technician.teamLeaderName || 'Chưa gán'}</td>
-                  <td>
-                    {(technician.specialties || []).slice(0, 2).map((s) => (
-                      <span key={s.id} className="tag">{s.name}</span>
-                    ))}
-                    {(technician.specialties || []).length > 2 && (
-                      <span className="tag">+{technician.specialties.length - 2}</span>
-                    )}
-                    {(technician.specialties || []).length === 0 && '—'}
-                  </td>
                   <td>{technician.phone || '—'}</td>
                   <td>{formatDate(technician.createdAt)}</td>
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
@@ -2576,9 +2531,8 @@ function TechnicianFormPage({ mode }) {
 
   const [branch, setBranch] = useState(null);
   const [teamLeaderOptions, setTeamLeaderOptions] = useState([]);
-  const [specialtyOptions, setSpecialtyOptions] = useState([]);
   const [form, setForm] = useState({
-    fullName: '', email: '', phone: '', teamLeaderId: '', status: 'active', password: '', confirmPassword: '', specialtyIds: [],
+    fullName: '', email: '', phone: '', teamLeaderId: '', status: 'active',
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -2589,7 +2543,6 @@ function TechnicianFormPage({ mode }) {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
     managerApi.getTeamLeaderOptions().then((data) => { if (mounted) setTeamLeaderOptions(data || []); }).catch(() => {});
-    managerApi.getSpecialties().then((data) => { if (mounted) setSpecialtyOptions(data || []); }).catch(() => {});
 
     if (isEdit && id) {
       managerApi
@@ -2602,9 +2555,6 @@ function TechnicianFormPage({ mode }) {
             phone: data.phone || '',
             teamLeaderId: data.teamLeaderId ? String(data.teamLeaderId) : '',
             status: data.status || 'active',
-            password: '',
-            confirmPassword: '',
-            specialtyIds: (data.specialties || []).map((s) => s.id),
           });
         })
         .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin thợ máy'); })
@@ -2620,16 +2570,6 @@ function TechnicianFormPage({ mode }) {
     setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
-  const toggleSpecialty = (specialtyId) => {
-    setForm((prev) => {
-      const exists = prev.specialtyIds.includes(specialtyId);
-      return {
-        ...prev,
-        specialtyIds: exists ? prev.specialtyIds.filter((sid) => sid !== specialtyId) : [...prev.specialtyIds, specialtyId],
-      };
-    });
-  };
-
   const validate = () => {
     const errors = {};
     if (!form.fullName.trim()) errors.fullName = 'Vui lòng nhập họ và tên';
@@ -2638,11 +2578,6 @@ function TechnicianFormPage({ mode }) {
     if (!form.phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại';
     else if (!PHONE_REGEX.test(form.phone.trim())) errors.phone = 'Số điện thoại không hợp lệ';
     if (!form.teamLeaderId) errors.teamLeaderId = 'Vui lòng chọn tổ trưởng phụ trách';
-    if (!isEdit) {
-      if (!form.password) errors.password = 'Vui lòng nhập mật khẩu tạm thời';
-      else if (form.password.length < 8) errors.password = 'Mật khẩu tối thiểu 8 ký tự';
-      if (form.confirmPassword !== form.password) errors.confirmPassword = 'Xác nhận mật khẩu không khớp';
-    }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -2660,13 +2595,12 @@ function TechnicianFormPage({ mode }) {
         phone: form.phone.trim(),
         teamLeaderId: Number(form.teamLeaderId),
         status: form.status,
-        specialtyIds: form.specialtyIds,
       };
 
       if (isEdit) {
         await managerApi.updateTechnician(id, payload);
       } else {
-        await managerApi.createTechnician({ ...payload, password: form.password, confirmPassword: form.confirmPassword });
+        await managerApi.createTechnician(payload);
       }
       navigate('/manager/technicians');
     } catch (err) {
@@ -2762,43 +2696,6 @@ function TechnicianFormPage({ mode }) {
             )}
           </div>
 
-          <div className="form-group" style={{ marginTop: 14 }}>
-            <label className="form-label">Chuyên môn</label>
-            {specialtyOptions.length === 0 ? (
-              <p className="form-hint">Chưa có danh mục chuyên môn nào trong hệ thống.</p>
-            ) : (
-              <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', maxHeight: 220, overflowY: 'auto' }}>
-                {specialtyOptions.map((s) => (
-                  <label
-                    key={s.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, cursor: 'pointer' }}
-                  >
-                    <input type="checkbox" checked={form.specialtyIds.includes(s.id)} onChange={() => toggleSpecialty(s.id)} />
-                    <span>{s.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {!isEdit && (
-            <>
-              <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Thông tin đăng nhập</div>
-              <div className="form-grid form-grid-2">
-                <div className="form-group">
-                  <label className="form-label required">Mật khẩu tạm thời</label>
-                  <input type="password" className="form-input" value={form.password} onChange={(e) => setField('password', e.target.value)} placeholder="Tối thiểu 8 ký tự" />
-                  {fieldErrors.password && <span className="form-error">{fieldErrors.password}</span>}
-                </div>
-                <div className="form-group">
-                  <label className="form-label required">Xác nhận mật khẩu</label>
-                  <input type="password" className="form-input" value={form.confirmPassword} onChange={(e) => setField('confirmPassword', e.target.value)} placeholder="Nhập lại mật khẩu" />
-                  {fieldErrors.confirmPassword && <span className="form-error">{fieldErrors.confirmPassword}</span>}
-                </div>
-              </div>
-              <p className="form-hint" style={{ marginTop: 8 }}>Hãy gửi mật khẩu cho thợ máy qua kênh an toàn.</p>
-            </>
-          )}
         </div>
 
         <div className="form-actions">
