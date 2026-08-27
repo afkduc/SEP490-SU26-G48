@@ -778,23 +778,6 @@ class AdminController {
 
       const closedSessions = result.recordset?.[0]?.closedSessions || 0;
 
-      // Xoa device cu trung lap (chi giu device moi nhat)
-      await query(`
-        WITH RankedDevices AS (
-          SELECT 
-            id,
-            user_id,
-            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY last_login_at DESC) as rn
-          FROM user_devices
-          WHERE is_current = 1
-        )
-        UPDATE user_devices
-        SET is_current = 0
-        WHERE id IN (
-          SELECT id FROM RankedDevices WHERE rn > 1
-        );
-      `);
-
       return success(res, {
         closedSessions,
         message: closedSessions > 0

@@ -76,12 +76,12 @@ async function start() {
       console.warn('[BE] Failed to start background jobs:', jobErr.message);
     }
 
-    // Dam bao cot thiet bi tin cay
+    // Dam bao cot thiet bi tren login_sessions (da gop bo user_devices)
     try {
-      await require('./infrastructure/repositories/DeviceRepository').ensureTrustedSchema();
-      console.log('[BE] user_devices trusted columns ready');
+      await require('./infrastructure/repositories/DeviceRepository').ensureSessionDeviceSchema();
+      console.log('[BE] login_sessions device columns ready');
     } catch (schemaErr) {
-      console.warn('[BE] ensureTrustedSchema:', schemaErr.message);
+      console.warn('[BE] ensureSessionDeviceSchema:', schemaErr.message);
     }
 
     // PHAI chay TRUOC cac buoc ensure* khac vi no doi ten bang

@@ -320,10 +320,25 @@ function buildAuditDescription(action, details = {}) {
   }
 }
 
+/**
+ * Nhãn đối tượng audit — thay bảng entity_definitions (không còn đọc DB).
+ * prefixCode/icon giữ shape API cũ nếu client còn gọi /audit/entity-definitions.
+ */
+const ENTITY_DEFINITIONS = [
+  { id: 1, tableName: 'users', entityName: 'Người dùng', prefixCode: 'USR', icon: 'user' },
+  { id: 2, tableName: 'branches', entityName: 'Chi nhánh', prefixCode: 'BR', icon: 'building' },
+  { id: 3, tableName: 'roles', entityName: 'Vai trò', prefixCode: 'ROL', icon: 'shield' },
+  { id: 4, tableName: 'login_sessions', entityName: 'Thiết bị / phiên đăng nhập', prefixCode: 'SES', icon: 'monitor' },
+  { id: 5, tableName: 'audit_logs', entityName: 'Nhật ký hệ thống', prefixCode: 'AUD', icon: 'file' },
+  { id: 6, tableName: 'security_alerts', entityName: 'Cảnh báo bảo mật', prefixCode: 'SEC', icon: 'alert' },
+  { id: 7, tableName: 'notifications', entityName: 'Thông báo', prefixCode: 'NTF', icon: 'bell' },
+];
+
 module.exports = {
   ACTION_LABELS,
   ROLE_LABELS,
   SCREEN_LABELS,
+  ENTITY_DEFINITIONS,
   getScreenLabel,
   getPermissionScreenLabel,
   getRoleLabel,
