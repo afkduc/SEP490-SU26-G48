@@ -181,7 +181,7 @@ export const AUDIT_FIELD_LABELS = {
   amount: 'Số tiền',
   totalAmount: 'Tổng tiền',
   paymentMethod: 'Phương thức thanh toán',
-  packageId: 'Mã gói dịch vụ',
+  packageId: 'Mã gói bảo dưỡng',
   serviceId: 'Mã dịch vụ',
   serviceName: 'Tên dịch vụ',
   categoryId: 'Mã danh mục',
@@ -309,8 +309,8 @@ export const AUDIT_TABLE_LABELS = {
   permissions: 'Phân quyền chi tiết',
   service_categories: 'Danh mục dịch vụ',
   services: 'Dịch vụ',
-  service_packages: 'Gói dịch vụ',
-  service_package_items: 'Hạng mục gói dịch vụ',
+  service_packages: 'Gói bảo dưỡng',
+  service_package_items: 'Hạng mục gói bảo dưỡng',
   suppliers: 'Nhà cung cấp',
   products: 'Phụ tùng / Sản phẩm',
   inventory_transactions: 'Giao dịch kho',
@@ -669,7 +669,7 @@ export function formatEntityCodeDisplay(entityCode, tableName, entityName) {
     return { label: 'Mã nhân sự', value: code, hint: 'Mã nhân viên / thợ trên hệ thống' };
   }
   if (table === 'services' || table === 'service_packages') {
-    return { label: 'Mã danh mục dịch vụ', value: code, hint: 'Mã dịch vụ hoặc gói dịch vụ' };
+    return { label: 'Mã danh mục dịch vụ', value: code, hint: 'Mã dịch vụ hoặc gói bảo dưỡng' };
   }
   return { label: 'Mã đối tượng', value: code, hint: 'Mã định danh bản ghi liên quan' };
 }

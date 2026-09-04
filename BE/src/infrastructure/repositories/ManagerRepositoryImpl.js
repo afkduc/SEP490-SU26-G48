@@ -609,7 +609,7 @@ class ManagerRepositoryImpl {
     if (!row) return null;
 
     const itemsResult = await query(
-      `SELECT s.id, s.service_code, s.service_name, s.unit_price, s.is_active
+      `SELECT s.id, s.service_code, s.service_name, s.unit_price, s.is_active, spi.action_code
        FROM service_package_items spi
        JOIN services s ON s.id = spi.service_id
        WHERE spi.package_id = @id
@@ -617,16 +617,19 @@ class ManagerRepositoryImpl {
       { id: Number(id) }
     );
 
-    return {
-      ...mapPackageRow(row),
-      services: itemsResult.recordset.map((r) => ({
-        id: r.id,
-        code: r.service_code,
-        name: r.service_name,
-        unitPrice: Number(r.unit_price || 0),
-        isActive: !!r.is_active,
-      })),
-    };
+    // Phu tung chi thuc su duoc thay khi hanh dong la "R" (Thay the) - cac dong
+    // I/M/V (kiem tra/thao ve sinh/kiem tra mat) khong tieu hao phu tung.
+    const services = await Promise.all(itemsResult.recordset.map(async (r) => ({
+      id: r.id,
+      code: r.service_code,
+      name: r.service_name,
+      unitPrice: Number(r.unit_price || 0),
+      isActive: !!r.is_active,
+      actionCode: r.action_code,
+      parts: r.action_code === 'R' ? await this._listServiceParts(r.id) : [],
+    })));
+
+    return { ...mapPackageRow(row), services };
   }
 
   async listPackagesUsingService(branchId, serviceId) {

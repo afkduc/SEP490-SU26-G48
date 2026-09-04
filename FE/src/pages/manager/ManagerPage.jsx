@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { usePermission } from '../../contexts/PermissionContext';
@@ -1344,7 +1344,7 @@ function ServiceFormPage({ mode }) {
         <div style={{ background: '#FFF3E0', border: '1px solid #FFD9A0', color: '#B45309', borderRadius: 12, padding: 18 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>⚠️ Dịch vụ đã được ngừng áp dụng</div>
           <p style={{ marginBottom: 10 }}>
-            Dịch vụ này vẫn đang nằm trong {packageWarning.length} gói dịch vụ đang hoạt động. Các gói đó sẽ
+            Dịch vụ này vẫn đang nằm trong {packageWarning.length} gói bảo dưỡng đang hoạt động. Các gói đó sẽ
             KHÔNG tự động cập nhật — nếu muốn, hãy vào từng gói để bỏ dịch vụ này ra:
           </p>
           <ul style={{ margin: '0 0 14px 20px' }}>
@@ -1494,23 +1494,69 @@ function ServiceFormPage({ mode }) {
   );
 }
 
+// Ma xe theo dung thu tu 12 xe trong bang vehicle_models, dung de sap xep nhom.
+const VEHICLE_CODE_ORDER = ['MZ2', 'MZ3', 'MZ6-LX', 'MZ6-PR', 'CX3-LX', 'CX3-PR', 'CX5-LX', 'CX5-PR', 'CX8-LX', 'CX8-PR', 'BT50-LX', 'BT50-PR'];
+// cap = 0 dai dien cho moc "1.000km dau" (truoc Cap 1), de sap xep/loc dung chung
+// co che voi Cap 1..5.
+function parsePackageCode(code) {
+  const m = /^PKG-(.+)-CAP(\d)$/.exec(code || '');
+  if (m) return { vehicleCode: m[1], cap: Number(m[2]) };
+  const m2 = /^PKG-(.+)-1000KM$/.exec(code || '');
+  if (m2) return { vehicleCode: m2[1], cap: 0 };
+  return { vehicleCode: null, cap: null };
+}
+function parseVehicleName(name) {
+  const m = /^Gói bảo dưỡng (?:Cấp \d+|1\.000km đầu) - (.+)$/.exec(name || '');
+  return m ? m[1] : (name || '');
+}
+function capLabel(cap) {
+  return cap === 0 ? '1.000km đầu' : `Cấp ${cap}`;
+}
+function fuelOfVehicleCode(vehicleCode) {
+  if (!vehicleCode) return null;
+  return vehicleCode.startsWith('BT50') ? 'diesel' : 'petrol';
+}
+function fuelBadge(fuel) {
+  if (fuel === 'diesel') return { label: 'Diesel', className: 'badge-pending' };
+  if (fuel === 'petrol') return { label: 'Xăng', className: 'badge-approved' };
+  return null;
+}
+// R/I/M/V theo dung chu giai cua Phu luc 3: chi "R" (Thay the) moi tieu hao phu tung.
+const ACTION_CODE_BADGE = {
+  R: { label: 'Thay thế', className: 'badge-active' },
+  I: { label: 'Kiểm tra/điều chỉnh', className: 'badge-approved' },
+  M: { label: 'Tháo vệ sinh', className: 'badge-inprogress' },
+  V: { label: 'Kiểm tra mắt', className: 'badge-inactive' },
+};
+function actionCodeBadge(code) {
+  return ACTION_CODE_BADGE[code] || { label: code || '—', className: 'badge-inactive' };
+}
+
 function ServicePackageDetailModal({ pkg, onClose }) {
   if (!pkg) return null;
   const badge = activeBadge(pkg.isActive);
+  const { vehicleCode, cap } = parsePackageCode(pkg.code);
+  const vehicleName = parseVehicleName(pkg.name);
+  const fBadge = fuelBadge(fuelOfVehicleCode(vehicleCode));
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">Chi tiết gói dịch vụ</h3>
+          <h3 className="modal-title">Chi tiết gói bảo dưỡng</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 10, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-900)' }}>{pkg.name}</div>
-            <span className={`badge ${badge.className}`}>{badge.label}</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {fBadge && <span className={`badge ${fBadge.className}`}>{fBadge.label}</span>}
+              <span className={`badge ${badge.className}`}>{badge.label}</span>
+            </div>
           </div>
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 16 }}>
             <div className="detail-row"><div className="detail-label">Mã gói</div><div className="detail-value">{pkg.code}</div></div>
+            <div className="detail-row"><div className="detail-label">Dòng xe áp dụng</div><div className="detail-value">{vehicleName}</div></div>
+            <div className="detail-row"><div className="detail-label">Cấp bảo dưỡng</div><div className="detail-value">{cap != null ? capLabel(cap) : '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Loại hình sửa chữa</div><div className="detail-value">{repairCategoryLabel(pkg.repairCategory)}</div></div>
             <div className="detail-row"><div className="detail-label">Giá gói</div><div className="detail-value">{formatCurrency(pkg.totalPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{pkg.description || '—'}</div></div>
@@ -1519,16 +1565,28 @@ function ServicePackageDetailModal({ pkg, onClose }) {
           <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13, color: 'var(--gray-700)' }}>
             Dịch vụ trong gói ({(pkg.services || []).length})
           </div>
+          <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 8 }}>
+            Cột "Hành động" lấy đúng theo Phụ lục 3 — chỉ dòng <strong>Thay thế (R)</strong> mới tiêu hao phụ tùng; các dòng Kiểm tra/Tháo vệ sinh/Kiểm tra mắt chỉ là công kiểm tra, không thay đồ.
+          </div>
           <div className="table-wrapper">
             <table className="data-table">
-              <thead><tr><th>Mã DV</th><th>Tên dịch vụ</th><th>Đơn giá</th><th>Trạng thái</th></tr></thead>
+              <thead><tr><th>Mã DV</th><th>Tên dịch vụ</th><th>Hành động</th><th>Phụ tùng thay thế</th><th>Đơn giá</th><th>Trạng thái</th></tr></thead>
               <tbody>
                 {(pkg.services || []).map((s) => {
                   const svcBadge = activeBadge(s.isActive);
+                  const acBadge = actionCodeBadge(s.actionCode);
                   return (
                     <tr key={s.id}>
                       <td style={{ fontFamily: 'monospace' }}>{s.code}</td>
                       <td>{s.name}</td>
+                      <td><span className={`badge ${acBadge.className}`}>{acBadge.label}</span></td>
+                      <td>
+                        {s.actionCode === 'R'
+                          ? ((s.parts || []).length
+                            ? s.parts.map((p) => p.productName).join(', ')
+                            : <span style={{ color: 'var(--gray-400)' }}>Chưa gán phụ tùng</span>)
+                          : <span style={{ color: 'var(--gray-400)' }}>—</span>}
+                      </td>
                       <td>{formatCurrency(s.unitPrice)}</td>
                       <td><span className={`badge ${svcBadge.className}`}>{svcBadge.label}</span></td>
                     </tr>
@@ -1550,13 +1608,14 @@ function ServicePackageListPage() {
   const navigate = useNavigate();
   const [packages, setPackages] = useState([]);
   const [search, setSearch] = useState('');
-  const [repairCategory, setRepairCategory] = useState('all');
   const [status, setStatus] = useState('all');
+  const [vehicleFilter, setVehicleFilter] = useState('all');
+  const [capFilter, setCapFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activePackage, setActivePackage] = useState(null);
   const [activePackageLoading, setActivePackageLoading] = useState(false);
-  const [page, setPage] = useState(1);
+  const [expanded, setExpanded] = useState(() => new Set());
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
@@ -1565,16 +1624,15 @@ function ServicePackageListPage() {
     setLoading(true);
     setError('');
     managerApi
-      .getServicePackages({ search: search.trim(), repairCategory, status })
+      .getServicePackages({ search: search.trim(), status })
       .then((data) => {
         if (seq !== requestSeq.current) return;
         setPackages(data || []);
-        setPage(1);
       })
       .catch((err) => {
         if (seq !== requestSeq.current) return;
         setPackages([]);
-        setError(err.message || 'Không tải được danh sách gói dịch vụ');
+        setError(err.message || 'Không tải được danh sách gói bảo dưỡng');
       })
       .finally(() => {
         if (seq === requestSeq.current) setLoading(false);
@@ -1586,12 +1644,13 @@ function ServicePackageListPage() {
     searchTimer.current = setTimeout(reload, 300);
     return () => clearTimeout(searchTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, repairCategory, status]);
+  }, [search, status]);
 
   const clearFilters = () => {
     setSearch('');
-    setRepairCategory('all');
     setStatus('all');
+    setVehicleFilter('all');
+    setCapFilter('all');
   };
 
   const openDetail = (pkg) => {
@@ -1603,15 +1662,67 @@ function ServicePackageListPage() {
       .finally(() => setActivePackageLoading(false));
   };
 
-  const totalPages = Math.max(1, Math.ceil(packages.length / PAGE_SIZE));
-  const pageItems = packages.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Danh sach dong xe co trong du lieu da tai (khong phu thuoc bo loc xe/cap
+  // hien tai) de dropdown "Dong xe" luon du 12 lua chon.
+  const vehicleOptions = useMemo(() => {
+    const map = new Map();
+    for (const p of packages) {
+      const { vehicleCode } = parsePackageCode(p.code);
+      if (vehicleCode && !map.has(vehicleCode)) map.set(vehicleCode, parseVehicleName(p.name));
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => VEHICLE_CODE_ORDER.indexOf(a) - VEHICLE_CODE_ORDER.indexOf(b))
+      .map(([code, name]) => ({ code, name }));
+  }, [packages]);
+
+  const filteredPackages = useMemo(() => packages.filter((p) => {
+    const { vehicleCode, cap } = parsePackageCode(p.code);
+    if (vehicleFilter !== 'all' && vehicleCode !== vehicleFilter) return false;
+    if (capFilter !== 'all' && cap !== Number(capFilter)) return false;
+    return true;
+  }), [packages, vehicleFilter, capFilter]);
+
+  // Nhom theo tung dong xe, moi nhom co toi da 5 goi (Cap 1..5), sap xep theo
+  // dung thu tu 12 xe va theo cap tang dan trong tung nhom.
+  const groups = useMemo(() => {
+    const map = new Map();
+    for (const p of filteredPackages) {
+      const { vehicleCode, cap } = parsePackageCode(p.code);
+      const key = vehicleCode || p.code;
+      if (!map.has(key)) map.set(key, { vehicleCode: key, vehicleName: parseVehicleName(p.name), fuel: fuelOfVehicleCode(vehicleCode), items: [] });
+      map.get(key).items.push({ ...p, cap });
+    }
+    const arr = [...map.values()];
+    arr.forEach((g) => g.items.sort((a, b) => (a.cap || 0) - (b.cap || 0)));
+    arr.sort((a, b) => {
+      const ia = VEHICLE_CODE_ORDER.indexOf(a.vehicleCode);
+      const ib = VEHICLE_CODE_ORDER.indexOf(b.vehicleCode);
+      if (ia === -1 && ib === -1) return a.vehicleName.localeCompare(b.vehicleName, 'vi');
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+    return arr;
+  }, [filteredPackages]);
+
+  const filtersActive = Boolean(search.trim()) || vehicleFilter !== 'all' || capFilter !== 'all';
+  const isExpanded = (vehicleCode) => filtersActive || expanded.has(vehicleCode);
+  const toggleGroup = (vehicleCode) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(vehicleCode)) next.delete(vehicleCode); else next.add(vehicleCode);
+      return next;
+    });
+  };
+  const expandAll = () => setExpanded(new Set(groups.map((g) => g.vehicleCode)));
+  const collapseAll = () => setExpanded(new Set());
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Quản lý gói dịch vụ</h1>
-          <div className="breadcrumb">Trang chủ / Gói dịch vụ</div>
+          <h1>Quản lý gói bảo dưỡng</h1>
+          <div className="breadcrumb">Trang chủ / Gói bảo dưỡng</div>
         </div>
         <div className="page-header-right">
           <PermissionGate permission="screen:manager:services:view">
@@ -1620,8 +1731,11 @@ function ServicePackageListPage() {
               className="btn btn-secondary"
               onClick={() => exportCsv(
                 'danh-sach-goi-dich-vu.csv',
-                ['Mã gói', 'Tên gói', 'Loại hình sửa chữa', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
-                packages.map((p) => [p.code, p.name, repairCategoryLabel(p.repairCategory), p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
+                ['Mã gói', 'Dòng xe', 'Cấp', 'Tên gói', 'Loại hình sửa chữa', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
+                packages.map((p) => {
+                  const { cap } = parsePackageCode(p.code);
+                  return [p.code, parseVehicleName(p.name), cap != null ? capLabel(cap) : '', p.name, repairCategoryLabel(p.repairCategory), p.itemCount, p.totalPrice, activeBadge(p.isActive).label];
+                })
               )}
             >
               📊 Xuất Excel
@@ -1629,7 +1743,7 @@ function ServicePackageListPage() {
           </PermissionGate>
           <PermissionGate permission="screen:manager:services:create">
             <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/service-packages/create')}>
-              + Thêm gói dịch vụ
+              + Thêm gói bảo dưỡng
             </button>
           </PermissionGate>
         </div>
@@ -1641,10 +1755,17 @@ function ServicePackageListPage() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã gói, tên gói..." />
         </div>
 
-        <select className="filter-select" value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)}>
-          <option value="all">Tất cả loại hình sửa chữa</option>
-          {REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+        <select className="filter-select" value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)}>
+          <option value="all">Tất cả dòng xe</option>
+          {vehicleOptions.map((v) => (
+            <option key={v.code} value={v.code}>{v.name}</option>
+          ))}
+        </select>
+
+        <select className="filter-select" value={capFilter} onChange={(e) => setCapFilter(e.target.value)}>
+          <option value="all">Tất cả cấp</option>
+          {[0, 1, 2, 3, 4, 5].map((c) => (
+            <option key={c} value={c}>{capLabel(c)}</option>
           ))}
         </select>
 
@@ -1666,80 +1787,97 @@ function ServicePackageListPage() {
         </div>
       )}
 
-      <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 8, textAlign: 'right' }}>
-        Hiển thị {pageItems.length}/{packages.length} gói dịch vụ
-      </div>
-
-      <div className="table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Mã gói</th>
-              <th>Tên gói</th>
-              <th>Loại hình sửa chữa</th>
-              <th>Số dịch vụ</th>
-              <th>Giá gói</th>
-              <th>Trạng thái</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7}>
-                <div className="empty-state">
-                  <div className="empty-state-icon">⏳</div>
-                  <h3>Đang tải danh sách gói dịch vụ</h3>
-                </div>
-              </td></tr>
-            )}
-
-            {!loading && pageItems.length === 0 && !error && (
-              <tr><td colSpan={7}>
-                <div className="empty-state">
-                  <div className="empty-state-icon">📭</div>
-                  <h3>Không có gói dịch vụ phù hợp</h3>
-                  <p>Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc, hoặc thêm gói mới.</p>
-                </div>
-              </td></tr>
-            )}
-
-            {!loading && pageItems.map((pkg) => {
-              const badge = activeBadge(pkg.isActive);
-              return (
-                <tr key={pkg.id}>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{pkg.code}</td>
-                  <td style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{pkg.name}</td>
-                  <td>{repairCategoryLabel(pkg.repairCategory)}</td>
-                  <td>{pkg.itemCount}</td>
-                  <td>{formatCurrency(pkg.totalPrice)}</td>
-                  <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
-                  <td>
-                    <div className="table-actions">
-                      <PermissionGate permission="screen:manager:services:view">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
-                      </PermissionGate>
-                      <PermissionGate permission="screen:manager:services:update">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
-                      </PermissionGate>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <div className="pagination">
-          <span className="pagination-info">
-            {packages.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, packages.length)} trong {packages.length} kết quả
-          </span>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)' }}>{page}</span>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>›</button>
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+          Hiển thị {filteredPackages.length} gói bảo dưỡng thuộc {groups.length} dòng xe
         </div>
+        {!filtersActive && groups.length > 1 && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={expandAll}>Mở tất cả</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={collapseAll}>Thu tất cả</button>
+          </div>
+        )}
       </div>
+
+      {loading && (
+        <div className="empty-state">
+          <div className="empty-state-icon">⏳</div>
+          <h3>Đang tải danh sách gói bảo dưỡng</h3>
+        </div>
+      )}
+
+      {!loading && groups.length === 0 && !error && (
+        <div className="empty-state">
+          <div className="empty-state-icon">📭</div>
+          <h3>Không có gói bảo dưỡng phù hợp</h3>
+          <p>Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc, hoặc thêm gói mới.</p>
+        </div>
+      )}
+
+      {!loading && groups.map((g) => {
+        const fBadge = fuelBadge(g.fuel);
+        const prices = g.items.map((it) => it.totalPrice);
+        const priceRange = prices.length ? (Math.min(...prices) === Math.max(...prices) ? formatCurrency(prices[0]) : `${formatCurrency(Math.min(...prices))} – ${formatCurrency(Math.max(...prices))}`) : '—';
+        const open = isExpanded(g.vehicleCode);
+        return (
+          <div key={g.vehicleCode} style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', marginBottom: 10, overflow: 'hidden', background: '#fff' }}>
+            <button
+              type="button"
+              onClick={() => toggleGroup(g.vehicleCode)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: 'var(--gray-50, #f8fafc)', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: 'var(--gray-500)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', display: 'inline-block' }}>▶</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--gray-900)' }}>{g.vehicleName}</span>
+                {fBadge && <span className={`badge ${fBadge.className}`}>{fBadge.label}</span>}
+                <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>{g.items.length} gói ({g.items.map((it) => capLabel(it.cap)).join(', ')})</span>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary-dark)' }}>{priceRange}</div>
+            </button>
+
+            {open && (
+              <div className="table-wrapper" style={{ margin: 0, border: 'none', borderTop: '1px solid var(--gray-200)' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Mã gói</th>
+                      <th>Cấp</th>
+                      <th>Số dịch vụ</th>
+                      <th>Giá gói</th>
+                      <th>Trạng thái</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.items.map((pkg) => {
+                      const badge = activeBadge(pkg.isActive);
+                      return (
+                        <tr key={pkg.id}>
+                          <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{pkg.code}</td>
+                          <td>{capLabel(pkg.cap)}</td>
+                          <td>{pkg.itemCount}</td>
+                          <td>{formatCurrency(pkg.totalPrice)}</td>
+                          <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
+                          <td>
+                            <div className="table-actions">
+                              <PermissionGate permission="screen:manager:services:view">
+                                <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
+                              </PermissionGate>
+                              <PermissionGate permission="screen:manager:services:update">
+                                <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
+                              </PermissionGate>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {!activePackageLoading && <ServicePackageDetailModal pkg={activePackage} onClose={() => setActivePackage(null)} />}
     </div>
@@ -1786,7 +1924,7 @@ function ServicePackageFormPage({ mode }) {
             serviceIds: (data.services || []).map((s) => s.id),
           });
         })
-        .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin gói dịch vụ'); })
+        .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin gói bảo dưỡng'); })
         .finally(() => { if (mounted) setLoading(false); });
     }
 
@@ -1859,7 +1997,7 @@ function ServicePackageFormPage({ mode }) {
     return (
       <div className="empty-state">
         <div className="empty-state-icon">⏳</div>
-        <h3>Đang tải thông tin gói dịch vụ</h3>
+        <h3>Đang tải thông tin gói bảo dưỡng</h3>
       </div>
     );
   }
@@ -1879,8 +2017,8 @@ function ServicePackageFormPage({ mode }) {
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>{isEdit ? 'Chỉnh sửa gói dịch vụ' : 'Thêm gói dịch vụ'}</h1>
-          <div className="breadcrumb">Gói dịch vụ / {isEdit ? 'Chỉnh sửa' : 'Thêm mới'}</div>
+          <h1>{isEdit ? 'Chỉnh sửa gói bảo dưỡng' : 'Thêm gói bảo dưỡng'}</h1>
+          <div className="breadcrumb">Gói bảo dưỡng / {isEdit ? 'Chỉnh sửa' : 'Thêm mới'}</div>
         </div>
       </div>
 
@@ -1892,19 +2030,19 @@ function ServicePackageFormPage({ mode }) {
 
       <form onSubmit={handleSubmit}>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">📦 Thông tin gói dịch vụ</div>
+          <div className="form-section-title">📦 Thông tin gói bảo dưỡng</div>
 
           {branch && (
             <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
               📍 Chi nhánh: <strong>{branch.name}</strong>
-              {!isEdit && ' — Gói dịch vụ mới sẽ được thêm vào danh mục chi nhánh này.'}
+              {!isEdit && ' — Gói bảo dưỡng mới sẽ được thêm vào danh mục chi nhánh này.'}
             </div>
           )}
 
           <div className="form-grid form-grid-2">
             <div className="form-group">
-              <label className="form-label required">Tên gói dịch vụ</label>
-              <input className="form-input" value={form.packageName} onChange={(e) => setField('packageName', e.target.value)} placeholder="Nhập tên gói dịch vụ" />
+              <label className="form-label required">Tên gói bảo dưỡng</label>
+              <input className="form-input" value={form.packageName} onChange={(e) => setField('packageName', e.target.value)} placeholder="Nhập tên gói bảo dưỡng" />
               {fieldErrors.packageName && <span className="form-error">{fieldErrors.packageName}</span>}
             </div>
 
@@ -1915,16 +2053,6 @@ function ServicePackageFormPage({ mode }) {
               {form.serviceIds.length > 0 && (
                 <span className="form-hint">Tổng giá các dịch vụ đã chọn: {formatCurrency(selectedTotal)}</span>
               )}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Loại hình sửa chữa</label>
-              <select className="form-select" value={form.repairCategory} onChange={(e) => setField('repairCategory', e.target.value)}>
-                {REPAIR_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <div style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
-                Dùng để tự điền khi cố vấn dịch vụ chọn gói này trên phiếu quyết toán.
-              </div>
             </div>
 
             {isEdit && (
@@ -1940,7 +2068,7 @@ function ServicePackageFormPage({ mode }) {
 
           <div className="form-group" style={{ marginTop: 14 }}>
             <label className="form-label">Mô tả</label>
-            <textarea className="form-textarea" value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Mô tả ngắn về gói dịch vụ" />
+            <textarea className="form-textarea" value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Mô tả ngắn về gói bảo dưỡng" />
           </div>
 
           <div className="form-group" style={{ marginTop: 14 }}>
@@ -1996,7 +2124,7 @@ function ServicePackageFormPage({ mode }) {
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/manager/service-packages')}>Hủy</button>
           <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Đang lưu...' : isEdit ? '🔄 Cập nhật' : '+ Thêm gói dịch vụ'}
+            {submitting ? 'Đang lưu...' : isEdit ? '🔄 Cập nhật' : '+ Thêm gói bảo dưỡng'}
           </button>
         </div>
       </form>

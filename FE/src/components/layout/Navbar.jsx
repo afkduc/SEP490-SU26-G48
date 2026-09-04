@@ -66,7 +66,7 @@ const MANAGER_NAV = [
     label: 'Dịch vụ',
     children: [
       { label: 'Dịch vụ lẻ', path: '/manager/services' },
-      { label: 'Gói dịch vụ', path: '/manager/service-packages' },
+      { label: 'Gói bảo dưỡng', path: '/manager/service-packages' },
     ],
   },
 ];
