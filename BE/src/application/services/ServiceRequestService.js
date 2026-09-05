@@ -58,7 +58,7 @@ class ServiceRequestService {
       { code, branchId: PUBLIC_SERVICE_PACKAGE_BRANCH_ID }
     );
     const row = result.recordset[0];
-    if (!row) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+    if (!row) throw new ApiError(404, 'Không tìm thấy gói bảo dưỡng');
 
     const itemsResult = await query(
       `SELECT s.service_name, s.unit_price

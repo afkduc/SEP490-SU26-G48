@@ -381,10 +381,10 @@ class ManagerService {
 
   async getServicePackageById(branchId, id) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-    if (!id) throw new ApiError(400, 'Thiếu mã gói dịch vụ');
+    if (!id) throw new ApiError(400, 'Thiếu mã gói bảo dưỡng');
 
     const pkg = await this.managerRepository.getServicePackageById(branchId, id);
-    if (!pkg) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+    if (!pkg) throw new ApiError(404, 'Không tìm thấy gói bảo dưỡng');
     return pkg;
   }
 
@@ -443,10 +443,10 @@ class ManagerService {
 
   async updateServicePackage(branchId, id, payload) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-    if (!id) throw new ApiError(400, 'Thiếu mã gói dịch vụ');
+    if (!id) throw new ApiError(400, 'Thiếu mã gói bảo dưỡng');
 
     const existing = await this.managerRepository.getServicePackageById(branchId, id);
-    if (!existing) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+    if (!existing) throw new ApiError(404, 'Không tìm thấy gói bảo dưỡng');
 
     const { price, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
       requireServiceIds: false,
