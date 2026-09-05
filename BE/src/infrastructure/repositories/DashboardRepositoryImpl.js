@@ -3,7 +3,7 @@ const { query } = require('../database/sqlServer');
 
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
 
-// Loai hinh sua chua THAT (service_order_items.repair_category) - khac voi
+// Loai hinh sua chua THAT (repair_order_items.repair_category) - khac voi
 // danh muc dich vu (service_categories) va khac ca LHSC (loai hang muc: cong/
 // vat tu). Gia tri + nhan phai khop voi REPAIR_CATEGORY_OPTIONS trong
 // RepairSettlementPage.jsx. 'OTHER' la bucket cho dong chua duoc gan loai hinh.
@@ -53,7 +53,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
     const kpiResult = await query(
       `WITH filtered_orders AS (
          SELECT so.id, so.status, so.total
-         FROM   service_orders so
+         FROM   repair_orders so
          WHERE  so.branch_id = @branchId
            AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
@@ -62,13 +62,13 @@ class DashboardRepositoryImpl extends DashboardRepository {
            AND  (
              @categoryId IS NULL
              OR (@categoryId = 'PARTS' AND EXISTS (
-                   SELECT 1 FROM service_order_items soi
-                   WHERE soi.service_order_id = so.id AND soi.lhsc = 'PT'
+                   SELECT 1 FROM repair_order_items soi
+                   WHERE soi.repair_order_id = so.id AND soi.lhsc = 'PT'
                  ))
              OR (@categoryId <> 'PARTS' AND EXISTS (
-                   SELECT 1 FROM service_order_items soi
+                   SELECT 1 FROM repair_order_items soi
                    JOIN services s ON s.id = soi.service_id
-                   WHERE soi.service_order_id = so.id AND s.category_id = TRY_CAST(@categoryId AS BIGINT)
+                   WHERE soi.repair_order_id = so.id AND s.category_id = TRY_CAST(@categoryId AS BIGINT)
                  ))
            )
        )
@@ -84,7 +84,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
     const trendResult = await query(
       `WITH filtered_orders AS (
          SELECT so.id, so.status, so.total, so.intake_date
-         FROM   service_orders so
+         FROM   repair_orders so
          WHERE  so.branch_id = @branchId
            AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
@@ -93,13 +93,13 @@ class DashboardRepositoryImpl extends DashboardRepository {
            AND  (
              @categoryId IS NULL
              OR (@categoryId = 'PARTS' AND EXISTS (
-                   SELECT 1 FROM service_order_items soi
-                   WHERE soi.service_order_id = so.id AND soi.lhsc = 'PT'
+                   SELECT 1 FROM repair_order_items soi
+                   WHERE soi.repair_order_id = so.id AND soi.lhsc = 'PT'
                  ))
              OR (@categoryId <> 'PARTS' AND EXISTS (
-                   SELECT 1 FROM service_order_items soi
+                   SELECT 1 FROM repair_order_items soi
                    JOIN services s ON s.id = soi.service_id
-                   WHERE soi.service_order_id = so.id AND s.category_id = TRY_CAST(@categoryId AS BIGINT)
+                   WHERE soi.repair_order_id = so.id AND s.category_id = TRY_CAST(@categoryId AS BIGINT)
                  ))
            )
        )
@@ -117,7 +117,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
     const statusResult = await query(
       `WITH filtered_orders AS (
          SELECT so.id, so.status
-         FROM   service_orders so
+         FROM   repair_orders so
          WHERE  so.branch_id = @branchId
            AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
@@ -126,13 +126,13 @@ class DashboardRepositoryImpl extends DashboardRepository {
            AND  (
              @categoryId IS NULL
              OR (@categoryId = 'PARTS' AND EXISTS (
-                   SELECT 1 FROM service_order_items soi
-                   WHERE soi.service_order_id = so.id AND soi.lhsc = 'PT'
+                   SELECT 1 FROM repair_order_items soi
+                   WHERE soi.repair_order_id = so.id AND soi.lhsc = 'PT'
                  ))
              OR (@categoryId <> 'PARTS' AND EXISTS (
-                   SELECT 1 FROM service_order_items soi
+                   SELECT 1 FROM repair_order_items soi
                    JOIN services s ON s.id = soi.service_id
-                   WHERE soi.service_order_id = so.id AND s.category_id = TRY_CAST(@categoryId AS BIGINT)
+                   WHERE soi.repair_order_id = so.id AND s.category_id = TRY_CAST(@categoryId AS BIGINT)
                  ))
            )
        )
@@ -148,7 +148,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
     const repairCategoryTrendResult = await query(
       `WITH date_status_orders AS (
          SELECT so.id, so.status, so.intake_date
-         FROM   service_orders so
+         FROM   repair_orders so
          WHERE  so.branch_id = @branchId
            AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
@@ -161,7 +161,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
            DATEFROMPARTS(YEAR(dso.intake_date), MONTH(dso.intake_date), 1) AS month_start,
            CASE WHEN soi.repair_category IS NULL OR soi.repair_category = '' THEN 'OTHER' ELSE soi.repair_category END AS repair_category
          FROM   date_status_orders dso
-         JOIN   service_order_items soi ON soi.service_order_id = dso.id
+         JOIN   repair_order_items soi ON soi.repair_order_id = dso.id
        ),
        month_category_orders AS (
          SELECT DISTINCT month_start, repair_category, order_id
@@ -179,7 +179,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
     const repairCategoryOverallResult = await query(
       `WITH date_status_orders AS (
          SELECT so.id, so.status
-         FROM   service_orders so
+         FROM   repair_orders so
          WHERE  so.branch_id = @branchId
            AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
            AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
@@ -193,7 +193,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
            CASE WHEN soi.repair_category IS NULL OR soi.repair_category = '' THEN 'OTHER' ELSE soi.repair_category END AS repair_category,
            soi.total AS item_total
          FROM   date_status_orders dso
-         JOIN   service_order_items soi ON soi.service_order_id = dso.id
+         JOIN   repair_order_items soi ON soi.repair_order_id = dso.id
        ),
        category_revenue AS (
          SELECT repair_category,

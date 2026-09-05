@@ -18,7 +18,7 @@
 class ExportRequestRepository {
   /**
    * Loc + phan trang danh sach phieu xuat.
-   * @param {Object} filters - { branchId, status, serviceOrderId, fromDate, toDate, search, page, limit }
+   * @param {Object} filters - { branchId, status, fromDate, toDate, search, page, limit }
    * @returns {Promise<ExportRequest[]>}
    */
   async findAll(filters = {}) {
@@ -67,7 +67,7 @@ class ExportRequestRepository {
    * 'inprogress' va 'completed') va chua tung duoc xuat cho RO do. Tra ve kem
    * tasks (product) de FE hien thi.
    * @param {Object} filters - { branchId, search, page, limit }
-   * @returns {Promise<Array<{ id, repairOrderCode, serviceOrderCode, customerName, vehiclePlate, status, items: Array }>>}
+   * @returns {Promise<Array<{ id, repairOrderCode, repairOrderCode, customerName, vehiclePlate, status, items: Array }>>}
    */
   async findExportableRepairOrders(filters = {}) {
     throw new Error('Method findExportableRepairOrders() must be implemented');
@@ -76,7 +76,7 @@ class ExportRequestRepository {
   /**
    * Lay 1 Repair Order kem cac phu tung (task_type='product') chua xuat.
    * @param {number} repairOrderId
-   * @returns {Promise<{ repairOrderCode, serviceOrderCode, customerName, vehiclePlate, status, items: Array }|null>}
+   * @returns {Promise<{ repairOrderCode, repairOrderCode, customerName, vehiclePlate, status, items: Array }|null>}
    */
   async findRepairOrderForExport(repairOrderId) {
     throw new Error('Method findRepairOrderForExport() must be implemented');

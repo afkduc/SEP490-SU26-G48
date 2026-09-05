@@ -123,7 +123,7 @@ export default function MaintenanceTips() {
                     className={styles.slot}
                     style={{ width: `${100 / extendedTotal}%` }}
                   >
-                    <Link href={`/kinh-nghiem/${tip.slug}`} className={styles.card}>
+                    <Link href={`/blog/${tip.slug}`} className={styles.card}>
                       <div className={styles.iconWrap}>
                         <Icon className={styles.icon} />
                       </div>

@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const ApiError = require('../../utils/ApiError');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -380,10 +381,10 @@ class ManagerService {
 
   async getServicePackageById(branchId, id) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-    if (!id) throw new ApiError(400, 'Thiếu mã gói dịch vụ');
+    if (!id) throw new ApiError(400, 'Thiếu mã gói bảo dưỡng');
 
     const pkg = await this.managerRepository.getServicePackageById(branchId, id);
-    if (!pkg) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+    if (!pkg) throw new ApiError(404, 'Không tìm thấy gói bảo dưỡng');
     return pkg;
   }
 
@@ -442,10 +443,10 @@ class ManagerService {
 
   async updateServicePackage(branchId, id, payload) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-    if (!id) throw new ApiError(400, 'Thiếu mã gói dịch vụ');
+    if (!id) throw new ApiError(400, 'Thiếu mã gói bảo dưỡng');
 
     const existing = await this.managerRepository.getServicePackageById(branchId, id);
-    if (!existing) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+    if (!existing) throw new ApiError(404, 'Không tìm thấy gói bảo dưỡng');
 
     const { price, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
       requireServiceIds: false,
@@ -568,7 +569,7 @@ class ManagerService {
   async createTechnician(branchId, payload) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
 
-    await this._validateStaffContact(payload, { requirePassword: true });
+    await this._validateStaffContact(payload, { requirePassword: false });
     await this._validateTeamLeaderAssignment(branchId, payload.teamLeaderId);
     const specialtyIds = await this._validateSpecialtyIds(payload.specialtyIds);
 
@@ -577,7 +578,9 @@ class ManagerService {
     const existed = await this.managerRepository.findByEmail(payload.email);
     if (existed) throw new ApiError(409, 'Email đã tồn tại');
 
-    const passwordHash = bcrypt.hashSync(payload.password, 10);
+    // Tho may khong dang nhap qua form nay - sinh mat khau ngau nhien, ho dat
+    // lai qua "Quen mat khau" khi thuc su can dang nhap.
+    const passwordHash = bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10);
     const pseudoId = await this.managerRepository.nextPseudoId();
 
     return this.managerRepository.createTechnician({

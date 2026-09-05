@@ -14,7 +14,7 @@ export default function ClosingCta() {
             Nhập mã sửa chữa được cung cấp khi tiếp nhận xe để xem tiến độ
             sửa chữa mới nhất — không cần đăng nhập.
           </p>
-          <Link href="/tra-cuu" className={styles.button}>
+          <Link href="/lookup" className={styles.button}>
             Tra cứu ngay
           </Link>
         </Reveal>

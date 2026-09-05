@@ -87,7 +87,7 @@ class InventoryRepository {
    * hop 2 nguon:
    *   - inventory_transactions (transaction_type='export') - luong xuat kho
    *     thuc te.
-   *   - service_order_items (lhsc='PT') - nhu cau phu tung tren phieu quyet
+   *   - repair_order_items (lhsc='PT') - nhu cau phu tung tren phieu quyet
    *     toan (co the chua duoc xuat kho).
    * Dung cho Dashboard Tong quan kho.
    * @param {number} branchId

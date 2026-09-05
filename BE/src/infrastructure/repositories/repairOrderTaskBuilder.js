@@ -113,11 +113,11 @@ function packageCodesNeeding(items) {
 
 // Dung chung cho luc TAO lenh sua chua (no het items -> tasks lan dau) va luc
 // co van CHINH SUA phieu quyet toan da gan to truong (dong bo lai checklist).
-async function buildDesiredTasks(tx, serviceOrderId) {
+async function buildDesiredTasks(tx, repairOrderId) {
   const itemsResult = await tx
     .request()
-    .input('serviceOrderId', sql.BigInt, serviceOrderId)
-    .query(`SELECT * FROM service_order_items WHERE service_order_id = @serviceOrderId ORDER BY id`);
+    .input('repairOrderId', sql.BigInt, repairOrderId)
+    .query(`SELECT * FROM repair_order_items WHERE repair_order_id = @repairOrderId ORDER BY id`);
 
   const items = itemsResult.recordset.map((r) => ({
     lhsc: r.lhsc,

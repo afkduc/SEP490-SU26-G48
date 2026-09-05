@@ -6,6 +6,7 @@ const { PublicVehicleHistoryDto } = RepairSettlementResponseDto;
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
 const { auditCrud } = require('../../utils/auditHelper');
 const { settlementSnapshot } = require('../../utils/auditSnapshots');
+const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
 const { isValidPhone, isValidEmail, EMAIL_HINT } = require('../../utils/fieldValidation');
 
 // CCCD (12 so, mau moi) hoac CMND cu (9 so) - chap nhan ca 2 vi du lieu cu
@@ -74,6 +75,71 @@ const ACTIVE_STATUS_LABELS = {
   waiting_payment: 'chờ thanh toán',
 };
 
+// So sanh 2 ban ghi phieu (truoc/sau 1 lan sua) de "Nhat ky hoat dong phieu"
+// hien ro sua CAI GI thanh CAI GI thay vi chi 1 dong mo ta chung chung - can
+// thiet voi phieu nhieu hang muc (theo yeu cau CVDV: "phiếu lớn thì xem không
+// biết là họ sửa gì"). Ghep hang muc theo code (hoac theo mo ta neu khong co
+// code) vi item id KHONG on dinh qua moi lan luu - repository.update() xoa
+// het roi chen lai toan bo repair_order_items (xem
+// RepairSettlementRepositoryImpl.update), nen khong the doi chieu theo id.
+const SETTLEMENT_DIFF_FIELDS = [
+  { key: 'customerRequest', label: 'Yêu cầu khách hàng' },
+  { key: 'note', label: 'Ghi chú' },
+  { key: 'currentKm', label: 'Số km hiện tại' },
+];
+const ITEM_DIFF_FIELDS = [
+  { key: 'qty', label: 'Số lượng' },
+  { key: 'unitPrice', label: 'Đơn giá' },
+  { key: 'discount', label: 'Chiết khấu (%)' },
+  { key: 'httt', label: 'Hình thức thanh toán' },
+  { key: 'isFree', label: 'Miễn phí' },
+  { key: 'note', label: 'Ghi chú hạng mục' },
+];
+function itemDiffKey(it) {
+  return (it.code && String(it.code).trim()) || `desc:${String(it.description || '').trim().toLowerCase()}`;
+}
+function diffSettlementForActivityLog(before, after) {
+  const changes = [];
+  for (const { key, label } of SETTLEMENT_DIFF_FIELDS) {
+    const b = before?.[key] ?? null;
+    const a = after?.[key] ?? null;
+    if (String(b ?? '') !== String(a ?? '')) {
+      changes.push({ type: 'field', label, before: b, after: a });
+    }
+  }
+
+  const beforeMap = new Map((before?.items || []).map((it) => [itemDiffKey(it), it]));
+  const afterMap = new Map((after?.items || []).map((it) => [itemDiffKey(it), it]));
+
+  for (const [key, it] of afterMap) {
+    if (!beforeMap.has(key)) {
+      changes.push({ type: 'item_added', label: it.description || it.code || 'Hạng mục', qty: it.qty, unitPrice: it.unitPrice });
+    }
+  }
+  for (const [key, it] of beforeMap) {
+    if (!afterMap.has(key)) {
+      changes.push({ type: 'item_removed', label: it.description || it.code || 'Hạng mục', qty: it.qty, unitPrice: it.unitPrice });
+    }
+  }
+  for (const [key, b] of beforeMap) {
+    const a = afterMap.get(key);
+    if (!a) continue;
+    const fields = [];
+    for (const { key: fk, label: fl } of ITEM_DIFF_FIELDS) {
+      const bv = b[fk];
+      const av = a[fk];
+      if (String(bv ?? '') !== String(av ?? '')) {
+        fields.push({ key: fk, label: fl, before: bv, after: av });
+      }
+    }
+    if (fields.length) {
+      changes.push({ type: 'item_changed', label: b.description || b.code || 'Hạng mục', fields });
+    }
+  }
+
+  return changes;
+}
+
 class RepairSettlementService {
   constructor({ repairSettlementRepository, customerRepository }) {
     this.repairSettlementRepository = repairSettlementRepository;
@@ -101,6 +167,76 @@ class RepairSettlementService {
     const entity = await this.repairSettlementRepository.findById(id);
     if (!entity) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
     return RepairSettlementResponseDto.fromEntity(entity);
+  }
+
+  // Chiem khoa "dang mo phieu" (man danh sach Phieu quyet toan - nut "Truy
+  // cap phieu") - chan 2 CVDV cung sua 1 phieu 1 luc. FE goi lai moi 20s de
+  // gia han trong luc con mo (xem RepairSettlementRepositoryImpl.acquireLock,
+  // LOCK_TTL_SECONDS); chi ghi 1 dong "Truy cap phieu" vao nhat ky khi la lan
+  // CHIEM MOI that su (fresh), khong ghi lap lai moi nhip gia han.
+  async acquireLock(id, req) {
+    const userId = req?.user?.userId;
+    const branchId = req?.user?.branchId;
+    // Nhip gia han goi lai moi 20s trong luc mo - danh dau ngay tu day de
+    // auditMiddleware (log chung moi request POST/PUT/PATCH/DELETE) khong tu
+    // ghi them 1 dong audit_logs rac moi 20s; lan CHIEM MOI (fresh) van duoc
+    // ghi rieng 1 dong "Truy cap phieu" o duoi (auditLifecycle tu set lai co
+    // nay, khong xung dot).
+    if (req) req._manualAuditWritten = true;
+    const result = await this.repairSettlementRepository.acquireLock(id, userId);
+    if (!result.ok) {
+      const err = new ApiError(409, `Phiếu đang được ${result.lockedByName || 'người khác'} mở, vui lòng thử lại sau`);
+      err.details = {
+        lockedByUserId: result.lockedByUserId,
+        lockedByName: result.lockedByName,
+        lockedAt: result.lockedAt,
+      };
+      throw err;
+    }
+    if (result.fresh) {
+      const item = await this.repairSettlementRepository.findById(id);
+      await auditCrud.lifecycle(req, {
+        tableName: 'repair_settlements',
+        entityCode: item?.code || `ID-${id}`,
+        recordId: item?.id || Number(id) || null,
+        entityName: 'Phiếu quyết toán',
+        step: 'accessed',
+        stepLabel: 'Truy cập phiếu',
+        action: 'UPDATE',
+        description: `Phiếu quyết toán ${item?.code || id}: truy cập`,
+        snapshot: settlementSnapshot(item),
+      });
+      if (branchId) emitRepairOrderEvent(branchId, 'locked', { orderId: Number(id) });
+    }
+    return { ok: true };
+  }
+
+  // Nha khoa khi CVDV dong phieu dang xem (hoac component unmount) - best
+  // effort, khong throw neu khong con giu khoa (vd het han roi bi nguoi khac
+  // chiem truoc) vi releaseLock() chi xoa dung khi con la chinh minh dang giu.
+  async releaseLock(id, req) {
+    const userId = req?.user?.userId;
+    const branchId = req?.user?.branchId;
+    // Nha khoa la thao tac phu, khong can hien trong audit_logs chung.
+    if (req) req._manualAuditWritten = true;
+    await this.repairSettlementRepository.releaseLock(id, userId);
+    if (branchId) emitRepairOrderEvent(branchId, 'unlocked', { orderId: Number(id) });
+    return { ok: true };
+  }
+
+  // Nhat ky hoat dong cua 1 phieu ("Nhat ky hoat dong phieu") - tai su dung
+  // dung audit log dang "lifecycle" da co san (1 dong/1 phieu, gom mang cac
+  // buoc tao/sua/doi trang thai/in/truy cap - xem auditHelper.auditLifecycle),
+  // khong tao bang rieng.
+  async getActivityLog(id) {
+    const log = await AuditRepository.findLifecycleAuditLog('repair_settlements', id);
+    if (!log?.new_value) return [];
+    try {
+      const parsed = typeof log.new_value === 'string' ? JSON.parse(log.new_value) : log.new_value;
+      return Array.isArray(parsed?.steps) ? parsed.steps : [];
+    } catch {
+      return [];
+    }
   }
 
   // Public - khong dang nhap (xem publicRoutes.js), khong duoc dung req.user o
@@ -166,7 +302,7 @@ class RepairSettlementService {
       contactPhone: customer.contactPhone || null,
       licensePlate: vehicle.licensePlate.trim(),
       vehicleModelText: vehicle.vehicleModel || null,
-      brandId: vehicle.brandId || null,
+      modelId: vehicle.modelId || null,
       frameNumber: vehicle.frameNumber || null,
       engineNumber: vehicle.engineNumber || null,
       currentKm: payload.currentKm || null,
@@ -188,7 +324,7 @@ class RepairSettlementService {
     // Realtime: phieu moi luon o trang thai waiting_repair luc vua tao - bao
     // ngay cho bang tin cac khoang xe trong chi nhanh (xem VehicleBayService),
     // khong can cho poll/F5.
-    emitRepairOrderEvent(branchId, 'new-pending', { settlementId: entity.id });
+    emitRepairOrderEvent(branchId, 'new-pending', { orderId: entity.id });
 
     return RepairSettlementResponseDto.fromEntity(entity);
   }
@@ -229,13 +365,12 @@ class RepairSettlementService {
     // xe cong khai, khong doi ho tu F5 moi thay dau muc da bien mat.
     if (existing.repairOrderId) {
       emitRepairOrderEvent(existing.branchId, 'task-updated', {
-        orderId: existing.repairOrderId,
-        settlementId: entity.id,
+        orderId: entity.id,
         taskId: null,
       });
     }
 
-    return RepairSettlementResponseDto.fromEntity(entity);
+    return { item: RepairSettlementResponseDto.fromEntity(entity), changes: diffSettlementForActivityLog(existing, entity) };
   }
 
   // 1 khach hang + 1 xe chi duoc co toi da 1 phieu quyet toan dang xu ly
@@ -304,7 +439,7 @@ class RepairSettlementService {
     // webhook (xem handlePayosWebhook), de danh sach/modal dang mo tu chuyen
     // sang tab "Đã xuất hóa đơn" ngay, khong doi F5.
     if (status === 'invoiced') {
-      emitRepairOrderEvent(existing.branchId, 'invoiced', { settlementId: entity.id });
+      emitRepairOrderEvent(existing.branchId, 'invoiced', { orderId: entity.id });
     }
 
     // Huy giua chung - neu da co to truong nhan (existing.repairOrderId), BE
@@ -316,8 +451,7 @@ class RepairSettlementService {
     // xoa dong tuong ung - xem TeamLeaderKiosk.jsx handleEvent 'order-cancelled'.
     if (status === 'cancelled') {
       emitRepairOrderEvent(existing.branchId, 'order-cancelled', {
-        orderId: existing.repairOrderId || null,
-        settlementId: entity.id,
+        orderId: entity.id,
         cancelReason,
       });
     }
@@ -327,7 +461,7 @@ class RepairSettlementService {
     // truoc gio CHUA bao realtime cho ai (Dashboard/cac man theo doi khac se
     // khong tu cap nhat neu thieu dong nay).
     if (status === 'invoiced') {
-      emitRepairOrderEvent(existing.branchId, 'invoiced', { settlementId: entity.id });
+      emitRepairOrderEvent(existing.branchId, 'invoiced', { orderId: entity.id });
     }
 
     return RepairSettlementResponseDto.fromEntity(entity);
@@ -341,7 +475,7 @@ class RepairSettlementService {
     const rows = await this.repairSettlementRepository.findGatePending(branchId);
     return rows.map((r) => ({
       id: r.id,
-      code: r.order_code,
+      code: r.repair_code,
       customerName: r.customer_full_name,
       vehiclePlate: r.vehicle_license_plate,
       vehicleModel: r.vehicle_model_text,
@@ -351,7 +485,7 @@ class RepairSettlementService {
   async confirmGateExit(id, branchId) {
     const ok = await this.repairSettlementRepository.confirmGateExit(id, branchId);
     if (!ok) throw new ApiError(409, 'Phiếu không tồn tại, không thuộc chi nhánh này, hoặc đã được xác nhận ra cổng trước đó');
-    emitRepairOrderEvent(branchId, 'gate-exit-confirmed', { settlementId: Number(id) });
+    emitRepairOrderEvent(branchId, 'gate-exit-confirmed', { orderId: Number(id) });
     return { id: Number(id) };
   }
 
@@ -428,23 +562,23 @@ class RepairSettlementService {
       paidAt: new Date(),
     });
 
-    const settlement = await this.repairSettlementRepository.findById(tx.service_order_id);
+    const settlement = await this.repairSettlementRepository.findById(tx.repair_order_id);
     if (!settlement || settlement.status !== 'waiting_payment') return;
 
-    await this.repairSettlementRepository.updateStatus(tx.service_order_id, 'invoiced', { issuedBy: settlement.advisorId, paymentMethod: 'TRANSFER' });
-    emitRepairOrderEvent(settlement.branchId, 'invoiced', { settlementId: tx.service_order_id });
+    await this.repairSettlementRepository.updateStatus(tx.repair_order_id, 'invoiced', { issuedBy: settlement.advisorId, paymentMethod: 'TRANSFER' });
+    emitRepairOrderEvent(settlement.branchId, 'invoiced', { orderId: tx.repair_order_id });
 
     // Ghi audit sau khi xuat hoa don — khong doi logic thanh toan.
     // Webhook khong co JWT: actor = system. requestBody rut gon (khong luu chu ky PayOS).
     await auditCrud.lifecycle(req, {
       tableName: 'repair_settlements',
       entityName: 'Phiếu quyết toán',
-      entityCode: settlement.code || `ID-${tx.service_order_id}`,
-      recordId: tx.service_order_id,
+      entityCode: settlement.code || `ID-${tx.repair_order_id}`,
+      recordId: tx.repair_order_id,
       step: 'paid',
       stepLabel: 'Khách hàng thanh toán (PayOS)',
       action: 'UPDATE',
-      description: `Phiếu quyết toán ${settlement.code || tx.service_order_id}: khách thanh toán ${(Number(tx.amount) || 0).toLocaleString('vi-VN')}đ qua PayOS — đã xuất hóa đơn`,
+      description: `Phiếu quyết toán ${settlement.code || tx.repair_order_id}: khách thanh toán ${(Number(tx.amount) || 0).toLocaleString('vi-VN')}đ qua PayOS — đã xuất hóa đơn`,
       snapshot: settlementSnapshot(settlement, {
         status: 'invoiced',
         amount: tx.amount,

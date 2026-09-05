@@ -134,17 +134,21 @@ async function authenticate(req, res, next) {
         return next(sessionExpiredError('EXPIRED'));
       }
     } else if (decoded.deviceId) {
-      // Token cu khong co sessionId: fallback theo is_current (bit MSSQL → boolean/number)
-      const deviceResult = await query(
-        `SELECT is_current FROM user_devices WHERE id = @deviceId AND user_id = @userId`,
-        { deviceId: decoded.deviceId, userId: decoded.userId }
+      // Token cũ / deviceId = sessionId sau khi gộp user_devices
+      const sessionResult = await query(
+        `SELECT status, logout_reason FROM login_sessions
+         WHERE id = @sessionId AND user_id = @userId AND action_type = 'LOGIN'`,
+        { sessionId: decoded.deviceId, userId: decoded.userId }
       );
-      if (deviceResult.recordset.length > 0) {
-        const raw = deviceResult.recordset[0].is_current;
-        const isCurrent = raw === 1 || raw === true;
-        if (!isCurrent) {
-          return next(new ApiError(401, 'Thiết bị đã bị đăng xuất từ quản trị. Vui lòng đăng nhập lại.'));
+      const sessionRow = sessionResult.recordset[0];
+      if (!sessionRow || sessionRow.status !== 'active') {
+        if (sessionRow && isTakeoverLogoutReason(sessionRow.logout_reason)) {
+          return next(sessionTakeoverError());
         }
+        if (sessionRow && String(sessionRow.logout_reason || '').toUpperCase() === 'TIMEOUT') {
+          return next(sessionExpiredError('TIMEOUT'));
+        }
+        return next(new ApiError(401, 'Thiết bị đã bị đăng xuất từ quản trị. Vui lòng đăng nhập lại.'));
       }
     }
 

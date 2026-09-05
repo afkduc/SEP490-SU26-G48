@@ -75,90 +75,12 @@ function getRequestMeta(req) {
   };
 }
 
-async function upsertDevice(userId, userAgent, ipAddress) {
-  try {
-    const { deviceName, browser, os } = parseUserAgent(userAgent);
-
-    // Check if device already exists for this user with same IP+browser+os
-    const existing = await query(
-      `SELECT TOP 1 id, is_current FROM user_devices
-       WHERE user_id = @p1 AND ip_address = @p2 AND browser = @p3 AND os = @p4`,
-      { p1: userId, p2: ipAddress, p3: browser, p4: os }
-    );
-
-    let deviceId;
-
-    if (existing.recordset.length > 0) {
-      const existingDevice = existing.recordset[0];
-      deviceId = existingDevice.id;
-      // Update existing device to current
-      // last_activity_at = last_login_at = now when user logs in
-      await query(
-        `UPDATE user_devices
-         SET    is_current = 1,
-                last_login_at = SYSUTCDATETIME(),
-                last_activity_at = SYSUTCDATETIME(),
-                user_agent = @p5
-         WHERE  id = @p1`,
-        { p1: existingDevice.id, p5: userAgent }
-      );
-      // Only mark OTHER devices of this USER as non-current (not all devices!)
-      // Skip if existing device is already current (avoid unnecessary query)
-      if (!existingDevice.is_current) {
-        await query(
-          'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1 AND id != @p2',
-          { p1: userId, p2: existingDevice.id }
-        );
-      }
-    } else {
-      // First time login on this device/IP/browser/os combination
-      // Mark all OLD devices of THIS user as non-current, then insert new device
-      await query(
-        'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
-        { p1: userId }
-      );
-      // Quan trong: trigger trg_user_devices_no_future la INSTEAD OF, no chan
-      // INSERT truc tiep va tu thuc hien INSERT khac. SCOPE_IDENTITY() KHONG
-      // hoat dong trong truong hop nay vi scope cua outer batch KHONG co
-      // identity moi (trigger chay trong scope rieng).
-      // Fix: dung @@IDENTITY thay SCOPE_IDENTITY(). @@IDENTITY tra gia tri
-      // identity cuoi cung do BAT KY statement nao tao ra (ke ca trigger).
-      // De an toan trong concurrent, nen chi chay mot INSERT tai mot thoi diem
-      // (khong co race vi session pool dam bao).
-      const insertResult = await query(
-        `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, last_login_at, last_activity_at)
-         VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
-         SELECT @@IDENTITY AS new_id;`,
-        { p1: userId, p2: deviceName, p3: browser, p4: os, p5: ipAddress, p6: userAgent }
-      );
-      const rawNewId = insertResult.recordset?.[0]?.new_id;
-      deviceId = rawNewId !== null && rawNewId !== undefined ? Number(rawNewId) : null;
-    }
-
-    return deviceId;
-  } catch (err) {
-    console.error('[loginSessionMiddleware] upsertDevice ERROR:', err.message ? err.message : err);
-    return null;
-  }
-}
-
-async function logSessionEvent({ sessionId, eventType, userId, userName, ipAddress, userAgent }) {
-  try {
-    await query(
-      `INSERT INTO login_session_events (session_id, event_type, user_id, user_name, ip_address, user_agent)
-       VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`,
-      {
-        p1: sessionId,
-        p2: eventType,
-        p3: userId || null,
-        p4: userName || null,
-        p5: ipAddress || null,
-        p6: userAgent || null,
-      }
-    );
-  } catch (err) {
-    console.error('[loginSessionMiddleware] logSessionEvent failed:', err && err.message ? err.message : err);
-  }
+/**
+ * @deprecated Đã gộp vào login_sessions — giữ stub để không break require cũ.
+ * deviceId = sessionId sau trackLogin.
+ */
+async function upsertDevice() {
+  return null;
 }
 
 function _sendLoginNotification(userId, browser, os, ipAddress, deviceId) {
@@ -238,15 +160,14 @@ async function _writeLoginAuditLog(req, { success, userId, userName, reason, ipA
 
 async function trackLogin(req, user) {
   try {
-    // Dam bao cot is_trusted ton tai truoc khi upsert device
     try {
-      await require('../infrastructure/repositories/DeviceRepository').ensureTrustedSchema();
+      await require('../infrastructure/repositories/DeviceRepository').ensureSessionDeviceSchema();
     } catch (schemaErr) {
-      console.warn('[trackLogin] ensureTrustedSchema:', schemaErr.message);
+      console.warn('[trackLogin] ensureSessionDeviceSchema:', schemaErr.message);
     }
 
     const { ipAddress, userAgent } = getRequestMeta(req);
-    const { browser, os } = parseUserAgent(userAgent);
+    const { deviceName, browser, os } = parseUserAgent(userAgent);
 
     const userId = user && (user.id !== undefined ? user.id : user.user_id) ? user.id : null;
     const userName = safeString(user && (user.user_name || user.name || user.email));
@@ -254,20 +175,12 @@ async function trackLogin(req, user) {
     const branchId = user && user.branch_id !== undefined && user.branch_id !== null
       ? user.branch_id
       : null;
+    const deviceIp = ipAddress || '0.0.0.0';
 
-    // ============================================================
-    // TRANSACTION: tat ca thay doi lien quan den login phai atomic.
-    // Neu bat ky buoc nao fail -> rollback toan bo (close stale sessions,
-    // device-set-current=0, insert session, upsert device).
-    // Day la fix cho "lịch sử đăng nhập het dong bo với thiết bị":
-    //   - Cu: 4 query rieng le, neu query 3 fail thi session dang active nhu
-    //     device da inactive (hoac nguoc lai) → 2 màn không khớp.
-    //   - Moi: 1 transaction de dat consistency.
-    // ============================================================
+    // 1 transaction: đóng phiên cũ + insert phiên mới. deviceId JWT = sessionId.
     const result = await executeTransaction(async (txQuery) => {
       const out = { sessionId: null, deviceId: null, isNewDevice: false, isTrusted: false };
 
-      // Step 1: Close stale sessions CUA USER HIEN TAI (logic single-session).
       if (userId) {
         const closeSessions = await txQuery(
           `UPDATE login_sessions
@@ -284,102 +197,60 @@ async function trackLogin(req, user) {
           console.log(`[trackLogin] Closed ${closeSessions.rowsAffected[0]} previous session(s) for userId=${userId}`);
         }
 
-        // Dong device cua user hien tai (logic single-session: chi 1 device current)
-        await txQuery(
-          'UPDATE user_devices SET is_current = 0 WHERE user_id = @p1',
-          { p1: userId }
+        const prior = await txQuery(
+          `SELECT TOP 1 id, is_trusted
+           FROM login_sessions
+           WHERE user_id = @p1
+             AND action_type = 'LOGIN'
+             AND ISNULL(ip_address, N'') = @p2
+             AND ISNULL(browser, N'') = @p3
+             AND ISNULL(os, N'') = @p4
+           ORDER BY login_time DESC`,
+          { p1: userId, p2: deviceIp, p3: browser || '', p4: os || '' }
         );
+        if (prior.recordset.length > 0) {
+          out.isNewDevice = false;
+          out.isTrusted = prior.recordset[0].is_trusted === 1 || prior.recordset[0].is_trusted === true;
+        } else {
+          out.isNewDevice = true;
+          out.isTrusted = false;
+        }
+      } else {
+        out.isNewDevice = true;
       }
 
-      // Step 2: Insert session moi
       const insertResult = await txQuery(
         `INSERT INTO login_sessions
            (action_type, user_id, user_name, phone, ip_address, user_agent,
-            browser, os, branch_id, status, login_time, last_activity_at)
+            browser, os, branch_id, status, login_time, last_activity_at,
+            device_name, is_trusted, trusted_at)
          VALUES
-           ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'active', SYSUTCDATETIME(), SYSUTCDATETIME());
+           ('LOGIN', @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 'active',
+            SYSUTCDATETIME(), SYSUTCDATETIME(),
+            @p9, @p10, @p11);
          SELECT @@IDENTITY AS new_id;`,
         {
           p1: userId,
           p2: userName,
           p3: phone,
-          p4: ipAddress,
+          p4: deviceIp,
           p5: userAgent,
           p6: browser,
           p7: os,
           p8: branchId,
+          p9: deviceName,
+          p10: out.isTrusted ? 1 : 0,
+          p11: out.isTrusted ? new Date() : null,
         }
       );
 
       const rawSessionId = insertResult.recordset?.[0]?.new_id;
       out.sessionId = rawSessionId !== null && rawSessionId !== undefined ? Number(rawSessionId) : null;
-
-      // Step 3: Upsert device (trong transaction)
-      // - Khớp đúng IP+browser+os → tái dùng
-      // - Ngược lại tạo mới → báo thiết bị mới (không còn nhánh "tin cậy")
-      // Luôn gắn device (IP fallback) để JWT có deviceId + session active —
-      // tránh heartbeat/API đá phiên mới ngay sau login.
-      const deviceIp = ipAddress || '0.0.0.0';
-      if (userId) {
-        const { deviceName } = parseUserAgent(userAgent);
-        const existing = await txQuery(
-          `SELECT TOP 1 id, is_current FROM user_devices
-           WHERE user_id = @p1 AND ip_address = @p2 AND browser = @p3 AND os = @p4`,
-          { p1: userId, p2: deviceIp, p3: browser, p4: os }
-        );
-
-        if (existing.recordset.length > 0) {
-          const existingDevice = existing.recordset[0];
-          out.deviceId = existingDevice.id;
-          out.isNewDevice = false;
-          out.isTrusted = false;
-          await txQuery(
-            `UPDATE user_devices
-             SET    is_current = 1,
-                    last_login_at = SYSUTCDATETIME(),
-                    last_activity_at = SYSUTCDATETIME(),
-                    user_agent = @p5
-             WHERE  id = @p1`,
-            { p1: existingDevice.id, p5: userAgent }
-          );
-        } else {
-          const insertDevice = await txQuery(
-            `INSERT INTO user_devices (user_id, device_name, browser, os, ip_address, user_agent, is_current, is_trusted, last_login_at, last_activity_at)
-             VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
-             SELECT @@IDENTITY AS new_id;`,
-            { p1: userId, p2: deviceName, p3: browser, p4: os, p5: deviceIp, p6: userAgent }
-          );
-          const rawNewId = insertDevice.recordset?.[0]?.new_id;
-          out.deviceId = rawNewId !== null && rawNewId !== undefined ? Number(rawNewId) : null;
-          out.isNewDevice = true;
-          out.isTrusted = false;
-        }
-      }
-
-      // Step 4: Link session ↔ device
-      if (out.sessionId && out.deviceId) {
-        await txQuery(
-          'UPDATE login_sessions SET device_id = @p1 WHERE id = @p2 AND user_id = @p3',
-          { p1: out.deviceId, p2: out.sessionId, p3: userId }
-        );
-      }
-
+      out.deviceId = out.sessionId;
       return out;
     });
 
     const { sessionId, deviceId, isNewDevice } = result;
-
-    // Post-commit (khong can transaction): log event + SSE
-    if (sessionId) {
-      await logSessionEvent({
-        sessionId,
-        eventType: 'LOGIN',
-        userId,
-        userName,
-        ipAddress,
-        userAgent,
-      });
-    }
 
     if (sessionId) {
       emitLoginSessionEvent('login', {
@@ -393,7 +264,6 @@ async function trackLogin(req, user) {
         branchId,
         deviceId,
       });
-      // Báo khi thiết bị mới (IP+browser+os chưa từng ghi nhận)
       if (isNewDevice) {
         _sendLoginNotification(userId, browser, os, ipAddress, deviceId);
       }
@@ -450,10 +320,11 @@ async function trackLogout(req) {
         { p1: sessionId, p2: userId }
       );
     } else if (deviceId) {
+      // deviceId JWT = sessionId (sau khi gộp user_devices)
       active = await query(
         `SELECT TOP 1 id, user_id, ip_address
          FROM login_sessions
-         WHERE device_id = @p1 AND user_id = @p2
+         WHERE id = @p1 AND user_id = @p2
            AND status = 'active' AND action_type = 'LOGIN'`,
         { p1: deviceId, p2: userId }
       );
@@ -497,59 +368,26 @@ async function trackLogout(req) {
 
     // (ipAddress, userAgent da duoc lay o tren tu getRequestMeta)
 
-    // ============================================================
-    // TRANSACTION: close session + close device phai atomic.
-    // Neu 1 trong 2 fail -> rollback toan bo (tranh
-    // session dong nhung device van "current" hoac nguoc lai).
-    // ============================================================
-    await executeTransaction(async (txQuery) => {
-      await txQuery(
-        `UPDATE login_sessions
-         SET    logout_time                = SYSUTCDATETIME(),
-                logout_reason              = 'USER_INITIATED',
-                session_duration_seconds   = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
-                status                     = 'ended'
-         WHERE  id = @p1`,
-        { p1: endedSessionId }
-      );
-
-      if (sessionUserId) {
-        if (deviceId) {
-          await txQuery(
-            `UPDATE user_devices
-             SET last_activity_at = SYSUTCDATETIME(), is_current = 0
-             WHERE id = @p1 AND user_id = @p2`,
-            { p1: deviceId, p2: sessionUserId }
-          );
-        } else {
-          await txQuery(
-            `UPDATE user_devices
-             SET last_activity_at = SYSUTCDATETIME(), is_current = 0
-             WHERE user_id = @p1 AND is_current = 1`,
-            { p1: sessionUserId }
-          );
-        }
-      }
-    }).catch((err) => {
-      console.error('[loginSessionMiddleware] logout transaction failed:', err.message);
+    await query(
+      `UPDATE login_sessions
+       SET    logout_time                = SYSUTCDATETIME(),
+              logout_reason              = 'USER_INITIATED',
+              session_duration_seconds   = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+              status                     = 'ended',
+              last_activity_at           = SYSUTCDATETIME()
+       WHERE  id = @p1`,
+      { p1: endedSessionId }
+    ).catch((err) => {
+      console.error('[loginSessionMiddleware] logout update failed:', err.message);
     });
 
-    await logSessionEvent({
-      sessionId: endedSessionId,
-      eventType: 'LOGOUT',
-      userId: sessionUserId,
-      userName,
-      ipAddress,
-      userAgent,
-    });
-
-    // Emit SSE event
+    // Emit SSE event (status/logout_reason đã ghi trên login_sessions)
     emitLoginSessionEvent('logout', {
       sessionId: endedSessionId,
       userId: sessionUserId,
       userName,
       ipAddress,
-      deviceId,
+      deviceId: endedSessionId,
     });
 
     try {
@@ -620,15 +458,6 @@ async function trackLoginFailed(req, payload) {
     const rawFailedSessionId = insertResult.recordset?.[0]?.new_id;
     const sessionId = rawFailedSessionId !== null && rawFailedSessionId !== undefined ? Number(rawFailedSessionId) : null;
     if (sessionId) {
-      await logSessionEvent({
-        sessionId,
-        eventType: 'LOGIN_FAILED',
-        userId,
-        userName,
-        ipAddress,
-        userAgent,
-      });
-
       // Emit SSE event (chi emi khi co userName vi loi thuong do nhap sai)
       if (userName) {
         emitLoginSessionEvent('login_failed', {
@@ -672,5 +501,4 @@ module.exports = {
   upsertDevice,
   parseUserAgent,
   getRequestMeta,
-  logSessionEvent,
 };

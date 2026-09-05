@@ -7,7 +7,7 @@ import { BASE_PATH } from "../config";
 import styles from "./Header.module.css";
 
 // Dung "/#id" (co dau "/" o dau) chu khong phai "#id" - vi Header con duoc
-// render o ca trang khac (/tra-cuu, /kinh-nghiem/...), href "#id" suong se
+// render o ca trang khac (/lookup, /blog/...), href "#id" suong se
 // chi nhay trong CHINH trang dang dung (khong co section do) nen khong chay
 // duoc gi. "/#id" luon dieu huong ve trang chu roi cuon toi dung section.
 //
@@ -20,7 +20,7 @@ import styles from "./Header.module.css";
 const navLinks = [
   { href: "/#trang-chu", label: "Trang chủ" },
   { href: "/#vi-sao-chon", label: "Vì sao chọn AutoGara" },
-  { href: "/#goi-dich-vu", label: "Gói dịch vụ" },
+  { href: "/#service-packages", label: "Gói dịch vụ" },
   { href: "/#chi-nhanh", label: "Chi nhánh" },
   { href: "/#meo-bao-duong", label: "Kinh nghiệm" },
   { href: "/#gui-yeu-cau", label: "Liên hệ" },
@@ -54,7 +54,7 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
-          <Link href="/tra-cuu" className={styles.cta}>
+          <Link href="/lookup" className={styles.cta}>
             Tra cứu tiến độ
           </Link>
         </nav>
@@ -90,7 +90,7 @@ export default function Header() {
           ))}
         </div>
         <Link
-          href="/tra-cuu"
+          href="/lookup"
           onClick={() => setMenuOpen(false)}
           className={`${styles.drawerCta} ${menuOpen ? styles.drawerItemIn : styles.drawerItemOut}`}
           style={{ transitionDelay: menuOpen ? "360ms" : "0ms" }}

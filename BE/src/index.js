@@ -76,12 +76,57 @@ async function start() {
       console.warn('[BE] Failed to start background jobs:', jobErr.message);
     }
 
-    // Dam bao cot thiet bi tin cay
+    // Dam bao cot thiet bi tren login_sessions (da gop bo user_devices)
     try {
-      await require('./infrastructure/repositories/DeviceRepository').ensureTrustedSchema();
-      console.log('[BE] user_devices trusted columns ready');
+      await require('./infrastructure/repositories/DeviceRepository').ensureSessionDeviceSchema();
+      console.log('[BE] login_sessions device columns ready');
     } catch (schemaErr) {
-      console.warn('[BE] ensureTrustedSchema:', schemaErr.message);
+      console.warn('[BE] ensureSessionDeviceSchema:', schemaErr.message);
+    }
+
+    // PHAI chay TRUOC cac buoc ensure* khac vi no doi ten bang
+    // (service_orders -> repair_orders, service_order_items ->
+    // repair_order_items) - cac buoc sau deu tham chieu ten MOI.
+    //
+    // Va KHAC cac buoc ensure* o duoi: doi ten bang/cot chu khong chi them
+    // cot, nen KHONG duoc nuot loi. Neu no hong (da rollback) thi schema van
+    // la ban cu trong khi code da la ban moi - chay tiep chi tao ra loi 500
+    // kho hieu o khap noi. Dung han cho de con biet duong sua.
+    try {
+      const { ensureRepairOrderMerge } = require('./infrastructure/database/ensureRepairOrderMerge');
+      const result = await ensureRepairOrderMerge();
+      console.log(result.skipped
+        ? '[BE] repair_orders merge: da gop tu truoc, bo qua'
+        : `[BE] repair_orders merge: DA GOP XONG (${result.steps} buoc)`);
+    } catch (mergeErr) {
+      console.error('[BE] KHONG THE KHOI DONG - gop bang repair_orders that bai:');
+      console.error(mergeErr.message);
+      process.exit(1);
+    }
+
+    // Dat lai ten rang buoc/index cho khop ten bang moi - THUAN THAM MY, hong
+    // cung khong sao nen chi canh bao (khac buoc gop bang o tren).
+    try {
+      const { ensureRepairOrderConstraintNames } = require('./infrastructure/database/ensureRepairOrderConstraintNames');
+      const r = await ensureRepairOrderConstraintNames();
+      if (r.renamed > 0) console.log(`[BE] doi ten ${r.renamed} rang buoc/index cho khop bang repair_orders`);
+    } catch (nameErr) {
+      console.warn('[BE] ensureRepairOrderConstraintNames:', nameErr.message);
+    }
+
+    // Bo bang `brands` (chi con Mazda) - doi cot nen KHONG duoc nuot loi:
+    // hong ma van chay tiep thi code moi (da bo brand_id) gap schema cu se
+    // loi kho hieu. Dung han cho de con biet duong sua.
+    try {
+      const { ensureDropBrands } = require('./infrastructure/database/ensureDropBrands');
+      const r = await ensureDropBrands();
+      console.log(r.skipped
+        ? '[BE] brands: da bo tu truoc, bo qua'
+        : `[BE] brands: DA BO XONG (${r.steps} buoc)`);
+    } catch (brandErr) {
+      console.error('[BE] KHONG THE KHOI DONG - bo bang brands that bai:');
+      console.error(brandErr.message);
+      process.exit(1);
     }
 
     try {
@@ -100,7 +145,7 @@ async function start() {
 
     try {
       await require('./infrastructure/database/ensureRepairOrderTasksColumns').ensureRepairOrderTasksColumns();
-      console.log('[BE] repair_order_tasks/service_order_items note+prev_quantity columns ready');
+      console.log('[BE] repair_order_tasks/repair_order_items note+prev_quantity columns ready');
     } catch (schemaErr) {
       console.warn('[BE] ensureRepairOrderTasksColumns:', schemaErr.message);
     }

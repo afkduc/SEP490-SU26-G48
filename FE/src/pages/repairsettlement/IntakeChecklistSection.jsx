@@ -1,5 +1,5 @@
 // Phiếu tiếp nhận và bàn giao xe - checklist tình trạng xe lúc tiếp nhận,
-// số hoá lại từ form giấy cùng tên. Lưu nguyên 1 khối JSON (service_orders.intake_checklist),
+// số hoá lại từ form giấy cùng tên. Lưu nguyên 1 khối JSON (repair_orders.intake_checklist),
 // không tách thành nhiều cột riêng vì đây là checklist tĩnh, không cần truy vấn/báo cáo theo từng mục.
 import { useRef } from 'react';
 export const DEFAULT_INTAKE_CHECKLIST = {
@@ -22,8 +22,11 @@ export const DEFAULT_INTAKE_CHECKLIST = {
     battery: null, engineOil: null, coolant: null, washerFluid: null,
     brakeClutchFluid: null, powerSteeringFluid: null, hoseCondition: null, driveBelt: null,
   },
-  priority: { repairRedo: false, hasAppointment: false, warranty: false },
-  otherInfo: { dealerKeepsOldParts: false, returnOldPartsToCustomer: false, carWash: false, customerWaitsAtShop: false },
+  exteriorBody: { notes: '', marks: [] }, // marks: [{ id, diagram: 'sedan-left', xPct, yPct }] - danh dau vi tri xuoc/mop tren hinh
+  // null = chua bam (giong itemsInCar) - tranh nut "K" hien san nhu da chon
+  // roi ngay tu dau, dù CVDV chua he dung vao.
+  priority: { repairRedo: null, hasAppointment: null, warranty: null },
+  otherInfo: { dealerKeepsOldParts: null, returnOldPartsToCustomer: null, carWash: null, customerWaitsAtShop: null },
   notes: '',
 };
 
@@ -53,7 +56,44 @@ export const ENGINE_BAY_FIELDS = [
   ['washerFluid', 'Nước rửa kính'], ['brakeClutchFluid', 'Dầu phanh/ly hợp'],
   ['powerSteeringFluid', 'Dầu trợ lực lái'], ['hoseCondition', 'Tình trạng các đường ống'], ['driveBelt', 'Dây đai dẫn động'],
 ];
+export const PRIORITY_FIELDS = [
+  ['repairRedo', 'Xe sửa chữa lại'], ['hasAppointment', 'Xe có đặt hẹn'], ['warranty', 'Xe bảo hành'],
+];
+export const OTHER_INFO_FIELDS = [
+  ['dealerKeepsOldParts', 'Đại lý giữ phụ tùng cũ trả bảo hành/bảo hiểm'],
+  ['returnOldPartsToCustomer', 'Trả phụ tùng cũ cho khách hàng'],
+  ['carWash', 'Rửa xe'], ['customerWaitsAtShop', 'Khách hàng chờ tại xưởng'],
+];
 export const FUEL_GAUGE_OPTIONS = ['E', '1/4', '1/2', '3/4', 'F'];
+
+// Kiem tra than vo xe ben ngoai - so hoa tu file mau "Reference/Phieu tiep
+// nhan va ban giao xe.xlsx" (3 sheet Sedan/SUV-HB/Pick-up). Anh so voi 4/5
+// goc (trai/phai/truoc/sau/tren) trich thang tu file mau do, luu trong
+// FE/public/vehicle-diagrams/. Dung dung 3 phan khuc nhu file mau, KHONG chia
+// them Hatchback rieng vi file mau da gop chung "SUV - HB" 1 sheet.
+export const SEGMENT_OPTIONS = [
+  ['sedan', 'Sedan/Hatchback'],
+  ['suv', 'SUV/Crossover'],
+  ['pickup', 'Bán tải'],
+];
+export const SEGMENT_DIAGRAMS = {
+  sedan: ['sedan-left', 'sedan-right', 'sedan-front', 'sedan-rear', 'sedan-top'],
+  suv: ['suv-left', 'suv-right', 'suv-front', 'suv-rear', 'suv-top'],
+  pickup: ['pickup-left', 'pickup-right', 'pickup-front', 'pickup-rear', 'pickup-top'],
+};
+const DIAGRAM_LABELS = { left: 'Trái', right: 'Phải', front: 'Trước', rear: 'Sau', top: 'Trên' };
+
+// Doan chuoi ten xe (vd "CX-5 2.0 Luxury 2024", "BT-50 1.9 Premium 2022") ->
+// doan phan khuc mac dinh, khop dung 3 nhom dong xe Mazda dang ban (CX-* la
+// SUV/Crossover, BT-50 la ban tai, con lai - Mazda2/Mazda3/Mazda6 - la
+// Sedan/Hatchback). Chi la GOI Y ban dau, CVDV van bam doi thu cong duoc neu
+// doan sai (vd xe hang thu 3 khong theo dung quy uoc ten nay).
+export function detectSegmentFromModelText(modelText) {
+  const t = (modelText || '').toLowerCase();
+  if (t.includes('bt-50') || t.includes('bt50')) return 'pickup';
+  if (t.includes('cx-') || t.includes('cx60') || t.includes('cx90') || /\bcx\s*\d/.test(t)) return 'suv';
+  return 'sedan';
+}
 
 // Cac group dung OkNgField/CoKhongField - value mac dinh null (chua bam),
 // khac voi checkbox (priority/otherInfo) von co false la 1 dap an hop le san
@@ -96,8 +136,8 @@ function PillToggle({ styleKey, text, active, onClick }) {
       style={{
         border: active ? `1px solid ${c.active}` : '1px solid var(--gray-300)',
         borderRadius: 4,
-        padding: '5px 14px',
-        minWidth: 44,
+        padding: '5px 0',
+        width: 44,
         textAlign: 'center',
         fontSize: 11.5,
         fontWeight: 700,
@@ -253,8 +293,100 @@ function FuelGauge({ value, onChange }) {
   );
 }
 
-export default function IntakeChecklistSection({ value, onChange }) {
+// Danh dau vi tri xuoc/mop truc tiep tren tung anh - bam vao dau tren anh la
+// them 1 dau X do dung ngay diem do (luu %x/%y theo kich thuoc anh, khong
+// theo px, de xem lai van dung vi tri du man hinh khac size). Moi anh 1 the
+// rieng, click nao cung day vao CHUNG 1 mang marks (co danh dau anh nao) de
+// nut "Xoa gan nhat" (undo) hieu dung "gan nhat" la lan bam gan nhat tren
+// TOAN BO 5 anh, khong rieng anh dang xem.
+function MarkableImage({ img, label, marks, onAddMark, style }) {
+  const handleClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+    const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+    onAddMark(img, xPct, yPct);
+  };
+  return (
+    <div style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: 8, textAlign: 'center', background: '#fff', ...style }}>
+      <div style={{ position: 'relative', cursor: 'crosshair' }} onClick={handleClick}>
+        <img src={`/vehicle-diagrams/${img}.png`} alt={label} style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }} draggable={false} />
+        {marks.filter((m) => m.diagram === img).map((m) => (
+          <span
+            key={m.id}
+            style={{
+              position: 'absolute', left: `${m.xPct}%`, top: `${m.yPct}%`, transform: 'translate(-50%, -50%)',
+              color: '#dc2626', fontSize: 22, fontWeight: 900, lineHeight: 1, pointerEvents: 'none',
+              textShadow: '0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff',
+            }}
+          >
+            ✕
+          </span>
+        ))}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-700)', marginTop: 6 }}>{label}</div>
+    </div>
+  );
+}
+
+// Kiem tra than vo xe ben ngoai - hien 5 goc anh so voi cua dung phan khuc,
+// phan khuc lay HOAN TOAN tu dong theo o "Loai xe" CVDV da go o tren (khong
+// cho chon tay rieng o day nua - tranh 2 nguon su that lech nhau, "Loai xe"
+// la duy nhat). Xep 2 anh/dong cho anh to ro. Bam truc tiep len anh de danh
+// dau vi tri xuoc/mop (dau X do), kem 2 nut Xoa het/Xoa gan nhat va 1 o ghi
+// chu tu do mo ta them.
+function ExteriorBodyCheck({ autoSegment, marks, onMarksChange, notes, onNotesChange }) {
+  const images = SEGMENT_DIAGRAMS[autoSegment] || SEGMENT_DIAGRAMS.sedan;
+  const segmentLabel = SEGMENT_OPTIONS.find(([key]) => key === autoSegment)?.[1] || autoSegment;
+  const list = marks || [];
+
+  const addMark = (diagram, xPct, yPct) => {
+    onMarksChange([...list, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, diagram, xPct, yPct }]);
+  };
+  const clearAll = () => onMarksChange([]);
+  const undoLast = () => onMarksChange(list.slice(0, -1));
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+          Phân khúc xe: <b style={{ color: 'var(--primary-dark)' }}>{segmentLabel}</b>
+          <span style={{ marginLeft: 10, fontStyle: 'italic', color: 'var(--gray-400)' }}>Đánh dấu lên hình để ghi lại vị trí xước/móp của xe</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={list.length === 0} onClick={undoLast}>
+            Xóa dấu gần nhất
+          </button>
+          <button type="button" className="btn btn-danger btn-sm" disabled={list.length === 0} onClick={clearAll}>
+            Xóa hết dấu
+          </button>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 12 }}>
+        {images.map((img, i) => {
+          const angle = img.split('-')[1];
+          // Anh cuoi le loi 1 minh 1 dong (5 anh/2 cot) - cho no chiem het
+          // dong roi tu can giua, khong de dinh sang trai trong khi ben phai
+          // trong khong.
+          const isLoneLast = i === images.length - 1 && images.length % 2 === 1;
+          const style = isLoneLast ? { gridColumn: '1 / -1', width: 'calc(50% - 5px)', margin: '0 auto' } : undefined;
+          return (
+            <MarkableImage
+              key={img} img={img} label={DIAGRAM_LABELS[angle] || angle} marks={list} onAddMark={addMark} style={style}
+            />
+          );
+        })}
+      </div>
+      <div className="form-group">
+        <label className="form-label">Ghi chú tình trạng thân vỏ (vết xước, móp, vị trí cụ thể...)</label>
+        <textarea className="form-textarea" rows={2} value={notes || ''} onChange={(e) => onNotesChange(e.target.value)} placeholder="Mô tả vị trí, mức độ (nếu có)" />
+      </div>
+    </div>
+  );
+}
+
+export default function IntakeChecklistSection({ value, onChange, vehicleModelText }) {
   const v = value || DEFAULT_INTAKE_CHECKLIST;
+  const autoSegment = detectSegmentFromModelText(vehicleModelText);
 
   const setGroupField = (group, key, val) => {
     onChange({ ...v, [group]: { ...v[group], [key]: val } });
@@ -317,10 +449,32 @@ export default function IntakeChecklistSection({ value, onChange }) {
           </div>
         </div>
 
-        <div className="form-section-title">Kiểm tra khoang động cơ</div>
+        <div className="form-section-title">Kiểm tra thân vỏ xe bên ngoài</div>
+        <div style={{ marginBottom: 12 }}>
+          <ExteriorBodyCheck
+            autoSegment={autoSegment}
+            marks={v.exteriorBody?.marks}
+            onMarksChange={(val) => setGroupField('exteriorBody', 'marks', val)}
+            notes={v.exteriorBody?.notes}
+            onNotesChange={(val) => setGroupField('exteriorBody', 'notes', val)}
+          />
+        </div>
+
         <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
-          <div>{renderOkNgGroup('engineBay', ENGINE_BAY_FIELDS.slice(0, 4))}</div>
-          <div>{renderOkNgGroup('engineBay', ENGINE_BAY_FIELDS.slice(4))}</div>
+          <div>
+            <div className="form-section-title" style={{ marginTop: 0 }}>Kiểm tra khoang động cơ</div>
+            {renderOkNgGroup('engineBay', ENGINE_BAY_FIELDS)}
+          </div>
+          <div>
+            <div className="form-section-title" style={{ marginTop: 0 }}>Mức độ ưu tiên</div>
+            {PRIORITY_FIELDS.map(([key, label]) => (
+              <CoKhongField key={key} label={label} value={v.priority?.[key] ?? null} onSet={(val) => setGroupField('priority', key, val)} />
+            ))}
+            <div className="form-section-title">Thông tin khác</div>
+            {OTHER_INFO_FIELDS.map(([key, label]) => (
+              <CoKhongField key={key} label={label} value={v.otherInfo?.[key] ?? null} onSet={(val) => setGroupField('otherInfo', key, val)} />
+            ))}
+          </div>
         </div>
 
         <div className="form-group">

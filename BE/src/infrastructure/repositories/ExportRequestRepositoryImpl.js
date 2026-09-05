@@ -7,14 +7,15 @@ const ApiError = require('../../utils/ApiError');
 
 /**
  * Loc chung cho findAll / count: branchId, status, repairOrderId, fromDate, toDate, search.
- * Ho tro ca truong hop loc theo repair_order_id hoac service_order_id (backward compat).
+ * Truoc khi gop bang o day co 2 tham so rieng (repairOrderId cho bang lenh sua
+ * chua, serviceOrderId cho phieu quyet toan) - gio chi con 1 vi ca 2 tro ve
+ * cung mot dong, xem ensureRepairOrderMerge.
  * @returns {Object} { whereSql, params }
  */
 function buildExportRequestFilters({
   branchId,
   status,
   repairOrderId,
-  serviceOrderId,
   fromDate,
   toDate,
   search,
@@ -34,10 +35,6 @@ function buildExportRequestFilters({
     where.push('er.repair_order_id = @repairOrderId');
     params.repairOrderId = repairOrderId;
   }
-  if (serviceOrderId) {
-    where.push('er.service_order_id = @serviceOrderId');
-    params.serviceOrderId = serviceOrderId;
-  }
   if (fromDate) {
     where.push('er.created_at >= @fromDate');
     params.fromDate = fromDate;
@@ -48,7 +45,7 @@ function buildExportRequestFilters({
   }
   if (search) {
     where.push(
-      '(er.request_code LIKE @search OR er.notes LIKE @search OR ro.repair_code LIKE @search OR so.order_code LIKE @search)'
+      '(er.request_code LIKE @search OR er.notes LIKE @search OR ro.repair_code LIKE @search)'
     );
     params.search = `%${search}%`;
   }
@@ -63,7 +60,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   async findAll({
     branchId,
     status,
-    serviceOrderId,
+    repairOrderId,
     fromDate,
     toDate,
     search,
@@ -75,14 +72,13 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const offset = (safePage - 1) * safeLimit;
 
     const { whereSql, params } = buildExportRequestFilters({
-      branchId, status, serviceOrderId, fromDate, toDate, search,
+      branchId, status, repairOrderId, fromDate, toDate, search,
     });
 
     const sqlText = `
       SELECT
         er.*,
         ro.repair_code AS repair_order_code,
-        so.order_code AS service_order_code,
         c.full_name AS customer_name,
         v.license_plate AS vehicle_plate,
         COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.first_name, N'') + N' ' + ISNULL(u_perf.last_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name,
@@ -91,9 +87,8 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
            FROM export_request_items i WHERE i.export_request_id = er.id) AS total_quantity
       FROM export_requests er
       LEFT JOIN repair_orders ro ON ro.id = er.repair_order_id
-      LEFT JOIN service_orders so ON so.id = er.service_order_id OR so.id = ro.service_order_id
-      LEFT JOIN customers c ON c.id = so.customer_id
-      LEFT JOIN vehicles v ON v.id = so.vehicle_id
+      LEFT JOIN customers c ON c.id = ro.customer_id
+      LEFT JOIN vehicles v ON v.id = ro.vehicle_id
       LEFT JOIN users u_perf ON u_perf.id = er.performed_by
       ${whereSql}
       ORDER BY er.created_at DESC
@@ -105,16 +100,15 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   }
 
   async count({
-    branchId, status, repairOrderId, serviceOrderId, fromDate, toDate, search,
+    branchId, status, repairOrderId, fromDate, toDate, search,
   } = {}) {
     const { whereSql, params } = buildExportRequestFilters({
-      branchId, status, repairOrderId, serviceOrderId, fromDate, toDate, search,
+      branchId, status, repairOrderId, fromDate, toDate, search,
     });
     const sqlText = `
       SELECT COUNT(*) AS total
       FROM export_requests er
       LEFT JOIN repair_orders ro ON ro.id = er.repair_order_id
-      LEFT JOIN service_orders so ON so.id = er.service_order_id OR so.id = ro.service_order_id
       ${whereSql}
     `;
     const result = await query(sqlText, params);
@@ -126,15 +120,13 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       `SELECT
          er.*,
          ro.repair_code AS repair_order_code,
-         so.order_code AS service_order_code,
          c.full_name AS customer_name,
          v.license_plate AS vehicle_plate,
          COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.first_name, N'') + N' ' + ISNULL(u_perf.last_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name
        FROM export_requests er
        LEFT JOIN repair_orders ro ON ro.id = er.repair_order_id
-       LEFT JOIN service_orders so ON so.id = er.service_order_id OR so.id = ro.service_order_id
-       LEFT JOIN customers c ON c.id = so.customer_id
-       LEFT JOIN vehicles v ON v.id = so.vehicle_id
+       LEFT JOIN customers c ON c.id = ro.customer_id
+       LEFT JOIN vehicles v ON v.id = ro.vehicle_id
        LEFT JOIN users u_perf ON u_perf.id = er.performed_by
        WHERE er.id = @id`,
       { id }
@@ -208,15 +200,14 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       `ro.status <> 'cancelled'`,
       `NOT EXISTS (
         SELECT 1 FROM export_requests er
-        WHERE (er.repair_order_id = ro.id
-          OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+        WHERE er.repair_order_id = ro.id
           AND er.status = 'completed'
       )`,
     ];
     const params = { branchId };
     if (search) {
       where.push(
-        '(ro.repair_code LIKE @search OR so.order_code LIKE @search OR c.full_name LIKE @search OR v.license_plate LIKE @search)'
+        '(ro.repair_code LIKE @search OR c.full_name LIKE @search OR v.license_plate LIKE @search)'
       );
       params.search = `%${search}%`;
     }
@@ -226,9 +217,8 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       SELECT
         ro.id,
         ro.repair_code AS repair_order_code,
-        so.order_code AS service_order_code,
         ro.status,
-        ro.created_at,
+        ro.intake_date AS created_at,
         c.full_name AS customer_name,
         v.license_plate AS vehicle_plate,
         tl.user_name AS team_leader_name,
@@ -248,19 +238,17 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         ) AS total_part_quantity,
         CAST(0 AS bit) AS already_exported
       FROM repair_orders ro
-      LEFT JOIN service_orders so ON so.id = ro.service_order_id
-      LEFT JOIN customers c ON c.id = so.customer_id
+            LEFT JOIN customers c ON c.id = ro.customer_id
       LEFT JOIN vehicles v ON v.id = ro.vehicle_id
       LEFT JOIN users tl ON tl.id = ro.team_leader_id
       ${whereSql}
-      ORDER BY ro.created_at DESC
+      ORDER BY ro.intake_date DESC
       OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
     `;
     const result = await query(sqlText, { ...params, offset, limit: safeLimit });
     return result.recordset.map((r) => ({
       id: r.id,
       repairOrderCode: r.repair_order_code,
-      serviceOrderCode: r.service_order_code,
       status: r.status,
       createdAt: r.created_at,
       customerName: r.customer_name,
@@ -278,15 +266,14 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       `ro.status <> 'cancelled'`,
       `NOT EXISTS (
         SELECT 1 FROM export_requests er
-        WHERE (er.repair_order_id = ro.id
-          OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+        WHERE er.repair_order_id = ro.id
           AND er.status = 'completed'
       )`,
     ];
     const params = { branchId };
     if (search) {
       where.push(
-        '(ro.repair_code LIKE @search OR so.order_code LIKE @search OR c.full_name LIKE @search OR v.license_plate LIKE @search)'
+        '(ro.repair_code LIKE @search OR c.full_name LIKE @search OR v.license_plate LIKE @search)'
       );
       params.search = `%${search}%`;
     }
@@ -294,8 +281,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const sqlText = `
       SELECT COUNT(*) AS total
       FROM repair_orders ro
-      LEFT JOIN service_orders so ON so.id = ro.service_order_id
-      LEFT JOIN customers c ON c.id = so.customer_id
+            LEFT JOIN customers c ON c.id = ro.customer_id
       LEFT JOIN vehicles v ON v.id = ro.vehicle_id
       ${whereSql}
     `;
@@ -313,19 +299,16 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          ro.id,
          ro.repair_code AS repair_order_code,
          ro.status,
-         so.order_code AS service_order_code,
          c.full_name AS customer_name,
          v.license_plate AS vehicle_plate,
          tl.user_name AS team_leader_name,
         CASE WHEN EXISTS (
           SELECT 1 FROM export_requests er
-          WHERE (er.repair_order_id = ro.id
-            OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+          WHERE er.repair_order_id = ro.id
             AND er.status = 'completed'
         ) THEN 1 ELSE 0 END AS already_exported
        FROM repair_orders ro
-       LEFT JOIN service_orders so ON so.id = ro.service_order_id
-       LEFT JOIN customers c ON c.id = so.customer_id
+              LEFT JOIN customers c ON c.id = ro.customer_id
        LEFT JOIN vehicles v ON v.id = ro.vehicle_id
        LEFT JOIN users tl ON tl.id = ro.team_leader_id
        WHERE ro.id = @id`,
@@ -358,7 +341,6 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     return {
       id: header.id,
       repairOrderCode: header.repair_order_code,
-      serviceOrderCode: header.service_order_code,
       status: header.status,
       customerName: header.customer_name,
       vehiclePlate: header.vehicle_plate,
@@ -394,31 +376,31 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         SELECT TOP 1 er.id
         FROM export_requests er WITH (UPDLOCK, HOLDLOCK)
         JOIN repair_orders ro ON ro.id = @repair_order_id
-        WHERE (er.repair_order_id = @repair_order_id
-          OR (er.repair_order_id IS NULL AND er.service_order_id = ro.service_order_id))
+        WHERE er.repair_order_id = @repair_order_id
           AND er.status = 'completed'
       `);
     if (existingExport.recordset.length > 0) {
       throw new ApiError(409, 'Lenh sua chua nay da duoc xuat kho');
     }
 
-    // 1) Insert header (repair_order_id, khong con service_order_id)
+    // 1) Insert header. Truoc khi gop bang o day ghi 2 cot rieng
+    // (repair_order_id tro bang lenh sua chua + service_order_id tro phieu
+    // quyet toan) - gio ca 2 la mot nen chi con 1 cot repair_order_id.
     const insertReq = await tx.request()
       .input('request_code', sql.VarChar(30), requestData.request_code)
       .input('branch_id', sql.BigInt, requestData.branch_id)
       .input('repair_order_id', sql.BigInt, requestData.repair_order_id)
-      .input('service_order_id', sql.BigInt, requestData.service_order_id ?? null)
       .input('performed_by', sql.BigInt, requestData.performed_by)
       .input('export_date', sql.Date, requestData.export_date ?? new Date())
       .input('notes', sql.NVarChar(500), requestData.notes ?? null)
       .query(`
         INSERT INTO export_requests (
-          request_code, branch_id, repair_order_id, service_order_id,
+          request_code, branch_id, repair_order_id,
           performed_by, export_date, status, notes, created_at
         )
         OUTPUT INSERTED.id
         VALUES (
-          @request_code, @branch_id, @repair_order_id, @service_order_id,
+          @request_code, @branch_id, @repair_order_id,
           @performed_by, @export_date, 'completed', @notes, GETDATE()
         )
       `);

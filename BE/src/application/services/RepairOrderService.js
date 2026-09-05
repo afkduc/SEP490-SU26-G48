@@ -4,10 +4,9 @@ const PublicRepairProgressDto = require('../dto/PublicRepairProgressDto');
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
 
 // 'cancelled' khong con la trang thai co the goi truc tiep qua endpoint nay -
-// huy gio la mot chieu tu Phieu quyet toan (xem RepairSettlementService.updateStatus,
-// cascade sang repair_orders), tranh 2 duong huy khac hanh vi nhau (truoc day
-// duong nay tra phieu quyet toan ve "waiting_repair" de nhan lai, gay nham lan
-// voi huy hoan toan).
+// huy gio la mot chieu tu Phieu quyet toan (xem RepairSettlementService
+// .updateStatus), tranh 2 duong huy khac hanh vi nhau (truoc day duong nay
+// tra phieu ve "waiting_repair" de nhan lai, gay nham lan voi huy hoan toan).
 const UPDATABLE_STATUS_VALUES = ['completed'];
 
 // Khach huy giua chung (co van bam huy tren Phieu quyet toan) trong khi to
@@ -39,17 +38,15 @@ class RepairOrderService {
   // Public - khong auth, dung cho landing page (khach nhap ma sua chua de
   // xem tien do). Tra ve DTO rut gon, khong lo thong tin khach hang.
   //
-  // Ma khach hang thuc su cam tren tay la ma PHIEU QUYET TOAN (order_code,
-  // vd "RO-2026-068") - cap ngay luc tiep nhan xe, TRUOC KHI co lenh sua
-  // chua. Nen tim theo ma nay truoc tien (ho tro ca truong hop chua gan to
-  // truong). Ma lenh sua chua (repair_code, "LSC-...") chi la du phong cho
-  // truong hop hiem gap ai do nhap nham/duoc cho nham ma noi bo.
+  // Chi con DUY NHAT 1 ma "RO-YYYY-NNN", cap luc tiep nhan xe va giu nguyen
+  // den luc xuat hoa don. Truoc day con co them ma noi bo "LSC-..." sinh ra
+  // luc to truong nhan viec (khach khong bao gio biet ma do) nen phai tra cuu
+  // 2 lan - da bo han khi gop bang, xem ensureRepairOrderMerge.
   async getPublicProgressByCode(code) {
     const trimmed = (code || '').trim();
     if (!trimmed) throw new ApiError(400, 'Vui lòng nhập mã sửa chữa');
 
-    const result = await this.repairOrderRepository.findByServiceOrderCode(trimmed)
-      || (await this.repairOrderRepository.findByCode(trimmed));
+    const result = await this.repairOrderRepository.findPublicProgressByCode(trimmed);
     if (!result) throw new ApiError(404, 'Không tìm thấy mã sửa chữa này');
 
     return PublicRepairProgressDto.fromEntity(result);
@@ -60,20 +57,20 @@ class RepairOrderService {
   // create()) - dieu kien atomic chong 2 khoang nhan trung 1 phieu nam trong
   // repository.claim(), o day chi validate dau vao + bao 409 dung nghia neu
   // thua race.
-  async claim(serviceOrderId, { branchId, teamLeaderId, bayId, bayNumber }) {
-    if (!serviceOrderId) throw new ApiError(400, 'Thiếu phiếu quyết toán');
+  async claim(repairOrderId, { branchId, teamLeaderId, bayId, bayNumber }) {
+    if (!repairOrderId) throw new ApiError(400, 'Thiếu phiếu quyết toán');
     if (!teamLeaderId || !bayId) throw new ApiError(400, 'Thiếu thông tin tổ trưởng/khoang xe');
 
-    const serviceOrder = await this.repairOrderRepository.findEligibleServiceOrder(serviceOrderId, branchId);
-    if (!serviceOrder) {
+    const order = await this.repairOrderRepository.findEligibleRepairOrder(repairOrderId, branchId);
+    if (!order) {
       throw new ApiError(404, 'Không tìm thấy phiếu quyết toán thuộc chi nhánh của bạn');
     }
-    if (serviceOrder.status !== 'waiting_repair') {
+    if (order.status !== 'waiting_repair') {
       throw new ApiError(409, 'Phiếu này đã được nhận hoặc không còn ở trạng thái chờ sửa chữa');
     }
 
     const entity = await this.repairOrderRepository.claim(
-      { serviceOrderId, vehicleId: serviceOrder.vehicle_id },
+      repairOrderId,
       { branchId, teamLeaderId, bayId, createdBy: teamLeaderId }
     );
     if (!entity) {
@@ -83,7 +80,6 @@ class RepairOrderService {
     emitRepairOrderEvent(branchId, 'claimed', {
       teamLeaderId: entity.teamLeaderId,
       orderId: entity.id,
-      settlementId: entity.serviceOrderId,
       code: entity.code,
       bayId,
       bayNumber,
@@ -136,7 +132,6 @@ class RepairOrderService {
     emitRepairOrderEvent(branchId, 'claimed', {
       teamLeaderId,
       orderId: Number(id),
-      settlementId: existing.serviceOrderId,
       code: existing.code,
       bayId: existing.bayId,
       bayNumber: existing.bayNumber,
@@ -178,7 +173,6 @@ class RepairOrderService {
     // bao ngay cho man Phieu quyet toan cua CVDV, khong can cho poll/F5.
     emitRepairOrderEvent(branchId, 'order-completed', {
       orderId: entity.id,
-      settlementId: entity.serviceOrderId,
       code: entity.code,
     });
 
@@ -226,7 +220,6 @@ class RepairOrderService {
     // biet ngay tien do vua thay doi, khong can F5 (xem sseRoutes.js).
     emitRepairOrderEvent(branchId, 'task-updated', {
       orderId: Number(id),
-      settlementId: existing.serviceOrderId,
       taskId: Number(taskId),
     });
 

@@ -11,12 +11,10 @@ const HEADER_SELECT = `
   SELECT sr.*,
          pb.branch_name AS purchase_branch_name,
          nb.branch_name AS nearest_branch_name,
-         vb.brand_name  AS vehicle_brand_name,
          au.user_name   AS accepted_by_name
   FROM   service_requests sr
   LEFT JOIN branches pb ON pb.id = sr.purchase_branch_id
   JOIN   branches nb    ON nb.id = sr.nearest_branch_id
-  LEFT JOIN brands vb   ON vb.id = sr.vehicle_brand_id
   LEFT JOIN users au    ON au.id = sr.accepted_by
 `;
 
@@ -45,13 +43,13 @@ class ServiceRequestRepositoryImpl extends ServiceRequestRepository {
       `
       INSERT INTO service_requests (
         full_name, gender, phone, email, address, issue_description,
-        purchase_branch_id, purchase_branch_other, vehicle_brand_id, vehicle_brand_other,
+        purchase_branch_id, purchase_branch_other, vehicle_brand_other,
         nearest_branch_id, status, created_at
       )
       OUTPUT INSERTED.id
       VALUES (
         @fullName, @gender, @phone, @email, @address, @issueDescription,
-        @purchaseBranchId, @purchaseBranchOther, @vehicleBrandId, @vehicleBrandOther,
+        @purchaseBranchId, @purchaseBranchOther, @vehicleBrandOther,
         @nearestBranchId, 'pending', GETUTCDATE()
       )
       `,
@@ -64,7 +62,6 @@ class ServiceRequestRepositoryImpl extends ServiceRequestRepository {
         issueDescription: data.issueDescription,
         purchaseBranchId: data.purchaseBranchId || null,
         purchaseBranchOther: data.purchaseBranchOther || null,
-        vehicleBrandId: data.vehicleBrandId || null,
         vehicleBrandOther: data.vehicleBrandOther || null,
         nearestBranchId: data.nearestBranchId,
       }

@@ -29,7 +29,7 @@ class RepairOrderController {
     try {
       // Chưa ghi audit ở bước chọn khoang — đợi tổ trưởng xác nhận phân công thợ
       // (setTechnicians) rồi mới ghi 1 dòng tổng hợp để tránh spam nhật ký.
-      const item = await this.repairOrderService.claim(req.body.serviceOrderId, {
+      const item = await this.repairOrderService.claim(req.body.repairOrderId, {
         branchId: req.user.branchId,
         teamLeaderId: req.user.userId,
         bayId: req.body.bayId,

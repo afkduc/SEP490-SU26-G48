@@ -122,7 +122,7 @@ class RepairSettlementController {
 
   update = async (req, res, next) => {
     try {
-      const item = await this.repairSettlementService.update(req.params.id, req.body);
+      const { item, changes } = await this.repairSettlementService.update(req.params.id, req.body);
       await auditCrud.lifecycle(req, {
         tableName: 'repair_settlements',
         entityCode: item?.code || `ID-${req.params.id}`,
@@ -133,6 +133,7 @@ class RepairSettlementController {
         action: 'UPDATE',
         description: `Phiếu quyết toán ${item?.code || req.params.id}: cập nhật nội dung`,
         snapshot: settlementSnapshot(item),
+        changes,
       });
       await this.notificationService.notifyAdmins('SETTLEMENT_UPDATED', {
         auditLogId: req._lastAuditLogId,
@@ -213,6 +214,33 @@ class RepairSettlementController {
         req.body = prevBody;
       }
       return success(res, { ok: true }, 'Print logged');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  lock = async (req, res, next) => {
+    try {
+      const result = await this.repairSettlementService.acquireLock(req.params.id, req);
+      return success(res, result, 'Đã mở phiếu');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  unlock = async (req, res, next) => {
+    try {
+      const result = await this.repairSettlementService.releaseLock(req.params.id, req);
+      return success(res, result, 'Đã đóng phiếu');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getActivityLog = async (req, res, next) => {
+    try {
+      const steps = await this.repairSettlementService.getActivityLog(req.params.id);
+      return success(res, { steps }, 'Activity log retrieved');
     } catch (err) {
       next(err);
     }

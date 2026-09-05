@@ -1,13 +1,13 @@
 /**
  * MaintenanceReminder entity - tuong ung bang `maintenance_reminders`, tu dong
  * sinh 3 moc (1 tuan/1 thang/2 thang tinh tu ngay tao phieu) cho moi phieu
- * quyet toan (service_orders), kem thong tin join tu vehicles/customers de
+ * quyet toan (repair_orders), kem thong tin join tu vehicles/customers de
  * hien thi.
  */
 class MaintenanceReminder {
   constructor(data = {}) {
     this.id = data.id ?? null;
-    this.serviceOrderId = data.serviceOrderId ?? null;
+    this.repairOrderId = data.repairOrderId ?? null;
     this.vehicleId = data.vehicleId ?? null;
     this.customerId = data.customerId ?? null;
     this.branchId = data.branchId ?? null;
@@ -28,7 +28,7 @@ class MaintenanceReminder {
     if (!row) return null;
     return new MaintenanceReminder({
       id: row.id,
-      serviceOrderId: row.service_order_id,
+      repairOrderId: row.repair_order_id,
       vehicleId: row.vehicle_id,
       customerId: row.customer_id,
       branchId: row.branch_id,

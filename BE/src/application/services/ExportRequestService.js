@@ -16,7 +16,7 @@ class ExportRequestService {
     this.exportRequestRepository = exportRequestRepository;
   }
 
-  async list({ branchId, status, repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit } = {}) {
+  async list({ branchId, status, repairOrderId, fromDate, toDate, search, page, limit } = {}) {
     if (!branchId) throw new ApiError(400, 'branchId is required');
     const dateRange = normalizeDateRange(fromDate, toDate);
     const safePage = Math.max(1, Number(page) || 1);
@@ -25,7 +25,6 @@ class ExportRequestService {
       branchId: Number(branchId),
       status: status || undefined,
       repairOrderId: repairOrderId ? Number(repairOrderId) : undefined,
-      serviceOrderId: serviceOrderId ? Number(serviceOrderId) : undefined,
       ...dateRange,
       search: search || undefined,
     };
