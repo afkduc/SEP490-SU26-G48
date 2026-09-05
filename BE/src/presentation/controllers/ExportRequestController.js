@@ -26,7 +26,7 @@ class ExportRequestController {
 
   list = async (req, res, next) => {
     try {
-      const { branchId, status, repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit } = req.query;
+      const { branchId, status, repairOrderId, fromDate, toDate, search, page, limit } = req.query;
       const branchIdToUse = branchId ? Number(branchId) : req.user?.branchId;
       if (!branchIdToUse) {
         throw new ApiError(400, 'branchId is required');
@@ -34,7 +34,7 @@ class ExportRequestController {
       const result = await this.exportRequestService.list({
         branchId: branchIdToUse,
         status: hasRole(req.user, 'warehouse_staff') ? 'completed' : status,
-        repairOrderId, serviceOrderId, fromDate, toDate, search, page, limit,
+        repairOrderId, fromDate, toDate, search, page, limit,
       });
       return success(res, result, 'Export requests retrieved');
     } catch (err) {

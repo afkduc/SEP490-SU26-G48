@@ -76,7 +76,7 @@ function mapSettlementRow(row) {
 
   return {
     id: row.id,
-    code: row.order_code,
+    code: row.repair_code,
     status: row.status,
     intakeDate: normalizeDate(row.intake_date),
     completedDate: normalizeDate(row.completed_date),
@@ -609,7 +609,7 @@ class ManagerRepositoryImpl {
     if (!row) return null;
 
     const itemsResult = await query(
-      `SELECT s.id, s.service_code, s.service_name, s.unit_price, s.is_active
+      `SELECT s.id, s.service_code, s.service_name, s.unit_price, s.is_active, spi.action_code
        FROM service_package_items spi
        JOIN services s ON s.id = spi.service_id
        WHERE spi.package_id = @id
@@ -617,16 +617,19 @@ class ManagerRepositoryImpl {
       { id: Number(id) }
     );
 
-    return {
-      ...mapPackageRow(row),
-      services: itemsResult.recordset.map((r) => ({
-        id: r.id,
-        code: r.service_code,
-        name: r.service_name,
-        unitPrice: Number(r.unit_price || 0),
-        isActive: !!r.is_active,
-      })),
-    };
+    // Phu tung chi thuc su duoc thay khi hanh dong la "R" (Thay the) - cac dong
+    // I/M/V (kiem tra/thao ve sinh/kiem tra mat) khong tieu hao phu tung.
+    const services = await Promise.all(itemsResult.recordset.map(async (r) => ({
+      id: r.id,
+      code: r.service_code,
+      name: r.service_name,
+      unitPrice: Number(r.unit_price || 0),
+      isActive: !!r.is_active,
+      actionCode: r.action_code,
+      parts: r.action_code === 'R' ? await this._listServiceParts(r.id) : [],
+    })));
+
+    return { ...mapPackageRow(row), services };
   }
 
   async listPackagesUsingService(branchId, serviceId) {
@@ -712,7 +715,7 @@ class ManagerRepositoryImpl {
     const result = await query(
       `SELECT
           so.id,
-          so.order_code,
+          so.repair_code,
           so.branch_id,
           b.branch_code,
           b.branch_name,
@@ -745,7 +748,7 @@ class ManagerRepositoryImpl {
           so.completed_date,
           so.cancelled_at,
           inv.issued_at AS invoice_issued_at
-       FROM service_orders so
+       FROM repair_orders so
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
@@ -754,14 +757,14 @@ class ManagerRepositoryImpl {
        OUTER APPLY (
            SELECT TOP 1 i.issued_at
            FROM   invoices i
-           WHERE  i.service_order_id = so.id
+           WHERE  i.repair_order_id = so.id
            ORDER  BY i.issued_at DESC
        ) inv
        WHERE so.branch_id = @branchId
          AND (@status IS NULL OR so.status = @status)
          AND (
            @search IS NULL
-           OR so.order_code LIKE @search
+           OR so.repair_code LIKE @search
            OR c.full_name LIKE @search
            OR c.phone LIKE @search
            OR v.license_plate LIKE @search
@@ -777,7 +780,7 @@ class ManagerRepositoryImpl {
     const result = await query(
       `SELECT TOP 1
           so.id,
-          so.order_code,
+          so.repair_code,
           so.branch_id,
           b.branch_code,
           b.branch_name,
@@ -812,9 +815,9 @@ class ManagerRepositoryImpl {
           inv.issued_at AS invoice_issued_at,
           CASE WHEN EXISTS (
             SELECT 1 FROM payos_transactions pt
-            WHERE pt.service_order_id = so.id AND pt.status = 'paid'
+            WHERE pt.repair_order_id = so.id AND pt.status = 'paid'
           ) THEN 1 ELSE 0 END AS paid_via_payos
-       FROM service_orders so
+       FROM repair_orders so
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
@@ -823,7 +826,7 @@ class ManagerRepositoryImpl {
        OUTER APPLY (
            SELECT TOP 1 i.issued_at
            FROM   invoices i
-           WHERE  i.service_order_id = so.id
+           WHERE  i.repair_order_id = so.id
            ORDER  BY i.issued_at DESC
        ) inv
        WHERE so.id = @id AND so.branch_id = @branchId`,
@@ -849,8 +852,8 @@ class ManagerRepositoryImpl {
           soi.discount_pct,
           soi.is_free,
           soi.total
-       FROM service_order_items soi
-       WHERE soi.service_order_id = @id
+       FROM repair_order_items soi
+       WHERE soi.repair_order_id = @id
        ORDER BY soi.id ASC`,
       { id: Number(id) }
     );

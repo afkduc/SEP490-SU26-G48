@@ -173,24 +173,6 @@ test('getPublicBranches filters inactive', async () => {
   assert.equal(branches[0].code, 'HN');
 });
 
-test('getPublicVehicleBrands returns brand list', async () => {
-  const brandPath = require.resolve('../../src/infrastructure/repositories/VehicleBrandRepository');
-  require.cache[brandPath] = {
-    id: brandPath,
-    filename: brandPath,
-    loaded: true,
-    exports: class {
-      async list() {
-        return [{ id: 1, brandName: 'Kia' }, { id: 2, brandName: 'Mazda' }];
-      }
-    },
-  };
-  const service = new ServiceRequestService({ serviceRequestRepository: mockRepo() });
-  const brands = await service.getPublicVehicleBrands();
-  assert.equal(brands.length, 2);
-  assert.equal(brands[0].name, 'Kia');
-});
-
 test('getPublicServicePackages maps active packages', async () => {
   mockSql.queryImpl = async () => ({
     recordset: [

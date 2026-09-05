@@ -794,18 +794,9 @@ async function getLoginSessionsSince(sinceDate, limit = 50) {
 }
 
 async function getEntityDefinitions() {
-  const result = await query(
-    `SELECT id, table_name, entity_name, prefix_code, icon
-     FROM   entity_definitions
-     ORDER  BY entity_name ASC`
-  );
-  return result.recordset.map((row) => ({
-    id: row.id,
-    tableName: row.table_name,
-    entityName: row.entity_name,
-    prefixCode: row.prefix_code,
-    icon: row.icon,
-  }));
+  // Không đọc DB — bảng entity_definitions đã thay bằng constant (auditLabels).
+  const { ENTITY_DEFINITIONS } = require('../../utils/auditLabels');
+  return ENTITY_DEFINITIONS.map((row) => ({ ...row }));
 }
 
 async function getAuditLogsByUser(userId, limit = 10) {

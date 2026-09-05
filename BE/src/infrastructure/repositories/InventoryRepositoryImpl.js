@@ -198,7 +198,7 @@ LEFT JOIN units u ON u.id = p.unit_id
    * Thong ke phu tung duoc su dung nhieu nhat, ket hop:
    *   - inventory_transactions (transaction_type='export', status='completed')
    *     -> so lieu XUAT KHO THUC TE.
-   *   - service_order_items (lhsc='PT')
+   *   - repair_order_items (lhsc='PT')
    *     -> NHU CAU phu tung tren phieu quyet toan (co the chua kip xuat kho).
    * 2 nguon duoc gop lai theo product_id (FULL OUTER JOIN) de FE co the so
    * sanh "nhu cau" vs "thuc xuat" cho tung phu tung/hang.
@@ -229,8 +229,8 @@ LEFT JOIN units u ON u.id = p.unit_id
         SELECT soi.product_id,
                SUM(soi.quantity) AS demand_quantity,
                COUNT(*) AS demand_count
-        FROM   service_order_items soi
-        JOIN   service_orders so ON so.id = soi.service_order_id
+        FROM   repair_order_items soi
+        JOIN   repair_orders so ON so.id = soi.repair_order_id
         WHERE  so.branch_id = @branchId
           AND  soi.lhsc = 'PT'
           AND  soi.product_id IS NOT NULL

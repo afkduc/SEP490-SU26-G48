@@ -51,7 +51,7 @@ function computeDateRange(presetKey) {
 // Cac loai su kien SSE (/sse/repair-orders) anh huong so lieu Dashboard:
 // phieu moi tao, hoan thanh (cho thanh toan), thanh toan xong (xuat hoa
 // don), hoac bi huy. Bo qua cac event khac (claimed, task-updated,
-// bay-occupied...) vi khong doi status/total cua service_orders.
+// bay-occupied...) vi khong doi status/total cua repair_orders.
 const DASHBOARD_RELEVANT_EVENTS = new Set([
   'new-pending', 'order-completed', 'invoiced', 'order-cancelled',
 ]);

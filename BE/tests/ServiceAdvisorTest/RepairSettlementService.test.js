@@ -434,7 +434,7 @@ test('getGatePending maps pending exit rows', async () => {
         assert.equal(branchId, 1);
         return [{
           id: 50,
-          order_code: 'RO-1',
+          repair_code: 'RO-1',
           customer_full_name: 'A',
           vehicle_license_plate: '30A-12345',
           vehicle_model_text: 'Kia',

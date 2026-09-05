@@ -10,7 +10,7 @@ function mockRepo(overrides = {}) {
   return {
     findAll: async () => [],
     findById: async () => null,
-    findByServiceOrderCode: async () => null,
+    findPublicProgressByCode: async () => null,
     findByCode: async () => null,
     updateStatus: async () => null,
     updateTaskStatus: async () => {},
@@ -23,7 +23,6 @@ const bayOrder = {
   code: 'LSC-2026-001',
   branchId: 1,
   teamLeaderId: 8,
-  serviceOrderId: 50,
   bayId: 3,
   bayNumber: 2,
   status: 'inprogress',
@@ -101,10 +100,10 @@ test('BayScreen complete order when all service tasks done', async () => {
   assert.equal(dto.status, 'completed');
 });
 
-test('Landing tra-cuu progress by settlement order code', async () => {
+test('Landing tra-cuu progress theo ma RO duy nhat', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
-      findByServiceOrderCode: async (code) => (
+      findPublicProgressByCode: async (code) => (
         code === 'RO-2026-068'
           ? { id: 1, code: 'LSC-1', status: 'inprogress', tasks: [], branchName: 'HN' }
           : null

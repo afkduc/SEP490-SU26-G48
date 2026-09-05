@@ -24,7 +24,7 @@ export const STATUS_HUES = {
 export const CATEGORY_HUES = ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7', '#e34948', '#e87ba4', '#eb6834'];
 export const PARTS_HUE = '#94a3b8';
 
-// Loai hinh sua chua THAT (service_order_items.repair_category) - khop voi
+// Loai hinh sua chua THAT (repair_order_items.repair_category) - khop voi
 // REPAIR_CATEGORY_OPTIONS trong RepairSettlementPage.jsx. Tai su dung bang mau
 // CATEGORY_HUES da validate; "Khac" dung mau xam trung tinh nhu PARTS_HUE.
 export const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'OTHER'];

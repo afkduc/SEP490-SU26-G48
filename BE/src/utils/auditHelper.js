@@ -308,6 +308,12 @@ async function auditLifecycle(req, opts = {}) {
     description = null,
     snapshot = null,
     meta = null,
+    // Danh sach thay doi cu the cua buoc nay (vd sua hang muc: gia truoc/sau,
+    // so luong truoc/sau...) - xem RepairSettlementService cho vi du tao
+    // shape { type, label, before, after } | { type: 'item_changed', label, fields }.
+    // Chi 1 buoc "chup" duoc (khac voi snapshot/meta - do la trang thai CUOI
+    // CUNG cong don, con changes la rieng cho tung buoc).
+    changes = null,
     responseStatus = 200,
     branchId: branchIdOverride = null,
   } = opts;
@@ -374,6 +380,7 @@ async function auditLifecycle(req, opts = {}) {
       at: new Date().toISOString(),
       by: userName,
       description: description || label,
+      ...(Array.isArray(changes) && changes.length ? { changes } : {}),
     };
     const steps = [...prevSteps, stepEntry];
     const stepLabels = steps.map((s) => s.label || s.step).filter(Boolean);

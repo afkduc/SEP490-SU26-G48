@@ -63,6 +63,8 @@ class RepairSettlementResponseDto {
       total: entity.total,
       isWarranty: entity.isWarranty,
       teamLeader: entity.teamLeaderName,
+      lockedByName: entity.lockedBy?.name || null,
+      lockedAt: entity.lockedAt ? toDDMMYYYYHHmm(entity.lockedAt) : null,
       technicians: entity.technicians,
       repairOrderId: entity.repairOrderId,
       bayNumber: entity.bayNumber,
@@ -91,7 +93,7 @@ const PUBLIC_STATUS_LABELS = {
 class PublicVehicleHistoryDto {
   static fromRow(row) {
     return {
-      code: row.order_code,
+      code: row.repair_code,
       status: row.status,
       statusLabel: PUBLIC_STATUS_LABELS[row.status] || row.status,
       intakeDate: toDDMMYYYY(row.intake_date),

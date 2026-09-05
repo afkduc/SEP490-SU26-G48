@@ -3,7 +3,7 @@ const ApiError = require('../../utils/ApiError');
 const { auditCrud } = require('../../utils/auditHelper');
 const NotificationService = require('../../application/services/NotificationService');
 
-// Man khoang xe cong khai (khong dang nhap) - Landing "/khoang/<chi nhanh>/
+// Man khoang xe cong khai (khong dang nhap) - Landing "/bay/<chi nhanh>/
 // <so khoang>". Chi con lai phan "lam viec tai khoang": xem viec dang lam,
 // tick dau muc, bam Hoan thanh. Phan "nhan viec" (chon phieu + gan khoang +
 // gan tho) va "Lich su" da chuyen ve tai khoan cua chinh to truong (dang

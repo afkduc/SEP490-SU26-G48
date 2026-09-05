@@ -4,8 +4,8 @@ import httpClient from './httpClient';
 // tu bang tin chung ca chi nhanh, gan cho 1 khoang cua minh - bayNumber
 // truyen kem de BE echo lai dung so khoang trong event SSE 'claimed' cho
 // cac khoang khac (bayId la id noi bo trong DB, khong phai so khoang hien thi).
-export async function claimRepairOrderApi(serviceOrderId, bayId, bayNumber) {
-  return httpClient.post('/repair-orders/claim', { serviceOrderId, bayId, bayNumber });
+export async function claimRepairOrderApi(repairOrderId, bayId, bayNumber) {
+  return httpClient.post('/repair-orders/claim', { repairOrderId, bayId, bayNumber });
 }
 
 // Goi y tho (chi trong doi cua to truong dang dang nhap, ke ca dieu dong tu

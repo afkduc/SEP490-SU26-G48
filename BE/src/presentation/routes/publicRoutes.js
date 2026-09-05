@@ -80,15 +80,13 @@ function buildPublicRouter() {
 
   router.get('/lookup/:code', lookupRateLimiter, controller.lookupPublicProgress);
   router.get('/vehicle-history/:identifier', lookupRateLimiter, repairSettlementController.lookupPublicHistory);
-  router.get('/branches', serviceRequestController.getPublicBranches);
-  router.get('/vehicle-brands', serviceRequestController.getPublicVehicleBrands);
-  router.get('/service-packages', serviceRequestController.getPublicServicePackages);
+  router.get('/branches', serviceRequestController.getPublicBranches);  router.get('/service-packages', serviceRequestController.getPublicServicePackages);
   router.get('/service-packages/:code', serviceRequestController.getPublicServicePackageByCode);
   router.post('/service-requests', serviceRequestRateLimiter, serviceRequestController.createPublic);
   router.get('/gate/pending', gateRateLimiter, repairSettlementController.getGatePending);
   router.post('/gate/:id/confirm-exit', gateRateLimiter, repairSettlementController.confirmGateExit);
 
-  // Man khoang xe cong khai (khong dang nhap) - "/khoang/<chi nhanh>/<so
+  // Man khoang xe cong khai (khong dang nhap) - "/bay/<chi nhanh>/<so
   // khoang>" tren Landing, xem PublicBayBoardController.js. Chi con "lam
   // viec tai khoang" (xem/tick/hoan thanh) - "nhan viec" va "lich su" da
   // chuyen ve tai khoan cua chinh to truong (xem repairOrderRoutes.js, authenticated).

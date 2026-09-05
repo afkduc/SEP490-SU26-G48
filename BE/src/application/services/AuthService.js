@@ -96,16 +96,6 @@ class AuthService {
          AND  action_type = 'LOGIN'`,
       { p1: userId, p2: String(reason).slice(0, 64) }
     );
-    // Dong luon device "Hiện tại" — tranh 2 thiet bi cung is_current=1
-    // khi trackLogin/heartbeat heal chua kip chay.
-    await query(
-      `UPDATE user_devices
-       SET    is_current = 0,
-              last_activity_at = SYSUTCDATETIME()
-       WHERE  user_id = @p1
-         AND  is_current = 1`,
-      { p1: userId }
-    );
   }
 
   /**
