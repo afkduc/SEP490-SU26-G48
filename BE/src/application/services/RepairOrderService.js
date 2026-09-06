@@ -2,12 +2,16 @@ const ApiError = require('../../utils/ApiError');
 const RepairOrderResponseDto = require('../dto/RepairOrderDto');
 const PublicRepairProgressDto = require('../dto/PublicRepairProgressDto');
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
+const { needsCheckResult, CHECK_RESULTS } = require('../../domain/maintenanceChecklist');
 
-// 'cancelled' khong con la trang thai co the goi truc tiep qua endpoint nay -
-// huy gio la mot chieu tu Phieu quyet toan (xem RepairSettlementService
-// .updateStatus), tranh 2 duong huy khac hanh vi nhau (truoc day duong nay
-// tra phieu ve "waiting_repair" de nhan lai, gay nham lan voi huy hoan toan).
-const UPDATABLE_STATUS_VALUES = ['completed'];
+// Ket thuc lenh gio la 2 buoc: khoang xe bao xong viec (reportBayCompleted)
+// roi to truong xac nhan (confirmCompleted) - khong con 1 endpoint doi
+// "trang thai" chung nua, nen bo luon danh sach gia tri hop le.
+//
+// 'cancelled' van khong phai la trang thai co the goi truc tiep qua day - huy
+// la mot chieu tu Phieu quyet toan (xem RepairSettlementService.updateStatus),
+// tranh 2 duong huy khac hanh vi nhau (truoc day duong nay tra phieu ve
+// "waiting_repair" de nhan lai, gay nham lan voi huy hoan toan).
 
 // Khach huy giua chung (co van bam huy tren Phieu quyet toan) trong khi to
 // truong dang thao tac tren lenh sua chua (tick dau muc/bam Hoan thanh) -
@@ -140,46 +144,134 @@ class RepairOrderService {
     return this.getById(id);
   }
 
-  async updateStatus(id, status, { branchId } = {}) {
-    if (!UPDATABLE_STATUS_VALUES.includes(status)) {
-      throw new ApiError(400, 'Trạng thái không hợp lệ');
-    }
-    const existing = await this.repairOrderRepository.findById(id);
-    if (!existing) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
-    if (String(existing.branchId) !== String(branchId)) {
-      throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
-    }
-    if (existing.status !== 'inprogress') {
-      if (existing.status === 'cancelled') throw cancelledOrderError(existing);
-      throw new ApiError(409, 'Lệnh đã kết thúc (hoàn thành/hủy), không thể đổi trạng thái nữa');
-    }
-    // Chi dau muc "dich vu" (task_type='service') can tich - phu tung
-    // (task_type='product') chi de hien thi, khong tinh vao dieu kien hoan thanh.
-    // Dau muc bi khach huy giua chung (isCancelled) khong the tick (xem
-    // updateTaskStatus/FE khoa checkbox) nen cung phai loai khoi dieu kien nay,
-    // neu khong lenh se vinh vien khong hoan thanh duoc sau khi CVDV huy 1
-    // hang muc - xem BayScreen.jsx/TeamLeaderDashboard.jsx allDone.
-    if (status === 'completed' && !(existing.technicians || []).length) {
-      throw new ApiError(409, 'Lệnh sửa chữa chưa được gán thợ thực hiện, không thể kết thúc lệnh');
-    }
-    if (status === 'completed' && existing.tasks.some((t) => t.taskType === 'service' && !t.isCancelled && !t.isDone)) {
-      throw new ApiError(409, 'Cần tích hoàn thành tất cả đầu mục công việc trước khi kết thúc lệnh');
+  // Khoang xe bam "Hoan thanh" - moi chi la BAO XONG VIEC, chua ket thuc lenh.
+  // Phieu quyet toan giu nguyen 'inprogress' nen CVDV van thay "Đang sửa
+  // chữa"; chi khi to truong bam Xac nhan (confirmCompleted ben duoi) phieu
+  // moi chuyen "Chờ thanh toán". Xem ensureBayCompletionConfirm.js.
+  async reportBayCompleted(id, { branchId } = {}) {
+    const existing = await this._assertCompletable(id, { branchId });
+    if (existing.status === 'awaiting_confirmation') {
+      throw new ApiError(409, 'Khoang đã báo xong việc, đang chờ tổ trưởng xác nhận');
     }
 
-    const entity = await this.repairOrderRepository.updateStatus(id, status);
+    const entity = await this.repairOrderRepository.reportBayCompleted(id);
+    if (!entity) throw new ApiError(409, 'Không báo xong việc được, lệnh vừa đổi trạng thái - tải lại trang');
 
-    // Realtime: to truong vua hoan thanh toan bo lenh -> phieu quyet toan goc
-    // da tu chuyen "Cho thanh toan" (xem RepairOrderRepositoryImpl.updateStatus) -
-    // bao ngay cho man Phieu quyet toan cua CVDV, khong can cho poll/F5.
-    emitRepairOrderEvent(branchId, 'order-completed', {
+    // Realtime: bao cho man to truong hien nut "Xác nhận hoàn thành", va cho
+    // cac man khoang khac dang mo cung 1 khoang cap nhat theo.
+    emitRepairOrderEvent(branchId, 'bay-reported', {
       orderId: entity.id,
       code: entity.code,
+      bayId: entity.bayId,
+      bayNumber: entity.bayNumber,
     });
 
     return RepairOrderResponseDto.fromEntity(entity);
   }
 
-  async updateTaskStatus(id, taskId, isDone, { userId, branchId } = {}) {
+  // To truong go tich 1 dau muc DA hoan thanh -> "tra ve lam lai". Thay cho
+  // mot nut "tra lai" rieng: to truong kiem hang thay dau muc nao chua dat thi
+  // go dung dau muc do ra, lenh tu quay ve "dang lam" cho khoang lam tiep
+  // (xem repository.reopenTask). Chi to truong DUOC PHAN CONG lenh, tu tai
+  // khoan cua ho, moi lam duoc - khoang xe (khong dang nhap) van khong the
+  // bo tich, giu nguyen quy tac "tick la chot" o phia tho.
+  async reopenTask(id, taskId, { branchId, teamLeaderId } = {}) {
+    const existing = await this.repairOrderRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
+    if (String(existing.branchId) !== String(branchId)) {
+      throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
+    }
+    if (String(existing.teamLeaderId) !== String(teamLeaderId)) {
+      throw new ApiError(403, 'Chỉ tổ trưởng được phân công lệnh này mới có quyền yêu cầu làm lại đầu mục');
+    }
+    if (existing.status === 'cancelled') throw cancelledOrderError(existing);
+    if (existing.status === 'completed') {
+      throw new ApiError(409, 'Lệnh đã kết thúc, không thể yêu cầu làm lại đầu mục');
+    }
+
+    const task = existing.tasks.find((t) => String(t.id) === String(taskId));
+    if (!task) throw new ApiError(404, 'Không tìm thấy đầu mục công việc');
+    if (task.taskType !== 'service') {
+      throw new ApiError(400, 'Chỉ đầu mục dịch vụ mới cần làm lại');
+    }
+    if (task.isCancelled) {
+      throw new ApiError(409, 'Đầu mục này đã bị khách hủy, không cần làm lại');
+    }
+    if (!task.isDone) {
+      throw new ApiError(409, 'Đầu mục này chưa hoàn thành, không cần yêu cầu làm lại');
+    }
+
+    const entity = await this.repairOrderRepository.reopenTask(id, taskId);
+    if (!entity) throw new ApiError(409, 'Đầu mục vừa đổi trạng thái, tải lại trang rồi thử lại');
+
+    // Realtime: bao cho man khoang xe (tho dang lam) va man CVDV. reopened=true
+    // de man khoang phat am bao - day la viec BI TRA LAI, tho can biet ngay
+    // chu khong phai tien do binh thuong do chinh ho vua tick.
+    emitRepairOrderEvent(branchId, 'task-updated', {
+      orderId: Number(id),
+      taskId: Number(taskId),
+      reopened: true,
+    });
+
+    return RepairOrderResponseDto.fromEntity(entity);
+  }
+
+  // To truong xac nhan lenh da xong that su -> phieu quyet toan chuyen
+  // "Chờ thanh toán" va khoang xe duoc giai phong. Chi to truong DUOC PHAN
+  // CONG lenh nay moi xac nhan duoc, va bat buoc khoang da bao xong truoc do.
+  async confirmCompleted(id, { branchId, teamLeaderId } = {}) {
+    const existing = await this._assertCompletable(id, { branchId });
+    if (String(existing.teamLeaderId) !== String(teamLeaderId)) {
+      throw new ApiError(403, 'Chỉ tổ trưởng được phân công lệnh này mới có quyền xác nhận hoàn thành');
+    }
+    if (existing.status !== 'awaiting_confirmation') {
+      throw new ApiError(409, 'Khoang xe chưa báo xong việc, chưa thể xác nhận hoàn thành');
+    }
+
+    const entity = await this.repairOrderRepository.updateStatus(id, 'completed');
+
+    // Realtime: phieu quyet toan goc vua chuyen "Chờ thanh toán" (xem
+    // RepairOrderRepositoryImpl.updateStatus) - bao ngay cho man Phieu quyet
+    // toan cua CVDV va man khoang xe, khong can cho poll/F5.
+    emitRepairOrderEvent(branchId, 'order-completed', {
+      orderId: entity.id,
+      code: entity.code,
+      bayId: entity.bayId,
+    });
+
+    return RepairOrderResponseDto.fromEntity(entity);
+  }
+
+  // Dieu kien chung cua ca 2 buoc (khoang bao xong + to truong xac nhan):
+  // lenh con dang chay, dung chi nhanh, da co tho, va moi dau muc dich vu con
+  // hieu luc deu da xu ly xong.
+  //
+  // Chi dau muc "dich vu" (task_type='service') can tich - phu tung
+  // (task_type='product') chi de hien thi, khong tinh vao dieu kien hoan thanh.
+  // Dau muc bi khach huy giua chung (isCancelled) khong the tick (xem
+  // updateTaskStatus/FE khoa checkbox) nen cung phai loai khoi dieu kien nay,
+  // neu khong lenh se vinh vien khong hoan thanh duoc sau khi CVDV huy 1
+  // hang muc - xem BayScreen.jsx/TeamLeaderDashboard.jsx allDone.
+  async _assertCompletable(id, { branchId } = {}) {
+    const existing = await this.repairOrderRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
+    if (String(existing.branchId) !== String(branchId)) {
+      throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
+    }
+    if (existing.status === 'cancelled') throw cancelledOrderError(existing);
+    if (existing.status === 'completed') {
+      throw new ApiError(409, 'Lệnh đã kết thúc (hoàn thành/hủy), không thể đổi trạng thái nữa');
+    }
+    if (!(existing.technicians || []).length) {
+      throw new ApiError(409, 'Lệnh sửa chữa chưa được gán thợ thực hiện, không thể kết thúc lệnh');
+    }
+    if (existing.tasks.some((t) => t.taskType === 'service' && !t.isCancelled && !t.isDone)) {
+      throw new ApiError(409, 'Cần tích hoàn thành tất cả đầu mục công việc trước khi kết thúc lệnh');
+    }
+    return existing;
+  }
+
+  async updateTaskStatus(id, taskId, isDone, { userId, branchId, checkResult, checkNote } = {}) {
     const existing = await this.repairOrderRepository.findById(id);
     if (!existing) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
     if (String(existing.branchId) !== String(branchId)) {
@@ -190,6 +282,13 @@ class RepairOrderService {
     }
     if (existing.status !== 'inprogress') {
       if (existing.status === 'cancelled') throw cancelledOrderError(existing);
+      // Da bam Hoan thanh o khoang thi khong tick lai duoc nua. Neu sau do
+      // CVDV them viec moi thi moc bao xong tu bi thu hoi (xem
+      // RepairSettlementRepositoryImpl._syncRepairOrderTasks) - lenh tro lai
+      // 'inprogress' va tick duoc binh thuong, khong ket cung o day.
+      if (existing.status === 'awaiting_confirmation') {
+        throw new ApiError(409, 'Khoang đã báo xong việc, đang chờ tổ trưởng xác nhận - không thể sửa đầu mục');
+      }
       throw new ApiError(409, 'Lệnh đã kết thúc, không thể cập nhật đầu mục công việc');
     }
     // claim() da chuyen phieu sang 'inprogress' ngay luc chon khoang, TRUOC
@@ -214,7 +313,28 @@ class RepairOrderService {
       throw new ApiError(400, 'Không thể bỏ tích đầu mục công việc');
     }
 
-    await this.repairOrderRepository.updateTaskStatus(taskId, isDone);
+    // Dau muc KIEM TRA cua goi bao duong (I/M/V) phai ghi ket qua Dat/Khong
+    // dat - dung cot KET QUA (OK/NG) cua bieu mau BDDK. Rieng "Khong dat" bat
+    // buoc mo ta ly do, dung nhu huong dan tren bieu mau ("Mo ta noi dung
+    // tuong ung cho cong viec... danh dau X tai o NG vao cot ghi chu").
+    // Dau muc "Thay the" va dau muc ngoai goi thi khong danh gia, chi tick.
+    const wantsCheck = needsCheckResult(task.actionCode);
+    const result = checkResult ? String(checkResult).toUpperCase() : null;
+    if (wantsCheck) {
+      if (!CHECK_RESULTS.includes(result)) {
+        throw new ApiError(400, 'Đầu mục kiểm tra phải ghi kết quả Đạt hoặc Không đạt');
+      }
+      if (result === 'NG' && !String(checkNote || '').trim()) {
+        throw new ApiError(400, 'Đầu mục Không đạt phải mô tả nội dung vào phần ghi chú');
+      }
+    } else if (result) {
+      throw new ApiError(400, 'Đầu mục này không đánh giá Đạt/Không đạt');
+    }
+
+    await this.repairOrderRepository.updateTaskStatus(taskId, isDone, {
+      checkResult: wantsCheck ? result : null,
+      checkNote: wantsCheck && result === 'NG' ? String(checkNote).trim() : null,
+    });
 
     // Realtime: bao CVDV dang mo modal "Xem chi tiet" phieu quyet toan nay
     // biet ngay tien do vua thay doi, khong can F5 (xem sseRoutes.js).

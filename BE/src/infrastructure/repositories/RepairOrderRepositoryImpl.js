@@ -49,6 +49,10 @@ const CLAIMED_ONLY = `ro.team_leader_id IS NOT NULL AND ro.repair_started_at IS 
 function repairStatusOf(row) {
   if (row.status === 'cancelled') return 'cancelled';
   if (row.status === 'waiting_payment' || row.status === 'invoiced') return 'completed';
+  // Khoang xe da bam Hoan thanh nhung to truong chua xac nhan lai - phieu
+  // quyet toan VAN la 'inprogress' o DB (CVDV chua thay "Cho thanh toan"),
+  // khoang van tinh la dang ban. Xem ensureBayCompletionConfirm.js.
+  if (row.bay_completed_at) return 'awaiting_confirmation';
   return 'inprogress';
 }
 
@@ -262,9 +266,12 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
           .input('quantity', sql.Int, t.quantity || 0)
           .input('unitPrice', sql.Decimal(18, 2), t.unitPrice || 0)
           .input('note', sql.NVarChar(500), t.note || null)
+          .input('actionCode', sql.VarChar(4), t.actionCode || null)
+          .input('checklistGroup', sql.NVarChar(120), t.checklistGroup || null)
+          .input('checklistOrder', sql.Int, t.checklistOrder ?? null)
           .query(`
-            INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done, note)
-            VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0, @note)
+            INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done, note, action_code, checklist_group, checklist_order)
+            VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0, @note, @actionCode, @checklistGroup, @checklistOrder)
           `);
       }
 
@@ -353,11 +360,18 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     });
   }
 
-  async updateTaskStatus(taskId, isDone) {
-    await query('UPDATE repair_order_tasks SET is_done = @isDone WHERE id = @taskId', {
-      taskId: Number(taskId),
-      isDone: isDone ? 1 : 0,
-    });
+  async updateTaskStatus(taskId, isDone, { checkResult = null, checkNote = null } = {}) {
+    await query(
+      `UPDATE repair_order_tasks
+       SET    is_done = @isDone, check_result = @checkResult, check_note = @checkNote
+       WHERE  id = @taskId`,
+      {
+        taskId: Number(taskId),
+        isDone: isDone ? 1 : 0,
+        checkResult,
+        checkNote,
+      }
+    );
   }
 
   // Chi con dung cho status='completed' - huy gio la mot chieu (CVDV huy tu
@@ -367,6 +381,56 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
   // Truoc khi gop bang, buoc nay phai ghi 2 cho: bang lenh sua chua ('completed')
   // roi cascade sang phieu quyet toan ('waiting_payment'). Gio chi con 1 dong
   // UPDATE - trang thai lenh la suy ra tu trang thai phieu (xem repairStatusOf).
+  // To truong go tich 1 dau muc da hoan thanh = "tra ve lam lai". Ngoai viec
+  // mo lai chinh dau muc do (xoa ca ket qua Dat/Khong dat da ghi, de tho danh
+  // gia lai tu dau), con phai THU HOI moc khoang bao xong: lenh dang cho xac
+  // nhan se quay ve "dang lam" de khoang tick tiep duoc - neu khong, lenh ket
+  // cung (khoang khong tick duoc vi lenh khong con 'inprogress', to truong
+  // cung khong xac nhan duoc vi con dau muc chua xong).
+  //
+  // 2 cau trong 1 transaction: mo dau muc va thu hoi moc phai cung song hoac
+  // cung chet, khong duoc de lenh o trang thai nua voi.
+  async reopenTask(repairOrderId, taskId) {
+    const ok = await runInTransaction(async (tx) => {
+      const result = await tx
+        .request()
+        .input('taskId', sql.BigInt, taskId)
+        .input('repairOrderId', sql.BigInt, repairOrderId)
+        .query(`
+          UPDATE repair_order_tasks
+          SET    is_done = 0, check_result = NULL, check_note = NULL
+          WHERE  id = @taskId AND repair_order_id = @repairOrderId AND is_done = 1
+        `);
+      if (!result.rowsAffected[0]) return false;
+
+      await tx
+        .request()
+        .input('repairOrderId', sql.BigInt, repairOrderId)
+        .query(`UPDATE repair_orders SET bay_completed_at = NULL WHERE id = @repairOrderId`);
+      return true;
+    });
+
+    return ok ? this.findById(repairOrderId) : null;
+  }
+
+  // Khoang xe bao da lam xong viec - CHUA ket thuc lenh. Phieu quyet toan giu
+  // nguyen 'inprogress' (CVDV van thay "Đang sửa chữa", khoang van dang ban),
+  // chi ghi lai moc thoi gian de to truong biet ma vao xac nhan. Dieu kien
+  // bay_completed_at IS NULL de bam 2 lan khong ghi de moc dau tien.
+  async reportBayCompleted(id) {
+    const result = await query(
+      `UPDATE repair_orders
+       SET    bay_completed_at = GETDATE()
+       WHERE  id = @id AND status = 'inprogress' AND bay_completed_at IS NULL`,
+      { id }
+    );
+    return result.rowsAffected[0] > 0 ? this.findById(id) : null;
+  }
+
+  // To truong xac nhan -> gio moi that su ket thuc lenh: phieu quyet toan
+  // chuyen 'waiting_payment' (CVDV thay "Chờ thanh toán") va khoang duoc giai
+  // phong. Bat buoc khoang da bao xong truoc do (bay_completed_at IS NOT NULL)
+  // de khong the xac nhan vuot mat khi tho chua bao gi.
   async updateStatus(id, status) {
     if (status !== 'completed') {
       throw new Error(`updateStatus chi ho tro 'completed', nhan duoc '${status}'`);
@@ -376,7 +440,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
        SET    status = 'waiting_payment',
               completed_date = GETDATE(),
               repair_completed_at = GETDATE()
-       WHERE  id = @id AND status = 'inprogress'`,
+       WHERE  id = @id AND status = 'inprogress' AND bay_completed_at IS NOT NULL`,
       { id }
     );
     return this.findById(id);

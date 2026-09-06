@@ -129,6 +129,20 @@ async function start() {
       process.exit(1);
     }
 
+    // Bo 5 cot chet cua vehicle_models - doi cot nen KHONG duoc nuot loi,
+    // giong ensureDropBrands: code moi da bo cac cot nay khoi cau SELECT.
+    try {
+      const { ensureTrimVehicleModelColumns } = require('./infrastructure/database/ensureTrimVehicleModelColumns');
+      const r = await ensureTrimVehicleModelColumns();
+      console.log(r.skipped
+        ? '[BE] vehicle_models: cot chet da bo tu truoc, bo qua'
+        : `[BE] vehicle_models: DA BO 5 COT CHET (${r.steps} buoc)`);
+    } catch (trimErr) {
+      console.error('[BE] KHONG THE KHOI DONG - bo cot chet vehicle_models that bai:');
+      console.error(trimErr.message);
+      process.exit(1);
+    }
+
     try {
       await require('./infrastructure/database/ensureAuditLogsUnicode').ensureAuditLogsUnicodeColumns();
       console.log('[BE] audit_logs unicode columns ready');
@@ -155,6 +169,38 @@ async function start() {
       console.log('[BE] invoices.payment_method column ready');
     } catch (schemaErr) {
       console.warn('[BE] ensureInvoicePaymentMethod:', schemaErr.message);
+    }
+
+    // Metadata goi bao duong dinh ky (doi xe cua goi, nhom + yeu cau thuc hien
+    // I/R/M/V theo bieu mau "Phieu kiem tra BDDK"). KHONG duoc nuot loi: code
+    // moi SELECT thang cac cot nay o catalog va o checklist to truong/khoang -
+    // thieu cot la 500 o khap noi thay vi mat 1 tinh nang.
+    try {
+      const { ensureMaintenancePackageMeta } = require('./infrastructure/database/ensureMaintenancePackageMeta');
+      const r = await ensureMaintenancePackageMeta();
+      console.log(r.skipped
+        ? '[BE] metadata goi bao duong: da co tu truoc, bo qua'
+        : `[BE] metadata goi bao duong: DA THEM XONG (${r.steps} buoc)`);
+    } catch (metaErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them metadata goi bao duong that bai:');
+      console.error(metaErr.message);
+      process.exit(1);
+    }
+
+    // Moc "khoang bao xong viec" - tach buoc khoang bao xong khoi buoc to
+    // truong xac nhan hoan thanh. KHONG duoc nuot loi: thieu cot thi
+    // repairStatusOf khong bao gio ra 'awaiting_confirmation' (nut Xac nhan
+    // khong hien) va cau UPDATE cua reportBayCompleted se loi ten cot.
+    try {
+      const { ensureBayCompletionConfirm } = require('./infrastructure/database/ensureBayCompletionConfirm');
+      const r = await ensureBayCompletionConfirm();
+      console.log(r.skipped
+        ? '[BE] moc xac nhan hoan thanh: da co tu truoc, bo qua'
+        : `[BE] moc xac nhan hoan thanh: DA THEM XONG (${r.steps} buoc)`);
+    } catch (confirmErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them moc xac nhan hoan thanh that bai:');
+      console.error(confirmErr.message);
+      process.exit(1);
     }
 
     const server = http.createServer({ maxHeaderSize: 32768 }, app);

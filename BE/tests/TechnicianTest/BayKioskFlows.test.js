@@ -12,6 +12,7 @@ function mockRepo(overrides = {}) {
     findById: async () => null,
     findPublicProgressByCode: async () => null,
     findByCode: async () => null,
+    reportBayCompleted: async () => null,
     updateStatus: async () => null,
     updateTaskStatus: async () => {},
     ...overrides,
@@ -78,26 +79,34 @@ test('BayScreen reject tick when no technician assigned yet', async () => {
   );
 });
 
-test('BayScreen complete order when all service tasks done', async () => {
-  const done = {
-    ...bayOrder,
-    status: 'completed',
-    tasks: [
-      { id: 500, taskType: 'service', isDone: true, isCancelled: false, taskName: 'Cong DV' },
-      { id: 501, taskType: 'product', isDone: false, isCancelled: false, taskName: 'Phu tung' },
-    ],
-  };
+// Bam "Hoan thanh" o khoang chi la BAO XONG VIEC - lenh chuyen sang cho to
+// truong xac nhan, chua giai phong khoang va phieu quyet toan ben CVDV van
+// "dang sua chua". Xem RepairOrderService.reportBayCompleted.
+test('BayScreen report done when all service tasks done', async () => {
+  const tasks = [
+    { id: 500, taskType: 'service', isDone: true, isCancelled: false, taskName: 'Cong DV' },
+    { id: 501, taskType: 'product', isDone: false, isCancelled: false, taskName: 'Phu tung' },
+  ];
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
-      findById: async () => ({
-        ...bayOrder,
-        tasks: done.tasks,
-      }),
-      updateStatus: async () => done,
+      findById: async () => ({ ...bayOrder, tasks }),
+      reportBayCompleted: async () => ({ ...bayOrder, status: 'awaiting_confirmation', tasks }),
     }),
   });
-  const dto = await service.updateStatus(70, 'completed', { branchId: 1 });
-  assert.equal(dto.status, 'completed');
+  const dto = await service.reportBayCompleted(70, { branchId: 1 });
+  assert.equal(dto.status, 'awaiting_confirmation');
+});
+
+test('BayScreen reject report done when a service task is still open', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({ ...bayOrder }),
+    }),
+  });
+  await assert.rejects(
+    () => service.reportBayCompleted(70, { branchId: 1 }),
+    (err) => err.statusCode === 409 && /tất cả đầu mục/.test(err.message),
+  );
 });
 
 test('Landing tra-cuu progress theo ma RO duy nhat', async () => {

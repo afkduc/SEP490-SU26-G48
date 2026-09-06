@@ -298,7 +298,13 @@ function buildSSERouter() {
 
     res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected' })}\n\n`);
 
-    const RELEVANT_TYPES = new Set(['new-pending', 'claimed', 'order-cancelled', 'task-updated']);
+    // 'bay-reported' (khoang bao xong viec) va 'order-completed' (to truong
+    // xac nhan, khoang duoc giai phong) cung chi chua orderId/code/bayId nhu
+    // cac event con lai - khong lo them gi qua kenh khong xac thuc.
+    const RELEVANT_TYPES = new Set([
+      'new-pending', 'claimed', 'order-cancelled', 'task-updated',
+      'bay-reported', 'order-completed',
+    ]);
     const unsubscribe = onRepairOrderEvent(branchId, (eventData) => {
       if (!RELEVANT_TYPES.has(eventData.type)) return;
       res.write(`event: bay-board\ndata: ${JSON.stringify(eventData)}\n\n`);

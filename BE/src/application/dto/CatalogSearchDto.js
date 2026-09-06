@@ -49,6 +49,9 @@ function groupPackageRows(rows, partsByServiceId = new Map()) {
         categoryId: row.category_id,
         totalPrice: row.total_price,
         repairCategory: row.package_repair_category,
+        // Doi xe ma goi nay danh cho (service_packages.model_id) - FE loc theo
+        // xe dang bao duong de khong con chon nham goi cua doi xe khac.
+        modelId: row.model_id ?? null,
         items: [],
       });
     }
@@ -58,6 +61,10 @@ function groupPackageRows(rows, partsByServiceId = new Map()) {
       serviceName: row.service_name,
       unitPrice: row.unit_price,
       repairCategory: row.service_repair_category,
+      // Bieu mau BDDK: yeu cau thuc hien (I/R/M/V) + nhom cong viec.
+      actionCode: row.action_code ?? null,
+      checklistGroup: row.checklist_group ?? null,
+      checklistOrder: row.checklist_order ?? null,
       parts: partsByServiceId.get(row.service_id) || [],
     });
   }

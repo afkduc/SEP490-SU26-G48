@@ -24,6 +24,9 @@ class RepairOrder {
     this.notes = data.notes ?? null;
     this.createdAt = data.createdAt ?? null;
     this.completedAt = data.completedAt ?? null;
+    // Moc khoang xe bam "Hoan thanh" - to truong chua xac nhan thi lenh
+    // van dang chay (status = 'awaiting_confirmation').
+    this.bayCompletedAt = data.bayCompletedAt ?? null;
     this.cancelReason = data.cancelReason ?? null;
 
     this.customer = data.customer ?? null; // { id, fullName }
@@ -54,6 +57,7 @@ class RepairOrder {
       notes: headerRow.repair_notes,
       createdAt: headerRow.repair_started_at,
       completedAt: headerRow.repair_completed_at,
+      bayCompletedAt: headerRow.bay_completed_at,
       cancelReason: headerRow.cancel_reason,
       customer: {
         id: headerRow.customer_id,
@@ -77,6 +81,13 @@ class RepairOrder {
         isQtyIncreased: Boolean(r.is_qty_increased),
         prevQuantity: r.prev_quantity ?? null,
         note: r.note ?? null,
+        // Bieu mau "Phieu kiem tra BDDK": yeu cau thuc hien (I/R/M/V), nhom
+        // cong viec, va ket qua kiem tra OK/NG + mo ta khi NG.
+        actionCode: r.action_code ?? null,
+        checklistGroup: r.checklist_group ?? null,
+        checklistOrder: r.checklist_order ?? null,
+        checkResult: r.check_result ?? null,
+        checkNote: r.check_note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

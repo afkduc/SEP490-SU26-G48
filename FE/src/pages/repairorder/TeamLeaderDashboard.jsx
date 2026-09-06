@@ -9,6 +9,7 @@
 // - Lich su: cac lenh da hoan thanh cua to truong, loc theo ngay.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
+import { actionLabel, OTHER_GROUP_LABEL } from '../../constants/maintenanceChecklist';
 import { listRepairSettlementsApi } from '../../services/repairSettlementApi';
 import { listMyBaysApi } from '../../services/vehicleBayApi';
 import {
@@ -16,13 +17,17 @@ import {
   listMyRepairOrdersApi,
   searchTechniciansApi,
   setRepairOrderTechniciansApi,
+  confirmRepairOrderCompleteApi,
+  reopenRepairOrderTaskApi,
 } from '../../services/repairOrderApi';
 import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
 import './TeamLeaderDashboard.css';
 
 const POLL_INTERVAL_MS = 15000;
+// 'bay-reported' = khoang vua bam Hoan thanh (bao xong viec) - phai nap lai
+// danh sach lenh de hien nut "Xác nhận hoàn thành" ngay, khong doi vong poll.
 const BAY_REFRESH_EVENT_TYPES = new Set(['claimed', 'order-completed', 'order-cancelled']);
-const ORDER_REFRESH_EVENT_TYPES = new Set(['claimed', 'task-updated', 'order-completed', 'order-cancelled']);
+const ORDER_REFRESH_EVENT_TYPES = new Set(['claimed', 'task-updated', 'order-completed', 'order-cancelled', 'bay-reported']);
 
 const TABS = [
   { key: 'pending', label: 'Việc chờ nhận' },
@@ -86,6 +91,45 @@ function TaskNameLabel({ t }) {
     <>
       <span style={{ textDecoration: isStruckThrough(t) ? 'line-through' : 'none' }}>{t.taskName}</span>
       {suffix && <span style={{ textDecoration: 'none' }}>{suffix}</span>}
+    </>
+  );
+}
+
+// Gom dau muc dich vu theo NHOM CONG VIEC cua bieu mau "Phieu kiem tra bao
+// duong dinh ky" (5 nhom: cac bo phan co ban cua dong co, he thong dien khoang
+// dong co, he thong nhien lieu va kiem soat khi xa, gam va than xe, dieu hoa).
+// Dau muc ngoai bieu mau (dich vu le khach yeu cau them) don xuong cuoi trong
+// nhom "Hang muc khac". Giu nguyen thu tu checklist_order do BE sap san.
+function groupServiceTasks(tasks) {
+  const groups = [];
+  const byName = new Map();
+  for (const t of tasks) {
+    const name = t.checklistGroup || OTHER_GROUP_LABEL;
+    if (!byName.has(name)) {
+      const g = { name, tasks: [], hasOrder: t.checklistGroup != null };
+      byName.set(name, g);
+      groups.push(g);
+    }
+    byName.get(name).tasks.push(t);
+  }
+  // "Hang muc khac" luon o cuoi du dong dau tien cua phieu la dich vu le.
+  return groups.sort((a, b) => Number(a.name === OTHER_GROUP_LABEL) - Number(b.name === OTHER_GROUP_LABEL));
+}
+
+// Dong phu duoi ten dau muc: yeu cau thuc hien (ghi hẳn chữ, không hiện mã
+// I/R/M/V) va ket qua kiem tra Dat/Khong dat + mo ta khi Khong dat.
+function TaskMeta({ t }) {
+  const label = actionLabel(t.actionCode);
+  if (!label && !t.checkResult) return null;
+  return (
+    <>
+      {label && <div className="tld-task__action">{label}</div>}
+      {t.checkResult && (
+        <div className={`tld-task__result tld-task__result--${t.checkResult === 'NG' ? 'ng' : 'ok'}`}>
+          {t.checkResult === 'NG' ? 'Không đạt' : 'Đạt'}
+          {t.checkResult === 'NG' && t.checkNote ? ` — ${t.checkNote}` : ''}
+        </div>
+      )}
     </>
   );
 }
@@ -351,15 +395,21 @@ function AssignTechniciansModal({ order, onClose, onDone }) {
 // Xem (khong tick duoc) - tick that su dien ra tai man hinh cong khai cua
 // dung khoang do (Landing), o day chi phan anh lai realtime qua SSE
 // 'task-updated'/danh sach orders duoc nap lai.
-function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
+function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId }) {
   const [intakeOrder, setIntakeOrder] = useState(null);
 
   if (bays.length === 0) {
     return <div className="tld-empty">Bạn chưa được gán khoang xe nào. Liên hệ Quản lý chi nhánh.</div>;
   }
 
+  // Lenh dang chiem khoang gom CA 2 trang thai: dang lam ('inprogress') va da
+  // bao xong dang cho to truong xac nhan ('awaiting_confirmation') - xe van
+  // nam trong khoang cho den khi xac nhan, va chinh o trang thai thu 2 moi
+  // hien nut "Xác nhận hoàn thành" ben duoi.
   const activeByBayId = new Map(
-    orders.filter((o) => o.status === 'inprogress').map((o) => [String(o.bayId), o])
+    orders
+      .filter((o) => o.status === 'inprogress' || o.status === 'awaiting_confirmation')
+      .map((o) => [String(o.bayId), o])
   );
 
   return (
@@ -371,13 +421,18 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
         const partTasks = order ? (order.tasks || []).filter((t) => t.taskType !== 'service') : [];
         const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
         const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
+        // Khoang da bam Hoan thanh nhung to truong chua xac nhan - khoang van
+        // tinh la dang ban (xe chua ra), chi doi nhan de biet la den luot minh.
+        const awaitingConfirm = order?.status === 'awaiting_confirmation';
 
         return (
           <div key={bay.id} className={`tld-bay-status-card ${busy ? 'tld-bay-status-card--busy' : ''}`}>
             <div className="tld-bay-status-card__header">
               <span className="tld-bay-status-card__number">Khoang {bay.bayNumber}</span>
-              <span className={`badge ${busy ? 'badge-inprogress' : 'badge-inactive'}`}>
-                {busy ? `Đang làm (${doneCount}/${activeServiceTasks.length})` : 'Trống'}
+              <span className={`badge ${awaitingConfirm ? 'badge-pending' : (busy ? 'badge-inprogress' : 'badge-inactive')}`}>
+                {awaitingConfirm
+                  ? 'Chờ xác nhận'
+                  : (busy ? `Đang làm (${doneCount}/${activeServiceTasks.length})` : 'Trống')}
               </span>
             </div>
 
@@ -407,17 +462,39 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
                 )}
                 {serviceTasks.length > 0 && (
                   <div className="tld-bay-status-card__tasks">
-                    {serviceTasks.map((task) => (
-                      <label key={task.id} className={`tld-task ${isStruckThrough(task) ? 'tld-task--cancelled' : (task.isDone ? 'tld-task--done' : '')}`}>
-                        <input type="checkbox" checked={task.isDone} readOnly disabled />
-                        <div className="tld-task__body">
-                          <div className="tld-task__nameRow">
-                            <TaskNameLabel t={task} />
-                            {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
-                          </div>
-                          {task.note && <div className="tld-task__note">{task.note}</div>}
-                        </div>
-                      </label>
+                    {groupServiceTasks(serviceTasks).map((group) => (
+                      <div key={group.name} className="tld-task-group">
+                        <div className="tld-task-group__title">{group.name}</div>
+                        {group.tasks.map((task) => {
+                          // To truong khong tu tich (viec do lam tai khoang),
+                          // nhung DUOC GO TICH dau muc da xong de yeu cau lam
+                          // lai - thay cho 1 nut "tra ve lam tiep" rieng.
+                          const canReopen = task.isDone && !task.isCancelled;
+                          return (
+                          <label
+                            key={task.id}
+                            className={`tld-task ${isStruckThrough(task) ? 'tld-task--cancelled' : (task.isDone ? 'tld-task--done' : '')}`}
+                            title={canReopen ? 'Gỡ tích để yêu cầu làm lại đầu mục này' : undefined}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={task.isDone}
+                              readOnly={!canReopen}
+                              disabled={!canReopen || reopeningTaskId === task.id}
+                              onChange={canReopen ? () => onReopenTask(order, task) : undefined}
+                            />
+                            <div className="tld-task__body">
+                              <div className="tld-task__nameRow">
+                                <TaskNameLabel t={task} />
+                                {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
+                              </div>
+                              <TaskMeta t={task} />
+                              {task.note && <div className="tld-task__note">{task.note}</div>}
+                            </div>
+                          </label>
+                          );
+                        })}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -449,6 +526,28 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
                 >
                   Xem tình trạng xe ban đầu
                 </button>
+
+                {/* Khoang da bam "Hoàn thành" (bao xong viec) - phieu quyet
+                    toan van dang "Đang sửa chữa" ben CVDV cho den khi to
+                    truong bam nut nay. Xem BE RepairOrderService
+                    .reportBayCompleted / .confirmCompleted. */}
+                {order.status === 'awaiting_confirmation' && (
+                  <div className="tld-confirm-box">
+                    <div className="tld-confirm-box__title">Khoang đã báo xong việc</div>
+                    <div className="tld-confirm-box__hint">
+                      Kiểm tra lại rồi xác nhận để chuyển phiếu sang <b>Chờ thanh toán</b> và giải phóng khoang.
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ width: '100%', justifyContent: 'center' }}
+                      disabled={confirmingId === order.id}
+                      onClick={() => onConfirmComplete(order)}
+                    >
+                      {confirmingId === order.id ? 'Đang xác nhận…' : 'Xác nhận hoàn thành'}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -502,11 +601,19 @@ function HistoryDetailModal({ order, onClose }) {
 
           {serviceTasks.length > 0 && (
             <div className="tld-bay-status-card__tasks" style={{ marginTop: 12 }}>
-              {serviceTasks.map((task) => (
-                <label key={task.id} className={`tld-task ${task.isCancelled ? 'tld-task--cancelled' : 'tld-task--done'}`}>
-                  <input type="checkbox" checked={task.isDone} readOnly disabled />
-                  <TaskNameLabel t={task} />
-                </label>
+              {groupServiceTasks(serviceTasks).map((group) => (
+                <div key={group.name} className="tld-task-group">
+                  <div className="tld-task-group__title">{group.name}</div>
+                  {group.tasks.map((task) => (
+                    <label key={task.id} className={`tld-task ${task.isCancelled ? 'tld-task--cancelled' : 'tld-task--done'}`}>
+                      <input type="checkbox" checked={task.isDone} readOnly disabled />
+                      <div className="tld-task__body">
+                        <div className="tld-task__nameRow"><TaskNameLabel t={task} /></div>
+                        <TaskMeta t={task} />
+                      </div>
+                    </label>
+                  ))}
+                </div>
               ))}
             </div>
           )}
@@ -582,6 +689,8 @@ export default function TeamLeaderDashboard() {
   const [error, setError] = useState('');
   const [claimingSettlement, setClaimingSettlement] = useState(null);
   const [assigningOrder, setAssigningOrder] = useState(null);
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [reopeningTaskId, setReopeningTaskId] = useState(null);
   const [claimedElsewhere, setClaimedElsewhere] = useState({});
   // So do goc tab - dem viec "chua xem": pendingSeenCount la mo (baseline) so
   // luong pending tai lan cuoi mo tab "Viec cho nhan" (null = chua seed lan
@@ -668,6 +777,43 @@ export default function TeamLeaderDashboard() {
 
   useRepairOrderEventsSSE(handleEvent, true);
 
+  // Go tich 1 dau muc da hoan thanh = yeu cau khoang lam lai dau muc do.
+  // Neu lenh dang cho xac nhan thi tu quay ve "dang lam" (BE thu hoi moc bao
+  // xong, xem RepairOrderRepositoryImpl.reopenTask).
+  const handleReopenTask = async (order, task) => {
+    if (!window.confirm(`Cần làm lại đầu mục công việc này?
+
+${task.taskName}`)) return;
+    setReopeningTaskId(task.id);
+    setError('');
+    try {
+      await reopenRepairOrderTaskApi(order.id, task.id);
+      loadOrders();
+      loadBays();
+    } catch (err) {
+      setError(err.message || 'Không yêu cầu làm lại đầu mục được');
+    } finally {
+      setReopeningTaskId(null);
+    }
+  };
+
+  // To truong xac nhan lenh da xong sau khi khoang bao xong viec - day moi la
+  // buoc lam phieu quyet toan ben CVDV chuyen "Chờ thanh toán" va giai phong
+  // khoang, nen phai nap lai ca bays lan orders.
+  const handleConfirmComplete = async (order) => {
+    setConfirmingId(order.id);
+    setError('');
+    try {
+      await confirmRepairOrderCompleteApi(order.id);
+      loadBays();
+      loadOrders();
+    } catch (err) {
+      setError(err.message || 'Không xác nhận hoàn thành được');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
   const handleClaimDone = () => {
     setClaimingSettlement(null);
     loadPending();
@@ -750,7 +896,7 @@ export default function TeamLeaderDashboard() {
         )
       )}
 
-      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} />}
+      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} onConfirmComplete={handleConfirmComplete} confirmingId={confirmingId} onReopenTask={handleReopenTask} reopeningTaskId={reopeningTaskId} />}
 
       {activeTab === 'history' && <HistoryPanel orders={orders} />}
 
