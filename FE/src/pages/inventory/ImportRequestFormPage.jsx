@@ -301,28 +301,38 @@ export default function ImportRequestFormPage() {
                           }
                         }}
                       />
-                      {it.showDropdown && (it.searchResults.length > 0 || it.searching) && (
-                        <div className="ir-form__dropdown">
-                          {it.searching && <div className="ir-form__dropdown-item">Đang tìm...</div>}
-                          {!it.searching && it.searchResults.length === 0 && (
-                            <div className="ir-form__dropdown-item">Không có kết quả</div>
-                          )}
-                          {!it.searching && it.searchResults.map((p) => (
-                            <button
-                              type="button"
-                              key={p.id}
-                              className="ir-form__dropdown-item ir-form__dropdown-item--clickable"
-                              onClick={() => pickProduct(it.rowKey, p)}
-                            >
-                              <span className="font-mono">{p.productCode}</span>
-                              &nbsp;-&nbsp;{p.productName}
-                              <span className="ir-form__dropdown-meta">
-                                ({p.unitName})
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      {it.showDropdown && (it.searchResults.length > 0 || it.searching) && (() => {
+                        // Bo qua phu tung da duoc chon o dong khac trong cung phieu -
+                        // tranh chon trung 1 phu tung 2 lan.
+                        const visibleResults = it.searchResults.filter(
+                          (p) => !items.some((other) => other.rowKey !== it.rowKey && other.productId === p.id)
+                        );
+                        return (
+                          <div className="ir-form__dropdown">
+                            {it.searching && <div className="ir-form__dropdown-item">Đang tìm...</div>}
+                            {!it.searching && it.searchResults.length === 0 && (
+                              <div className="ir-form__dropdown-item">Không có kết quả</div>
+                            )}
+                            {!it.searching && it.searchResults.length > 0 && visibleResults.length === 0 && (
+                              <div className="ir-form__dropdown-item">Phụ tùng phù hợp đã được chọn ở dòng khác</div>
+                            )}
+                            {!it.searching && visibleResults.map((p) => (
+                              <button
+                                type="button"
+                                key={p.id}
+                                className="ir-form__dropdown-item ir-form__dropdown-item--clickable"
+                                onClick={() => pickProduct(it.rowKey, p)}
+                              >
+                                <span className="font-mono">{p.productCode}</span>
+                                &nbsp;-&nbsp;{p.productName}
+                                <span className="ir-form__dropdown-meta">
+                                  ({p.unitName})
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td>
                       <span className="font-mono">{it.productCode || '—'}</span>

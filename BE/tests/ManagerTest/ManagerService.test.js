@@ -425,7 +425,7 @@ function basePackagePayload(overrides = {}) {
     packageName: 'Gói bảo dưỡng cơ bản',
     totalPrice: 1200000,
     repairCategory: 'PM',
-    serviceIds: [700, 701],
+    services: [{ serviceId: 700, actionCode: 'R' }, { serviceId: 701, actionCode: 'I' }],
     ...overrides,
   };
 }
@@ -445,12 +445,16 @@ test('createServicePackage requires name/price, valid price/repairCategory, and 
     (err) => err.statusCode === 400 && /Loại hình sửa chữa/i.test(err.message),
   );
   await assert.rejects(
-    () => service.createServicePackage(1, basePackagePayload({ serviceIds: [] })),
+    () => service.createServicePackage(1, basePackagePayload({ services: [] })),
     (err) => err.statusCode === 400 && /ít nhất 1 dịch vụ/i.test(err.message),
   );
   await assert.rejects(
-    () => service.createServicePackage(1, basePackagePayload({ serviceIds: [999] })),
+    () => service.createServicePackage(1, basePackagePayload({ services: [{ serviceId: 999, actionCode: 'R' }] })),
     (err) => err.statusCode === 400 && /không thuộc chi nhánh/i.test(err.message),
+  );
+  await assert.rejects(
+    () => service.createServicePackage(1, basePackagePayload({ services: [{ serviceId: 700, actionCode: 'X' }] })),
+    (err) => err.statusCode === 400 && /hành động không hợp lệ/i.test(err.message),
   );
 });
 
@@ -458,7 +462,7 @@ test('createServicePackage succeeds with generated package code', async () => {
   const service = new ManagerService(mockRepo());
   const created = await service.createServicePackage(1, basePackagePayload());
   assert.equal(created.packageCode, 'PKG-001');
-  assert.deepEqual(created.serviceIds, [700, 701]);
+  assert.deepEqual(created.services, [{ serviceId: 700, actionCode: 'R' }, { serviceId: 701, actionCode: 'I' }]);
 });
 
 test('updateServicePackage 404s when missing; serviceIds optional but validated when provided', async () => {
@@ -469,14 +473,14 @@ test('updateServicePackage 404s when missing; serviceIds optional but validated 
   );
 
   const service = new ManagerService(mockRepo());
-  // Khong gui serviceIds -> khong bat buoc (requireServiceIds=false)
+  // Khong gui services -> khong bat buoc (requireServiceIds=false)
   const payload = basePackagePayload();
-  delete payload.serviceIds;
+  delete payload.services;
   const updated = await service.updateServicePackage(1, 1, payload);
-  assert.equal(updated.serviceIds, undefined);
+  assert.equal(updated.services, undefined);
 
   await assert.rejects(
-    () => service.updateServicePackage(1, 1, basePackagePayload({ serviceIds: [999] })),
+    () => service.updateServicePackage(1, 1, basePackagePayload({ services: [{ serviceId: 999, actionCode: 'R' }] })),
     (err) => err.statusCode === 400 && /không thuộc chi nhánh/i.test(err.message),
   );
 });

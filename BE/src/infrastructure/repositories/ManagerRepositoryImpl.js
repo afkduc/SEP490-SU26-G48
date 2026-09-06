@@ -643,17 +643,17 @@ class ManagerRepositoryImpl {
     return result.recordset.map((row) => ({ id: row.id, code: row.package_code, name: row.package_name }));
   }
 
-  async _syncPackageItems(packageId, serviceIds = []) {
+  async _syncPackageItems(packageId, services = []) {
     await query('DELETE FROM service_package_items WHERE package_id = @packageId', { packageId: Number(packageId) });
-    for (const serviceId of serviceIds) {
-      await query('INSERT INTO service_package_items (package_id, service_id) VALUES (@packageId, @serviceId)', {
-        packageId: Number(packageId),
-        serviceId: Number(serviceId),
-      });
+    for (const item of services) {
+      await query(
+        'INSERT INTO service_package_items (package_id, service_id, action_code) VALUES (@packageId, @serviceId, @actionCode)',
+        { packageId: Number(packageId), serviceId: Number(item.serviceId), actionCode: item.actionCode }
+      );
     }
   }
 
-  async createServicePackage({ branchId, packageCode, packageName, categoryId, totalPrice, description, purpose, repairCategory, serviceIds }) {
+  async createServicePackage({ branchId, packageCode, packageName, categoryId, totalPrice, description, purpose, repairCategory, services }) {
     const result = await query(
       `INSERT INTO service_packages (package_code, package_name, category_id, total_price, description, purpose, is_active, branch_id, repair_category)
        OUTPUT INSERTED.id
@@ -670,11 +670,11 @@ class ManagerRepositoryImpl {
       }
     );
     const packageId = result.recordset[0].id;
-    await this._syncPackageItems(packageId, serviceIds);
+    await this._syncPackageItems(packageId, services);
     return this.getServicePackageById(branchId, packageId);
   }
 
-  async updateServicePackage(branchId, id, { packageName, categoryId, totalPrice, description, purpose, isActive, repairCategory, serviceIds }) {
+  async updateServicePackage(branchId, id, { packageName, categoryId, totalPrice, description, purpose, isActive, repairCategory, services }) {
     await query(
       `UPDATE service_packages
        SET package_name = @packageName,
@@ -698,8 +698,8 @@ class ManagerRepositoryImpl {
       }
     );
 
-    if (serviceIds) {
-      await this._syncPackageItems(id, serviceIds);
+    if (services) {
+      await this._syncPackageItems(id, services);
     }
 
     return this.getServicePackageById(branchId, id);
