@@ -57,6 +57,16 @@ class ImportRequestRepository {
   }
 
   /**
+   * Kiem tra 1 nha cung cap da co phieu nhap nao dung so hoa don nay chua.
+   * @param {number} supplierId
+   * @param {string} supplierInvoiceNo
+   * @returns {Promise<boolean>}
+   */
+  async existsBySupplierInvoice(supplierId, supplierInvoiceNo) {
+    throw new Error('Method existsBySupplierInvoice() must be implemented');
+  }
+
+  /**
    * Tao phieu nhap moi (status='pending') + insert items.
    * Can truyen transaction handle de dam bao atom.
    * @param {Object} tx - msnodesqlv8 transaction
