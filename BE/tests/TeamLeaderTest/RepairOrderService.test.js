@@ -12,6 +12,8 @@ function mockRepo(overrides = {}) {
     claim: async () => null,
     searchTechnicians: async () => [],
     setTechnicians: async () => true,
+    reportBayCompleted: async () => null,
+    reopenTask: async () => null,
     updateStatus: async () => null,
     updateTaskStatus: async () => {},
     ...overrides,
@@ -202,7 +204,7 @@ test('updateTaskStatus rejects when no technician assigned yet', async () => {
   );
 });
 
-test('updateStatus rejects completing order when no technician assigned yet', async () => {
+test('reportBayCompleted rejects when no technician assigned yet', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
       findById: async () => ({
@@ -213,7 +215,7 @@ test('updateStatus rejects completing order when no technician assigned yet', as
     }),
   });
   await assert.rejects(
-    () => service.updateStatus(70, 'completed', { branchId: 1 }),
+    () => service.reportBayCompleted(70, { branchId: 1 }),
     (err) => err.statusCode === 409 && /chưa được gán thợ/.test(err.message),
   );
 });
@@ -253,41 +255,169 @@ test('updateTaskStatus ticks service task', async () => {
   assert.equal(updated, true);
 });
 
-test('updateStatus only accepts completed and requires all service tasks done', async () => {
+test('reportBayCompleted requires all service tasks done', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
       findById: async () => ({ ...inProgressOrder }),
     }),
   });
   await assert.rejects(
-    () => service.updateStatus(70, 'cancelled', { branchId: 1 }),
-    (err) => err.statusCode === 400,
-  );
-  await assert.rejects(
-    () => service.updateStatus(70, 'completed', { branchId: 1 }),
+    () => service.reportBayCompleted(70, { branchId: 1 }),
     (err) => err.statusCode === 409 && /tất cả đầu mục/.test(err.message),
   );
 });
 
-test('updateStatus ignores cancelled service tasks when checking completion', async () => {
-  const completed = {
-    ...inProgressOrder,
-    status: 'completed',
-    tasks: [
-      { id: 500, taskType: 'service', isDone: true, isCancelled: false },
-      { id: 502, taskType: 'service', isDone: false, isCancelled: true },
-      { id: 501, taskType: 'product', isDone: false, isCancelled: false },
-    ],
-  };
+// Khoang bao xong viec KHONG ket thuc lenh: lenh chuyen sang cho to truong
+// xac nhan, phieu quyet toan ben CVDV van "dang sua chua".
+test('reportBayCompleted ignores cancelled service tasks and only awaits confirmation', async () => {
+  const tasks = [
+    { id: 500, taskType: 'service', isDone: true, isCancelled: false },
+    { id: 502, taskType: 'service', isDone: false, isCancelled: true },
+    { id: 501, taskType: 'product', taskName: 'Phu tung', isDone: false, isCancelled: false },
+  ];
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({ ...inProgressOrder, tasks }),
+      reportBayCompleted: async () => ({ ...inProgressOrder, status: 'awaiting_confirmation', tasks }),
+    }),
+  });
+  const dto = await service.reportBayCompleted(70, { branchId: 1 });
+  assert.equal(dto.status, 'awaiting_confirmation');
+});
+
+test('reportBayCompleted rejects when bay already reported', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
       findById: async () => ({
         ...inProgressOrder,
-        tasks: completed.tasks,
+        status: 'awaiting_confirmation',
+        tasks: [{ id: 500, taskType: 'service', isDone: true, isCancelled: false }],
       }),
-      updateStatus: async () => completed,
     }),
   });
-  const dto = await service.updateStatus(70, 'completed', { branchId: 1 });
+  await assert.rejects(
+    () => service.reportBayCompleted(70, { branchId: 1 }),
+    (err) => err.statusCode === 409 && /chờ tổ trưởng xác nhận/.test(err.message),
+  );
+});
+
+// To truong go tich 1 dau muc da xong = yeu cau lam lai. Thay cho 1 nut
+// "tra ve lam tiep" rieng - xem RepairOrderService.reopenTask.
+test('reopenTask rejects a task that is not done yet', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({ ...inProgressOrder }),
+    }),
+  });
+  await assert.rejects(
+    () => service.reopenTask(70, 500, { branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 409 && /chưa hoàn thành/.test(err.message),
+  );
+});
+
+test('reopenTask rejects another team leader', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({
+        ...inProgressOrder,
+        tasks: [{ id: 500, taskType: 'service', isDone: true, isCancelled: false }],
+      }),
+    }),
+  });
+  await assert.rejects(
+    () => service.reopenTask(70, 500, { branchId: 1, teamLeaderId: 99 }),
+    (err) => err.statusCode === 403,
+  );
+});
+
+test('reopenTask rejects a task the customer already cancelled', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({
+        ...inProgressOrder,
+        tasks: [{ id: 500, taskType: 'service', isDone: true, isCancelled: true }],
+      }),
+    }),
+  });
+  await assert.rejects(
+    () => service.reopenTask(70, 500, { branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 409 && /khách hủy/.test(err.message),
+  );
+});
+
+// Go tich khi lenh dang CHO XAC NHAN -> lenh quay ve "dang lam" de khoang
+// lam tiep, khong ket cung.
+test('reopenTask sends an awaiting-confirmation order back to inprogress', async () => {
+  let reopened = null;
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({
+        ...inProgressOrder,
+        status: 'awaiting_confirmation',
+        tasks: [{ id: 500, taskType: 'service', isDone: true, isCancelled: false }],
+      }),
+      reopenTask: async (id, taskId) => {
+        reopened = [Number(id), Number(taskId)];
+        return {
+          ...inProgressOrder,
+          status: 'inprogress',
+          tasks: [{ id: 500, taskType: 'service', isDone: false, isCancelled: false }],
+        };
+      },
+    }),
+  });
+  const dto = await service.reopenTask(70, 500, { branchId: 1, teamLeaderId: 8 });
+  assert.deepEqual(reopened, [70, 500]);
+  assert.equal(dto.status, 'inprogress');
+  assert.equal(dto.tasks[0].isDone, false);
+});
+
+test('confirmCompleted rejects when bay has not reported yet', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({
+        ...inProgressOrder,
+        tasks: [{ id: 500, taskType: 'service', isDone: true, isCancelled: false }],
+      }),
+    }),
+  });
+  await assert.rejects(
+    () => service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 409 && /chưa báo xong việc/.test(err.message),
+  );
+});
+
+test('confirmCompleted rejects another team leader', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({
+        ...inProgressOrder,
+        status: 'awaiting_confirmation',
+        tasks: [{ id: 500, taskType: 'service', isDone: true, isCancelled: false }],
+      }),
+    }),
+  });
+  await assert.rejects(
+    () => service.confirmCompleted(70, { branchId: 1, teamLeaderId: 99 }),
+    (err) => err.statusCode === 403,
+  );
+});
+
+// Chi buoc nay moi that su ket thuc lenh -> phieu quyet toan chuyen
+// "Cho thanh toan" ben man CVDV.
+test('confirmCompleted completes the order', async () => {
+  const tasks = [{ id: 500, taskType: 'service', isDone: true, isCancelled: false }];
+  let completedWith = null;
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({ ...inProgressOrder, status: 'awaiting_confirmation', tasks }),
+      updateStatus: async (id, status) => {
+        completedWith = status;
+        return { ...inProgressOrder, status: 'completed', tasks };
+      },
+    }),
+  });
+  const dto = await service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 });
+  assert.equal(completedWith, 'completed');
   assert.equal(dto.status, 'completed');
 });

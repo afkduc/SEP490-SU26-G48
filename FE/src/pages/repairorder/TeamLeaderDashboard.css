@@ -357,6 +357,12 @@
   cursor: default;
 }
 
+/* Dau muc DA xong thi to truong go tich duoc de yeu cau lam lai - o do con
+   bam duoc nen phai cho con tro dang "bam duoc", khac han cac o chi de xem. */
+.tld-task input:not(:disabled) {
+  cursor: pointer;
+}
+
 /* Tich xanh binh thuong khi hoan thanh - KHONG gach ngang, gach ngang danh
    rieng cho truong hop khach huy hang muc (xem HistorySettlementPage.jsx). */
 .tld-task--done {
@@ -398,6 +404,52 @@
   font-size: 11px;
   color: var(--gray-500);
   font-style: italic;
+}
+
+/* Yeu cau thuc hien theo bieu mau "Phieu kiem tra bao duong dinh ky" - ghi
+   hẳn chữ ("Thay thế", "Kiểm tra, điều chỉnh hoặc thay thế nếu cần thiết"...)
+   nen cho phep xuong dong thay vi cat bot, khoang xe/to truong doc mot lan la
+   biet phai lam gi. */
+.tld-task__action {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--gray-600);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Ket qua kiem tra Dat/Khong dat (cot KET QUA OK/NG cua bieu mau). */
+.tld-task__result {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.tld-task__result--ok {
+  color: #2E7D32;
+}
+.tld-task__result--ng {
+  color: #C62828;
+}
+
+/* Nhom cong viec cua bieu mau (5 nhom + "Hang muc khac"). */
+.tld-task-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tld-task-group + .tld-task-group {
+  margin-top: 10px;
+}
+.tld-task-group__title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--primary-dark);
+  border-bottom: 1px solid var(--gray-200);
+  padding-bottom: 3px;
 }
 
 .tld-bay-status-card__parts-title {
@@ -456,4 +508,28 @@
   font-size: 13px;
   color: var(--gray-500);
   white-space: nowrap;
+}
+
+/* Khoang da bao xong viec - o xac nhan cua to truong. Buoc nay moi lam phieu
+   quyet toan ben CVDV chuyen "Cho thanh toan" va giai phong khoang, nen tach
+   ra thanh 1 khoi rieng thay vi 1 nut lan giua cac nut xem thong tin. */
+.tld-confirm-box {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--primary-light);
+  border-radius: 8px;
+  background: var(--primary-very-light);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tld-confirm-box__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+.tld-confirm-box__hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--gray-600);
 }

@@ -135,6 +135,9 @@ class RepairSettlement {
         engineNumber: headerRow.vehicle_engine_number,
         purchaseDate: headerRow.vehicle_purchase_date,
         currentKm: headerRow.vehicle_current_km,
+        // Doi xe that trong catalog - de man sua phieu van loc dung goi bao
+        // duong cua xe do (giong luc tao moi), xem RepairSettlementPage.
+        modelId: headerRow.vehicle_model_id ?? null,
       },
       advisor: {
         id: headerRow.advisor_id,
@@ -157,6 +160,9 @@ class RepairSettlement {
         isFree: Boolean(r.is_free),
         total: r.total,
         note: r.note ?? null,
+        // Yeu cau thuc hien cua bieu mau BDDK - de mo lai phieu cu van hien
+        // dung "Thay the"/"Kiem tra..." tren tung dau muc con cua goi.
+        actionCode: r.action_code ?? null,
       })),
       tasks: taskRows.map((r) => ({
         id: r.id,

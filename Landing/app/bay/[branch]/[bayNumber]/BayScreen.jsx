@@ -5,6 +5,7 @@ import { API_BASE_URL } from "../../../config";
 import { apiFetch } from "../../apiClient";
 import { BRANCH_SLUGS } from "../../branchSlugs";
 import IntakeChecklistView from "../../IntakeChecklistView";
+import { actionLabel, groupServiceTasks, needsCheckResult } from "../../maintenanceChecklist";
 import styles from "../../kiosk.module.css";
 
 const POLL_INTERVAL_MS = 15000;
@@ -87,6 +88,105 @@ function TaskNameLabel({ t }) {
   );
 }
 
+// 1 dong dau muc cong viec. Hai kieu tuong tac, theo dung bieu mau BDDK:
+//  - Dau muc PHAI THAY (hoac dau muc ngoai goi bao duong): tick "da lam xong"
+//    nhu cu.
+//  - Dau muc KIEM TRA (kiem tra/dieu chinh, thao ve sinh do kiem, kiem tra
+//    bang mat): chon Dat hoac Khong dat - dung cot KET QUA OK/NG. Chon "Khong
+//    dat" thi phai mo ta noi dung truoc khi luu, dung huong dan tren bieu mau.
+function TaskRow({ task, busy, onTaskDone }) {
+  const [ngOpen, setNgOpen] = useState(false);
+  const [ngNote, setNgNote] = useState("");
+  const label = actionLabel(task.actionCode);
+  const locked = busy || task.isDone || task.isCancelled;
+  const wantsResult = needsCheckResult(task.actionCode);
+
+  const body = (
+    <div className={styles.taskBody}>
+      <div className={styles.taskNameRow}>
+        <TaskNameLabel t={task} />
+        {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
+      </div>
+      {label && <div className={styles.taskAction}>{label}</div>}
+      {task.note && <div className={styles.taskNote}>{task.note}</div>}
+      {task.checkResult && (
+        <div className={task.checkResult === "NG" ? styles.taskResultNg : styles.taskResultOk}>
+          {task.checkResult === "NG" ? "Không đạt" : "Đạt"}
+          {task.checkResult === "NG" && task.checkNote ? ` — ${task.checkNote}` : ""}
+        </div>
+      )}
+    </div>
+  );
+
+  if (!wantsResult) {
+    return (
+      <label className={`${styles.task} ${isStruckThrough(task) ? styles.taskCancelled : (task.isDone ? styles.taskDone : "")}`}>
+        <input type="checkbox" checked={task.isDone} disabled={locked} onChange={() => onTaskDone(task)} />
+        {body}
+      </label>
+    );
+  }
+
+  return (
+    <div className={`${styles.task} ${styles.taskCheck} ${isStruckThrough(task) ? styles.taskCancelled : (task.isDone ? styles.taskDone : "")}`}>
+      {body}
+      {!task.isDone && !task.isCancelled && !ngOpen && (
+        <div className={styles.taskResultBtns}>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnSm} ${styles.btnOk}`}
+            disabled={busy}
+            onClick={() => onTaskDone(task, { checkResult: "OK" })}
+          >
+            Đạt
+          </button>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnSm} ${styles.btnNg}`}
+            disabled={busy}
+            onClick={() => { setNgNote(""); setNgOpen(true); }}
+          >
+            Không đạt
+          </button>
+        </div>
+      )}
+      {ngOpen && (
+        <div className={styles.taskNgForm}>
+          <textarea
+            className={styles.taskNgInput}
+            rows={2}
+            autoFocus
+            value={ngNote}
+            onChange={(e) => setNgNote(e.target.value)}
+            placeholder="Mô tả nội dung không đạt (bắt buộc)…"
+          />
+          <div className={styles.taskResultBtns}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnSm} ${styles.btnNg}`}
+              disabled={busy || !ngNote.trim()}
+              onClick={async () => {
+                await onTaskDone(task, { checkResult: "NG", checkNote: ngNote.trim() });
+                setNgOpen(false);
+              }}
+            >
+              Lưu
+            </button>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnSecondary} ${styles.btnSm}`}
+              disabled={busy}
+              onClick={() => setNgOpen(false)}
+            >
+              Huỷ
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing }) {
   const [showIntake, setShowIntake] = useState(false);
   const tasks = order.tasks || [];
@@ -95,6 +195,7 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
   const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
   const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
   const allDone = activeServiceTasks.length > 0 && doneCount === activeServiceTasks.length;
+  const awaitingConfirm = order.status === "awaiting_confirmation";
 
   return (
     <div className={styles.job}>
@@ -117,25 +218,18 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
 
       <div className={styles.jobSectionTitle}>Đầu mục công việc ({doneCount}/{activeServiceTasks.length})</div>
       <div className={styles.jobTasklist}>
-        {serviceTasks.map((task) => (
-          <label
-            key={task.id}
-            className={`${styles.task} ${isStruckThrough(task) ? styles.taskCancelled : (task.isDone ? styles.taskDone : "")}`}
-          >
-            <input
-              type="checkbox"
-              checked={task.isDone}
-              disabled={busyTaskId === task.id || task.isDone || task.isCancelled}
-              onChange={() => onTaskDone(task)}
-            />
-            <div className={styles.taskBody}>
-              <div className={styles.taskNameRow}>
-                <TaskNameLabel t={task} />
-                {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
-              </div>
-              {task.note && <div className={styles.taskNote}>{task.note}</div>}
-            </div>
-          </label>
+        {groupServiceTasks(serviceTasks).map((group) => (
+          <div key={group.name} className={styles.taskGroup}>
+            <div className={styles.taskGroupTitle}>{group.name}</div>
+            {group.tasks.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                busy={busyTaskId === task.id}
+                onTaskDone={onTaskDone}
+              />
+            ))}
+          </div>
         ))}
       </div>
 
@@ -170,14 +264,23 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
         Xem tình trạng xe ban đầu
       </button>
 
-      <button
-        type="button"
-        className={`${styles.btn} ${styles.btnPrimary} ${styles.jobComplete}`}
-        disabled={!allDone || completing}
-        onClick={onComplete}
-      >
-        {completing ? "Đang xử lý…" : "Hoàn thành"}
-      </button>
+      {/* Bam "Hoàn thành" o day moi la BAO XONG VIEC. Phieu quyet toan ben
+          CVDV chi chuyen "Chờ thanh toán" khi to truong bam Xac nhan tren tai
+          khoan cua ho - xe van nam trong khoang cho den luc do. */}
+      {awaitingConfirm ? (
+        <div className={styles.jobAwaitingConfirm}>
+          Đã báo xong việc, đang chờ tổ trưởng xác nhận hoàn thành.
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnPrimary} ${styles.jobComplete}`}
+          disabled={!allDone || completing}
+          onClick={onComplete}
+        >
+          {completing ? "Đang xử lý…" : "Hoàn thành"}
+        </button>
+      )}
 
       {showIntake && (
         <div className={styles.modalOverlay} onClick={() => setShowIntake(false)}>
@@ -279,10 +382,25 @@ export default function BayScreen({ slug, bayNumber }) {
       // (event.taskId = null, xem RepairSettlementService.update) - vd khach
       // them/huy hang muc. Chi phat am bao cho truong hop CVDV sua phieu -
       // tho dang tu tick tren chinh man hinh nay thi khong can bao lai chinh ho.
-      if (event.taskId == null) {
+      // event.reopened = to truong vua GO TICH 1 dau muc, tra ve cho tho lam
+      // lai - phai bao am giong truong hop CVDV sua phieu, vi day khong phai
+      // tien do do chinh tho vua tick.
+      if (event.taskId == null || event.reopened) {
         playUpdateChime();
       }
       loadActiveOrder();
+      return;
+    }
+    if (event.type === "bay-reported" && event.orderId === bay?.activeRepairOrderId) {
+      // Cung 1 khoang co the dang mo tren nhieu man - dong bo trang thai
+      // "đã báo xong, chờ tổ trưởng xác nhận" cho tat ca.
+      loadActiveOrder();
+      return;
+    }
+    if (event.type === "order-completed" && event.orderId === bay?.activeRepairOrderId) {
+      // To truong vua xac nhan hoan thanh -> lenh khong con 'inprogress' nen
+      // khoang duoc giai phong, man hinh tra ve trang thai "Trống".
+      refreshBay();
     }
   }, [bay?.id, bay?.activeRepairOrderId, refreshBay, loadActiveOrder]);
 
@@ -310,12 +428,15 @@ export default function BayScreen({ slug, bayNumber }) {
     };
   }, [bay?.branchId, handleEvent, refreshBay]);
 
-  const handleTaskDone = async (task) => {
+  const handleTaskDone = async (task, { checkResult, checkNote } = {}) => {
     setBusyTaskId(task.id);
     try {
       const updated = await apiFetch(`/public/repair-orders/${activeOrder.id}/tasks/${task.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ bayId: bay.id, isDone: true }),
+        // Dau muc kiem tra gui kem ket qua Dat/Khong dat (+ mo ta khi Khong
+        // dat); dau muc phai thay chi gui isDone nhu cu. BE tu chan lai neu
+        // gui thieu/thua so voi loai dau muc (xem RepairOrderService).
+        body: JSON.stringify({ bayId: bay.id, isDone: true, checkResult, checkNote }),
       });
       setActiveOrder(updated);
     } catch (err) {
@@ -329,13 +450,17 @@ export default function BayScreen({ slug, bayNumber }) {
     }
   };
 
+  // "Hoàn thành" o khoang = BAO XONG VIEC. Lenh van o lai khoang (chua giai
+  // phong) va phieu quyet toan ben CVDV chua doi trang thai - phai cho to
+  // truong bam Xac nhan tren tai khoan cua ho. Xem BE RepairOrderService
+  // .reportBayCompleted / .confirmCompleted.
   const handleComplete = async () => {
     setCompleting(true);
     setError("");
     try {
       await apiFetch(`/public/repair-orders/${activeOrder.id}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ bayId: bay.id, status: "completed" }),
+        body: JSON.stringify({ bayId: bay.id }),
       });
       refreshBay();
     } catch (err) {

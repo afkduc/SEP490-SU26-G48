@@ -56,7 +56,14 @@ class PublicBayBoardController {
         req.params.id,
         req.params.taskId,
         Boolean(req.body.isDone),
-        { userId: bay.teamLeaderId, branchId: bay.branchId }
+        {
+          userId: bay.teamLeaderId,
+          branchId: bay.branchId,
+          // Dau muc kiem tra cua goi bao duong: ket qua Dat/Khong dat + mo ta
+          // khi Khong dat (cot KET QUA/GHI CHU cua bieu mau BDDK).
+          checkResult: req.body.checkResult,
+          checkNote: req.body.checkNote,
+        }
       );
       // Không ghi audit từng đầu mục — chỉ ghi khi bấm Hoàn thành (updateStatus)
       return success(res, item, 'Task status updated');
@@ -65,28 +72,31 @@ class PublicBayBoardController {
     }
   };
 
+  // Khoang bam "Hoan thanh" - BAO XONG VIEC, chua ket thuc lenh. Phieu quyet
+  // toan chi chuyen "Chờ thanh toán" khi to truong bam Xac nhan tu tai khoan
+  // cua ho (xem RepairOrderController.confirmComplete).
   updateStatus = async (req, res, next) => {
     try {
       const bay = await this._resolveBay(req.body.bayId);
-      const item = await this.repairOrderService.updateStatus(req.params.id, req.body.status, {
+      const item = await this.repairOrderService.reportBayCompleted(req.params.id, {
         branchId: bay.branchId,
       });
       const doneTasks = (item?.tasks || []).filter((t) => t.isDone || t.is_done);
-      const isCompleted = String(req.body.status || '').toLowerCase() === 'completed';
-      const statusLabel = isCompleted ? 'Hoàn thành sửa chữa' : `Cập nhật trạng thái (${req.body.status})`;
+      const statusLabel = 'Khoang báo xong việc';
       const { repairOrderSnapshot } = require('../../utils/auditSnapshots');
       await auditCrud.lifecycle(req, {
         tableName: 'repair_orders',
         entityCode: item?.code || `ID-${req.params.id}`,
         recordId: item?.id || Number(req.params.id) || null,
         entityName: 'Lệnh sửa chữa',
-        step: isCompleted ? 'completed' : 'status',
+        step: 'bay_reported',
         stepLabel: statusLabel,
         action: 'UPDATE',
-        description: `${statusLabel} lệnh ${item?.code || req.params.id} — Khoang ${bay.bayNumber}`
-          + (doneTasks.length ? ` (${doneTasks.length} đầu mục)` : ''),
+        description: `${statusLabel} cho lệnh ${item?.code || req.params.id} — Khoang ${bay.bayNumber}`
+          + (doneTasks.length ? ` (${doneTasks.length} đầu mục)` : '')
+          + ' — chờ tổ trưởng xác nhận',
         snapshot: repairOrderSnapshot(item, {
-          status: req.body.status,
+          status: item?.status,
           completedTaskCount: doneTasks.length,
           taskNames: doneTasks.map((t) => t.taskName || t.task_name).filter(Boolean),
           bayNumber: bay.bayNumber,

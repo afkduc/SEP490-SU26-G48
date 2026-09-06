@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AppContext';
 import { useToast } from '../../components/common/ToastContext';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { ROLES } from '../../constants/roles';
+import { actionLabel, consumesPart } from '../../constants/maintenanceChecklist';
 import { formatCurrency } from '../../utils';
 import { searchVehiclesApi, listVehicleModelsApi } from '../../services/vehicleApi';
 import { searchCatalogApi } from '../../services/catalogApi';
@@ -138,7 +139,7 @@ function emptyItem() {
   // httt de trong (chua chon) - chi mac dinh "Khach hang thanh toan" SAU KHI
   // co van chon 1 dich vu/goi/phu tung that tu catalog (xem selectCatalog*),
   // tranh hien thi san 1 gia tri nhu da chon roi trong khi dong con dang trong.
-  return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: '', repairCategory: '', unit: 'Công', qty: 1, unitPrice: 0, discount: 0, total: 0, note: '' };
+  return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: '', repairCategory: '', unit: 'Công', qty: 1, unitPrice: 0, discount: 0, total: 0, note: '', actionCode: null };
 }
 
 // Suy luan lai nhom "dich vu/goi da chon + phu tung/dich vu con tu dong chen
@@ -919,6 +920,11 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit }) {
                       <td>
                         {item.description}
                         {!item.isFree && isExemptFromCustomerBilling(item) && <span className="tag" style={{ marginLeft: 6 }}>Miễn thu KH</span>}
+                        {/* Yêu cầu thực hiện của biểu mẫu "Phiếu kiểm tra BDĐK" -
+                            chỉ đầu mục con của gói bảo dưỡng mới có. */}
+                        {actionLabel(item.actionCode) && (
+                          <div style={{ fontSize: 11, color: 'var(--gray-600)', fontStyle: 'italic' }}>{actionLabel(item.actionCode)}</div>
+                        )}
                       </td>
                       <td style={{ textAlign: 'center' }}><span className="tag">{REPAIR_CATEGORY_LABEL_BY_VALUE[item.repairCategory] || '—'}</span></td>
                       <td style={{ textAlign: 'center' }}>{HTTT_LABEL_BY_VALUE[item.httt] || '—'}</td>
@@ -2064,7 +2070,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'product', products } }));
         } else {
           const result = await searchCatalogApi(term);
-          if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'catalog', ...result } }));
+          // Gói bảo dưỡng được khai báo riêng cho TỪNG đời xe (72 gói = 12 đời
+          // x 6 cấp) nên chỉ gợi ý gói của đúng chiếc xe đang lập phiếu - trước
+          // đây hiện cả 72 gói nên chọn nhầm gói CX-5 cho xe Mazda2 vẫn lưu
+          // được. Xe cũ chưa gán được đời trong catalog (modelId rỗng) thì vẫn
+          // hiện đủ, không chặn cố vấn lập phiếu.
+          const packages = vehicleInfo.modelId
+            ? (result.packages || []).filter((p) => !p.modelId || String(p.modelId) === String(vehicleInfo.modelId))
+            : (result.packages || []);
+          if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'catalog', ...result, packages } }));
         }
       } catch {
         if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
@@ -2072,7 +2086,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCatalogIdx, items[activeCatalogIdx]?.description, items[activeCatalogIdx]?.lhsc]);
+  }, [activeCatalogIdx, items[activeCatalogIdx]?.description, items[activeCatalogIdx]?.lhsc, vehicleInfo.modelId]);
 
   const fillFromRow = async (row) => {
     setShowSuggestions(false);
@@ -2101,6 +2115,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : '', currentKm: '',
       warrantyEndDate: row.warrantyEndDate ? String(row.warrantyEndDate).slice(0, 10) : '',
       warrantyKmLimit: row.warrantyKmLimit ?? null,
+      // Doi xe that trong catalog - de o "Hang muc" chi goi y dung goi bao
+      // duong cua chiec xe nay (xem effect tra cuu catalog o tren).
+      modelId: row.modelId ?? null,
       // Km lan ghi nhan gan nhat (khong hien len o) - chi de doi chieu canh
       // bao neu CVDV nhap so km MOI thap hon, xem handleSave.
       lastKnownKm: row.currentKm ?? null,
@@ -2616,8 +2633,20 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           httt: 'KHT',
           repairCategory,
           groupId,
+          // Yêu cầu thực hiện của cấp bảo dưỡng này (Thay thế / Kiểm tra...) -
+          // chỉ để hiển thị, không lưu xuống repair_order_items (BE tự tra lại
+          // từ catalog khi sinh checklist cho tổ trưởng, xem
+          // repairOrderTaskBuilder.js).
+          actionCode: it.actionCode || null,
         }));
-        rows.push(...buildPartRows(it.parts, repairCategory).map((r) => ({ ...r, groupId })));
+        // Chỉ đầu mục PHẢI THAY mới kèm sẵn phụ tùng. Đầu mục kiểm tra (I/M/V)
+        // theo biểu mẫu chỉ "thay nếu cần thiết" - kèm sẵn phụ tùng cho cả 30
+        // đầu mục như trước là xuất kho thừa và đội tiền của khách; khi thợ
+        // xác định cần thay thật thì cố vấn thêm dòng phụ tùng sau (dòng thêm
+        // sau được đánh dấu "(Khách thêm)", xem _syncRepairOrderTasks).
+        if (consumesPart(it.actionCode)) {
+          rows.push(...buildPartRows(it.parts, repairCategory).map((r) => ({ ...r, groupId })));
+        }
       }
       next.splice(idx + 1, 0, ...rows);
       return next;
@@ -3166,6 +3195,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                             onFocus={(e) => !isChild && openCatalogDropdown(idx, e.target)}
                             onBlur={() => setTimeout(() => closeCatalogSuggestions(idx), 180)}
                             placeholder={canSave ? (isPartRow ? 'Nhập tên/mã phụ tùng trong kho...' : 'Nhập tên dịch vụ / gói combo...') : 'Vui lòng chọn khách hàng và xe trước'} />
+                          {/* Yêu cầu thực hiện của đầu mục theo biểu mẫu "Phiếu kiểm
+                              tra BDĐK" - ghi hẳn chữ, không hiện mã I/R/M/V. Chỉ đầu
+                              mục con của gói bảo dưỡng mới có. */}
+                          {actionLabel(item.actionCode) && (
+                            <div style={{ fontSize: 10.5, lineHeight: 1.3, color: 'var(--gray-600)', padding: '1px 8px 2px', fontStyle: 'italic' }}>
+                              {actionLabel(item.actionCode)}
+                            </div>
+                          )}
                           {hasSuggestions && catalogDropdownRect && createPortal(
                             <div style={{ position: 'fixed', top: catalogDropdownRect.top, left: catalogDropdownRect.left, width: 440, maxHeight: 420, overflowY: 'auto', background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000 }}>
                               {suggestion.type === 'product' && suggestion.products?.length > 0 && (

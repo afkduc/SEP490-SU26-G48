@@ -30,6 +30,7 @@ const HEADER_SELECT = `
          v.frame_number       AS vehicle_frame_number,
          v.engine_number      AS vehicle_engine_number,
          v.current_km         AS vehicle_current_km,
+         v.model_id           AS vehicle_model_id,
          wr.purchase_date     AS vehicle_purchase_date,
          adv.user_name AS advisor_name,
          adv.phone     AS advisor_phone,
@@ -68,7 +69,8 @@ const HEADER_SELECT = `
   FROM   repair_orders so
   JOIN   branches  b   ON b.id = so.branch_id
   JOIN   customers c   ON c.id = so.customer_id
-  JOIN   vehicles  v   ON v.id = so.vehicle_id  JOIN   users     adv ON adv.id = so.advisor_id
+  JOIN   vehicles  v   ON v.id = so.vehicle_id
+  JOIN   users     adv ON adv.id = so.advisor_id
   LEFT JOIN users  tl  ON tl.id = so.team_leader_id
   LEFT JOIN users  lockUser ON lockUser.id = so.locked_by_user_id
   OUTER APPLY (
@@ -486,9 +488,12 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('unitPrice', sql.Decimal(18, 2), t.unitPrice || 0)
         .input('isCancelled', sql.Bit, t.isCancelled ? 1 : 0)
         .input('note', sql.NVarChar(500), t.note || null)
+        .input('actionCode', sql.VarChar(4), t.actionCode || null)
+        .input('checklistGroup', sql.NVarChar(120), t.checklistGroup || null)
+        .input('checklistOrder', sql.Int, t.checklistOrder ?? null)
         .query(`
-          INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done, is_cancelled, is_added_later, note)
-          VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0, @isCancelled, 1, @note)
+          INSERT INTO repair_order_tasks (repair_order_id, task_name, task_type, product_id, quantity, unit_price, is_done, is_cancelled, is_added_later, note, action_code, checklist_group, checklist_order)
+          VALUES (@repairOrderId, @taskName, @taskType, @productId, @quantity, @unitPrice, 0, @isCancelled, 1, @note, @actionCode, @checklistGroup, @checklistOrder)
         `);
     }
 
@@ -526,6 +531,25 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('note', sql.NVarChar(500), d.note || null)
         .query(`UPDATE repair_order_tasks SET note = @note WHERE id = @id`);
     }
+
+    // Co van vua them viec (hoac bo huy 1 dau muc) cho 1 lenh ma khoang DA bao
+    // xong -> thu hoi moc bao xong, tra lenh ve "dang lam". Neu khong, khoang
+    // khong tick duoc dau muc moi (chi tick khi lenh dang 'inprogress') ma to
+    // truong cung khong xac nhan duoc (con dau muc chua xong) - lenh ket cung.
+    await tx
+      .request()
+      .input('repairOrderId', sql.BigInt, repairOrderId)
+      .query(`
+        UPDATE repair_orders
+        SET    bay_completed_at = NULL
+        WHERE  id = @repairOrderId
+          AND  bay_completed_at IS NOT NULL
+          AND  EXISTS (
+                 SELECT 1 FROM repair_order_tasks
+                 WHERE repair_order_id = @repairOrderId
+                   AND task_type = 'service' AND is_cancelled = 0 AND is_done = 0
+               )
+      `);
   }
 
   async updateStatus(id, status, { issuedBy, cancelReason, paymentMethod } = {}) {
@@ -634,14 +658,19 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('isFree', sql.Bit, Boolean(item.isFree))
         .input('total', sql.Decimal(18, 2), item.total || 0)
         .input('note', sql.NVarChar(500), (item.note || '').trim() || null)
+        // Yeu cau thuc hien theo bieu mau BDDK (I/R/M/V) - chi co o dong dich
+        // vu con sinh tu 1 goi bao duong; dich vu le/phu tung de NULL.
+        .input('actionCode', sql.VarChar(4), item.actionCode || null)
         .query(`
           INSERT INTO repair_order_items (
             repair_order_id, item_type, product_id, service_id, item_code, item_description,
-            lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total, note
+            lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total, note,
+            action_code
           )
           VALUES (
             @repairOrderId, @itemType, @productId, @serviceId, @itemCode, @itemDescription,
-            @lhsc, @httt, @repairCategory, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total, @note
+            @lhsc, @httt, @repairCategory, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total, @note,
+            @actionCode
           )
         `);
     }

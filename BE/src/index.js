@@ -171,6 +171,38 @@ async function start() {
       console.warn('[BE] ensureInvoicePaymentMethod:', schemaErr.message);
     }
 
+    // Metadata goi bao duong dinh ky (doi xe cua goi, nhom + yeu cau thuc hien
+    // I/R/M/V theo bieu mau "Phieu kiem tra BDDK"). KHONG duoc nuot loi: code
+    // moi SELECT thang cac cot nay o catalog va o checklist to truong/khoang -
+    // thieu cot la 500 o khap noi thay vi mat 1 tinh nang.
+    try {
+      const { ensureMaintenancePackageMeta } = require('./infrastructure/database/ensureMaintenancePackageMeta');
+      const r = await ensureMaintenancePackageMeta();
+      console.log(r.skipped
+        ? '[BE] metadata goi bao duong: da co tu truoc, bo qua'
+        : `[BE] metadata goi bao duong: DA THEM XONG (${r.steps} buoc)`);
+    } catch (metaErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them metadata goi bao duong that bai:');
+      console.error(metaErr.message);
+      process.exit(1);
+    }
+
+    // Moc "khoang bao xong viec" - tach buoc khoang bao xong khoi buoc to
+    // truong xac nhan hoan thanh. KHONG duoc nuot loi: thieu cot thi
+    // repairStatusOf khong bao gio ra 'awaiting_confirmation' (nut Xac nhan
+    // khong hien) va cau UPDATE cua reportBayCompleted se loi ten cot.
+    try {
+      const { ensureBayCompletionConfirm } = require('./infrastructure/database/ensureBayCompletionConfirm');
+      const r = await ensureBayCompletionConfirm();
+      console.log(r.skipped
+        ? '[BE] moc xac nhan hoan thanh: da co tu truoc, bo qua'
+        : `[BE] moc xac nhan hoan thanh: DA THEM XONG (${r.steps} buoc)`);
+    } catch (confirmErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them moc xac nhan hoan thanh that bai:');
+      console.error(confirmErr.message);
+      process.exit(1);
+    }
+
     const server = http.createServer({ maxHeaderSize: 32768 }, app);
     server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);

@@ -33,11 +33,19 @@ class RepairOrderRepository {
     throw new Error('Method setTechnicians() must be implemented');
   }
 
+  async reopenTask(repairOrderId, taskId) {
+    throw new Error('Method reopenTask() must be implemented');
+  }
+
+  async reportBayCompleted(id) {
+    throw new Error('Method reportBayCompleted() must be implemented');
+  }
+
   async updateStatus(id, status) {
     throw new Error('Method updateStatus() must be implemented');
   }
 
-  async updateTaskStatus(taskId, isDone) {
+  async updateTaskStatus(taskId, isDone, { checkResult, checkNote } = {}) {
     throw new Error('Method updateTaskStatus() must be implemented');
   }
 }
