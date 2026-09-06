@@ -129,6 +129,20 @@ async function start() {
       process.exit(1);
     }
 
+    // Bo 5 cot chet cua vehicle_models - doi cot nen KHONG duoc nuot loi,
+    // giong ensureDropBrands: code moi da bo cac cot nay khoi cau SELECT.
+    try {
+      const { ensureTrimVehicleModelColumns } = require('./infrastructure/database/ensureTrimVehicleModelColumns');
+      const r = await ensureTrimVehicleModelColumns();
+      console.log(r.skipped
+        ? '[BE] vehicle_models: cot chet da bo tu truoc, bo qua'
+        : `[BE] vehicle_models: DA BO 5 COT CHET (${r.steps} buoc)`);
+    } catch (trimErr) {
+      console.error('[BE] KHONG THE KHOI DONG - bo cot chet vehicle_models that bai:');
+      console.error(trimErr.message);
+      process.exit(1);
+    }
+
     try {
       await require('./infrastructure/database/ensureAuditLogsUnicode').ensureAuditLogsUnicodeColumns();
       console.log('[BE] audit_logs unicode columns ready');
