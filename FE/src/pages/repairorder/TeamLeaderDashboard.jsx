@@ -95,13 +95,13 @@ function TaskNameLabel({ t }) {
   );
 }
 
-// So luong + DON VI TINH cua dau muc phu tung: "x4 Lít", "x1 Cái"... Tho o
-// khoang phai biet do 4 LIT dau hay lay 4 CAI bugi, chi "x4" thi khong du.
+// So luong + DON VI TINH cua dau muc phu tung: "4 Lít", "1 Cái"... Tho o
+// khoang phai biet do 4 LIT dau hay lay 4 CAI bugi, chi so khong thi khong du.
 // Dau muc dich vu khong co DVT va luon SL 1 -> tra ve rong, khong hien gi.
 function qtyLabel(t) {
   const n = Number(t.quantity) || 0;
   if (!t.unit && n <= 1) return '';
-  return `x${n}${t.unit ? ` ${t.unit}` : ''}`;
+  return `${n}${t.unit ? ` ${t.unit}` : ''}`;
 }
 
 // Gom dau muc dich vu theo NHOM CONG VIEC cua bieu mau "Phieu kiem tra bao
