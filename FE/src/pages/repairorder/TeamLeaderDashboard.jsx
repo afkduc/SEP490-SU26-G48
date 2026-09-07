@@ -95,6 +95,15 @@ function TaskNameLabel({ t }) {
   );
 }
 
+// So luong + DON VI TINH cua dau muc phu tung: "x4 Lít", "x1 Cái"... Tho o
+// khoang phai biet do 4 LIT dau hay lay 4 CAI bugi, chi "x4" thi khong du.
+// Dau muc dich vu khong co DVT va luon SL 1 -> tra ve rong, khong hien gi.
+function qtyLabel(t) {
+  const n = Number(t.quantity) || 0;
+  if (!t.unit && n <= 1) return '';
+  return `x${n}${t.unit ? ` ${t.unit}` : ''}`;
+}
+
 // Gom dau muc dich vu theo NHOM CONG VIEC cua bieu mau "Phieu kiem tra bao
 // duong dinh ky" (5 nhom: cac bo phan co ban cua dong co, he thong dien khoang
 // dong co, he thong nhien lieu va kiem soat khi xa, gam va than xe, dieu hoa).
@@ -488,7 +497,7 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                             <div className="tld-task__body">
                               <div className="tld-task__nameRow">
                                 <TaskNameLabel t={task} />
-                                {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
+                                {qtyLabel(task) && <span className="tld-task__qty">{qtyLabel(task)}</span>}
                               </div>
                               <TaskMeta t={task} />
                               {task.note && <div className="tld-task__note">{task.note}</div>}
@@ -513,7 +522,7 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                             </div>
                             {task.note && <div className="tld-task__note">{task.note}</div>}
                           </div>
-                          {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
+                          {qtyLabel(task) && <span className="tld-task__qty">{qtyLabel(task)}</span>}
                         </div>
                       ))}
                     </div>
@@ -626,7 +635,7 @@ function HistoryDetailModal({ order, onClose }) {
                 {partTasks.map((task) => (
                   <div key={task.id} className={`tld-task ${task.isCancelled ? 'tld-task--cancelled' : ''}`}>
                     <TaskNameLabel t={task} />
-                    {task.quantity > 1 && <span> x{task.quantity}</span>}
+                    {qtyLabel(task) && <span> {qtyLabel(task)}</span>}
                   </div>
                 ))}
               </div>

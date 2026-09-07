@@ -43,6 +43,17 @@ const HEADER_SELECT = `
 // Phieu con o 'waiting_repair' chua thuoc ve ai nen khong hien o day.
 const CLAIMED_ONLY = `ro.team_leader_id IS NOT NULL AND ro.repair_started_at IS NOT NULL`;
 
+// Dau muc phu tung phai hien ro DON VI TINH ("x4 Lít" chu khong phai "x4") -
+// tho o khoang can biet do 4 lit dau hay lay 4 cai bugi. repair_order_tasks
+// khong luu DVT (chi co so luong), nen lay tu kho qua product_id. Dich vu thi
+// khong co product_id -> unit = NULL, FE tu bo qua.
+const TASK_SELECT = `
+  SELECT rot.*, u.unit_name AS unit
+  FROM   repair_order_tasks rot
+  LEFT   JOIN products p ON p.id = rot.product_id
+  LEFT   JOIN units    u ON u.id = p.unit_id
+`;
+
 // Trang thai lenh sua chua truoc day la 1 cot rieng (inprogress/completed/
 // cancelled) - that ra chi la anh xa 1-1 tu trang thai phieu, nen sau khi gop
 // thi suy ra thay vi luu trung. Xem ensureRepairOrderMerge.
@@ -112,7 +123,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     const taskParams = {};
     ids.forEach((rid, i) => { taskParams[`id${i}`] = rid; });
     const tasksResult = await query(
-      `SELECT * FROM repair_order_tasks WHERE repair_order_id IN (${inClause}) ORDER BY id`,
+      `${TASK_SELECT} WHERE rot.repair_order_id IN (${inClause}) ORDER BY rot.id`,
       taskParams
     );
     const tasksByOrder = new Map();
@@ -130,7 +141,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     if (!header) return null;
 
     const tasksResult = await query(
-      `SELECT * FROM repair_order_tasks WHERE repair_order_id = @id ORDER BY id`,
+      `${TASK_SELECT} WHERE rot.repair_order_id = @id ORDER BY rot.id`,
       { id }
     );
     const techniciansByOrder = await fetchTechniciansByOrderIds([header.id]);
@@ -143,7 +154,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     if (!header) return null;
 
     const tasksResult = await query(
-      `SELECT * FROM repair_order_tasks WHERE repair_order_id = @id ORDER BY id`,
+      `${TASK_SELECT} WHERE rot.repair_order_id = @id ORDER BY rot.id`,
       { id: header.id }
     );
     const techniciansByOrder = await fetchTechniciansByOrderIds([header.id]);

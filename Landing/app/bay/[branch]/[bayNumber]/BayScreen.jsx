@@ -69,6 +69,15 @@ function isStruckThrough(t) {
   return t.isCancelled || isFullyReturned(t);
 }
 
+// So luong + DON VI TINH cua dau muc phu tung: "x4 Lít", "x1 Cái"... Tho o
+// khoang phai biet do 4 LIT dau hay lay 4 CAI bugi, chi "x4" thi khong du.
+// Dau muc dich vu khong co DVT va luon SL 1 -> tra ve rong, khong hien gi.
+function qtyLabel(t) {
+  const n = Number(t.quantity) || 0;
+  if (!t.unit && n <= 1) return '';
+  return `x${n}${t.unit ? ` ${t.unit}` : ''}`;
+}
+
 function TaskNameLabel({ t }) {
   const qtyReturned = qtyReturnedOf(t);
   const suffix = t.isCancelled
@@ -105,7 +114,7 @@ function TaskRow({ task, busy, onTaskDone }) {
     <div className={styles.taskBody}>
       <div className={styles.taskNameRow}>
         <TaskNameLabel t={task} />
-        {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
+        {qtyLabel(task) && <span className={styles.partRowQty}>{qtyLabel(task)}</span>}
       </div>
       {label && <div className={styles.taskAction}>{label}</div>}
       {task.note && <div className={styles.taskNote}>{task.note}</div>}
@@ -244,10 +253,10 @@ function ActiveJobPanel({ order, onTaskDone, busyTaskId }) {
                   </div>
                   {task.note && <div className={styles.taskNote}>{task.note}</div>}
                   {task.isCancelled && (
-                    <div className={styles.taskReturnNote}>Số lượng trả lại kho x{task.quantity}</div>
+                    <div className={styles.taskReturnNote}>Số lượng trả lại kho {qtyLabel(task) || `x${task.quantity}`}</div>
                   )}
                 </div>
-                {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
+                {qtyLabel(task) && <span className={styles.partRowQty}>{qtyLabel(task)}</span>}
               </div>
             ))}
           </div>

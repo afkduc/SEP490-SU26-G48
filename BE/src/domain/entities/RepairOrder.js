@@ -70,6 +70,8 @@ class RepairOrder {
         taskType: r.task_type,
         productId: r.product_id,
         quantity: r.quantity,
+        // DVT lay tu kho qua product_id (xem TASK_SELECT) - dich vu de trong.
+        unit: r.unit ?? null,
         unitPrice: r.unit_price,
         isDone: Boolean(r.is_done),
         isCancelled: Boolean(r.is_cancelled),
