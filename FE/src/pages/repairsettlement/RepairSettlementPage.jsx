@@ -286,6 +286,80 @@ function TaskNameLabel({ t }) {
   );
 }
 
+// "Tien do cong viec" hien cho co van - dung chung cho modal Truy cap phieu
+// va man Sua phieu (truoc day 2 cho copy y het nhau nen sua 1 ben la lech).
+//
+// QUAN TRONG - phan biet Dat va KHONG DAT: dau muc kiem tra bi danh "Khong
+// dat" van co is_done = 1 (tho DA lam xong viec kiem tra, chi la ket qua
+// khong dat). Neu chi nhin is_done thi no hien tich xanh y het dau muc dat,
+// co van doc phieu se tuong xe khong co van de gi. Phai to do + dau X rieng.
+function TaskProgressRow({ t }) {
+  const ng = t.checkResult === 'NG';
+  const ok = t.isDone && !ng;
+  const yeuCau = actionLabel(t.actionCode);
+  return (
+    <label
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px',
+        background: t.isCancelled ? 'var(--gray-50)' : (ng ? '#FDECEA' : (ok ? '#E8F5E9' : 'var(--gray-50)')),
+        borderRadius: 6,
+        fontSize: 13,
+        color: t.isCancelled ? 'var(--gray-400)' : (ng ? '#B91C1C' : (ok ? '#2E7D32' : 'var(--gray-900)')),
+      }}
+    >
+      {ng ? (
+        <span style={{ fontWeight: 700, width: 13, textAlign: 'center', flexShrink: 0, lineHeight: '16px' }}>✕</span>
+      ) : (
+        <input type="checkbox" checked={t.isDone} disabled readOnly
+          style={{ accentColor: '#2E7D32', marginTop: 2, flexShrink: 0 }} />
+      )}
+      <span>
+        <TaskNameLabel t={t} />
+        {/* Yeu cau thuc hien ghi ngay trong ngoac sau ten cong viec - co van
+            nhin phieu la biet dau muc do chi kiem tra hay phai thay. */}
+        {yeuCau && <span style={{ color: 'var(--gray-600)' }}> ({yeuCau})</span>}
+        {ng && (
+          <span style={{ fontWeight: 700 }}>
+            {' — Không đạt'}{t.checkNote ? ` — ${t.checkNote}` : ''}
+          </span>
+        )}
+        {ok && t.checkResult === 'OK' && <span style={{ fontWeight: 600 }}> — Đạt</span>}
+      </span>
+    </label>
+  );
+}
+
+function TaskProgressList({ tasks, bayNumber, technicians }) {
+  const serviceTasks = (tasks || []).filter((t) => t.taskType === 'service');
+  if (serviceTasks.length === 0) return null;
+  const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
+  const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
+  const ngCount = activeServiceTasks.filter((t) => t.checkResult === 'NG').length;
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div className="form-section-title">
+        Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
+        {/* Bao ro co bao nhieu dau muc KHONG DAT ngay tren tieu de - day la
+            thu co van can tu van lai cho khach, khong the de lan trong danh
+            sach dai. */}
+        {ngCount > 0 && (
+          <span style={{ color: '#B91C1C', fontWeight: 700 }}>{`  ·  ${ngCount} không đạt`}</span>
+        )}
+      </div>
+      {(bayNumber || technicians?.length > 0) && (
+        <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
+          {bayNumber && <>Khoang đang thực hiện: <b>{bayNumber}</b></>}
+          {bayNumber && technicians?.length > 0 && '  ·  '}
+          {technicians?.length > 0 && <>Thợ thực hiện: <b>{technicians.map(formatTechnicianLabel).join(', ')}</b></>}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {serviceTasks.map((t) => <TaskProgressRow key={t.id} t={t} />)}
+      </div>
+    </div>
+  );
+}
+
 function calcTotals(items) {
   const billable = (i) => !i.isFree && !isExemptFromCustomerBilling(i);
   const subtotal = items.reduce((s, i) => s + (billable(i) ? (i.qty || 0) * (i.unitPrice || 0) * (1 - (i.discount || 0) / 100) : 0), 0);
@@ -1011,42 +1085,7 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit }) {
             </table>
           </div>
 
-          {(() => {
-            const serviceTasks = (order.tasks || []).filter((t) => t.taskType === 'service');
-            if (serviceTasks.length === 0) return null;
-            const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
-            const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
-            return (
-              <div style={{ marginTop: 16 }}>
-                <div className="form-section-title">
-                  Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
-                </div>
-                {(order.bayNumber || order.technicians?.length > 0) && (
-                  <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
-                    {order.bayNumber && <>Khoang đang thực hiện: <b>{order.bayNumber}</b></>}
-                    {order.bayNumber && order.technicians?.length > 0 && '  ·  '}
-                    {order.technicians?.length > 0 && <>Thợ thực hiện: <b>{order.technicians.map(formatTechnicianLabel).join(', ')}</b></>}
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {serviceTasks.map((t) => (
-                    <label
-                      key={t.id}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                        background: t.isCancelled ? 'var(--gray-50)' : (t.isDone ? '#E8F5E9' : 'var(--gray-50)'), borderRadius: 6,
-                        fontSize: 13,
-                        color: t.isCancelled ? 'var(--gray-400)' : (t.isDone ? '#2E7D32' : 'var(--gray-900)'),
-                      }}
-                    >
-                      <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#2E7D32' }} />
-                      <TaskNameLabel t={t} />
-                    </label>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          <TaskProgressList tasks={order.tasks} bayNumber={order.bayNumber} technicians={order.technicians} />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
             {order.signatureData ? (
@@ -3447,42 +3486,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         </div>
       </CollapsibleCard>
 
-      {isEdit && (() => {
-        const serviceTasks = (liveOrderInfo.tasks || []).filter((t) => t.taskType === 'service');
-        if (serviceTasks.length === 0) return null;
-        const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
-        const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
-        return (
-          <div style={{ marginTop: 16 }}>
-            <div className="form-section-title">
-              Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
-            </div>
-            {(liveOrderInfo.bayNumber || liveOrderInfo.technicians?.length > 0) && (
-              <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
-                {liveOrderInfo.bayNumber && <>Khoang đang thực hiện: <b>{liveOrderInfo.bayNumber}</b></>}
-                {liveOrderInfo.bayNumber && liveOrderInfo.technicians?.length > 0 && '  ·  '}
-                {liveOrderInfo.technicians?.length > 0 && <>Thợ thực hiện: <b>{liveOrderInfo.technicians.map(formatTechnicianLabel).join(', ')}</b></>}
-              </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {serviceTasks.map((t) => (
-                <label
-                  key={t.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                    background: t.isCancelled ? 'var(--gray-50)' : (t.isDone ? '#E8F5E9' : 'var(--gray-50)'), borderRadius: 6,
-                    fontSize: 13,
-                    color: t.isCancelled ? 'var(--gray-400)' : (t.isDone ? '#2E7D32' : 'var(--gray-900)'),
-                  }}
-                >
-                  <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#2E7D32' }} />
-                  <TaskNameLabel t={t} />
-                </label>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+      {isEdit && (
+        <TaskProgressList tasks={liveOrderInfo.tasks}
+          bayNumber={liveOrderInfo.bayNumber} technicians={liveOrderInfo.technicians} />
+      )}
 
       </fieldset>
 
