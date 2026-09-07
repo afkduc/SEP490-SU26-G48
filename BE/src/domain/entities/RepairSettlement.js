@@ -61,6 +61,8 @@ class RepairSettlement {
     // HEADER_SELECT, da loc TTL san trong SQL nen o day luon la "con hieu luc").
     this.lockedBy = data.lockedBy ?? null; // { id, name }
     this.lockedAt = data.lockedAt ?? null;
+    // So dau muc "Khong dat" cho co van hoi khach - man danh sach hien canh bao.
+    this.ngPendingCount = data.ngPendingCount ?? 0;
 
     this.customer = data.customer ?? null; // { id, fullName, phone, address, taxCode, cccd, email, contactPerson, contactPhone }
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel, frameNumber, engineNumber, purchaseDate, currentKm }
@@ -116,6 +118,7 @@ class RepairSettlement {
         ? { id: headerRow.active_locked_by_user_id, name: headerRow.active_locked_by_name }
         : null,
       lockedAt: headerRow.active_locked_at ?? null,
+      ngPendingCount: Number(headerRow.ng_pending_count || 0),
       customer: {
         id: headerRow.customer_id,
         fullName: headerRow.customer_full_name,
@@ -184,6 +187,10 @@ class RepairSettlement {
         checklistOrder: r.checklist_order ?? null,
         checkResult: r.check_result ?? null,
         checkNote: r.check_note ?? null,
+        // Xu ly dau muc Khong dat - co van nhin cot nay de biet muc nao con
+        // phai goi hoi khach (xem ensureNgDecision.js).
+        ngDecision: r.ng_decision ?? null,
+        ngNote: r.ng_note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

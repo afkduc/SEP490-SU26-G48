@@ -369,8 +369,13 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
 
   async updateTaskStatus(taskId, isDone, { checkResult = null, checkNote = null } = {}) {
     await query(
+      // Cham "Khong dat" -> dat luon ng_decision='pending' (cho co van hoi
+      // khach). Chinh co 'pending' nay chan to truong bam Hoan thanh, va lam
+      // cho phieu hien canh bao ben man co van.
       `UPDATE repair_order_tasks
-       SET    is_done = @isDone, check_result = @checkResult, check_note = @checkNote
+       SET    is_done = @isDone, check_result = @checkResult, check_note = @checkNote,
+              ng_decision = CASE WHEN @checkResult = 'NG' THEN 'pending' ELSE NULL END,
+              ng_note = NULL, ng_decided_by = NULL, ng_decided_at = NULL
        WHERE  id = @taskId`,
       {
         taskId: Number(taskId),
@@ -405,7 +410,8 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
         .input('repairOrderId', sql.BigInt, repairOrderId)
         .query(`
           UPDATE repair_order_tasks
-          SET    is_done = 0, check_result = NULL, check_note = NULL
+          SET    is_done = 0, check_result = NULL, check_note = NULL,
+                 ng_decision = NULL, ng_note = NULL, ng_decided_by = NULL, ng_decided_at = NULL
           WHERE  id = @taskId AND repair_order_id = @repairOrderId AND is_done = 1
         `);
       return result.rowsAffected[0] > 0;

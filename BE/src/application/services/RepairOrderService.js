@@ -238,6 +238,16 @@ class RepairOrderService {
     if (existing.tasks.some((t) => t.taskType === 'service' && !t.isCancelled && !t.isDone)) {
       throw new ApiError(409, 'Cần tích hoàn thành tất cả đầu mục công việc trước khi kết thúc lệnh');
     }
+    // Dau muc tho cham "Khong dat" ma co van CHUA hoi khach -> khong duoc dong
+    // lenh. Neu khong, xe ra khoi xuong trong khi khach chua he duoc bao la co
+    // hang muc can thay - sau nay hong that thi gara khong co gi chung minh
+    // da khuyen cao. Xem ensureNgDecision.js.
+    const choHoiKhach = existing.tasks.filter((t) => t.ngDecision === 'pending');
+    if (choHoiKhach.length > 0) {
+      throw new ApiError(409,
+        `Còn ${choHoiKhach.length} đầu mục "Không đạt" chưa được cố vấn dịch vụ trao đổi với khách: `
+        + choHoiKhach.map((t) => t.taskName).join(', '));
+    }
     return existing;
   }
 

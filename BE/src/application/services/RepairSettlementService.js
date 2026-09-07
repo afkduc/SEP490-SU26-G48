@@ -140,6 +140,9 @@ function diffSettlementForActivityLog(before, after) {
   return changes;
 }
 
+// Quyet dinh cua khach cho 1 dau muc "Khong dat" (xem ensureNgDecision.js).
+const NG_DECISIONS = ['accepted', 'declined'];
+
 class RepairSettlementService {
   constructor({ repairSettlementRepository, customerRepository }) {
     this.repairSettlementRepository = repairSettlementRepository;
@@ -331,6 +334,51 @@ class RepairSettlementService {
     emitRepairOrderEvent(branchId, 'new-pending', { orderId: entity.id });
 
     return RepairSettlementResponseDto.fromEntity(entity);
+  }
+
+  // Co van goi khach xong, ghi nhan quyet dinh cho 1 dau muc "Khong dat":
+  //   'accepted' - khach dong y thay -> co van vao Chinh sua phieu them phu
+  //                tung, dong phu tung do se hien "(Khách thêm)" cho tho
+  //   'declined' - khach tu choi -> BAT BUOC ghi ly do, dau muc di vao muc
+  //                "CAC HANG MUC CAN LAM SOM" cua phieu
+  //
+  // Cong kiem tra cua dau muc bi tu choi VAN tinh tien - nhung cong do da nam
+  // trong gia goi bao duong nen khong phai tinh them gi o day.
+  async decideNgTask(id, taskId, { decision, note, userId, branchId } = {}) {
+    if (!NG_DECISIONS.includes(decision)) {
+      throw new ApiError(400, 'Quyết định không hợp lệ');
+    }
+    if (decision === 'declined' && !String(note || '').trim()) {
+      throw new ApiError(400, 'Khách từ chối thì phải ghi rõ lý do để lưu vào phần khuyến nghị');
+    }
+
+    const existing = await this.repairSettlementRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
+    if (String(existing.branchId) !== String(branchId)) {
+      throw new ApiError(403, 'Không có quyền thao tác trên phiếu của chi nhánh khác');
+    }
+
+    const task = (existing.tasks || []).find((t) => String(t.id) === String(taskId));
+    if (!task) throw new ApiError(404, 'Không tìm thấy đầu mục công việc');
+    if (task.checkResult !== 'NG') {
+      throw new ApiError(400, 'Đầu mục này không bị đánh Không đạt');
+    }
+    if (task.ngDecision && task.ngDecision !== 'pending') {
+      throw new ApiError(409, 'Đầu mục này đã được ghi nhận quyết định của khách rồi');
+    }
+
+    const ok = await this.repairSettlementRepository.setNgDecision(id, taskId, {
+      decision,
+      note: String(note || '').trim() || null,
+      userId,
+    });
+    if (!ok) throw new ApiError(409, 'Đầu mục vừa được người khác xử lý, tải lại trang rồi thử lại');
+
+    // Bao cho man to truong/khoang biet dau muc da duoc xu ly - to truong
+    // dang bi chan bam Hoan thanh boi chinh dau muc nay.
+    emitRepairOrderEvent(branchId, 'task-updated', { orderId: Number(id), taskId: Number(taskId) });
+
+    return this.getById(id);
   }
 
   async update(id, payload) {

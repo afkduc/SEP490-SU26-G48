@@ -20,6 +20,7 @@ function buildRepairSettlementRouter() {
   router.put('/:id', controller.update);
   router.patch('/:id/status', controller.updateStatus);
   router.post('/:id/print-log', controller.logPrint);
+  router.patch('/:id/tasks/:taskId/ng-decision', controller.decideNgTask);
   router.post('/:id/lock', controller.lock);
   router.delete('/:id/lock', controller.unlock);
   router.get('/:id/activity-log', controller.getActivityLog);

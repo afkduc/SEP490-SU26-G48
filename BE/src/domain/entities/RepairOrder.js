@@ -86,6 +86,10 @@ class RepairOrder {
         checklistOrder: r.checklist_order ?? null,
         checkResult: r.check_result ?? null,
         checkNote: r.check_note ?? null,
+        // Xu ly dau muc Khong dat: 'pending' (cho co van hoi khach) ->
+        // 'accepted' (khach dong y thay) / 'declined' (khach tu choi).
+        ngDecision: r.ng_decision ?? null,
+        ngNote: r.ng_note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

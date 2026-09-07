@@ -204,6 +204,21 @@ async function start() {
       process.exit(1);
     }
 
+    // Xu ly dau muc "Khong dat": cot ng_decision/ng_note/ng_decided_*.
+    // KHONG duoc nuot loi - thieu cot thi to truong bam Hoan thanh duoc ca khi
+    // con dau muc chua hoi khach, dung lo hong ma tinh nang nay sinh ra de va.
+    try {
+      const { ensureNgDecision } = require('./infrastructure/database/ensureNgDecision');
+      const r = await ensureNgDecision();
+      console.log(r.skipped
+        ? '[BE] xu ly dau muc khong dat: da co tu truoc, bo qua'
+        : `[BE] xu ly dau muc khong dat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (ngErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot xu ly dau muc khong dat that bai:');
+      console.error(ngErr.message);
+      process.exit(1);
+    }
+
     const server = http.createServer({ maxHeaderSize: 32768 }, app);
     server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);

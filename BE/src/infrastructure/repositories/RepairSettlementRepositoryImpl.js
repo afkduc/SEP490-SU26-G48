@@ -56,6 +56,11 @@ const HEADER_SELECT = `
            SELECT 1 FROM repair_order_tasks rot
            WHERE rot.repair_order_id = so.id AND rot.is_done = 1
          ) THEN 1 ELSE 0 END AS has_completed_task,
+         -- So dau muc tho cham "Khong dat" ma co van CHUA hoi khach. Man danh
+         -- sach dung de hien canh bao ngay tren dong phieu - khong the bat co
+         -- van mo tung phieu ra moi biet co viec can goi khach.
+         (SELECT COUNT(*) FROM repair_order_tasks rotng
+          WHERE rotng.repair_order_id = so.id AND rotng.ng_decision = 'pending') AS ng_pending_count,
          -- Da gan tho thuc hien chua - claim() chuyen status sang 'inprogress'
          -- ngay luc chon khoang (truoc ca khi gan tho, de khoa khong cho to
          -- truong khac nhan trung), nhung ben man CVDV chi nen hien "Đang sửa
@@ -207,7 +212,8 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
               -- duoc dau muc nao tho cham KHONG DAT de con tu van lai cho
               -- khach, khong chi thay tich hoan thanh.
               rot.action_code, rot.checklist_group, rot.checklist_order,
-              rot.check_result, rot.check_note
+              rot.check_result, rot.check_note,
+              rot.ng_decision, rot.ng_note
        FROM   repair_order_tasks rot
        WHERE  rot.repair_order_id = @id
        ORDER  BY rot.id`,
@@ -738,6 +744,27 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
   // LOCK_TTL_SECONDS (het han). OUTPUT deleted.* de biet nguoi giu TRUOC do
   // la ai, tu do phan biet duoc "chiem moi" (fresh - can ghi audit "Truy cap
   // phieu") voi "chi la nhip gia han cua chinh minh" (khong ghi log lap lai).
+  // Co van ghi nhan quyet dinh cua khach cho 1 dau muc "Khong dat".
+  // Dieu kien ng_decision = 'pending' de 2 co van cung bam thi chi 1 lan an,
+  // va khong ghi de len quyet dinh da chot truoc do.
+  async setNgDecision(repairOrderId, taskId, { decision, note, userId }) {
+    const result = await query(
+      `UPDATE repair_order_tasks
+       SET    ng_decision = @decision, ng_note = @note,
+              ng_decided_by = @userId, ng_decided_at = ${NOW_VN_SQL}
+       WHERE  id = @taskId AND repair_order_id = @repairOrderId
+         AND  check_result = 'NG' AND ng_decision = 'pending'`,
+      {
+        taskId: Number(taskId),
+        repairOrderId: Number(repairOrderId),
+        decision,
+        note: note || null,
+        userId: Number(userId),
+      }
+    );
+    return result.rowsAffected[0] > 0;
+  }
+
   async acquireLock(id, userId) {
     const result = await query(
       `UPDATE repair_orders

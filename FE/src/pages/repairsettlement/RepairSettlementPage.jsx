@@ -12,6 +12,7 @@ import { searchCatalogApi } from '../../services/catalogApi';
 import { searchProductsApi } from '../../services/productApi';
 import {
   listRepairSettlementsApi,
+  decideNgTaskApi,
   getRepairSettlementApi,
   checkDuplicateSettlementApi,
   createRepairSettlementApi,
@@ -293,7 +294,7 @@ function TaskNameLabel({ t }) {
 // dat" van co is_done = 1 (tho DA lam xong viec kiem tra, chi la ket qua
 // khong dat). Neu chi nhin is_done thi no hien tich xanh y het dau muc dat,
 // co van doc phieu se tuong xe khong co van de gi. Phai to do + dau X rieng.
-function TaskProgressRow({ t }) {
+function TaskProgressRow({ t, onDecideNg, decidingId }) {
   const ng = t.checkResult === 'NG';
   const ok = t.isDone && !ng;
   const yeuCau = actionLabel(t.actionCode);
@@ -324,17 +325,45 @@ function TaskProgressRow({ t }) {
           </span>
         )}
         {ok && t.checkResult === 'OK' && <span style={{ fontWeight: 600 }}> — Đạt</span>}
+        {/* Quyet dinh cua khach cho dau muc Khong dat. 'pending' = chua ai hoi
+            khach - chinh trang thai nay chan to truong bam Hoan thanh. */}
+        {t.ngDecision === 'accepted' && (
+          <div style={{ color: '#2E7D32', fontWeight: 600, fontSize: 12 }}>
+            Khách đồng ý thay{t.ngNote ? ` — ${t.ngNote}` : ''} · nhớ thêm phụ tùng vào phiếu
+          </div>
+        )}
+        {t.ngDecision === 'declined' && (
+          <div style={{ color: 'var(--gray-600)', fontWeight: 600, fontSize: 12 }}>
+            Khách từ chối thay — {t.ngNote}
+          </div>
+        )}
+        {t.ngDecision === 'pending' && onDecideNg && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-primary btn-sm" disabled={decidingId === t.id}
+              onClick={(e) => { e.preventDefault(); onDecideNg(t, 'accepted'); }}>
+              Khách đồng ý thay
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={decidingId === t.id}
+              onClick={(e) => { e.preventDefault(); onDecideNg(t, 'declined'); }}>
+              Khách từ chối
+            </button>
+          </div>
+        )}
+        {t.ngDecision === 'pending' && !onDecideNg && (
+          <div style={{ color: '#B45309', fontWeight: 600, fontSize: 12 }}>Chờ trao đổi với khách</div>
+        )}
       </span>
     </label>
   );
 }
 
-function TaskProgressList({ tasks, bayNumber, technicians }) {
+function TaskProgressList({ tasks, bayNumber, technicians, onDecideNg, decidingId }) {
   const serviceTasks = (tasks || []).filter((t) => t.taskType === 'service');
   if (serviceTasks.length === 0) return null;
   const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
   const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
   const ngCount = activeServiceTasks.filter((t) => t.checkResult === 'NG').length;
+  const pendingCount = activeServiceTasks.filter((t) => t.ngDecision === 'pending').length;
   return (
     <div style={{ marginTop: 16 }}>
       <div className="form-section-title">
@@ -345,6 +374,9 @@ function TaskProgressList({ tasks, bayNumber, technicians }) {
         {ngCount > 0 && (
           <span style={{ color: '#B91C1C', fontWeight: 700 }}>{`  ·  ${ngCount} không đạt`}</span>
         )}
+        {pendingCount > 0 && (
+          <span style={{ color: '#B45309', fontWeight: 700 }}>{`  ·  ${pendingCount} chờ hỏi khách`}</span>
+        )}
       </div>
       {(bayNumber || technicians?.length > 0) && (
         <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
@@ -354,7 +386,7 @@ function TaskProgressList({ tasks, bayNumber, technicians }) {
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {serviceTasks.map((t) => <TaskProgressRow key={t.id} t={t} />)}
+        {serviceTasks.map((t) => <TaskProgressRow key={t.id} t={t} onDecideNg={onDecideNg} decidingId={decidingId} />)}
       </div>
     </div>
   );
@@ -939,7 +971,7 @@ function CollapsibleCard({ title, note, summary, actions, open, onToggle, bodySt
   );
 }
 
-function DetailModal({ order, onClose, onPreview, canEdit, onEdit }) {
+function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, decidingId }) {
   const st = STATUS_LABELS[displayStatus(order)];
   const [showIntake, setShowIntake] = useState(false);
   return (
@@ -1085,7 +1117,8 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit }) {
             </table>
           </div>
 
-          <TaskProgressList tasks={order.tasks} bayNumber={order.bayNumber} technicians={order.technicians} />
+          <TaskProgressList tasks={order.tasks} bayNumber={order.bayNumber} technicians={order.technicians}
+            onDecideNg={onDecideNg} decidingId={decidingId} />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
             {order.signatureData ? (
@@ -1196,6 +1229,32 @@ function RepairSettlementList() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  // Ghi nhan quyet dinh cua khach cho dau muc "Khong dat" (xem BE
+  // RepairSettlementService.decideNgTask). Khach tu choi thi BAT BUOC ghi ly
+  // do - ly do nay se in vao muc "Cac hang muc can lam som" cua phieu.
+  const [decidingId, setDecidingId] = useState(null);
+  const handleDecideNg = async (task, decision) => {
+    let note = '';
+    if (decision === 'declined') {
+      note = (window.prompt(`Khách từ chối thay "${task.taskName}".
+Ghi rõ lý do (bắt buộc):`, '') || '').trim();
+      if (!note) return;
+    } else if (!window.confirm(`Khách đồng ý thay "${task.taskName}"?
+
+Sau khi xác nhận, hãy vào Chỉnh sửa phiếu để thêm phụ tùng.`)) {
+      return;
+    }
+    setDecidingId(task.id);
+    try {
+      const updated = await decideNgTaskApi(view.id, task.id, decision, note);
+      setView(updated);
+      loadAll({ silent: true });
+    } catch (err) {
+      toast.error(err.message || 'Không ghi nhận được quyết định');
+    } finally {
+      setDecidingId(null);
+    }
+  };
   const canManage = user?.primaryRole !== ROLES.ADMIN;
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1625,6 +1684,14 @@ function RepairSettlementList() {
                   <td style={{ fontWeight: 700, color: '#C62828' }}>{formatCurrency(o.total)}</td>
                   <td>
                     <span className={`badge ${st?.badge}`}>{st?.label}</span>
+                    {/* Tho da cham "Khong dat" ma chua ai goi hoi khach - viec
+                        cua co van, phai thay ngay o danh sach chu khong doi mo
+                        tung phieu. To truong cung dang bi chan dong lenh vi no. */}
+                    {o.ngPendingCount > 0 && (
+                      <div style={{ fontSize: 10.5, color: '#B45309', fontWeight: 700, marginTop: 3 }}>
+                        ⚠ {o.ngPendingCount} mục không đạt — cần hỏi khách
+                      </div>
+                    )}
                     {o.lockedByName && (
                       <div style={{ fontSize: 10, color: 'var(--gray-500)', marginTop: 3, fontStyle: 'italic' }}>
                         Đang mở: {o.lockedByName}{o.lockedAt ? ` lúc ${o.lockedAt.slice(-5)}` : ''}
@@ -1685,6 +1752,8 @@ function RepairSettlementList() {
           order={view}
           onClose={() => { releaseLockIfHeld(); setView(null); }}
           onPreview={setPreviewOrder}
+          onDecideNg={canManage ? handleDecideNg : undefined}
+          decidingId={decidingId}
           canEdit={canManage && view.status !== 'invoiced' && view.status !== 'waiting_payment' && view.status !== 'cancelled'}
           // Nha khoa "dang mo phieu" truoc khi roi sang trang Chinh sua - trang
           // do khong gui nhip gia han khoa, giu lai se thanh khoa "ma" treo den

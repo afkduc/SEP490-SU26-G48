@@ -55,6 +55,10 @@ class RepairSettlementRepository {
     throw new Error('Method markPayosTransactionPaid() must be implemented');
   }
 
+  async setNgDecision(repairOrderId, taskId, { decision, note, userId }) {
+    throw new Error('Method setNgDecision() must be implemented');
+  }
+
   async acquireLock(id, userId) {
     throw new Error('Method acquireLock() must be implemented');
   }

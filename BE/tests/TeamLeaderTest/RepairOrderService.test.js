@@ -352,6 +352,44 @@ test('confirmCompleted ignores cancelled service tasks', async () => {
   assert.equal(dto.status, 'completed');
 });
 
+// Tho cham "Khong dat" -> ng_decision='pending'. Chua ai hoi khach thi KHONG
+// duoc dong lenh: xe ra khoi xuong ma khach chua he duoc bao co hang muc can
+// thay. Xem ensureNgDecision.js.
+test('confirmCompleted blocks while an NG item is still waiting for the customer', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({
+        ...inProgressOrder,
+        tasks: [
+          { id: 500, taskType: 'service', taskName: 'Ga lạnh hệ thống điều hòa', isDone: true, isCancelled: false, checkResult: 'NG', ngDecision: 'pending' },
+        ],
+      }),
+    }),
+  });
+  await assert.rejects(
+    () => service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 409
+      && /chưa được cố vấn dịch vụ trao đổi với khách/.test(err.message)
+      && /Ga lạnh hệ thống điều hòa/.test(err.message),
+  );
+});
+
+test('confirmCompleted passes once every NG item has a customer decision', async () => {
+  const tasks = [
+    { id: 500, taskType: 'service', isDone: true, isCancelled: false, checkResult: 'NG', ngDecision: 'declined' },
+    { id: 501, taskType: 'service', isDone: true, isCancelled: false, checkResult: 'NG', ngDecision: 'accepted' },
+    { id: 502, taskType: 'service', isDone: true, isCancelled: false, checkResult: 'OK' },
+  ];
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({ ...inProgressOrder, tasks }),
+      updateStatus: async () => ({ ...inProgressOrder, status: 'completed', tasks }),
+    }),
+  });
+  const dto = await service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 });
+  assert.equal(dto.status, 'completed');
+});
+
 test('confirmCompleted rejects another team leader', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
