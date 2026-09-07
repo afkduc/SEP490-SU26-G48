@@ -1970,6 +1970,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // Tu khoa tim kiem trong o "Loai xe" - TACH RIENG khoi vehicleInfo.vehicleModel
   // (gia tri that). Go vao day khong lam thay doi loai xe da chon.
   const [modelQuery, setModelQuery] = useState('');
+  const toast = useToast();
   // Dong/mo 3 khung chinh cua form. Mac dinh mo het; chi la trang thai hien
   // thi nen khong can luu lai giua cac lan mo form.
   const [openSections, setOpenSections] = useState({ customer: true, intake: true, items: true });
@@ -2257,6 +2258,25 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // co the lech thuc te, can co van dieu chinh duoc ma khong phai doi so luong
   // ca dau nhom (se keo theo ty le lam sai cac phu tung khac cung nhom).
   const isChildRow = (it) => Boolean(it.groupId) && !it.isGroupParent;
+
+  // Dong "dau goi" dang co trong phieu (neu co). Moi phieu CHI duoc 1 goi bao
+  // duong: goi la 1 cap bao duong dinh ky theo so km, khong the vua Cap 1 vua
+  // Cap 3 tren cung 1 lan vao xuong. exceptIdx = dong dang go de doi goi -
+  // dong do khong tinh la "da co", neu khong se tu chan chinh no.
+  const findPackageRow = (exceptIdx) => items.find((it, i) => (
+    i !== exceptIdx && it.isGroupParent && it.lhsc === 'DV' && !it.serviceId && Boolean(it.groupId)
+  ));
+
+  // Ly do 1 goi KHONG duoc chon o dong dang go - tra ve '' neu chon duoc.
+  const packageBlockedReason = (pkg, idx) => {
+    const dangCo = findPackageRow(idx);
+    if (dangCo && dangCo.code === pkg.code) return 'Gói này đã có trong phiếu';
+    if (dangCo) return `Phiếu đã có gói "${dangCo.description}" — mỗi phiếu chỉ 1 gói bảo dưỡng`;
+    if (vehicleInfo.modelId && pkg.modelId && String(pkg.modelId) !== String(vehicleInfo.modelId)) {
+      return 'Gói của đời xe khác';
+    }
+    return '';
+  };
 
   // Dong PT (phu tung) nay dang "di kem" dich vu con nao trong cung nhom -
   // luc chen (selectCatalogPackage/selectCatalogService) da chen NGAY SAU
@@ -2681,6 +2701,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // (xem findOwningServiceIdx/handleCancelItem) - có thể trùng phụ tùng
   // giữa 2 dịch vụ con (mỗi dịch vụ giữ dòng riêng), chấp nhận đánh đổi này.
   const selectCatalogPackage = (idx, pkg) => {
+    // Chan lan 2 ngay tai day - danh sach goi y da lam mo cac goi khong chon
+    // duoc, nhung giu them chot nay de khong co duong nao lot qua.
+    const chan = packageBlockedReason(pkg, idx);
+    if (chan) { toast.warning(chan); return; }
     // Uu tien Loai hinh sua chua khai bao rieng cho GOI; neu goi chua khai
     // bao thi lay tam theo dich vu con dau tien co khai bao - van tot hon
     // de trong, cho van chi can sua lai 1 lan neu chua dung.
@@ -3345,13 +3369,27 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                               {suggestion.type === 'catalog' && suggestion.packages?.length > 0 && (
                                 <div>
                                   <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Gói combo</div>
-                                  {suggestion.packages.map((pkg) => (
-                                    <div key={`pkg-${pkg.id}`} onMouseDown={() => selectCatalogPackage(idx, pkg)}
-                                      style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
+                                  {suggestion.packages.map((pkg) => {
+                                    // Goi khong chon duoc (da co trong phieu / phieu da co goi
+                                    // khac / khac doi xe) van HIEN nhung lam mo va ghi ro ly do -
+                                    // an di thi co van khong hieu tai sao khong tim thay goi.
+                                    const chan = packageBlockedReason(pkg, idx);
+                                    return (
+                                    <div key={`pkg-${pkg.id}`}
+                                      onMouseDown={() => (chan ? toast.warning(chan) : selectCatalogPackage(idx, pkg))}
+                                      style={{
+                                        padding: '8px 10px', cursor: chan ? 'not-allowed' : 'pointer', fontSize: 12,
+                                        borderBottom: '1px solid var(--gray-100)',
+                                        background: chan ? 'var(--gray-50)' : undefined,
+                                        color: chan ? 'var(--gray-400)' : undefined,
+                                      }}>
                                       <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pkg.name} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({pkg.items.length} hạng mục)</span></div>
-                                      <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{formatCurrency(pkg.totalPrice)}</div>
+                                      <div style={{ fontSize: 11, color: chan ? '#B45309' : 'var(--gray-600)', fontStyle: chan ? 'italic' : undefined }}>
+                                        {chan || formatCurrency(pkg.totalPrice)}
+                                      </div>
                                     </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                               {suggestion.type === 'catalog' && suggestion.services?.length > 0 && (
