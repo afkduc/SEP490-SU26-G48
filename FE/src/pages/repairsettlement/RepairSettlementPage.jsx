@@ -1880,7 +1880,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const [vehicleInfo, setVehicleInfo] = useState(() => {
     const base = existingOrder?.vehicle || {
       licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '',
-      warrantyEndDate: '', warrantyKmLimit: null, modelId: null, modelYear: '',
+      warrantyEndDate: '', warrantyKmLimit: null, modelId: null,
     };
     // Km luc mo trang (man Sua) - dung lam moc doi chieu canh bao neu CVDV
     // sua currentKm xuong THAP HON, xem handleSave.
@@ -1898,12 +1898,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     if (isEdit) return;
     listVehicleModelsApi().then(setVehicleModels).catch(() => {});
   }, [isEdit]);
-  const currentYear = new Date().getFullYear();
   // Catalog o muc do doi xe (yearFrom-yearTo), khong phai tung nam cu the -
   // xe that cua khach van can 1 nam san xuat rieng (giong du lieu that dang
   // co: "Mazda CX-5 2.0 Premium 2023"), nen sau khi chon mau xe van can nhap
   // them nam nay, gan vao cuoi vehicleModel.
-  const selectedModel = vehicleInfo.modelId ? vehicleModels.find((m) => m.id === vehicleInfo.modelId) : null;
   // O "Loai xe" la DANH SACH CHON, khong cho go tay: chu go vao chi de LOC
   // (modelQuery), khong bao gio tro thanh gia tri. Truoc day go tay duoc nen
   // CVDV luu duoc 1 loai xe khong co trong catalog (modelId = null) - xe do
@@ -2150,7 +2148,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // khi autofill nen khong the sua tay duoc nua.
   const resetLookup = () => {
     setCustomerInfo({ fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' });
-    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, modelId: null, modelYear: '', lastKnownKm: null });
+    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, modelId: null, lastKnownKm: null });
     setModelQuery('');
     setCustomerQuery('');
     setPlateQuery('');
@@ -2724,8 +2722,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       // Loai xe BAT BUOC chon tu catalog (modelId), khong con go tay duoc -
       // xe khong gan duoc doi xe thi sau nay khong loc duoc goi bao duong va
       // khong tra dung dinh muc phu tung.
-      && Boolean(vehicleInfo.modelId)
-      && Boolean((vehicleInfo.modelYear || '').toString().trim()));
+      && Boolean(vehicleInfo.modelId));
 
   const buildPayload = () => ({
     customerId: customerInfo.id || null,
@@ -3030,7 +3027,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       if (e.key === 'Enter' && showModelSuggestions && modelSuggestions.length === 1) {
                         e.preventDefault();
                         const m = modelSuggestions[0];
-                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id, modelYear: '' }));
+                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id }));
                         setShowModelSuggestions(false);
                       }
                     }}
@@ -3040,7 +3037,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       <button type="button" title="Bỏ chọn loại xe"
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          setVehicleInfo((p) => ({ ...p, vehicleModel: '', modelId: null, modelYear: '' }));
+                          setVehicleInfo((p) => ({ ...p, vehicleModel: '', modelId: null }));
                           setModelQuery('');
                         }}
                         style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--gray-500)', fontSize: 14, lineHeight: 1, padding: 4 }}>✕</button>
@@ -3057,7 +3054,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       </div>
                     ) : modelSuggestions.map((m) => (
                       <div key={m.id} onMouseDown={() => {
-                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id, modelYear: '' }));
+                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id }));
                         setModelQuery('');
                         setShowModelSuggestions(false);
                       }}
@@ -3069,16 +3066,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   </div>
                 )}
               </div>
-              {!isFromLookup && !isEdit && vehicleInfo.modelId && (
-                <div className="form-group" style={{ marginBottom: 12 }}>
-                  <label className="form-label required">Năm sản xuất</label>
-                  <input className="form-input" type="number"
-                    min={selectedModel?.yearFrom || 2015} max={selectedModel?.yearTo || currentYear}
-                    value={vehicleInfo.modelYear}
-                    placeholder={`VD: ${selectedModel?.yearFrom || ''}`}
-                    onChange={(e) => setVehicleInfo((p) => ({ ...p, modelYear: e.target.value }))} />
-                </div>
-              )}
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Số khung</label>

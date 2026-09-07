@@ -129,18 +129,17 @@ class CustomerRepositoryImpl extends CustomerRepository {
             .input('customerId', sql.BigInt, customerId)
             .input('vehicleModelText', sql.NVarChar(200), data.vehicleModelText || null)
             .input('modelId', sql.BigInt, data.modelId || null)
-            .input('manufactureYear', sql.Int, data.manufactureYear || null)
             .input('frameNumber', sql.VarChar(50), data.frameNumber || null)
             .input('engineNumber', sql.VarChar(50), data.engineNumber || null)
             .input('currentKm', sql.Int, data.currentKm || 0)
             .query(`
               INSERT INTO vehicles (
-                license_plate, customer_id, vehicle_model_text, model_id, manufacture_year,
+                license_plate, customer_id, vehicle_model_text, model_id,
                 frame_number, engine_number, current_km
               )
               OUTPUT inserted.id
               VALUES (
-                @licensePlate, @customerId, @vehicleModelText, @modelId, @manufactureYear,
+                @licensePlate, @customerId, @vehicleModelText, @modelId,
                 @frameNumber, @engineNumber, @currentKm
               )
             `);
