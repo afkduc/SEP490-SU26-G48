@@ -1241,7 +1241,7 @@ Ghi rõ lý do (bắt buộc):`, '') || '').trim();
       if (!note) return;
     } else if (!window.confirm(`Khách đồng ý thay "${task.taskName}"?
 
-Sau khi xác nhận, hãy vào Chỉnh sửa phiếu để thêm phụ tùng.`)) {
+Hệ thống sẽ tự thêm phụ tùng của đầu mục này vào phiếu và tính lại tổng tiền.`)) {
       return;
     }
     setDecidingId(task.id);
@@ -1249,6 +1249,18 @@ Sau khi xác nhận, hãy vào Chỉnh sửa phiếu để thêm phụ tùng.`))
       const updated = await decideNgTaskApi(view.id, task.id, decision, note);
       setView(updated);
       loadAll({ silent: true });
+      // Bao ro da them phu tung gi - co van con doi chieu voi gia da bao
+      // khach qua dien thoai truoc khi chot.
+      const daThem = updated?.ngAddedParts || [];
+      if (decision === 'accepted') {
+        if (daThem.length > 0) {
+          toast.success(`Đã thêm vào phiếu: ${daThem.map((p) => `${p.name} (${p.quantity} ${p.unit || 'Cái'})`).join(', ')}`);
+        } else {
+          // Dich vu khong khai dinh muc phu tung - co van phai tu them
+          // tay, khong de im lang tuong la da xong.
+          toast.warning('Đã ghi nhận khách đồng ý, nhưng đầu mục này chưa khai định mức phụ tùng - hãy vào Chỉnh sửa phiếu để thêm tay');
+        }
+      }
     } catch (err) {
       toast.error(err.message || 'Không ghi nhận được quyết định');
     } finally {

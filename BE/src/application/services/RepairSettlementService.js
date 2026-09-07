@@ -4,6 +4,8 @@ const config = require('../../config');
 const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
 const { PublicVehicleHistoryDto } = RepairSettlementResponseDto;
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
+// Cong thuc tinh tien dung chung voi repository - xem utils/settlementTotals.js
+const { calcTotalsFromItems } = require('../../utils/settlementTotals');
 const { auditCrud } = require('../../utils/auditHelper');
 const { settlementSnapshot } = require('../../utils/auditSnapshots');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
@@ -36,7 +38,6 @@ const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB', 'HUY'];
 // REPAIR_CATEGORY = "Loai hinh sua chua" THAT (dung nhu thuc te tai dai ly xe -
 // khac voi LHSC o tren, vi LHSC da bi dung nham thanh "loai hang muc").
 const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
-const EXEMPT_HTTT_VALUES = new Set(['BHH', 'BH', 'NB', 'HUY']);
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
 
 // Tinh lai toan bo tong tien tu CHINH danh sach hang muc - khong tin theo
@@ -46,29 +47,6 @@ const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoi
 // createPayosPaymentLink ben duoi). PHAI khop chinh xac cong thuc voi
 // RepairSettlementPage.jsx calcTotals() de khong lech so voi so CVDV nhin
 // thay tren man hinh truoc khi bam Luu.
-function calcTotalsFromItems(items) {
-  let subtotal = 0;
-  let discountAmount = 0;
-  let freeAmount = 0;
-  for (const item of items) {
-    const qty = Number(item.qty) || 0;
-    const unitPrice = Number(item.unitPrice) || 0;
-    const base = qty * unitPrice;
-    if (item.isFree) {
-      freeAmount += base;
-      continue;
-    }
-    if (EXEMPT_HTTT_VALUES.has(item.httt)) continue;
-    const discountPct = Number(item.discount) || 0;
-    subtotal += base * (1 - discountPct / 100);
-    discountAmount += base * (discountPct / 100);
-  }
-  subtotal = Math.round(subtotal);
-  discountAmount = Math.round(discountAmount);
-  freeAmount = Math.round(freeAmount);
-  const vat = Math.round(subtotal * 0.08);
-  return { subtotal, discountAmount, afterDiscount: subtotal, vat, freeAmount, total: subtotal + vat };
-}
 const ACTIVE_STATUS_LABELS = {
   waiting_repair: 'chờ sửa chữa',
   inprogress: 'đang sửa chữa',
@@ -367,18 +345,40 @@ class RepairSettlementService {
       throw new ApiError(409, 'Đầu mục này đã được ghi nhận quyết định của khách rồi');
     }
 
-    const ok = await this.repairSettlementRepository.setNgDecision(id, taskId, {
-      decision,
-      note: String(note || '').trim() || null,
-      userId,
-    });
-    if (!ok) throw new ApiError(409, 'Đầu mục vừa được người khác xử lý, tải lại trang rồi thử lại');
+    // Sua phieu chi cho phep khi con dang xu ly - them phu tung sau khi da
+    // chot tien (waiting_payment/invoiced) se lech voi QR/hoa don da phat.
+    if (decision === 'accepted'
+        && existing.status !== 'waiting_repair' && existing.status !== 'inprogress') {
+      throw new ApiError(409, 'Phiếu đã chốt tiền, không thể thêm phụ tùng - hãy lập phiếu mới cho phần phát sinh');
+    }
+
+    let daThem = [];
+    if (decision === 'accepted') {
+      // Khach dong y -> chen luon phu tung theo dinh muc cua chinh dich vu do,
+      // tinh lai tien va dong bo checklist, tat ca trong 1 transaction.
+      const kq = await this.repairSettlementRepository.acceptNgTaskAndAddParts(id, taskId, {
+        note: String(note || '').trim() || null,
+        userId,
+      });
+      if (!kq.ok) throw new ApiError(409, 'Đầu mục vừa được người khác xử lý, tải lại trang rồi thử lại');
+      daThem = kq.added;
+    } else {
+      const ok = await this.repairSettlementRepository.setNgDecision(id, taskId, {
+        decision,
+        note: String(note || '').trim() || null,
+        userId,
+      });
+      if (!ok) throw new ApiError(409, 'Đầu mục vừa được người khác xử lý, tải lại trang rồi thử lại');
+    }
 
     // Bao cho man to truong/khoang biet dau muc da duoc xu ly - to truong
     // dang bi chan bam Hoan thanh boi chinh dau muc nay.
     emitRepairOrderEvent(branchId, 'task-updated', { orderId: Number(id), taskId: Number(taskId) });
 
-    return this.getById(id);
+    // Tra kem danh sach phu tung vua chen de FE bao lai cho co van biet da
+    // them gi vao phieu, khong phai tu do lai bang hang muc.
+    const item = await this.getById(id);
+    return { ...item, ngAddedParts: daThem };
   }
 
   async update(id, payload) {
