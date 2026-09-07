@@ -828,6 +828,43 @@ function displayStatus(o) {
 }
 
 // ─── Modal xem chi tiết phiếu ────────────────────────────────────────
+// Khung thu gon duoc cua form tao/sua phieu. Form nay rat dai (khach hang +
+// xe, tiep nhan/ban giao, hang muc, chu ky) nen cho phep gap tung khung lai
+// de con vien tap trung vao phan dang lam.
+//
+// Noi dung KHONG bi unmount khi thu gon (chi display:none) - phai giu nguyen
+// canvas chu ky (SignaturePad giu ref + net ve), o dang go do, va vi tri cuon.
+// Neu render co dieu kien thi chu ky da ve se mat khi gap khung lai.
+//
+// Bam vao mui ten hoac tieu de de gap/mo; cac nut thao tac o ben phai (Chon
+// lai khach hang, Them dich vu...) nam ngoai vung bam nen khong bi anh huong.
+function CollapsibleCard({ title, note, summary, actions, open, onToggle, bodyStyle, children }) {
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button type="button" onClick={onToggle} aria-expanded={open}
+          title={open ? 'Thu gọn' : 'Mở rộng'}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, border: 'none', background: 'none',
+            padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit',
+          }}>
+          <span style={{
+            fontSize: 11, color: 'var(--gray-500)', width: 16, textAlign: 'center',
+            transition: 'transform .15s', transform: open ? 'rotate(90deg)' : 'none',
+          }}>▶</span>
+          <span className="card-title">{title}</span>
+        </button>
+        {note}
+        {!open && summary && (
+          <span style={{ fontSize: 12, color: 'var(--gray-600)', fontStyle: 'italic' }}>{summary}</span>
+        )}
+        {actions && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>{actions}</div>}
+      </div>
+      <div className="card-body" style={open ? bodyStyle : { display: 'none' }}>{children}</div>
+    </div>
+  );
+}
+
 function DetailModal({ order, onClose, onPreview, canEdit, onEdit }) {
   const st = STATUS_LABELS[displayStatus(order)];
   const [showIntake, setShowIntake] = useState(false);
@@ -1894,6 +1931,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // Tu khoa tim kiem trong o "Loai xe" - TACH RIENG khoi vehicleInfo.vehicleModel
   // (gia tri that). Go vao day khong lam thay doi loai xe da chon.
   const [modelQuery, setModelQuery] = useState('');
+  // Dong/mo 3 khung chinh cua form. Mac dinh mo het; chi la trang thai hien
+  // thi nen khong can luu lai giua cac lan mo form.
+  const [openSections, setOpenSections] = useState({ customer: true, intake: true, items: true });
+  const toggleSection = (key) => setOpenSections((p) => ({ ...p, [key]: !p[key] }));
   useEffect(() => {
     if (isEdit) return;
     listVehicleModelsApi().then(setVehicleModels).catch(() => {});
@@ -2881,14 +2922,24 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       </div>
 
       {/* SECTION 1: Khách hàng & xe */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
-          <span className="card-title">Thông tin khách hàng & xe</span>
-          {isFromLookup && !isEdit && (
-            <button className="btn btn-secondary btn-sm" onClick={resetLookup}>Chọn lại khách hàng</button>
-          )}
-        </div>
-        <div className="card-body">
+      <CollapsibleCard
+        title="Thông tin khách hàng & xe"
+        open={openSections.customer}
+        onToggle={() => toggleSection('customer')}
+        summary={(() => {
+          // Gap khung lai van phai biet da du thong tin bat buoc chua - o
+          // "Yeu cau cua khach hang" nam trong khung nay, khuat di rat de
+          // bam Luu hut roi khong hieu vi sao nut bi khoa.
+          const daNhap = [customerInfo.fullName, vehicleInfo.licensePlate, vehicleInfo.vehicleModel]
+            .filter(Boolean).join(' · ');
+          const thieu = !canSave || !(customerRequest || '').trim();
+          return `${daNhap || 'Chưa nhập'}${thieu ? ' — ⚠ còn thiếu thông tin bắt buộc' : ''}`;
+        })()}
+        actions={isFromLookup && !isEdit && (
+          <button className="btn btn-secondary btn-sm" onClick={resetLookup}>Chọn lại khách hàng</button>
+        )}
+      >
+        <div>
           <div className="form-grid form-grid-2">
             <div>
               <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
@@ -3139,7 +3190,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             <textarea className="form-textarea" rows={2} value={customerRequest} onChange={(e) => setCustomerRequest(e.target.value)} placeholder="Mô tả tình trạng xe / yêu cầu sửa chữa của khách hàng..." />
           </div>
         </div>
-      </div>
+      </CollapsibleCard>
 
       {/* SECTION 1b: Phiếu tiếp nhận và bàn giao xe.
           Khi SUA phieu thi CHI XEM - phan nay ghi lai tinh trang xe DUNG LUC
@@ -3147,33 +3198,41 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           xem ben duoi). Sua lai sau do se lam sai lech ban ghi goc va khien chu
           ky khong con khop voi noi dung khach da ky. */}
       {isEdit ? (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header" style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-            <span className="card-title">Tiếp nhận và bàn giao xe</span>
+        <CollapsibleCard
+          title="Tiếp nhận và bàn giao xe"
+          open={openSections.intake}
+          onToggle={() => toggleSection('intake')}
+          note={(
             <span style={{ fontSize: 12, color: 'var(--gray-500)', fontStyle: 'italic' }}>
               (Chỉ xem — ghi nhận lúc tiếp nhận xe, không sửa được)
             </span>
-          </div>
-          <div className="card-body">
-            <IntakeChecklistView value={intakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
-          </div>
-        </div>
+          )}
+        >
+          <IntakeChecklistView value={intakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
+        </CollapsibleCard>
       ) : (
-        <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
+        <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist}
+          vehicleModelText={vehicleInfo.vehicleModel}
+          open={openSections.intake} onToggle={() => toggleSection('intake')} />
       )}
 
-      {/* SECTION 2: Hạng mục công việc */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
-          <span className="card-title">Hạng mục công việc / phụ tùng</span>
-          <div style={{ display: 'flex', gap: 8 }}>
+      {/* SECTION 3: Hạng mục công việc */}
+      <CollapsibleCard
+        title="Hạng mục công việc / phụ tùng"
+        open={openSections.items}
+        onToggle={() => toggleSection('items')}
+        summary={`${items.filter((it) => (it.description || '').trim()).length} hạng mục · ${formatCurrency(totals.total || 0)}`}
+        bodyStyle={{ padding: 0 }}
+        actions={(
+          <>
             <button className="btn btn-secondary btn-sm" onClick={addItem} disabled={!canSave}
               title={canSave ? undefined : 'Vui lòng chọn khách hàng và xe trước'}>Thêm dịch vụ</button>
             <button className="btn btn-secondary btn-sm" onClick={addPartItem} disabled={!canSave}
               title={canSave ? undefined : 'Vui lòng chọn khách hàng và xe trước'}>Thêm phụ tùng</button>
-          </div>
-        </div>
-        <div className="card-body" style={{ padding: 0 }}>
+          </>
+        )}
+      >
+        <div>
           <div className="table-wrapper" style={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
             <table className="data-table">
               <thead>
@@ -3386,7 +3445,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             </table>
           </div>
         </div>
-      </div>
+      </CollapsibleCard>
 
       {isEdit && (() => {
         const serviceTasks = (liveOrderInfo.tasks || []).filter((t) => t.taskType === 'service');
