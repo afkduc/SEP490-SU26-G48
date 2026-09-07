@@ -1898,10 +1898,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     if (isEdit) return;
     listVehicleModelsApi().then(setVehicleModels).catch(() => {});
   }, [isEdit]);
-  // Catalog o muc do doi xe (yearFrom-yearTo), khong phai tung nam cu the -
-  // xe that cua khach van can 1 nam san xuat rieng (giong du lieu that dang
-  // co: "Mazda CX-5 2.0 Premium 2023"), nen sau khi chon mau xe van can nhap
-  // them nam nay, gan vao cuoi vehicleModel.
   // O "Loai xe" la DANH SACH CHON, khong cho go tay: chu go vao chi de LOC
   // (modelQuery), khong bao gio tro thanh gia tri. Truoc day go tay duoc nen
   // CVDV luu duoc 1 loai xe khong co trong catalog (modelId = null) - xe do
@@ -3031,7 +3027,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         setShowModelSuggestions(false);
                       }
                     }}
-                    placeholder={isFromLookup || isEdit ? ' ' : 'Chọn đời xe trong danh mục...'} />
+                    placeholder={isFromLookup || isEdit ? ' ' : 'Chọn loại xe'} />
                   {!isFromLookup && !isEdit && (
                     vehicleInfo.modelId && !showModelSuggestions ? (
                       <button type="button" title="Bỏ chọn loại xe"
@@ -3060,7 +3056,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       }}
                         style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)', background: m.id === vehicleInfo.modelId ? 'var(--primary-very-light)' : undefined }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{m.displayName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>Đời {m.yearFrom}{m.yearTo ? ` – ${m.yearTo}` : ' – hiện tại'}</div>
                       </div>
                     ))}
                   </div>
