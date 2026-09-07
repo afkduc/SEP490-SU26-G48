@@ -24,10 +24,10 @@ import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
 import './TeamLeaderDashboard.css';
 
 const POLL_INTERVAL_MS = 15000;
-// 'bay-reported' = khoang vua bam Hoan thanh (bao xong viec) - phai nap lai
-// danh sach lenh de hien nut "Xác nhận hoàn thành" ngay, khong doi vong poll.
+// 'task-updated' = tho vua tick 1 dau muc o khoang - phai nap lai danh sach
+// lenh de nut "Hoàn thành" mo khoa ngay khi du dau muc, khong doi vong poll.
 const BAY_REFRESH_EVENT_TYPES = new Set(['claimed', 'order-completed', 'order-cancelled']);
-const ORDER_REFRESH_EVENT_TYPES = new Set(['claimed', 'task-updated', 'order-completed', 'order-cancelled', 'bay-reported']);
+const ORDER_REFRESH_EVENT_TYPES = new Set(['claimed', 'task-updated', 'order-completed', 'order-cancelled']);
 
 const TABS = [
   { key: 'pending', label: 'Việc chờ nhận' },
@@ -403,12 +403,12 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
   }
 
   // Lenh dang chiem khoang gom CA 2 trang thai: dang lam ('inprogress') va da
-  // bao xong dang cho to truong xac nhan ('awaiting_confirmation') - xe van
+  // Lenh dang chiem khoang - xe van
   // nam trong khoang cho den khi xac nhan, va chinh o trang thai thu 2 moi
   // hien nut "Xác nhận hoàn thành" ben duoi.
   const activeByBayId = new Map(
     orders
-      .filter((o) => o.status === 'inprogress' || o.status === 'awaiting_confirmation')
+      .filter((o) => o.status === 'inprogress')
       .map((o) => [String(o.bayId), o])
   );
 
@@ -423,14 +423,16 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
         const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
         // Khoang da bam Hoan thanh nhung to truong chua xac nhan - khoang van
         // tinh la dang ban (xe chua ra), chi doi nhan de biet la den luot minh.
-        const awaitingConfirm = order?.status === 'awaiting_confirmation';
+        // Tho da tick het dau muc dich vu -> to truong bam "Hoàn thành" duoc.
+        // Khoang xe khong co nut ket thuc, buoc nay chi to truong lam.
+        const xongHet = activeServiceTasks.length > 0 && doneCount === activeServiceTasks.length;
 
         return (
           <div key={bay.id} className={`tld-bay-status-card ${busy ? 'tld-bay-status-card--busy' : ''}`}>
             <div className="tld-bay-status-card__header">
               <span className="tld-bay-status-card__number">Khoang {bay.bayNumber}</span>
-              <span className={`badge ${awaitingConfirm ? 'badge-pending' : (busy ? 'badge-inprogress' : 'badge-inactive')}`}>
-                {awaitingConfirm
+              <span className={`badge ${xongHet ? 'badge-pending' : (busy ? 'badge-inprogress' : 'badge-inactive')}`}>
+                {xongHet
                   ? 'Chờ xác nhận'
                   : (busy ? `Đang làm (${doneCount}/${activeServiceTasks.length})` : 'Trống')}
               </span>
@@ -527,15 +529,14 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                   Xem tình trạng xe ban đầu
                 </button>
 
-                {/* Khoang da bam "Hoàn thành" (bao xong viec) - phieu quyet
-                    toan van dang "Đang sửa chữa" ben CVDV cho den khi to
-                    truong bam nut nay. Xem BE RepairOrderService
-                    .reportBayCompleted / .confirmCompleted. */}
-                {order.status === 'awaiting_confirmation' && (
+                {/* Tho da tick het dau muc. Khoang xe KHONG co nut ket thuc -
+                    phieu quyet toan van "Đang sửa chữa" ben CVDV cho den khi
+                    to truong bam nut nay. Xem RepairOrderService.confirmCompleted. */}
+                {xongHet && (
                   <div className="tld-confirm-box">
-                    <div className="tld-confirm-box__title">Khoang đã báo xong việc</div>
+                    <div className="tld-confirm-box__title">Thợ đã xong tất cả đầu mục</div>
                     <div className="tld-confirm-box__hint">
-                      Kiểm tra lại rồi xác nhận để chuyển phiếu sang <b>Chờ thanh toán</b> và giải phóng khoang.
+                      Kiểm tra lại rồi bấm Hoàn thành để chuyển phiếu sang <b>Chờ thanh toán</b> và giải phóng khoang.
                     </div>
                     <button
                       type="button"
@@ -544,7 +545,7 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                       disabled={confirmingId === order.id}
                       onClick={() => onConfirmComplete(order)}
                     >
-                      {confirmingId === order.id ? 'Đang xác nhận…' : 'Xác nhận hoàn thành'}
+                      {confirmingId === order.id ? 'Đang xử lý…' : 'Hoàn thành'}
                     </button>
                   </div>
                 )}

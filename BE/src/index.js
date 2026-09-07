@@ -187,10 +187,11 @@ async function start() {
       process.exit(1);
     }
 
-    // Moc "khoang bao xong viec" - tach buoc khoang bao xong khoi buoc to
-    // truong xac nhan hoan thanh. KHONG duoc nuot loi: thieu cot thi
-    // repairStatusOf khong bao gio ra 'awaiting_confirmation' (nut Xac nhan
-    // khong hien) va cau UPDATE cua reportBayCompleted se loi ten cot.
+    // Cot repair_orders.bay_completed_at. Ban dau dung cho luong 2 buoc
+    // (khoang bao xong -> to truong xac nhan); nay khoang khong con nut ket
+    // thuc nua nen cot KHONG con duoc doc/ghi o dau. Giu buoc ensure lai de
+    // dung schema giua cac may van khop nhau; muon bo han thi phai co
+    // migration DROP COLUMN rieng.
     try {
       const { ensureBayCompletionConfirm } = require('./infrastructure/database/ensureBayCompletionConfirm');
       const r = await ensureBayCompletionConfirm();

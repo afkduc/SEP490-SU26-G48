@@ -49,10 +49,6 @@ const CLAIMED_ONLY = `ro.team_leader_id IS NOT NULL AND ro.repair_started_at IS 
 function repairStatusOf(row) {
   if (row.status === 'cancelled') return 'cancelled';
   if (row.status === 'waiting_payment' || row.status === 'invoiced') return 'completed';
-  // Khoang xe da bam Hoan thanh nhung to truong chua xac nhan lai - phieu
-  // quyet toan VAN la 'inprogress' o DB (CVDV chua thay "Cho thanh toan"),
-  // khoang van tinh la dang ban. Xem ensureBayCompletionConfirm.js.
-  if (row.bay_completed_at) return 'awaiting_confirmation';
   return 'inprogress';
 }
 
@@ -401,36 +397,16 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
           SET    is_done = 0, check_result = NULL, check_note = NULL
           WHERE  id = @taskId AND repair_order_id = @repairOrderId AND is_done = 1
         `);
-      if (!result.rowsAffected[0]) return false;
-
-      await tx
-        .request()
-        .input('repairOrderId', sql.BigInt, repairOrderId)
-        .query(`UPDATE repair_orders SET bay_completed_at = NULL WHERE id = @repairOrderId`);
-      return true;
+      return result.rowsAffected[0] > 0;
     });
 
     return ok ? this.findById(repairOrderId) : null;
   }
 
-  // Khoang xe bao da lam xong viec - CHUA ket thuc lenh. Phieu quyet toan giu
-  // nguyen 'inprogress' (CVDV van thay "Đang sửa chữa", khoang van dang ban),
-  // chi ghi lai moc thoi gian de to truong biet ma vao xac nhan. Dieu kien
-  // bay_completed_at IS NULL de bam 2 lan khong ghi de moc dau tien.
-  async reportBayCompleted(id) {
-    const result = await query(
-      `UPDATE repair_orders
-       SET    bay_completed_at = GETDATE()
-       WHERE  id = @id AND status = 'inprogress' AND bay_completed_at IS NULL`,
-      { id }
-    );
-    return result.rowsAffected[0] > 0 ? this.findById(id) : null;
-  }
-
-  // To truong xac nhan -> gio moi that su ket thuc lenh: phieu quyet toan
-  // chuyen 'waiting_payment' (CVDV thay "Chờ thanh toán") va khoang duoc giai
-  // phong. Bat buoc khoang da bao xong truoc do (bay_completed_at IS NOT NULL)
-  // de khong the xac nhan vuot mat khi tho chua bao gi.
+  // To truong bam "Hoan thanh" -> ket thuc lenh: phieu quyet toan chuyen
+  // 'waiting_payment' (CVDV thay "Chờ thanh toán") va khoang duoc giai phong.
+  // Chi to truong lam duoc buoc nay - khoang xe (khong dang nhap) chi tick
+  // dau muc, khong tu ket thuc lenh.
   async updateStatus(id, status) {
     if (status !== 'completed') {
       throw new Error(`updateStatus chi ho tro 'completed', nhan duoc '${status}'`);
@@ -440,7 +416,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
        SET    status = 'waiting_payment',
               completed_date = GETDATE(),
               repair_completed_at = GETDATE()
-       WHERE  id = @id AND status = 'inprogress' AND bay_completed_at IS NOT NULL`,
+       WHERE  id = @id AND status = 'inprogress'`,
       { id }
     );
     return this.findById(id);

@@ -549,24 +549,6 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .query(`UPDATE repair_order_tasks SET note = @note WHERE id = @id`);
     }
 
-    // Co van vua them viec (hoac bo huy 1 dau muc) cho 1 lenh ma khoang DA bao
-    // xong -> thu hoi moc bao xong, tra lenh ve "dang lam". Neu khong, khoang
-    // khong tick duoc dau muc moi (chi tick khi lenh dang 'inprogress') ma to
-    // truong cung khong xac nhan duoc (con dau muc chua xong) - lenh ket cung.
-    await tx
-      .request()
-      .input('repairOrderId', sql.BigInt, repairOrderId)
-      .query(`
-        UPDATE repair_orders
-        SET    bay_completed_at = NULL
-        WHERE  id = @repairOrderId
-          AND  bay_completed_at IS NOT NULL
-          AND  EXISTS (
-                 SELECT 1 FROM repair_order_tasks
-                 WHERE repair_order_id = @repairOrderId
-                   AND task_type = 'service' AND is_cancelled = 0 AND is_done = 0
-               )
-      `);
   }
 
   async updateStatus(id, status, { issuedBy, cancelReason, paymentMethod } = {}) {

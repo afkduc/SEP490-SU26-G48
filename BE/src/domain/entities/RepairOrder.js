@@ -24,9 +24,6 @@ class RepairOrder {
     this.notes = data.notes ?? null;
     this.createdAt = data.createdAt ?? null;
     this.completedAt = data.completedAt ?? null;
-    // Moc khoang xe bam "Hoan thanh" - to truong chua xac nhan thi lenh
-    // van dang chay (status = 'awaiting_confirmation').
-    this.bayCompletedAt = data.bayCompletedAt ?? null;
     this.cancelReason = data.cancelReason ?? null;
 
     this.customer = data.customer ?? null; // { id, fullName }
@@ -57,7 +54,6 @@ class RepairOrder {
       notes: headerRow.repair_notes,
       createdAt: headerRow.repair_started_at,
       completedAt: headerRow.repair_completed_at,
-      bayCompletedAt: headerRow.bay_completed_at,
       cancelReason: headerRow.cancel_reason,
       customer: {
         id: headerRow.customer_id,

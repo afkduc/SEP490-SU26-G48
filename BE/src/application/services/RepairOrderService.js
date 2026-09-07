@@ -4,9 +4,9 @@ const PublicRepairProgressDto = require('../dto/PublicRepairProgressDto');
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
 const { needsCheckResult, CHECK_RESULTS } = require('../../domain/maintenanceChecklist');
 
-// Ket thuc lenh gio la 2 buoc: khoang xe bao xong viec (reportBayCompleted)
-// roi to truong xac nhan (confirmCompleted) - khong con 1 endpoint doi
-// "trang thai" chung nua, nen bo luon danh sach gia tri hop le.
+// Ket thuc lenh CHI to truong lam duoc (confirmCompleted). Khoang xe chi
+// tick tung dau muc, khong co nut ket thuc - tho lam xong thi tick het, to
+// truong nhin thay du dau muc roi moi bam Hoan thanh.
 //
 // 'cancelled' van khong phai la trang thai co the goi truc tiep qua day - huy
 // la mot chieu tu Phieu quyet toan (xem RepairSettlementService.updateStatus),
@@ -144,31 +144,6 @@ class RepairOrderService {
     return this.getById(id);
   }
 
-  // Khoang xe bam "Hoan thanh" - moi chi la BAO XONG VIEC, chua ket thuc lenh.
-  // Phieu quyet toan giu nguyen 'inprogress' nen CVDV van thay "Đang sửa
-  // chữa"; chi khi to truong bam Xac nhan (confirmCompleted ben duoi) phieu
-  // moi chuyen "Chờ thanh toán". Xem ensureBayCompletionConfirm.js.
-  async reportBayCompleted(id, { branchId } = {}) {
-    const existing = await this._assertCompletable(id, { branchId });
-    if (existing.status === 'awaiting_confirmation') {
-      throw new ApiError(409, 'Khoang đã báo xong việc, đang chờ tổ trưởng xác nhận');
-    }
-
-    const entity = await this.repairOrderRepository.reportBayCompleted(id);
-    if (!entity) throw new ApiError(409, 'Không báo xong việc được, lệnh vừa đổi trạng thái - tải lại trang');
-
-    // Realtime: bao cho man to truong hien nut "Xác nhận hoàn thành", va cho
-    // cac man khoang khac dang mo cung 1 khoang cap nhat theo.
-    emitRepairOrderEvent(branchId, 'bay-reported', {
-      orderId: entity.id,
-      code: entity.code,
-      bayId: entity.bayId,
-      bayNumber: entity.bayNumber,
-    });
-
-    return RepairOrderResponseDto.fromEntity(entity);
-  }
-
   // To truong go tich 1 dau muc DA hoan thanh -> "tra ve lam lai". Thay cho
   // mot nut "tra lai" rieng: to truong kiem hang thay dau muc nao chua dat thi
   // go dung dau muc do ra, lenh tu quay ve "dang lam" cho khoang lam tiep
@@ -216,18 +191,14 @@ class RepairOrderService {
     return RepairOrderResponseDto.fromEntity(entity);
   }
 
-  // To truong xac nhan lenh da xong that su -> phieu quyet toan chuyen
-  // "Chờ thanh toán" va khoang xe duoc giai phong. Chi to truong DUOC PHAN
-  // CONG lenh nay moi xac nhan duoc, va bat buoc khoang da bao xong truoc do.
+  // To truong bam "Hoan thanh" -> phieu quyet toan chuyen "Chờ thanh toán" va
+  // khoang xe duoc giai phong. Chi to truong DUOC PHAN CONG lenh nay moi lam
+  // duoc; dieu kien du dau muc da xong nam trong _assertCompletable.
   async confirmCompleted(id, { branchId, teamLeaderId } = {}) {
     const existing = await this._assertCompletable(id, { branchId });
     if (String(existing.teamLeaderId) !== String(teamLeaderId)) {
       throw new ApiError(403, 'Chỉ tổ trưởng được phân công lệnh này mới có quyền xác nhận hoàn thành');
     }
-    if (existing.status !== 'awaiting_confirmation') {
-      throw new ApiError(409, 'Khoang xe chưa báo xong việc, chưa thể xác nhận hoàn thành');
-    }
-
     const entity = await this.repairOrderRepository.updateStatus(id, 'completed');
 
     // Realtime: phieu quyet toan goc vua chuyen "Chờ thanh toán" (xem
@@ -242,9 +213,8 @@ class RepairOrderService {
     return RepairOrderResponseDto.fromEntity(entity);
   }
 
-  // Dieu kien chung cua ca 2 buoc (khoang bao xong + to truong xac nhan):
-  // lenh con dang chay, dung chi nhanh, da co tho, va moi dau muc dich vu con
-  // hieu luc deu da xu ly xong.
+  // Dieu kien de ket thuc lenh: lenh con dang chay, dung chi nhanh, da co tho,
+  // va moi dau muc dich vu con hieu luc deu da xu ly xong.
   //
   // Chi dau muc "dich vu" (task_type='service') can tich - phu tung
   // (task_type='product') chi de hien thi, khong tinh vao dieu kien hoan thanh.
@@ -282,13 +252,6 @@ class RepairOrderService {
     }
     if (existing.status !== 'inprogress') {
       if (existing.status === 'cancelled') throw cancelledOrderError(existing);
-      // Da bam Hoan thanh o khoang thi khong tick lai duoc nua. Neu sau do
-      // CVDV them viec moi thi moc bao xong tu bi thu hoi (xem
-      // RepairSettlementRepositoryImpl._syncRepairOrderTasks) - lenh tro lai
-      // 'inprogress' va tick duoc binh thuong, khong ket cung o day.
-      if (existing.status === 'awaiting_confirmation') {
-        throw new ApiError(409, 'Khoang đã báo xong việc, đang chờ tổ trưởng xác nhận - không thể sửa đầu mục');
-      }
       throw new ApiError(409, 'Lệnh đã kết thúc, không thể cập nhật đầu mục công việc');
     }
     // claim() da chuyen phieu sang 'inprogress' ngay luc chon khoang, TRUOC

@@ -187,7 +187,7 @@ function TaskRow({ task, busy, onTaskDone }) {
   );
 }
 
-function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing }) {
+function ActiveJobPanel({ order, onTaskDone, busyTaskId }) {
   const [showIntake, setShowIntake] = useState(false);
   const tasks = order.tasks || [];
   const serviceTasks = tasks.filter((t) => t.taskType === "service");
@@ -195,7 +195,6 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
   const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
   const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
   const allDone = activeServiceTasks.length > 0 && doneCount === activeServiceTasks.length;
-  const awaitingConfirm = order.status === "awaiting_confirmation";
 
   return (
     <div className={styles.job}>
@@ -264,22 +263,14 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
         Xem tình trạng xe ban đầu
       </button>
 
-      {/* Bam "Hoàn thành" o day moi la BAO XONG VIEC. Phieu quyet toan ben
-          CVDV chi chuyen "Chờ thanh toán" khi to truong bam Xac nhan tren tai
-          khoan cua ho - xe van nam trong khoang cho den luc do. */}
-      {awaitingConfirm ? (
+      {/* Khoang xe KHONG co nut ket thuc lenh - tho chi tick tung dau muc.
+          Xong het thi to truong nhin thay du dau muc va bam "Hoàn thành" tren
+          tai khoan cua ho, luc do phieu quyet toan moi chuyen "Chờ thanh
+          toán". Xem RepairOrderService.confirmCompleted. */}
+      {allDone && (
         <div className={styles.jobAwaitingConfirm}>
-          Đã báo xong việc, đang chờ tổ trưởng xác nhận hoàn thành.
+          Đã xong tất cả đầu mục — chờ tổ trưởng xác nhận hoàn thành.
         </div>
-      ) : (
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnPrimary} ${styles.jobComplete}`}
-          disabled={!allDone || completing}
-          onClick={onComplete}
-        >
-          {completing ? "Đang xử lý…" : "Hoàn thành"}
-        </button>
       )}
 
       {showIntake && (
@@ -313,7 +304,6 @@ export default function BayScreen({ slug, bayNumber }) {
   const [error, setError] = useState("");
   const [cancelledInfo, setCancelledInfo] = useState("");
   const [busyTaskId, setBusyTaskId] = useState(null);
-  const [completing, setCompleting] = useState(false);
 
   // Tu an thong bao loi sau 5s (moi setError() o duoi deu qua day) - tranh
   // banner do nam lai man hinh kiosk mai khong ai bam tat.
@@ -450,30 +440,6 @@ export default function BayScreen({ slug, bayNumber }) {
     }
   };
 
-  // "Hoàn thành" o khoang = BAO XONG VIEC. Lenh van o lai khoang (chua giai
-  // phong) va phieu quyet toan ben CVDV chua doi trang thai - phai cho to
-  // truong bam Xac nhan tren tai khoan cua ho. Xem BE RepairOrderService
-  // .reportBayCompleted / .confirmCompleted.
-  const handleComplete = async () => {
-    setCompleting(true);
-    setError("");
-    try {
-      await apiFetch(`/public/repair-orders/${activeOrder.id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ bayId: bay.id }),
-      });
-      refreshBay();
-    } catch (err) {
-      if (err.code === "ORDER_CANCELLED") {
-        setCancelledInfo(err.message);
-      } else {
-        setError(err.message || "Không đánh dấu hoàn thành được");
-      }
-    } finally {
-      setCompleting(false);
-    }
-  };
-
   if (branch === undefined || bay === undefined) {
     return <div className={styles.center}><div className={styles.empty}>Đang tải…</div></div>;
   }
@@ -507,7 +473,7 @@ export default function BayScreen({ slug, bayNumber }) {
       {bay.activeRepairOrderId ? (
         !activeOrder
           ? <div className={styles.empty}>Đang tải…</div>
-          : <ActiveJobPanel order={activeOrder} onTaskDone={handleTaskDone} onComplete={handleComplete} busyTaskId={busyTaskId} completing={completing} />
+          : <ActiveJobPanel order={activeOrder} onTaskDone={handleTaskDone} busyTaskId={busyTaskId} />
       ) : (
         <div className={styles.empty}>Chưa có việc được gán cho khoang này.</div>
       )}
