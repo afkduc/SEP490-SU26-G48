@@ -12,6 +12,17 @@ const { buildDesiredTasks, computeDesiredTasks, loadPackageServiceNames, package
 // CASE WHEN trong HEADER_SELECT de 2 noi tinh nhat quan).
 const LOCK_TTL_SECONDS = 60;
 
+// "Bay gio" theo DUNG quy uoc datetime cua du an: cot datetime luu SO GIO
+// VIET NAM tren truc UTC, doc lai bang .getUTCHours() (xem utils/dateVN.js).
+//
+// SYSUTCDATETIME() tra ve gio UTC THAT nen lech 7 tieng so voi moi cot con
+// lai - truoc day cot locked_at ghi bang ham do, khien man danh sach hien
+// "Đang mở: ... lúc 15:49" trong khi dong ho la 22:49.
+//
+// Viet Nam khong co DST nen +7 la hang so, va DATEADD tren SYSUTCDATETIME()
+// khong phu thuoc mui gio he dieu hanh cua may chu (khac GETDATE()).
+const NOW_VN_SQL = 'DATEADD(HOUR, 7, SYSUTCDATETIME())';
+
 // Cot join dung chung cho findAll/findById - lay du thong tin khach hang,
 // xe (kem ngay mua tu warranty_records), co van dich vu va to truong.
 const HEADER_SELECT = `
@@ -58,13 +69,13 @@ const HEADER_SELECT = `
          -- khong ai mo (NULL) du cot goc trong DB co the van con gia tri cu -
          -- xem acquireLock, chi thuc su xoa cot khi co nguoi khac chiem lai.
          CASE WHEN so.lock_heartbeat_at IS NOT NULL
-                   AND so.lock_heartbeat_at > DATEADD(SECOND, -${LOCK_TTL_SECONDS}, SYSUTCDATETIME())
+                   AND so.lock_heartbeat_at > DATEADD(SECOND, -${LOCK_TTL_SECONDS}, ${NOW_VN_SQL})
               THEN so.locked_by_user_id ELSE NULL END AS active_locked_by_user_id,
          CASE WHEN so.lock_heartbeat_at IS NOT NULL
-                   AND so.lock_heartbeat_at > DATEADD(SECOND, -${LOCK_TTL_SECONDS}, SYSUTCDATETIME())
+                   AND so.lock_heartbeat_at > DATEADD(SECOND, -${LOCK_TTL_SECONDS}, ${NOW_VN_SQL})
               THEN lockUser.user_name ELSE NULL END AS active_locked_by_name,
          CASE WHEN so.lock_heartbeat_at IS NOT NULL
-                   AND so.lock_heartbeat_at > DATEADD(SECOND, -${LOCK_TTL_SECONDS}, SYSUTCDATETIME())
+                   AND so.lock_heartbeat_at > DATEADD(SECOND, -${LOCK_TTL_SECONDS}, ${NOW_VN_SQL})
               THEN so.locked_at ELSE NULL END AS active_locked_at
   FROM   repair_orders so
   JOIN   branches  b   ON b.id = so.branch_id
@@ -748,14 +759,14 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
   async acquireLock(id, userId) {
     const result = await query(
       `UPDATE repair_orders
-       SET    locked_by_user_id = @userId, locked_at = SYSUTCDATETIME(), lock_heartbeat_at = SYSUTCDATETIME()
+       SET    locked_by_user_id = @userId, locked_at = ${NOW_VN_SQL}, lock_heartbeat_at = ${NOW_VN_SQL}
        OUTPUT deleted.locked_by_user_id AS prev_locked_by_user_id
        WHERE  id = @id
          AND  (
            locked_by_user_id IS NULL
            OR locked_by_user_id = @userId
            OR lock_heartbeat_at IS NULL
-           OR lock_heartbeat_at < DATEADD(SECOND, -${LOCK_TTL_SECONDS}, SYSUTCDATETIME())
+           OR lock_heartbeat_at < DATEADD(SECOND, -${LOCK_TTL_SECONDS}, ${NOW_VN_SQL})
          )`,
       { id: Number(id), userId: Number(userId) }
     );
