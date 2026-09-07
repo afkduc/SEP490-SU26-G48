@@ -13,6 +13,7 @@ function mockRepo(overrides = {}) {
     searchTechnicians: async () => [],
     setTechnicians: async () => true,
     reopenTask: async () => null,
+    forwardNgTask: async () => true,
     updateStatus: async () => null,
     updateTaskStatus: async () => {},
     ...overrides,
@@ -352,9 +353,9 @@ test('confirmCompleted ignores cancelled service tasks', async () => {
   assert.equal(dto.status, 'completed');
 });
 
-// Tho cham "Khong dat" -> ng_decision='pending'. Chua ai hoi khach thi KHONG
-// duoc dong lenh: xe ra khoi xuong ma khach chua he duoc bao co hang muc can
-// thay. Xem ensureNgDecision.js.
+// Tho cham "Khong dat" -> 'reported' -> to truong bao co van -> 'pending'.
+// Con dung o bat ky chang nao thi KHONG duoc dong lenh: xe ra khoi xuong ma
+// khach chua he duoc bao co hang muc can thay. Xem ensureNgDecision.js.
 test('confirmCompleted blocks while an NG item is still waiting for the customer', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
@@ -422,4 +423,75 @@ test('confirmCompleted completes the order', async () => {
   const dto = await service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 });
   assert.equal(completedWith, 'completed');
   assert.equal(dto.status, 'completed');
+});
+
+// ─── To truong bao co van hang muc "Khong dat" ──────────────────────────────
+// Khoang xe khong noi thang duoc voi co van: tho cham Khong dat thi dau muc
+// dung o 'reported' cho to truong xem lai roi moi chuyen len.
+
+const ngOrder = {
+  ...inProgressOrder,
+  tasks: [
+    { id: 500, taskType: 'service', taskName: 'Ga lạnh hệ thống điều hòa', isDone: true, isCancelled: false, checkResult: 'NG', ngDecision: 'reported', checkNote: 'thiếu ga' },
+    { id: 501, taskType: 'service', taskName: 'Lọc gió điều hòa', isDone: true, isCancelled: false, checkResult: 'OK', ngDecision: null },
+  ],
+};
+
+test('forwardNgTask chuyen dau muc tu "reported" sang "pending"', async () => {
+  let goiVoi = null;
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({ ...ngOrder }),
+      forwardNgTask: async (id, taskId) => { goiVoi = [id, taskId]; return true; },
+    }),
+  });
+  const dto = await service.forwardNgTask(70, 500, { branchId: 1, teamLeaderId: 8 });
+  assert.deepEqual(goiVoi, [70, 500]);
+  assert.equal(dto.id, 70);
+});
+
+test('forwardNgTask chan dau muc khong phai Khong dat', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({ findById: async () => ({ ...ngOrder }) }),
+  });
+  await assert.rejects(
+    () => service.forwardNgTask(70, 501, { branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 400 && /không bị đánh Không đạt/.test(err.message),
+  );
+});
+
+test('forwardNgTask chan bam 2 lan va chan to truong khac', async () => {
+  const daBao = {
+    ...ngOrder,
+    tasks: [{ ...ngOrder.tasks[0], ngDecision: 'pending' }],
+  };
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({ findById: async () => daBao }),
+  });
+  await assert.rejects(
+    () => service.forwardNgTask(70, 500, { branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 409 && /đã được báo cho cố vấn/.test(err.message),
+  );
+
+  const service2 = new RepairOrderService({
+    repairOrderRepository: mockRepo({ findById: async () => ({ ...ngOrder }) }),
+  });
+  await assert.rejects(
+    () => service2.forwardNgTask(70, 500, { branchId: 1, teamLeaderId: 999 }),
+    (err) => err.statusCode === 403,
+  );
+});
+
+// Chua bam "Bao co van" thi loi phai chi thang vao viec cua CHINH to truong,
+// khong duoc do sang co van - nguoi doc loi la nguoi phai lam tiep.
+test('confirmCompleted chan khi con dau muc Khong dat chua bao co van', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({ findById: async () => ({ ...ngOrder }) }),
+  });
+  await assert.rejects(
+    () => service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 409
+      && /chưa báo cố vấn dịch vụ/.test(err.message)
+      && /Ga lạnh hệ thống điều hòa/.test(err.message),
+  );
 });

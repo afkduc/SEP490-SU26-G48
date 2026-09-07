@@ -433,6 +433,64 @@
   color: #C62828;
 }
 
+/* Duong di cua dau muc "Khong dat": tho bao -> to truong chuyen -> co van
+   hoi khach. Moi chang 1 mau de to truong luot mat la biet con viec gi. */
+.tld-task-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tld-ng-box {
+  margin-left: 24px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Dang cho chinh to truong lam - noi bat nhat, co nut bam. */
+.tld-ng-box--todo {
+  background: #FFF8E1;
+  border: 1px solid #FFB74D;
+  color: #E65100;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tld-ng-box__title {
+  font-size: 11px;
+  font-weight: 700;
+}
+.tld-ng-box--waiting {
+  background: #E3F2FD;
+  border: 1px solid #90CAF9;
+  color: #1565C0;
+}
+.tld-ng-box--ok {
+  background: #E8F5E9;
+  border: 1px solid #A5D6A7;
+  color: #2E7D32;
+}
+.tld-ng-box--declined {
+  background: #FAFAFA;
+  border: 1px solid #E0E0E0;
+  color: #616161;
+}
+/* Con dau muc Khong dat chua di het duong -> khoa nut Hoan thanh. */
+.tld-confirm-box__blocked {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #FFEBEE;
+  border: 1px solid #EF9A9A;
+  color: #C62828;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 /* Nhom cong viec cua bieu mau (5 nhom + "Hang muc khac"). */
 .tld-task-group {
   display: flex;

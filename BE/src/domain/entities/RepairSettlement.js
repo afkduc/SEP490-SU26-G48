@@ -187,8 +187,9 @@ class RepairSettlement {
         checklistOrder: r.checklist_order ?? null,
         checkResult: r.check_result ?? null,
         checkNote: r.check_note ?? null,
-        // Xu ly dau muc Khong dat - co van nhin cot nay de biet muc nao con
-        // phai goi hoi khach (xem ensureNgDecision.js).
+        // Xu ly dau muc Khong dat - co van CHI phai xu ly muc 'pending'
+        // (to truong da xem lai va bao len); muc 'reported' la tho vua
+        // cham, con nam o to truong (xem ensureNgDecision.js).
         ngDecision: r.ng_decision ?? null,
         ngNote: r.ng_note ?? null,
       })),

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { usePartDetail } from '../../hooks/inventory/usePartDetail';
 import { useParts } from '../../hooks/inventory/useParts';
 import { useInventoryBranch } from './InventoryLayout';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import { listUnitsApi } from '../../services/productApi';
 import { PermissionGate } from '../../components/PermissionGate';
 import './PartDetailPage.css';
@@ -15,6 +16,7 @@ const STATUS_LABELS = {
 
 export default function PartDetailPage() {
   const { id } = useParams();
+  const confirm = useConfirm();
   const { branchId, loadingBranches, branchError } = useInventoryBranch();
   const { part, history, loading, error, refetch } = usePartDetail(id);
   const { update, deactivate, reactivate } = useParts({ branchId });
@@ -77,10 +79,15 @@ export default function PartDetailPage() {
 
   async function handleToggleStatus() {
     const isActive = part.status === 'active';
-    const msg = isActive
-      ? 'Xác nhận tạm ngừng phụ tùng này?'
-      : 'Xác nhận kích hoạt lại phụ tùng này?';
-    if (!window.confirm(msg)) return;
+    const ok = await confirm({
+      title: isActive ? 'Tạm ngừng phụ tùng' : 'Kích hoạt phụ tùng',
+      message: isActive
+        ? 'Tạm ngừng phụ tùng này? Phụ tùng sẽ không còn được chọn khi lập phiếu.'
+        : 'Kích hoạt lại phụ tùng này?',
+      confirmText: isActive ? 'Tạm ngừng' : 'Kích hoạt',
+      tone: isActive ? 'warning' : 'primary',
+    });
+    if (!ok) return;
     setToggling(true);
     setFormError('');
     try {

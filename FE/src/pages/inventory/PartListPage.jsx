@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useInventoryBranch } from './InventoryLayout';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import { useParts } from '../../hooks/inventory/useParts';
 import { listUnitsApi } from '../../services/productApi';
 import { PermissionGate } from '../../components/PermissionGate';
@@ -34,6 +35,7 @@ function emptyForm() {
 
 export default function PartListPage() {
   const { branchId, loadingBranches, branchError } = useInventoryBranch();
+  const confirm = useConfirm();
   const {
     parts, total, loading, error, categories,
     params,
@@ -115,10 +117,15 @@ export default function PartListPage() {
 
   async function handleToggleStatus(p) {
     const isActive = p.status === 'active';
-    const msg = isActive
-      ? 'Xác nhận tạm ngừng phụ tùng này?'
-      : 'Xác nhận kích hoạt lại phụ tùng này?';
-    if (!window.confirm(msg)) return;
+    const ok = await confirm({
+      title: isActive ? 'Tạm ngừng phụ tùng' : 'Kích hoạt phụ tùng',
+      message: isActive
+        ? 'Tạm ngừng phụ tùng này? Phụ tùng sẽ không còn được chọn khi lập phiếu.'
+        : 'Kích hoạt lại phụ tùng này?',
+      confirmText: isActive ? 'Tạm ngừng' : 'Kích hoạt',
+      tone: isActive ? 'warning' : 'primary',
+    });
+    if (!ok) return;
     setTogglingId(p.id);
     try {
       if (isActive) await deactivate(p.id);

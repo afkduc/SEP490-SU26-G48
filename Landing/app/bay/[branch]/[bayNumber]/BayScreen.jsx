@@ -124,6 +124,23 @@ function TaskRow({ task, busy, onTaskDone }) {
           {task.checkResult === "NG" && task.checkNote ? ` — ${task.checkNote}` : ""}
         </div>
       )}
+      {/* Bao "Khong dat" xong thi viec chuyen sang TO TRUONG - tho khong phai
+          cho ai goi cho khach, va cung khong tu goi. Ghi ro dang o dau de tho
+          khong bam lai hay di hoi lai. Xem ensureNgDecision.js. */}
+      {task.checkResult === "NG" && task.ngDecision === "reported" && (
+        <div className={styles.taskNgFlow}>Đã báo tổ trưởng — chờ tổ trưởng chuyển cố vấn dịch vụ</div>
+      )}
+      {task.checkResult === "NG" && task.ngDecision === "pending" && (
+        <div className={styles.taskNgFlow}>Tổ trưởng đã báo cố vấn — chờ khách quyết định</div>
+      )}
+      {task.checkResult === "NG" && task.ngDecision === "accepted" && (
+        <div className={styles.taskNgOk}>Khách đồng ý thay — phụ tùng đã thêm vào phiếu</div>
+      )}
+      {task.checkResult === "NG" && task.ngDecision === "declined" && (
+        <div className={styles.taskNgFlow}>
+          Khách từ chối thay{task.ngNote ? ` — ${task.ngNote}` : ""}
+        </div>
+      )}
     </div>
   );
 

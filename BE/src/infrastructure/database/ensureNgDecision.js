@@ -9,11 +9,14 @@ const { getPool } = require('./sqlServer');
 // xe ra khoi xuong trong khi khach chua he duoc bao. Sau nay hong that thi
 // gara khong co gi chung minh da khuyen cao.
 //
-// Luong dung:
-//   tho cham Khong dat        -> ng_decision = 'pending' (cho hoi khach)
-//   co van goi khach, khach dong y -> 'accepted', roi them phu tung vao phieu
+// Luong dung - moi thu tu khoang deu phai QUA TO TRUONG roi moi toi co van,
+// ke ca viec bao can thay the (to truong la nguoi chiu trach nhiem ky thuat,
+// ho xac nhan dung la phai thay truoc khi co van goi bao gia cho khach):
+//   tho cham Khong dat             -> 'reported' (cho to truong xem lai)
+//   to truong bam "Báo cố vấn"     -> 'pending'  (cho co van hoi khach)
+//   co van goi khach, khach dong y -> 'accepted', phu tung tu chen vao phieu
 //   khach tu choi                  -> 'declined' + ng_note (bat buoc ghi ly do)
-//   con dau muc 'pending'          -> to truong KHONG bam Hoan thanh duoc
+//   con 'reported' hoac 'pending'  -> to truong KHONG bam Hoan thanh duoc
 //
 // Dau muc bi tu choi van tinh tien CONG KIEM TRA - nhung cong do da nam trong
 // gia goi bao duong roi nen khong phai tinh them gi, chi ghi nhan de in vao
@@ -39,11 +42,13 @@ const STEPS = [
     IF COL_LENGTH('dbo.repair_order_tasks','ng_decided_at') IS NULL
       ALTER TABLE dbo.repair_order_tasks ADD ng_decided_at DATETIME NULL;
   `],
-  // Dau muc DA cham Khong dat truoc khi co tinh nang nay -> dat ve 'pending'
-  // de co van con thay ma xu ly, thay vi bi bo quen im lang.
-  ['Danh dau cac dau muc Khong dat cu la "cho hoi khach"', `
+  // Dau muc DA cham Khong dat truoc khi co tinh nang nay -> dat ve 'reported'
+  // (dau chuoi) de to truong xem lai roi bao co van, thay vi bi bo quen im
+  // lang. Cac dau muc dang o 'pending' cua ban truoc thi GIU NGUYEN - co van
+  // da nhin thay chung roi, keo nguoc ve to truong chi lam ho phai bao lai.
+  ['Danh dau cac dau muc Khong dat cu la "cho to truong"', `
     UPDATE dbo.repair_order_tasks
-    SET    ng_decision = 'pending'
+    SET    ng_decision = 'reported'
     WHERE  check_result = 'NG' AND ng_decision IS NULL;
   `],
 ];

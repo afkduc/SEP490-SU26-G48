@@ -191,6 +191,49 @@ class RepairOrderService {
     return RepairOrderResponseDto.fromEntity(entity);
   }
 
+  // To truong chuyen dau muc "Khong dat" len co van dich vu.
+  //
+  // Khoang xe khong noi thang duoc voi co van: tho cham Khong dat thi dau muc
+  // dung o 'reported', to truong xem lai tan noi roi moi bam nut nay. To
+  // truong la nguoi chiu trach nhiem ky thuat - ho xac nhan dung la phai thay
+  // truoc khi co van goi bao gia cho khach, tranh viec goi khach roi moi phat
+  // hien tho cham nham.
+  async forwardNgTask(id, taskId, { branchId, teamLeaderId } = {}) {
+    const existing = await this.repairOrderRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
+    if (String(existing.branchId) !== String(branchId)) {
+      throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
+    }
+    if (String(existing.teamLeaderId) !== String(teamLeaderId)) {
+      throw new ApiError(403, 'Chỉ tổ trưởng được phân công lệnh này mới có quyền báo cố vấn dịch vụ');
+    }
+    if (existing.status === 'cancelled') throw cancelledOrderError(existing);
+    if (existing.status === 'completed') {
+      throw new ApiError(409, 'Lệnh đã kết thúc, không thể báo thêm đầu mục');
+    }
+
+    const task = existing.tasks.find((t) => String(t.id) === String(taskId));
+    if (!task) throw new ApiError(404, 'Không tìm thấy đầu mục công việc');
+    if (task.checkResult !== 'NG') {
+      throw new ApiError(400, 'Đầu mục này không bị đánh Không đạt, không cần báo cố vấn');
+    }
+    if (task.ngDecision !== 'reported') {
+      throw new ApiError(409, task.ngDecision === 'pending'
+        ? 'Đầu mục này đã được báo cho cố vấn dịch vụ rồi'
+        : 'Đầu mục này đã có quyết định của khách, không báo lại được');
+    }
+
+    const ok = await this.repairOrderRepository.forwardNgTask(id, taskId);
+    if (!ok) throw new ApiError(409, 'Đầu mục vừa đổi trạng thái, tải lại trang rồi thử lại');
+
+    // Realtime: man Phieu quyet toan cua CVDV hien ngay canh bao "cần hỏi
+    // khách" - dung de co van phai F5 moi thay viec cua minh.
+    emitRepairOrderEvent(branchId, 'task-updated', { orderId: Number(id), taskId: Number(taskId) });
+
+    const entity = await this.repairOrderRepository.findById(id);
+    return RepairOrderResponseDto.fromEntity(entity);
+  }
+
   // To truong bam "Hoan thanh" -> phieu quyet toan chuyen "Chờ thanh toán" va
   // khoang xe duoc giai phong. Chi to truong DUOC PHAN CONG lenh nay moi lam
   // duoc; dieu kien du dau muc da xong nam trong _assertCompletable.
@@ -238,10 +281,19 @@ class RepairOrderService {
     if (existing.tasks.some((t) => t.taskType === 'service' && !t.isCancelled && !t.isDone)) {
       throw new ApiError(409, 'Cần tích hoàn thành tất cả đầu mục công việc trước khi kết thúc lệnh');
     }
-    // Dau muc tho cham "Khong dat" ma co van CHUA hoi khach -> khong duoc dong
+    // Dau muc tho cham "Khong dat" ma chua di het duong -> khong duoc dong
     // lenh. Neu khong, xe ra khoi xuong trong khi khach chua he duoc bao la co
     // hang muc can thay - sau nay hong that thi gara khong co gi chung minh
     // da khuyen cao. Xem ensureNgDecision.js.
+    //
+    // 2 chang, bao loi rieng vi nguoi phai lam tiep la 2 nguoi khac nhau:
+    // 'reported' -> con nam o chinh to truong; 'pending' -> dang cho co van.
+    const chuaBaoCoVan = existing.tasks.filter((t) => t.ngDecision === 'reported');
+    if (chuaBaoCoVan.length > 0) {
+      throw new ApiError(409,
+        `Còn ${chuaBaoCoVan.length} đầu mục "Không đạt" chưa báo cố vấn dịch vụ: `
+        + chuaBaoCoVan.map((t) => t.taskName).join(', '));
+    }
     const choHoiKhach = existing.tasks.filter((t) => t.ngDecision === 'pending');
     if (choHoiKhach.length > 0) {
       throw new ApiError(409,

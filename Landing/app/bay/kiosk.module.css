@@ -298,6 +298,9 @@
 .taskAction { font-size: 13px; line-height: 1.35; color: var(--text-muted); white-space: normal; overflow-wrap: anywhere; }
 .taskResultOk { font-size: 13px; font-weight: 700; color: var(--success); }
 .taskResultNg { font-size: 13px; font-weight: 700; color: var(--accent); white-space: normal; overflow-wrap: anywhere; }
+/* Dau muc Khong dat dang di den dau: tho bao -> to truong -> co van -> khach. */
+.taskNgFlow { font-size: 12px; font-weight: 600; color: #94a3b8; white-space: normal; overflow-wrap: anywhere; }
+.taskNgOk { font-size: 12px; font-weight: 700; color: #4ade80; white-space: normal; overflow-wrap: anywhere; }
 
 /* Nhom cong viec cua bieu mau (5 nhom + "Hang muc khac"). */
 .taskGroup { display: flex; flex-direction: column; gap: 8px; }

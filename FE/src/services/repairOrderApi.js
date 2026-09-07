@@ -33,6 +33,12 @@ export async function reopenRepairOrderTaskApi(id, taskId) {
   return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/reopen`, {});
 }
 
+// To truong bam "Báo cố vấn" cho 1 đầu mục thợ chấm Không đạt: đầu mục
+// chuyển từ 'reported' (thợ vừa báo) sang 'pending' (chờ cố vấn hỏi khách).
+export async function forwardNgTaskApi(id, taskId) {
+  return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/forward-ng`, {});
+}
+
 // Toan bo lenh sua chua cua to truong dang dang nhap (inprogress + hoan
 // thanh) - dung cho tab "Khoang xe cua toi" (loc inprogress) va "Lich su"
 // (loc completed) tren TeamLeaderDashboard.jsx.

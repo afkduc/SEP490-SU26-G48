@@ -17,6 +17,7 @@ import {
 } from '../../utils/validation';
 import { navigateWithCrm, writeCrmBrowserUrl } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import PermissionGate from '../../components/PermissionGate';
 import AdminPagination from './components/AdminPagination';
 import TableSkeleton from './components/TableSkeleton';
@@ -103,6 +104,7 @@ export default function AdminUsersPage() {
   const { can } = usePermission();
   const { set403Error } = useGlobalError();
   const toast = useToast();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const location = useLocation();
   const isInitialMount = useRef(true);
@@ -211,10 +213,16 @@ export default function AdminUsersPage() {
 
   async function handleToggleStatus(userId, newStatus) {
     const isDeactivate = newStatus === 'inactive';
-    const confirmMsg = isDeactivate
-      ? 'Khóa tài khoản này? Người dùng sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
-      : 'Kích hoạt lại tài khoản này?';
-    if (!window.confirm(confirmMsg)) return;
+    const ok = await confirm({
+      title: isDeactivate ? 'Khóa tài khoản' : 'Kích hoạt tài khoản',
+      message: isDeactivate
+        ? 'Khóa tài khoản này? Người dùng sẽ không thể đăng nhập.'
+        : 'Kích hoạt lại tài khoản này?',
+      detail: isDeactivate ? 'Hệ thống không có chức năng xóa tài khoản.' : undefined,
+      confirmText: isDeactivate ? 'Khóa tài khoản' : 'Kích hoạt',
+      tone: isDeactivate ? 'danger' : 'primary',
+    });
+    if (!ok) return;
 
     setTogglingId(userId);
     try {

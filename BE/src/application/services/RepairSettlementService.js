@@ -341,6 +341,12 @@ class RepairSettlementService {
     if (task.checkResult !== 'NG') {
       throw new ApiError(400, 'Đầu mục này không bị đánh Không đạt');
     }
+    // 'reported' = tho vua cham Khong dat, TO TRUONG chua chuyen len. Co van
+    // khong duoc goi khach truoc buoc do - to truong phai xac nhan dung la
+    // phai thay da, tranh goi bao gia roi moi biet tho cham nham.
+    if (task.ngDecision === 'reported') {
+      throw new ApiError(409, 'Tổ trưởng chưa báo đầu mục này lên, chưa liên hệ khách được');
+    }
     if (task.ngDecision && task.ngDecision !== 'pending') {
       throw new ApiError(409, 'Đầu mục này đã được ghi nhận quyết định của khách rồi');
     }

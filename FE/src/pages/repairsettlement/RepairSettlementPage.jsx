@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { useToast } from '../../components/common/ToastContext';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { ROLES } from '../../constants/roles';
 import { actionLabel, consumesPart } from '../../constants/maintenanceChecklist';
@@ -325,8 +326,14 @@ function TaskProgressRow({ t, onDecideNg, decidingId }) {
           </span>
         )}
         {ok && t.checkResult === 'OK' && <span style={{ fontWeight: 600 }}> — Đạt</span>}
-        {/* Quyet dinh cua khach cho dau muc Khong dat. 'pending' = chua ai hoi
-            khach - chinh trang thai nay chan to truong bam Hoan thanh. */}
+        {/* Quyet dinh cua khach cho dau muc Khong dat. 'reported' = tho vua
+            bao, con nam o to truong; 'pending' = to truong da chuyen len, den
+            luot co van goi khach - ca 2 deu chan to truong bam Hoan thanh. */}
+        {t.ngDecision === 'reported' && (
+          <div style={{ color: 'var(--gray-600)', fontWeight: 600, fontSize: 12 }}>
+            Thợ báo cần thay — chờ tổ trưởng xác nhận, chưa cần liên hệ khách
+          </div>
+        )}
         {t.ngDecision === 'accepted' && (
           <div style={{ color: '#2E7D32', fontWeight: 600, fontSize: 12 }}>
             Khách đồng ý thay{t.ngNote ? ` — ${t.ngNote}` : ''} · nhớ thêm phụ tùng vào phiếu
@@ -1229,6 +1236,7 @@ function RepairSettlementList() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const confirm = useConfirm();
   // Ghi nhan quyet dinh cua khach cho dau muc "Khong dat" (xem BE
   // RepairSettlementService.decideNgTask). Khach tu choi thi BAT BUOC ghi ly
   // do - ly do nay se in vao muc "Cac hang muc can lam som" cua phieu.
@@ -1236,13 +1244,29 @@ function RepairSettlementList() {
   const handleDecideNg = async (task, decision) => {
     let note = '';
     if (decision === 'declined') {
-      note = (window.prompt(`Khách từ chối thay "${task.taskName}".
-Ghi rõ lý do (bắt buộc):`, '') || '').trim();
-      if (!note) return;
-    } else if (!window.confirm(`Khách đồng ý thay "${task.taskName}"?
-
-Hệ thống sẽ tự thêm phụ tùng của đầu mục này vào phiếu và tính lại tổng tiền.`)) {
-      return;
+      const lyDo = await confirm({
+        title: 'Khách từ chối thay',
+        message: `Khách từ chối thay "${task.taskName}".`,
+        detail: task.checkNote ? `Thợ ghi: ${task.checkNote}` : undefined,
+        confirmText: 'Ghi nhận từ chối',
+        tone: 'warning',
+        input: {
+          label: 'Lý do khách từ chối',
+          placeholder: 'VD: khách hẹn lần bảo dưỡng sau',
+          required: true,
+        },
+      });
+      if (!lyDo) return;
+      note = lyDo;
+    } else {
+      const ok = await confirm({
+        title: 'Khách đồng ý thay',
+        message: `Khách đồng ý thay "${task.taskName}"?`,
+        detail: 'Hệ thống sẽ tự thêm phụ tùng của đầu mục này vào phiếu và tính lại tổng tiền.',
+        confirmText: 'Khách đồng ý',
+        tone: 'success',
+      });
+      if (!ok) return;
     }
     setDecidingId(task.id);
     try {
