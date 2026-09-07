@@ -1917,7 +1917,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   })();
 
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
-  const [note, setNote] = useState(existingOrder?.note || '');
   const [intakeChecklist, setIntakeChecklist] = useState(existingOrder?.intakeChecklist || DEFAULT_INTAKE_CHECKLIST);
 
   // Chu ky dien tu tai cho - bat buoc luc tao phieu moi (khong ap dung khi sua
@@ -2730,7 +2729,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     customer: customerInfo,
     vehicle: vehicleInfo,
     customerRequest,
-    note,
     currentKm: vehicleInfo.currentKm || null,
     items,
     ...totals,
@@ -3139,11 +3137,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           <div className="form-group" style={{ marginTop: 16 }}>
             <label className="form-label required">Yêu cầu của khách hàng</label>
             <textarea className="form-textarea" rows={2} value={customerRequest} onChange={(e) => setCustomerRequest(e.target.value)} placeholder="Mô tả tình trạng xe / yêu cầu sửa chữa của khách hàng..." />
-          </div>
-
-          <div className="form-group" style={{ marginTop: 16 }}>
-            <label className="form-label">Ghi chú</label>
-            <textarea className="form-textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú thêm (nếu có)..." />
           </div>
         </div>
       </div>
