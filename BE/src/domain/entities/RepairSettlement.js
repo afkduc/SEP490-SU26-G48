@@ -175,6 +175,15 @@ class RepairSettlement {
         isQtyIncreased: Boolean(r.is_qty_increased),
         prevQuantity: r.prev_quantity ?? null,
         note: r.note ?? null,
+        // PHAI map giong RepairOrder.js: man Phieu quyet toan cua co van doc
+        // task qua entity NAY, con man to truong/khoang doc qua RepairOrder.
+        // Thieu 3 truong duoi thi dau muc bi cham "Khong dat" se hien y het
+        // dau muc dat ben man co van (chi con is_done de nhin).
+        actionCode: r.action_code ?? null,
+        checklistGroup: r.checklist_group ?? null,
+        checklistOrder: r.checklist_order ?? null,
+        checkResult: r.check_result ?? null,
+        checkNote: r.check_note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

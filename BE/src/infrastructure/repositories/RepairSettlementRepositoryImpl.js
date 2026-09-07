@@ -190,7 +190,13 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     // Chi co khi phieu da duoc to truong nhan viec - de co van xem duoc tien
     // do tung dau viec To truong da tich, khong can qua man rieng.
     const tasksResult = await query(
-      `SELECT rot.id, rot.task_name, rot.task_type, rot.quantity, rot.is_done, rot.is_cancelled, rot.is_added_later, rot.is_qty_increased, rot.prev_quantity, rot.note
+      `SELECT rot.id, rot.task_name, rot.task_type, rot.quantity, rot.is_done, rot.is_cancelled,
+              rot.is_added_later, rot.is_qty_increased, rot.prev_quantity, rot.note,
+              -- Yeu cau thuc hien + ket qua Dat/Khong dat: co van phai thay
+              -- duoc dau muc nao tho cham KHONG DAT de con tu van lai cho
+              -- khach, khong chi thay tich hoan thanh.
+              rot.action_code, rot.checklist_group, rot.checklist_order,
+              rot.check_result, rot.check_note
        FROM   repair_order_tasks rot
        WHERE  rot.repair_order_id = @id
        ORDER  BY rot.id`,
