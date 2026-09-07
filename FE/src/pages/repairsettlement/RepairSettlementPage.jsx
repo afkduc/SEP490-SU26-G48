@@ -1891,6 +1891,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // voi catalog. Chi vai chuc dong nen tai het 1 lan, loc ngay tren FE.
   const [vehicleModels, setVehicleModels] = useState([]);
   const [showModelSuggestions, setShowModelSuggestions] = useState(false);
+  // Tu khoa tim kiem trong o "Loai xe" - TACH RIENG khoi vehicleInfo.vehicleModel
+  // (gia tri that). Go vao day khong lam thay doi loai xe da chon.
+  const [modelQuery, setModelQuery] = useState('');
   useEffect(() => {
     if (isEdit) return;
     listVehicleModelsApi().then(setVehicleModels).catch(() => {});
@@ -1901,10 +1904,22 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // co: "Mazda CX-5 2.0 Premium 2023"), nen sau khi chon mau xe van can nhap
   // them nam nay, gan vao cuoi vehicleModel.
   const selectedModel = vehicleInfo.modelId ? vehicleModels.find((m) => m.id === vehicleInfo.modelId) : null;
+  // O "Loai xe" la DANH SACH CHON, khong cho go tay: chu go vao chi de LOC
+  // (modelQuery), khong bao gio tro thanh gia tri. Truoc day go tay duoc nen
+  // CVDV luu duoc 1 loai xe khong co trong catalog (modelId = null) - xe do
+  // sau nay khong loc duoc goi bao duong theo doi xe, va khong tra ra dung
+  // phu tung/dinh muc. Xem them ensureMaintenancePackageMeta.js.
+  //
+  // Bo trong o tim kiem -> hien TOAN BO danh sach (khong cat 8 dong nhu truoc,
+  // catalog chi hon chuc dong nen cuon thoai mai).
   const modelSuggestions = (() => {
-    const term = (vehicleInfo.vehicleModel || '').trim().toLowerCase();
-    if (!term) return [];
-    return vehicleModels.filter((m) => m.displayName.toLowerCase().includes(term)).slice(0, 8);
+    const term = modelQuery.trim().toLowerCase();
+    if (!term) return vehicleModels;
+    return vehicleModels.filter((m) => (
+      m.displayName.toLowerCase().includes(term)
+      || (m.modelLine || '').toLowerCase().includes(term)
+      || (m.trimName || '').toLowerCase().includes(term)
+    ));
   })();
 
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
@@ -2136,6 +2151,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const resetLookup = () => {
     setCustomerInfo({ fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' });
     setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, modelId: null, modelYear: '', lastKnownKm: null });
+    setModelQuery('');
     setCustomerQuery('');
     setPlateQuery('');
     setIsFromLookup(false);
@@ -2705,8 +2721,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       && Boolean((customerInfo.fullName || '').trim())
       && Boolean((customerInfo.phone || '').trim())
       && Boolean((vehicleInfo.licensePlate || '').trim())
-      && Boolean((vehicleInfo.vehicleModel || '').trim())
-      && (!vehicleInfo.modelId || Boolean((vehicleInfo.modelYear || '').toString().trim())));
+      // Loai xe BAT BUOC chon tu catalog (modelId), khong con go tay duoc -
+      // xe khong gan duoc doi xe thi sau nay khong loc duoc goi bao duong va
+      // khong tra dung dinh muc phu tung.
+      && Boolean(vehicleInfo.modelId)
+      && Boolean((vehicleInfo.modelYear || '').toString().trim()));
 
   const buildPayload = () => ({
     customerId: customerInfo.id || null,
@@ -2989,23 +3008,60 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
               <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
                 <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Loại xe</label>
-                <input className="form-input" value={vehicleInfo.vehicleModel}
-                  readOnly={isFromLookup || isEdit}
-                  onChange={(e) => {
-                    setVehicleInfo((p) => ({ ...p, vehicleModel: e.target.value, modelId: null, modelYear: '' }));
-                    setShowModelSuggestions(true);
-                  }}
-                  onFocus={() => { if (!isFromLookup && !isEdit) setShowModelSuggestions(true); }}
-                  onBlur={() => setTimeout(() => setShowModelSuggestions(false), 180)}
-                  placeholder={isFromLookup || isEdit ? ' ' : 'VD: CX-5 2.0 Luxury 2023'} />
-                {!isFromLookup && !isEdit && showModelSuggestions && modelSuggestions.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100, maxHeight: 260, overflowY: 'auto' }}>
-                    {modelSuggestions.map((m) => (
-                      <div key={m.id} onMouseDown={() => {
+                {/* Danh sach chon, KHONG go tay duoc: o input chi de tim kiem.
+                    Dang mo -> hien tu khoa dang go; dong lai -> hien loai xe da
+                    chon. Muon doi thi bam vao o (tu xoa tu khoa, mo lai danh
+                    sach) hoac bam dau x. */}
+                <div style={{ position: 'relative' }}>
+                  <input className="form-input" style={{ paddingRight: 30 }}
+                    value={showModelSuggestions ? modelQuery : (vehicleInfo.vehicleModel || '')}
+                    readOnly={isFromLookup || isEdit}
+                    onChange={(e) => { setModelQuery(e.target.value); setShowModelSuggestions(true); }}
+                    onFocus={() => {
+                      if (isFromLookup || isEdit) return;
+                      setModelQuery('');
+                      setShowModelSuggestions(true);
+                    }}
+                    onBlur={() => setTimeout(() => setShowModelSuggestions(false), 180)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') { setShowModelSuggestions(false); e.target.blur(); }
+                      // Enter khi danh sach loc con dung 1 dong -> chon luon,
+                      // go nhanh khong can roi tay khoi ban phim.
+                      if (e.key === 'Enter' && showModelSuggestions && modelSuggestions.length === 1) {
+                        e.preventDefault();
+                        const m = modelSuggestions[0];
                         setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id, modelYear: '' }));
                         setShowModelSuggestions(false);
+                      }
+                    }}
+                    placeholder={isFromLookup || isEdit ? ' ' : 'Chọn đời xe trong danh mục...'} />
+                  {!isFromLookup && !isEdit && (
+                    vehicleInfo.modelId && !showModelSuggestions ? (
+                      <button type="button" title="Bỏ chọn loại xe"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setVehicleInfo((p) => ({ ...p, vehicleModel: '', modelId: null, modelYear: '' }));
+                          setModelQuery('');
+                        }}
+                        style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--gray-500)', fontSize: 14, lineHeight: 1, padding: 4 }}>✕</button>
+                    ) : (
+                      <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-500)', fontSize: 10, pointerEvents: 'none' }}>▼</span>
+                    )
+                  )}
+                </div>
+                {!isFromLookup && !isEdit && showModelSuggestions && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100, maxHeight: 260, overflowY: 'auto' }}>
+                    {modelSuggestions.length === 0 ? (
+                      <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--gray-500)' }}>
+                        Không có đời xe nào khớp “{modelQuery}”
+                      </div>
+                    ) : modelSuggestions.map((m) => (
+                      <div key={m.id} onMouseDown={() => {
+                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id, modelYear: '' }));
+                        setModelQuery('');
+                        setShowModelSuggestions(false);
                       }}
-                        style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
+                        style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)', background: m.id === vehicleInfo.modelId ? 'var(--primary-very-light)' : undefined }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{m.displayName}</div>
                         <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>Đời {m.yearFrom}{m.yearTo ? ` – ${m.yearTo}` : ' – hiện tại'}</div>
                       </div>
@@ -3020,14 +3076,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                     min={selectedModel?.yearFrom || 2015} max={selectedModel?.yearTo || currentYear}
                     value={vehicleInfo.modelYear}
                     placeholder={`VD: ${selectedModel?.yearFrom || ''}`}
-                    onChange={(e) => {
-                      const year = e.target.value;
-                      setVehicleInfo((p) => ({
-                        ...p,
-                        modelYear: year,
-                        vehicleModel: year ? `${selectedModel?.displayName} ${year}` : (selectedModel?.displayName || ''),
-                      }));
-                    }} />
+                    onChange={(e) => setVehicleInfo((p) => ({ ...p, modelYear: e.target.value }))} />
                 </div>
               )}
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>

@@ -301,8 +301,11 @@ class RepairSettlementService {
       contactName: customer.contactPerson || null,
       contactPhone: customer.contactPhone || null,
       licensePlate: vehicle.licensePlate.trim(),
+      // Ten loai xe luu DUNG ten trong danh muc (display_name), KHONG dan
+      // nam san xuat vao duoi nua - nam co cot rieng manufacture_year.
       vehicleModelText: vehicle.vehicleModel || null,
       modelId: vehicle.modelId || null,
+      manufactureYear: vehicle.modelYear ? Number(vehicle.modelYear) : null,
       frameNumber: vehicle.frameNumber || null,
       engineNumber: vehicle.engineNumber || null,
       currentKm: payload.currentKm || null,
