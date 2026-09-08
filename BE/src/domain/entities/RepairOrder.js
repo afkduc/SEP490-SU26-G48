@@ -24,9 +24,6 @@ class RepairOrder {
     this.notes = data.notes ?? null;
     this.createdAt = data.createdAt ?? null;
     this.completedAt = data.completedAt ?? null;
-    // Moc khoang xe bam "Hoan thanh" - to truong chua xac nhan thi lenh
-    // van dang chay (status = 'awaiting_confirmation').
-    this.bayCompletedAt = data.bayCompletedAt ?? null;
     this.cancelReason = data.cancelReason ?? null;
 
     this.customer = data.customer ?? null; // { id, fullName }
@@ -57,7 +54,6 @@ class RepairOrder {
       notes: headerRow.repair_notes,
       createdAt: headerRow.repair_started_at,
       completedAt: headerRow.repair_completed_at,
-      bayCompletedAt: headerRow.bay_completed_at,
       cancelReason: headerRow.cancel_reason,
       customer: {
         id: headerRow.customer_id,
@@ -74,6 +70,8 @@ class RepairOrder {
         taskType: r.task_type,
         productId: r.product_id,
         quantity: r.quantity,
+        // DVT lay tu kho qua product_id (xem TASK_SELECT) - dich vu de trong.
+        unit: r.unit ?? null,
         unitPrice: r.unit_price,
         isDone: Boolean(r.is_done),
         isCancelled: Boolean(r.is_cancelled),
@@ -88,6 +86,12 @@ class RepairOrder {
         checklistOrder: r.checklist_order ?? null,
         checkResult: r.check_result ?? null,
         checkNote: r.check_note ?? null,
+        // Xu ly dau muc Khong dat: 'reported' (tho bao, cho to truong) ->
+        // 'resolved' (xuong tu xu ly, khong qua co van) HOAC 'pending' (da
+        // bao co van, cho hoi khach) -> 'accepted' (khach dong y thay) /
+        // 'declined' (khach tu choi). Xem ensureNgDecision.js.
+        ngDecision: r.ng_decision ?? null,
+        ngNote: r.ng_note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

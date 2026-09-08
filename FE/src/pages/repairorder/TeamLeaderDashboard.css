@@ -57,9 +57,13 @@
   font-size: 13px;
 }
 
+/* auto-FIT chu khong phai auto-fill: auto-fill van tao du so cot dai vua
+   man hinh roi de trong cac cot thua ben phai (man 1920 chi co 3 the thi mat
+   nua man trang tron). auto-fit thu gon cot rong lai nen may the trai deu het
+   chieu ngang. min(100%, 300px) de tren dien thoai cot khong tran ra ngoai. */
 .tld-pending-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 16px;
 }
 
@@ -264,14 +268,17 @@
   color: #B91C1C;
 }
 
-/* Tab "Khoang xe cua toi" */
+/* Tab "Khoang xe cua toi" - xem chu thich auto-fit o .tld-pending-grid. */
 .tld-bay-status-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 16px;
 }
 
+/* Chi con 1-2 khoang ma man 1920 thi the se keo dai gan het man - chan lai
+   cho de doc, phan du de trong con hon 1 the rong ca gang tay. */
 .tld-bay-status-card {
+  max-width: 820px;
   background: #fff;
   border: 1px solid var(--gray-200);
   border-left: 4px solid var(--gray-300);
@@ -293,11 +300,66 @@
   justify-content: space-between;
   gap: 8px;
 }
+.tld-bay-status-card__header .badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Nut thu gon 1 khoang - tam giac nho nam sat ben trai so khoang. */
+.tld-bay-collapse {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0 2px 0 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--gray-600);
+  flex-shrink: 0;
+}
+/* Cum ben trai cua header (nut + so khoang + tom tat khi thu gon); badge
+   trang thai la item con lai nen van bam ben phai. */
+.tld-bay-head-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+/* Khach hang + bien so ghep vao thanh khi thu gon - cat bang ... neu dai. */
+.tld-bay-collapsed-hint {
+  color: var(--gray-500);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* min-width:0 moi cho phep flex item nay co nho hon noi dung cua no - thieu
+     dong nay thi no khong chiu co, va cai bi be dong lai la "Khoang 1". */
+  flex: 1;
+  min-width: 0;
+}
+/* Khoang dang cho chinh to truong quyet - phai bat mat ngay tren thanh thu
+   gon, khong thi ho phai mo tung khoang ra moi biet. */
+.tld-bay-collapsed-warn {
+  color: #E65100;
+}
+
+/* Thu gon la CA KHUNG khoang co lai con 1 thanh: bo padding thua, va
+   align-self:start de o luoi khong bi keo cao bang khoang dang mo ben canh. */
+.tld-bay-status-card--collapsed {
+  padding: 8px 12px;
+  gap: 0;
+  align-self: start;
+}
 
 .tld-bay-status-card__number {
   font-size: 16px;
   font-weight: 800;
   color: var(--primary-dark);
+  /* "Khoang" va so khoang phai luon o cung 1 dong, tren moi kich thuoc man.
+     Khong cho co lai (flex item mac dinh co the co den min-content = be chu
+     xuong dong) - phan phai nhuong cho la ten khach o ben canh. */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tld-bay-status-card__code {
@@ -335,13 +397,23 @@
   padding: 6px 10px;
 }
 
+/* Goi bao duong co 30+ dau muc: xep 1 cot doc thi the dai loang ngoang,
+   phai cuon rat lau. `columns: 260px` tu chia lam 2-3 cot khi the du rong
+   (desktop, iPad ngang) va tu ve lai 1 cot khi the hep (dien thoai, iPad doc)
+   - khong can media query, cu con cho la no dung. */
 .tld-bay-status-card__tasks {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  columns: 260px;
+  column-gap: 18px;
   margin-top: 4px;
   padding-top: 10px;
   border-top: 1px solid var(--gray-100);
+}
+/* Khong cho cat 1 nhom cong viec (hay 1 dau muc kem khoi "Khong dat" cua no)
+   lam doi giua 2 cot. Ban -webkit- cho Safari cu tren iPad. */
+.tld-task-group,
+.tld-task-wrap {
+  -webkit-column-break-inside: avoid;
+  break-inside: avoid;
 }
 
 .tld-task {
@@ -433,14 +505,76 @@
   color: #C62828;
 }
 
+/* Duong di cua dau muc "Khong dat": tho bao -> to truong chuyen -> co van
+   hoi khach. Moi chang 1 mau de to truong luot mat la biet con viec gi. */
+.tld-task-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tld-ng-box {
+  margin-left: 24px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Dang cho chinh to truong lam - noi bat nhat, co nut bam. */
+.tld-ng-box--todo {
+  background: #FFF8E1;
+  border: 1px solid #FFB74D;
+  color: #E65100;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tld-ng-box__title {
+  font-size: 11px;
+  font-weight: 700;
+}
+.tld-ng-box--waiting {
+  background: #E3F2FD;
+  border: 1px solid #90CAF9;
+  color: #1565C0;
+}
+.tld-ng-box--ok {
+  background: #E8F5E9;
+  border: 1px solid #A5D6A7;
+  color: #2E7D32;
+}
+.tld-ng-box--declined {
+  background: #FAFAFA;
+  border: 1px solid #E0E0E0;
+  color: #616161;
+}
+/* Con dau muc Khong dat chua di het duong -> khoa nut Hoan thanh. */
+.tld-confirm-box__blocked {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #FFEBEE;
+  border: 1px solid #EF9A9A;
+  color: #C62828;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 /* Nhom cong viec cua bieu mau (5 nhom + "Hang muc khac"). */
 .tld-task-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Cach nhau bang margin DUOI chu khong phai margin tren: o layout nhieu
+     cot, margin tren cua nhom dung dau mot cot se day cot do lech xuong so
+     voi cac cot ben canh. */
+  margin-bottom: 10px;
 }
-.tld-task-group + .tld-task-group {
-  margin-top: 10px;
+.tld-task-group:last-child {
+  margin-bottom: 0;
 }
 .tld-task-group__title {
   font-size: 11px;

@@ -187,10 +187,11 @@ async function start() {
       process.exit(1);
     }
 
-    // Moc "khoang bao xong viec" - tach buoc khoang bao xong khoi buoc to
-    // truong xac nhan hoan thanh. KHONG duoc nuot loi: thieu cot thi
-    // repairStatusOf khong bao gio ra 'awaiting_confirmation' (nut Xac nhan
-    // khong hien) va cau UPDATE cua reportBayCompleted se loi ten cot.
+    // Cot repair_orders.bay_completed_at. Ban dau dung cho luong 2 buoc
+    // (khoang bao xong -> to truong xac nhan); nay khoang khong con nut ket
+    // thuc nua nen cot KHONG con duoc doc/ghi o dau. Giu buoc ensure lai de
+    // dung schema giua cac may van khop nhau; muon bo han thi phai co
+    // migration DROP COLUMN rieng.
     try {
       const { ensureBayCompletionConfirm } = require('./infrastructure/database/ensureBayCompletionConfirm');
       const r = await ensureBayCompletionConfirm();
@@ -200,6 +201,21 @@ async function start() {
     } catch (confirmErr) {
       console.error('[BE] KHONG THE KHOI DONG - them moc xac nhan hoan thanh that bai:');
       console.error(confirmErr.message);
+      process.exit(1);
+    }
+
+    // Xu ly dau muc "Khong dat": cot ng_decision/ng_note/ng_decided_*.
+    // KHONG duoc nuot loi - thieu cot thi to truong bam Hoan thanh duoc ca khi
+    // con dau muc chua hoi khach, dung lo hong ma tinh nang nay sinh ra de va.
+    try {
+      const { ensureNgDecision } = require('./infrastructure/database/ensureNgDecision');
+      const r = await ensureNgDecision();
+      console.log(r.skipped
+        ? '[BE] xu ly dau muc khong dat: da co tu truoc, bo qua'
+        : `[BE] xu ly dau muc khong dat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (ngErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot xu ly dau muc khong dat that bai:');
+      console.error(ngErr.message);
       process.exit(1);
     }
 

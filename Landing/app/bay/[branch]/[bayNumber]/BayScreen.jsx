@@ -69,6 +69,15 @@ function isStruckThrough(t) {
   return t.isCancelled || isFullyReturned(t);
 }
 
+// So luong + DON VI TINH cua dau muc phu tung: "4 Lít", "1 Cái"... Tho o
+// khoang phai biet do 4 LIT dau hay lay 4 CAI bugi, chi so khong thi khong du.
+// Dau muc dich vu khong co DVT va luon SL 1 -> tra ve rong, khong hien gi.
+function qtyLabel(t) {
+  const n = Number(t.quantity) || 0;
+  if (!t.unit && n <= 1) return '';
+  return `${n}${t.unit ? ` ${t.unit}` : ''}`;
+}
+
 function TaskNameLabel({ t }) {
   const qtyReturned = qtyReturnedOf(t);
   const suffix = t.isCancelled
@@ -99,13 +108,17 @@ function TaskRow({ task, busy, onTaskDone }) {
   const [ngNote, setNgNote] = useState("");
   const label = actionLabel(task.actionCode);
   const locked = busy || task.isDone || task.isCancelled;
-  const wantsResult = needsCheckResult(task.actionCode);
+  // Khach da dong y thay: dau muc quay lai thanh viec PHAI LAM (BE dat lai
+  // is_done=0 luc co van ghi nhan). Lan tick nay la "da thay xong", khong hoi
+  // Dat/Khong dat nua - da cham roi, ket qua la Khong dat.
+  const dangChoThay = task.ngDecision === "accepted" && !task.isDone && !task.isCancelled;
+  const wantsResult = needsCheckResult(task.actionCode) && !dangChoThay;
 
   const body = (
     <div className={styles.taskBody}>
       <div className={styles.taskNameRow}>
         <TaskNameLabel t={task} />
-        {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
+        {qtyLabel(task) && <span className={styles.partRowQty}>{qtyLabel(task)}</span>}
       </div>
       {label && <div className={styles.taskAction}>{label}</div>}
       {task.note && <div className={styles.taskNote}>{task.note}</div>}
@@ -113,6 +126,34 @@ function TaskRow({ task, busy, onTaskDone }) {
         <div className={task.checkResult === "NG" ? styles.taskResultNg : styles.taskResultOk}>
           {task.checkResult === "NG" ? "Không đạt" : "Đạt"}
           {task.checkResult === "NG" && task.checkNote ? ` — ${task.checkNote}` : ""}
+        </div>
+      )}
+      {/* Bao "Khong dat" xong thi viec chuyen sang TO TRUONG - tho khong phai
+          cho ai goi cho khach, va cung khong tu goi. Ghi ro dang o dau de tho
+          khong bam lai hay di hoi lai. Xem ensureNgDecision.js. */}
+      {task.checkResult === "NG" && task.ngDecision === "reported" && (
+        <div className={styles.taskNgFlow}>Đã báo tổ trưởng — chờ tổ trưởng chuyển cố vấn dịch vụ</div>
+      )}
+      {task.checkResult === "NG" && task.ngDecision === "pending" && (
+        <div className={styles.taskNgFlow}>Tổ trưởng đã báo cố vấn — chờ khách quyết định</div>
+      )}
+      {task.checkResult === "NG" && task.ngDecision === "accepted" && (
+        <div className={styles.taskNgOk}>
+          {task.isDone
+            ? "Khách đồng ý thay — đã thay xong"
+            : "Khách đồng ý thay — phụ tùng đã thêm vào phiếu, thay xong thì tích ô bên trái"}
+        </div>
+      )}
+      {/* To truong xu ly luon, khong qua co van - ket qua da doi thanh Dat
+          nen khong loc theo checkResult duoc nua. */}
+      {task.ngDecision === "resolved" && (
+        <div className={styles.taskNgOk}>
+          Tổ trưởng đã xử lý tại xưởng{task.ngNote ? ` — ${task.ngNote}` : ""}
+        </div>
+      )}
+      {task.checkResult === "NG" && task.ngDecision === "declined" && (
+        <div className={styles.taskNgFlow}>
+          Khách từ chối thay{task.ngNote ? ` — ${task.ngNote}` : ""}
         </div>
       )}
     </div>
@@ -187,7 +228,7 @@ function TaskRow({ task, busy, onTaskDone }) {
   );
 }
 
-function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing }) {
+function ActiveJobPanel({ order, onTaskDone, busyTaskId }) {
   const [showIntake, setShowIntake] = useState(false);
   const tasks = order.tasks || [];
   const serviceTasks = tasks.filter((t) => t.taskType === "service");
@@ -195,7 +236,6 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
   const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
   const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
   const allDone = activeServiceTasks.length > 0 && doneCount === activeServiceTasks.length;
-  const awaitingConfirm = order.status === "awaiting_confirmation";
 
   return (
     <div className={styles.job}>
@@ -245,10 +285,10 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
                   </div>
                   {task.note && <div className={styles.taskNote}>{task.note}</div>}
                   {task.isCancelled && (
-                    <div className={styles.taskReturnNote}>Số lượng trả lại kho x{task.quantity}</div>
+                    <div className={styles.taskReturnNote}>Số lượng trả lại kho {qtyLabel(task) || task.quantity}</div>
                   )}
                 </div>
-                {task.quantity > 1 && <span className={styles.partRowQty}>x{task.quantity}</span>}
+                {qtyLabel(task) && <span className={styles.partRowQty}>{qtyLabel(task)}</span>}
               </div>
             ))}
           </div>
@@ -264,22 +304,14 @@ function ActiveJobPanel({ order, onTaskDone, onComplete, busyTaskId, completing 
         Xem tình trạng xe ban đầu
       </button>
 
-      {/* Bam "Hoàn thành" o day moi la BAO XONG VIEC. Phieu quyet toan ben
-          CVDV chi chuyen "Chờ thanh toán" khi to truong bam Xac nhan tren tai
-          khoan cua ho - xe van nam trong khoang cho den luc do. */}
-      {awaitingConfirm ? (
+      {/* Khoang xe KHONG co nut ket thuc lenh - tho chi tick tung dau muc.
+          Xong het thi to truong nhin thay du dau muc va bam "Hoàn thành" tren
+          tai khoan cua ho, luc do phieu quyet toan moi chuyen "Chờ thanh
+          toán". Xem RepairOrderService.confirmCompleted. */}
+      {allDone && (
         <div className={styles.jobAwaitingConfirm}>
-          Đã báo xong việc, đang chờ tổ trưởng xác nhận hoàn thành.
+          Đã xong tất cả đầu mục — chờ tổ trưởng xác nhận hoàn thành.
         </div>
-      ) : (
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnPrimary} ${styles.jobComplete}`}
-          disabled={!allDone || completing}
-          onClick={onComplete}
-        >
-          {completing ? "Đang xử lý…" : "Hoàn thành"}
-        </button>
       )}
 
       {showIntake && (
@@ -313,7 +345,6 @@ export default function BayScreen({ slug, bayNumber }) {
   const [error, setError] = useState("");
   const [cancelledInfo, setCancelledInfo] = useState("");
   const [busyTaskId, setBusyTaskId] = useState(null);
-  const [completing, setCompleting] = useState(false);
 
   // Tu an thong bao loi sau 5s (moi setError() o duoi deu qua day) - tranh
   // banner do nam lai man hinh kiosk mai khong ai bam tat.
@@ -450,30 +481,6 @@ export default function BayScreen({ slug, bayNumber }) {
     }
   };
 
-  // "Hoàn thành" o khoang = BAO XONG VIEC. Lenh van o lai khoang (chua giai
-  // phong) va phieu quyet toan ben CVDV chua doi trang thai - phai cho to
-  // truong bam Xac nhan tren tai khoan cua ho. Xem BE RepairOrderService
-  // .reportBayCompleted / .confirmCompleted.
-  const handleComplete = async () => {
-    setCompleting(true);
-    setError("");
-    try {
-      await apiFetch(`/public/repair-orders/${activeOrder.id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ bayId: bay.id }),
-      });
-      refreshBay();
-    } catch (err) {
-      if (err.code === "ORDER_CANCELLED") {
-        setCancelledInfo(err.message);
-      } else {
-        setError(err.message || "Không đánh dấu hoàn thành được");
-      }
-    } finally {
-      setCompleting(false);
-    }
-  };
-
   if (branch === undefined || bay === undefined) {
     return <div className={styles.center}><div className={styles.empty}>Đang tải…</div></div>;
   }
@@ -507,7 +514,7 @@ export default function BayScreen({ slug, bayNumber }) {
       {bay.activeRepairOrderId ? (
         !activeOrder
           ? <div className={styles.empty}>Đang tải…</div>
-          : <ActiveJobPanel order={activeOrder} onTaskDone={handleTaskDone} onComplete={handleComplete} busyTaskId={busyTaskId} completing={completing} />
+          : <ActiveJobPanel order={activeOrder} onTaskDone={handleTaskDone} busyTaskId={busyTaskId} />
       ) : (
         <div className={styles.empty}>Chưa có việc được gán cho khoang này.</div>
       )}

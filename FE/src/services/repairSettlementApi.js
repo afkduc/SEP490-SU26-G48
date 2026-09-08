@@ -1,5 +1,12 @@
 import httpClient from './httpClient';
 
+// Co van ghi nhan quyet dinh cua khach cho 1 dau muc "Khong dat":
+// decision = 'accepted' (khach dong y thay) | 'declined' (khach tu choi, bat
+// buoc kem note la ly do). Xem BE RepairSettlementService.decideNgTask.
+export async function decideNgTaskApi(id, taskId, decision, note) {
+  return httpClient.patch(`/repair-settlements/${id}/tasks/${taskId}/ng-decision`, { decision, note });
+}
+
 export async function listRepairSettlementsApi({ status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 100, scope } = {}) {
   const params = new URLSearchParams();
   if (status) params.set('status', status);

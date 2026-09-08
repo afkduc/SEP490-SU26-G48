@@ -29,4 +29,13 @@ function nowVN() {
   ));
 }
 
-module.exports = { nowVN };
+// Ban SQL cua nowVN(): dung khi gia tri phai do CHINH SQL Server sinh ra
+// (vd cau UPDATE co dieu kien, khong tien lam 2 vong doc-ghi).
+//
+// SYSUTCDATETIME() tra ve gio UTC THAT nen lech 7 tieng so voi moi cot con
+// lai cua he thong. Viet Nam khong co DST nen +7 la hang so, va DATEADD tren
+// SYSUTCDATETIME() khong phu thuoc mui gio he dieu hanh cua may chu (khac
+// GETDATE()).
+const NOW_VN_SQL = 'DATEADD(HOUR, 7, SYSUTCDATETIME())';
+
+module.exports = { nowVN, NOW_VN_SQL };

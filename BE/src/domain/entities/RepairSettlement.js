@@ -61,6 +61,8 @@ class RepairSettlement {
     // HEADER_SELECT, da loc TTL san trong SQL nen o day luon la "con hieu luc").
     this.lockedBy = data.lockedBy ?? null; // { id, name }
     this.lockedAt = data.lockedAt ?? null;
+    // So dau muc "Khong dat" cho co van hoi khach - man danh sach hien canh bao.
+    this.ngPendingCount = data.ngPendingCount ?? 0;
 
     this.customer = data.customer ?? null; // { id, fullName, phone, address, taxCode, cccd, email, contactPerson, contactPhone }
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel, frameNumber, engineNumber, purchaseDate, currentKm }
@@ -116,6 +118,7 @@ class RepairSettlement {
         ? { id: headerRow.active_locked_by_user_id, name: headerRow.active_locked_by_name }
         : null,
       lockedAt: headerRow.active_locked_at ?? null,
+      ngPendingCount: Number(headerRow.ng_pending_count || 0),
       customer: {
         id: headerRow.customer_id,
         fullName: headerRow.customer_full_name,
@@ -175,6 +178,20 @@ class RepairSettlement {
         isQtyIncreased: Boolean(r.is_qty_increased),
         prevQuantity: r.prev_quantity ?? null,
         note: r.note ?? null,
+        // PHAI map giong RepairOrder.js: man Phieu quyet toan cua co van doc
+        // task qua entity NAY, con man to truong/khoang doc qua RepairOrder.
+        // Thieu 3 truong duoi thi dau muc bi cham "Khong dat" se hien y het
+        // dau muc dat ben man co van (chi con is_done de nhin).
+        actionCode: r.action_code ?? null,
+        checklistGroup: r.checklist_group ?? null,
+        checklistOrder: r.checklist_order ?? null,
+        checkResult: r.check_result ?? null,
+        checkNote: r.check_note ?? null,
+        // Xu ly dau muc Khong dat - co van CHI phai xu ly muc 'pending'
+        // (to truong da xem lai va bao len); muc 'reported' la tho vua
+        // cham, con nam o to truong (xem ensureNgDecision.js).
+        ngDecision: r.ng_decision ?? null,
+        ngNote: r.ng_note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

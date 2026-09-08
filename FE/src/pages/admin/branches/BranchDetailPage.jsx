@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { adminBranchesApi } from '../../../services/adminApi';
 import { useToast } from '../../../components/common/ToastContext';
+import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { useApiError } from '../../../hooks/useApiError';
 import PermissionGate from '../../../components/PermissionGate';
 import { formatPhoneDisplay } from '../../../utils/validation';
@@ -22,6 +23,7 @@ export default function BranchDetailPage() {
   const location = useLocation();
   const listSearch = location.state?.fromListSearch || '';
   const toast = useToast();
+  const confirm = useConfirm();
   const { handleApiError } = useApiError();
   const [branch, setBranch] = useState(null);
   const [stats, setStats] = useState(null);
@@ -53,9 +55,14 @@ export default function BranchDetailPage() {
 
   async function handleDeactivate() {
     if (!branch) return;
-    if (!window.confirm(
-      `Ngưng hoạt động chi nhánh "${branch.branchName}"? Nhân viên tại chi nhánh sẽ không thể đăng nhập. (Không xóa cứng.)`
-    )) return;
+    const ok = await confirm({
+      title: 'Ngưng hoạt động chi nhánh',
+      message: `Ngưng hoạt động chi nhánh "${branch.branchName}"?`,
+      detail: 'Nhân viên tại chi nhánh sẽ không thể đăng nhập. Dữ liệu không bị xóa.',
+      confirmText: 'Ngưng hoạt động',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setActionLoading(true);
     try {
       await adminBranchesApi.deactivate(branch.id);

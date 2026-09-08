@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { adminUsersApi } from '../../../services/adminApi';
 import PermissionGate from '../../../components/PermissionGate';
 import { useToast } from '../../../components/common/ToastContext';
+import { useConfirm } from '../../../components/common/ConfirmDialog';
 import { formatPhoneDisplay } from '../../../utils/validation';
 import ResetPasswordModal from './ResetPasswordModal';
 import './UserDetailPage.css';
@@ -61,6 +62,7 @@ export default function UserDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const confirm = useConfirm();
   const listSearch = location.state?.fromListSearch || '';
   const backToList = `/admin/users${listSearch}`;
   const [user, setUser] = useState(null);
@@ -91,10 +93,17 @@ export default function UserDetailPage() {
   async function handleToggleStatus() {
     if (!user) return;
     const next = user.status === 'active' ? 'inactive' : 'active';
-    const confirmMsg = next === 'inactive'
-      ? 'Khóa tài khoản này? Người dùng sẽ không thể đăng nhập. (Không có chức năng xóa tài khoản.)'
-      : 'Kích hoạt lại tài khoản này?';
-    if (!window.confirm(confirmMsg)) return;
+    const khoa = next === 'inactive';
+    const ok = await confirm({
+      title: khoa ? 'Khóa tài khoản' : 'Kích hoạt tài khoản',
+      message: khoa
+        ? 'Khóa tài khoản này? Người dùng sẽ không thể đăng nhập.'
+        : 'Kích hoạt lại tài khoản này?',
+      detail: khoa ? 'Hệ thống không có chức năng xóa tài khoản.' : undefined,
+      confirmText: khoa ? 'Khóa tài khoản' : 'Kích hoạt',
+      tone: khoa ? 'danger' : 'primary',
+    });
+    if (!ok) return;
     setToggling(true);
     try {
       await adminUsersApi.update({ userId: user.id, status: next });

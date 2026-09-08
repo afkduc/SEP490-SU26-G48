@@ -139,6 +139,88 @@ class RepairOrderController {
     }
   };
 
+  // To truong chuyen 1 dau muc "Khong dat" len co van dich vu de goi bao gia
+  // cho khach - xem RepairOrderService.forwardNgTask.
+  //
+  // GHI AUDIT: day la moc bat dau chuoi "gara khuyen cao khach thay X". Neu
+  // sau nay khach khieu nai (xe hong ma bao khong ai noi gi), day la bang
+  // chung to truong da chuyen canh bao di luc may gio, cho ai.
+  forwardNgTask = async (req, res, next) => {
+    try {
+      const before = await this.repairOrderService.getById(req.params.id);
+      const task = (before?.tasks || []).find((t) => String(t.id) === String(req.params.taskId));
+      const item = await this.repairOrderService.forwardNgTask(req.params.id, req.params.taskId, {
+        branchId: req.user.branchId,
+        teamLeaderId: req.user.userId,
+      });
+      const entityCode = item?.code || `ID-${req.params.id}`;
+      const { repairOrderSnapshot } = require('../../utils/auditSnapshots');
+      await auditCrud.lifecycle(req, {
+        tableName: 'repair_orders',
+        entityCode,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Lệnh sửa chữa',
+        step: 'ng_forwarded',
+        stepLabel: 'Báo cố vấn hạng mục không đạt',
+        action: 'UPDATE',
+        description: `Tổ trưởng báo cố vấn dịch vụ hạng mục không đạt${task?.taskName ? ` "${task.taskName}"` : ''}`
+          + ` của lệnh ${entityCode}`
+          + (task?.checkNote ? ` — ${task.checkNote}` : ''),
+        snapshot: repairOrderSnapshot(item, {
+          status: item?.status,
+          ngTaskId: Number(req.params.taskId) || null,
+          ngTaskName: task?.taskName || null,
+          ngNote: task?.checkNote || null,
+        }),
+      });
+      return success(res, item, 'NG task forwarded to advisor');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // To truong tu khac phuc 1 dau muc "Khong dat" ma khong qua co van - xem
+  // RepairOrderService.resolveNgTask.
+  //
+  // GHI AUDIT: dau muc dang tu "Không đạt" chuyen thanh "Đạt", day la doi ket
+  // qua kiem tra tren ho so xe. Phai luu ai doi, luc nao, va da lam gi.
+  resolveNgTask = async (req, res, next) => {
+    try {
+      const before = await this.repairOrderService.getById(req.params.id);
+      const task = (before?.tasks || []).find((t) => String(t.id) === String(req.params.taskId));
+      const item = await this.repairOrderService.resolveNgTask(req.params.id, req.params.taskId, {
+        note: req.body.note,
+        branchId: req.user.branchId,
+        teamLeaderId: req.user.userId,
+      });
+      const entityCode = item?.code || `ID-${req.params.id}`;
+      const { repairOrderSnapshot } = require('../../utils/auditSnapshots');
+      await auditCrud.lifecycle(req, {
+        tableName: 'repair_orders',
+        entityCode,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Lệnh sửa chữa',
+        step: 'ng_resolved',
+        stepLabel: 'Xử lý tại xưởng hạng mục không đạt',
+        action: 'UPDATE',
+        description: `Tổ trưởng xử lý tại xưởng hạng mục không đạt${task?.taskName ? ` "${task.taskName}"` : ''}`
+          + ` của lệnh ${entityCode}`
+          + (task?.checkNote ? ` — thợ ghi: ${task.checkNote}` : '')
+          + ` — đã xử lý: ${String(req.body.note || '').trim()}`,
+        snapshot: repairOrderSnapshot(item, {
+          status: item?.status,
+          ngTaskId: Number(req.params.taskId) || null,
+          ngTaskName: task?.taskName || null,
+          ngReason: task?.checkNote || null,
+          ngResolution: String(req.body.note || '').trim() || null,
+        }),
+      });
+      return success(res, item, 'NG task resolved in-house');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   // To truong xac nhan lenh da xong that su, sau khi khoang xe bao xong viec.
   // Day moi la buoc lam phieu quyet toan chuyen "Chờ thanh toán" ben man CVDV
   // va giai phong khoang - xem RepairOrderService.confirmCompleted.

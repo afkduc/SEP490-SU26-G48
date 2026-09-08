@@ -37,10 +37,6 @@ class RepairOrderRepository {
     throw new Error('Method reopenTask() must be implemented');
   }
 
-  async reportBayCompleted(id) {
-    throw new Error('Method reportBayCompleted() must be implemented');
-  }
-
   async updateStatus(id, status) {
     throw new Error('Method updateStatus() must be implemented');
   }

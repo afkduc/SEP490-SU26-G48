@@ -2,6 +2,7 @@ const RepairOrderRepository = require('../../domain/repositories/RepairOrderRepo
 const RepairOrder = require('../../domain/entities/RepairOrder');
 const { query, sql, getPool } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const { NOW_VN_SQL } = require('../../utils/dateVN');
 const { buildDesiredTasks } = require('./repairOrderTaskBuilder');
 
 // Repository nay phuc vu goc nhin TO TRUONG / KHOANG XE tren cung bang
@@ -43,16 +44,23 @@ const HEADER_SELECT = `
 // Phieu con o 'waiting_repair' chua thuoc ve ai nen khong hien o day.
 const CLAIMED_ONLY = `ro.team_leader_id IS NOT NULL AND ro.repair_started_at IS NOT NULL`;
 
+// Dau muc phu tung phai hien ro DON VI TINH ("x4 Lít" chu khong phai "x4") -
+// tho o khoang can biet do 4 lit dau hay lay 4 cai bugi. repair_order_tasks
+// khong luu DVT (chi co so luong), nen lay tu kho qua product_id. Dich vu thi
+// khong co product_id -> unit = NULL, FE tu bo qua.
+const TASK_SELECT = `
+  SELECT rot.*, u.unit_name AS unit
+  FROM   repair_order_tasks rot
+  LEFT   JOIN products p ON p.id = rot.product_id
+  LEFT   JOIN units    u ON u.id = p.unit_id
+`;
+
 // Trang thai lenh sua chua truoc day la 1 cot rieng (inprogress/completed/
 // cancelled) - that ra chi la anh xa 1-1 tu trang thai phieu, nen sau khi gop
 // thi suy ra thay vi luu trung. Xem ensureRepairOrderMerge.
 function repairStatusOf(row) {
   if (row.status === 'cancelled') return 'cancelled';
   if (row.status === 'waiting_payment' || row.status === 'invoiced') return 'completed';
-  // Khoang xe da bam Hoan thanh nhung to truong chua xac nhan lai - phieu
-  // quyet toan VAN la 'inprogress' o DB (CVDV chua thay "Cho thanh toan"),
-  // khoang van tinh la dang ban. Xem ensureBayCompletionConfirm.js.
-  if (row.bay_completed_at) return 'awaiting_confirmation';
   return 'inprogress';
 }
 
@@ -116,7 +124,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     const taskParams = {};
     ids.forEach((rid, i) => { taskParams[`id${i}`] = rid; });
     const tasksResult = await query(
-      `SELECT * FROM repair_order_tasks WHERE repair_order_id IN (${inClause}) ORDER BY id`,
+      `${TASK_SELECT} WHERE rot.repair_order_id IN (${inClause}) ORDER BY rot.id`,
       taskParams
     );
     const tasksByOrder = new Map();
@@ -134,7 +142,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     if (!header) return null;
 
     const tasksResult = await query(
-      `SELECT * FROM repair_order_tasks WHERE repair_order_id = @id ORDER BY id`,
+      `${TASK_SELECT} WHERE rot.repair_order_id = @id ORDER BY rot.id`,
       { id }
     );
     const techniciansByOrder = await fetchTechniciansByOrderIds([header.id]);
@@ -147,7 +155,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     if (!header) return null;
 
     const tasksResult = await query(
-      `SELECT * FROM repair_order_tasks WHERE repair_order_id = @id ORDER BY id`,
+      `${TASK_SELECT} WHERE rot.repair_order_id = @id ORDER BY rot.id`,
       { id: header.id }
     );
     const techniciansByOrder = await fetchTechniciansByOrderIds([header.id]);
@@ -360,10 +368,28 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     });
   }
 
-  async updateTaskStatus(taskId, isDone, { checkResult = null, checkNote = null } = {}) {
+  // giuLichSuNg: dau muc "Khong dat" ma khach da dong y thay - tho dang tick
+  // lai sau khi THAY XONG, khong phai cham ket qua kiem tra lan nua. Chi doi
+  // is_done, giu nguyen check_result/check_note/ng_* lam lich su; neu ghi de
+  // nhu binh thuong thi CASE WHEN ben duoi se xoa sach ca quyet dinh cua
+  // khach lan ly do phai thay.
+  async updateTaskStatus(taskId, isDone, { checkResult = null, checkNote = null, giuLichSuNg = false } = {}) {
+    if (giuLichSuNg) {
+      await query(
+        `UPDATE repair_order_tasks SET is_done = @isDone WHERE id = @taskId`,
+        { taskId: Number(taskId), isDone: isDone ? 1 : 0 }
+      );
+      return;
+    }
     await query(
+      // Cham "Khong dat" -> 'reported': tho DA BAO, dang cho TO TRUONG chuyen
+      // len co van. Khong nhay thang 'pending' (= cho co van hoi khach) nua -
+      // moi thu tu khoang phai qua to truong roi moi toi co van, ke ca viec
+      // bao can thay the (xem forwardNgTask ben duoi).
       `UPDATE repair_order_tasks
-       SET    is_done = @isDone, check_result = @checkResult, check_note = @checkNote
+       SET    is_done = @isDone, check_result = @checkResult, check_note = @checkNote,
+              ng_decision = CASE WHEN @checkResult = 'NG' THEN 'reported' ELSE NULL END,
+              ng_note = NULL, ng_decided_by = NULL, ng_decided_at = NULL
        WHERE  id = @taskId`,
       {
         taskId: Number(taskId),
@@ -381,6 +407,56 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
   // Truoc khi gop bang, buoc nay phai ghi 2 cho: bang lenh sua chua ('completed')
   // roi cascade sang phieu quyet toan ('waiting_payment'). Gio chi con 1 dong
   // UPDATE - trang thai lenh la suy ra tu trang thai phieu (xem repairStatusOf).
+  // To truong chuyen 1 dau muc "Khong dat" len cho co van dich vu lien he
+  // khach: 'reported' (tho vua bao) -> 'pending' (cho co van hoi khach).
+  //
+  // Dieu kien ng_decision = 'reported' vua chan bam 2 lan, vua chan chuyen
+  // nham dau muc da co quyet dinh cua khach ('accepted'/'declined').
+  async forwardNgTask(repairOrderId, taskId) {
+    const result = await query(
+      `UPDATE repair_order_tasks
+       SET    ng_decision = 'pending'
+       WHERE  id = @taskId AND repair_order_id = @repairOrderId
+         AND  check_result = 'NG' AND ng_decision = 'reported'`,
+      { taskId: Number(taskId), repairOrderId: Number(repairOrderId) }
+    );
+    return result.rowsAffected[0] > 0;
+  }
+
+  // To truong tu khac phuc luon 1 dau muc "Khong dat" ma KHONG phai hoi khach.
+  //
+  // Dau muc "I" cua bieu mau ghi "Kiem tra, DIEU CHINH hoac thay the neu can
+  // thiet" - nghia la phan dieu chinh da nam trong gia goi bao duong. Siet lai
+  // 1 con oc, chinh lai day curoa, chau them nuoc lam mat... thi khong phat
+  // sinh dong nao, khong co gi de hoi khach. Chi khi phai THAY PHU TUNG (them
+  // tien) moi bat buoc qua co van - xem forwardNgTask.
+  //
+  // check_result ve 'OK': sau khi dieu chinh thi dau muc dat that, cot KET QUA
+  // cua bieu mau phai ghi Dat. Nhung ng_note (to truong da lam gi) va
+  // check_note (ly do tho cham Khong dat) deu GIU LAI - khong duoc de mat dau
+  // vet la dau muc nay tung co van de.
+  //
+  // Chi nhan tu 'reported'. Da chuyen len co van ('pending') thi thoi, luc do
+  // co van co the dang goi khach roi - keo nguoc ve lam co van noi mot dang,
+  // xuong lam mot neo.
+  async resolveNgTask(repairOrderId, taskId, { note, userId }) {
+    const result = await query(
+      `UPDATE repair_order_tasks
+       SET    ng_decision = 'resolved', ng_note = @note,
+              ng_decided_by = @userId, ng_decided_at = ${NOW_VN_SQL},
+              check_result = 'OK'
+       WHERE  id = @taskId AND repair_order_id = @repairOrderId
+         AND  check_result = 'NG' AND ng_decision = 'reported'`,
+      {
+        taskId: Number(taskId),
+        repairOrderId: Number(repairOrderId),
+        note: note || null,
+        userId: Number(userId),
+      }
+    );
+    return result.rowsAffected[0] > 0;
+  }
+
   // To truong go tich 1 dau muc da hoan thanh = "tra ve lam lai". Ngoai viec
   // mo lai chinh dau muc do (xoa ca ket qua Dat/Khong dat da ghi, de tho danh
   // gia lai tu dau), con phai THU HOI moc khoang bao xong: lenh dang cho xac
@@ -398,39 +474,20 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
         .input('repairOrderId', sql.BigInt, repairOrderId)
         .query(`
           UPDATE repair_order_tasks
-          SET    is_done = 0, check_result = NULL, check_note = NULL
+          SET    is_done = 0, check_result = NULL, check_note = NULL,
+                 ng_decision = NULL, ng_note = NULL, ng_decided_by = NULL, ng_decided_at = NULL
           WHERE  id = @taskId AND repair_order_id = @repairOrderId AND is_done = 1
         `);
-      if (!result.rowsAffected[0]) return false;
-
-      await tx
-        .request()
-        .input('repairOrderId', sql.BigInt, repairOrderId)
-        .query(`UPDATE repair_orders SET bay_completed_at = NULL WHERE id = @repairOrderId`);
-      return true;
+      return result.rowsAffected[0] > 0;
     });
 
     return ok ? this.findById(repairOrderId) : null;
   }
 
-  // Khoang xe bao da lam xong viec - CHUA ket thuc lenh. Phieu quyet toan giu
-  // nguyen 'inprogress' (CVDV van thay "Đang sửa chữa", khoang van dang ban),
-  // chi ghi lai moc thoi gian de to truong biet ma vao xac nhan. Dieu kien
-  // bay_completed_at IS NULL de bam 2 lan khong ghi de moc dau tien.
-  async reportBayCompleted(id) {
-    const result = await query(
-      `UPDATE repair_orders
-       SET    bay_completed_at = GETDATE()
-       WHERE  id = @id AND status = 'inprogress' AND bay_completed_at IS NULL`,
-      { id }
-    );
-    return result.rowsAffected[0] > 0 ? this.findById(id) : null;
-  }
-
-  // To truong xac nhan -> gio moi that su ket thuc lenh: phieu quyet toan
-  // chuyen 'waiting_payment' (CVDV thay "Chờ thanh toán") va khoang duoc giai
-  // phong. Bat buoc khoang da bao xong truoc do (bay_completed_at IS NOT NULL)
-  // de khong the xac nhan vuot mat khi tho chua bao gi.
+  // To truong bam "Hoan thanh" -> ket thuc lenh: phieu quyet toan chuyen
+  // 'waiting_payment' (CVDV thay "Chờ thanh toán") va khoang duoc giai phong.
+  // Chi to truong lam duoc buoc nay - khoang xe (khong dang nhap) chi tick
+  // dau muc, khong tu ket thuc lenh.
   async updateStatus(id, status) {
     if (status !== 'completed') {
       throw new Error(`updateStatus chi ho tro 'completed', nhan duoc '${status}'`);
@@ -440,7 +497,7 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
        SET    status = 'waiting_payment',
               completed_date = GETDATE(),
               repair_completed_at = GETDATE()
-       WHERE  id = @id AND status = 'inprogress' AND bay_completed_at IS NOT NULL`,
+       WHERE  id = @id AND status = 'inprogress'`,
       { id }
     );
     return this.findById(id);

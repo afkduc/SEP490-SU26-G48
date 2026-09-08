@@ -65,6 +65,7 @@ class RepairSettlementResponseDto {
       teamLeader: entity.teamLeaderName,
       lockedByName: entity.lockedBy?.name || null,
       lockedAt: entity.lockedAt ? toDDMMYYYYHHmm(entity.lockedAt) : null,
+      ngPendingCount: entity.ngPendingCount ?? 0,
       technicians: entity.technicians,
       repairOrderId: entity.repairOrderId,
       bayNumber: entity.bayNumber,
