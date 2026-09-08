@@ -329,6 +329,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Khoang dang cho chinh to truong quyet - phai bat mat ngay tren thanh thu
+   gon, khong thi ho phai mo tung khoang ra moi biet. */
+.tld-bay-collapsed-warn {
+  color: #E65100;
+}
+
 /* Thu gon la CA KHUNG khoang co lai con 1 thanh: bo padding thua, va
    align-self:start de o luoi khong bi keo cao bang khoang dang mo ben canh. */
 .tld-bay-status-card--collapsed {

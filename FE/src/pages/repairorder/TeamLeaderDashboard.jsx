@@ -475,12 +475,17 @@ function AssignTechniciansModal({ order, onClose, onDone }) {
 // 'task-updated'/danh sach orders duoc nap lai.
 function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId, onForwardNg, onResolveNg, forwardingTaskId }) {
   const [intakeOrder, setIntakeOrder] = useState(null);
-  // Goi bao duong bung ra 30+ dau muc, 3 khoang cung luc la phai cuon rat
-  // lau moi xem het. Cho thu gon tung khoang lai - chi la trang thai hien
-  // thi nen khong can luu, va luon giu lai dong khach hang/bien so de con
-  // biet khoang nao dang lam xe nao.
-  const [collapsedBays, setCollapsedBays] = useState(() => new Set());
-  const toggleBay = (bayId) => setCollapsedBays((prev) => {
+  // Goi bao duong bung ra 30+ dau muc, 3 khoang cung luc la phai cuon rat lau
+  // moi xem het - trong khi to truong thuong chi dang quan tam 1 khoang. Nen
+  // MAC DINH THU GON het, bam vao khoang nao thi mo khoang do ra.
+  //
+  // Luu danh sach khoang DANG MO chu khong phai khoang dang thu gon: mac dinh
+  // (Set rong) tu no la thu gon het, khong phai cho danh sach bays tai xong
+  // roi moi di seed. Va quan trong hon, loadBays() chay lai moi lan co su kien
+  // SSE - neu seed lai theo bays thi khoang to truong vua mo se tu dong sap
+  // lai ngay khi tho ben duoi tick 1 dau muc.
+  const [expandedBays, setExpandedBays] = useState(() => new Set());
+  const toggleBay = (bayId) => setExpandedBays((prev) => {
     const next = new Set(prev);
     if (next.has(bayId)) next.delete(bayId); else next.add(bayId);
     return next;
@@ -520,7 +525,7 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
         const ngChuaBao = activeServiceTasks.filter((t) => t.ngDecision === 'reported');
         const ngChoKhach = activeServiceTasks.filter((t) => t.ngDecision === 'pending');
         const vuongNg = ngChuaBao.length + ngChoKhach.length > 0;
-        const thuGon = collapsedBays.has(bay.id);
+        const thuGon = !expandedBays.has(bay.id);
 
         return (
           <div key={bay.id} className={`tld-bay-status-card ${busy ? 'tld-bay-status-card--busy' : ''}${thuGon ? ' tld-bay-status-card--collapsed' : ''}`}>
@@ -539,7 +544,15 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                 {thuGon && order && (
                   <span className="tld-bay-collapsed-hint">
                     {order.customer?.fullName} — {order.vehicle?.licensePlate}
-                    {vuongNg ? ` · ${ngChuaBao.length + ngChoKhach.length} mục không đạt` : ''}
+                    {/* Mac dinh dong het nen phai nhin ra ngay khoang nao dang
+                        cho CHINH to truong quyet, khong the bat ho mo tung
+                        khoang ra do. */}
+                    {ngChuaBao.length > 0 && (
+                      <b className="tld-bay-collapsed-warn"> · {ngChuaBao.length} mục chờ bạn quyết</b>
+                    )}
+                    {ngChuaBao.length === 0 && ngChoKhach.length > 0 && (
+                      <span> · {ngChoKhach.length} mục chờ khách</span>
+                    )}
                   </span>
                 )}
               </div>
