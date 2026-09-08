@@ -2954,6 +2954,19 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // luu moi bao thi phai cuon nguoc len tim, va thuong la da quen so dung.
   //
   // handleSave VAN kiem lai - day chi la canh bao som, khong phai cai chan.
+  // Khung "Thong tin khach hang va xe" co the dang thu gon, va o nhap thi nam
+  // tit tren dau trang. Bao loi ma khong den duoc o do thi bao lam gi - nen mo
+  // lai khung, cuon toi va focus thang vao o.
+  const kmInputRef = useRef(null);
+  const nhayToiOKm = () => {
+    setOpenSections((s) => ({ ...s, customer: true }));
+    // doi React mo khung xong roi moi cuon, khong thi o van dang display:none
+    setTimeout(() => {
+      kmInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      kmInputRef.current?.focus();
+    }, 0);
+  };
+
   const kmLoi = (() => {
     const { currentKm, lastKnownKm } = vehicleInfo;
     if (currentKm === '' || currentKm == null) return '';
@@ -3393,6 +3406,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                     type="number"
                     min={vehicleInfo.lastKnownKm || 0}
                     value={vehicleInfo.currentKm}
+                    ref={kmInputRef}
                     aria-invalid={Boolean(kmLoi)}
                     style={kmLoi ? { borderColor: 'var(--red)' } : undefined}
                     onChange={(e) => vInfoSet('currentKm', e.target.value)}
@@ -3809,6 +3823,19 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   : 'Vui lòng nhập đủ tên khách hàng, số điện thoại, biển số xe, hãng xe và tên xe để có thể lưu.'}
               </div>
             )}
+            {/* Nut Luu bi khoa thi phai noi ro vi sao, khong thi CVDV tuong
+                trang hong roi ngoi bam mai. */}
+            {Boolean(kmLoi) && !closedElsewhere && (
+              <button type="button" onClick={nhayToiOKm}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left', marginBottom: 8,
+                  padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                  background: '#FEF2F2', border: '1px solid var(--red)',
+                  fontSize: 12, color: 'var(--red)', fontWeight: 600, fontFamily: 'inherit',
+                }}>
+                Chưa lưu được: số km hiện tại chưa hợp lệ — bấm vào đây để nhập lại.
+              </button>
+            )}
 
             {closedElsewhere ? (
               <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}
@@ -3829,7 +3856,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             ) : (
               <>
                 <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
-                  disabled={!canSave || saving || locked || (!isEdit && signatureEmpty)}
+                  disabled={!canSave || saving || locked || Boolean(kmLoi) || (!isEdit && signatureEmpty)}
+                  title={kmLoi ? 'Số km hiện tại chưa hợp lệ — sửa lại rồi mới lưu được' : undefined}
                   onClick={handleSave}>
                   {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
                 </button>
