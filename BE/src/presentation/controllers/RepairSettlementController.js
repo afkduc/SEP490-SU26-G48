@@ -219,6 +219,35 @@ class RepairSettlementController {
     }
   };
 
+  // Co van ghi nhan quyet dinh cua khach cho 1 dau muc "Khong dat".
+  decideNgTask = async (req, res, next) => {
+    try {
+      const item = await this.repairSettlementService.decideNgTask(req.params.id, req.params.taskId, {
+        decision: req.body.decision,
+        note: req.body.note,
+        userId: req.user.userId,
+        branchId: req.user.branchId,
+      });
+      const dongY = req.body.decision === 'accepted';
+      const tenDauMuc = (item?.tasks || []).find((t) => String(t.id) === String(req.params.taskId))?.taskName;
+      await auditCrud.lifecycle(req, {
+        tableName: 'repair_settlements',
+        entityCode: item?.code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Phiếu quyết toán',
+        step: dongY ? 'ng_accepted' : 'ng_declined',
+        stepLabel: dongY ? 'Khách đồng ý thay' : 'Khách từ chối thay',
+        action: 'UPDATE',
+        description: `${dongY ? 'Khách đồng ý thay' : 'Khách từ chối thay'}`
+          + `${tenDauMuc ? ` — ${tenDauMuc}` : ''} (phiếu ${item?.code || req.params.id})`
+          + (req.body.note ? ` — ${req.body.note}` : ''),
+      });
+      return success(res, item, 'NG decision saved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   lock = async (req, res, next) => {
     try {
       const result = await this.repairSettlementService.acquireLock(req.params.id, req);

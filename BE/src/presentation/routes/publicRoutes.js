@@ -80,7 +80,8 @@ function buildPublicRouter() {
 
   router.get('/lookup/:code', lookupRateLimiter, controller.lookupPublicProgress);
   router.get('/vehicle-history/:identifier', lookupRateLimiter, repairSettlementController.lookupPublicHistory);
-  router.get('/branches', serviceRequestController.getPublicBranches);  router.get('/service-packages', serviceRequestController.getPublicServicePackages);
+  router.get('/branches', serviceRequestController.getPublicBranches);
+  router.get('/service-packages', serviceRequestController.getPublicServicePackages);
   router.get('/service-packages/:code', serviceRequestController.getPublicServicePackageByCode);
   router.post('/service-requests', serviceRequestRateLimiter, serviceRequestController.createPublic);
   router.get('/gate/pending', gateRateLimiter, repairSettlementController.getGatePending);
@@ -93,7 +94,6 @@ function buildPublicRouter() {
   router.get('/bays', gateRateLimiter, bayBoardController.listBays);
   router.get('/bays/:bayId/active-order', gateRateLimiter, bayBoardController.getActiveOrder);
   router.patch('/repair-orders/:id/tasks/:taskId', gateRateLimiter, bayBoardController.updateTaskStatus);
-  router.patch('/repair-orders/:id/status', gateRateLimiter, bayBoardController.updateStatus);
 
   return router;
 }

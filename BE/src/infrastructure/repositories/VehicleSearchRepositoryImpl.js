@@ -23,6 +23,7 @@ class VehicleSearchRepositoryImpl extends VehicleSearchRepository {
               v.frame_number,
               v.engine_number,
               v.current_km,
+              v.model_id,
               wr.purchase_date,
               wr.warranty_end_date,
               wr.warranty_km AS warranty_km_limit

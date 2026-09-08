@@ -19,6 +19,33 @@ export async function setRepairOrderTechniciansApi(id, technicianIds) {
   return httpClient.patch(`/repair-orders/${id}/technicians`, { technicianIds });
 }
 
+// To truong xac nhan lenh da xong, SAU KHI khoang xe bam "Hoàn thành" (báo
+// xong việc). Đây mới là bước làm phiếu quyết toán bên màn CVDV chuyển sang
+// "Chờ thanh toán" và giải phóng khoang - xem BE RepairOrderService
+// .reportBayCompleted / .confirmCompleted.
+export async function confirmRepairOrderCompleteApi(id) {
+  return httpClient.patch(`/repair-orders/${id}/confirm-complete`, {});
+}
+
+// To truong gỡ tích 1 đầu mục đã hoàn thành = yêu cầu làm lại đầu mục đó.
+// Lệnh đang chờ xác nhận sẽ tự quay về "đang làm" cho khoang làm tiếp.
+export async function reopenRepairOrderTaskApi(id, taskId) {
+  return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/reopen`, {});
+}
+
+// To truong bam "Báo cố vấn" cho 1 đầu mục thợ chấm Không đạt: đầu mục
+// chuyển từ 'reported' (thợ vừa báo) sang 'pending' (chờ cố vấn hỏi khách).
+export async function forwardNgTaskApi(id, taskId) {
+  return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/forward-ng`, {});
+}
+
+// To truong tu khac phuc luon 1 đầu mục "Không đạt" (điều chỉnh nằm trong
+// giá gói, không phát sinh tiền nên không phải hỏi khách): đầu mục chuyển
+// sang 'resolved' và kết quả kiểm tra đổi thành "Đạt". Bắt buộc ghi đã làm gì.
+export async function resolveNgTaskApi(id, taskId, note) {
+  return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/resolve-ng`, { note });
+}
+
 // Toan bo lenh sua chua cua to truong dang dang nhap (inprogress + hoan
 // thanh) - dung cho tab "Khoang xe cua toi" (loc inprogress) va "Lich su"
 // (loc completed) tren TeamLeaderDashboard.jsx.
