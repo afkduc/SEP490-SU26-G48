@@ -2205,6 +2205,49 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   useRepairOrderEventsSSE(handleOrderInfoSSE, isEdit);
 
   // Phieu da roi khoi trang thai cho sua ("waiting_repair"/"inprogress") o
+  // Khoa "dang mo phieu" cho chinh trang Chinh sua.
+  //
+  // Truoc day CHI man danh sach giu khoa (luc mo modal xem chi tiet), con bam
+  // "Chỉnh sửa" la NHA khoa roi moi dieu huong sang day - nen trong suot luc
+  // 1 CVDV ngoi sua, phieu hoan toan khong co khoa: nguoi thu 2 van vao sua
+  // duoc, va ai bam Luu sau thi de len ban cua nguoi kia. Sua ngay chinh la
+  // luc va cham nguy hiem nhat, khong phai luc xem.
+  //
+  // Nay trang nay tu chiem khoa khi mo, cu 20s gia han 1 lan (TTL ben BE la
+  // 60s, gap 3 lan chu ky) va nha khi roi trang.
+  const [khoaBoiNguoiKhac, setKhoaBoiNguoiKhac] = useState(null);
+  useEffect(() => {
+    if (!isEdit || !existingOrder?.id) return undefined;
+    const id = existingOrder.id;
+    let nhipGiaHan = null;
+    let dangGiu = false;
+    let daRoiTrang = false;
+
+    lockSettlementApi(id)
+      .then(() => {
+        // Roi trang trong luc dang cho API tra loi -> nha ngay, khong de lai
+        // khoa "ma" treo den het TTL.
+        if (daRoiTrang) {
+          unlockSettlementApi(id).catch(() => {});
+          return;
+        }
+        dangGiu = true;
+        nhipGiaHan = setInterval(() => { lockSettlementApi(id).catch(() => {}); }, 20000);
+      })
+      .catch((err) => {
+        if (daRoiTrang) return;
+        setKhoaBoiNguoiKhac(err.status === 409
+          ? (err.details?.lockedByName || 'người khác')
+          : (err.message || 'người khác'));
+      });
+
+    return () => {
+      daRoiTrang = true;
+      if (nhipGiaHan) clearInterval(nhipGiaHan);
+      if (dangGiu) unlockSettlementApi(id).catch(() => {});
+    };
+  }, [isEdit, existingOrder?.id]);
+
   // NOI KHAC (to truong hoan thanh lenh, hoac CVDV khac huy/xuat hoa don)
   // trong luc man Chinh sua nay van dang mo - khong the sua tiep duoc nua,
   // xem comment liveOrderInfo o tren. Vua luu thanh cong trong phien nay
@@ -2213,7 +2256,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     && liveOrderInfo.status !== 'waiting_repair' && liveOrderInfo.status !== 'inprogress';
   // khoa toan bo form lai, tranh go them ma khong con nut Luu nao de bam nua
   // (xem fieldset disabled ben duoi va nut trong Tong ket thanh toan).
-  const locked = Boolean(savedOrder) || closedElsewhere;
+  const locked = Boolean(savedOrder) || closedElsewhere || Boolean(khoaBoiNguoiKhac);
 
   // Lỗi lưu phiếu hiện giữa màn hình dạng mockup, tự ẩn sau ~4s (không cần
   // đóng tay) - thay cho banner cố định trên đầu trang như trước.
@@ -3151,9 +3194,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
       {locked && (
         <div style={{ background: '#FFF7E6', border: '1px solid #FFE0A3', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#8A6100' }}>
-          {closedElsewhere
-            ? 'Lệnh sửa chữa của phiếu này vừa hoàn thành (hoặc phiếu đã bị hủy/xuất hóa đơn) - không thể chỉnh sửa nữa. Vui lòng quay lại danh sách.'
-            : 'Phiếu đã lưu - đang ở chế độ chỉ xem. Bấm "Chỉnh sửa lại phiếu" nếu muốn sửa thêm.'}
+          {khoaBoiNguoiKhac
+            ? `Phiếu đang được ${khoaBoiNguoiKhac} mở - chỉ xem, không sửa được. Đợi họ đóng phiếu rồi vào lại.`
+            : (closedElsewhere
+              ? 'Lệnh sửa chữa của phiếu này vừa hoàn thành (hoặc phiếu đã bị hủy/xuất hóa đơn) - không thể chỉnh sửa nữa. Vui lòng quay lại danh sách.'
+              : 'Phiếu đã lưu - đang ở chế độ chỉ xem. Bấm "Chỉnh sửa lại phiếu" nếu muốn sửa thêm.')}
         </div>
       )}
 
