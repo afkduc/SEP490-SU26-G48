@@ -57,9 +57,13 @@
   font-size: 13px;
 }
 
+/* auto-FIT chu khong phai auto-fill: auto-fill van tao du so cot dai vua
+   man hinh roi de trong cac cot thua ben phai (man 1920 chi co 3 the thi mat
+   nua man trang tron). auto-fit thu gon cot rong lai nen may the trai deu het
+   chieu ngang. min(100%, 300px) de tren dien thoai cot khong tran ra ngoai. */
 .tld-pending-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 16px;
 }
 
@@ -264,14 +268,17 @@
   color: #B91C1C;
 }
 
-/* Tab "Khoang xe cua toi" */
+/* Tab "Khoang xe cua toi" - xem chu thich auto-fit o .tld-pending-grid. */
 .tld-bay-status-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 16px;
 }
 
+/* Chi con 1-2 khoang ma man 1920 thi the se keo dai gan het man - chan lai
+   cho de doc, phan du de trong con hon 1 the rong ca gang tay. */
 .tld-bay-status-card {
+  max-width: 820px;
   background: #fff;
   border: 1px solid var(--gray-200);
   border-left: 4px solid var(--gray-300);
@@ -371,13 +378,23 @@
   padding: 6px 10px;
 }
 
+/* Goi bao duong co 30+ dau muc: xep 1 cot doc thi the dai loang ngoang,
+   phai cuon rat lau. `columns: 260px` tu chia lam 2-3 cot khi the du rong
+   (desktop, iPad ngang) va tu ve lai 1 cot khi the hep (dien thoai, iPad doc)
+   - khong can media query, cu con cho la no dung. */
 .tld-bay-status-card__tasks {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  columns: 260px;
+  column-gap: 18px;
   margin-top: 4px;
   padding-top: 10px;
   border-top: 1px solid var(--gray-100);
+}
+/* Khong cho cat 1 nhom cong viec (hay 1 dau muc kem khoi "Khong dat" cua no)
+   lam doi giua 2 cot. Ban -webkit- cho Safari cu tren iPad. */
+.tld-task-group,
+.tld-task-wrap {
+  -webkit-column-break-inside: avoid;
+  break-inside: avoid;
 }
 
 .tld-task {
@@ -532,9 +549,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Cach nhau bang margin DUOI chu khong phai margin tren: o layout nhieu
+     cot, margin tren cua nhom dung dau mot cot se day cot do lech xuong so
+     voi cac cot ben canh. */
+  margin-bottom: 10px;
 }
-.tld-task-group + .tld-task-group {
-  margin-top: 10px;
+.tld-task-group:last-child {
+  margin-bottom: 0;
 }
 .tld-task-group__title {
   font-size: 11px;
