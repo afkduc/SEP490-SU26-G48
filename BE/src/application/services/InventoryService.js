@@ -67,7 +67,10 @@ class InventoryService {
   // Tra cuu phu tung dang active theo chi nhanh - dung khi tao phieu quyet
   // toan sua chua (chon dong "Phu tung"). Fetch het roi loc khong-dau o day
   // (giong CatalogSearchService), vi catalog phu tung cung chi vai chuc dong.
-  async searchProducts(term, branchId) {
+  // modelId: doi xe cua chiec dang lap phieu. Loc o DAY chu khong de FE loc -
+  // danh sach bi cat con 10 dong, de FE loc thi 10 dong lay ve co the toan phu
+  // tung cua doi xe khac. Phu tung dung chung (model_id NULL) van giu.
+  async searchProducts(term, branchId, modelId = null) {
     if (!term || term.trim().length < 2) {
       throw new ApiError(400, 'Từ khóa tìm kiếm phải có ít nhất 2 ký tự');
     }
@@ -75,11 +78,13 @@ class InventoryService {
 
     const needle = normalizeVietnamese(term.trim());
     const allProducts = await this.inventoryRepository.findAllActiveProducts(branchId);
-    const matched = allProducts.filter(
-      (p) =>
-        normalizeVietnamese(p.productCode).includes(needle) ||
-        normalizeVietnamese(p.productName).includes(needle)
-    );
+    const matched = allProducts
+      .filter(
+        (p) =>
+          normalizeVietnamese(p.productCode).includes(needle) ||
+          normalizeVietnamese(p.productName).includes(needle)
+      )
+      .filter((p) => !modelId || !p.modelId || String(p.modelId) === String(modelId));
     return InventoryResponseDto.fromEntityList(matched.slice(0, 10));
   }
 

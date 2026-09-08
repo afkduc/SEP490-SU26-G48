@@ -1,6 +1,7 @@
 // Ban chi-xem (read-only) cua "Phieu tiep nhan va ban giao xe" - dung trong
 // cac man xem chi tiet phieu quyet toan. Tach rieng khoi IntakeChecklistSection
 // (ban chinh sua) vi khong can bat ky state/tuong tac nao, chi render gia tri.
+import { INTAKE_NOTICE_LINES } from './intakeNotice';
 import {
   DEFAULT_INTAKE_CHECKLIST,
   INTERIOR_FIELDS, ITEMS_IN_CAR_FIELDS, EXTERIOR_LEFT_FIELDS, EXTERIOR_RIGHT_FIELDS,
@@ -188,6 +189,15 @@ export default function IntakeChecklistView({ value, vehicleModelText }) {
       <div className="form-group" style={{ marginTop: 12 }}>
         <label className="form-label">Lưu ý (hạng mục cần làm sớm, ghi chú)</label>
         <div style={{ fontSize: 12.5, color: v.notes ? '#334155' : 'var(--gray-400)', whiteSpace: 'pre-wrap' }}>{v.notes || '—'}</div>
+      </div>
+
+      {/* Cam ket khach da doc khi ky nhan xe - phai o cuoi, ngay tren cho ky. */}
+      <div style={{
+        marginTop: 14, padding: '10px 12px', borderRadius: 6,
+        background: 'var(--gray-50)', border: '1px solid var(--gray-200)',
+        fontSize: 12.5, lineHeight: 1.6, color: '#334155',
+      }}>
+        {INTAKE_NOTICE_LINES.map((dong) => <div key={dong}>{dong}</div>)}
       </div>
     </div>
   );

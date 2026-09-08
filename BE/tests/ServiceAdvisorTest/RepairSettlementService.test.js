@@ -63,6 +63,9 @@ function mockRepos(overrides = {}) {
     findAll: async () => [],
     count: async () => 0,
     findById: async () => null,
+    findPendingPayosTransactions: async () => [],
+    markPayosTransactionCancelled: async () => {},
+    hasPaidPayosTransaction: async () => false,
     findPublicHistoryByVehicleIdentifier: async () => [],
     findActiveByCustomerVehicle: async () => null,
     create: async (data, ctx) => ({
@@ -673,4 +676,74 @@ test('decideNgTask: khach tu choi thi KHONG chen phu tung', async () => {
   const kq = await service.decideNgTask(70, 500, { decision: 'declined', note: 'khách hẹn lần sau', userId: 9, branchId: 1 });
   assert.equal(daChen, false);
   assert.equal(kq.ngAddedParts.length, 0);
+});
+
+// ─── Ma QR PayOS chi duoc thanh toan 1 lan ─────────────────────────────────
+// Moi lan bam "Tao ma QR" truoc day la sinh them 1 link PayOS moi ma khong
+// dong link cu - tren DB that co 13 phieu cong don nhieu ma, 1 phieu toi 12.
+// Moi ma la 1 duong thu tien: khach quet nham ma cu la tien van di trong khi
+// phieu da xuat hoa don theo ma khac.
+
+const phieuChoThanhToan = {
+  id: 90, code: 'RO-2026-090', branchId: 1, status: 'waiting_payment',
+  total: 1000000, customer: { fullName: 'Nguyễn Văn A' },
+};
+
+test('khong tao ma QR moi cho phieu da thanh toan qua QR', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findById: async () => ({ ...phieuChoThanhToan }),
+      hasPaidPayosTransaction: async () => true,
+    }),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.createPayosPaymentLink(90),
+    (err) => err.statusCode === 409 && /đã được thanh toán qua QR/.test(err.message),
+  );
+});
+
+test('khong tao ma QR khi phieu chua o trang thai cho thanh toan', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findById: async () => ({ ...phieuChoThanhToan, status: 'inprogress' }),
+    }),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.createPayosPaymentLink(90),
+    (err) => err.statusCode === 409 && /chờ thanh toán/.test(err.message),
+  );
+});
+
+test('_huyCacMaQrCu danh dau huy MOI ma con song cua phieu', async () => {
+  const daHuy = [];
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findPendingPayosTransactions: async () => ([
+        { order_code: 111, payment_link_id: 'a' },
+        { order_code: 222, payment_link_id: 'b' },
+      ]),
+      markPayosTransactionCancelled: async (code) => { daHuy.push(code); },
+    }),
+    customerRepository: {},
+  });
+  // PayOS that se nem loi (khong co cau hinh trong test) - ham phai nuot loi
+  // do va VAN danh dau huy o DB, neu khong thi DB con "pending" vinh vien.
+  const n = await service._huyCacMaQrCu(90);
+  assert.equal(n, 2);
+  assert.deepEqual(daHuy, [111, 222]);
+});
+
+test('_huyCacMaQrCu bo qua dung ma vua duoc thanh toan', async () => {
+  let hoiVoi = null;
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({
+      findPendingPayosTransactions: async (id, opts) => { hoiVoi = { id, opts }; return []; },
+    }),
+    customerRepository: {},
+  });
+  await service._huyCacMaQrCu(90, { exceptOrderCode: 777 });
+  assert.equal(hoiVoi.id, 90);
+  assert.equal(hoiVoi.opts.exceptOrderCode, 777);
 });

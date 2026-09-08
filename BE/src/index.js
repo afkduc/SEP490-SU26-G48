@@ -204,6 +204,38 @@ async function start() {
       process.exit(1);
     }
 
+    // Loai hinh sua chua 'CS' (Cham soc xe) - FE/BE da cho phep nhung rang
+    // buoc CHECK cua repair_order_items thi chua, nen luu phieu co dich vu
+    // cham soc xe la chet o INSERT. KHONG duoc nuot loi: bo qua thi CVDV van
+    // gap dung loi do.
+    try {
+      const { ensureRepairCategoryCS } = require('./infrastructure/database/ensureRepairCategoryCS');
+      const r = await ensureRepairCategoryCS();
+      console.log(r.skipped
+        ? '[BE] loai hinh sua chua CS: da mo tu truoc, bo qua'
+        : `[BE] loai hinh sua chua CS: DA MO XONG (${r.steps} buoc)`);
+    } catch (csErr) {
+      console.error('[BE] KHONG THE KHOI DONG - mo rang buoc loai hinh sua chua that bai:');
+      console.error(csErr.message);
+      process.exit(1);
+    }
+
+    // Gan doi xe cho dich vu le + phu tung (services/products.model_id) de
+    // form quyet toan chi goi y do dung cho chinh chiec xe dang lam. KHONG
+    // duoc nuot loi: thieu cot thi cau SELECT cua catalog gay 500 o form tao
+    // phieu - hong han chuc nang chinh cua CVDV.
+    try {
+      const { ensureCatalogModel } = require('./infrastructure/database/ensureCatalogModel');
+      const r = await ensureCatalogModel();
+      console.log(r.skipped
+        ? '[BE] doi xe cho catalog: da co tu truoc, bo qua'
+        : `[BE] doi xe cho catalog: DA GAN XONG (${r.steps} buoc)`);
+    } catch (catErr) {
+      console.error('[BE] KHONG THE KHOI DONG - gan doi xe cho catalog that bai:');
+      console.error(catErr.message);
+      process.exit(1);
+    }
+
     // Xu ly dau muc "Khong dat": cot ng_decision/ng_note/ng_decided_*.
     // KHONG duoc nuot loi - thieu cot thi to truong bam Hoan thanh duoc ca khi
     // con dau muc chua hoi khach, dung lo hong ma tinh nang nay sinh ra de va.

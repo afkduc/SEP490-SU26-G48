@@ -55,6 +55,12 @@ export async function createPayosPaymentLinkApi(id) {
 // Khoa "dang mo phieu" (man danh sach) - chiem/gia han khi bam "Truy cập
 // phiếu" (goi lai moi 20s trong luc con mo), nha khi dong. Xem
 // RepairSettlementService.acquireLock/releaseLock. 409 kem err.details =
+// Cố vấn dịch vụ của chính chi nhánh người đang đăng nhập (branchId lấy từ
+// token) - dùng cho ô lọc "theo cố vấn" ở màn danh sách.
+export async function listBranchAdvisorsApi() {
+  return httpClient.get('/repair-settlements/advisors'); // [{ id, name, phone }]
+}
+
 // { lockedByUserId, lockedByName, lockedAt } khi dang bi nguoi khac giu.
 export async function lockSettlementApi(id) {
   return httpClient.post(`/repair-settlements/${id}/lock`);

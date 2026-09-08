@@ -21,6 +21,7 @@ import {
   updateRepairSettlementStatusApi,
   logRepairSettlementPrintApi,
   createPayosPaymentLinkApi,
+  listBranchAdvisorsApi,
   lockSettlementApi,
   unlockSettlementApi,
   getSettlementActivityLogApi,
@@ -241,6 +242,15 @@ function exemptionShortLabel(item) {
 // don gia*so luong ban dau, khong nham voi cac dong bi mien thu qua HTTT.
 function isQuantityReturned(item) {
   return item.lhsc === 'PT' && item.originalQty != null && Number(item.qty) < Number(item.originalQty);
+}
+
+// Dong bi THAY DOI sau khi phieu da chot voi khach - khach huy giua chung,
+// hoac tra bot phu tung da lap. Ca 2 deu la thay doi do BEN KHAC (khach, tho,
+// to truong) gay ra chu khong phai co van tu go, nen phai noi bat len de nguoi
+// doc phieu khong luot qua: chinh may dong nay la ly do tien cuoi cung khac
+// voi bao gia ban dau.
+function laDongDaThayDoi(item) {
+  return item.httt === HTTT_CANCELLED_VALUE || isQuantityReturned(item);
 }
 
 // Nhan hien thi 1 tho trong "Thợ thực hiện" - kem "(Điều động)" neu tho nay
@@ -493,14 +503,26 @@ function printSettlement(order, payosQrCode) {
   // Tach 2 nhom "Cong viec can thuc hien" / "Phu tung, vat tu" khi in - giong
   // cach hien thi ben form tao/sua phieu va modal Xem chi tiet (giu nguyen so
   // thu tu goc trong mang items, khong danh lai tu 1 cho tung nhom).
-  const indexedItems = (order.items || []).map((item, i) => ({ item, i }));
+  // Goi bao duong bung ra 30+ dau muc con, in het thi phieu dai 4-5 trang
+  // trong khi khach chi tra 1 gia goi - in DUNG dong ten goi la du. Chi tiet
+  // ben trong da nam o "Phieu kiem tra BDDK" rieng.
+  //
+  // assignGroupIds suy lai quan he cha-con tu chinh du lieu (BE khong luu
+  // groupId) - dong con cua goi la dong DV gia 0 nam duoi 1 dau goi.
+  let demNhom = 0;
+  const dsCoNhom = assignGroupIds(order.items || [], () => { demNhom += 1; return demNhom; });
+  // Danh lai STT SAU khi bo dong - giu so goc thi phieu in ra nhay coc
+  // 1, 2, 3, 38, 39 vi 30+ dau muc con da bi an di.
+  const indexedItems = dsCoNhom
+    .filter((item) => !(item.groupId && !item.isGroupParent && item.lhsc === 'DV'))
+    .map((item, i) => ({ item, i }));
   const laborItems = indexedItems.filter(({ item }) => item.lhsc !== 'PT');
   const partItems = indexedItems.filter(({ item }) => item.lhsc === 'PT');
   const laborSubtotal = laborItems.reduce((s, { item }) => s + (item.total || 0), 0);
   const partSubtotal = partItems.reduce((s, { item }) => s + (item.total || 0), 0);
 
   const renderItemRow = ({ item, i }) => `
-    <tr>
+    <tr${laDongDaThayDoi(item) ? ' class="doi-sau"' : ''}>
       <td style="text-align:center">${i + 1}</td>
       <td style="text-align:center">${item.code}</td>
       <td>${item.description}</td>
@@ -557,6 +579,10 @@ function printSettlement(order, payosQrCode) {
   .sign-row { display:flex; justify-content:space-between; margin-top:30px; }
   .sign-box { text-align:center; width:22%; }
   .sign-line { margin-top:40px; border-top:1px solid #000; padding-top:3px; font-size:10px; }
+  /* Dong bi doi sau khi chot voi khach (khach huy / tra bot phu tung) - in
+     mau do de nguoi doc thay ngay vi sao tien cuoi khac bao gia ban dau.
+     print-color-adjust de trinh duyet khong bo mau khi in ra giay. */
+  tr.doi-sau td { color:#c00; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   @media print { body { margin:8mm 12mm; } }
 </style></head><body>
 <div class="center bold" style="font-size:12px">CÔNG TY TNHH AUTOGARA – CHI NHÁNH ${(order.branch || MOCK_BRANCH).toUpperCase()}</div>
@@ -1074,8 +1100,10 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
                   const laborSubtotal = laborRows.reduce((s, { item }) => s + (item.total || 0), 0);
                   const partSubtotal = partRows.reduce((s, { item }) => s + (item.total || 0), 0);
 
+                  // To do CA DONG neu no bi doi sau khi chot voi khach - giong
+                  // ban in, de nguoi doc thay ngay vi sao tien khac bao gia dau.
                   const renderRow = ({ item, i }) => (
-                    <tr key={i}>
+                    <tr key={i} style={laDongDaThayDoi(item) ? { color: 'var(--red)' } : undefined}>
                       <td style={{ textAlign: 'center' }}>{i + 1}</td>
                       <td><span style={{ fontFamily: 'monospace', fontSize: 11 }}>{item.code}</span></td>
                       <td>
@@ -1095,7 +1123,7 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
                       <td style={{ textAlign: 'center' }}>{item.discount || 0}%</td>
                       <td style={{ textAlign: 'right', fontWeight: 700 }}>
                         {(item.total || 0).toLocaleString('vi-VN')}
-                        {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
+                        {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: laDongDaThayDoi(item) ? 'var(--red)' : 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
                       </td>
                       <td style={{ color: 'var(--gray-600)', fontStyle: item.note ? 'normal' : 'italic' }}>{item.note || '—'}</td>
                     </tr>
@@ -1365,6 +1393,23 @@ function RepairSettlementList() {
   // ap dung moi tab (phieu nao chua co to truong se khong khop khi loc chon 1
   // ten cu the, dung nhu ky vong); hinh thuc thanh toan chi co y nghia o tab
   // "Đã xuất hóa đơn" nen chi hien dropdown do o dung tab nay.
+  //
+  // Bo loc theo co van dich vu. Mac dinh 'me' - mo phan mem len la thay viec
+  // CUA MINH truoc, khong phai loi ca chi nhanh ra roi tu tim. Van doi sang
+  // 'all' hoac 1 co van cu the duoc (vd truc thay ca, hoac xem giup dong
+  // nghiep dang nghi).
+  //
+  // Danh sach lay tu CHINH cac phieu da tai ve - ma phieu tai ve luon bi BE
+  // gioi han trong chi nhanh cua nguoi dang dang nhap (branchId lay tu token,
+  // khong nhan tu client), nen khong co duong nao loc sang chi nhanh khac.
+  const [filterAdvisor, setFilterAdvisor] = useState('me');
+  // Lay theo VAI TRO tu BE, khong suy tu cac phieu da tai ve: suy tu phieu thi
+  // ai bi gan nham vao o co van cung hien ra (dang co 1 to truong nam trong
+  // do), va co van moi chua lam phieu nao thi lai khong hien.
+  const [advisorOptions, setAdvisorOptions] = useState([]);
+  useEffect(() => {
+    listBranchAdvisorsApi().then(setAdvisorOptions).catch(() => setAdvisorOptions([]));
+  }, []);
   const [filterTeamLeader, setFilterTeamLeader] = useState('');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -1470,17 +1515,28 @@ function RepairSettlementList() {
   };
   useRepairOrderEventsSSE(handleRepairOrderEvent, true);
 
+  // Bo loc co van ap cho CA so dem tren tab lan danh sach - neu chi ap cho
+  // danh sach thi tab ghi "Đang sửa chữa 2" trong khi ben duoi chi co 1 dong,
+  // nguoi dung tuong mat phieu.
+  const dungCoVan = (o) => {
+    if (filterAdvisor === 'me') return String(o.advisorId) === String(user?.id);
+    if (filterAdvisor === 'all') return true;
+    return String(o.advisorId) === filterAdvisor;
+  };
+  const theoCoVan = orders.filter(dungCoVan);
+
   const counts = {
-    waiting_repair: orders.filter((o) => displayStatus(o) === 'waiting_repair').length,
-    inprogress: orders.filter((o) => displayStatus(o) === 'inprogress').length,
-    waiting_payment: orders.filter((o) => o.status === 'waiting_payment').length,
-    invoiced: orders.filter((o) => o.status === 'invoiced').length,
-    cancelled: orders.filter((o) => o.status === 'cancelled').length,
+    waiting_repair: theoCoVan.filter((o) => displayStatus(o) === 'waiting_repair').length,
+    inprogress: theoCoVan.filter((o) => displayStatus(o) === 'inprogress').length,
+    waiting_payment: theoCoVan.filter((o) => o.status === 'waiting_payment').length,
+    invoiced: theoCoVan.filter((o) => o.status === 'invoiced').length,
+    cancelled: theoCoVan.filter((o) => o.status === 'cancelled').length,
   };
 
   // Danh sach Tổ trưởng duy nhat tu chinh du lieu dang co, cho dropdown loc -
   // khong goi API rieng, tranh phai dong bo them 1 nguon du lieu khac.
   const teamLeaderOptions = [...new Set(orders.map((o) => o.teamLeader).filter(Boolean))].sort();
+
 
   const filtered = orders.filter((o) => {
     if (displayStatus(o) !== tab) return false;
@@ -1491,6 +1547,7 @@ function RepairSettlementList() {
         || (o.vehicle?.licensePlate || '').toLowerCase().includes(s);
       if (!matches) return false;
     }
+    if (!dungCoVan(o)) return false;
     if (filterTeamLeader && o.teamLeader !== filterTeamLeader) return false;
     if (tab === 'invoiced' && filterPaymentMethod && o.paymentMethod !== filterPaymentMethod) return false;
     const orderDate = toComparableDate(o.date);
@@ -1507,7 +1564,7 @@ function RepairSettlementList() {
   const pageSafe = Math.min(page, totalPages);
   const paginated = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
-  useEffect(() => { setPage(1); }, [tab, search, filterTeamLeader, filterPaymentMethod, filterDateFrom, filterDateTo]);
+  useEffect(() => { setPage(1); }, [tab, search, filterAdvisor, filterTeamLeader, filterPaymentMethod, filterDateFrom, filterDateTo]);
 
   // Danh sach chi tra ve thong tin tom tat (khong co items - de tranh phai
   // gop them bang repair_order_items cho tung dong khi hien thi danh sach) -
@@ -1613,6 +1670,19 @@ function RepairSettlementList() {
 
       {/* Bo loc bo sung - tat ca AND voi nhau va voi o Search/tab o tren (loc kep). */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select className="form-select" style={{ fontSize: 12, width: 'auto', minWidth: 180 }}
+          value={filterAdvisor} onChange={(e) => setFilterAdvisor(e.target.value)}
+          title="Lọc theo cố vấn dịch vụ phụ trách phiếu (trong cùng chi nhánh)">
+          <option value="me">Phiếu của tôi</option>
+          <option value="all">Tất cả cố vấn</option>
+          {advisorOptions
+            .filter((cv) => String(cv.id) !== String(user?.id))
+            .map((cv) => (
+              <option key={cv.id} value={cv.id}>
+                {cv.phone ? `${cv.name} — ${cv.phone}` : cv.name}
+              </option>
+            ))}
+        </select>
         <select className="form-select" style={{ fontSize: 12, width: 'auto', minWidth: 160 }}
           value={filterTeamLeader} onChange={(e) => setFilterTeamLeader(e.target.value)}>
           <option value="">Tất cả Tổ trưởng</option>
@@ -1632,11 +1702,11 @@ function RepairSettlementList() {
           <span>đến</span>
           <input className="form-input" type="date" style={{ fontSize: 12, width: 'auto' }} value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
         </div>
-        {(filterTeamLeader || filterPaymentMethod || filterDateFrom || filterDateTo) && (
+        {(filterAdvisor !== 'me' || filterTeamLeader || filterPaymentMethod || filterDateFrom || filterDateTo) && (
           <button
             className="btn btn-secondary btn-sm"
             style={{ fontSize: 11 }}
-            onClick={() => { setFilterTeamLeader(''); setFilterPaymentMethod(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+            onClick={() => { setFilterAdvisor('me'); setFilterTeamLeader(''); setFilterPaymentMethod(''); setFilterDateFrom(''); setFilterDateTo(''); }}
           >
             Xóa lọc
           </button>
@@ -2205,6 +2275,49 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   useRepairOrderEventsSSE(handleOrderInfoSSE, isEdit);
 
   // Phieu da roi khoi trang thai cho sua ("waiting_repair"/"inprogress") o
+  // Khoa "dang mo phieu" cho chinh trang Chinh sua.
+  //
+  // Truoc day CHI man danh sach giu khoa (luc mo modal xem chi tiet), con bam
+  // "Chỉnh sửa" la NHA khoa roi moi dieu huong sang day - nen trong suot luc
+  // 1 CVDV ngoi sua, phieu hoan toan khong co khoa: nguoi thu 2 van vao sua
+  // duoc, va ai bam Luu sau thi de len ban cua nguoi kia. Sua ngay chinh la
+  // luc va cham nguy hiem nhat, khong phai luc xem.
+  //
+  // Nay trang nay tu chiem khoa khi mo, cu 20s gia han 1 lan (TTL ben BE la
+  // 60s, gap 3 lan chu ky) va nha khi roi trang.
+  const [khoaBoiNguoiKhac, setKhoaBoiNguoiKhac] = useState(null);
+  useEffect(() => {
+    if (!isEdit || !existingOrder?.id) return undefined;
+    const id = existingOrder.id;
+    let nhipGiaHan = null;
+    let dangGiu = false;
+    let daRoiTrang = false;
+
+    lockSettlementApi(id)
+      .then(() => {
+        // Roi trang trong luc dang cho API tra loi -> nha ngay, khong de lai
+        // khoa "ma" treo den het TTL.
+        if (daRoiTrang) {
+          unlockSettlementApi(id).catch(() => {});
+          return;
+        }
+        dangGiu = true;
+        nhipGiaHan = setInterval(() => { lockSettlementApi(id).catch(() => {}); }, 20000);
+      })
+      .catch((err) => {
+        if (daRoiTrang) return;
+        setKhoaBoiNguoiKhac(err.status === 409
+          ? (err.details?.lockedByName || 'người khác')
+          : (err.message || 'người khác'));
+      });
+
+    return () => {
+      daRoiTrang = true;
+      if (nhipGiaHan) clearInterval(nhipGiaHan);
+      if (dangGiu) unlockSettlementApi(id).catch(() => {});
+    };
+  }, [isEdit, existingOrder?.id]);
+
   // NOI KHAC (to truong hoan thanh lenh, hoac CVDV khac huy/xuat hoa don)
   // trong luc man Chinh sua nay van dang mo - khong the sua tiep duoc nua,
   // xem comment liveOrderInfo o tren. Vua luu thanh cong trong phien nay
@@ -2213,7 +2326,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     && liveOrderInfo.status !== 'waiting_repair' && liveOrderInfo.status !== 'inprogress';
   // khoa toan bo form lai, tranh go them ma khong con nut Luu nao de bam nua
   // (xem fieldset disabled ben duoi va nut trong Tong ket thanh toan).
-  const locked = Boolean(savedOrder) || closedElsewhere;
+  const locked = Boolean(savedOrder) || closedElsewhere || Boolean(khoaBoiNguoiKhac);
 
   // Lỗi lưu phiếu hiện giữa màn hình dạng mockup, tự ẩn sau ~4s (không cần
   // đóng tay) - thay cho banner cố định trên đầu trang như trước.
@@ -2270,20 +2383,21 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     const seq = ++catalogSearchSeq.current;
     const timer = setTimeout(async () => {
       try {
+        // Gói, dịch vụ lẻ và phụ tùng đều được khai báo riêng cho TỪNG đời xe
+        // (vd "Guốc phanh đỗ – Mazda CX-8 2.5 Luxury"), nên chỉ gợi ý thứ dùng
+        // được cho đúng chiếc xe đang lập phiếu — trước đây gõ "phanh" cho một
+        // chiếc CX-8 vẫn hiện guốc phanh của BT-50, CX-3, CX-5.
+        //
+        // Việc lọc nằm ở BE chứ không ở đây: danh sách bị cắt còn 10 dòng nên
+        // lọc phía FE thì 10 dòng lấy về có thể toàn của đời xe khác, đúng cái
+        // cần tìm thì đã bị cắt mất. Xe cũ chưa gán được đời (modelId rỗng) thì
+        // BE trả về đủ, không chặn cố vấn lập phiếu.
         if (lhsc === 'PT') {
-          const products = await searchProductsApi(term);
+          const products = await searchProductsApi(term, undefined, vehicleInfo.modelId);
           if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'product', products } }));
         } else {
-          const result = await searchCatalogApi(term);
-          // Gói bảo dưỡng được khai báo riêng cho TỪNG đời xe (72 gói = 12 đời
-          // x 6 cấp) nên chỉ gợi ý gói của đúng chiếc xe đang lập phiếu - trước
-          // đây hiện cả 72 gói nên chọn nhầm gói CX-5 cho xe Mazda2 vẫn lưu
-          // được. Xe cũ chưa gán được đời trong catalog (modelId rỗng) thì vẫn
-          // hiện đủ, không chặn cố vấn lập phiếu.
-          const packages = vehicleInfo.modelId
-            ? (result.packages || []).filter((p) => !p.modelId || String(p.modelId) === String(vehicleInfo.modelId))
-            : (result.packages || []);
-          if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'catalog', ...result, packages } }));
+          const result = await searchCatalogApi(term, vehicleInfo.modelId);
+          if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'catalog', ...result } }));
         }
       } catch {
         if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
@@ -2781,6 +2895,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // này ngay bên dưới (giống phiếu quyết toán thực tế - phụ tùng tiêu hao
   // liệt kê riêng bên dưới phần công việc), cùng 1 Loại hình sửa chữa.
   const selectCatalogService = (idx, svc) => {
+    // Dich vu nay DA nam trong goi bao duong dang co tren phieu -> chan han.
+    // Cong tho cua no da tinh trong gia goi roi; them lan nua chi lam phieu
+    // ghi "lam 2 lan" cung 1 viec, va tho khong biet phai lam may lan.
+    const trongGoi = items.find((it) => it.serviceId === svc.id && isChildRow(it));
+    if (trongGoi) {
+      const dauGoi = items.find((it) => it.groupId === trongGoi.groupId && it.isGroupParent);
+      toast.warning(`"${svc.name}" đã có sẵn trong ${dauGoi ? `gói "${dauGoi.description}"` : 'gói bảo dưỡng'} — không cần thêm lại`);
+      closeCatalogSuggestions(idx);
+      return;
+    }
     const repairCategory = svc.repairCategory || '';
     setItems((prev) => {
       // Dong nay truoc do da la dau nhom (vd doi sang dich vu khac) -> bo het
@@ -2792,11 +2916,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         return true;
       });
 
-      // Dich vu vua chon da TRUNG voi 1 dong co san o noi khac (vd dich vu con
-      // duoc goi lon tu dong chen kem truoc do) -> cong don +1 so luong vao
-      // dong do, mo khoa cho sua so luong tay, KHONG tao them dong/nhom moi
-      // (tranh liet ke trung lap cung 1 hang muc 2 lan).
-      const dupIdx = withoutCurrent.findIndex((it) => it.serviceId === svc.id);
+      // Dich vu vua chon da TRUNG voi 1 dong dich vu LE co san -> cong don +1
+      // so luong vao dong do, mo khoa cho sua so luong tay, KHONG tao them
+      // dong/nhom moi (tranh liet ke trung lap cung 1 hang muc 2 lan). Vd
+      // khach muon thay 2 lop cung loai.
+      //
+      // Dong con cua goi bao duong thi da bi chan o tren roi, khong xuong toi
+      // day - cong so luong o do la sai, khong phai la "lam 2 lan".
+      const dupIdx = withoutCurrent.findIndex((it) => it.serviceId === svc.id && !isChildRow(it));
       if (dupIdx !== -1) {
         const next = [...withoutCurrent];
         const target = next[dupIdx];
@@ -2934,6 +3061,57 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
   const totals = calcTotals(items);
   const signatureDate = new Date();
+
+  // Cong-to-met ve nguyen tac chi tang. Bao NGAY luc go chu khong doi den luc
+  // bam Luu: CVDV go xong o nay con dien tiep ca form dai ben duoi, den luc
+  // luu moi bao thi phai cuon nguoc len tim, va thuong la da quen so dung.
+  //
+  // handleSave VAN kiem lai - day chi la canh bao som, khong phai cai chan.
+  // Khung "Thong tin khach hang va xe" co the dang thu gon, va o nhap thi nam
+  // tit tren dau trang. Bao loi ma khong den duoc o do thi bao lam gi - nen mo
+  // lai khung, cuon toi va focus thang vao o.
+  const kmInputRef = useRef(null);
+  const nhayToiOKm = () => {
+    setOpenSections((s) => ({ ...s, customer: true }));
+    // doi React mo khung xong roi moi cuon, khong thi o van dang display:none
+    setTimeout(() => {
+      kmInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      kmInputRef.current?.focus();
+    }, 0);
+  };
+
+  const kmLoi = (() => {
+    const { currentKm, lastKnownKm } = vehicleInfo;
+    if (currentKm === '' || currentKm == null) return '';
+    const km = Number(currentKm);
+    if (Number.isNaN(km)) return 'Số km phải là số.';
+    if (km < 0) return 'Số km không được là số âm.';
+    if (lastKnownKm != null && km < Number(lastKnownKm)) {
+      return `Nhỏ hơn lần ghi nhận gần nhất (${Number(lastKnownKm).toLocaleString('vi-VN')} km). `
+        + 'Công-tơ-mét chỉ tăng — kiểm tra lại số vừa nhập.';
+    }
+    return '';
+  })();
+
+  // Roi khoi o ma so km van sai: bao ro 1 lan roi XOA so vua go va tra con
+  // tro ve chinh o do. Khong de lai so sai trong form - de lai thi CVDV dien
+  // tiep phan duoi, luc quay lai khong con nho la so nay chua sua.
+  //
+  // Xoa xong thi o rong -> kmLoi ve rong -> lan blur sau khong ban lai thong
+  // bao nua, nen khong co vong lap focus/blur.
+  const kiemTraKmKhiRoiO = () => {
+    if (!kmLoi) return;
+    const truoc = vehicleInfo.lastKnownKm;
+    toast.error(
+      truoc != null
+        ? `Số km vừa nhập nhỏ hơn lần trước (${Number(truoc).toLocaleString('vi-VN')} km). Vui lòng nhập lại.`
+        : 'Số km vừa nhập không hợp lệ. Vui lòng nhập lại.',
+      3000
+    );
+    vInfoSet('currentKm', '');
+    // Doi trinh duyet chuyen focus xong roi moi doi lai, khong thi bi no ghi de.
+    setTimeout(() => kmInputRef.current?.focus(), 0);
+  };
 
   // Neu chon tu goi y tra cuu (co id that trong DB) thi luon du dieu kien Luu.
   // Neu KHONG chon tu tra cuu (khach hang/xe hoan toan moi, chi luc TAO phieu
@@ -3086,9 +3264,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
       {locked && (
         <div style={{ background: '#FFF7E6', border: '1px solid #FFE0A3', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#8A6100' }}>
-          {closedElsewhere
-            ? 'Lệnh sửa chữa của phiếu này vừa hoàn thành (hoặc phiếu đã bị hủy/xuất hóa đơn) - không thể chỉnh sửa nữa. Vui lòng quay lại danh sách.'
-            : 'Phiếu đã lưu - đang ở chế độ chỉ xem. Bấm "Chỉnh sửa lại phiếu" nếu muốn sửa thêm.'}
+          {khoaBoiNguoiKhac
+            ? `Phiếu đang được ${khoaBoiNguoiKhac} mở - chỉ xem, không sửa được. Đợi họ đóng phiếu rồi vào lại.`
+            : (closedElsewhere
+              ? 'Lệnh sửa chữa của phiếu này vừa hoàn thành (hoặc phiếu đã bị hủy/xuất hóa đơn) - không thể chỉnh sửa nữa. Vui lòng quay lại danh sách.'
+              : 'Phiếu đã lưu - đang ở chế độ chỉ xem. Bấm "Chỉnh sửa lại phiếu" nếu muốn sửa thêm.')}
         </div>
       )}
 
@@ -3356,7 +3536,18 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       </span>
                     )}
                   </label>
-                  <input className="form-input" type="number" min={vehicleInfo.lastKnownKm || 0} value={vehicleInfo.currentKm} onChange={(e) => vInfoSet('currentKm', e.target.value)} />
+                  <input
+                    className="form-input"
+                    type="number"
+                    min={vehicleInfo.lastKnownKm || 0}
+                    value={vehicleInfo.currentKm}
+                    ref={kmInputRef}
+                    aria-invalid={Boolean(kmLoi)}
+                    style={kmLoi ? { borderColor: 'var(--red)' } : undefined}
+                    onChange={(e) => vInfoSet('currentKm', e.target.value)}
+                    onBlur={kiemTraKmKhiRoiO}
+                  />
+                  {kmLoi && <div className="form-error" style={{ marginTop: 4 }}>{kmLoi}</div>}
                 </div>
               </div>
               {(() => {
@@ -3613,9 +3804,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                           {(item.total || 0).toLocaleString('vi-VN')}
                           {exemptionShortLabel(item) ? (
-                            <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>
+                            <span style={{ fontWeight: 400, color: laDongDaThayDoi(item) ? 'var(--red)' : 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>
                           ) : isQuantityReturned(item) && (
-                            <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> (Khách hoàn trả hàng SL x {item.originalQty - item.qty})</span>
+                            <span style={{ fontWeight: 400, color: 'var(--red)' }}> (Khách hoàn trả hàng SL x {item.originalQty - item.qty})</span>
                           )}
                         </td>
                         <td>
@@ -3768,6 +3959,19 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   : 'Vui lòng nhập đủ tên khách hàng, số điện thoại, biển số xe, hãng xe và tên xe để có thể lưu.'}
               </div>
             )}
+            {/* Nut Luu bi khoa thi phai noi ro vi sao, khong thi CVDV tuong
+                trang hong roi ngoi bam mai. */}
+            {Boolean(kmLoi) && !closedElsewhere && (
+              <button type="button" onClick={nhayToiOKm}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left', marginBottom: 8,
+                  padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                  background: '#FEF2F2', border: '1px solid var(--red)',
+                  fontSize: 12, color: 'var(--red)', fontWeight: 600, fontFamily: 'inherit',
+                }}>
+                Chưa lưu được: số km hiện tại chưa hợp lệ — bấm vào đây để nhập lại.
+              </button>
+            )}
 
             {closedElsewhere ? (
               <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}
@@ -3788,7 +3992,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             ) : (
               <>
                 <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
-                  disabled={!canSave || saving || locked || (!isEdit && signatureEmpty)}
+                  disabled={!canSave || saving || locked || Boolean(kmLoi) || (!isEdit && signatureEmpty)}
+                  title={kmLoi ? 'Số km hiện tại chưa hợp lệ — sửa lại rồi mới lưu được' : undefined}
                   onClick={handleSave}>
                   {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
                 </button>
