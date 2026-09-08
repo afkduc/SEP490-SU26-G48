@@ -300,6 +300,10 @@
   justify-content: space-between;
   gap: 8px;
 }
+.tld-bay-status-card__header .badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 /* Nut thu gon 1 khoang - tam giac nho nam sat ben trai so khoang. */
 .tld-bay-collapse {
@@ -328,6 +332,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* min-width:0 moi cho phep flex item nay co nho hon noi dung cua no - thieu
+     dong nay thi no khong chiu co, va cai bi be dong lai la "Khoang 1". */
+  flex: 1;
+  min-width: 0;
 }
 /* Khoang dang cho chinh to truong quyet - phai bat mat ngay tren thanh thu
    gon, khong thi ho phai mo tung khoang ra moi biet. */
@@ -347,6 +355,11 @@
   font-size: 16px;
   font-weight: 800;
   color: var(--primary-dark);
+  /* "Khoang" va so khoang phai luon o cung 1 dong, tren moi kich thuoc man.
+     Khong cho co lai (flex item mac dinh co the co den min-content = be chu
+     xuong dong) - phan phai nhuong cho la ten khach o ben canh. */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tld-bay-status-card__code {
