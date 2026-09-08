@@ -1,0 +1,78 @@
+name: Báo lỗi (Bug)
+description: Ghi nhận một lỗi gặp trong quá trình làm dự án — code hoặc tài liệu
+title: "[BE|FE|Landing|Docs] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Điền đủ các mục bên dưới. Một bug ghi rõ **các bước tái hiện** và
+        **kết quả mong đợi vs thực tế** thì người khác mở lên là dựng lại được
+        ngay, không phải đi hỏi lại.
+
+  - type: input
+    id: moi-truong
+    attributes:
+      label: Môi trường
+      description: Nhánh, vai trò đăng nhập, màn hình/thiết bị nếu là lỗi giao diện.
+      placeholder: BE dev + FE CRM, tài khoản tổ trưởng, Chrome 1920x1080
+    validations:
+      required: true
+
+  - type: textarea
+    id: cac-buoc
+    attributes:
+      label: Các bước tái hiện
+      description: Đánh số từng bước, cụ thể tới mức người khác làm theo là ra lỗi.
+      placeholder: |
+        1. Đăng nhập cố vấn dịch vụ, mở màn Phiếu quyết toán
+        2. Tạo phiếu mới, chọn khách hàng + xe
+        3. Thêm gói bảo dưỡng Cấp 1
+    validations:
+      required: true
+
+  - type: textarea
+    id: mong-doi
+    attributes:
+      label: Kết quả mong đợi
+      placeholder: Bảng hiện đủ 30 đầu mục, cột Mã số đọc được.
+    validations:
+      required: true
+
+  - type: textarea
+    id: thuc-te
+    attributes:
+      label: Kết quả thực tế
+      description: Kèm ảnh chụp màn hình hoặc log lỗi nếu có (kéo thả ảnh vào ô này).
+      placeholder: Cột Mã số bị co lại còn một nửa, mã phụ tùng bị cắt.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: muc-do
+    attributes:
+      label: Mức độ nghiêm trọng
+      options:
+        - "critical — sai tiền / mất dữ liệu / chặn nghiệp vụ chính"
+        - "major — sai chức năng, có đường vòng nhưng ảnh hưởng người dùng"
+        - "minor — giao diện, trải nghiệm, không sai nghiệp vụ"
+    validations:
+      required: true
+
+  - type: textarea
+    id: nguyen-nhan
+    attributes:
+      label: Nguyên nhân gốc
+      description: |
+        Điền khi đã tìm ra. Ghi rõ file:dòng nếu biết — đây là phần cho thấy
+        đã thực sự truy ra lỗi chứ không chỉ ghi triệu chứng.
+      placeholder: |
+        RepairSettlementRepositoryImpl.findById dùng danh sách cột tường minh
+        nên không lấy cột check_result mới thêm.
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        **Sửa xong thì:** ghi `Fixes #<số issue>` vào commit message — GitHub sẽ
+        tự đóng issue và gắn link tới commit đã sửa, khỏi phải đóng tay.
