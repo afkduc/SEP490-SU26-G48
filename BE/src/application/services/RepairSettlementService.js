@@ -127,6 +127,11 @@ class RepairSettlementService {
     this.customerRepository = customerRepository;
   }
 
+  async getBranchAdvisors(branchId) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    return this.repairSettlementRepository.findBranchAdvisors(branchId);
+  }
+
   async getAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page, limit } = {}) {
     const [items, total] = await Promise.all([
       this.repairSettlementRepository.findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page, limit }),

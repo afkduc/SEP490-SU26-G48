@@ -10,6 +10,18 @@ class RepairSettlementController {
     this.notificationService = new NotificationService();
   }
 
+  // Danh sach co van dich vu cua CHINH chi nhanh nguoi dang dang nhap -
+  // branchId lay tu token, khong nhan tu query, nen khong xem sang chi nhanh
+  // khac duoc.
+  getBranchAdvisors = async (req, res, next) => {
+    try {
+      const items = await this.repairSettlementService.getBranchAdvisors(req.user.branchId);
+      return success(res, items, 'Branch advisors retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getAll = async (req, res, next) => {
     try {
       const { status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 20, scope } = req.query;

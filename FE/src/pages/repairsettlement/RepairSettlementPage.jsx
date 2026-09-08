@@ -21,6 +21,7 @@ import {
   updateRepairSettlementStatusApi,
   logRepairSettlementPrintApi,
   createPayosPaymentLinkApi,
+  listBranchAdvisorsApi,
   lockSettlementApi,
   unlockSettlementApi,
   getSettlementActivityLogApi,
@@ -1402,6 +1403,13 @@ function RepairSettlementList() {
   // gioi han trong chi nhanh cua nguoi dang dang nhap (branchId lay tu token,
   // khong nhan tu client), nen khong co duong nao loc sang chi nhanh khac.
   const [filterAdvisor, setFilterAdvisor] = useState('me');
+  // Lay theo VAI TRO tu BE, khong suy tu cac phieu da tai ve: suy tu phieu thi
+  // ai bi gan nham vao o co van cung hien ra (dang co 1 to truong nam trong
+  // do), va co van moi chua lam phieu nao thi lai khong hien.
+  const [advisorOptions, setAdvisorOptions] = useState([]);
+  useEffect(() => {
+    listBranchAdvisorsApi().then(setAdvisorOptions).catch(() => setAdvisorOptions([]));
+  }, []);
   const [filterTeamLeader, setFilterTeamLeader] = useState('');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -1528,9 +1536,7 @@ function RepairSettlementList() {
   // Danh sach Tổ trưởng duy nhat tu chinh du lieu dang co, cho dropdown loc -
   // khong goi API rieng, tranh phai dong bo them 1 nguon du lieu khac.
   const teamLeaderOptions = [...new Set(orders.map((o) => o.teamLeader).filter(Boolean))].sort();
-  const advisorOptions = [...new Map(
-    orders.filter((o) => o.advisorId != null).map((o) => [String(o.advisorId), o.advisor || '(không rõ tên)'])
-  )].sort((a, b) => a[1].localeCompare(b[1], 'vi'));
+
 
   const filtered = orders.filter((o) => {
     if (displayStatus(o) !== tab) return false;
@@ -1670,8 +1676,12 @@ function RepairSettlementList() {
           <option value="me">Phiếu của tôi</option>
           <option value="all">Tất cả cố vấn</option>
           {advisorOptions
-            .filter(([id]) => String(id) !== String(user?.id))
-            .map(([id, ten]) => <option key={id} value={id}>{ten}</option>)}
+            .filter((cv) => String(cv.id) !== String(user?.id))
+            .map((cv) => (
+              <option key={cv.id} value={cv.id}>
+                {cv.phone ? `${cv.name} — ${cv.phone}` : cv.name}
+              </option>
+            ))}
         </select>
         <select className="form-select" style={{ fontSize: 12, width: 'auto', minWidth: 160 }}
           value={filterTeamLeader} onChange={(e) => setFilterTeamLeader(e.target.value)}>

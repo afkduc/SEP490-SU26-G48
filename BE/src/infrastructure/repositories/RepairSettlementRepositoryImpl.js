@@ -156,6 +156,26 @@ function buildConditions({ branchId, status, search, customerId, vehicleId, from
 }
 
 class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
+  // Co van dich vu cua 1 chi nhanh - cho o loc "theo co van" tren man danh
+  // sach. Lay tu VAI TRO chu khong suy tu cac phieu da co: suy tu phieu thi
+  // ai bi gan nham vao advisor_id cung hien ra (tren DB that dang co 1 to
+  // truong nam trong do), va co van moi chua lam phieu nao thi lai khong hien.
+  //
+  // Kem so dien thoai de phan biet 2 nguoi trung ten.
+  async findBranchAdvisors(branchId) {
+    const result = await query(
+      `SELECT u.id, u.user_name, u.phone
+       FROM   users u
+       JOIN   user_role ur ON ur.user_id = u.id
+       JOIN   roles r      ON r.id = ur.role_id
+       WHERE  r.role_name = 'service_advisor'
+         AND  u.branch_id = @branchId AND u.status = 'active'
+       ORDER  BY u.user_name`,
+      { branchId: Number(branchId) }
+    );
+    return result.recordset.map((r) => ({ id: r.id, name: r.user_name, phone: r.phone || null }));
+  }
+
   async findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
     const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId });

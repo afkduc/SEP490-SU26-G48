@@ -15,6 +15,8 @@ function buildRepairSettlementRouter() {
   router.use(authenticate, trackActivity);
   router.get('/', controller.getAll);
   router.get('/check-duplicate', controller.checkDuplicate);
+  // PHAI dat truoc '/:id' - khong thi Express khop "advisors" vao :id.
+  router.get('/advisors', controller.getBranchAdvisors);
   router.get('/:id', controller.getById);
   router.post('/', controller.create);
   router.put('/:id', controller.update);
