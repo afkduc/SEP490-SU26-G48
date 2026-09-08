@@ -3418,6 +3418,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             <table className="data-table">
               <thead>
                 <tr>
+                  {/* Cot rieng cho nut thu gon goi - de chung o "Mã số" thi
+                      o do bi bop lai chi con 1 nua, doc khong ra ma. */}
+                  <th style={{ width: 26, padding: 0 }}></th>
                   <th style={{ width: 110 }}>Mã số</th>
                   <th style={{ minWidth: 260 }}>Nội dung công việc</th>
                   <th style={{ width: 180 }}>Loại hình sửa chữa</th>
@@ -3440,6 +3443,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   const partSubtotal = partRows.reduce((s, { item }) => s + (item.total || 0), 0);
                   // Tinh tien TRUOC roi moi loc dong an di - thu gon goi khong
                   // duoc lam thay doi tong tien.
+                  //
+                  // CHI thu gon phan "Công việc cần thực hiện" (30+ dau muc
+                  // kiem tra la thu lam bang dai ngoang). Phu tung luon hien
+                  // day du - do la phan khach nhin vao de doi chieu tien, an
+                  // di thi phieu trong nhu chua co gi.
                   const hienThi = ({ item }) => !(isChildRow(item) && collapsedGroups.has(item.groupId));
 
                   const renderRow = ({ item, idx }) => {
@@ -3453,24 +3461,23 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                     );
                     return (
                       <tr key={idx} style={{ background: rowColorForGroup(item.groupId) }}>
-                        <td>
-                          {/* Dong dau goi co nut thu gon 30+ dong con lai cho
-                              bang de nhin. Chi an dong, tien khong doi. */}
-                          {isPackageHeadRow(item) ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <button type="button"
-                                onClick={() => toggleGroup(item.groupId)}
-                                title={collapsedGroups.has(item.groupId) ? 'Xem các đầu mục trong gói' : 'Thu gọn các đầu mục trong gói'}
-                                style={{
-                                  border: 'none', background: 'none', cursor: 'pointer', padding: 0,
-                                  fontSize: 10, color: 'var(--gray-600)', width: 14, flexShrink: 0,
-                                  transform: collapsedGroups.has(item.groupId) ? 'none' : 'rotate(90deg)',
-                                }}>▶</button>
-                              <input className="form-input" style={{ fontSize: 11, fontFamily: 'monospace', background: 'transparent' }} value={item.code || ''} readOnly />
-                            </div>
-                          ) : (
-                            <input className="form-input" style={{ fontSize: 11, fontFamily: 'monospace', background: 'transparent' }} value={item.code || ''} readOnly />
+                        {/* O rieng cho nut thu gon 30+ dau muc cong viec cua
+                            goi. Chi an dong tren bang, tien khong doi. */}
+                        <td style={{ padding: 0, textAlign: 'center' }}>
+                          {isPackageHeadRow(item) && (
+                            <button type="button"
+                              onClick={() => toggleGroup(item.groupId)}
+                              title={collapsedGroups.has(item.groupId) ? 'Xem các đầu mục công việc trong gói' : 'Thu gọn các đầu mục công việc trong gói'}
+                              style={{
+                                border: 'none', background: 'none', cursor: 'pointer', padding: 0,
+                                fontSize: 10, color: 'var(--gray-600)', lineHeight: 1,
+                                display: 'inline-block',
+                                transform: collapsedGroups.has(item.groupId) ? 'none' : 'rotate(90deg)',
+                              }}>▶</button>
                           )}
+                        </td>
+                        <td>
+                          <input className="form-input" style={{ fontSize: 11, fontFamily: 'monospace', background: 'transparent' }} value={item.code || ''} readOnly />
                         </td>
                         <td style={{ position: 'relative' }}>
                           <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.description} disabled={!canSave} readOnly={isChild}
@@ -3483,7 +3490,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                               mục con của gói bảo dưỡng mới có. */}
                           {isPackageHeadRow(item) && collapsedGroups.has(item.groupId) && (
                             <div style={{ fontSize: 10.5, color: 'var(--gray-600)', padding: '1px 8px 2px', fontStyle: 'italic' }}>
-                              {items.filter((it) => it.groupId === item.groupId && !it.isGroupParent).length} đầu mục đang thu gọn
+                              {items.filter((it) => it.groupId === item.groupId && !it.isGroupParent && it.lhsc !== 'PT').length} đầu mục công việc đang thu gọn
                             </div>
                           )}
                           {actionLabel(item.actionCode) && (
@@ -3631,12 +3638,13 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   return (
                     <>
                       <tr>
+                        <td style={{ background: 'var(--gray-200)', padding: 0 }}></td>
                         <td style={{ background: 'var(--gray-200)' }}></td>
                         <td colSpan={10} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>CÔNG VIỆC CẦN THỰC HIỆN</td>
                       </tr>
                       {laborRows.filter(hienThi).map(renderRow)}
                       <tr>
-                        <td colSpan={8} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                        <td colSpan={9} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
                         <td style={{ fontWeight: 700 }}>{laborSubtotal.toLocaleString('vi-VN')}</td>
                         <td></td>
                         <td></td>
@@ -3645,12 +3653,13 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       {partRows.length > 0 && (
                         <>
                           <tr>
+                            <td style={{ background: 'var(--gray-200)', padding: 0 }}></td>
                             <td style={{ background: 'var(--gray-200)' }}></td>
                             <td colSpan={10} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>PHỤ TÙNG, VẬT TƯ</td>
                           </tr>
-                          {partRows.filter(hienThi).map(renderRow)}
+                          {partRows.map(renderRow)}
                           <tr>
-                            <td colSpan={8} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                            <td colSpan={9} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
                             <td style={{ fontWeight: 700 }}>{partSubtotal.toLocaleString('vi-VN')}</td>
                             <td></td>
                             <td></td>
