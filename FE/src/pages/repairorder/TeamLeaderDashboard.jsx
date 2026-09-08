@@ -21,6 +21,7 @@ import {
   confirmRepairOrderCompleteApi,
   reopenRepairOrderTaskApi,
   forwardNgTaskApi,
+  resolveNgTaskApi,
 } from '../../services/repairOrderApi';
 import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
 import './TeamLeaderDashboard.css';
@@ -149,13 +150,19 @@ function TaskMeta({ t }) {
 // roi bao co van -> co van goi khach. Khoang xe khong noi thang duoc voi co
 // van, nen o day to truong luon la nguoi bam nut chuyen tiep.
 // Xem ensureNgDecision.js + RepairOrderService.forwardNgTask.
-function NgActionBox({ task, onForwardNg, forwardingTaskId }) {
-  if (task.checkResult !== 'NG') return null;
+function NgActionBox({ task, onForwardNg, onResolveNg, forwardingTaskId }) {
+  // 'resolved' da doi check_result ve 'OK' nen khong loc theo checkResult
+  // duoc nua - phai xet ca ngDecision.
+  if (task.checkResult !== 'NG' && task.ngDecision !== 'resolved') return null;
 
   if (task.ngDecision === 'reported') {
     return (
       <div className="tld-ng-box tld-ng-box--todo">
-        <div className="tld-ng-box__title">Thợ báo cần thay — chờ bạn chuyển cố vấn</div>
+        <div className="tld-ng-box__title">Thợ báo không đạt — chờ bạn quyết</div>
+        {/* 2 duong khac han nhau:
+            - Phai THAY phu tung = phat sinh tien -> bat buoc qua co van hoi khach.
+            - Chi can DIEU CHINH = da nam trong gia goi bao duong -> xuong lam
+              luon, khong co gi de hoi. */}
         <button
           type="button"
           className="btn btn-warning btn-sm"
@@ -163,8 +170,24 @@ function NgActionBox({ task, onForwardNg, forwardingTaskId }) {
           disabled={forwardingTaskId === task.id}
           onClick={() => onForwardNg(task)}
         >
-          {forwardingTaskId === task.id ? 'Đang gửi…' : 'Báo cố vấn dịch vụ'}
+          {forwardingTaskId === task.id ? 'Đang gửi…' : 'Cần thay — báo cố vấn dịch vụ'}
         </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          style={{ width: '100%', justifyContent: 'center' }}
+          disabled={forwardingTaskId === task.id}
+          onClick={() => onResolveNg(task)}
+        >
+          Xưởng xử lý được — không cần báo khách
+        </button>
+      </div>
+    );
+  }
+  if (task.ngDecision === 'resolved') {
+    return (
+      <div className="tld-ng-box tld-ng-box--ok">
+        Xưởng đã xử lý — không phát sinh chi phí{task.ngNote ? `: ${task.ngNote}` : ''}
       </div>
     );
   }
@@ -450,7 +473,7 @@ function AssignTechniciansModal({ order, onClose, onDone }) {
 // Xem (khong tick duoc) - tick that su dien ra tai man hinh cong khai cua
 // dung khoang do (Landing), o day chi phan anh lai realtime qua SSE
 // 'task-updated'/danh sach orders duoc nap lai.
-function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId, onForwardNg, forwardingTaskId }) {
+function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId, onForwardNg, onResolveNg, forwardingTaskId }) {
   const [intakeOrder, setIntakeOrder] = useState(null);
   // Goi bao duong bung ra 30+ dau muc, 3 khoang cung luc la phai cuon rat
   // lau moi xem het. Cho thu gon tung khoang lai - chi la trang thai hien
@@ -583,7 +606,7 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                               {task.note && <div className="tld-task__note">{task.note}</div>}
                             </div>
                           </label>
-                          <NgActionBox task={task} onForwardNg={(t) => onForwardNg(order, t)} forwardingTaskId={forwardingTaskId} />
+                          <NgActionBox task={task} onForwardNg={(t) => onForwardNg(order, t)} onResolveNg={(t) => onResolveNg(order, t)} forwardingTaskId={forwardingTaskId} />
                           </div>
                           );
                         })}
@@ -934,6 +957,38 @@ export default function TeamLeaderDashboard() {
     }
   };
 
+  // Xuong tu khac phuc, khong qua co van. Bat buoc ghi da lam gi vi dau muc
+  // dang tu "Không đạt" chuyen thanh "Đạt" tren ho so xe.
+  const handleResolveNg = async (order, task) => {
+    const moTa = await confirm({
+      title: 'Xưởng xử lý được — không cần báo khách',
+      message: `Đầu mục "${task.taskName}" sẽ chuyển thành Đạt và không báo cố vấn dịch vụ.`,
+      detail: (task.checkNote ? `Thợ ghi: ${task.checkNote}
+
+` : '')
+        + 'Chỉ dùng khi xử lý được trong phạm vi gói bảo dưỡng (điều chỉnh, vệ sinh, siết lại…). Nếu phải thay phụ tùng thì bấm "Cần thay — báo cố vấn dịch vụ".',
+      confirmText: 'Đã xử lý xong',
+      tone: 'warning',
+      input: {
+        label: 'Đã xử lý thế nào?',
+        placeholder: 'VD: siết lại ốc bắt giá đỡ, kiểm tra lại đạt',
+        required: true,
+      },
+    });
+    if (!moTa) return;
+    setForwardingTaskId(task.id);
+    setError('');
+    try {
+      await resolveNgTaskApi(order.id, task.id, moTa);
+      loadOrders();
+      loadBays();
+    } catch (err) {
+      setError(err.message || 'Không ghi nhận được kết quả xử lý');
+    } finally {
+      setForwardingTaskId(null);
+    }
+  };
+
   // To truong xac nhan lenh da xong sau khi khoang bao xong viec - day moi la
   // buoc lam phieu quyet toan ben CVDV chuyen "Chờ thanh toán" va giai phong
   // khoang, nen phai nap lai ca bays lan orders.
@@ -1033,7 +1088,7 @@ export default function TeamLeaderDashboard() {
         )
       )}
 
-      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} onConfirmComplete={handleConfirmComplete} confirmingId={confirmingId} onReopenTask={handleReopenTask} reopeningTaskId={reopeningTaskId} onForwardNg={handleForwardNg} forwardingTaskId={forwardingTaskId} />}
+      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} onConfirmComplete={handleConfirmComplete} confirmingId={confirmingId} onReopenTask={handleReopenTask} reopeningTaskId={reopeningTaskId} onForwardNg={handleForwardNg} onResolveNg={handleResolveNg} forwardingTaskId={forwardingTaskId} />}
 
       {activeTab === 'history' && <HistoryPanel orders={orders} />}
 

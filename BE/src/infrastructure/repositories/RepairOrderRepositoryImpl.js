@@ -2,6 +2,7 @@ const RepairOrderRepository = require('../../domain/repositories/RepairOrderRepo
 const RepairOrder = require('../../domain/entities/RepairOrder');
 const { query, sql, getPool } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const { NOW_VN_SQL } = require('../../utils/dateVN');
 const { buildDesiredTasks } = require('./repairOrderTaskBuilder');
 
 // Repository nay phuc vu goc nhin TO TRUONG / KHOANG XE tren cung bang
@@ -418,6 +419,40 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
        WHERE  id = @taskId AND repair_order_id = @repairOrderId
          AND  check_result = 'NG' AND ng_decision = 'reported'`,
       { taskId: Number(taskId), repairOrderId: Number(repairOrderId) }
+    );
+    return result.rowsAffected[0] > 0;
+  }
+
+  // To truong tu khac phuc luon 1 dau muc "Khong dat" ma KHONG phai hoi khach.
+  //
+  // Dau muc "I" cua bieu mau ghi "Kiem tra, DIEU CHINH hoac thay the neu can
+  // thiet" - nghia la phan dieu chinh da nam trong gia goi bao duong. Siet lai
+  // 1 con oc, chinh lai day curoa, chau them nuoc lam mat... thi khong phat
+  // sinh dong nao, khong co gi de hoi khach. Chi khi phai THAY PHU TUNG (them
+  // tien) moi bat buoc qua co van - xem forwardNgTask.
+  //
+  // check_result ve 'OK': sau khi dieu chinh thi dau muc dat that, cot KET QUA
+  // cua bieu mau phai ghi Dat. Nhung ng_note (to truong da lam gi) va
+  // check_note (ly do tho cham Khong dat) deu GIU LAI - khong duoc de mat dau
+  // vet la dau muc nay tung co van de.
+  //
+  // Chi nhan tu 'reported'. Da chuyen len co van ('pending') thi thoi, luc do
+  // co van co the dang goi khach roi - keo nguoc ve lam co van noi mot dang,
+  // xuong lam mot neo.
+  async resolveNgTask(repairOrderId, taskId, { note, userId }) {
+    const result = await query(
+      `UPDATE repair_order_tasks
+       SET    ng_decision = 'resolved', ng_note = @note,
+              ng_decided_by = @userId, ng_decided_at = ${NOW_VN_SQL},
+              check_result = 'OK'
+       WHERE  id = @taskId AND repair_order_id = @repairOrderId
+         AND  check_result = 'NG' AND ng_decision = 'reported'`,
+      {
+        taskId: Number(taskId),
+        repairOrderId: Number(repairOrderId),
+        note: note || null,
+        userId: Number(userId),
+      }
     );
     return result.rowsAffected[0] > 0;
   }

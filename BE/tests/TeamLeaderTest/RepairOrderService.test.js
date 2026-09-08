@@ -14,6 +14,7 @@ function mockRepo(overrides = {}) {
     setTechnicians: async () => true,
     reopenTask: async () => null,
     forwardNgTask: async () => true,
+    resolveNgTask: async () => true,
     updateStatus: async () => null,
     updateTaskStatus: async () => {},
     ...overrides,
@@ -553,4 +554,62 @@ test('confirmCompleted chan khi khach da dong y thay nhung tho chua thay xong', 
     () => service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 }),
     (err) => err.statusCode === 409 && /tất cả đầu mục/.test(err.message),
   );
+});
+
+// ─── To truong tu khac phuc, khong qua co van ──────────────────────────────
+// Dau muc "I" cua bieu mau la "Kiem tra, DIEU CHINH hoac thay the neu can
+// thiet" - phan dieu chinh nam trong gia goi. Siet lai 1 con oc thi xuong lam
+// luon, khong co gi de hoi khach.
+
+test('resolveNgTask doi dau muc thanh Dat va bat buoc ghi da lam gi', async () => {
+  let goiVoi = null;
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({ ...ngOrder }),
+      resolveNgTask: async (id, taskId, opts) => { goiVoi = { id, taskId, opts }; return true; },
+    }),
+  });
+  const dto = await service.resolveNgTask(70, 500, { note: '  siết lại ốc  ', branchId: 1, teamLeaderId: 8 });
+  assert.deepEqual([goiVoi.id, goiVoi.taskId], [70, 500]);
+  assert.equal(goiVoi.opts.note, 'siết lại ốc');
+  assert.equal(dto.id, 70);
+});
+
+test('resolveNgTask chan khi khong ghi da xu ly the nao', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({ findById: async () => ({ ...ngOrder }) }),
+  });
+  await assert.rejects(
+    () => service.resolveNgTask(70, 500, { note: '   ', branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 400 && /đã xử lý thế nào/.test(err.message),
+  );
+});
+
+// Da chuyen len co van thi thoi - luc do co van co the dang goi khach, keo
+// nguoc ve la co van noi mot dang xuong lam mot neo.
+test('resolveNgTask chan dau muc da bao len co van', async () => {
+  const daBao = { ...ngOrder, tasks: [{ ...ngOrder.tasks[0], ngDecision: 'pending' }] };
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({ findById: async () => daBao }),
+  });
+  await assert.rejects(
+    () => service.resolveNgTask(70, 500, { note: 'siết lại ốc', branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 409 && /đã báo cố vấn dịch vụ/.test(err.message),
+  );
+});
+
+// Xu ly tai xuong xong thi dong lenh duoc ngay - khong con gi cho ai ca.
+test('confirmCompleted khong bi chan boi dau muc da xu ly tai xuong', async () => {
+  const daXuLy = {
+    ...ngOrder,
+    tasks: [{ ...ngOrder.tasks[0], checkResult: 'OK', ngDecision: 'resolved', ngNote: 'siết lại ốc' }],
+  };
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => daXuLy,
+      updateStatus: async () => ({ ...daXuLy, status: 'completed' }),
+    }),
+  });
+  const dto = await service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 });
+  assert.equal(dto.status, 'completed');
 });

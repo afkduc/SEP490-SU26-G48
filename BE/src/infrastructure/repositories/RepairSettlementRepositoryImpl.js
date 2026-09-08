@@ -2,7 +2,7 @@ const RepairSettlementRepository = require('../../domain/repositories/RepairSett
 const RepairSettlement = require('../../domain/entities/RepairSettlement');
 const { query, sql } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
-const { nowVN } = require('../../utils/dateVN');
+const { nowVN, NOW_VN_SQL } = require('../../utils/dateVN');
 const { buildDesiredTasks, computeDesiredTasks, loadPackageServiceNames, packageCodesNeeding, PACKAGE_SERVICES_SQL } = require('./repairOrderTaskBuilder');
 const { calcTotalsFromItems } = require('../../utils/settlementTotals');
 
@@ -12,17 +12,6 @@ const { calcTotalsFromItems } = require('../../utils/settlementTotals');
 // duoc chiem lai (xem acquireLock ben duoi - PHAI dung chung 1 con so voi
 // CASE WHEN trong HEADER_SELECT de 2 noi tinh nhat quan).
 const LOCK_TTL_SECONDS = 60;
-
-// "Bay gio" theo DUNG quy uoc datetime cua du an: cot datetime luu SO GIO
-// VIET NAM tren truc UTC, doc lai bang .getUTCHours() (xem utils/dateVN.js).
-//
-// SYSUTCDATETIME() tra ve gio UTC THAT nen lech 7 tieng so voi moi cot con
-// lai - truoc day cot locked_at ghi bang ham do, khien man danh sach hien
-// "Đang mở: ... lúc 15:49" trong khi dong ho la 22:49.
-//
-// Viet Nam khong co DST nen +7 la hang so, va DATEADD tren SYSUTCDATETIME()
-// khong phu thuoc mui gio he dieu hanh cua may chu (khac GETDATE()).
-const NOW_VN_SQL = 'DATEADD(HOUR, 7, SYSUTCDATETIME())';
 
 // Cot join dung chung cho findAll/findById - lay du thong tin khach hang,
 // xe (kem ngay mua tu warranty_records), co van dich vu va to truong.

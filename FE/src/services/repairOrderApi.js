@@ -39,6 +39,13 @@ export async function forwardNgTaskApi(id, taskId) {
   return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/forward-ng`, {});
 }
 
+// To truong tu khac phuc luon 1 đầu mục "Không đạt" (điều chỉnh nằm trong
+// giá gói, không phát sinh tiền nên không phải hỏi khách): đầu mục chuyển
+// sang 'resolved' và kết quả kiểm tra đổi thành "Đạt". Bắt buộc ghi đã làm gì.
+export async function resolveNgTaskApi(id, taskId, note) {
+  return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/resolve-ng`, { note });
+}
+
 // Toan bo lenh sua chua cua to truong dang dang nhap (inprogress + hoan
 // thanh) - dung cho tab "Khoang xe cua toi" (loc inprogress) va "Lich su"
 // (loc completed) tren TeamLeaderDashboard.jsx.

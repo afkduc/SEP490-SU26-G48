@@ -340,6 +340,15 @@ function TaskProgressRow({ t, onDecideNg, decidingId }) {
             {t.isDone ? ' · đã thay xong' : ' · phụ tùng đã thêm vào phiếu, chờ thợ thay'}
           </div>
         )}
+        {/* Xuong tu khac phuc: ket qua da la "Đạt" nhung van phai noi ro
+            tung co van de, khong thi co van khong hieu vi sao lich su xe co
+            ghi chu cua tho ma ket qua lai Dat. */}
+        {t.ngDecision === 'resolved' && (
+          <div style={{ color: 'var(--gray-600)', fontWeight: 600, fontSize: 12 }}>
+            Thợ báo không đạt{t.checkNote ? ` (${t.checkNote})` : ''} — xưởng đã xử lý tại chỗ,
+            không phát sinh chi phí{t.ngNote ? `: ${t.ngNote}` : ''}
+          </div>
+        )}
         {t.ngDecision === 'declined' && (
           <div style={{ color: 'var(--gray-600)', fontWeight: 600, fontSize: 12 }}>
             Khách từ chối thay — {t.ngNote}

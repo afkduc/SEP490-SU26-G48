@@ -13,9 +13,15 @@ const { getPool } = require('./sqlServer');
 // ke ca viec bao can thay the (to truong la nguoi chiu trach nhiem ky thuat,
 // ho xac nhan dung la phai thay truoc khi co van goi bao gia cho khach):
 //   tho cham Khong dat             -> 'reported' (cho to truong xem lai)
-//   to truong bam "Báo cố vấn"     -> 'pending'  (cho co van hoi khach)
-//   co van goi khach, khach dong y -> 'accepted', phu tung tu chen vao phieu
-//   khach tu choi                  -> 'declined' + ng_note (bat buoc ghi ly do)
+//
+// Tu 'reported', to truong re 1 trong 2 huong:
+//   a) chi can DIEU CHINH (da nam trong gia goi) -> 'resolved' + ng_note,
+//      check_result doi luon thanh 'OK', khong lam phien khach
+//   b) phai THAY PHU TUNG (phat sinh tien) -> 'pending', chuyen co van hoi khach
+//        khach dong y -> 'accepted': phu tung tu chen vao phieu VA dau muc mo
+//                        lai (is_done=0) cho tho thay that roi tick xac nhan
+//        khach tu choi -> 'declined' + ng_note (bat buoc ghi ly do)
+//
 //   con 'reported' hoac 'pending'  -> to truong KHONG bam Hoan thanh duoc
 //
 // Dau muc bi tu choi van tinh tien CONG KIEM TRA - nhung cong do da nam trong

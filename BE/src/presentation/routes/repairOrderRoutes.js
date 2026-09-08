@@ -24,6 +24,7 @@ function buildRepairOrderRouter() {
   router.patch('/:id/technicians', controller.setTechnicians);
   router.patch('/:id/tasks/:taskId/reopen', controller.reopenTask);
   router.patch('/:id/tasks/:taskId/forward-ng', controller.forwardNgTask);
+  router.patch('/:id/tasks/:taskId/resolve-ng', controller.resolveNgTask);
   router.patch('/:id/confirm-complete', controller.confirmComplete);
 
   return router;

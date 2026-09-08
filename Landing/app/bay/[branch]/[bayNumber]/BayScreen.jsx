@@ -144,6 +144,13 @@ function TaskRow({ task, busy, onTaskDone }) {
             : "Khách đồng ý thay — phụ tùng đã thêm vào phiếu, thay xong thì tích ô bên trái"}
         </div>
       )}
+      {/* To truong xu ly luon, khong qua co van - ket qua da doi thanh Dat
+          nen khong loc theo checkResult duoc nua. */}
+      {task.ngDecision === "resolved" && (
+        <div className={styles.taskNgOk}>
+          Tổ trưởng đã xử lý tại xưởng{task.ngNote ? ` — ${task.ngNote}` : ""}
+        </div>
+      )}
       {task.checkResult === "NG" && task.ngDecision === "declined" && (
         <div className={styles.taskNgFlow}>
           Khách từ chối thay{task.ngNote ? ` — ${task.ngNote}` : ""}

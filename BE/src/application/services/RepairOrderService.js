@@ -234,6 +234,58 @@ class RepairOrderService {
     return RepairOrderResponseDto.fromEntity(entity);
   }
 
+  // To truong tu khac phuc luon, KHONG qua co van.
+  //
+  // Khong phai dau muc "Khong dat" nao cung la chuyen tien: dau muc "I" cua
+  // bieu mau ghi "Kiem tra, DIEU CHINH hoac thay the neu can thiet" - phan
+  // dieu chinh nam trong gia goi bao duong roi. Siet lai con oc, chinh day
+  // curoa, chau them nuoc lam mat thi xuong lam luon, khong co gi de hoi
+  // khach. Bat moi thu qua co van chi lam cham xe va lam phien khach.
+  //
+  // Bat buoc ghi da lam gi: dau muc dang tu "Khong dat" chuyen thanh "Đạt",
+  // phai co dau vet ai xu ly, xu ly ra sao. Neu khong, nut nay thanh cho de
+  // xoa mot phat het moi phat hien cua tho.
+  async resolveNgTask(id, taskId, { note, branchId, teamLeaderId } = {}) {
+    const moTa = String(note || '').trim();
+    if (!moTa) {
+      throw new ApiError(400, 'Phải ghi rõ đã xử lý thế nào để lưu vào hồ sơ xe');
+    }
+
+    const existing = await this.repairOrderRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
+    if (String(existing.branchId) !== String(branchId)) {
+      throw new ApiError(403, 'Không có quyền thao tác trên lệnh sửa chữa của chi nhánh khác');
+    }
+    if (String(existing.teamLeaderId) !== String(teamLeaderId)) {
+      throw new ApiError(403, 'Chỉ tổ trưởng được phân công lệnh này mới có quyền xử lý đầu mục');
+    }
+    if (existing.status === 'cancelled') throw cancelledOrderError(existing);
+    if (existing.status === 'completed') {
+      throw new ApiError(409, 'Lệnh đã kết thúc, không thể xử lý thêm đầu mục');
+    }
+
+    const task = existing.tasks.find((t) => String(t.id) === String(taskId));
+    if (!task) throw new ApiError(404, 'Không tìm thấy đầu mục công việc');
+    if (task.checkResult !== 'NG') {
+      throw new ApiError(400, 'Đầu mục này không bị đánh Không đạt');
+    }
+    // Da chuyen len co van thi thoi - luc nay co van co the dang goi khach.
+    // Muon xu ly tai xuong thi de co van chot voi khach cho xong da.
+    if (task.ngDecision !== 'reported') {
+      throw new ApiError(409, task.ngDecision === 'pending'
+        ? 'Đầu mục này đã báo cố vấn dịch vụ, chờ cố vấn chốt với khách đã'
+        : 'Đầu mục này đã có quyết định của khách, không tự xử lý được nữa');
+    }
+
+    const ok = await this.repairOrderRepository.resolveNgTask(id, taskId, { note: moTa, userId: teamLeaderId });
+    if (!ok) throw new ApiError(409, 'Đầu mục vừa đổi trạng thái, tải lại trang rồi thử lại');
+
+    emitRepairOrderEvent(branchId, 'task-updated', { orderId: Number(id), taskId: Number(taskId) });
+
+    const entity = await this.repairOrderRepository.findById(id);
+    return RepairOrderResponseDto.fromEntity(entity);
+  }
+
   // To truong bam "Hoan thanh" -> phieu quyet toan chuyen "Chờ thanh toán" va
   // khoang xe duoc giai phong. Chi to truong DUOC PHAN CONG lenh nay moi lam
   // duoc; dieu kien du dau muc da xong nam trong _assertCompletable.
