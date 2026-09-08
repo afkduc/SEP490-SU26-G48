@@ -44,6 +44,9 @@ class RepairSettlementResponseDto {
       paidDate: entity.paidAt ? toDDMMYYYYHHmm(entity.paidAt) : null,
       paymentMethod: entity.paymentMethod,
       advisor: entity.advisor?.name || null,
+      // Kem ID chu khong chi ten: bo loc "Phiếu của tôi" o man danh sach khop
+      // theo id, 2 co van trung ten thi loc theo ten se ra sai.
+      advisorId: entity.advisor?.id ?? entity.advisorId ?? null,
       advisorPhone: entity.advisor?.phone || null,
       branch: entity.branchName,
       customer: entity.customer,

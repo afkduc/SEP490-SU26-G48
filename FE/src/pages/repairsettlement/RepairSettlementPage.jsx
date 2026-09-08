@@ -1392,6 +1392,16 @@ function RepairSettlementList() {
   // ap dung moi tab (phieu nao chua co to truong se khong khop khi loc chon 1
   // ten cu the, dung nhu ky vong); hinh thuc thanh toan chi co y nghia o tab
   // "Đã xuất hóa đơn" nen chi hien dropdown do o dung tab nay.
+  //
+  // Bo loc theo co van dich vu. Mac dinh 'me' - mo phan mem len la thay viec
+  // CUA MINH truoc, khong phai loi ca chi nhanh ra roi tu tim. Van doi sang
+  // 'all' hoac 1 co van cu the duoc (vd truc thay ca, hoac xem giup dong
+  // nghiep dang nghi).
+  //
+  // Danh sach lay tu CHINH cac phieu da tai ve - ma phieu tai ve luon bi BE
+  // gioi han trong chi nhanh cua nguoi dang dang nhap (branchId lay tu token,
+  // khong nhan tu client), nen khong co duong nao loc sang chi nhanh khac.
+  const [filterAdvisor, setFilterAdvisor] = useState('me');
   const [filterTeamLeader, setFilterTeamLeader] = useState('');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -1497,17 +1507,30 @@ function RepairSettlementList() {
   };
   useRepairOrderEventsSSE(handleRepairOrderEvent, true);
 
+  // Bo loc co van ap cho CA so dem tren tab lan danh sach - neu chi ap cho
+  // danh sach thi tab ghi "Đang sửa chữa 2" trong khi ben duoi chi co 1 dong,
+  // nguoi dung tuong mat phieu.
+  const dungCoVan = (o) => {
+    if (filterAdvisor === 'me') return String(o.advisorId) === String(user?.id);
+    if (filterAdvisor === 'all') return true;
+    return String(o.advisorId) === filterAdvisor;
+  };
+  const theoCoVan = orders.filter(dungCoVan);
+
   const counts = {
-    waiting_repair: orders.filter((o) => displayStatus(o) === 'waiting_repair').length,
-    inprogress: orders.filter((o) => displayStatus(o) === 'inprogress').length,
-    waiting_payment: orders.filter((o) => o.status === 'waiting_payment').length,
-    invoiced: orders.filter((o) => o.status === 'invoiced').length,
-    cancelled: orders.filter((o) => o.status === 'cancelled').length,
+    waiting_repair: theoCoVan.filter((o) => displayStatus(o) === 'waiting_repair').length,
+    inprogress: theoCoVan.filter((o) => displayStatus(o) === 'inprogress').length,
+    waiting_payment: theoCoVan.filter((o) => o.status === 'waiting_payment').length,
+    invoiced: theoCoVan.filter((o) => o.status === 'invoiced').length,
+    cancelled: theoCoVan.filter((o) => o.status === 'cancelled').length,
   };
 
   // Danh sach Tổ trưởng duy nhat tu chinh du lieu dang co, cho dropdown loc -
   // khong goi API rieng, tranh phai dong bo them 1 nguon du lieu khac.
   const teamLeaderOptions = [...new Set(orders.map((o) => o.teamLeader).filter(Boolean))].sort();
+  const advisorOptions = [...new Map(
+    orders.filter((o) => o.advisorId != null).map((o) => [String(o.advisorId), o.advisor || '(không rõ tên)'])
+  )].sort((a, b) => a[1].localeCompare(b[1], 'vi'));
 
   const filtered = orders.filter((o) => {
     if (displayStatus(o) !== tab) return false;
@@ -1518,6 +1541,7 @@ function RepairSettlementList() {
         || (o.vehicle?.licensePlate || '').toLowerCase().includes(s);
       if (!matches) return false;
     }
+    if (!dungCoVan(o)) return false;
     if (filterTeamLeader && o.teamLeader !== filterTeamLeader) return false;
     if (tab === 'invoiced' && filterPaymentMethod && o.paymentMethod !== filterPaymentMethod) return false;
     const orderDate = toComparableDate(o.date);
@@ -1534,7 +1558,7 @@ function RepairSettlementList() {
   const pageSafe = Math.min(page, totalPages);
   const paginated = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
-  useEffect(() => { setPage(1); }, [tab, search, filterTeamLeader, filterPaymentMethod, filterDateFrom, filterDateTo]);
+  useEffect(() => { setPage(1); }, [tab, search, filterAdvisor, filterTeamLeader, filterPaymentMethod, filterDateFrom, filterDateTo]);
 
   // Danh sach chi tra ve thong tin tom tat (khong co items - de tranh phai
   // gop them bang repair_order_items cho tung dong khi hien thi danh sach) -
@@ -1640,6 +1664,15 @@ function RepairSettlementList() {
 
       {/* Bo loc bo sung - tat ca AND voi nhau va voi o Search/tab o tren (loc kep). */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select className="form-select" style={{ fontSize: 12, width: 'auto', minWidth: 180 }}
+          value={filterAdvisor} onChange={(e) => setFilterAdvisor(e.target.value)}
+          title="Lọc theo cố vấn dịch vụ phụ trách phiếu (trong cùng chi nhánh)">
+          <option value="me">Phiếu của tôi</option>
+          <option value="all">Tất cả cố vấn</option>
+          {advisorOptions
+            .filter(([id]) => String(id) !== String(user?.id))
+            .map(([id, ten]) => <option key={id} value={id}>{ten}</option>)}
+        </select>
         <select className="form-select" style={{ fontSize: 12, width: 'auto', minWidth: 160 }}
           value={filterTeamLeader} onChange={(e) => setFilterTeamLeader(e.target.value)}>
           <option value="">Tất cả Tổ trưởng</option>
@@ -1659,11 +1692,11 @@ function RepairSettlementList() {
           <span>đến</span>
           <input className="form-input" type="date" style={{ fontSize: 12, width: 'auto' }} value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
         </div>
-        {(filterTeamLeader || filterPaymentMethod || filterDateFrom || filterDateTo) && (
+        {(filterAdvisor !== 'me' || filterTeamLeader || filterPaymentMethod || filterDateFrom || filterDateTo) && (
           <button
             className="btn btn-secondary btn-sm"
             style={{ fontSize: 11 }}
-            onClick={() => { setFilterTeamLeader(''); setFilterPaymentMethod(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+            onClick={() => { setFilterAdvisor('me'); setFilterTeamLeader(''); setFilterPaymentMethod(''); setFilterDateFrom(''); setFilterDateTo(''); }}
           >
             Xóa lọc
           </button>
