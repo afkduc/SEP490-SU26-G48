@@ -8,7 +8,7 @@ const VALID_STATUSES = ['active', 'inactive'];
 // Phai giu dong bo voi REPAIR_CATEGORY_VALUES trong RepairSettlementService.js -
 // khai bao san Loai hinh sua chua cho dich vu/goi tai day de man tao phieu
 // quyet toan tu dong dien theo, khong phai chon tay tung lan.
-const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
+const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS'];
 
 let vehicleBayRepository = null;
 function getVehicleBayRepository() {

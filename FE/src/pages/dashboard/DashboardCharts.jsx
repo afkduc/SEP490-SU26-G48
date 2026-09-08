@@ -27,13 +27,14 @@ export const PARTS_HUE = '#94a3b8';
 // Loai hinh sua chua THAT (repair_order_items.repair_category) - khop voi
 // REPAIR_CATEGORY_OPTIONS trong RepairSettlementPage.jsx. Tai su dung bang mau
 // CATEGORY_HUES da validate; "Khac" dung mau xam trung tinh nhu PARTS_HUE.
-export const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'OTHER'];
+export const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS', 'OTHER'];
 export const REPAIR_CATEGORY_LABELS = {
   ER: 'Sửa chữa động cơ',
   CB: 'Sửa chữa gầm',
   EE: 'Sửa chữa điện - điện tử',
   BP: 'Đồng sơn',
   PM: 'Bảo dưỡng định kỳ',
+  CS: 'Chăm sóc xe',
   OTHER: 'Khác',
 };
 export const REPAIR_CATEGORY_HUES = {
@@ -42,6 +43,7 @@ export const REPAIR_CATEGORY_HUES = {
   EE: CATEGORY_HUES[2],
   BP: CATEGORY_HUES[3],
   PM: CATEGORY_HUES[4],
+  CS: CATEGORY_HUES[5],
   OTHER: PARTS_HUE,
 };
 

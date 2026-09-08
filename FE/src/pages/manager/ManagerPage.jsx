@@ -1195,6 +1195,7 @@ const REPAIR_CATEGORY_OPTIONS = [
   { value: 'EE', label: 'Sửa chữa điện - điện tử' },
   { value: 'BP', label: 'Đồng sơn' },
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
+  { value: 'CS', label: 'Chăm sóc xe' },
 ];
 
 function repairCategoryLabel(code) {
@@ -1596,7 +1597,7 @@ function ServicePackageDetailModal({ pkg, onClose }) {
           </div>
           <div className="table-wrapper">
             <table className="data-table">
-              <thead><tr><th>Mã DV</th><th>Tên dịch vụ</th><th>Hành động</th><th>Phụ tùng thay thế</th><th>Đơn giá</th><th>Trạng thái</th></tr></thead>
+              <thead><tr><th>Mã DV</th><th>Tên dịch vụ</th><th>Loại hình</th><th>Hành động</th><th>Phụ tùng thay thế</th><th>Đơn giá</th><th>Trạng thái</th></tr></thead>
               <tbody>
                 {(pkg.services || []).map((s) => {
                   const svcBadge = activeBadge(s.isActive);
@@ -1605,6 +1606,12 @@ function ServicePackageDetailModal({ pkg, onClose }) {
                     <tr key={s.id}>
                       <td style={{ fontFamily: 'monospace' }}>{s.code}</td>
                       <td>{s.name}</td>
+                      {/* Trong ngu canh 1 goi bao duong, moi dich vu con deu hien
+                          THEO LOAI HINH CUA GOI (luon la "Bao duong dinh ky") -
+                          de nguoi dung biet dich vu nay dang nam trong goi BDDK,
+                          khac voi khi xem no o man "Dich vu le" (hien loai hinh
+                          THAT cua rieng dich vu do, vd "Dong son"). */}
+                      <td>{repairCategoryLabel(pkg.repairCategory)}</td>
                       <td><span className={`badge ${acBadge.className}`}>{acBadge.label}</span></td>
                       <td>
                         {s.actionCode === 'R'
