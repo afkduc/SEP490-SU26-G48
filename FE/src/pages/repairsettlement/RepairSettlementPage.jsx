@@ -51,6 +51,7 @@ const REPAIR_CATEGORY_OPTIONS = [
   { value: 'EE', label: 'Sửa chữa điện - điện tử' },
   { value: 'BP', label: 'Đồng sơn' },
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
+  { value: 'CS', label: 'Chăm sóc xe' },
 ];
 const REPAIR_CATEGORY_LABEL_BY_VALUE = Object.fromEntries(REPAIR_CATEGORY_OPTIONS.map((o) => [o.value, o.label]));
 // HTTT = nơi DUY NHẤT xác định ai trả tiền cho dòng này. "Hợp đồng bảo dưỡng"

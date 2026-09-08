@@ -37,7 +37,7 @@ const LHSC_VALUES = ['DV', 'PT'];
 const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB', 'HUY'];
 // REPAIR_CATEGORY = "Loai hinh sua chua" THAT (dung nhu thuc te tai dai ly xe -
 // khac voi LHSC o tren, vi LHSC da bi dung nham thanh "loai hang muc").
-const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
+const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS'];
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
 
 // Tinh lai toan bo tong tien tu CHINH danh sach hang muc - khong tin theo
