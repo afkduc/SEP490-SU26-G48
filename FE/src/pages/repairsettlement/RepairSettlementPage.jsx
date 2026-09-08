@@ -335,8 +335,9 @@ function TaskProgressRow({ t, onDecideNg, decidingId }) {
           </div>
         )}
         {t.ngDecision === 'accepted' && (
-          <div style={{ color: '#2E7D32', fontWeight: 600, fontSize: 12 }}>
-            Khách đồng ý thay{t.ngNote ? ` — ${t.ngNote}` : ''} · nhớ thêm phụ tùng vào phiếu
+          <div style={{ color: t.isDone ? '#2E7D32' : '#B45309', fontWeight: 600, fontSize: 12 }}>
+            Khách đồng ý thay{t.ngNote ? ` — ${t.ngNote}` : ''}
+            {t.isDone ? ' · đã thay xong' : ' · phụ tùng đã thêm vào phiếu, chờ thợ thay'}
           </div>
         )}
         {t.ngDecision === 'declined' && (
@@ -1262,7 +1263,7 @@ function RepairSettlementList() {
       const ok = await confirm({
         title: 'Khách đồng ý thay',
         message: `Khách đồng ý thay "${task.taskName}"?`,
-        detail: 'Hệ thống sẽ tự thêm phụ tùng của đầu mục này vào phiếu và tính lại tổng tiền.',
+        detail: 'Hệ thống sẽ tự thêm phụ tùng vào phiếu, tính lại tổng tiền, và mở lại đầu mục này để thợ thay.',
         confirmText: 'Khách đồng ý',
         tone: 'success',
       });
@@ -1278,7 +1279,7 @@ function RepairSettlementList() {
       const daThem = updated?.ngAddedParts || [];
       if (decision === 'accepted') {
         if (daThem.length > 0) {
-          toast.success(`Đã thêm vào phiếu: ${daThem.map((p) => `${p.name} (${p.quantity} ${p.unit || 'Cái'})`).join(', ')}`);
+          toast.success(`Đã thêm vào phiếu: ${daThem.map((p) => `${p.name} (${p.quantity} ${p.unit || 'Cái'})`).join(', ')}. Đầu mục đã mở lại để thợ thay.`);
         } else {
           // Dich vu khong khai dinh muc phu tung - co van phai tu them
           // tay, khong de im lang tuong la da xong.

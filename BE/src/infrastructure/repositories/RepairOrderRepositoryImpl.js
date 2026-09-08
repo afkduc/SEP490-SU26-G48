@@ -367,7 +367,19 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
     });
   }
 
-  async updateTaskStatus(taskId, isDone, { checkResult = null, checkNote = null } = {}) {
+  // giuLichSuNg: dau muc "Khong dat" ma khach da dong y thay - tho dang tick
+  // lai sau khi THAY XONG, khong phai cham ket qua kiem tra lan nua. Chi doi
+  // is_done, giu nguyen check_result/check_note/ng_* lam lich su; neu ghi de
+  // nhu binh thuong thi CASE WHEN ben duoi se xoa sach ca quyet dinh cua
+  // khach lan ly do phai thay.
+  async updateTaskStatus(taskId, isDone, { checkResult = null, checkNote = null, giuLichSuNg = false } = {}) {
+    if (giuLichSuNg) {
+      await query(
+        `UPDATE repair_order_tasks SET is_done = @isDone WHERE id = @taskId`,
+        { taskId: Number(taskId), isDone: isDone ? 1 : 0 }
+      );
+      return;
+    }
     await query(
       // Cham "Khong dat" -> 'reported': tho DA BAO, dang cho TO TRUONG chuyen
       // len co van. Khong nhay thang 'pending' (= cho co van hoi khach) nua -

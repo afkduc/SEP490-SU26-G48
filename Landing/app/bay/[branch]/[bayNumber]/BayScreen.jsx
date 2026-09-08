@@ -108,7 +108,11 @@ function TaskRow({ task, busy, onTaskDone }) {
   const [ngNote, setNgNote] = useState("");
   const label = actionLabel(task.actionCode);
   const locked = busy || task.isDone || task.isCancelled;
-  const wantsResult = needsCheckResult(task.actionCode);
+  // Khach da dong y thay: dau muc quay lai thanh viec PHAI LAM (BE dat lai
+  // is_done=0 luc co van ghi nhan). Lan tick nay la "da thay xong", khong hoi
+  // Dat/Khong dat nua - da cham roi, ket qua la Khong dat.
+  const dangChoThay = task.ngDecision === "accepted" && !task.isDone && !task.isCancelled;
+  const wantsResult = needsCheckResult(task.actionCode) && !dangChoThay;
 
   const body = (
     <div className={styles.taskBody}>
@@ -134,7 +138,11 @@ function TaskRow({ task, busy, onTaskDone }) {
         <div className={styles.taskNgFlow}>Tổ trưởng đã báo cố vấn — chờ khách quyết định</div>
       )}
       {task.checkResult === "NG" && task.ngDecision === "accepted" && (
-        <div className={styles.taskNgOk}>Khách đồng ý thay — phụ tùng đã thêm vào phiếu</div>
+        <div className={styles.taskNgOk}>
+          {task.isDone
+            ? "Khách đồng ý thay — đã thay xong"
+            : "Khách đồng ý thay — phụ tùng đã thêm vào phiếu, thay xong thì tích ô bên trái"}
+        </div>
       )}
       {task.checkResult === "NG" && task.ngDecision === "declined" && (
         <div className={styles.taskNgFlow}>

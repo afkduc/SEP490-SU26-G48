@@ -338,12 +338,18 @@ class RepairOrderService {
       throw new ApiError(400, 'Không thể bỏ tích đầu mục công việc');
     }
 
+    // Dau muc da cham "Khong dat" va khach DA DONG Y THAY: lan tick nay la
+    // "da thay xong", khong phai cham ket qua kiem tra lan nua. Khong hoi
+    // Dat/Khong dat, va khong ghi de len lich su NG (ly do phai thay + quyet
+    // dinh cua khach) - xem repository, giuLichSuNg.
+    const dangThayTheoYKhach = task.ngDecision === 'accepted';
+
     // Dau muc KIEM TRA cua goi bao duong (I/M/V) phai ghi ket qua Dat/Khong
     // dat - dung cot KET QUA (OK/NG) cua bieu mau BDDK. Rieng "Khong dat" bat
     // buoc mo ta ly do, dung nhu huong dan tren bieu mau ("Mo ta noi dung
     // tuong ung cho cong viec... danh dau X tai o NG vao cot ghi chu").
     // Dau muc "Thay the" va dau muc ngoai goi thi khong danh gia, chi tick.
-    const wantsCheck = needsCheckResult(task.actionCode);
+    const wantsCheck = needsCheckResult(task.actionCode) && !dangThayTheoYKhach;
     const result = checkResult ? String(checkResult).toUpperCase() : null;
     if (wantsCheck) {
       if (!CHECK_RESULTS.includes(result)) {
@@ -359,6 +365,7 @@ class RepairOrderService {
     await this.repairOrderRepository.updateTaskStatus(taskId, isDone, {
       checkResult: wantsCheck ? result : null,
       checkNote: wantsCheck && result === 'NG' ? String(checkNote).trim() : null,
+      giuLichSuNg: dangThayTheoYKhach,
     });
 
     // Realtime: bao CVDV dang mo modal "Xem chi tiet" phieu quyet toan nay

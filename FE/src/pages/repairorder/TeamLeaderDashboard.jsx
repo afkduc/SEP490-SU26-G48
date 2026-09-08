@@ -172,7 +172,12 @@ function NgActionBox({ task, onForwardNg, forwardingTaskId }) {
     return <div className="tld-ng-box tld-ng-box--waiting">Đã báo cố vấn — chờ cố vấn trao đổi với khách</div>;
   }
   if (task.ngDecision === 'accepted') {
-    return <div className="tld-ng-box tld-ng-box--ok">Khách đồng ý thay — phụ tùng đã thêm vào phiếu</div>;
+    // Khach dong y thay = con nguyen phan THAY THE chua ai lam, BE mo lai dau
+    // muc (is_done=0). Chua thay xong thi day la viec dang cho, khong phai
+    // viec da khep lai - phai nhin ra ngay.
+    return task.isDone
+      ? <div className="tld-ng-box tld-ng-box--ok">Khách đồng ý thay — thợ đã thay xong</div>
+      : <div className="tld-ng-box tld-ng-box--todo">Khách đồng ý thay — chờ thợ thay và tích hoàn thành</div>;
   }
   if (task.ngDecision === 'declined') {
     return (

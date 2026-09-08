@@ -842,14 +842,23 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .query(`UPDATE repair_orders SET subtotal=@st, discount_amount=@da, after_discount=@ad,
                        vat=@vat, free_amount=@fa, total=@tt3 WHERE id=@roId5`);
 
-      // 6. Chot quyet dinh
+      // 6. Chot quyet dinh, va MO LAI dau muc cho tho lam tiep.
+      //
+      // is_done=0 moi la mau chot: luc tho cham "Khong dat" thi dau muc da
+      // duoc tinh la xong (xong phan KIEM TRA). Nhung khach vua dong y thay
+      // nghia la con nguyen phan THAY THE chua ai lam. De nguyen is_done=1
+      // thi to truong dong lenh duoc ngay, xe ra khoi xuong voi phu tung da
+      // tinh tien ma chua he thay - vua that thu vua mat uy tin.
+      //
+      // Van giu check_result='NG' + check_note: do la lich su "vi sao phai
+      // thay", phai con de in ra phieu va de doi chieu ve sau.
       await req()
         .input('taskId2', sql.BigInt, taskId)
         .input('note', sql.NVarChar(500), note || null)
         .input('uid', sql.BigInt, userId)
         .query(`UPDATE repair_order_tasks
                 SET ng_decision='accepted', ng_note=@note, ng_decided_by=@uid,
-                    ng_decided_at=${NOW_VN_SQL}
+                    ng_decided_at=${NOW_VN_SQL}, is_done=0
                 WHERE id=@taskId2`);
 
       // 7. Dong bo checklist - dong phu tung moi thanh task cho tho, tu dong

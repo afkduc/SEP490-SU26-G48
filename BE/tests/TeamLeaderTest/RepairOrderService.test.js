@@ -495,3 +495,62 @@ test('confirmCompleted chan khi con dau muc Khong dat chua bao co van', async ()
       && /Ga lạnh hệ thống điều hòa/.test(err.message),
   );
 });
+
+// ─── Tick lai sau khi khach dong y thay ────────────────────────────────────
+// Cham "Khong dat" xong la dau muc duoc tinh la xong (xong phan KIEM TRA).
+// Khach dong y thay -> co van mo lai (is_done=0), con nguyen phan THAY THE.
+// Lan tick nay la "da thay xong", KHONG hoi Dat/Khong dat lan nua va khong
+// duoc ghi de len lich su NG.
+
+function ngAcceptedOrder(overrides = {}) {
+  return {
+    ...inProgressOrder,
+    tasks: [{
+      id: 500, taskType: 'service', taskName: 'Lọc gió điều hòa',
+      isDone: false, isCancelled: false, actionCode: 'M',
+      checkResult: 'NG', checkNote: 'bẩn, cần thay', ngDecision: 'accepted',
+      ...overrides,
+    }],
+  };
+}
+
+test('tick lai dau muc khach da dong y thay: khong hoi Dat/Khong dat, giu lich su NG', async () => {
+  let goiVoi = null;
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ngAcceptedOrder(),
+      updateTaskStatus: async (taskId, isDone, opts) => { goiVoi = { taskId, isDone, opts }; },
+    }),
+  });
+  await service.updateTaskStatus(70, 500, true, { userId: 8, branchId: 1 });
+  assert.equal(goiVoi.isDone, true);
+  assert.equal(goiVoi.opts.giuLichSuNg, true);
+  // Khong duoc ghi de check_result/check_note - do la ly do phai thay
+  assert.equal(goiVoi.opts.checkResult, null);
+  assert.equal(goiVoi.opts.checkNote, null);
+});
+
+// Dau muc kiem tra BINH THUONG (chua qua NG) van bat buoc ghi ket qua.
+test('dau muc kiem tra chua co quyet dinh cua khach van phai ghi Dat/Khong dat', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ngAcceptedOrder({ checkResult: null, checkNote: null, ngDecision: null }),
+    }),
+  });
+  await assert.rejects(
+    () => service.updateTaskStatus(70, 500, true, { userId: 8, branchId: 1 }),
+    (err) => err.statusCode === 400 && /Đạt hoặc Không đạt/.test(err.message),
+  );
+});
+
+// Khach dong y thay ma tho chua thay xong -> khong dong lenh duoc. Neu khong,
+// xe ra khoi xuong voi phu tung DA TINH TIEN ma chua he thay.
+test('confirmCompleted chan khi khach da dong y thay nhung tho chua thay xong', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({ findById: async () => ngAcceptedOrder() }),
+  });
+  await assert.rejects(
+    () => service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 }),
+    (err) => err.statusCode === 409 && /tất cả đầu mục/.test(err.message),
+  );
+});
