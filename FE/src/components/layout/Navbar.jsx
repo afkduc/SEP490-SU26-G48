@@ -75,7 +75,6 @@ const MANAGER_NAV = [
 const WAREHOUSE_STAFF_NAV = [
   { label: 'Tổng quan kho', path: '/inventory', end: true },
   { label: 'Phụ tùng', path: '/inventory/parts' },
-  { label: 'Tồn kho', path: '/inventory/stock' },
   { label: 'Phiếu nhập', path: '/inventory/import-requests' },
   { label: 'Phiếu xuất', path: '/inventory/export-requests' },
   { label: 'Nhà cung cấp', path: '/inventory/suppliers' },

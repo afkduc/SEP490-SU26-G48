@@ -195,13 +195,15 @@ LEFT JOIN units u ON u.id = p.unit_id
   }
 
   /**
-   * Thong ke phu tung duoc su dung nhieu nhat, ket hop:
-   *   - inventory_transactions (transaction_type='export', status='completed')
-   *     -> so lieu XUAT KHO THUC TE.
-   *   - repair_order_items (lhsc='PT')
-   *     -> NHU CAU phu tung tren phieu quyet toan (co the chua kip xuat kho).
-   * 2 nguon duoc gop lai theo product_id (FULL OUTER JOIN) de FE co the so
-   * sanh "nhu cau" vs "thuc xuat" cho tung phu tung/hang.
+   * Thong ke phu tung duoc su dung nhieu nhat. Chi tinh phu tung DA XUAT
+   * KHO THUC TE (co giao dich trong inventory_transactions, transaction_type=
+   * 'export', status='completed') - phu tung chi co nhu cau tren phieu
+   * quyet toan (repair_order_items, lhsc='PT') nhung chua xuat kho se KHONG
+   * xuat hien trong danh sach nay. demand_quantity/demand_count van duoc
+   * gop them cho cac phu tung da xuat, de FE so sanh "nhu cau" vs "thuc xuat".
+   * summary.totalExportCount/totalImportCount la SO PHIEU phan biet (COUNT
+   * DISTINCT export_request_id/import_request_id), khong phai so dong giao
+   * dich - 1 phieu co nhieu dong (nhieu phu tung) van tinh la 1 lan.
    */
   async getTopUsedPartsStats(branchId, { fromDate, toDate, limit = 10 } = {}) {
     const params = {
@@ -239,14 +241,43 @@ LEFT JOIN units u ON u.id = p.unit_id
         GROUP BY soi.product_id
       ),
       combined AS (
+        -- Chi lay phu tung DA XUAT KHO thuc te (co mat trong export_stats).
+        -- Nhu cau tren phieu quyet toan (demand_stats) chi la thong tin bo
+        -- sung, khong tu minh dua phu tung vao danh sach neu chua xuat kho.
         SELECT
-          COALESCE(e.product_id, d.product_id) AS product_id,
-          ISNULL(e.export_quantity, 0) AS export_quantity,
-          ISNULL(e.export_count, 0) AS export_count,
+          e.product_id AS product_id,
+          e.export_quantity AS export_quantity,
+          e.export_count AS export_count,
           ISNULL(d.demand_quantity, 0) AS demand_quantity,
           ISNULL(d.demand_count, 0) AS demand_count
         FROM export_stats e
-        FULL OUTER JOIN demand_stats d ON e.product_id = d.product_id
+        LEFT JOIN demand_stats d ON e.product_id = d.product_id
+      ),
+      import_stats AS (
+        -- import_count = so PHIEU nhap kho phan biet (khong phai so dong
+        -- giao dich, vi 1 phieu co the co nhieu dong ung voi nhieu phu tung).
+        SELECT
+          SUM(it.quantity) AS import_quantity,
+          COUNT(DISTINCT it.import_request_id) AS import_count
+        FROM   inventory_transactions it
+        WHERE  it.branch_id = @branchId
+          AND  it.transaction_type = 'import'
+          AND  it.status = 'completed'
+          AND  (@fromDate IS NULL OR it.transaction_date >= @fromDate)
+          AND  (@toDate IS NULL OR it.transaction_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
+      ),
+      export_request_stats AS (
+        -- export_count tong hop = so PHIEU xuat kho phan biet, cung logic
+        -- voi import_count o tren (khong dung SUM(c.export_count) vi do la
+        -- so dong giao dich theo tung phu tung, se dem trung phieu).
+        SELECT
+          COUNT(DISTINCT it.export_request_id) AS export_request_count
+        FROM   inventory_transactions it
+        WHERE  it.branch_id = @branchId
+          AND  it.transaction_type = 'export'
+          AND  it.status = 'completed'
+          AND  (@fromDate IS NULL OR it.transaction_date >= @fromDate)
+          AND  (@toDate IS NULL OR it.transaction_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
       )
     `;
 
@@ -254,7 +285,7 @@ LEFT JOIN units u ON u.id = p.unit_id
       ${cte}
       SELECT TOP (@limit)
         c.product_id,
-        p.product_code, p.product_name, p.category, p.brand_name,
+        p.product_code, p.product_name, p.category,
         u.unit_name, p.stock_quantity,
         c.export_quantity, c.export_count, c.demand_quantity, c.demand_count,
         (c.export_quantity + c.demand_quantity) AS total_quantity
@@ -265,36 +296,22 @@ LEFT JOIN units u ON u.id = p.unit_id
 
       ${cte}
       SELECT
-        ISNULL(p.brand_name, N'Không xác định') AS brand_name,
-        SUM(c.export_quantity) AS export_quantity,
-        SUM(c.export_count) AS export_count,
-        SUM(c.demand_quantity) AS demand_quantity,
-        SUM(c.demand_count) AS demand_count,
-        SUM(c.export_quantity + c.demand_quantity) AS total_quantity
-      FROM combined c
-      JOIN products p ON p.id = c.product_id
-      GROUP BY p.brand_name
-      ORDER BY total_quantity DESC;
-
-      ${cte}
-      SELECT
         COUNT(*) AS distinct_parts,
         ISNULL(SUM(c.export_quantity), 0) AS total_export_quantity,
-        ISNULL(SUM(c.export_count), 0) AS total_export_count,
-        ISNULL(SUM(c.demand_quantity), 0) AS total_demand_quantity,
-        ISNULL(SUM(c.demand_count), 0) AS total_demand_count
+        ISNULL((SELECT export_request_count FROM export_request_stats), 0) AS total_export_count,
+        ISNULL((SELECT import_quantity FROM import_stats), 0) AS total_import_quantity,
+        ISNULL((SELECT import_count FROM import_stats), 0) AS total_import_count
       FROM combined c;
     `;
 
     const result = await query(sqlText, params);
-    const [topPartsRecordset, topBrandsRecordset, summaryRecordset] = result.recordsets;
+    const [topPartsRecordset, summaryRecordset] = result.recordsets;
 
     const topParts = topPartsRecordset.map((r) => ({
       productId: r.product_id,
       productCode: r.product_code,
       productName: r.product_name,
       category: r.category,
-      brandName: r.brand_name,
       unit: r.unit_name || 'Cai',
       currentStock: Number(r.stock_quantity) || 0,
       exportQuantity: Number(r.export_quantity) || 0,
@@ -304,30 +321,16 @@ LEFT JOIN units u ON u.id = p.unit_id
       totalQuantity: Number(r.total_quantity) || 0,
     }));
 
-    const totalQuantityAll = topBrandsRecordset.reduce((sum, r) => sum + (Number(r.total_quantity) || 0), 0);
-    const topBrands = topBrandsRecordset.map((r) => {
-      const total = Number(r.total_quantity) || 0;
-      return {
-        brandName: r.brand_name,
-        exportQuantity: Number(r.export_quantity) || 0,
-        exportCount: Number(r.export_count) || 0,
-        demandQuantity: Number(r.demand_quantity) || 0,
-        demandCount: Number(r.demand_count) || 0,
-        totalQuantity: total,
-        percentage: totalQuantityAll > 0 ? Math.round((total / totalQuantityAll) * 1000) / 10 : 0,
-      };
-    });
-
     const summaryRow = summaryRecordset[0] || {};
     const summary = {
       distinctParts: Number(summaryRow.distinct_parts) || 0,
       totalExportQuantity: Number(summaryRow.total_export_quantity) || 0,
       totalExportCount: Number(summaryRow.total_export_count) || 0,
-      totalDemandQuantity: Number(summaryRow.total_demand_quantity) || 0,
-      totalDemandCount: Number(summaryRow.total_demand_count) || 0,
+      totalImportQuantity: Number(summaryRow.total_import_quantity) || 0,
+      totalImportCount: Number(summaryRow.total_import_count) || 0,
     };
 
-    return { topParts, topBrands, summary };
+    return { topParts, summary };
   }
 }
 

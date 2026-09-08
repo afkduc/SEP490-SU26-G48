@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AppContext';
 import { usePermission } from '../../contexts/PermissionContext';
 import { formatCurrency, formatDate } from '../../utils';
 import managerApi from '../../services/managerApi';
+import { listVehicleModelsApi } from '../../services/vehicleApi';
 import { PermissionGate } from '../../components/PermissionGate';
 import ManagerImportRequestListPage from './ManagerImportRequestListPage';
 import ManagerImportRequestDetailPage from './ManagerImportRequestDetailPage';
@@ -1496,6 +1497,24 @@ function ServiceFormPage({ mode }) {
 
 // Ma xe theo dung thu tu 12 xe trong bang vehicle_models, dung de sap xep nhom.
 const VEHICLE_CODE_ORDER = ['MZ2', 'MZ3', 'MZ6-LX', 'MZ6-PR', 'CX3-LX', 'CX3-PR', 'CX5-LX', 'CX5-PR', 'CX8-LX', 'CX8-PR', 'BT50-LX', 'BT50-PR'];
+// Mazda khong co cot "ma ngan" (MZ2, CX3-LX...) trong vehicle_models that -
+// day la quy uoc rieng dung khi dat ten phu tung/dich vu "hang cung" (vd
+// "Loc dau dong co (Mazda2 1.5 Premium) [MZ2]"). Anh xa theo dung ten hien
+// thi (displayName) de biet 1 model_id that ung voi ma ngan nao khi loc.
+const VEHICLE_DISPLAY_NAME_TO_CODE = {
+  'Mazda2 1.5 Premium': 'MZ2',
+  'Mazda3 1.5 Luxury (Sedan)': 'MZ3',
+  'Mazda6 2.0 Luxury': 'MZ6-LX',
+  'Mazda6 2.0 Premium': 'MZ6-PR',
+  'Mazda CX-3 1.5 Luxury': 'CX3-LX',
+  'Mazda CX-3 1.5 Premium': 'CX3-PR',
+  'Mazda CX-5 2.0 Luxury': 'CX5-LX',
+  'Mazda CX-5 2.0 Premium': 'CX5-PR',
+  'Mazda CX-8 2.5 Luxury (2WD)': 'CX8-LX',
+  'Mazda CX-8 2.5 Premium (2WD)': 'CX8-PR',
+  'Mazda BT-50 1.9 Luxury': 'BT50-LX',
+  'Mazda BT-50 1.9 Premium': 'BT50-PR',
+};
 // cap = 0 dai dien cho moc "1.000km dau" (truoc Cap 1), de sap xep/loc dung chung
 // co che voi Cap 1..5.
 function parsePackageCode(code) {
@@ -1543,7 +1562,7 @@ function ServicePackageDetailModal({ pkg, onClose }) {
   if (!pkg) return null;
   const badge = activeBadge(pkg.isActive);
   const { vehicleCode, cap } = parsePackageCode(pkg.code);
-  const vehicleName = parseVehicleName(pkg.name);
+  const vehicleName = pkg.modelName || parseVehicleName(pkg.name);
   const fBadge = fuelBadge(fuelOfVehicleCode(vehicleCode));
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1675,7 +1694,7 @@ function ServicePackageListPage() {
     const map = new Map();
     for (const p of packages) {
       const { vehicleCode } = parsePackageCode(p.code);
-      if (vehicleCode && !map.has(vehicleCode)) map.set(vehicleCode, parseVehicleName(p.name));
+      if (vehicleCode && !map.has(vehicleCode)) map.set(vehicleCode, p.modelName || parseVehicleName(p.name));
     }
     return [...map.entries()]
       .sort(([a], [b]) => VEHICLE_CODE_ORDER.indexOf(a) - VEHICLE_CODE_ORDER.indexOf(b))
@@ -1696,7 +1715,7 @@ function ServicePackageListPage() {
     for (const p of filteredPackages) {
       const { vehicleCode, cap } = parsePackageCode(p.code);
       const key = vehicleCode || p.code;
-      if (!map.has(key)) map.set(key, { vehicleCode: key, vehicleName: parseVehicleName(p.name), fuel: fuelOfVehicleCode(vehicleCode), items: [] });
+      if (!map.has(key)) map.set(key, { vehicleCode: key, vehicleName: p.modelName || parseVehicleName(p.name), fuel: fuelOfVehicleCode(vehicleCode), items: [] });
       map.get(key).items.push({ ...p, cap });
     }
     const arr = [...map.values()];
@@ -1902,11 +1921,11 @@ function ServicePackageFormPage({ mode }) {
 
   const [branch, setBranch] = useState(null);
   const [availableServices, setAvailableServices] = useState([]);
+  const [vehicleModels, setVehicleModels] = useState([]);
   const [selectedSearch, setSelectedSearch] = useState('');
   const [availableSearch, setAvailableSearch] = useState('');
-  const [vehicleFilter, setVehicleFilter] = useState('all');
   const [form, setForm] = useState({
-    packageName: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [], actionCodes: {},
+    packageName: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', modelId: '', serviceIds: [], actionCodes: {},
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1917,6 +1936,7 @@ function ServicePackageFormPage({ mode }) {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
     managerApi.getServices({ status: 'all' }).then((data) => { if (mounted) setAvailableServices(data || []); }).catch(() => {});
+    listVehicleModelsApi().then((data) => { if (mounted) setVehicleModels(data || []); }).catch(() => {});
 
     if (isEdit && id) {
       managerApi
@@ -1930,6 +1950,7 @@ function ServicePackageFormPage({ mode }) {
             purpose: data.purpose || '',
             isActive: data.isActive,
             repairCategory: data.repairCategory || '',
+            modelId: data.modelId != null ? String(data.modelId) : '',
             serviceIds: (data.services || []).map((s) => s.id),
             actionCodes: Object.fromEntries((data.services || []).map((s) => [s.id, s.actionCode || 'I'])),
           });
@@ -1995,6 +2016,7 @@ function ServicePackageFormPage({ mode }) {
         purpose: form.purpose.trim(),
         isActive: form.isActive,
         repairCategory: form.repairCategory || null,
+        modelId: form.modelId || null,
         services: form.serviceIds.map((sid) => ({ serviceId: sid, actionCode: form.actionCodes[sid] || 'I' })),
       };
 
@@ -2033,25 +2055,19 @@ function ServicePackageFormPage({ mode }) {
   const matchesNeedle = (s, needle) => !needle || s.name.toLowerCase().includes(needle) || s.code.toLowerCase().includes(needle);
   const selectedServices = availableServices.filter((s) => form.serviceIds.includes(s.id) && matchesNeedle(s, selectedNeedle));
 
+  // Danh sach xe THAT tu vehicle_models (khong con tu suy ra tu ten dich vu nua).
+  const vehicleModelOptions = [...vehicleModels].sort(
+    (a, b) => VEHICLE_CODE_ORDER.indexOf(VEHICLE_DISPLAY_NAME_TO_CODE[a.displayName]) - VEHICLE_CODE_ORDER.indexOf(VEHICLE_DISPLAY_NAME_TO_CODE[b.displayName])
+  );
   // Dich vu "hang cung" (loc dau, bugi, ac quy...) co 12 bien the rieng theo
   // tung xe - loc theo dong xe de khong phai doc lan trong list 140 dich vu.
   // Dich vu dung chung (dau may, cham soc xe...) luon hien du moi luc.
-  const vehicleFilterOptions = [];
-  {
-    const seen = new Set();
-    for (const s of availableServices) {
-      const parsed = parseServiceVehicle(s.name);
-      if (parsed && !seen.has(parsed.vehicleCode)) {
-        seen.add(parsed.vehicleCode);
-        vehicleFilterOptions.push({ code: parsed.vehicleCode, name: parsed.vehicleName });
-      }
-    }
-    vehicleFilterOptions.sort((a, b) => VEHICLE_CODE_ORDER.indexOf(a.code) - VEHICLE_CODE_ORDER.indexOf(b.code));
-  }
+  const selectedVehicleModel = vehicleModels.find((v) => String(v.id) === String(form.modelId));
+  const selectedVehicleCode = selectedVehicleModel ? VEHICLE_DISPLAY_NAME_TO_CODE[selectedVehicleModel.displayName] : null;
   const matchesVehicleFilter = (s) => {
-    if (vehicleFilter === 'all') return true;
+    if (!form.modelId) return true;
     const parsed = parseServiceVehicle(s.name);
-    return !parsed || parsed.vehicleCode === vehicleFilter; // khong co bien the xe -> dung chung, luon hien
+    return !parsed || parsed.vehicleCode === selectedVehicleCode; // khong co bien the xe -> dung chung, luon hien
   };
   const unselectedServices = availableServices.filter(
     (s) => !form.serviceIds.includes(s.id) && matchesNeedle(s, availableNeedle) && matchesVehicleFilter(s)
@@ -2086,14 +2102,14 @@ function ServicePackageFormPage({ mode }) {
           <div className="form-grid form-grid-2">
             <div className="form-group">
               <label className="form-label">Dòng xe áp dụng</label>
-              <select className="form-select" value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)}>
-                <option value="all">— Chưa chọn / dùng chung nhiều xe —</option>
-                {vehicleFilterOptions.map((v) => (
-                  <option key={v.code} value={v.code}>{v.name}</option>
+              <select className="form-select" value={form.modelId} onChange={(e) => setField('modelId', e.target.value)}>
+                <option value="">— Chưa chọn / dùng chung nhiều xe —</option>
+                {vehicleModelOptions.map((v) => (
+                  <option key={v.id} value={v.id}>{v.displayName}</option>
                 ))}
               </select>
               <div className="form-hint">
-                Chỉ để lọc bớt danh sách dịch vụ "hàng cứng" bên dưới cho đúng xe — không tự lưu vào gói, bạn vẫn cần ghi rõ tên xe trong "Tên gói bảo dưỡng".
+                Lưu thật vào gói (dùng để lọc/nhóm ở trang danh sách) và lọc bớt danh sách dịch vụ "hàng cứng" bên dưới cho đúng xe.
               </div>
             </div>
 
@@ -2218,10 +2234,10 @@ function ServicePackageFormPage({ mode }) {
                           placeholder="Tìm dịch vụ theo tên hoặc mã..."
                         />
                       </div>
-                      <select className="filter-select" value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)} title="Lọc dịch vụ hàng cứng theo dòng xe">
-                        <option value="all">Tất cả dòng xe</option>
-                        {vehicleFilterOptions.map((v) => (
-                          <option key={v.code} value={v.code}>{v.name}</option>
+                      <select className="filter-select" value={form.modelId} onChange={(e) => setField('modelId', e.target.value)} title="Lọc dịch vụ hàng cứng theo dòng xe">
+                        <option value="">Tất cả dòng xe</option>
+                        {vehicleModelOptions.map((v) => (
+                          <option key={v.id} value={v.id}>{v.displayName}</option>
                         ))}
                       </select>
                     </div>

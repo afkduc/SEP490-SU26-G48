@@ -6,6 +6,7 @@ import { useParts } from '../../hooks/inventory/useParts';
 import { listUnitsApi } from '../../services/productApi';
 import { PermissionGate } from '../../components/PermissionGate';
 import { getSuppliersApi } from '../../services/supplierApi';
+import { getLowStockApi } from '../../services/inventoryApi';
 import './PartListPage.css';
 
 const STATUS_LABELS = {
@@ -27,7 +28,6 @@ function emptyForm() {
     unitPrice: '',
     minStock: 5,
     supplierId: '',
-    location: '',
     status: 'active',
     note: '',
   };
@@ -50,6 +50,7 @@ export default function PartListPage() {
   const [togglingId, setTogglingId] = useState(null);
   const [units, setUnits] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [lowStock, setLowStock] = useState([]);
 
   useEffect(() => {
     listUnitsApi().then(setUnits).catch(() => setUnits([]));
@@ -57,6 +58,18 @@ export default function PartListPage() {
       .then((res) => setSuppliers(res.items || []))
       .catch(() => setSuppliers([]));
   }, []);
+
+  const refreshLowStock = () => {
+    if (!branchId) return;
+    getLowStockApi(branchId)
+      .then((res) => setLowStock(res?.items || []))
+      .catch(() => setLowStock([]));
+  };
+
+  useEffect(() => {
+    refreshLowStock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchId]);
 
   function openCreate() {
     setEditing(null);
@@ -75,7 +88,6 @@ export default function PartListPage() {
       unitPrice: p.unitPrice ?? '',
       minStock: p.minStock ?? 5,
       supplierId: p.supplierId ?? '',
-      location: p.location || '',
       status: p.status || 'active',
       note: p.note || '',
     });
@@ -100,7 +112,6 @@ export default function PartListPage() {
         unitPrice: form.unitPrice === '' ? null : Number(form.unitPrice),
         minStock: Number(form.minStock),
         supplierId: form.supplierId === '' ? null : Number(form.supplierId),
-        location: form.location,
         status: form.status,
         note: form.note,
       };
@@ -110,6 +121,7 @@ export default function PartListPage() {
         await create(payload);
       }
       closeModal();
+      refreshLowStock();
     } catch (err) {
       setFormError(err.message);
     }
@@ -130,6 +142,7 @@ export default function PartListPage() {
     try {
       if (isActive) await deactivate(p.id);
       else await reactivate(p.id);
+      refreshLowStock();
     } finally {
       setTogglingId(null);
     }
@@ -158,6 +171,42 @@ export default function PartListPage() {
           </button>
         </PermissionGate>
       </div>
+
+      {/* Cảnh báo tồn kho thấp */}
+      {lowStock.length > 0 && (
+        <div className="part-alert">
+          <h2 className="part-alert__title">⚠ Cảnh báo tồn kho thấp</h2>
+          <p className="part-alert__desc">
+            Có {lowStock.length} phụ tùng đang ở mức sắp hết ({'<= '} tồn tối thiểu). Cần nhập thêm hàng.
+          </p>
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Mã PT</th>
+                  <th>Tên phụ tùng</th>
+                  <th>SL tồn</th>
+                  <th>Tồn tối thiểu</th>
+                  <th>Thiếu</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lowStock.slice(0, 5).map((p) => (
+                  <tr key={p.id}>
+                    <td><span className="font-mono">{p.productCode ?? p.partCode}</span></td>
+                    <td>
+                      <Link to={`/inventory/parts/${p.id}`}>{p.productName ?? p.partName}</Link>
+                    </td>
+                    <td className="text-right text-danger">{p.stockQuantity}</td>
+                    <td className="text-right">{p.minStock}</td>
+                    <td className="text-right text-danger">{p.stockQuantity - p.minStock}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="part-list__filters">
@@ -382,12 +431,6 @@ export default function PartListPage() {
                       <option key={s.id} value={s.id}>{s.supplierName} ({s.supplierCode})</option>
                     ))}
                   </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Vị trí (Kho)</label>
-                  <input className="input" value={form.location}
-                    onChange={(e) => setForm({ ...form, location: e.target.value })}
-                    placeholder="VD: K1-A1" />
                 </div>
               </div>
 

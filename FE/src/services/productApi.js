@@ -5,8 +5,8 @@ import httpClient from './httpClient';
  * Luu y: KHONG truyen stockQuantity len BE (BE se tu dong bo qua).
  *
  *   - list(params): GET /api/products voi filter { branchId, status, search, category, page, limit }.
- *     tra ve: { items: [{ id, productCode, productName, category, brandName, unitId, unitName, unitPrice,
- *                         stockQuantity, minStock, supplierId, supplierName, location, branchId, status, isLowStock }],
+ *     tra ve: { items: [{ id, productCode, productName, category, unitId, unitName, unitPrice,
+ *                         stockQuantity, minStock, supplierId, supplierName, branchId, status, isLowStock }],
  *               total, page, limit }
  *
  *   - getDetail(id): GET /api/products/:id
