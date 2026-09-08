@@ -99,9 +99,12 @@ export async function markProductSeenApi(id) {
  * Tra cuu phu tung theo tu khoa (dung o trang quyet toan sua chua).
  * BE: GET /api/inventory/products/search?q=...
  */
-export async function searchProductsApi(term, branchId) {
+export async function searchProductsApi(term, branchId, modelId) {
   const qs = new URLSearchParams();
   qs.set('q', term);
   if (branchId) qs.set('branchId', String(branchId));
+  // Doi xe cua chiec dang lap phieu - BE bo phu tung cua doi xe khac, giu lai
+  // loai dung chung. Loc o BE vi danh sach bi cat con 10 dong.
+  if (modelId) qs.set('modelId', String(modelId));
   return httpClient.get(`/inventory/products/search?${qs.toString()}`);
 }

@@ -16,6 +16,9 @@ class Product {
     this.minStock = data.min_stock ?? data.minStock ?? 0;
     this.supplierId = data.supplier_id ?? data.supplierId ?? null;
     this.branchId = data.branch_id ?? data.branchId ?? null;
+    // Doi xe cua phu tung. NULL = dung chung moi doi (dau dong co, dem xa
+    // dau...) - xem ensureCatalogModel.js.
+    this.modelId = data.model_id ?? data.modelId ?? null;
     this.status = data.status ?? 'active';
     this.note = data.note ?? null;
     this.createdByRole = data.created_by_role ?? data.createdByRole ?? null;
@@ -38,6 +41,7 @@ class Product {
       min_stock: row.min_stock,
       supplier_id: row.supplier_id,
       branch_id: row.branch_id,
+      model_id: row.model_id,
       status: row.status,
       created_by_role: row.created_by_role,
       seen_by_manager_at: row.seen_by_manager_at,

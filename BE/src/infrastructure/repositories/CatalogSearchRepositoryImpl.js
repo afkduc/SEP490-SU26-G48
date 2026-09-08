@@ -7,7 +7,10 @@ const { query } = require('../database/sqlServer');
 class CatalogSearchRepositoryImpl extends CatalogSearchRepository {
   async findAllActiveServices(branchId) {
     const result = await query(
-      `SELECT id, service_code, service_name, category_id, unit_price, repair_category
+      // model_id: dich vu phu thuoc doi xe (vd "Guoc phanh do - Mazda CX-8...")
+      // de FE chi goi y do dung cho chiec xe dang lap phieu. NULL = dung chung
+      // moi doi xe (dau dong co, dau phanh...) - xem ensureCatalogModel.js.
+      `SELECT id, service_code, service_name, category_id, unit_price, repair_category, model_id
        FROM services
        WHERE is_active = 1 AND branch_id = @branchId
        ORDER BY service_name`,

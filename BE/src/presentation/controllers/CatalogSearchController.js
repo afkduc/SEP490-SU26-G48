@@ -8,7 +8,11 @@ class CatalogSearchController {
 
   async search(req, res, next) {
     try {
-      const results = await this.catalogSearchService.search(req.query.q, req.user.branchId);
+      // modelId: doi xe cua chiec dang lap phieu - de khong goi y dich vu/goi
+      // cua doi xe khac. Thieu thi tra ve het (xe cu chua gan duoc doi xe).
+      const results = await this.catalogSearchService.search(
+        req.query.q, req.user.branchId, req.query.modelId || null
+      );
       return success(res, results, 'Tìm kiếm thành công');
     } catch (err) {
       next(err);

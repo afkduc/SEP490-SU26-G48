@@ -2270,20 +2270,21 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     const seq = ++catalogSearchSeq.current;
     const timer = setTimeout(async () => {
       try {
+        // Gói, dịch vụ lẻ và phụ tùng đều được khai báo riêng cho TỪNG đời xe
+        // (vd "Guốc phanh đỗ – Mazda CX-8 2.5 Luxury"), nên chỉ gợi ý thứ dùng
+        // được cho đúng chiếc xe đang lập phiếu — trước đây gõ "phanh" cho một
+        // chiếc CX-8 vẫn hiện guốc phanh của BT-50, CX-3, CX-5.
+        //
+        // Việc lọc nằm ở BE chứ không ở đây: danh sách bị cắt còn 10 dòng nên
+        // lọc phía FE thì 10 dòng lấy về có thể toàn của đời xe khác, đúng cái
+        // cần tìm thì đã bị cắt mất. Xe cũ chưa gán được đời (modelId rỗng) thì
+        // BE trả về đủ, không chặn cố vấn lập phiếu.
         if (lhsc === 'PT') {
-          const products = await searchProductsApi(term);
+          const products = await searchProductsApi(term, undefined, vehicleInfo.modelId);
           if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'product', products } }));
         } else {
-          const result = await searchCatalogApi(term);
-          // Gói bảo dưỡng được khai báo riêng cho TỪNG đời xe (72 gói = 12 đời
-          // x 6 cấp) nên chỉ gợi ý gói của đúng chiếc xe đang lập phiếu - trước
-          // đây hiện cả 72 gói nên chọn nhầm gói CX-5 cho xe Mazda2 vẫn lưu
-          // được. Xe cũ chưa gán được đời trong catalog (modelId rỗng) thì vẫn
-          // hiện đủ, không chặn cố vấn lập phiếu.
-          const packages = vehicleInfo.modelId
-            ? (result.packages || []).filter((p) => !p.modelId || String(p.modelId) === String(vehicleInfo.modelId))
-            : (result.packages || []);
-          if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'catalog', ...result, packages } }));
+          const result = await searchCatalogApi(term, vehicleInfo.modelId);
+          if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'catalog', ...result } }));
         }
       } catch {
         if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: null }));
@@ -2781,6 +2782,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // này ngay bên dưới (giống phiếu quyết toán thực tế - phụ tùng tiêu hao
   // liệt kê riêng bên dưới phần công việc), cùng 1 Loại hình sửa chữa.
   const selectCatalogService = (idx, svc) => {
+    // Dich vu nay DA nam trong goi bao duong dang co tren phieu -> chan han.
+    // Cong tho cua no da tinh trong gia goi roi; them lan nua chi lam phieu
+    // ghi "lam 2 lan" cung 1 viec, va tho khong biet phai lam may lan.
+    const trongGoi = items.find((it) => it.serviceId === svc.id && isChildRow(it));
+    if (trongGoi) {
+      const dauGoi = items.find((it) => it.groupId === trongGoi.groupId && it.isGroupParent);
+      toast.warning(`"${svc.name}" đã có sẵn trong ${dauGoi ? `gói "${dauGoi.description}"` : 'gói bảo dưỡng'} — không cần thêm lại`);
+      closeCatalogSuggestions(idx);
+      return;
+    }
     const repairCategory = svc.repairCategory || '';
     setItems((prev) => {
       // Dong nay truoc do da la dau nhom (vd doi sang dich vu khac) -> bo het
@@ -2792,11 +2803,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         return true;
       });
 
-      // Dich vu vua chon da TRUNG voi 1 dong co san o noi khac (vd dich vu con
-      // duoc goi lon tu dong chen kem truoc do) -> cong don +1 so luong vao
-      // dong do, mo khoa cho sua so luong tay, KHONG tao them dong/nhom moi
-      // (tranh liet ke trung lap cung 1 hang muc 2 lan).
-      const dupIdx = withoutCurrent.findIndex((it) => it.serviceId === svc.id);
+      // Dich vu vua chon da TRUNG voi 1 dong dich vu LE co san -> cong don +1
+      // so luong vao dong do, mo khoa cho sua so luong tay, KHONG tao them
+      // dong/nhom moi (tranh liet ke trung lap cung 1 hang muc 2 lan). Vd
+      // khach muon thay 2 lop cung loai.
+      //
+      // Dong con cua goi bao duong thi da bi chan o tren roi, khong xuong toi
+      // day - cong so luong o do la sai, khong phai la "lam 2 lan".
+      const dupIdx = withoutCurrent.findIndex((it) => it.serviceId === svc.id && !isChildRow(it));
       if (dupIdx !== -1) {
         const next = [...withoutCurrent];
         const target = next[dupIdx];

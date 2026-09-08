@@ -29,6 +29,8 @@ function toServiceDto(row, partsByServiceId = new Map()) {
     categoryId: row.category_id,
     unitPrice: row.unit_price,
     repairCategory: row.repair_category,
+    // NULL = dich vu dung chung moi doi xe (xem ensureCatalogModel.js)
+    modelId: row.model_id ?? null,
     parts: partsByServiceId.get(row.id) || [],
   };
 }
