@@ -2980,6 +2980,26 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     return '';
   })();
 
+  // Roi khoi o ma so km van sai: bao ro 1 lan roi XOA so vua go va tra con
+  // tro ve chinh o do. Khong de lai so sai trong form - de lai thi CVDV dien
+  // tiep phan duoi, luc quay lai khong con nho la so nay chua sua.
+  //
+  // Xoa xong thi o rong -> kmLoi ve rong -> lan blur sau khong ban lai thong
+  // bao nua, nen khong co vong lap focus/blur.
+  const kiemTraKmKhiRoiO = () => {
+    if (!kmLoi) return;
+    const truoc = vehicleInfo.lastKnownKm;
+    toast.error(
+      truoc != null
+        ? `Số km vừa nhập nhỏ hơn lần trước (${Number(truoc).toLocaleString('vi-VN')} km). Vui lòng nhập lại.`
+        : 'Số km vừa nhập không hợp lệ. Vui lòng nhập lại.',
+      3000
+    );
+    vInfoSet('currentKm', '');
+    // Doi trinh duyet chuyen focus xong roi moi doi lai, khong thi bi no ghi de.
+    setTimeout(() => kmInputRef.current?.focus(), 0);
+  };
+
   // Neu chon tu goi y tra cuu (co id that trong DB) thi luon du dieu kien Luu.
   // Neu KHONG chon tu tra cuu (khach hang/xe hoan toan moi, chi luc TAO phieu
   // moi) - van cho Luu binh thuong, khong bat buoc phai co san trong DB nua:
@@ -3410,6 +3430,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                     aria-invalid={Boolean(kmLoi)}
                     style={kmLoi ? { borderColor: 'var(--red)' } : undefined}
                     onChange={(e) => vInfoSet('currentKm', e.target.value)}
+                    onBlur={kiemTraKmKhiRoiO}
                   />
                   {kmLoi && <div className="form-error" style={{ marginTop: 4 }}>{kmLoi}</div>}
                 </div>
