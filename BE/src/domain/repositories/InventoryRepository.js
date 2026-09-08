@@ -83,16 +83,16 @@ class InventoryRepository {
   }
 
   /**
-   * Thong ke phu tung duoc su dung nhieu nhat trong 1 khoang thoi gian, ket
-   * hop 2 nguon:
-   *   - inventory_transactions (transaction_type='export') - luong xuat kho
-   *     thuc te.
-   *   - repair_order_items (lhsc='PT') - nhu cau phu tung tren phieu quyet
-   *     toan (co the chua duoc xuat kho).
-   * Dung cho Dashboard Tong quan kho.
+   * Thong ke phu tung duoc su dung nhieu nhat trong 1 khoang thoi gian. Chi
+   * tinh phu tung DA XUAT KHO thuc te (inventory_transactions, transaction_
+   * type='export', status='completed'); nhu cau tren phieu quyet toan
+   * (repair_order_items, lhsc='PT') chi la thong tin bo sung cho tung phu
+   * tung da xuat. Summary cong them tong so luong/so lan NHAP KHO trong
+   * cung khoang thoi gian (khong phu thuoc combined - tinh tren toan bo
+   * giao dich import cua chi nhanh). Dung cho Dashboard Tong quan kho.
    * @param {number} branchId
    * @param {Object} params - { fromDate, toDate, limit }
-   * @returns {Promise<{ topParts: Object[], topBrands: Object[], summary: Object }>}
+   * @returns {Promise<{ topParts: Object[], summary: Object }>}
    */
   async getTopUsedPartsStats(branchId, { fromDate, toDate, limit } = {}) {
     throw new Error('Method getTopUsedPartsStats() must be implemented');

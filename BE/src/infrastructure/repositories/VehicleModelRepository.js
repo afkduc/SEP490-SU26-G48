@@ -13,10 +13,7 @@ function mapRow(row) {
     id: row.id,
     modelLine: row.model_line,
     generationCode: row.generation_code,
-    bodyType: row.body_type,
     segment: row.segment,
-    engineDisplacement: row.engine_displacement != null ? Number(row.engine_displacement) : null,
-    drivetrain: row.drivetrain,
     trimName: row.trim_name,
     yearFrom: row.year_from,
     yearTo: row.year_to,
@@ -27,8 +24,8 @@ function mapRow(row) {
 class VehicleModelRepository {
   async list() {
     const result = await query(
-      `SELECT id, model_line, generation_code, body_type, segment,
-              engine_displacement, drivetrain, trim_name, year_from, year_to, display_name
+      `SELECT id, model_line, generation_code, segment,
+              trim_name, year_from, year_to, display_name
        FROM   vehicle_models
        ORDER  BY model_line ASC, generation_code ASC, trim_name ASC`
     );

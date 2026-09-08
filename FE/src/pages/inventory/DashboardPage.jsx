@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useInventoryBranch } from './InventoryLayout';
 import { getStockSummaryApi, getTopUsedPartsApi } from '../../services/inventoryApi';
+import { getProductsApi } from '../../services/productApi';
 import { formatCurrency } from '../../utils';
-import { StatTile, BrandDonutChart, TopPartsBarChart } from './InventoryDashboardCharts';
+import { StatTile, TopPartsBarChart } from './InventoryDashboardCharts';
 import '../dashboard/DashboardPage.css';
 import './DashboardPage.css';
 
@@ -51,6 +52,13 @@ export default function DashboardPage() {
   const [partsLoading, setPartsLoading] = useState(true);
   const [partsError, setPartsError] = useState(null);
 
+  // Phu tung theo tung loai - chi tai khi mo rong dong tuong ung (lazy load,
+  // cache lai theo category de bam lai khong goi lai API).
+  const [expandedCategory, setExpandedCategory] = useState(null);
+  const [categoryParts, setCategoryParts] = useState({});
+  const [categoryPartsLoading, setCategoryPartsLoading] = useState({});
+  const [categoryPartsError, setCategoryPartsError] = useState({});
+
   useEffect(() => {
     if (!branchId) {
       setSummaryLoading(false);
@@ -81,6 +89,27 @@ export default function DashboardPage() {
     return () => { mounted = false; };
   }, [branchId, period]);
 
+  function toggleCategory(category) {
+    if (expandedCategory === category) {
+      setExpandedCategory(null);
+      return;
+    }
+    setExpandedCategory(category);
+    if (categoryParts[category] || categoryPartsLoading[category]) return;
+    setCategoryPartsLoading((prev) => ({ ...prev, [category]: true }));
+    setCategoryPartsError((prev) => ({ ...prev, [category]: null }));
+    getProductsApi({ branchId, category, status: 'active', limit: 200 })
+      .then((res) => {
+        setCategoryParts((prev) => ({ ...prev, [category]: res.items || [] }));
+      })
+      .catch((err) => {
+        setCategoryPartsError((prev) => ({ ...prev, [category]: err.message || 'Không tải được danh sách phụ tùng' }));
+      })
+      .finally(() => {
+        setCategoryPartsLoading((prev) => ({ ...prev, [category]: false }));
+      });
+  }
+
   if (!branchId) {
     return (
       <div className="inv-dashboard__error">
@@ -90,9 +119,8 @@ export default function DashboardPage() {
   }
 
   const topParts = partsStats?.topParts || [];
-  const topBrands = partsStats?.topBrands || [];
   const partsSummary = partsStats?.summary || {
-    distinctParts: 0, totalExportQuantity: 0, totalExportCount: 0, totalDemandQuantity: 0, totalDemandCount: 0,
+    distinctParts: 0, totalExportQuantity: 0, totalExportCount: 0, totalImportQuantity: 0, totalImportCount: 0,
   };
   const topPart = topParts[0];
 
@@ -128,9 +156,6 @@ export default function DashboardPage() {
         <select className="form-select" value={period} onChange={(e) => setPeriod(e.target.value)}>
           {PERIOD_PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
         </select>
-        <div className="dash-filterbar__count">
-          {partsLoading ? 'Đang tải…' : `${partsSummary.distinctParts} phụ tùng có phát sinh`}
-        </div>
       </div>
 
       {partsError && (
@@ -142,68 +167,99 @@ export default function DashboardPage() {
       <div className="dashboard__cards">
         <StatTile label="Tổng SL xuất kho" value={partsSummary.totalExportQuantity.toLocaleString('vi-VN')} />
         <StatTile label="Số lần xuất kho" value={partsSummary.totalExportCount.toLocaleString('vi-VN')} />
-        <StatTile label="Tổng SL trên phiếu quyết toán" value={partsSummary.totalDemandQuantity.toLocaleString('vi-VN')} />
-        <StatTile label="Số lượt dùng trên phiếu" value={partsSummary.totalDemandCount.toLocaleString('vi-VN')} />
+        <StatTile label="Tổng SL nhập kho" value={partsSummary.totalImportQuantity.toLocaleString('vi-VN')} />
+        <StatTile label="Số lần nhập kho" value={partsSummary.totalImportCount.toLocaleString('vi-VN')} />
       </div>
 
-      <div className="dash-grid-2">
-        <div className="dash-card dash-card--chart">
-          <div className="dash-card__title">Top 10 phụ tùng sử dụng nhiều nhất</div>
-          {topPart && topPart.totalQuantity > 0 && (
-            <div style={{ fontSize: 11.5, color: 'var(--gray-700)', marginBottom: 10 }}>
-              Được sử dụng nhiều nhất:{' '}
-              <b>{topPart.productName}</b>{' '}({topPart.totalQuantity.toLocaleString('vi-VN')} {topPart.unit})
-            </div>
-          )}
-          {partsLoading ? <div className="empty-state" style={{ minHeight: 220 }}><p>Đang tải…</p></div> : <TopPartsBarChart data={topParts} />}
-        </div>
-        <div className="dash-card dash-card--chart">
-          <div className="dash-card__title">Phân bố theo hãng</div>
-          {partsLoading ? <div className="empty-state" style={{ minHeight: 180 }}><p>Đang tải…</p></div> : <BrandDonutChart data={topBrands} />}
-        </div>
+      <div className="dash-card dash-card--chart">
+        <div className="dash-card__title">Top 10 phụ tùng sử dụng nhiều nhất</div>
+        {topPart && topPart.totalQuantity > 0 && (
+          <div style={{ fontSize: 11.5, color: 'var(--gray-700)', marginBottom: 10 }}>
+            Được sử dụng nhiều nhất:{' '}
+            <b>{topPart.productName}</b>{' '}({topPart.totalQuantity.toLocaleString('vi-VN')} {topPart.unit})
+          </div>
+        )}
+        {partsLoading ? <div className="empty-state" style={{ minHeight: 220 }}><p>Đang tải…</p></div> : <TopPartsBarChart data={topParts} />}
       </div>
 
-      <div className="dash-card" style={{ padding: 0 }}>
-        <div className="dash-card__title" style={{ padding: '16px 20px 0' }}>Chi tiết phụ tùng sử dụng nhiều nhất</div>
-        <div className="table-wrapper" style={{ border: 'none', boxShadow: 'none' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Mã phụ tùng</th>
-                <th>Tên phụ tùng</th>
-                <th>Hãng</th>
-                <th>SL xuất kho</th>
-                <th>Số lần xuất</th>
-                <th>SL trên phiếu QT</th>
-                <th>Tồn hiện tại</th>
-              </tr>
-            </thead>
-            <tbody>
-              {partsLoading && (
-                <tr><td colSpan={7}><div className="empty-state"><p>Đang tải…</p></div></td></tr>
-              )}
-              {!partsLoading && topParts.length === 0 && (
-                <tr><td colSpan={7}>
-                  <div className="empty-state">
-                    <h3>Chưa có dữ liệu</h3>
-                  </div>
-                </td></tr>
-              )}
-              {!partsLoading && topParts.map((p) => (
-                <tr key={p.productId}>
-                  <td>{p.productCode}</td>
-                  <td style={{ fontWeight: 600 }}>{p.productName}</td>
-                  <td>{p.brandName || '—'}</td>
-                  <td>{p.exportQuantity.toLocaleString('vi-VN')} {p.unit}</td>
-                  <td>{p.exportCount.toLocaleString('vi-VN')}</td>
-                  <td>{p.demandQuantity.toLocaleString('vi-VN')} {p.unit}</td>
-                  <td>{p.currentStock.toLocaleString('vi-VN')} {p.unit}</td>
+      {summary && summary.summary && summary.summary.length > 0 && (
+        <div className="dash-card" style={{ padding: 0 }}>
+          <div className="dash-card__title" style={{ padding: '16px 20px 0' }}>Tổng hợp theo loại</div>
+          <div className="table-wrapper" style={{ border: 'none', boxShadow: 'none' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Loại</th>
+                  <th>Số phụ tùng</th>
+                  <th>Tổng SL tồn</th>
+                  <th>Giá trị</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {summary.summary.map((c) => {
+                  const isOpen = expandedCategory === c.category;
+                  const parts = categoryParts[c.category];
+                  const loadingParts = categoryPartsLoading[c.category];
+                  const partsError = categoryPartsError[c.category];
+                  return (
+                    <Fragment key={c.category}>
+                      <tr
+                        onClick={() => toggleCategory(c.category)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td style={{ fontWeight: 600 }}>
+                          <span style={{ display: 'inline-block', width: 14, color: 'var(--gray-500)' }}>{isOpen ? '▾' : '▸'}</span>
+                          {c.category}
+                        </td>
+                        <td>{c.productCount}</td>
+                        <td>{c.totalQuantity}</td>
+                        <td>{formatCurrency(c.totalValue)}</td>
+                      </tr>
+                      {isOpen && (
+                        <tr>
+                          <td colSpan={4} style={{ padding: 0, background: 'var(--gray-50, #f8fafc)' }}>
+                            {loadingParts && (
+                              <div style={{ padding: '12px 20px', fontSize: 13, color: 'var(--gray-600)' }}>Đang tải…</div>
+                            )}
+                            {partsError && (
+                              <div style={{ padding: '12px 20px', fontSize: 13, color: '#C62828' }}>{partsError}</div>
+                            )}
+                            {!loadingParts && !partsError && parts && parts.length === 0 && (
+                              <div style={{ padding: '12px 20px', fontSize: 13, color: 'var(--gray-600)' }}>Không có phụ tùng nào</div>
+                            )}
+                            {!loadingParts && !partsError && parts && parts.length > 0 && (
+                              <table className="data-table" style={{ margin: '0 20px 12px', width: 'calc(100% - 40px)' }}>
+                                <thead>
+                                  <tr>
+                                    <th>Mã</th>
+                                    <th>Tên</th>
+                                    <th>Số lượng</th>
+                                    <th>Tổng giá trị</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {parts.map((p) => (
+                                    <tr key={p.id}>
+                                      <td>{p.productCode}</td>
+                                      <td>{p.productName}</td>
+                                      <td>{p.stockQuantity}</td>
+                                      <td>{formatCurrency((p.stockQuantity || 0) * (p.unitPrice || 0))}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
     </div>
   );

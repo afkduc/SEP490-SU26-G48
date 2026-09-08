@@ -404,6 +404,11 @@ class ManagerService {
       throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
     }
 
+    if (payload.modelId != null && payload.modelId !== '') {
+      const validModel = await this.managerRepository.isValidVehicleModel(payload.modelId);
+      if (!validModel) throw new ApiError(400, 'Dòng xe áp dụng không hợp lệ');
+    }
+
     let normalizedServices;
     if (requireServiceIds || services !== undefined) {
       if (!Array.isArray(services) || services.length === 0) {
@@ -438,6 +443,7 @@ class ManagerService {
       description: (payload.description || '').trim() || null,
       purpose: (payload.purpose || '').trim() || null,
       repairCategory: payload.repairCategory || null,
+      modelId: payload.modelId || null,
       services,
     });
   }
@@ -461,6 +467,7 @@ class ManagerService {
       purpose: (payload.purpose || '').trim() || null,
       isActive: payload.isActive !== undefined ? !!payload.isActive : existing.isActive,
       repairCategory: payload.repairCategory || null,
+      modelId: payload.modelId !== undefined ? (payload.modelId || null) : existing.modelId,
       services,
     });
   }

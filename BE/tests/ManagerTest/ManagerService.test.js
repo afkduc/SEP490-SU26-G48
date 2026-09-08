@@ -37,6 +37,7 @@ function mockRepo(overrides = {}) {
     nextPackageCode: async () => 'PKG-001',
     createServicePackage: async (data) => ({ id: 300, ...data }),
     updateServicePackage: async (branchId, id, data) => ({ id, ...data }),
+    isValidVehicleModel: async (modelId) => Number(modelId) === 1,
 
     // Settlement reports (read-only cho Manager)
     listSettlementReports: async () => [],
@@ -463,6 +464,16 @@ test('createServicePackage succeeds with generated package code', async () => {
   const created = await service.createServicePackage(1, basePackagePayload());
   assert.equal(created.packageCode, 'PKG-001');
   assert.deepEqual(created.services, [{ serviceId: 700, actionCode: 'R' }, { serviceId: 701, actionCode: 'I' }]);
+});
+
+test('createServicePackage validates modelId against vehicle_models', async () => {
+  const service = new ManagerService(mockRepo());
+  await assert.rejects(
+    () => service.createServicePackage(1, basePackagePayload({ modelId: 999 })),
+    (err) => err.statusCode === 400 && /Dòng xe/i.test(err.message),
+  );
+  const created = await service.createServicePackage(1, basePackagePayload({ modelId: 1 }));
+  assert.equal(created.modelId, 1);
 });
 
 test('updateServicePackage 404s when missing; serviceIds optional but validated when provided', async () => {

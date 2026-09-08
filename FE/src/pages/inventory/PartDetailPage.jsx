@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { usePartDetail } from '../../hooks/inventory/usePartDetail';
 import { useParts } from '../../hooks/inventory/useParts';
 import { useInventoryBranch } from './InventoryLayout';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import { listUnitsApi } from '../../services/productApi';
 import { PermissionGate } from '../../components/PermissionGate';
 import './PartDetailPage.css';
@@ -15,8 +16,9 @@ const STATUS_LABELS = {
 
 export default function PartDetailPage() {
   const { id } = useParams();
+  const confirm = useConfirm();
   const { branchId, loadingBranches, branchError } = useInventoryBranch();
-  const { part, history, loading, error, refetch } = usePartDetail(id);
+  const { part, loading, error, refetch } = usePartDetail(id);
   const { update, deactivate, reactivate } = useParts({ branchId });
 
   const [editing, setEditing] = useState(false);
@@ -38,7 +40,6 @@ export default function PartDetailPage() {
       unitPrice: part.unitPrice ?? '',
       minStock: part.minStock ?? 5,
       supplierId: part.supplierId ?? '',
-      location: part.location || '',
       status: part.status || 'active',
       note: part.note || '',
     });
@@ -77,10 +78,15 @@ export default function PartDetailPage() {
 
   async function handleToggleStatus() {
     const isActive = part.status === 'active';
-    const msg = isActive
-      ? 'Xác nhận tạm ngừng phụ tùng này?'
-      : 'Xác nhận kích hoạt lại phụ tùng này?';
-    if (!window.confirm(msg)) return;
+    const ok = await confirm({
+      title: isActive ? 'Tạm ngừng phụ tùng' : 'Kích hoạt phụ tùng',
+      message: isActive
+        ? 'Tạm ngừng phụ tùng này? Phụ tùng sẽ không còn được chọn khi lập phiếu.'
+        : 'Kích hoạt lại phụ tùng này?',
+      confirmText: isActive ? 'Tạm ngừng' : 'Kích hoạt',
+      tone: isActive ? 'warning' : 'primary',
+    });
+    if (!ok) return;
     setToggling(true);
     setFormError('');
     try {
@@ -209,12 +215,6 @@ export default function PartDetailPage() {
                     onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
                     placeholder="ID nhà cung cấp" />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Vị trí kho</label>
-                  <input className="input" value={form.location}
-                    onChange={(e) => setForm({ ...form, location: e.target.value })}
-                    placeholder="VD: K1-A1" />
-                </div>
               </div>
 
               <div className="form-group">
@@ -245,7 +245,6 @@ export default function PartDetailPage() {
               <DetailRow label="Mã phụ tùng" value={<span className="font-mono">{part.productCode}</span>} />
               <DetailRow label="Tên phụ tùng" value={part.productName} />
               <DetailRow label="Loại" value={part.category || '—'} />
-              <DetailRow label="Thương hiệu" value={part.brandName || '—'} />
               <DetailRow label="Đơn vị" value={part.unitName || '—'} />
               <DetailRow label="Nhà cung cấp" value={part.supplierName || part.supplierId || '—'} />
             </div>
@@ -253,7 +252,7 @@ export default function PartDetailPage() {
         </div>
 
         <div className="detail-card">
-          <h3 className="detail-card__title">Tồn kho (chỉ đọc)</h3>
+          <h3 className="detail-card__title">Tồn kho</h3>
           <div className={`stock-highlight ${isLow ? 'stock-highlight--warn' : 'stock-highlight--ok'}`}>
             <span className="stock-highlight__number">{stock}</span>
             <span className="stock-highlight__unit">{part.unitName || ''}</span>
@@ -272,7 +271,6 @@ export default function PartDetailPage() {
               label="Đơn giá"
               value={part.unitPrice != null ? Number(part.unitPrice).toLocaleString('vi-VN') + ' đ' : '—'}
             />
-            <DetailRow label="Vị trí" value={part.location || '—'} />
             <DetailRow
               label="Trạng thái"
               value={<span className={`badge ${isLow ? 'badge--warning' : 'badge--success'}`}>
@@ -280,49 +278,7 @@ export default function PartDetailPage() {
               </span>}
             />
           </div>
-          <p className="detail-hint">
-            Số lượng tồn chỉ được thay đổi qua phiếu nhập/xuất kho (sẽ thêm ở phase sau).
-          </p>
         </div>
-      </div>
-
-      {/* Lịch sử tồn kho */}
-      <div className="detail-card detail-card--full">
-        <h3 className="detail-card__title">Lịch sử tồn kho</h3>
-        {history.length === 0 ? (
-          <p className="detail-empty">
-            Chưa có giao dịch nào (lịch sử sẽ hiển thị khi có phiếu nhập/xuất).
-          </p>
-        ) : (
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Mã phiếu</th>
-                  <th>Loại</th>
-                  <th>Số lượng</th>
-                  <th>Ngày</th>
-                  <th>Người thực hiện</th>
-                  <th>Ghi chú</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((tx) => (
-                  <tr key={tx.id}>
-                    <td><span className="font-mono">{tx.transactionCode}</span></td>
-                    <td>{tx.transactionType}</td>
-                    <td className="text-right">
-                      {tx.transactionType === 'import' ? '+' : '-'}{tx.quantity}
-                    </td>
-                    <td>{tx.transactionDate}</td>
-                    <td>{tx.performedBy}</td>
-                    <td>{tx.note || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );
