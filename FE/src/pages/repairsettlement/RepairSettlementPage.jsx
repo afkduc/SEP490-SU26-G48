@@ -2949,6 +2949,24 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const totals = calcTotals(items);
   const signatureDate = new Date();
 
+  // Cong-to-met ve nguyen tac chi tang. Bao NGAY luc go chu khong doi den luc
+  // bam Luu: CVDV go xong o nay con dien tiep ca form dai ben duoi, den luc
+  // luu moi bao thi phai cuon nguoc len tim, va thuong la da quen so dung.
+  //
+  // handleSave VAN kiem lai - day chi la canh bao som, khong phai cai chan.
+  const kmLoi = (() => {
+    const { currentKm, lastKnownKm } = vehicleInfo;
+    if (currentKm === '' || currentKm == null) return '';
+    const km = Number(currentKm);
+    if (Number.isNaN(km)) return 'Số km phải là số.';
+    if (km < 0) return 'Số km không được là số âm.';
+    if (lastKnownKm != null && km < Number(lastKnownKm)) {
+      return `Nhỏ hơn lần ghi nhận gần nhất (${Number(lastKnownKm).toLocaleString('vi-VN')} km). `
+        + 'Công-tơ-mét chỉ tăng — kiểm tra lại số vừa nhập.';
+    }
+    return '';
+  })();
+
   // Neu chon tu goi y tra cuu (co id that trong DB) thi luon du dieu kien Luu.
   // Neu KHONG chon tu tra cuu (khach hang/xe hoan toan moi, chi luc TAO phieu
   // moi) - van cho Luu binh thuong, khong bat buoc phai co san trong DB nua:
@@ -3370,7 +3388,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       </span>
                     )}
                   </label>
-                  <input className="form-input" type="number" min={vehicleInfo.lastKnownKm || 0} value={vehicleInfo.currentKm} onChange={(e) => vInfoSet('currentKm', e.target.value)} />
+                  <input
+                    className="form-input"
+                    type="number"
+                    min={vehicleInfo.lastKnownKm || 0}
+                    value={vehicleInfo.currentKm}
+                    aria-invalid={Boolean(kmLoi)}
+                    style={kmLoi ? { borderColor: 'var(--red)' } : undefined}
+                    onChange={(e) => vInfoSet('currentKm', e.target.value)}
+                  />
+                  {kmLoi && <div className="form-error" style={{ marginTop: 4 }}>{kmLoi}</div>}
                 </div>
               </div>
               {(() => {
