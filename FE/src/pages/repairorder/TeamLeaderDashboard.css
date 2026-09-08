@@ -294,6 +294,42 @@
   gap: 8px;
 }
 
+/* Nut thu gon 1 khoang - tam giac nho nam sat ben trai so khoang. */
+.tld-bay-collapse {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0 2px 0 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--gray-600);
+  flex-shrink: 0;
+}
+/* Cum ben trai cua header (nut + so khoang + tom tat khi thu gon); badge
+   trang thai la item con lai nen van bam ben phai. */
+.tld-bay-head-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+/* Khach hang + bien so ghep vao thanh khi thu gon - cat bang ... neu dai. */
+.tld-bay-collapsed-hint {
+  color: var(--gray-500);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Thu gon la CA KHUNG khoang co lai con 1 thanh: bo padding thua, va
+   align-self:start de o luoi khong bi keo cao bang khoang dang mo ben canh. */
+.tld-bay-status-card--collapsed {
+  padding: 8px 12px;
+  gap: 0;
+  align-self: start;
+}
+
 .tld-bay-status-card__number {
   font-size: 16px;
   font-weight: 800;

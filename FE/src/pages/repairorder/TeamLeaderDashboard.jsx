@@ -447,6 +447,16 @@ function AssignTechniciansModal({ order, onClose, onDone }) {
 // 'task-updated'/danh sach orders duoc nap lai.
 function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId, onForwardNg, forwardingTaskId }) {
   const [intakeOrder, setIntakeOrder] = useState(null);
+  // Goi bao duong bung ra 30+ dau muc, 3 khoang cung luc la phai cuon rat
+  // lau moi xem het. Cho thu gon tung khoang lai - chi la trang thai hien
+  // thi nen khong can luu, va luon giu lai dong khach hang/bien so de con
+  // biet khoang nao dang lam xe nao.
+  const [collapsedBays, setCollapsedBays] = useState(() => new Set());
+  const toggleBay = (bayId) => setCollapsedBays((prev) => {
+    const next = new Set(prev);
+    if (next.has(bayId)) next.delete(bayId); else next.add(bayId);
+    return next;
+  });
 
   if (bays.length === 0) {
     return <div className="tld-empty">Bạn chưa được gán khoang xe nào. Liên hệ Quản lý chi nhánh.</div>;
@@ -482,11 +492,29 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
         const ngChuaBao = activeServiceTasks.filter((t) => t.ngDecision === 'reported');
         const ngChoKhach = activeServiceTasks.filter((t) => t.ngDecision === 'pending');
         const vuongNg = ngChuaBao.length + ngChoKhach.length > 0;
+        const thuGon = collapsedBays.has(bay.id);
 
         return (
-          <div key={bay.id} className={`tld-bay-status-card ${busy ? 'tld-bay-status-card--busy' : ''}`}>
+          <div key={bay.id} className={`tld-bay-status-card ${busy ? 'tld-bay-status-card--busy' : ''}${thuGon ? ' tld-bay-status-card--collapsed' : ''}`}>
             <div className="tld-bay-status-card__header">
-              <span className="tld-bay-status-card__number">Khoang {bay.bayNumber}</span>
+              <div className="tld-bay-head-left">
+                {busy && (
+                  <button type="button" className="tld-bay-collapse"
+                    onClick={() => toggleBay(bay.id)}
+                    title={thuGon ? 'Mở lại khoang này' : 'Thu gọn khoang này'}
+                    style={{ transform: thuGon ? 'none' : 'rotate(90deg)' }}>▶</button>
+                )}
+                <span className="tld-bay-status-card__number">Khoang {bay.bayNumber}</span>
+                {/* Thu gon: ca khung khoang co lai con dung thanh nay, nen
+                    ghep luon khach hang + bien so vao de van biet khoang nao
+                    dang lam xe nao ma khong phai mo ra. */}
+                {thuGon && order && (
+                  <span className="tld-bay-collapsed-hint">
+                    {order.customer?.fullName} — {order.vehicle?.licensePlate}
+                    {vuongNg ? ` · ${ngChuaBao.length + ngChoKhach.length} mục không đạt` : ''}
+                  </span>
+                )}
+              </div>
               <span className={`badge ${xongHet ? 'badge-pending' : (busy ? 'badge-inprogress' : 'badge-inactive')}`}>
                 {xongHet
                   ? 'Chờ xác nhận'
@@ -494,9 +522,9 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
               </span>
             </div>
 
-            {busy && !order && <div className="tld-empty">Đang tải tiến độ…</div>}
+            {busy && !order && !thuGon && <div className="tld-empty">Đang tải tiến độ…</div>}
 
-            {busy && order && (
+            {busy && order && !thuGon && (
               <>
                 <div className="tld-bay-status-card__customer">Khách hàng: {order.customer?.fullName} — {order.vehicle?.licensePlate}</div>
                 {order.advisorName && (
