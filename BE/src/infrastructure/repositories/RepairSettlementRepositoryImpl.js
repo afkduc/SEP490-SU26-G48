@@ -722,6 +722,41 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.recordset[0] || null;
   }
 
+  // Cac ma QR con SONG cua 1 phieu (chua thanh toan, chua bi huy).
+  //
+  // Moi lan bam "Tao ma QR" la sinh them 1 link PayOS moi ma khong dong link
+  // cu lai - tren DB that co 13 phieu dang cong don nhieu ma, 1 phieu toi 12
+  // ma. Moi ma do la 1 duong thu tien that: khach quet nham ma cu la tien van
+  // di, trong khi phieu da xuat hoa don theo ma khac.
+  async findPendingPayosTransactions(repairOrderId, { exceptOrderCode = null } = {}) {
+    const result = await query(
+      `SELECT order_code, payment_link_id FROM payos_transactions
+       WHERE  repair_order_id = @repairOrderId AND status = 'pending'
+         AND  (@exceptOrderCode IS NULL OR order_code <> @exceptOrderCode)`,
+      { repairOrderId: Number(repairOrderId), exceptOrderCode: exceptOrderCode ?? null }
+    );
+    return result.recordset;
+  }
+
+  async markPayosTransactionCancelled(orderCode) {
+    await query(
+      `UPDATE payos_transactions SET status = 'cancelled'
+       WHERE  order_code = @orderCode AND status = 'pending'`,
+      { orderCode }
+    );
+  }
+
+  // Phieu nay da tung thanh toan thanh cong qua QR chua - dung de chan tao
+  // them ma moi cho 1 phieu da thu tien xong.
+  async hasPaidPayosTransaction(repairOrderId) {
+    const result = await query(
+      `SELECT TOP 1 order_code FROM payos_transactions
+       WHERE  repair_order_id = @repairOrderId AND status = 'paid'`,
+      { repairOrderId: Number(repairOrderId) }
+    );
+    return Boolean(result.recordset[0]);
+  }
+
   async markPayosTransactionPaid(orderCode, { reference, paidAt }) {
     await query(
       `UPDATE payos_transactions SET status = 'paid', webhook_reference = @reference, paid_at = @paidAt WHERE order_code = @orderCode`,

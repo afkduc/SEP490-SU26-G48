@@ -2,6 +2,7 @@
 // số hoá lại từ form giấy cùng tên. Lưu nguyên 1 khối JSON (repair_orders.intake_checklist),
 // không tách thành nhiều cột riêng vì đây là checklist tĩnh, không cần truy vấn/báo cáo theo từng mục.
 import { useRef } from 'react';
+import { INTAKE_NOTICE_LINES } from './intakeNotice';
 export const DEFAULT_INTAKE_CHECKLIST = {
   interior: { ac: null, handbrake: null, brakePedalClutch: null, seatsHeadliner: null },
   fuelGauge: null, // 'E' | '1/4' | '1/2' | '3/4' | 'F'
@@ -494,6 +495,15 @@ export default function IntakeChecklistSection({ value, onChange, vehicleModelTe
         <div className="form-group">
           <label className="form-label">Lưu ý (hạng mục cần làm sớm, ghi chú)</label>
           <textarea className="form-textarea" rows={2} value={v.notes || ''} onChange={(e) => setField('notes', e.target.value)} />
+        </div>
+
+        {/* Cam ket khach da doc khi ky nhan xe - phai o cuoi, ngay tren cho ky. */}
+        <div style={{
+          marginTop: 14, padding: '10px 12px', borderRadius: 6,
+          background: 'var(--gray-50)', border: '1px solid var(--gray-200)',
+          fontSize: 12.5, lineHeight: 1.6, color: '#334155',
+        }}>
+          {INTAKE_NOTICE_LINES.map((dong) => <div key={dong}>{dong}</div>)}
         </div>
       </div>
     </div>

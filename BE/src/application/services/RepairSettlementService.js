@@ -553,12 +553,45 @@ class RepairSettlementService {
   // FE). Het han sau 60s (test nhanh theo yeu cau) - moi lan goi la 1
   // orderCode moi (Date.now()), khong tai su dung orderCode cu vi PayOS bat
   // buoc orderCode duy nhat.
+  // Dong (huy) cac ma QR con song cua 1 phieu, ca o PayOS lan o DB.
+  //
+  // Best-effort o phia PayOS: ma da het han hoac vua duoc thanh toan thi
+  // cancel se bao loi - nuot di, vi muc tieu la KHONG con ma nao thu duoc
+  // tien nua, ma 2 truong hop do thi von da khong thu duoc roi. Nhung DB thi
+  // van phai danh dau lai cho khop.
+  async _huyCacMaQrCu(repairOrderId, { exceptOrderCode = null } = {}) {
+    const dsCu = await this.repairSettlementRepository.findPendingPayosTransactions(
+      repairOrderId, { exceptOrderCode }
+    );
+    for (const cu of dsCu) {
+      try {
+        await getPayOS().paymentRequests.cancel(cu.order_code, { cancellationReason: 'Thay bang ma QR moi' });
+      } catch (err) {
+        console.warn(`[payos] khong huy duoc ma ${cu.order_code} (co the da het han/da thanh toan):`, err.message);
+      }
+      await this.repairSettlementRepository.markPayosTransactionCancelled(cu.order_code);
+    }
+    return dsCu.length;
+  }
+
   async createPayosPaymentLink(id, req = {}) {
     const existing = await this.repairSettlementRepository.findById(id);
     if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
     if (existing.status !== 'waiting_payment') {
       throw new ApiError(409, 'Phiếu không ở trạng thái chờ thanh toán');
     }
+    // Da thu tien qua QR roi thi khong sinh them ma nao nua. Trang thai phieu
+    // thuong da chan (webhook chuyen sang 'invoiced'), nhung day la lop chan
+    // theo CHINH giao dich - webhook co the toi muon, hoac ai do dua phieu
+    // nguoc ve cho thanh toan.
+    if (await this.repairSettlementRepository.hasPaidPayosTransaction(id)) {
+      throw new ApiError(409, 'Phiếu này đã được thanh toán qua QR, không tạo mã mới được');
+    }
+
+    // MOI phieu chi duoc 1 ma QR song tai 1 thoi diem: dong het ma cu truoc
+    // khi phat ma moi. Neu khong, moi lan bam la them 1 duong thu tien - khach
+    // quet nham ma cu la tien van di, con phieu thi da xuat hoa don theo ma khac.
+    await this._huyCacMaQrCu(id);
 
     const orderCode = Date.now();
     const expiredAtUnix = Math.floor(Date.now() / 1000) + 60;
@@ -619,6 +652,10 @@ class RepairSettlementService {
       reference: webhookData.reference,
       paidAt: new Date(),
     });
+
+    // Thu duoc tien roi thi moi ma QR con lai cua phieu deu phai chet ngay -
+    // khong de khach quet trung lan 2 vao mot ma khac cua cung phieu.
+    await this._huyCacMaQrCu(tx.repair_order_id, { exceptOrderCode: webhookData.orderCode });
 
     const settlement = await this.repairSettlementRepository.findById(tx.repair_order_id);
     if (!settlement || settlement.status !== 'waiting_payment') return;

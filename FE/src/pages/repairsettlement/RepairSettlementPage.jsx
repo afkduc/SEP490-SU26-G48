@@ -243,6 +243,15 @@ function isQuantityReturned(item) {
   return item.lhsc === 'PT' && item.originalQty != null && Number(item.qty) < Number(item.originalQty);
 }
 
+// Dong bi THAY DOI sau khi phieu da chot voi khach - khach huy giua chung,
+// hoac tra bot phu tung da lap. Ca 2 deu la thay doi do BEN KHAC (khach, tho,
+// to truong) gay ra chu khong phai co van tu go, nen phai noi bat len de nguoi
+// doc phieu khong luot qua: chinh may dong nay la ly do tien cuoi cung khac
+// voi bao gia ban dau.
+function laDongDaThayDoi(item) {
+  return item.httt === HTTT_CANCELLED_VALUE || isQuantityReturned(item);
+}
+
 // Nhan hien thi 1 tho trong "Thợ thực hiện" - kem "(Điều động)" neu tho nay
 // khong cung to voi to truong dang phu trach lenh sua chua (dieu dong tu to
 // khac sang giup, xem RepairOrder.sameTeam/RepairSettlement.technicians[].sameTeam).
@@ -493,14 +502,26 @@ function printSettlement(order, payosQrCode) {
   // Tach 2 nhom "Cong viec can thuc hien" / "Phu tung, vat tu" khi in - giong
   // cach hien thi ben form tao/sua phieu va modal Xem chi tiet (giu nguyen so
   // thu tu goc trong mang items, khong danh lai tu 1 cho tung nhom).
-  const indexedItems = (order.items || []).map((item, i) => ({ item, i }));
+  // Goi bao duong bung ra 30+ dau muc con, in het thi phieu dai 4-5 trang
+  // trong khi khach chi tra 1 gia goi - in DUNG dong ten goi la du. Chi tiet
+  // ben trong da nam o "Phieu kiem tra BDDK" rieng.
+  //
+  // assignGroupIds suy lai quan he cha-con tu chinh du lieu (BE khong luu
+  // groupId) - dong con cua goi la dong DV gia 0 nam duoi 1 dau goi.
+  let demNhom = 0;
+  const dsCoNhom = assignGroupIds(order.items || [], () => { demNhom += 1; return demNhom; });
+  // Danh lai STT SAU khi bo dong - giu so goc thi phieu in ra nhay coc
+  // 1, 2, 3, 38, 39 vi 30+ dau muc con da bi an di.
+  const indexedItems = dsCoNhom
+    .filter((item) => !(item.groupId && !item.isGroupParent && item.lhsc === 'DV'))
+    .map((item, i) => ({ item, i }));
   const laborItems = indexedItems.filter(({ item }) => item.lhsc !== 'PT');
   const partItems = indexedItems.filter(({ item }) => item.lhsc === 'PT');
   const laborSubtotal = laborItems.reduce((s, { item }) => s + (item.total || 0), 0);
   const partSubtotal = partItems.reduce((s, { item }) => s + (item.total || 0), 0);
 
   const renderItemRow = ({ item, i }) => `
-    <tr>
+    <tr${laDongDaThayDoi(item) ? ' class="doi-sau"' : ''}>
       <td style="text-align:center">${i + 1}</td>
       <td style="text-align:center">${item.code}</td>
       <td>${item.description}</td>
@@ -557,6 +578,10 @@ function printSettlement(order, payosQrCode) {
   .sign-row { display:flex; justify-content:space-between; margin-top:30px; }
   .sign-box { text-align:center; width:22%; }
   .sign-line { margin-top:40px; border-top:1px solid #000; padding-top:3px; font-size:10px; }
+  /* Dong bi doi sau khi chot voi khach (khach huy / tra bot phu tung) - in
+     mau do de nguoi doc thay ngay vi sao tien cuoi khac bao gia ban dau.
+     print-color-adjust de trinh duyet khong bo mau khi in ra giay. */
+  tr.doi-sau td { color:#c00; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   @media print { body { margin:8mm 12mm; } }
 </style></head><body>
 <div class="center bold" style="font-size:12px">CÔNG TY TNHH AUTOGARA – CHI NHÁNH ${(order.branch || MOCK_BRANCH).toUpperCase()}</div>
@@ -1074,8 +1099,10 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
                   const laborSubtotal = laborRows.reduce((s, { item }) => s + (item.total || 0), 0);
                   const partSubtotal = partRows.reduce((s, { item }) => s + (item.total || 0), 0);
 
+                  // To do CA DONG neu no bi doi sau khi chot voi khach - giong
+                  // ban in, de nguoi doc thay ngay vi sao tien khac bao gia dau.
                   const renderRow = ({ item, i }) => (
-                    <tr key={i}>
+                    <tr key={i} style={laDongDaThayDoi(item) ? { color: 'var(--red)' } : undefined}>
                       <td style={{ textAlign: 'center' }}>{i + 1}</td>
                       <td><span style={{ fontFamily: 'monospace', fontSize: 11 }}>{item.code}</span></td>
                       <td>
@@ -1095,7 +1122,7 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
                       <td style={{ textAlign: 'center' }}>{item.discount || 0}%</td>
                       <td style={{ textAlign: 'right', fontWeight: 700 }}>
                         {(item.total || 0).toLocaleString('vi-VN')}
-                        {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
+                        {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: laDongDaThayDoi(item) ? 'var(--red)' : 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
                       </td>
                       <td style={{ color: 'var(--gray-600)', fontStyle: item.note ? 'normal' : 'italic' }}>{item.note || '—'}</td>
                     </tr>
@@ -3734,9 +3761,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                           {(item.total || 0).toLocaleString('vi-VN')}
                           {exemptionShortLabel(item) ? (
-                            <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>
+                            <span style={{ fontWeight: 400, color: laDongDaThayDoi(item) ? 'var(--red)' : 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>
                           ) : isQuantityReturned(item) && (
-                            <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> (Khách hoàn trả hàng SL x {item.originalQty - item.qty})</span>
+                            <span style={{ fontWeight: 400, color: 'var(--red)' }}> (Khách hoàn trả hàng SL x {item.originalQty - item.qty})</span>
                           )}
                         </td>
                         <td>
