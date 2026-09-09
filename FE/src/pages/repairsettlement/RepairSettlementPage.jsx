@@ -2673,12 +2673,17 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     if (!headRow) return;
 
     let priceByServiceId = new Map();
+    let categoryByServiceId = new Map();
     let serviceIdByProductId = new Map();
     try {
       const result = await searchCatalogApi(headRow.code);
       const pkg = (result.packages || []).find((p) => p.code === headRow.code);
       if (pkg) {
         priceByServiceId = new Map(pkg.items.map((it) => [String(it.serviceId), it.unitPrice]));
+        // Loai hinh sua chua THAT cua tung dich vu - khi con nguyen goi thi ca
+        // nhom deu mang loai hinh cua GOI ("Bảo dưỡng định kỳ"); vo goi roi thi
+        // moi dich vu tro ve dich vu le nen phai tra ve dung loai hinh rieng.
+        categoryByServiceId = new Map(pkg.items.map((it) => [String(it.serviceId), it.repairCategory || '']));
         for (const svc of pkg.items) {
           for (const part of svc.parts || []) {
             serviceIdByProductId.set(String(part.productId), String(svc.serviceId));
@@ -2709,12 +2714,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         if (it.lhsc === 'DV') {
           const newGid = nextGroupId();
           newGroupIdByOwnerIdx.set(i, newGid);
+          // Tro ve dich vu le -> lay lai loai hinh sua chua rieng cua dich vu
+          // (khong con la "Bảo dưỡng định kỳ" cua goi nua).
+          const cat = categoryByServiceId.get(String(it.serviceId));
+          const repairCategory = cat != null ? cat : it.repairCategory;
           if (i === cancelledIdx) {
             // Huy tu (chua lam) -> so luong ve 0 luon.
-            replacement.push(recalcItem({ ...it, httt: HTTT_CANCELLED_VALUE, qty: 0, groupId: newGid, isGroupParent: true }));
+            replacement.push(recalcItem({ ...it, repairCategory, httt: HTTT_CANCELLED_VALUE, qty: 0, groupId: newGid, isGroupParent: true }));
           } else {
             const price = priceByServiceId.get(String(it.serviceId));
-            replacement.push(recalcItem({ ...it, unitPrice: price != null ? price : it.unitPrice, groupId: newGid, isGroupParent: true }));
+            replacement.push(recalcItem({ ...it, repairCategory, unitPrice: price != null ? price : it.unitPrice, groupId: newGid, isGroupParent: true }));
           }
           continue;
         }
@@ -2728,7 +2737,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           : findOwningServiceIdx(prev, i);
         const ownerNewGid = newGroupIdByOwnerIdx.get(ownerIdx);
         const cancelled = ownerIdx === cancelledIdx;
-        replacement.push(recalcItem({ ...it, groupId: ownerNewGid ?? it.groupId, httt: cancelled ? HTTT_CANCELLED_VALUE : it.httt, qty: cancelled ? 0 : it.qty }));
+        // Phu tung theo dung loai hinh cua dich vu so huu no (dich vu do vua
+        // tro ve loai hinh rieng khi vo goi).
+        const ownerCat = ownerServiceId != null ? categoryByServiceId.get(ownerServiceId) : undefined;
+        replacement.push(recalcItem({
+          ...it,
+          repairCategory: ownerCat != null ? ownerCat : it.repairCategory,
+          groupId: ownerNewGid ?? it.groupId,
+          httt: cancelled ? HTTT_CANCELLED_VALUE : it.httt,
+          qty: cancelled ? 0 : it.qty,
+        }));
       }
 
       const result = [];

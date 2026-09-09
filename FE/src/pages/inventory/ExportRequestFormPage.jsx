@@ -1,22 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useInventoryBranch } from './InventoryLayout';
 import { useExportRequestForm } from '../../hooks/inventory/useExportRequestForm';
-import { productApi } from '../../services';
 import { PermissionGate } from '../../components/PermissionGate';
+import SignaturePad from '../repairsettlement/SignaturePad';
 import './ExportRequestFormPage.css';
 
-function buildItemFromRo(roTask) {
-  return {
-    rowKey: `r_${roTask.repairTaskId}_${Math.random().toString(36).slice(2, 6)}`,
-    productId: roTask.productId,
-    productCode: roTask.productCode,
-    productName: roTask.productName,
-    unit: roTask.unit,
-    quantity: roTask.requestedQuantity,
-    requestedQuantity: roTask.requestedQuantity,
-    currentStock: roTask.currentStock,
-  };
+// Trang thai 1 dong phu tung, tinh tu du lieu server tra ve:
+//   pendingQuantity > 0 -> con phai xuat. Lan dau (chua xuat gi) la "Cần xuất",
+//                          da tung xuat roi thi la "Xuất thêm" (hien do).
+//   pendingQuantity < 0 -> CVDV da bot phu tung sau khi da xuat -> "Trả hàng".
+//   pendingQuantity = 0 -> xong, khong con gi de lam.
+// Thieu ton kho thi KHONG cho tick, chi bao "Tồn kho không đủ".
+function lineState(item, slipExportedBefore) {
+  const pending = Number(item.pendingQuantity) || 0;
+  const exported = Number(item.exportedQuantity) || 0;
+  const unit = item.unit || '';
+
+  if (pending === 0) {
+    return { kind: 'done', label: 'Đã xuất đủ', canTick: false, danger: false };
+  }
+  if (pending < 0) {
+    return { kind: 'return', label: `Trả hàng: ${Math.abs(pending)} ${unit}`.trim(), canTick: true, danger: true };
+  }
+  if (!item.enoughStock) {
+    return { kind: 'no_stock', label: 'Tồn kho không đủ', canTick: false, danger: true };
+  }
+  if (slipExportedBefore) {
+    // Da xuat truoc do roi ma con phat sinh -> canh bao do. Phu tung da xuat
+    // lan truoc thi ghi ro so luong xuat them; phu tung moi thi chi ghi
+    // "Xuất thêm" (khong co so cu de so sanh).
+    return {
+      kind: 'export_more',
+      label: exported > 0 ? `Xuất thêm: ${pending} ${unit}`.trim() : 'Xuất thêm',
+      canTick: true,
+      danger: true,
+    };
+  }
+  return { kind: 'first', label: `Cần xuất: ${pending} ${unit}`.trim(), canTick: true, danger: false };
 }
 
 export default function ExportRequestFormPage() {
@@ -24,129 +45,115 @@ export default function ExportRequestFormPage() {
   const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
   const {
-    nextCode, codeDate, loadingCode, codeError, refetchCode,
     submitting, submitError, submit,
     repairOrders, loadingRepairOrders, fetchRepairOrders,
+    technicians, loadingTechnicians,
     loadRepairOrder, loadingRoDetail,
   } = useExportRequestForm(branchId);
 
-  const [notes, setNotes] = useState('');
+  const [receivedBy, setReceivedBy] = useState('');
+  const [receivedByName, setReceivedByName] = useState('');
+  const [technicianSearchTerm, setTechnicianSearchTerm] = useState('');
   const [selectedRo, setSelectedRo] = useState(null);
   const [items, setItems] = useState([]);
+  const [tickedIds, setTickedIds] = useState(() => new Set());
   const [formError, setFormError] = useState('');
   const [roSearchTerm, setRoSearchTerm] = useState('');
-  const [showRoPicker, setShowRoPicker] = useState(true);
 
-  // Them phu tung thu cong (khi LSC khong co san task PART)
-  const [productSearchTerm, setProductSearchTerm] = useState('');
-  const [productSearchResults, setProductSearchResults] = useState([]);
-  const [searchingProducts, setSearchingProducts] = useState(false);
+  // Chu ky cua chinh nguoi lay (tho) xac nhan da nhan phu tung - giong het
+  // co che khach hang ky tren phieu quyet toan (SignaturePad dung chung).
+  const signaturePadRef = useRef(null);
+  const [signatureEmpty, setSignatureEmpty] = useState(true);
 
-  // Load danh sach RO khi mo form
+  const visibleTechnicians = (() => {
+    const term = technicianSearchTerm.trim().toLowerCase();
+    if (!term) return [];
+    return technicians.filter((t) =>
+      t.fullName.toLowerCase().includes(term)
+      || (t.employeeId || '').toLowerCase().includes(term));
+  })();
+
+  function handlePickTechnician(t) {
+    setReceivedBy(String(t.id));
+    setReceivedByName(`${t.employeeId ? `${t.employeeId} - ` : ''}${t.fullName}`);
+    setTechnicianSearchTerm('');
+  }
+
+  function handleChangeTechnician() {
+    setReceivedBy('');
+    setReceivedByName('');
+  }
+
+  // Danh sach RO CHI hien khi nguoi dung go dung tu khoa tim kiem (>= 2 ky
+  // tu) - khong tu load toan bo danh sach luc vao trang, tranh lo het cac
+  // RO dang cho xuat kho cua chi nhanh cho bat ky ai mo trang nay.
   useEffect(() => {
-    if (showRoPicker) {
-      fetchRepairOrders(roSearchTerm);
-    }
-  }, [showRoPicker, roSearchTerm, fetchRepairOrders]);
-
-  // Tim phu tung khi nhap tu khoa (debounce 300ms)
-  useEffect(() => {
-    const term = productSearchTerm.trim();
-    if (term.length < 2) {
-      setProductSearchResults([]);
-      return;
-    }
-    const handle = setTimeout(async () => {
-      setSearchingProducts(true);
-      try {
-        const res = await productApi.searchProductsApi(term, branchId);
-        const list = Array.isArray(res) ? res : (res?.items || []);
-        setProductSearchResults(list.slice(0, 20));
-      } catch (_) {
-        setProductSearchResults([]);
-      } finally {
-        setSearchingProducts(false);
-      }
+    const term = roSearchTerm.trim();
+    if (term.length < 2) return;
+    const handle = setTimeout(() => {
+      fetchRepairOrders(term);
     }, 300);
     return () => clearTimeout(handle);
-  }, [productSearchTerm, branchId]);
+  }, [roSearchTerm, fetchRepairOrders]);
+
+  const visibleRepairOrders = roSearchTerm.trim().length < 2 ? [] : repairOrders;
+
+  async function loadRoState(roId) {
+    const detail = await loadRepairOrder(roId);
+    setSelectedRo({
+      id: detail.id,
+      repairOrderCode: detail.repairOrderCode,
+      status: detail.status,
+      customerName: detail.customerName,
+      vehiclePlate: detail.vehiclePlate,
+      teamLeaderName: detail.teamLeaderName,
+      exportRequestId: detail.exportRequestId,
+      locked: detail.locked,
+    });
+    setItems(detail.items || []);
+    // KHONG tick san dong nao: tick la hanh dong xac nhan chu dong cua NV Kho
+    // ("da lay dong nay"), de san thi ky xac nhan mat y nghia.
+    setTickedIds(new Set());
+    return detail;
+  }
 
   async function handlePickRo(ro) {
     setFormError('');
-    if (ro.alreadyExported) {
-      setFormError(`Lệnh sửa chữa ${ro.repairOrderCode} đã được xuất kho trước đó.`);
-      return;
-    }
     try {
-      const detail = await loadRepairOrder(ro.id);
-      const builtItems = (detail.items || []).map(buildItemFromRo);
-      setSelectedRo({
-        id: detail.id,
-        repairOrderCode: detail.repairOrderCode,
-        status: detail.status,
-        customerName: detail.customerName,
-        vehiclePlate: detail.vehiclePlate,
-        teamLeaderName: detail.teamLeaderName,
-      });
-      setItems(builtItems);
-      setShowRoPicker(false);
+      await loadRoState(ro.id);
+      setRoSearchTerm('');
     } catch (err) {
       setFormError(err.message || 'Không thể tải lệnh sửa chữa');
     }
   }
 
+  function toggleTick(productId) {
+    setTickedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+  }
+
   function handleChangeRo() {
     setSelectedRo(null);
     setItems([]);
-    setShowRoPicker(true);
-  }
-
-  function updateItem(rowKey, patch) {
-    setItems((prev) => prev.map((it) => (it.rowKey === rowKey ? { ...it, ...patch } : it)));
-  }
-
-  function addManualProduct(p) {
-    setItems((prev) => {
-      // Neu SP da co thi cong don so luong
-      const exist = prev.find((it) => it.productId === p.id);
-      if (exist) {
-        return prev.map((it) => (it.productId === p.id ? { ...it, quantity: Number(exist.quantity || 0) + 1 } : it));
-      }
-      return [
-        ...prev,
-        {
-          rowKey: `m_${p.id}_${Math.random().toString(36).slice(2, 6)}`,
-          productId: p.id,
-          productCode: p.code || p.productCode,
-          productName: p.name || p.productName,
-          unit: p.unit,
-          quantity: 1,
-          requestedQuantity: 0,
-          currentStock: p.stockQuantity ?? p.stock_quantity ?? null,
-        },
-      ];
-    });
-    setProductSearchTerm('');
-    setProductSearchResults([]);
-  }
-
-  function removeItem(rowKey) {
-    setItems((prev) => prev.filter((it) => it.rowKey !== rowKey));
+    setTickedIds(new Set());
+    signaturePadRef.current?.clear();
   }
 
   function validate() {
     if (!selectedRo) return 'Vui lòng chọn lệnh sửa chữa';
-    if (items.length === 0) return 'Phiếu xuất phải có ít nhất 1 dòng phụ tùng';
-    for (let i = 0; i < items.length; i += 1) {
-      const it = items[i];
-      const q = Number(it.quantity);
-      if (!Number.isFinite(q) || q <= 0 || !Number.isInteger(q)) {
-        return `Dòng ${i + 1}: số lượng phải là số nguyên dương`;
-      }
-      if (it.currentStock != null && q > it.currentStock) {
-        return `Dòng ${i + 1}: tồn kho chỉ còn ${it.currentStock} (cần xuất ${q})`;
-      }
+    if (selectedRo.locked) return 'Lệnh sửa chữa đã chốt, không thể xuất/trả phụ tùng nữa';
+    if (tickableCount === 0) return 'Không có dòng nào cần xuất hoặc trả';
+    // Phai tich DU tat ca cac dong con viec - khong cho luu phieu nua voi.
+    // (Dong thieu ton kho khong tick duoc nen khong tinh vao day.)
+    if (tickedIds.size < tickableCount) {
+      return `Còn ${tickableCount - tickedIds.size} dòng chưa tích — phải tích đủ tất cả các dòng mới lưu được phiếu`;
     }
+    if (!receivedBy) return 'Vui lòng chọn người lấy (thợ nhận phụ tùng)';
+    if (signaturePadRef.current?.isEmpty() ?? true) return 'Vui lòng ký xác nhận đã lấy phụ tùng';
     return '';
   }
 
@@ -159,27 +166,31 @@ export default function ExportRequestFormPage() {
       return;
     }
     try {
-      const created = await submit({
+      // Chi gui productIds duoc tick - so luong do server tu tinh lai.
+      const saved = await submit({
         repairOrderId: selectedRo.id,
-        notes: notes || undefined,
-        items: items.map((it) => ({
-          productId: it.productId,
-          productCode: it.productCode,
-          productName: it.productName,
-          unit: it.unit || undefined,
-          quantity: Number(it.quantity),
-        })),
+        receivedBy: Number(receivedBy),
+        receivedSignatureData: signaturePadRef.current.toDataURL(),
+        productIds: [...tickedIds],
       });
-      navigate(`/inventory/export-requests/${created.id}`);
+      navigate(`/inventory/export-requests/${saved.id}`);
     } catch (submitErr) {
-      setFormError(submitErr.message || 'Tạo phiếu xuất thất bại');
+      setFormError(submitErr.message || 'Xác nhận xuất/trả phụ tùng thất bại');
     }
   }
 
-  const totalQuantity = items.reduce(
-    (sum, it) => sum + (Number(it.quantity) || 0),
-    0,
-  );
+  const slipExportedBefore = Boolean(selectedRo?.exportRequestId);
+  // So dong THUC SU can thao tac (bo qua dong da xong va dong thieu ton kho).
+  const tickableCount = items.filter((it) => lineState(it, slipExportedBefore).canTick).length;
+  const allTicked = tickableCount > 0 && tickedIds.size >= tickableCount;
+
+  // Phai DIEN DU ca 3 phan moi cho luu: tich het dong, chon nguoi lay, va da ky.
+  const missing = [];
+  if (!allTicked) missing.push(`tích đủ các dòng (${tickedIds.size}/${tickableCount})`);
+  if (!receivedBy) missing.push('chọn người lấy');
+  if (signatureEmpty) missing.push('ký xác nhận');
+  const canSubmit = Boolean(selectedRo) && !selectedRo?.locked && missing.length === 0;
+  const missingLabel = missing.length ? `Còn thiếu: ${missing.join(', ')}` : '';
 
   if (!branchId) {
     return (
@@ -205,58 +216,54 @@ export default function ExportRequestFormPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="er-form__body">
-        {/* Chọn lệnh sửa chữa */}
+        {/* Chọn lệnh sửa chữa - danh sách luôn hiện để dễ đổi phiếu, không ẩn đi sau khi chọn */}
         <div className="er-form__section">
           <h2 className="er-form__section-title">Lệnh sửa chữa (Repair Order)</h2>
-          {!selectedRo ? (
-            <div className="er-form__so-picker">
-              <input
-                className="input"
-                type="text"
-                placeholder="Tìm theo mã RO, tên khách, biển số xe..."
-                value={roSearchTerm}
-                onChange={(e) => setRoSearchTerm(e.target.value)}
-              />
-              {loadingRepairOrders ? (
-                <div className="er-form__hint">Đang tải danh sách LSC...</div>
-              ) : repairOrders.length === 0 ? (
-                <div className="er-form__hint">Không có lệnh sửa chữa nào cần xuất kho.</div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Mã RO</th>
-                        <th>Khách hàng</th>
-                        <th>Xe</th>
-                        <th className="text-right">Số PT</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {repairOrders.map((ro) => (
-                        <tr key={ro.id}>
-                          <td><span className="font-mono">{ro.repairOrderCode || '—'}</span></td>
-                          <td>{ro.customerName || '—'}</td>
-                          <td>{ro.vehiclePlate || '—'}</td>
-                          <td className="text-right">{ro.partTaskCount ?? 0}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="btn btn--primary btn--sm"
-                              onClick={() => handlePickRo(ro)}
-                            >
-                              Chọn
-                            </button>
-                          </td>
+          <div className="er-form__search-picker">
+            <input
+              className="input"
+              type="text"
+              placeholder="Tìm theo mã RO, tên khách, biển số xe..."
+              value={roSearchTerm}
+              onChange={(e) => setRoSearchTerm(e.target.value)}
+            />
+            {roSearchTerm.trim().length >= 2 && (
+              <div className="er-form__search-dropdown">
+                {loadingRepairOrders ? (
+                  <div className="er-form__hint">Đang tải danh sách LSC...</div>
+                ) : visibleRepairOrders.length === 0 ? (
+                  <div className="er-form__hint">Không tìm thấy lệnh sửa chữa nào khớp "{roSearchTerm.trim()}".</div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Mã RO</th>
+                          <th>Khách hàng</th>
+                          <th>Xe</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ) : (
+                      </thead>
+                      <tbody>
+                        {visibleRepairOrders.map((ro) => (
+                          <tr
+                            key={ro.id}
+                            className={`er-form__search-row ${selectedRo?.id === ro.id ? 'er-form__search-row--active' : ''}`}
+                            onClick={() => selectedRo?.id !== ro.id && handlePickRo(ro)}
+                          >
+                            <td><span className="font-mono">{ro.repairOrderCode || '—'}</span></td>
+                            <td>{ro.customerName || '—'}</td>
+                            <td>{ro.vehiclePlate || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {selectedRo && (
             <div className="er-form__so-summary">
               <div className="er-form__info-grid">
                 <div><strong>Mã RO:</strong> <span className="font-mono">{selectedRo.repairOrderCode || '—'}</span></div>
@@ -265,7 +272,7 @@ export default function ExportRequestFormPage() {
                 <div><strong>Tổ trưởng:</strong> {selectedRo.teamLeaderName || '—'}</div>
               </div>
               <button type="button" className="btn btn--ghost btn--sm" onClick={handleChangeRo}>
-                Đổi phiếu khác
+                Bỏ chọn
               </button>
             </div>
           )}
@@ -277,44 +284,78 @@ export default function ExportRequestFormPage() {
             <div className="er-form__info">
               <div className="er-form__info-row">
                 <div className="er-form__field">
-                  <label className="er-form__label">Mã phiếu (sẽ sinh tự động)</label>
+                  <label className="er-form__label">Mã phiếu (theo mã lệnh sửa chữa)</label>
                   <input
                     className="input"
                     type="text"
-                    value={loadingCode ? 'Đang sinh...' : (nextCode || '')}
+                    value={selectedRo.repairOrderCode || ''}
                     readOnly
-                    placeholder="EXB-{branchId}-{YYYYMMDD}-{seq}"
                   />
-                  {codeError && <div className="er-form__hint er-form__hint--error">{codeError}</div>}
                 </div>
 
-              </div>
-
-              <div className="er-form__field">
-                <label className="er-form__label">Ghi chú</label>
-                <textarea
-                  className="input"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  maxLength={500}
-                  placeholder="Ghi chú thêm về phiếu xuất..."
-                />
+                <div className="er-form__field">
+                  <label className="er-form__label">Người lấy <span className="required">*</span></label>
+                  {receivedBy ? (
+                    <div className="er-form__picked-chip">
+                      <span>{receivedByName}</span>
+                      <button type="button" className="btn btn--ghost btn--sm" onClick={handleChangeTechnician}>
+                        Bỏ chọn
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="er-form__search-picker">
+                      <input
+                        className="input"
+                        type="text"
+                        placeholder={loadingTechnicians ? 'Đang tải danh sách thợ...' : 'Tìm theo mã hoặc tên thợ...'}
+                        value={technicianSearchTerm}
+                        onChange={(e) => setTechnicianSearchTerm(e.target.value)}
+                      />
+                      {technicianSearchTerm.trim().length > 0 && (
+                        <div className="er-form__search-dropdown">
+                          {visibleTechnicians.length === 0 ? (
+                            <div className="er-form__hint">Không tìm thấy thợ nào khớp "{technicianSearchTerm.trim()}".</div>
+                          ) : (
+                            <ul className="er-form__tech-list">
+                              {visibleTechnicians.map((t) => (
+                                <li
+                                  key={t.id}
+                                  className="er-form__search-row"
+                                  onClick={() => handlePickTechnician(t)}
+                                >
+                                  {t.employeeId && <span className="font-mono">{t.employeeId}</span>}
+                                  <span>{t.fullName}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="er-form__items">
               <div className="er-form__items-header">
-                <h2 className="er-form__items-title">Danh sách phụ tùng xuất</h2>
+                <h2 className="er-form__items-title">Danh sách phụ tùng</h2>
                 <span className="er-form__hint">
-                  Có thể điều chỉnh số lượng, thêm phụ tùng phát sinh hoặc xóa dòng không cần xuất.
+                  Phải tích đủ tất cả các dòng rồi mới ký xác nhận được. Số lượng do hệ thống tính, không sửa tay.
+                  {tickableCount > 0 && ` (đã tích ${tickedIds.size}/${tickableCount})`}
                   {loadingRoDetail && ' Đang tải...'}
                 </span>
               </div>
 
+              {selectedRo.locked && (
+                <div className="er-form__hint er-form__hint--error">
+                  Lệnh sửa chữa đã chốt (chờ thanh toán/đã xuất hóa đơn/đã hủy) — không thể xuất hoặc trả phụ tùng nữa.
+                </div>
+              )}
+
               {items.length === 0 ? (
                 <p className="er-form__empty">
-                  Phiếu sửa chữa không có phụ tùng (PART) nào. Bạn có thể thêm thủ công bên dưới.
+                  Phiếu sửa chữa không có phụ tùng (PART) nào.
                 </p>
               ) : (
                 <div className="table-responsive">
@@ -325,90 +366,56 @@ export default function ExportRequestFormPage() {
                         <th>Mã phụ tùng</th>
                         <th>Tên phụ tùng</th>
                         <th>Đơn vị</th>
-                        <th className="text-right" style={{ width: 100 }}>Yêu cầu</th>
-                        <th className="text-right" style={{ width: 100 }}>Tồn kho</th>
-                        <th style={{ width: 130 }}>Xuất *</th>
-                        <th style={{ width: 70 }}></th>
+                        <th className="text-right" style={{ width: 90 }}>Yêu cầu</th>
+                        <th className="text-right" style={{ width: 90 }}>Đã xuất</th>
+                        <th className="text-right" style={{ width: 90 }}>Tồn kho</th>
+                        <th style={{ width: 210 }}>Xác nhận</th>
                       </tr>
                     </thead>
                     <tbody>
                       {items.map((it, idx) => {
-                        const overStock = it.currentStock != null && Number(it.quantity) > it.currentStock;
+                        const st = lineState(it, slipExportedBefore);
                         return (
-                          <tr key={it.rowKey}>
+                          <tr key={it.productId} className={st.danger ? 'er-form__row--alert' : ''}>
                             <td>{idx + 1}</td>
                             <td><span className="font-mono">{it.productCode}</span></td>
                             <td>{it.productName}</td>
                             <td>{it.unit || '—'}</td>
-                            <td className="text-right">{it.requestedQuantity ?? '—'}</td>
-                            <td className="text-right">
-                              <span className={overStock ? 'er-form__stock--low' : ''}>
-                                {it.currentStock ?? '—'}
-                              </span>
-                            </td>
+                            <td className="text-right">{it.requiredQuantity}</td>
+                            <td className="text-right">{it.exportedQuantity}</td>
+                            <td className="text-right">{it.currentStock}</td>
                             <td>
-                              <input
-                                className={`input ${overStock ? 'er-form__input--error' : ''}`}
-                                type="number"
-                                min={1}
-                                step={1}
-                                value={it.quantity}
-                                onChange={(e) => updateItem(it.rowKey, { quantity: e.target.value })}
-                                placeholder="0"
-                              />
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                className="btn btn--ghost btn--sm"
-                                onClick={() => removeItem(it.rowKey)}
-                                title="Xóa dòng này"
-                              >
-                                Xóa
-                              </button>
+                              <label className="er-form__confirm-cell">
+                                {st.canTick && !selectedRo.locked && (
+                                  <input
+                                    type="checkbox"
+                                    checked={tickedIds.has(it.productId)}
+                                    onChange={() => toggleTick(it.productId)}
+                                  />
+                                )}
+                                <span className={st.danger ? 'er-form__confirm-label--alert' : ''}>
+                                  {st.label}
+                                </span>
+                              </label>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
-                    <tfoot>
-                      <tr>
-                        <td colSpan={6} className="text-right"><strong>Tổng số lượng:</strong></td>
-                        <td className="text-right"><strong>{totalQuantity}</strong></td>
-                      </tr>
-                    </tfoot>
                   </table>
                 </div>
               )}
 
-              {/* Thêm phụ tùng thủ công (cho phép từ LSC không có PART task) */}
-              <div className="er-form__add-product">
-                <h3 className="er-form__add-title">+ Thêm phụ tùng</h3>
-                <input
-                  className="input"
-                  type="text"
-                  placeholder="Nhập mã hoặc tên phụ tùng (ít nhất 2 ký tự)..."
-                  value={productSearchTerm}
-                  onChange={(e) => setProductSearchTerm(e.target.value)}
-                />
-                {searchingProducts && (
-                  <div className="er-form__hint">Đang tìm...</div>
-                )}
-                {!searchingProducts && productSearchResults.length > 0 && (
-                  <ul className="er-form__product-results">
-                    {productSearchResults.map((p) => (
-                      <li key={p.id}>
-                        <button type="button" className="er-form__product-hit" onClick={() => addManualProduct(p)}>
-                          <span className="font-mono">{p.code || p.productCode}</span>
-                          <span className="er-form__product-name">{p.name || p.productName}</span>
-                          <span className="er-form__product-stock">Tồn: {p.stockQuantity ?? p.stock_quantity ?? '—'}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {!searchingProducts && productSearchTerm.trim().length >= 2 && productSearchResults.length === 0 && (
-                  <div className="er-form__hint">Không tìm thấy phụ tùng phù hợp.</div>
+              {/* Nguoi lay TU KY xac nhan da nhan phu tung - giong het co che
+                  khach hang ky tren phieu quyet toan, de biet chac chan AI
+                  da lay hang chu khong chi ghi ten qua dropdown. */}
+              <div className="er-form__signature">
+                <h3 className="er-form__add-title">Người lấy ký xác nhận <span className="required">*</span></h3>
+                <div className="er-form__signature-pad">
+                  <SignaturePad ref={signaturePadRef} onChange={setSignatureEmpty} />
+                </div>
+                {!signatureEmpty && receivedByName && (
+                  <div className="er-form__signature-name">{receivedByName}</div>
                 )}
               </div>
             </div>
@@ -427,9 +434,10 @@ export default function ExportRequestFormPage() {
               <button
                 type="submit"
                 className="btn btn--primary"
-                disabled={submitting || loadingCode || !nextCode || items.length === 0}
+                disabled={submitting || !canSubmit}
+                title={canSubmit ? undefined : missingLabel}
               >
-                {submitting ? 'Đang lưu...' : 'Tạo phiếu xuất'}
+                {submitting ? 'Đang lưu...' : 'Xác nhận xuất/trả'}
               </button>
             </PermissionGate>
           </div>

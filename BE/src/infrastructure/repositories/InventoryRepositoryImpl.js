@@ -215,12 +215,14 @@ LEFT JOIN units u ON u.id = p.unit_id
 
     const cte = `
       WITH export_stats AS (
+        -- SL xuat RONG: tru di phan da tra lai kho ('return'), neu khong phu
+        -- tung xuat roi tra het van bi tinh la "dung nhieu".
         SELECT it.product_id,
-               SUM(it.quantity) AS export_quantity,
-               COUNT(*) AS export_count
+               SUM(CASE WHEN it.transaction_type = 'export' THEN it.quantity ELSE -it.quantity END) AS export_quantity,
+               SUM(CASE WHEN it.transaction_type = 'export' THEN 1 ELSE 0 END) AS export_count
         FROM   inventory_transactions it
         WHERE  it.branch_id = @branchId
-          AND  it.transaction_type = 'export'
+          AND  it.transaction_type IN ('export', 'return')
           AND  it.status = 'completed'
           AND  it.product_id IS NOT NULL
           AND  (@fromDate IS NULL OR it.transaction_date >= @fromDate)

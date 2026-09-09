@@ -53,16 +53,6 @@ class ExportRequestRepository {
   }
 
   /**
-   * Sinh ma phieu tiep theo: EXB-{branchId}-{YYYYMMDD}-{sequence:4}
-   * @param {number} branchId
-   * @param {Date} date
-   * @returns {Promise<string>}
-   */
-  async getNextRequestCode(branchId, date) {
-    throw new Error('Method getNextRequestCode() must be implemented');
-  }
-
-  /**
    * Lay cac Repair Order co the xuat kho (status <> 'cancelled', bao gom ca
    * 'inprogress' va 'completed') va chua tung duoc xuat cho RO do. Tra ve kem
    * tasks (product) de FE hien thi.
@@ -76,17 +66,29 @@ class ExportRequestRepository {
   /**
    * Lay 1 Repair Order kem cac phu tung (task_type='product') chua xuat.
    * @param {number} repairOrderId
-   * @returns {Promise<{ repairOrderCode, repairOrderCode, customerName, vehiclePlate, status, items: Array }|null>}
+   * @returns {Promise<{ repairOrderCode, customerName, vehiclePlate, status, items: Array }|null>}
    */
   async findRepairOrderForExport(repairOrderId) {
     throw new Error('Method findRepairOrderForExport() must be implemented');
   }
 
   /**
+   * Danh sach tho may dang hoat dong cua 1 chi nhanh - dropdown "Nguoi lay"
+   * khi tao phieu xuat.
+   * @param {number} branchId
+   * @returns {Promise<Array<{ id, employeeId, fullName }>>}
+   */
+  async findTechnicians(branchId) {
+    throw new Error('Method findTechnicians() must be implemented');
+  }
+
+  /**
    * Tao phieu xuat moi (status='completed') + insert items + tru stock + ghi log.
+   * Ma phieu (request_code) = ma cua chinh Lenh sua chua (repair_code) - repo
+   * tu lay trong cung transaction, khong nhan tu requestData.
    * Toan bo trong 1 transaction. Neu stock khong du -> throw error, rollback.
    * @param {Object} tx - msnodesqlv8 transaction
-   * @param {Object} requestData - { request_code, branch_id, repair_order_id, performed_by, export_date, notes }
+   * @param {Object} requestData - { branch_id, repair_order_id, performed_by, received_by, received_signature_data, export_date, notes }
    * @param {Array<Object>} items - [{ product_id, product_code, product_name, unit, quantity }]
    * @returns {Promise<{ request: ExportRequest, items: ExportRequestItem[] }>}
    */

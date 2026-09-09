@@ -185,9 +185,9 @@ export default function PartListPage() {
                 <tr>
                   <th>Mã PT</th>
                   <th>Tên phụ tùng</th>
-                  <th>SL tồn</th>
-                  <th>Tồn tối thiểu</th>
-                  <th>Thiếu</th>
+                  <th className="text-right">SL tồn</th>
+                  <th className="text-right">Tồn tối thiểu</th>
+                  <th className="text-right">Thiếu</th>
                 </tr>
               </thead>
               <tbody>

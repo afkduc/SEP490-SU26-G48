@@ -73,9 +73,6 @@ export default function ExportRequestListPage() {
       <div className="er-list__header">
         <div>
           <h1 className="er-list__title">Phiếu xuất kho</h1>
-          <p className="er-list__subtitle">
-            Xuất phụ tùng theo phiếu sửa chữa (Service Order). NV kho tự xuất - không cần Manager duyệt.
-          </p>
         </div>
         <PermissionGate permission="export_requests:create">
           <Link to="/inventory/export-requests/new" className="btn btn--primary">

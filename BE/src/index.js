@@ -251,6 +251,52 @@ async function start() {
       process.exit(1);
     }
 
+    // Cot export_requests.received_by (tho nhan phu tung khi xuat kho, thay
+    // cho o "Ghi chu" tu do). KHONG duoc nuot loi: thieu cot thi tao phieu
+    // xuat kho gui receivedBy len se chet ngay o INSERT.
+    try {
+      const { ensureExportRequestReceivedBy } = require('./infrastructure/database/ensureExportRequestReceivedBy');
+      const r = await ensureExportRequestReceivedBy();
+      console.log(r.skipped
+        ? '[BE] tho nhan hang phieu xuat: da co tu truoc, bo qua'
+        : `[BE] tho nhan hang phieu xuat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (recvErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot tho nhan hang phieu xuat that bai:');
+      console.error(recvErr.message);
+      process.exit(1);
+    }
+
+    // Cot export_requests.received_signature_data/received_signed_at (tho
+    // nhan phu tung tu ky xac nhan, giong khach hang ky phieu quyet toan).
+    // KHONG duoc nuot loi: thieu cot thi tao phieu xuat gui chu ky len se
+    // chet ngay o INSERT.
+    try {
+      const { ensureExportRequestReceivedSignature } = require('./infrastructure/database/ensureExportRequestReceivedSignature');
+      const r = await ensureExportRequestReceivedSignature();
+      console.log(r.skipped
+        ? '[BE] chu ky nguoi lay phieu xuat: da co tu truoc, bo qua'
+        : `[BE] chu ky nguoi lay phieu xuat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (sigErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot chu ky nguoi lay phieu xuat that bai:');
+      console.error(sigErr.message);
+      process.exit(1);
+    }
+
+    // Bang export_request_pickups + cot inventory_transactions.pickup_id -
+    // cho phep xuat kho nhieu lan / tra hang tren cung 1 phieu xuat. KHONG
+    // duoc nuot loi: thieu bang thi man xuat kho hong hoan toan.
+    try {
+      const { ensureExportPickups } = require('./infrastructure/database/ensureExportPickups');
+      const r = await ensureExportPickups();
+      console.log(r.skipped
+        ? '[BE] lich su lay hang phieu xuat: da co tu truoc, bo qua'
+        : `[BE] lich su lay hang phieu xuat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (pickupErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them lich su lay hang phieu xuat that bai:');
+      console.error(pickupErr.message);
+      process.exit(1);
+    }
+
     const server = http.createServer({ maxHeaderSize: 32768 }, app);
     server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);
