@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AppContext';
 import { usePermission } from '../../contexts/PermissionContext';
 import { formatCurrency, formatDate } from '../../utils';
 import managerApi from '../../services/managerApi';
+import { listVehicleModelsApi } from '../../services/vehicleApi';
 import { PermissionGate } from '../../components/PermissionGate';
 import ManagerImportRequestListPage from './ManagerImportRequestListPage';
 import ManagerImportRequestDetailPage from './ManagerImportRequestDetailPage';
@@ -1194,6 +1195,7 @@ const REPAIR_CATEGORY_OPTIONS = [
   { value: 'EE', label: 'Sửa chữa điện - điện tử' },
   { value: 'BP', label: 'Đồng sơn' },
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
+  { value: 'CS', label: 'Chăm sóc xe' },
 ];
 
 function repairCategoryLabel(code) {
@@ -1496,6 +1498,24 @@ function ServiceFormPage({ mode }) {
 
 // Ma xe theo dung thu tu 12 xe trong bang vehicle_models, dung de sap xep nhom.
 const VEHICLE_CODE_ORDER = ['MZ2', 'MZ3', 'MZ6-LX', 'MZ6-PR', 'CX3-LX', 'CX3-PR', 'CX5-LX', 'CX5-PR', 'CX8-LX', 'CX8-PR', 'BT50-LX', 'BT50-PR'];
+// Mazda khong co cot "ma ngan" (MZ2, CX3-LX...) trong vehicle_models that -
+// day la quy uoc rieng dung khi dat ten phu tung/dich vu "hang cung" (vd
+// "Loc dau dong co (Mazda2 1.5 Premium) [MZ2]"). Anh xa theo dung ten hien
+// thi (displayName) de biet 1 model_id that ung voi ma ngan nao khi loc.
+const VEHICLE_DISPLAY_NAME_TO_CODE = {
+  'Mazda2 1.5 Premium': 'MZ2',
+  'Mazda3 1.5 Luxury (Sedan)': 'MZ3',
+  'Mazda6 2.0 Luxury': 'MZ6-LX',
+  'Mazda6 2.0 Premium': 'MZ6-PR',
+  'Mazda CX-3 1.5 Luxury': 'CX3-LX',
+  'Mazda CX-3 1.5 Premium': 'CX3-PR',
+  'Mazda CX-5 2.0 Luxury': 'CX5-LX',
+  'Mazda CX-5 2.0 Premium': 'CX5-PR',
+  'Mazda CX-8 2.5 Luxury (2WD)': 'CX8-LX',
+  'Mazda CX-8 2.5 Premium (2WD)': 'CX8-PR',
+  'Mazda BT-50 1.9 Luxury': 'BT50-LX',
+  'Mazda BT-50 1.9 Premium': 'BT50-PR',
+};
 // cap = 0 dai dien cho moc "1.000km dau" (truoc Cap 1), de sap xep/loc dung chung
 // co che voi Cap 1..5.
 function parsePackageCode(code) {
@@ -1511,6 +1531,13 @@ function parseVehicleName(name) {
 }
 function capLabel(cap) {
   return cap === 0 ? '1.000km đầu' : `Cấp ${cap}`;
+}
+// Ten dich vu "hang cung" duoc sinh dang "<ten goc> – <ten xe> [<ma xe>]" -
+// tach ra de loc dich vu theo dung xe khi tao/sua goi bao duong.
+function parseServiceVehicle(name) {
+  const m = /^(.*) – (.+) \[([A-Za-z0-9-]+)\]$/.exec(name || '');
+  if (!m) return null;
+  return { base: m[1], vehicleName: m[2], vehicleCode: m[3] };
 }
 function fuelOfVehicleCode(vehicleCode) {
   if (!vehicleCode) return null;
@@ -1536,7 +1563,7 @@ function ServicePackageDetailModal({ pkg, onClose }) {
   if (!pkg) return null;
   const badge = activeBadge(pkg.isActive);
   const { vehicleCode, cap } = parsePackageCode(pkg.code);
-  const vehicleName = parseVehicleName(pkg.name);
+  const vehicleName = pkg.modelName || parseVehicleName(pkg.name);
   const fBadge = fuelBadge(fuelOfVehicleCode(vehicleCode));
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1570,7 +1597,7 @@ function ServicePackageDetailModal({ pkg, onClose }) {
           </div>
           <div className="table-wrapper">
             <table className="data-table">
-              <thead><tr><th>Mã DV</th><th>Tên dịch vụ</th><th>Hành động</th><th>Phụ tùng thay thế</th><th>Đơn giá</th><th>Trạng thái</th></tr></thead>
+              <thead><tr><th>Mã DV</th><th>Tên dịch vụ</th><th>Loại hình</th><th>Hành động</th><th>Phụ tùng thay thế</th><th>Đơn giá</th><th>Trạng thái</th></tr></thead>
               <tbody>
                 {(pkg.services || []).map((s) => {
                   const svcBadge = activeBadge(s.isActive);
@@ -1579,6 +1606,12 @@ function ServicePackageDetailModal({ pkg, onClose }) {
                     <tr key={s.id}>
                       <td style={{ fontFamily: 'monospace' }}>{s.code}</td>
                       <td>{s.name}</td>
+                      {/* Trong ngu canh 1 goi bao duong, moi dich vu con deu hien
+                          THEO LOAI HINH CUA GOI (luon la "Bao duong dinh ky") -
+                          de nguoi dung biet dich vu nay dang nam trong goi BDDK,
+                          khac voi khi xem no o man "Dich vu le" (hien loai hinh
+                          THAT cua rieng dich vu do, vd "Dong son"). */}
+                      <td>{repairCategoryLabel(pkg.repairCategory)}</td>
                       <td><span className={`badge ${acBadge.className}`}>{acBadge.label}</span></td>
                       <td>
                         {s.actionCode === 'R'
@@ -1668,7 +1701,7 @@ function ServicePackageListPage() {
     const map = new Map();
     for (const p of packages) {
       const { vehicleCode } = parsePackageCode(p.code);
-      if (vehicleCode && !map.has(vehicleCode)) map.set(vehicleCode, parseVehicleName(p.name));
+      if (vehicleCode && !map.has(vehicleCode)) map.set(vehicleCode, p.modelName || parseVehicleName(p.name));
     }
     return [...map.entries()]
       .sort(([a], [b]) => VEHICLE_CODE_ORDER.indexOf(a) - VEHICLE_CODE_ORDER.indexOf(b))
@@ -1689,7 +1722,7 @@ function ServicePackageListPage() {
     for (const p of filteredPackages) {
       const { vehicleCode, cap } = parsePackageCode(p.code);
       const key = vehicleCode || p.code;
-      if (!map.has(key)) map.set(key, { vehicleCode: key, vehicleName: parseVehicleName(p.name), fuel: fuelOfVehicleCode(vehicleCode), items: [] });
+      if (!map.has(key)) map.set(key, { vehicleCode: key, vehicleName: p.modelName || parseVehicleName(p.name), fuel: fuelOfVehicleCode(vehicleCode), items: [] });
       map.get(key).items.push({ ...p, cap });
     }
     const arr = [...map.values()];
@@ -1895,9 +1928,11 @@ function ServicePackageFormPage({ mode }) {
 
   const [branch, setBranch] = useState(null);
   const [availableServices, setAvailableServices] = useState([]);
-  const [serviceSearch, setServiceSearch] = useState('');
+  const [vehicleModels, setVehicleModels] = useState([]);
+  const [selectedSearch, setSelectedSearch] = useState('');
+  const [availableSearch, setAvailableSearch] = useState('');
   const [form, setForm] = useState({
-    packageName: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [],
+    packageName: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', modelId: '', serviceIds: [], actionCodes: {},
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1908,6 +1943,7 @@ function ServicePackageFormPage({ mode }) {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
     managerApi.getServices({ status: 'all' }).then((data) => { if (mounted) setAvailableServices(data || []); }).catch(() => {});
+    listVehicleModelsApi().then((data) => { if (mounted) setVehicleModels(data || []); }).catch(() => {});
 
     if (isEdit && id) {
       managerApi
@@ -1921,7 +1957,9 @@ function ServicePackageFormPage({ mode }) {
             purpose: data.purpose || '',
             isActive: data.isActive,
             repairCategory: data.repairCategory || '',
+            modelId: data.modelId != null ? String(data.modelId) : '',
             serviceIds: (data.services || []).map((s) => s.id),
+            actionCodes: Object.fromEntries((data.services || []).map((s) => [s.id, s.actionCode || 'I'])),
           });
         })
         .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin gói bảo dưỡng'); })
@@ -1940,12 +1978,24 @@ function ServicePackageFormPage({ mode }) {
   const toggleService = (serviceId) => {
     setForm((prev) => {
       const exists = prev.serviceIds.includes(serviceId);
+      if (exists) {
+        const nextActionCodes = { ...prev.actionCodes };
+        delete nextActionCodes[serviceId];
+        return { ...prev, serviceIds: prev.serviceIds.filter((sid) => sid !== serviceId), actionCodes: nextActionCodes };
+      }
       return {
         ...prev,
-        serviceIds: exists ? prev.serviceIds.filter((sid) => sid !== serviceId) : [...prev.serviceIds, serviceId],
+        serviceIds: [...prev.serviceIds, serviceId],
+        // Mac dinh "I - Kiem tra/dieu chinh" khi vua them - an toan hon vi
+        // khong tu nhan la se thay phu tung (R) khi chua chac chan.
+        actionCodes: { ...prev.actionCodes, [serviceId]: prev.actionCodes[serviceId] || 'I' },
       };
     });
     setFieldErrors((prev) => ({ ...prev, serviceIds: undefined }));
+  };
+
+  const setActionCode = (serviceId, code) => {
+    setForm((prev) => ({ ...prev, actionCodes: { ...prev.actionCodes, [serviceId]: code } }));
   };
 
   const validate = () => {
@@ -1973,7 +2023,8 @@ function ServicePackageFormPage({ mode }) {
         purpose: form.purpose.trim(),
         isActive: form.isActive,
         repairCategory: form.repairCategory || null,
-        serviceIds: form.serviceIds,
+        modelId: form.modelId || null,
+        services: form.serviceIds.map((sid) => ({ serviceId: sid, actionCode: form.actionCodes[sid] || 'I' })),
       };
 
       if (isEdit) {
@@ -2006,12 +2057,28 @@ function ServicePackageFormPage({ mode }) {
     .filter((s) => form.serviceIds.includes(s.id))
     .reduce((sum, s) => sum + Number(s.unitPrice || 0), 0);
 
-  const needle = serviceSearch.trim().toLowerCase();
-  const filteredServices = needle
-    ? availableServices.filter(
-        (s) => s.name.toLowerCase().includes(needle) || s.code.toLowerCase().includes(needle)
-      )
-    : availableServices;
+  const selectedNeedle = selectedSearch.trim().toLowerCase();
+  const availableNeedle = availableSearch.trim().toLowerCase();
+  const matchesNeedle = (s, needle) => !needle || s.name.toLowerCase().includes(needle) || s.code.toLowerCase().includes(needle);
+  const selectedServices = availableServices.filter((s) => form.serviceIds.includes(s.id) && matchesNeedle(s, selectedNeedle));
+
+  // Danh sach xe THAT tu vehicle_models (khong con tu suy ra tu ten dich vu nua).
+  const vehicleModelOptions = [...vehicleModels].sort(
+    (a, b) => VEHICLE_CODE_ORDER.indexOf(VEHICLE_DISPLAY_NAME_TO_CODE[a.displayName]) - VEHICLE_CODE_ORDER.indexOf(VEHICLE_DISPLAY_NAME_TO_CODE[b.displayName])
+  );
+  // Dich vu "hang cung" (loc dau, bugi, ac quy...) co 12 bien the rieng theo
+  // tung xe - loc theo dong xe de khong phai doc lan trong list 140 dich vu.
+  // Dich vu dung chung (dau may, cham soc xe...) luon hien du moi luc.
+  const selectedVehicleModel = vehicleModels.find((v) => String(v.id) === String(form.modelId));
+  const selectedVehicleCode = selectedVehicleModel ? VEHICLE_DISPLAY_NAME_TO_CODE[selectedVehicleModel.displayName] : null;
+  const matchesVehicleFilter = (s) => {
+    if (!form.modelId) return true;
+    const parsed = parseServiceVehicle(s.name);
+    return !parsed || parsed.vehicleCode === selectedVehicleCode; // khong co bien the xe -> dung chung, luon hien
+  };
+  const unselectedServices = availableServices.filter(
+    (s) => !form.serviceIds.includes(s.id) && matchesNeedle(s, availableNeedle) && matchesVehicleFilter(s)
+  );
 
   return (
     <div>
@@ -2040,6 +2107,19 @@ function ServicePackageFormPage({ mode }) {
           )}
 
           <div className="form-grid form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Dòng xe áp dụng</label>
+              <select className="form-select" value={form.modelId} onChange={(e) => setField('modelId', e.target.value)}>
+                <option value="">— Chưa chọn / dùng chung nhiều xe —</option>
+                {vehicleModelOptions.map((v) => (
+                  <option key={v.id} value={v.id}>{v.displayName}</option>
+                ))}
+              </select>
+              <div className="form-hint">
+                Lưu thật vào gói (dùng để lọc/nhóm ở trang danh sách) và lọc bớt danh sách dịch vụ "hàng cứng" bên dưới cho đúng xe.
+              </div>
+            </div>
+
             <div className="form-group">
               <label className="form-label required">Tên gói bảo dưỡng</label>
               <input className="form-input" value={form.packageName} onChange={(e) => setField('packageName', e.target.value)} placeholder="Nhập tên gói bảo dưỡng" />
@@ -2086,34 +2166,111 @@ function ServicePackageFormPage({ mode }) {
             <label className="form-label required">
               Dịch vụ trong gói {form.serviceIds.length > 0 && `(đã chọn ${form.serviceIds.length})`}
             </label>
+            <div className="form-hint" style={{ marginBottom: 8 }}>
+              Với mỗi dịch vụ đã chọn, chọn đúng hành động ở cột "Trong gói này": chỉ <strong>R (Thay thế)</strong> mới gắn phụ tùng của dịch vụ đó vào gói; I/M/V (kiểm tra/tháo vệ sinh/kiểm tra mắt) không tiêu hao phụ tùng.
+            </div>
             {availableServices.length === 0 ? (
               <p className="form-hint">Chi nhánh chưa có dịch vụ lẻ nào đang áp dụng — hãy thêm Dịch vụ lẻ trước.</p>
             ) : (
               <>
-                <div className="search-input" style={{ maxWidth: '100%', marginBottom: 8 }}>
-                  <span className="search-icon">🔍</span>
-                  <input
-                    value={serviceSearch}
-                    onChange={(e) => setServiceSearch(e.target.value)}
-                    placeholder="Tìm dịch vụ theo tên hoặc mã..."
-                  />
-                </div>
-                <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', maxHeight: 260, overflowY: 'auto' }}>
-                  {filteredServices.length === 0 ? (
-                    <p style={{ padding: 12, fontSize: 13, color: 'var(--gray-500)' }}>Không tìm thấy dịch vụ phù hợp.</p>
-                  ) : (
-                    filteredServices.map((s) => (
-                      <label
-                        key={s.id}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, cursor: 'pointer', opacity: s.isActive ? 1 : 0.65 }}
-                      >
-                        <input type="checkbox" checked={form.serviceIds.includes(s.id)} onChange={() => toggleService(s.id)} />
-                        <span style={{ flex: 1 }}>{s.name}</span>
-                        {!s.isActive && <span className="badge badge-inactive">Ngừng áp dụng</span>}
-                        <span style={{ color: 'var(--gray-500)' }}>{formatCurrency(s.unitPrice)}</span>
-                      </label>
-                    ))
-                  )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+                      Trong gói này ({selectedServices.length})
+                    </div>
+                    <div className="search-input" style={{ maxWidth: '100%', marginBottom: 8 }}>
+                      <span className="search-icon">🔍</span>
+                      <input
+                        value={selectedSearch}
+                        onChange={(e) => setSelectedSearch(e.target.value)}
+                        placeholder="Tìm trong dịch vụ đã chọn..."
+                      />
+                    </div>
+                    <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', height: 300, overflowY: 'auto' }}>
+                      {selectedServices.length === 0 ? (
+                        <p style={{ padding: 12, fontSize: 13, color: 'var(--gray-500)' }}>
+                          {selectedSearch.trim()
+                            ? 'Không tìm thấy dịch vụ phù hợp trong số đã chọn.'
+                            : 'Chưa có dịch vụ nào — bấm dịch vụ ở cột bên phải để thêm vào đây.'}
+                        </p>
+                      ) : (
+                        selectedServices.map((s) => (
+                          <div
+                            key={s.id}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, opacity: s.isActive ? 1 : 0.65 }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => toggleService(s.id)}
+                              title="Bấm để bỏ khỏi gói"
+                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--red-600, #dc2626)', fontWeight: 700 }}
+                            >
+                              ✕
+                            </button>
+                            <span style={{ flex: 1 }}>{s.name}</span>
+                            {!s.isActive && <span className="badge badge-inactive">Ngừng áp dụng</span>}
+                            <select
+                              className="form-select"
+                              value={form.actionCodes[s.id] || 'I'}
+                              onChange={(e) => setActionCode(s.id, e.target.value)}
+                              title="Hành động - chỉ R (Thay thế) mới gắn phụ tùng"
+                              style={{ fontSize: 12, padding: '2px 4px', width: 'auto' }}
+                            >
+                              <option value="R">R - Thay thế</option>
+                              <option value="I">I - Kiểm tra/điều chỉnh</option>
+                              <option value="M">M - Tháo vệ sinh</option>
+                              <option value="V">V - Kiểm tra mắt</option>
+                            </select>
+                            <span style={{ color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>{formatCurrency(s.unitPrice)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+                      Tất cả dịch vụ ({unselectedServices.length})
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <div className="search-input" style={{ flex: 1, maxWidth: 'none' }}>
+                        <span className="search-icon">🔍</span>
+                        <input
+                          value={availableSearch}
+                          onChange={(e) => setAvailableSearch(e.target.value)}
+                          placeholder="Tìm dịch vụ theo tên hoặc mã..."
+                        />
+                      </div>
+                      <select className="filter-select" value={form.modelId} onChange={(e) => setField('modelId', e.target.value)} title="Lọc dịch vụ hàng cứng theo dòng xe">
+                        <option value="">Tất cả dòng xe</option>
+                        {vehicleModelOptions.map((v) => (
+                          <option key={v.id} value={v.id}>{v.displayName}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', height: 300, overflowY: 'auto' }}>
+                      {unselectedServices.length === 0 ? (
+                        <p style={{ padding: 12, fontSize: 13, color: 'var(--gray-500)' }}>
+                          {availableSearch.trim() ? 'Không tìm thấy dịch vụ phù hợp.' : 'Đã thêm hết dịch vụ vào gói.'}
+                        </p>
+                      ) : (
+                        unselectedServices.map((s) => (
+                          <button
+                            type="button"
+                            key={s.id}
+                            onClick={() => toggleService(s.id)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--gray-100)', background: 'none', fontSize: 13, textAlign: 'left', cursor: 'pointer', opacity: s.isActive ? 1 : 0.65 }}
+                            title="Bấm để thêm vào gói"
+                          >
+                            <span style={{ color: 'var(--primary, #4f46e5)', fontWeight: 700 }}>+</span>
+                            <span style={{ flex: 1 }}>{s.name}</span>
+                            {!s.isActive && <span className="badge badge-inactive">Ngừng áp dụng</span>}
+                            <span style={{ color: 'var(--gray-500)' }}>{formatCurrency(s.unitPrice)}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               </>
             )}

@@ -2,7 +2,8 @@ const { query } = require('../database/sqlServer');
 
 // Catalog dong xe/doi xe that (vehicle_models) - dung de CVDV chon dung khi
 // dang ky xe MOI, thay vi go tu do vao "Loai xe" nhu truoc (khong lien ket
-// duoc voi catalog, khong biet dung phu tung theo doi nao). Chi ~50-60 dong
+// duoc voi catalog, khong biet dung phu tung theo doi nao). Catalog da duoc
+// rut gon con ~12 dong (moi dong xe chi giu 1-2 ban dai dien Luxury/Premium)
 // nen tra ve TOAN BO 1 lan, FE tu loc/goi y khi go - khong can API search
 // rieng/debounce.
 //
@@ -13,11 +14,8 @@ function mapRow(row) {
     id: row.id,
     modelLine: row.model_line,
     generationCode: row.generation_code,
-    bodyType: row.body_type,
-    segment: row.segment,
-    engineDisplacement: row.engine_displacement != null ? Number(row.engine_displacement) : null,
-    drivetrain: row.drivetrain,
     trimName: row.trim_name,
+    segment: row.segment,
     yearFrom: row.year_from,
     yearTo: row.year_to,
     displayName: row.display_name,
@@ -27,8 +25,7 @@ function mapRow(row) {
 class VehicleModelRepository {
   async list() {
     const result = await query(
-      `SELECT id, model_line, generation_code, body_type, segment,
-              engine_displacement, drivetrain, trim_name, year_from, year_to, display_name
+      `SELECT id, model_line, generation_code, trim_name, segment, year_from, year_to, display_name
        FROM   vehicle_models
        ORDER  BY model_line ASC, generation_code ASC, trim_name ASC`
     );

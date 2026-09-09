@@ -29,6 +29,10 @@ function buildRepository(callLog, status = 'pending') {
     async count() {
       return 0;
     },
+    async existsBySupplierInvoice(supplierId, supplierInvoiceNo) {
+      callLog.push(['existsBySupplierInvoice', supplierId, supplierInvoiceNo]);
+      return false;
+    },
     async findById(id, options = {}) {
       callLog.push(['findById', id, options]);
       return {
@@ -102,21 +106,46 @@ test('create auto-approves warehouse import in the same transaction', async () =
 
   assert.equal(result.status, 'approved');
   assert.deepEqual(calls.map((entry) => entry[0]), [
+    'existsBySupplierInvoice',
     'getNextRequestCode',
     'create',
     'approve',
     'findById',
   ]);
-  assert.equal(calls[0][1], 1);
-  assert.equal(calls[1][1], tx);
-  assert.equal(calls[1][5], 'INV-2026-001');
-  assert.ok(calls[1][6] instanceof Date);
-  assert.notEqual(calls[1][6].toISOString().slice(0, 10), '2000-01-01');
+  assert.deepEqual(calls[0].slice(1), [2, 'INV-2026-001']);
+  assert.equal(calls[1][1], 1);
   assert.equal(calls[2][1], tx);
-  assert.equal(calls[2][2], 101);
-  assert.equal(calls[2][3], 7);
-  assert.deepEqual(calls[2][5], { branchId: 1 });
-  assert.deepEqual(calls[3][2], { branchId: 1 });
+  assert.equal(calls[2][5], 'INV-2026-001');
+  assert.ok(calls[2][6] instanceof Date);
+  assert.notEqual(calls[2][6].toISOString().slice(0, 10), '2000-01-01');
+  assert.equal(calls[3][1], tx);
+  assert.equal(calls[3][2], 101);
+  assert.equal(calls[3][3], 7);
+  assert.deepEqual(calls[3][5], { branchId: 1 });
+  assert.deepEqual(calls[4][2], { branchId: 1 });
+});
+
+test('create rejects when supplier already has an import request with the same invoice number', async () => {
+  const calls = [];
+  const repository = buildRepository(calls, 'approved');
+  repository.existsBySupplierInvoice = async (supplierId, supplierInvoiceNo) => {
+    calls.push(['existsBySupplierInvoice', supplierId, supplierInvoiceNo]);
+    return true;
+  };
+  repository.create = async () => {
+    throw new Error('create should not be called when invoice is duplicated');
+  };
+
+  const service = new ImportRequestService({
+    importRequestRepository: repository,
+    transactionRunner: async (callback) => callback({ id: 'tx-dup' }),
+  });
+
+  await assert.rejects(
+    () => service.create(buildPayload(), { autoApprove: true, approvedBy: 7 }),
+    (err) => err.statusCode === 409 && /đã được nhập/i.test(err.message),
+  );
+  assert.deepEqual(calls, [['existsBySupplierInvoice', 2, 'INV-2026-001']]);
 });
 
 test('create requires supplier invoice number', async () => {
@@ -163,11 +192,12 @@ test('create keeps pending flow when auto-approve is disabled', async () => {
 
   assert.equal(result.status, 'pending');
   assert.deepEqual(calls.map((entry) => entry[0]), [
+    'existsBySupplierInvoice',
     'getNextRequestCode',
     'create',
     'findById',
   ]);
-  assert.deepEqual(calls[2][2], { branchId: 1 });
+  assert.deepEqual(calls[3][2], { branchId: 1 });
 });
 
 test('list scopes filters, normalizes pagination, and maps results', async () => {

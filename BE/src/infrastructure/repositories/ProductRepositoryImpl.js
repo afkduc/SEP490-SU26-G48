@@ -92,14 +92,14 @@ class ProductRepositoryImpl extends ProductRepository {
   async create(data) {
     const sql = `
       INSERT INTO products (
-        product_code, product_name, category, brand_name, unit_id,
+        product_code, product_name, category, unit_id,
         unit_price, stock_quantity, min_stock, supplier_id,
-        location, branch_id, status, created_by_role
+        branch_id, status, created_by_role
       )
       VALUES (
-        @productCode, @productName, @category, @brandName, @unitId,
+        @productCode, @productName, @category, @unitId,
         @unitPrice, @stockQuantity, @minStock, @supplierId,
-        @location, @branchId, @status, @createdByRole
+        @branchId, @status, @createdByRole
       );
       SELECT SCOPE_IDENTITY() AS id;
     `;
@@ -107,13 +107,11 @@ class ProductRepositoryImpl extends ProductRepository {
       productCode: data.productCode,
       productName: data.productName,
       category: data.category || null,
-      brandName: data.brandName || null,
       unitId: data.unitId || 1,
       unitPrice: data.unitPrice || null,
       stockQuantity: data.stockQuantity || 0,
       minStock: data.minStock || 0,
       supplierId: data.supplierId || null,
-      location: data.location || null,
       branchId: data.branchId || null,
       status: data.status || 'active',
       createdByRole: data.createdByRole || null,
@@ -153,10 +151,6 @@ class ProductRepositoryImpl extends ProductRepository {
       params.category = data.category;
       fields.push('category = @category');
     }
-    if (data.brandName !== undefined) {
-      params.brandName = data.brandName;
-      fields.push('brand_name = @brandName');
-    }
     if (data.unitId !== undefined) {
       params.unitId = data.unitId;
       fields.push('unit_id = @unitId');
@@ -172,10 +166,6 @@ class ProductRepositoryImpl extends ProductRepository {
     if (data.supplierId !== undefined) {
       params.supplierId = data.supplierId;
       fields.push('supplier_id = @supplierId');
-    }
-    if (data.location !== undefined) {
-      params.location = data.location;
-      fields.push('location = @location');
     }
     if (data.status !== undefined) {
       params.status = data.status;

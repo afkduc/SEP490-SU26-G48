@@ -3,8 +3,8 @@ import httpClient from './httpClient';
 /**
  * Inventory API (read-only) - module Kho.
  *   - getStockList(params): GET /api/inventory voi filter { branchId, search, category, lowStockOnly, page, limit }.
- *     tra ve: { items: [{ id, productCode, productName, category, brandName, unit, unitPrice,
- *                         stockQuantity, minStock, supplierId, supplierName, location, branchId, status,
+ *     tra ve: { items: [{ id, productCode, productName, category, unit, unitPrice,
+ *                         stockQuantity, minStock, supplierId, supplierName, branchId, status,
  *                         isLowStock, stockGap }], total, page, limit }
  *
  *   - getLowStock(branchId): GET /api/inventory/low-stock?branchId=
@@ -43,10 +43,9 @@ export async function getStockSummaryApi(branchId) {
 
 /**
  * getTopUsedPartsApi(params): GET /api/inventory/top-used-parts voi filter { fromDate, toDate, limit }.
- * tra ve: { topParts: [{ productId, productCode, productName, category, brandName, unit,
+ * tra ve: { topParts: [{ productId, productCode, productName, category, unit,
  *                         currentStock, exportQuantity, exportCount, demandQuantity, demandCount, totalQuantity }],
- *           topBrands: [{ brandName, exportQuantity, exportCount, demandQuantity, demandCount, totalQuantity, percentage }],
- *           summary: { distinctParts, totalExportQuantity, totalExportCount, totalDemandQuantity, totalDemandCount } }
+ *           summary: { distinctParts, totalExportQuantity, totalExportCount, totalImportQuantity, totalImportCount } }
  */
 export async function getTopUsedPartsApi(params = {}) {
   return httpClient.get(`/inventory/top-used-parts${buildQuery(params)}`);

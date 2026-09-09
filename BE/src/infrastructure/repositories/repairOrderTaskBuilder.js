@@ -57,7 +57,19 @@ function computeDesiredTasks(items, packageServiceNamesByCode) {
       if (pkgServices.length > 0) {
         for (const svc of pkgServices) {
           coveredServiceIds.add(String(svc.serviceId));
-          tasks.push({ taskName: svc.serviceName, taskType: 'service', productId: null, quantity: 1, unitPrice: 0 });
+          tasks.push({
+            taskName: svc.serviceName,
+            taskType: 'service',
+            productId: null,
+            quantity: 1,
+            unitPrice: 0,
+            // I/R/M/V + nhom cong viec cua bieu mau BDDK - chi dau muc SINH TU
+            // GOI moi co (dich vu le chon rieng khong thuoc cap bao duong nao
+            // nen khong co "yeu cau thuc hien", FE xep vao "Hang muc khac").
+            actionCode: svc.actionCode || null,
+            checklistGroup: svc.checklistGroup || null,
+            checklistOrder: svc.checklistOrder ?? null,
+          });
         }
         continue;
       }
@@ -91,18 +103,29 @@ async function loadPackageServiceNames(queryPackageServices, packageCodes) {
   const map = new Map();
   for (const code of packageCodes) {
     const rows = await queryPackageServices(code);
-    map.set(code, rows.map((r) => ({ serviceId: r.service_id, serviceName: r.service_name })));
+    map.set(code, rows.map((r) => ({
+      serviceId: r.service_id,
+      serviceName: r.service_name,
+      actionCode: r.action_code || null,
+      checklistGroup: r.checklist_group || null,
+      checklistOrder: r.checklist_order ?? null,
+    })));
   }
   return map;
 }
 
+// Sap theo checklist_order (thu tu bieu mau "Phieu kiem tra BDDK": nhom*100 +
+// so thu tu trong nhom) de checklist ben to truong/khoang sua ra dung thu tu
+// giay to that. Dich vu ngoai bieu mau (checklist_order NULL) day xuong cuoi.
 const PACKAGE_SERVICES_SQL = `
-  SELECT s.id AS service_id, s.service_name
+  SELECT s.id AS service_id, s.service_name, spi.action_code,
+         s.checklist_group, s.checklist_order
   FROM   service_packages sp
   JOIN   service_package_items spi ON spi.package_id = sp.id
   JOIN   services s ON s.id = spi.service_id
   WHERE  sp.package_code = @code
-  ORDER  BY s.service_name
+  ORDER  BY CASE WHEN s.checklist_order IS NULL THEN 1 ELSE 0 END,
+            s.checklist_order, s.service_name
 `;
 
 function packageCodesNeeding(items) {

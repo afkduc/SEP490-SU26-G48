@@ -4,6 +4,8 @@ const config = require('../../config');
 const RepairSettlementResponseDto = require('../dto/RepairSettlementDto');
 const { PublicVehicleHistoryDto } = RepairSettlementResponseDto;
 const { emitRepairOrderEvent } = require('../events/RepairOrderEvents');
+// Cong thuc tinh tien dung chung voi repository - xem utils/settlementTotals.js
+const { calcTotalsFromItems } = require('../../utils/settlementTotals');
 const { auditCrud } = require('../../utils/auditHelper');
 const { settlementSnapshot } = require('../../utils/auditSnapshots');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
@@ -35,8 +37,7 @@ const LHSC_VALUES = ['DV', 'PT'];
 const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB', 'HUY'];
 // REPAIR_CATEGORY = "Loai hinh sua chua" THAT (dung nhu thuc te tai dai ly xe -
 // khac voi LHSC o tren, vi LHSC da bi dung nham thanh "loai hang muc").
-const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
-const EXEMPT_HTTT_VALUES = new Set(['BHH', 'BH', 'NB', 'HUY']);
+const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS'];
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
 
 // Tinh lai toan bo tong tien tu CHINH danh sach hang muc - khong tin theo
@@ -46,29 +47,6 @@ const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoi
 // createPayosPaymentLink ben duoi). PHAI khop chinh xac cong thuc voi
 // RepairSettlementPage.jsx calcTotals() de khong lech so voi so CVDV nhin
 // thay tren man hinh truoc khi bam Luu.
-function calcTotalsFromItems(items) {
-  let subtotal = 0;
-  let discountAmount = 0;
-  let freeAmount = 0;
-  for (const item of items) {
-    const qty = Number(item.qty) || 0;
-    const unitPrice = Number(item.unitPrice) || 0;
-    const base = qty * unitPrice;
-    if (item.isFree) {
-      freeAmount += base;
-      continue;
-    }
-    if (EXEMPT_HTTT_VALUES.has(item.httt)) continue;
-    const discountPct = Number(item.discount) || 0;
-    subtotal += base * (1 - discountPct / 100);
-    discountAmount += base * (discountPct / 100);
-  }
-  subtotal = Math.round(subtotal);
-  discountAmount = Math.round(discountAmount);
-  freeAmount = Math.round(freeAmount);
-  const vat = Math.round(subtotal * 0.08);
-  return { subtotal, discountAmount, afterDiscount: subtotal, vat, freeAmount, total: subtotal + vat };
-}
 const ACTIVE_STATUS_LABELS = {
   waiting_repair: 'chờ sửa chữa',
   inprogress: 'đang sửa chữa',
@@ -140,10 +118,18 @@ function diffSettlementForActivityLog(before, after) {
   return changes;
 }
 
+// Quyet dinh cua khach cho 1 dau muc "Khong dat" (xem ensureNgDecision.js).
+const NG_DECISIONS = ['accepted', 'declined'];
+
 class RepairSettlementService {
   constructor({ repairSettlementRepository, customerRepository }) {
     this.repairSettlementRepository = repairSettlementRepository;
     this.customerRepository = customerRepository;
+  }
+
+  async getBranchAdvisors(branchId) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    return this.repairSettlementRepository.findBranchAdvisors(branchId);
   }
 
   async getAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page, limit } = {}) {
@@ -301,6 +287,10 @@ class RepairSettlementService {
       contactName: customer.contactPerson || null,
       contactPhone: customer.contactPhone || null,
       licensePlate: vehicle.licensePlate.trim(),
+      // Ten loai xe luu DUNG ten trong danh muc (display_name), khong dan
+      // nam san xuat vao duoi nhu truoc. Form khong con hoi nam san xuat nua
+      // nen manufacture_year cua xe tao tu day de trong - cot do gio chi con
+      // duoc dien qua duong nhap Excel (importCustomerVehicleRow).
       vehicleModelText: vehicle.vehicleModel || null,
       modelId: vehicle.modelId || null,
       frameNumber: vehicle.frameNumber || null,
@@ -327,6 +317,79 @@ class RepairSettlementService {
     emitRepairOrderEvent(branchId, 'new-pending', { orderId: entity.id });
 
     return RepairSettlementResponseDto.fromEntity(entity);
+  }
+
+  // Co van goi khach xong, ghi nhan quyet dinh cho 1 dau muc "Khong dat":
+  //   'accepted' - khach dong y thay -> co van vao Chinh sua phieu them phu
+  //                tung, dong phu tung do se hien "(Khách thêm)" cho tho
+  //   'declined' - khach tu choi -> BAT BUOC ghi ly do, dau muc di vao muc
+  //                "CAC HANG MUC CAN LAM SOM" cua phieu
+  //
+  // Cong kiem tra cua dau muc bi tu choi VAN tinh tien - nhung cong do da nam
+  // trong gia goi bao duong nen khong phai tinh them gi o day.
+  async decideNgTask(id, taskId, { decision, note, userId, branchId } = {}) {
+    if (!NG_DECISIONS.includes(decision)) {
+      throw new ApiError(400, 'Quyết định không hợp lệ');
+    }
+    if (decision === 'declined' && !String(note || '').trim()) {
+      throw new ApiError(400, 'Khách từ chối thì phải ghi rõ lý do để lưu vào phần khuyến nghị');
+    }
+
+    const existing = await this.repairSettlementRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
+    if (String(existing.branchId) !== String(branchId)) {
+      throw new ApiError(403, 'Không có quyền thao tác trên phiếu của chi nhánh khác');
+    }
+
+    const task = (existing.tasks || []).find((t) => String(t.id) === String(taskId));
+    if (!task) throw new ApiError(404, 'Không tìm thấy đầu mục công việc');
+    if (task.checkResult !== 'NG') {
+      throw new ApiError(400, 'Đầu mục này không bị đánh Không đạt');
+    }
+    // 'reported' = tho vua cham Khong dat, TO TRUONG chua chuyen len. Co van
+    // khong duoc goi khach truoc buoc do - to truong phai xac nhan dung la
+    // phai thay da, tranh goi bao gia roi moi biet tho cham nham.
+    if (task.ngDecision === 'reported') {
+      throw new ApiError(409, 'Tổ trưởng chưa báo đầu mục này lên, chưa liên hệ khách được');
+    }
+    if (task.ngDecision && task.ngDecision !== 'pending') {
+      throw new ApiError(409, 'Đầu mục này đã được ghi nhận quyết định của khách rồi');
+    }
+
+    // Sua phieu chi cho phep khi con dang xu ly - them phu tung sau khi da
+    // chot tien (waiting_payment/invoiced) se lech voi QR/hoa don da phat.
+    if (decision === 'accepted'
+        && existing.status !== 'waiting_repair' && existing.status !== 'inprogress') {
+      throw new ApiError(409, 'Phiếu đã chốt tiền, không thể thêm phụ tùng - hãy lập phiếu mới cho phần phát sinh');
+    }
+
+    let daThem = [];
+    if (decision === 'accepted') {
+      // Khach dong y -> chen luon phu tung theo dinh muc cua chinh dich vu do,
+      // tinh lai tien va dong bo checklist, tat ca trong 1 transaction.
+      const kq = await this.repairSettlementRepository.acceptNgTaskAndAddParts(id, taskId, {
+        note: String(note || '').trim() || null,
+        userId,
+      });
+      if (!kq.ok) throw new ApiError(409, 'Đầu mục vừa được người khác xử lý, tải lại trang rồi thử lại');
+      daThem = kq.added;
+    } else {
+      const ok = await this.repairSettlementRepository.setNgDecision(id, taskId, {
+        decision,
+        note: String(note || '').trim() || null,
+        userId,
+      });
+      if (!ok) throw new ApiError(409, 'Đầu mục vừa được người khác xử lý, tải lại trang rồi thử lại');
+    }
+
+    // Bao cho man to truong/khoang biet dau muc da duoc xu ly - to truong
+    // dang bi chan bam Hoan thanh boi chinh dau muc nay.
+    emitRepairOrderEvent(branchId, 'task-updated', { orderId: Number(id), taskId: Number(taskId) });
+
+    // Tra kem danh sach phu tung vua chen de FE bao lai cho co van biet da
+    // them gi vao phieu, khong phai tu do lai bang hang muc.
+    const item = await this.getById(id);
+    return { ...item, ngAddedParts: daThem };
   }
 
   async update(id, payload) {
@@ -495,12 +558,45 @@ class RepairSettlementService {
   // FE). Het han sau 60s (test nhanh theo yeu cau) - moi lan goi la 1
   // orderCode moi (Date.now()), khong tai su dung orderCode cu vi PayOS bat
   // buoc orderCode duy nhat.
+  // Dong (huy) cac ma QR con song cua 1 phieu, ca o PayOS lan o DB.
+  //
+  // Best-effort o phia PayOS: ma da het han hoac vua duoc thanh toan thi
+  // cancel se bao loi - nuot di, vi muc tieu la KHONG con ma nao thu duoc
+  // tien nua, ma 2 truong hop do thi von da khong thu duoc roi. Nhung DB thi
+  // van phai danh dau lai cho khop.
+  async _huyCacMaQrCu(repairOrderId, { exceptOrderCode = null } = {}) {
+    const dsCu = await this.repairSettlementRepository.findPendingPayosTransactions(
+      repairOrderId, { exceptOrderCode }
+    );
+    for (const cu of dsCu) {
+      try {
+        await getPayOS().paymentRequests.cancel(cu.order_code, { cancellationReason: 'Thay bang ma QR moi' });
+      } catch (err) {
+        console.warn(`[payos] khong huy duoc ma ${cu.order_code} (co the da het han/da thanh toan):`, err.message);
+      }
+      await this.repairSettlementRepository.markPayosTransactionCancelled(cu.order_code);
+    }
+    return dsCu.length;
+  }
+
   async createPayosPaymentLink(id, req = {}) {
     const existing = await this.repairSettlementRepository.findById(id);
     if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
     if (existing.status !== 'waiting_payment') {
       throw new ApiError(409, 'Phiếu không ở trạng thái chờ thanh toán');
     }
+    // Da thu tien qua QR roi thi khong sinh them ma nao nua. Trang thai phieu
+    // thuong da chan (webhook chuyen sang 'invoiced'), nhung day la lop chan
+    // theo CHINH giao dich - webhook co the toi muon, hoac ai do dua phieu
+    // nguoc ve cho thanh toan.
+    if (await this.repairSettlementRepository.hasPaidPayosTransaction(id)) {
+      throw new ApiError(409, 'Phiếu này đã được thanh toán qua QR, không tạo mã mới được');
+    }
+
+    // MOI phieu chi duoc 1 ma QR song tai 1 thoi diem: dong het ma cu truoc
+    // khi phat ma moi. Neu khong, moi lan bam la them 1 duong thu tien - khach
+    // quet nham ma cu la tien van di, con phieu thi da xuat hoa don theo ma khac.
+    await this._huyCacMaQrCu(id);
 
     const orderCode = Date.now();
     const expiredAtUnix = Math.floor(Date.now() / 1000) + 60;
@@ -561,6 +657,10 @@ class RepairSettlementService {
       reference: webhookData.reference,
       paidAt: new Date(),
     });
+
+    // Thu duoc tien roi thi moi ma QR con lai cua phieu deu phai chet ngay -
+    // khong de khach quet trung lan 2 vao mot ma khac cua cung phieu.
+    await this._huyCacMaQrCu(tx.repair_order_id, { exceptOrderCode: webhookData.orderCode });
 
     const settlement = await this.repairSettlementRepository.findById(tx.repair_order_id);
     if (!settlement || settlement.status !== 'waiting_payment') return;
