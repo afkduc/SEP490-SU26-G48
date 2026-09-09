@@ -134,6 +134,25 @@
 
 .part-list .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
 
+/* ── Cảnh báo tồn kho thấp ── */
+.part-alert {
+  background: var(--md-warning-container);
+  border-radius: var(--md-shape-lg);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.part-alert__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--md-on-warning-container);
+}
+.part-alert__desc {
+  margin: 0 0 12px;
+  color: var(--md-on-warning-container);
+  font-size: 14px;
+}
+
 /* ── Filters bar (MD3 surface container) ── */
 .part-list__filters {
   display: flex;

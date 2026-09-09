@@ -292,6 +292,49 @@
    vi day la 1 hanh dong tho/to truong CAN LAM, khong chi la ghi chu tham khao. */
 .taskReturnNote { font-size: 12px; color: var(--accent-2); font-weight: 700; }
 
+/* Yeu cau thuc hien theo bieu mau "Phieu kiem tra bao duong dinh ky" - ghi
+   hẳn chữ ("Thay thế", "Kiểm tra, điều chỉnh hoặc thay thế nếu cần thiết"...),
+   cho phep xuong dong de khong vo cot tren man hinh khoang. */
+.taskAction { font-size: 13px; line-height: 1.35; color: var(--text-muted); white-space: normal; overflow-wrap: anywhere; }
+.taskResultOk { font-size: 13px; font-weight: 700; color: var(--success); }
+.taskResultNg { font-size: 13px; font-weight: 700; color: var(--accent); white-space: normal; overflow-wrap: anywhere; }
+/* Dau muc Khong dat dang di den dau: tho bao -> to truong -> co van -> khach. */
+.taskNgFlow { font-size: 12px; font-weight: 600; color: #94a3b8; white-space: normal; overflow-wrap: anywhere; }
+.taskNgOk { font-size: 12px; font-weight: 700; color: #4ade80; white-space: normal; overflow-wrap: anywhere; }
+
+/* Nhom cong viec cua bieu mau (5 nhom + "Hang muc khac"). */
+.taskGroup { display: flex; flex-direction: column; gap: 8px; }
+.taskGroup + .taskGroup { margin-top: 14px; }
+.taskGroupTitle {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+/* Dau muc KIEM TRA: khong tick checkbox ma chon Dat/Khong dat, nen dong xep
+   doc (noi dung o tren, 2 nut o duoi) de nut du to cho thao tac bang tay. */
+.taskCheck { flex-direction: column; align-items: stretch; gap: 10px; cursor: default; }
+.taskResultBtns { display: flex; gap: 10px; }
+.taskResultBtns .btn { flex: 1; justify-content: center; }
+.btnOk { background: var(--success); color: #fff; }
+.btnNg { background: var(--accent); color: #fff; }
+.taskNgForm { display: flex; flex-direction: column; gap: 10px; }
+.taskNgInput {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+}
+
 .jobPartlist { display: flex; flex-direction: column; gap: 6px; }
 .partRow {
   display: flex;
@@ -358,3 +401,17 @@
   margin-bottom: 10px;
 }
 .historyRowDate { font-size: 13px; color: var(--text-muted); }
+
+/* Khoang da bam "Hoàn thành" (bao xong viec) nhung to truong chua xac nhan -
+   thay cho chinh cai nut do, de tho biet la khong con gi phai bam nua. */
+.jobAwaitingConfirm {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px dashed var(--success);
+  background: #e6f4ea;
+  color: var(--success);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}

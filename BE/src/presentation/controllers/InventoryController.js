@@ -136,7 +136,9 @@ class InventoryController {
       if (!branchIdToUse) {
         throw new ApiError(400, 'branchId is required');
       }
-      const result = await this.inventoryService.searchProducts(req.query.q, branchIdToUse);
+      const result = await this.inventoryService.searchProducts(
+        req.query.q, branchIdToUse, req.query.modelId || null
+      );
       return success(res, result, 'Tìm kiếm phụ tùng thành công');
     } catch (err) {
       next(err);

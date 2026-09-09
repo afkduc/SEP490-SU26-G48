@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { adminSecurityAlertsApi } from '../../services/adminApi';
 import { useToast } from '../../components/common/ToastContext';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import { parseAlertMeta } from './securityAlertFocus';
 import { emitSecurityAlertsCount } from '../../utils/securityAlertEvents';
 import './SecurityAlertsPanel.css';
@@ -52,6 +53,7 @@ export default function SecurityAlertsPanel({
   onCountChange,
 }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [counts, setCounts] = useState({ total: 0, critical: 0, high: 0, medium: 0, info: 0 });
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -182,9 +184,12 @@ export default function SecurityAlertsPanel({
 
   async function handleAckAll() {
     if (total <= 0 || ackingAll) return;
-    const ok = window.confirm(
-      `Đánh dấu đã xử lý tất cả ${total > 100 ? '99+' : total} cảnh báo chưa xử lý?`
-    );
+    const ok = await confirm({
+      title: 'Xử lý tất cả cảnh báo',
+      message: `Đánh dấu đã xử lý tất cả ${total > 100 ? '99+' : total} cảnh báo chưa xử lý?`,
+      confirmText: 'Đánh dấu đã xử lý',
+      tone: 'warning',
+    });
     if (!ok) return;
     setAckingAll(true);
     try {

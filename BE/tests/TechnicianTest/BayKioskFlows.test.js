@@ -78,27 +78,9 @@ test('BayScreen reject tick when no technician assigned yet', async () => {
   );
 });
 
-test('BayScreen complete order when all service tasks done', async () => {
-  const done = {
-    ...bayOrder,
-    status: 'completed',
-    tasks: [
-      { id: 500, taskType: 'service', isDone: true, isCancelled: false, taskName: 'Cong DV' },
-      { id: 501, taskType: 'product', isDone: false, isCancelled: false, taskName: 'Phu tung' },
-    ],
-  };
-  const service = new RepairOrderService({
-    repairOrderRepository: mockRepo({
-      findById: async () => ({
-        ...bayOrder,
-        tasks: done.tasks,
-      }),
-      updateStatus: async () => done,
-    }),
-  });
-  const dto = await service.updateStatus(70, 'completed', { branchId: 1 });
-  assert.equal(dto.status, 'completed');
-});
+// Khoang xe KHONG con nut ket thuc lenh - tho chi tick dau muc. Ket thuc la
+// viec cua to truong (RepairOrderService.confirmCompleted, co kiem tra quyen
+// va dieu kien du dau muc), nen o day khong con test nao cho buoc do.
 
 test('Landing tra-cuu progress theo ma RO duy nhat', async () => {
   const service = new RepairOrderService({

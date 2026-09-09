@@ -63,6 +63,16 @@ class ImportRequestService {
   async create(payload, { autoApprove = false, approvedBy } = {}) {
     const data = validateCreateImportRequest(payload);
 
+    if (data.supplier_id != null) {
+      const duplicated = await this.importRequestRepository.existsBySupplierInvoice(
+        data.supplier_id,
+        data.supplier_invoice_no,
+      );
+      if (duplicated) {
+        throw new ApiError(409, 'Số hóa đơn này đã được nhập trước đó cho nhà cung cấp này');
+      }
+    }
+
     const newId = await this.transactionRunner(async (tx) => {
       const requestCode = await this.importRequestRepository.getNextRequestCode(
         data.branch_id,

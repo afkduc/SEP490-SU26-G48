@@ -5,8 +5,8 @@ import httpClient from './httpClient';
  * Luu y: KHONG truyen stockQuantity len BE (BE se tu dong bo qua).
  *
  *   - list(params): GET /api/products voi filter { branchId, status, search, category, page, limit }.
- *     tra ve: { items: [{ id, productCode, productName, category, brandName, unitId, unitName, unitPrice,
- *                         stockQuantity, minStock, supplierId, supplierName, location, branchId, status, isLowStock }],
+ *     tra ve: { items: [{ id, productCode, productName, category, unitId, unitName, unitPrice,
+ *                         stockQuantity, minStock, supplierId, supplierName, branchId, status, isLowStock }],
  *               total, page, limit }
  *
  *   - getDetail(id): GET /api/products/:id
@@ -99,9 +99,12 @@ export async function markProductSeenApi(id) {
  * Tra cuu phu tung theo tu khoa (dung o trang quyet toan sua chua).
  * BE: GET /api/inventory/products/search?q=...
  */
-export async function searchProductsApi(term, branchId) {
+export async function searchProductsApi(term, branchId, modelId) {
   const qs = new URLSearchParams();
   qs.set('q', term);
   if (branchId) qs.set('branchId', String(branchId));
+  // Doi xe cua chiec dang lap phieu - BE bo phu tung cua doi xe khac, giu lai
+  // loai dung chung. Loc o BE vi danh sach bi cat con 10 dong.
+  if (modelId) qs.set('modelId', String(modelId));
   return httpClient.get(`/inventory/products/search?${qs.toString()}`);
 }

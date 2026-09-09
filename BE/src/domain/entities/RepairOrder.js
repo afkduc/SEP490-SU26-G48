@@ -70,6 +70,8 @@ class RepairOrder {
         taskType: r.task_type,
         productId: r.product_id,
         quantity: r.quantity,
+        // DVT lay tu kho qua product_id (xem TASK_SELECT) - dich vu de trong.
+        unit: r.unit ?? null,
         unitPrice: r.unit_price,
         isDone: Boolean(r.is_done),
         isCancelled: Boolean(r.is_cancelled),
@@ -77,6 +79,19 @@ class RepairOrder {
         isQtyIncreased: Boolean(r.is_qty_increased),
         prevQuantity: r.prev_quantity ?? null,
         note: r.note ?? null,
+        // Bieu mau "Phieu kiem tra BDDK": yeu cau thuc hien (I/R/M/V), nhom
+        // cong viec, va ket qua kiem tra OK/NG + mo ta khi NG.
+        actionCode: r.action_code ?? null,
+        checklistGroup: r.checklist_group ?? null,
+        checklistOrder: r.checklist_order ?? null,
+        checkResult: r.check_result ?? null,
+        checkNote: r.check_note ?? null,
+        // Xu ly dau muc Khong dat: 'reported' (tho bao, cho to truong) ->
+        // 'resolved' (xuong tu xu ly, khong qua co van) HOAC 'pending' (da
+        // bao co van, cho hoi khach) -> 'accepted' (khach dong y thay) /
+        // 'declined' (khach tu choi). Xem ensureNgDecision.js.
+        ngDecision: r.ng_decision ?? null,
+        ngNote: r.ng_note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

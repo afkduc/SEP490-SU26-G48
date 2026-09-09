@@ -5,6 +5,7 @@ import { usePermission } from '../../contexts/PermissionContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -1426,6 +1427,7 @@ function TechnicianListPage() {
 
 function BranchManagerListPage() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { canScreenAction } = usePermission();
   const navigate = useNavigate();
   const canViewManagers = canScreenAction('director:branch_managers', 'view');
@@ -1520,11 +1522,15 @@ function BranchManagerListPage() {
     if (!row?.branch?.id) return;
 
     const actionLabel = nextActive ? 'kích hoạt lại' : 'ngưng hoạt động';
-    const confirmed = window.confirm(
-      nextActive
-        ? `Kích hoạt lại chi nhánh ${row.branch.name}? Nhân sự thuộc chi nhánh này sẽ có thể đăng nhập lại.`
-        : `Ngưng hoạt động chi nhánh ${row.branch.name}? Tất cả tài khoản thuộc chi nhánh này sẽ bị dừng hoạt động và các phiên đăng nhập hiện tại sẽ hết hiệu lực.`
-    );
+    const confirmed = await confirm({
+      title: nextActive ? 'Kích hoạt lại chi nhánh' : 'Ngưng hoạt động chi nhánh',
+      message: `${nextActive ? 'Kích hoạt lại' : 'Ngưng hoạt động'} chi nhánh ${row.branch.name}?`,
+      detail: nextActive
+        ? 'Nhân sự thuộc chi nhánh này sẽ có thể đăng nhập lại.'
+        : 'Tất cả tài khoản thuộc chi nhánh này sẽ bị dừng hoạt động và các phiên đăng nhập hiện tại sẽ hết hiệu lực.',
+      confirmText: nextActive ? 'Kích hoạt lại' : 'Ngưng hoạt động',
+      tone: nextActive ? 'primary' : 'danger',
+    });
     if (!confirmed) return;
 
     setActionLoadingId(row.branch.id);

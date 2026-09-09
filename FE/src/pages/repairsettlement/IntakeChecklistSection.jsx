@@ -2,6 +2,7 @@
 // số hoá lại từ form giấy cùng tên. Lưu nguyên 1 khối JSON (repair_orders.intake_checklist),
 // không tách thành nhiều cột riêng vì đây là checklist tĩnh, không cần truy vấn/báo cáo theo từng mục.
 import { useRef } from 'react';
+import { INTAKE_NOTICE_LINES } from './intakeNotice';
 export const DEFAULT_INTAKE_CHECKLIST = {
   interior: { ac: null, handbrake: null, brakePedalClutch: null, seatsHeadliner: null },
   fuelGauge: null, // 'E' | '1/4' | '1/2' | '3/4' | 'F'
@@ -384,7 +385,10 @@ function ExteriorBodyCheck({ autoSegment, marks, onMarksChange, notes, onNotesCh
   );
 }
 
-export default function IntakeChecklistSection({ value, onChange, vehicleModelText }) {
+// open/onToggle: do man Phieu quyet toan giu (xem CollapsibleCard trong
+// RepairSettlementPage) de gap/mo khung nay giong 2 khung con lai. Noi dung
+// chi bi an bang display:none, KHONG unmount - giu nguyen cac o da tick.
+export default function IntakeChecklistSection({ value, onChange, vehicleModelText, open = true, onToggle }) {
   const v = value || DEFAULT_INTAKE_CHECKLIST;
   const autoSegment = detectSegmentFromModelText(vehicleModelText);
 
@@ -405,11 +409,22 @@ export default function IntakeChecklistSection({ value, onChange, vehicleModelTe
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header" style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-        <span className="card-title">Tiếp nhận và bàn giao xe</span>
+      <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button type="button" onClick={onToggle} aria-expanded={open}
+          title={open ? 'Thu gọn' : 'Mở rộng'}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, border: 'none', background: 'none',
+            padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit',
+          }}>
+          <span style={{
+            fontSize: 11, color: 'var(--gray-500)', width: 16, textAlign: 'center',
+            transition: 'transform .15s', transform: open ? 'rotate(90deg)' : 'none',
+          }}>▶</span>
+          <span className="card-title">Tiếp nhận và bàn giao xe</span>
+        </button>
         <span style={{ fontSize: 12, color: '#000' }}>(Diễn giải: OK: Tốt / NG: Không tốt / K: Không)</span>
       </div>
-      <div className="card-body">
+      <div className="card-body" style={open ? undefined : { display: 'none' }}>
         <div className="form-section-title" style={{ marginTop: 0 }}>Kiểm tra nội thất</div>
         <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
           {renderOkNgGroup('interior', INTERIOR_FIELDS)}
@@ -480,6 +495,15 @@ export default function IntakeChecklistSection({ value, onChange, vehicleModelTe
         <div className="form-group">
           <label className="form-label">Lưu ý (hạng mục cần làm sớm, ghi chú)</label>
           <textarea className="form-textarea" rows={2} value={v.notes || ''} onChange={(e) => setField('notes', e.target.value)} />
+        </div>
+
+        {/* Cam ket khach da doc khi ky nhan xe - phai o cuoi, ngay tren cho ky. */}
+        <div style={{
+          marginTop: 14, padding: '10px 12px', borderRadius: 6,
+          background: 'var(--gray-50)', border: '1px solid var(--gray-200)',
+          fontSize: 12.5, lineHeight: 1.6, color: '#334155',
+        }}>
+          {INTAKE_NOTICE_LINES.map((dong) => <div key={dong}>{dong}</div>)}
         </div>
       </div>
     </div>

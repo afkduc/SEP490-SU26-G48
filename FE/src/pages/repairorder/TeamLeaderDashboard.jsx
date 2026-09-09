@@ -9,6 +9,8 @@
 // - Lich su: cac lenh da hoan thanh cua to truong, loc theo ngay.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
+import { useConfirm } from '../../components/common/ConfirmDialog';
+import { actionLabel, OTHER_GROUP_LABEL } from '../../constants/maintenanceChecklist';
 import { listRepairSettlementsApi } from '../../services/repairSettlementApi';
 import { listMyBaysApi } from '../../services/vehicleBayApi';
 import {
@@ -16,11 +18,17 @@ import {
   listMyRepairOrdersApi,
   searchTechniciansApi,
   setRepairOrderTechniciansApi,
+  confirmRepairOrderCompleteApi,
+  reopenRepairOrderTaskApi,
+  forwardNgTaskApi,
+  resolveNgTaskApi,
 } from '../../services/repairOrderApi';
 import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
 import './TeamLeaderDashboard.css';
 
 const POLL_INTERVAL_MS = 15000;
+// 'task-updated' = tho vua tick 1 dau muc o khoang - phai nap lai danh sach
+// lenh de nut "Hoàn thành" mo khoa ngay khi du dau muc, khong doi vong poll.
 const BAY_REFRESH_EVENT_TYPES = new Set(['claimed', 'order-completed', 'order-cancelled']);
 const ORDER_REFRESH_EVENT_TYPES = new Set(['claimed', 'task-updated', 'order-completed', 'order-cancelled']);
 
@@ -88,6 +96,120 @@ function TaskNameLabel({ t }) {
       {suffix && <span style={{ textDecoration: 'none' }}>{suffix}</span>}
     </>
   );
+}
+
+// So luong + DON VI TINH cua dau muc phu tung: "4 Lít", "1 Cái"... Tho o
+// khoang phai biet do 4 LIT dau hay lay 4 CAI bugi, chi so khong thi khong du.
+// Dau muc dich vu khong co DVT va luon SL 1 -> tra ve rong, khong hien gi.
+function qtyLabel(t) {
+  const n = Number(t.quantity) || 0;
+  if (!t.unit && n <= 1) return '';
+  return `${n}${t.unit ? ` ${t.unit}` : ''}`;
+}
+
+// Gom dau muc dich vu theo NHOM CONG VIEC cua bieu mau "Phieu kiem tra bao
+// duong dinh ky" (5 nhom: cac bo phan co ban cua dong co, he thong dien khoang
+// dong co, he thong nhien lieu va kiem soat khi xa, gam va than xe, dieu hoa).
+// Dau muc ngoai bieu mau (dich vu le khach yeu cau them) don xuong cuoi trong
+// nhom "Hang muc khac". Giu nguyen thu tu checklist_order do BE sap san.
+function groupServiceTasks(tasks) {
+  const groups = [];
+  const byName = new Map();
+  for (const t of tasks) {
+    const name = t.checklistGroup || OTHER_GROUP_LABEL;
+    if (!byName.has(name)) {
+      const g = { name, tasks: [], hasOrder: t.checklistGroup != null };
+      byName.set(name, g);
+      groups.push(g);
+    }
+    byName.get(name).tasks.push(t);
+  }
+  // "Hang muc khac" luon o cuoi du dong dau tien cua phieu la dich vu le.
+  return groups.sort((a, b) => Number(a.name === OTHER_GROUP_LABEL) - Number(b.name === OTHER_GROUP_LABEL));
+}
+
+// Dong phu duoi ten dau muc: yeu cau thuc hien (ghi hẳn chữ, không hiện mã
+// I/R/M/V) va ket qua kiem tra Dat/Khong dat + mo ta khi Khong dat.
+function TaskMeta({ t }) {
+  const label = actionLabel(t.actionCode);
+  if (!label && !t.checkResult) return null;
+  return (
+    <>
+      {label && <div className="tld-task__action">{label}</div>}
+      {t.checkResult && (
+        <div className={`tld-task__result tld-task__result--${t.checkResult === 'NG' ? 'ng' : 'ok'}`}>
+          {t.checkResult === 'NG' ? 'Không đạt' : 'Đạt'}
+          {t.checkResult === 'NG' && t.checkNote ? ` — ${t.checkNote}` : ''}
+        </div>
+      )}
+    </>
+  );
+}
+
+// Duong di cua 1 dau muc bi cham "Khong dat": tho bao -> TO TRUONG xem lai
+// roi bao co van -> co van goi khach. Khoang xe khong noi thang duoc voi co
+// van, nen o day to truong luon la nguoi bam nut chuyen tiep.
+// Xem ensureNgDecision.js + RepairOrderService.forwardNgTask.
+function NgActionBox({ task, onForwardNg, onResolveNg, forwardingTaskId }) {
+  // 'resolved' da doi check_result ve 'OK' nen khong loc theo checkResult
+  // duoc nua - phai xet ca ngDecision.
+  if (task.checkResult !== 'NG' && task.ngDecision !== 'resolved') return null;
+
+  if (task.ngDecision === 'reported') {
+    return (
+      <div className="tld-ng-box tld-ng-box--todo">
+        <div className="tld-ng-box__title">Thợ báo không đạt — chờ bạn quyết</div>
+        {/* 2 duong khac han nhau:
+            - Phai THAY phu tung = phat sinh tien -> bat buoc qua co van hoi khach.
+            - Chi can DIEU CHINH = da nam trong gia goi bao duong -> xuong lam
+              luon, khong co gi de hoi. */}
+        <button
+          type="button"
+          className="btn btn-warning btn-sm"
+          style={{ width: '100%', justifyContent: 'center' }}
+          disabled={forwardingTaskId === task.id}
+          onClick={() => onForwardNg(task)}
+        >
+          {forwardingTaskId === task.id ? 'Đang gửi…' : 'Cần thay — báo cố vấn dịch vụ'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          style={{ width: '100%', justifyContent: 'center' }}
+          disabled={forwardingTaskId === task.id}
+          onClick={() => onResolveNg(task)}
+        >
+          Xưởng xử lý được — không cần báo khách
+        </button>
+      </div>
+    );
+  }
+  if (task.ngDecision === 'resolved') {
+    return (
+      <div className="tld-ng-box tld-ng-box--ok">
+        Xưởng đã xử lý — không phát sinh chi phí{task.ngNote ? `: ${task.ngNote}` : ''}
+      </div>
+    );
+  }
+  if (task.ngDecision === 'pending') {
+    return <div className="tld-ng-box tld-ng-box--waiting">Đã báo cố vấn — chờ cố vấn trao đổi với khách</div>;
+  }
+  if (task.ngDecision === 'accepted') {
+    // Khach dong y thay = con nguyen phan THAY THE chua ai lam, BE mo lai dau
+    // muc (is_done=0). Chua thay xong thi day la viec dang cho, khong phai
+    // viec da khep lai - phai nhin ra ngay.
+    return task.isDone
+      ? <div className="tld-ng-box tld-ng-box--ok">Khách đồng ý thay — thợ đã thay xong</div>
+      : <div className="tld-ng-box tld-ng-box--todo">Khách đồng ý thay — chờ thợ thay và tích hoàn thành</div>;
+  }
+  if (task.ngDecision === 'declined') {
+    return (
+      <div className="tld-ng-box tld-ng-box--declined">
+        Khách từ chối thay{task.ngNote ? ` — ${task.ngNote}` : ''}
+      </div>
+    );
+  }
+  return null;
 }
 
 // Chon (nhieu) tho cho 1 lenh sua chua - tach rieng khoi ClaimModal de dung
@@ -351,15 +473,36 @@ function AssignTechniciansModal({ order, onClose, onDone }) {
 // Xem (khong tick duoc) - tick that su dien ra tai man hinh cong khai cua
 // dung khoang do (Landing), o day chi phan anh lai realtime qua SSE
 // 'task-updated'/danh sach orders duoc nap lai.
-function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
+function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId, onForwardNg, onResolveNg, forwardingTaskId }) {
   const [intakeOrder, setIntakeOrder] = useState(null);
+  // Goi bao duong bung ra 30+ dau muc, 3 khoang cung luc la phai cuon rat lau
+  // moi xem het - trong khi to truong thuong chi dang quan tam 1 khoang. Nen
+  // MAC DINH THU GON het, bam vao khoang nao thi mo khoang do ra.
+  //
+  // Luu danh sach khoang DANG MO chu khong phai khoang dang thu gon: mac dinh
+  // (Set rong) tu no la thu gon het, khong phai cho danh sach bays tai xong
+  // roi moi di seed. Va quan trong hon, loadBays() chay lai moi lan co su kien
+  // SSE - neu seed lai theo bays thi khoang to truong vua mo se tu dong sap
+  // lai ngay khi tho ben duoi tick 1 dau muc.
+  const [expandedBays, setExpandedBays] = useState(() => new Set());
+  const toggleBay = (bayId) => setExpandedBays((prev) => {
+    const next = new Set(prev);
+    if (next.has(bayId)) next.delete(bayId); else next.add(bayId);
+    return next;
+  });
 
   if (bays.length === 0) {
     return <div className="tld-empty">Bạn chưa được gán khoang xe nào. Liên hệ Quản lý chi nhánh.</div>;
   }
 
+  // Lenh dang chiem khoang gom CA 2 trang thai: dang lam ('inprogress') va da
+  // Lenh dang chiem khoang - xe van
+  // nam trong khoang cho den khi xac nhan, va chinh o trang thai thu 2 moi
+  // hien nut "Xác nhận hoàn thành" ben duoi.
   const activeByBayId = new Map(
-    orders.filter((o) => o.status === 'inprogress').map((o) => [String(o.bayId), o])
+    orders
+      .filter((o) => o.status === 'inprogress')
+      .map((o) => [String(o.bayId), o])
   );
 
   return (
@@ -371,19 +514,58 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
         const partTasks = order ? (order.tasks || []).filter((t) => t.taskType !== 'service') : [];
         const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
         const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
+        // Khoang da bam Hoan thanh nhung to truong chua xac nhan - khoang van
+        // tinh la dang ban (xe chua ra), chi doi nhan de biet la den luot minh.
+        // Tho da tick het dau muc dich vu -> to truong bam "Hoàn thành" duoc.
+        // Khoang xe khong co nut ket thuc, buoc nay chi to truong lam.
+        const xongHet = activeServiceTasks.length > 0 && doneCount === activeServiceTasks.length;
+        // Dau muc "Khong dat" con dang di tren duong bao khach - BE chan bam
+        // Hoan thanh (xem RepairOrderService._assertCompletable), o day chan
+        // luon o giao dien de to truong biet con thieu gi thay vi bam roi an loi.
+        const ngChuaBao = activeServiceTasks.filter((t) => t.ngDecision === 'reported');
+        const ngChoKhach = activeServiceTasks.filter((t) => t.ngDecision === 'pending');
+        const vuongNg = ngChuaBao.length + ngChoKhach.length > 0;
+        const thuGon = !expandedBays.has(bay.id);
 
         return (
-          <div key={bay.id} className={`tld-bay-status-card ${busy ? 'tld-bay-status-card--busy' : ''}`}>
+          <div key={bay.id} className={`tld-bay-status-card ${busy ? 'tld-bay-status-card--busy' : ''}${thuGon ? ' tld-bay-status-card--collapsed' : ''}`}>
             <div className="tld-bay-status-card__header">
-              <span className="tld-bay-status-card__number">Khoang {bay.bayNumber}</span>
-              <span className={`badge ${busy ? 'badge-inprogress' : 'badge-inactive'}`}>
-                {busy ? `Đang làm (${doneCount}/${activeServiceTasks.length})` : 'Trống'}
+              <div className="tld-bay-head-left">
+                {busy && (
+                  <button type="button" className="tld-bay-collapse"
+                    onClick={() => toggleBay(bay.id)}
+                    title={thuGon ? 'Mở lại khoang này' : 'Thu gọn khoang này'}
+                    style={{ transform: thuGon ? 'none' : 'rotate(90deg)' }}>▶</button>
+                )}
+                <span className="tld-bay-status-card__number">Khoang {bay.bayNumber}</span>
+                {/* Thu gon: ca khung khoang co lai con dung thanh nay, nen
+                    ghep luon khach hang + bien so vao de van biet khoang nao
+                    dang lam xe nao ma khong phai mo ra. */}
+                {thuGon && order && (
+                  <span className="tld-bay-collapsed-hint">
+                    {order.customer?.fullName} — {order.vehicle?.licensePlate}
+                    {/* Mac dinh dong het nen phai nhin ra ngay khoang nao dang
+                        cho CHINH to truong quyet, khong the bat ho mo tung
+                        khoang ra do. */}
+                    {ngChuaBao.length > 0 && (
+                      <b className="tld-bay-collapsed-warn"> · {ngChuaBao.length} mục chờ bạn quyết</b>
+                    )}
+                    {ngChuaBao.length === 0 && ngChoKhach.length > 0 && (
+                      <span> · {ngChoKhach.length} mục chờ khách</span>
+                    )}
+                  </span>
+                )}
+              </div>
+              <span className={`badge ${xongHet ? 'badge-pending' : (busy ? 'badge-inprogress' : 'badge-inactive')}`}>
+                {xongHet
+                  ? 'Chờ xác nhận'
+                  : (busy ? `Đang làm (${doneCount}/${activeServiceTasks.length})` : 'Trống')}
               </span>
             </div>
 
-            {busy && !order && <div className="tld-empty">Đang tải tiến độ…</div>}
+            {busy && !order && !thuGon && <div className="tld-empty">Đang tải tiến độ…</div>}
 
-            {busy && order && (
+            {busy && order && !thuGon && (
               <>
                 <div className="tld-bay-status-card__customer">Khách hàng: {order.customer?.fullName} — {order.vehicle?.licensePlate}</div>
                 {order.advisorName && (
@@ -407,17 +589,41 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
                 )}
                 {serviceTasks.length > 0 && (
                   <div className="tld-bay-status-card__tasks">
-                    {serviceTasks.map((task) => (
-                      <label key={task.id} className={`tld-task ${isStruckThrough(task) ? 'tld-task--cancelled' : (task.isDone ? 'tld-task--done' : '')}`}>
-                        <input type="checkbox" checked={task.isDone} readOnly disabled />
-                        <div className="tld-task__body">
-                          <div className="tld-task__nameRow">
-                            <TaskNameLabel t={task} />
-                            {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
+                    {groupServiceTasks(serviceTasks).map((group) => (
+                      <div key={group.name} className="tld-task-group">
+                        <div className="tld-task-group__title">{group.name}</div>
+                        {group.tasks.map((task) => {
+                          // To truong khong tu tich (viec do lam tai khoang),
+                          // nhung DUOC GO TICH dau muc da xong de yeu cau lam
+                          // lai - thay cho 1 nut "tra ve lam tiep" rieng.
+                          const canReopen = task.isDone && !task.isCancelled;
+                          return (
+                          <div key={task.id} className="tld-task-wrap">
+                          <label
+                            className={`tld-task ${isStruckThrough(task) ? 'tld-task--cancelled' : (task.isDone ? 'tld-task--done' : '')}`}
+                            title={canReopen ? 'Gỡ tích để yêu cầu làm lại đầu mục này' : undefined}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={task.isDone}
+                              readOnly={!canReopen}
+                              disabled={!canReopen || reopeningTaskId === task.id}
+                              onChange={canReopen ? () => onReopenTask(order, task) : undefined}
+                            />
+                            <div className="tld-task__body">
+                              <div className="tld-task__nameRow">
+                                <TaskNameLabel t={task} />
+                                {qtyLabel(task) && <span className="tld-task__qty">{qtyLabel(task)}</span>}
+                              </div>
+                              <TaskMeta t={task} />
+                              {task.note && <div className="tld-task__note">{task.note}</div>}
+                            </div>
+                          </label>
+                          <NgActionBox task={task} onForwardNg={(t) => onForwardNg(order, t)} onResolveNg={(t) => onResolveNg(order, t)} forwardingTaskId={forwardingTaskId} />
                           </div>
-                          {task.note && <div className="tld-task__note">{task.note}</div>}
-                        </div>
-                      </label>
+                          );
+                        })}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -434,7 +640,7 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
                             </div>
                             {task.note && <div className="tld-task__note">{task.note}</div>}
                           </div>
-                          {task.quantity > 1 && <span className="tld-task__qty">x{task.quantity}</span>}
+                          {qtyLabel(task) && <span className="tld-task__qty">{qtyLabel(task)}</span>}
                         </div>
                       ))}
                     </div>
@@ -449,6 +655,39 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians }) {
                 >
                   Xem tình trạng xe ban đầu
                 </button>
+
+                {/* Tho da tick het dau muc. Khoang xe KHONG co nut ket thuc -
+                    phieu quyet toan van "Đang sửa chữa" ben CVDV cho den khi
+                    to truong bam nut nay. Xem RepairOrderService.confirmCompleted. */}
+                {xongHet && (
+                  <div className="tld-confirm-box">
+                    <div className="tld-confirm-box__title">Thợ đã xong tất cả đầu mục</div>
+                    {vuongNg ? (
+                      <div className="tld-confirm-box__blocked">
+                        Chưa đóng lệnh được — xe không được rời xưởng khi khách chưa được báo:
+                        {ngChuaBao.length > 0 && (
+                          <div>• {ngChuaBao.length} đầu mục chưa báo cố vấn: {ngChuaBao.map((t) => t.taskName).join(', ')}</div>
+                        )}
+                        {ngChoKhach.length > 0 && (
+                          <div>• {ngChoKhach.length} đầu mục cố vấn đang hỏi khách: {ngChoKhach.map((t) => t.taskName).join(', ')}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="tld-confirm-box__hint">
+                        Kiểm tra lại rồi bấm Hoàn thành để chuyển phiếu sang <b>Chờ thanh toán</b> và giải phóng khoang.
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ width: '100%', justifyContent: 'center' }}
+                      disabled={confirmingId === order.id || vuongNg}
+                      onClick={() => onConfirmComplete(order)}
+                    >
+                      {confirmingId === order.id ? 'Đang xử lý…' : 'Hoàn thành'}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -502,11 +741,19 @@ function HistoryDetailModal({ order, onClose }) {
 
           {serviceTasks.length > 0 && (
             <div className="tld-bay-status-card__tasks" style={{ marginTop: 12 }}>
-              {serviceTasks.map((task) => (
-                <label key={task.id} className={`tld-task ${task.isCancelled ? 'tld-task--cancelled' : 'tld-task--done'}`}>
-                  <input type="checkbox" checked={task.isDone} readOnly disabled />
-                  <TaskNameLabel t={task} />
-                </label>
+              {groupServiceTasks(serviceTasks).map((group) => (
+                <div key={group.name} className="tld-task-group">
+                  <div className="tld-task-group__title">{group.name}</div>
+                  {group.tasks.map((task) => (
+                    <label key={task.id} className={`tld-task ${task.isCancelled ? 'tld-task--cancelled' : 'tld-task--done'}`}>
+                      <input type="checkbox" checked={task.isDone} readOnly disabled />
+                      <div className="tld-task__body">
+                        <div className="tld-task__nameRow"><TaskNameLabel t={task} /></div>
+                        <TaskMeta t={task} />
+                      </div>
+                    </label>
+                  ))}
+                </div>
               ))}
             </div>
           )}
@@ -518,7 +765,7 @@ function HistoryDetailModal({ order, onClose }) {
                 {partTasks.map((task) => (
                   <div key={task.id} className={`tld-task ${task.isCancelled ? 'tld-task--cancelled' : ''}`}>
                     <TaskNameLabel t={task} />
-                    {task.quantity > 1 && <span> x{task.quantity}</span>}
+                    {qtyLabel(task) && <span> {qtyLabel(task)}</span>}
                   </div>
                 ))}
               </div>
@@ -582,6 +829,10 @@ export default function TeamLeaderDashboard() {
   const [error, setError] = useState('');
   const [claimingSettlement, setClaimingSettlement] = useState(null);
   const [assigningOrder, setAssigningOrder] = useState(null);
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [reopeningTaskId, setReopeningTaskId] = useState(null);
+  const [forwardingTaskId, setForwardingTaskId] = useState(null);
+  const confirm = useConfirm();
   const [claimedElsewhere, setClaimedElsewhere] = useState({});
   // So do goc tab - dem viec "chua xem": pendingSeenCount la mo (baseline) so
   // luong pending tai lan cuoi mo tab "Viec cho nhan" (null = chua seed lan
@@ -668,6 +919,106 @@ export default function TeamLeaderDashboard() {
 
   useRepairOrderEventsSSE(handleEvent, true);
 
+  // Go tich 1 dau muc da hoan thanh = yeu cau khoang lam lai dau muc do.
+  // Neu lenh dang cho xac nhan thi tu quay ve "dang lam" (BE thu hoi moc bao
+  // xong, xem RepairOrderRepositoryImpl.reopenTask).
+  const handleReopenTask = async (order, task) => {
+    const ok = await confirm({
+      title: 'Yêu cầu làm lại đầu mục',
+      message: 'Cần làm lại đầu mục công việc này?',
+      detail: task.taskName,
+      confirmText: 'Yêu cầu làm lại',
+      tone: 'warning',
+    });
+    if (!ok) return;
+    setReopeningTaskId(task.id);
+    setError('');
+    try {
+      await reopenRepairOrderTaskApi(order.id, task.id);
+      loadOrders();
+      loadBays();
+    } catch (err) {
+      setError(err.message || 'Không yêu cầu làm lại đầu mục được');
+    } finally {
+      setReopeningTaskId(null);
+    }
+  };
+
+  // Chuyen 1 dau muc "Khong dat" len co van dich vu. Khoang xe khong noi
+  // thang duoc voi co van: tho cham Khong dat xong thi dau muc dung lai o day,
+  // to truong ra xem tan noi roi moi bam nut nay - co van chi bat dau goi
+  // khach khi da co xac nhan ky thuat cua to truong.
+  const handleForwardNg = async (order, task) => {
+    const ok = await confirm({
+      title: 'Báo cố vấn dịch vụ',
+      message: `Chuyển đầu mục "${task.taskName}" cho cố vấn dịch vụ liên hệ khách hàng?`,
+      detail: task.checkNote ? `Thợ ghi: ${task.checkNote}` : undefined,
+      confirmText: 'Báo cố vấn',
+      tone: 'warning',
+    });
+    if (!ok) return;
+    setForwardingTaskId(task.id);
+    setError('');
+    try {
+      await forwardNgTaskApi(order.id, task.id);
+      loadOrders();
+      loadBays();
+    } catch (err) {
+      setError(err.message || 'Không báo cố vấn dịch vụ được');
+    } finally {
+      setForwardingTaskId(null);
+    }
+  };
+
+  // Xuong tu khac phuc, khong qua co van. Bat buoc ghi da lam gi vi dau muc
+  // dang tu "Không đạt" chuyen thanh "Đạt" tren ho so xe.
+  const handleResolveNg = async (order, task) => {
+    const moTa = await confirm({
+      title: 'Xưởng xử lý được — không cần báo khách',
+      message: `Đầu mục "${task.taskName}" sẽ chuyển thành Đạt và không báo cố vấn dịch vụ.`,
+      detail: (task.checkNote ? `Thợ ghi: ${task.checkNote}
+
+` : '')
+        + 'Chỉ dùng khi xử lý được trong phạm vi gói bảo dưỡng (điều chỉnh, vệ sinh, siết lại…). Nếu phải thay phụ tùng thì bấm "Cần thay — báo cố vấn dịch vụ".',
+      confirmText: 'Đã xử lý xong',
+      tone: 'warning',
+      input: {
+        label: 'Đã xử lý thế nào?',
+        placeholder: 'VD: siết lại ốc bắt giá đỡ, kiểm tra lại đạt',
+        required: true,
+      },
+    });
+    if (!moTa) return;
+    setForwardingTaskId(task.id);
+    setError('');
+    try {
+      await resolveNgTaskApi(order.id, task.id, moTa);
+      loadOrders();
+      loadBays();
+    } catch (err) {
+      setError(err.message || 'Không ghi nhận được kết quả xử lý');
+    } finally {
+      setForwardingTaskId(null);
+    }
+  };
+
+  // To truong xac nhan lenh da xong sau khi khoang bao xong viec - day moi la
+  // buoc lam phieu quyet toan ben CVDV chuyen "Chờ thanh toán" va giai phong
+  // khoang, nen phai nap lai ca bays lan orders.
+  const handleConfirmComplete = async (order) => {
+    setConfirmingId(order.id);
+    setError('');
+    try {
+      await confirmRepairOrderCompleteApi(order.id);
+      loadBays();
+      loadOrders();
+    } catch (err) {
+      setError(err.message || 'Không xác nhận hoàn thành được');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
   const handleClaimDone = () => {
     setClaimingSettlement(null);
     loadPending();
@@ -750,7 +1101,7 @@ export default function TeamLeaderDashboard() {
         )
       )}
 
-      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} />}
+      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} onConfirmComplete={handleConfirmComplete} confirmingId={confirmingId} onReopenTask={handleReopenTask} reopeningTaskId={reopeningTaskId} onForwardNg={handleForwardNg} onResolveNg={handleResolveNg} forwardingTaskId={forwardingTaskId} />}
 
       {activeTab === 'history' && <HistoryPanel orders={orders} />}
 
