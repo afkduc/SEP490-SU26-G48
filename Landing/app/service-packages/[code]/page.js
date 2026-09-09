@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, Wrench, Sparkles, Disc3, Snowflake, ClipboardList } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Wrench, ClipboardList } from "lucide-react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { API_BASE_URL } from "../../config";
@@ -8,9 +8,7 @@ import styles from "./page.module.css";
 
 const CATEGORY_ICONS = {
   "Bảo dưỡng định kỳ": Wrench,
-  "Chăm sóc xe": Sparkles,
-  "Phanh & Gầm": Disc3,
-  "Điều hòa": Snowflake,
+  "Bảo dưỡng cơ bản": Wrench,
 };
 
 function formatPrice(value) {
@@ -47,7 +45,15 @@ export default async function ServicePackageDetailPage({ params }) {
   if (!pkg) notFound();
 
   const Icon = CATEGORY_ICONS[pkg.categoryName] || ClipboardList;
-  const others = allPackages.filter((p) => p.code !== code).slice(0, 4);
+  const others = allPackages
+    .filter(
+      (p) =>
+        p.code !== code &&
+        String(p.categoryName || "")
+          .toLowerCase()
+          .includes("bảo dưỡng")
+    )
+    .slice(0, 4);
 
   return (
     <>

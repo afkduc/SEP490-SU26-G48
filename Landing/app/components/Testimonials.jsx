@@ -11,12 +11,12 @@ const TESTIMONIALS = [
       "Xe được kỹ thuật viên kiểm tra kỹ và giải thích rõ từng hạng mục trước khi sửa, phụ tùng thay đúng là hàng chính hãng Mazda nên rất yên tâm.",
   },
   {
-    name: "Khách hàng sử dụng Kia Seltos",
+    name: "Khách hàng sử dụng Mazda3",
     quote:
       "Đặt lịch qua trang web nhanh gọn, đến nơi không phải chờ lâu. Xe bảo dưỡng định kỳ xong chạy êm hẳn so với trước.",
   },
   {
-    name: "Khách hàng sử dụng Kia Morning",
+    name: "Khách hàng sử dụng Mazda2",
     quote:
       "Tra cứu tiến độ sửa xe online rất tiện, không cần gọi điện hỏi liên tục như trước đây. Nhân viên tư vấn cũng nhiệt tình.",
   },
@@ -28,7 +28,7 @@ export default function Testimonials() {
       <div className="container">
         <Reveal className={styles.heading}>
           <span className={styles.eyebrow}>Khách hàng nói gì</span>
-          <h2>Được khách hàng Kia & Mazda tin tưởng</h2>
+          <h2>Được khách hàng Mazda tin tưởng</h2>
         </Reveal>
 
         <div className={styles.grid}>

@@ -76,7 +76,7 @@ export default function Hero() {
           custom={0}
           variants={fadeUp}
         >
-          Gara chuyên sâu Kia & Mazda
+          Gara chuyên sâu Mazda
         </motion.span>
 
         <motion.h1

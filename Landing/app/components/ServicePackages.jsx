@@ -2,16 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Wrench, Sparkles, Disc3, Snowflake, ClipboardList } from "lucide-react";
+import { Wrench, ClipboardList } from "lucide-react";
 import Reveal from "./Reveal";
 import { API_BASE_URL } from "../config";
 import styles from "./ServicePackages.module.css";
 
 const CATEGORY_ICONS = {
   "Bảo dưỡng định kỳ": Wrench,
-  "Chăm sóc xe": Sparkles,
-  "Phanh & Gầm": Disc3,
-  "Điều hòa": Snowflake,
+  "Bảo dưỡng cơ bản": Wrench,
 };
 
 function formatPrice(value) {
@@ -67,7 +65,15 @@ export default function ServicePackages() {
     fetch(`${API_BASE_URL}/public/service-packages`)
       .then((res) => res.json())
       .then((body) => {
-        if (body?.success) setPackages(body.data);
+        if (!body?.success) return;
+        // Chi hien goi bao duong (doi phong neu API tra them goi sua chua).
+        setPackages(
+          body.data.filter((p) =>
+            String(p.categoryName || "")
+              .toLowerCase()
+              .includes("bảo dưỡng")
+          )
+        );
       })
       .catch(() => {});
   }, []);
@@ -81,7 +87,7 @@ export default function ServicePackages() {
       <div className="container">
         <Reveal className={styles.heading}>
           <span className={styles.eyebrow}>Gói dịch vụ</span>
-          <h2>Bảng giá gói bảo dưỡng, chăm sóc phổ biến</h2>
+          <h2>Bảng giá gói bảo dưỡng phổ biến</h2>
         </Reveal>
 
         {featured && (
