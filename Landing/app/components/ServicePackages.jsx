@@ -1,37 +1,69 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Wrench, ClipboardList } from "lucide-react";
+import { Wrench } from "lucide-react";
 import Reveal from "./Reveal";
 import { API_BASE_URL } from "../config";
 import styles from "./ServicePackages.module.css";
 
-const CATEGORY_ICONS = {
-  "Bảo dưỡng định kỳ": Wrench,
-  "Bảo dưỡng cơ bản": Wrench,
-};
+const BODY_FILTERS = [
+  { key: "sedan", label: "Sedan", segments: ["Sedan/Hatchback"] },
+  { key: "suv", label: "SUV", segments: ["SUV/Crossover"] },
+  { key: "pickup", label: "Bán tải", segments: ["Pickup Truck"] },
+];
 
 function formatPrice(value) {
   return `${Number(value).toLocaleString("vi-VN")}đ`;
 }
 
-// Danh muc nhieu goi nhat (thuong la "Bao duong dinh ky") duoc tach rieng
-// thanh 1 the rong full-width, cac danh muc con lai (thuong chi 1-2 goi moi
-// danh muc) xep thanh 1 hang deu nhau ben duoi - tranh phai chia 2 cot cao
-// bang nhau trong khi so luong goi giua cac danh muc chenh lech qua nhieu.
-function splitFeatured(packages) {
-  const map = new Map();
-  packages.forEach((p) => {
-    const key = p.categoryName || "Khác";
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(p);
-  });
-  const groups = Array.from(map.entries())
-    .map(([category, items]) => ({ category, items }))
-    .sort((a, b) => b.items.length - a.items.length);
+/** Tach moc bao duong tu ten goi DB (vd. "... 1.000km dau - Mazda2 ..."). */
+function parseLevel(name) {
+  const raw = String(name || "");
+  if (/1\.000\s*km\s*đầu/i.test(raw)) {
+    return { key: "km1000", label: "Gói bảo dưỡng 1.000km đầu", order: 0 };
+  }
+  const cap = raw.match(/Cấp\s*(\d+)/i);
+  if (cap) {
+    const n = Number(cap[1]);
+    return { key: `cap${n}`, label: `Gói bảo dưỡng Cấp ${n}`, order: n };
+  }
+  // Fallback: bo phan ten xe sau dau "-".
+  const generic = raw.replace(/\s*-\s*.+$/, "").trim() || raw;
+  return { key: generic.toLowerCase(), label: generic, order: 99 };
+}
 
-  return { featured: groups[0], others: groups.slice(1) };
+/** Bo ten mau xe cu the trong mo ta (Mazda2, BT-50, ...). */
+function cleanDescription(desc) {
+  if (!desc) return "";
+  return String(desc)
+    .replace(/\s*dành cho\s+[^.]+?(?=\s*\(|\s*\.|$)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+\./g, ".")
+    .trim();
+}
+
+/**
+ * Trong 1 loai xe (Sedan/SUV/Ban tai): gop cac goi trung moc bao duong
+ * (Luxury/Premium + nhieu dong xe) thanh 1 dong, khong ghi ten xe.
+ */
+function summarizeByLevel(packages, bodyKey) {
+  const filter = BODY_FILTERS.find((f) => f.key === bodyKey);
+  if (!filter) return [];
+  const matched = packages.filter((p) => filter.segments.includes(p.segment));
+  const byLevel = new Map();
+  matched.forEach((p) => {
+    const level = parseLevel(p.name);
+    if (byLevel.has(level.key)) return;
+    byLevel.set(level.key, {
+      code: p.code,
+      name: level.label,
+      description: cleanDescription(p.description),
+      totalPrice: p.totalPrice,
+      order: level.order,
+    });
+  });
+  return [...byLevel.values()].sort((a, b) => a.order - b.order);
 }
 
 function PackageRow({ p }) {
@@ -46,27 +78,15 @@ function PackageRow({ p }) {
   );
 }
 
-function GroupHeader({ category }) {
-  const Icon = CATEGORY_ICONS[category] || ClipboardList;
-  return (
-    <div className={styles.groupHeader}>
-      <div className={styles.groupIconWrap}>
-        <Icon className={styles.groupIcon} />
-      </div>
-      <h3>{category}</h3>
-    </div>
-  );
-}
-
 export default function ServicePackages() {
   const [packages, setPackages] = useState([]);
+  const [bodyType, setBodyType] = useState("sedan");
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/public/service-packages`)
       .then((res) => res.json())
       .then((body) => {
         if (!body?.success) return;
-        // Chi hien goi bao duong (doi phong neu API tra them goi sua chua).
         setPackages(
           body.data.filter((p) =>
             String(p.categoryName || "")
@@ -78,9 +98,12 @@ export default function ServicePackages() {
       .catch(() => {});
   }, []);
 
-  if (packages.length === 0) return null;
+  const visible = useMemo(
+    () => summarizeByLevel(packages, bodyType),
+    [packages, bodyType]
+  );
 
-  const { featured, others } = splitFeatured(packages);
+  if (packages.length === 0) return null;
 
   return (
     <section id="service-packages" className={`snap-section ${styles.section}`}>
@@ -90,29 +113,37 @@ export default function ServicePackages() {
           <h2>Bảng giá gói bảo dưỡng phổ biến</h2>
         </Reveal>
 
-        {featured && (
-          <Reveal className={`${styles.group} ${styles.featured}`}>
-            <GroupHeader category={featured.category} />
+        <Reveal className={styles.filters}>
+          {BODY_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              className={`${styles.filterBtn} ${bodyType === f.key ? styles.filterBtnActive : ""}`}
+              onClick={() => setBodyType(f.key)}
+              aria-pressed={bodyType === f.key}
+            >
+              {f.label}
+            </button>
+          ))}
+        </Reveal>
+
+        <Reveal className={`${styles.group} ${styles.featured}`}>
+          <div className={styles.groupHeader}>
+            <div className={styles.groupIconWrap}>
+              <Wrench className={styles.groupIcon} />
+            </div>
+            <h3>Bảo dưỡng định kỳ</h3>
+          </div>
+          {visible.length === 0 ? (
+            <p className={styles.empty}>Chưa có gói bảo dưỡng cho loại xe này.</p>
+          ) : (
             <div className={styles.featuredList}>
-              {featured.items.map((p) => (
-                <PackageRow key={p.code} p={p} />
+              {visible.map((p) => (
+                <PackageRow key={`${bodyType}-${p.name}`} p={p} />
               ))}
             </div>
-          </Reveal>
-        )}
-
-        <div className={styles.othersRow}>
-          {others.map((g, i) => (
-            <Reveal key={g.category} delay={i * 0.06} className={styles.group}>
-              <GroupHeader category={g.category} />
-              <div className={styles.list}>
-                {g.items.map((p) => (
-                  <PackageRow key={p.code} p={p} />
-                ))}
-              </div>
-            </Reveal>
-          ))}
-        </div>
+          )}
+        </Reveal>
 
         <Reveal delay={0.2} className={styles.cta}>
           <Link href="/#gui-yeu-cau" className={styles.ctaBtn}>

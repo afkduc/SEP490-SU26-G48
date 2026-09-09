@@ -15,6 +15,25 @@ function formatPrice(value) {
   return `${Number(value).toLocaleString("vi-VN")}đ`;
 }
 
+/** An ten mau xe cu the tren trang public (giu dung moc bao duong). */
+function publicPackageTitle(name) {
+  const raw = String(name || "");
+  if (/1\.000\s*km\s*đầu/i.test(raw)) return "Gói bảo dưỡng 1.000km đầu";
+  const cap = raw.match(/Cấp\s*(\d+)/i);
+  if (cap) return `Gói bảo dưỡng Cấp ${cap[1]}`;
+  return raw.replace(/\s*-\s*.+$/, "").trim() || raw;
+}
+
+function cleanPublicText(text) {
+  if (!text) return "";
+  return String(text)
+    .replace(/\s*dành cho\s+[^.]+?(?=\s*\(|\s*\.|$)/gi, "")
+    .replace(/\s*dành riêng cho\s+[^.]+?(?=,|\.|$)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+\./g, ".")
+    .trim();
+}
+
 async function getPackage(code) {
   const res = await fetch(`${API_BASE_URL}/public/service-packages/${code}`, { cache: "no-store" });
   if (!res.ok) return null;
@@ -34,8 +53,8 @@ export async function generateMetadata({ params }) {
   const pkg = await getPackage(code);
   if (!pkg) return {};
   return {
-    title: pkg.name,
-    description: pkg.description,
+    title: publicPackageTitle(pkg.name),
+    description: cleanPublicText(pkg.description),
   };
 }
 
@@ -45,15 +64,20 @@ export default async function ServicePackageDetailPage({ params }) {
   if (!pkg) notFound();
 
   const Icon = CATEGORY_ICONS[pkg.categoryName] || ClipboardList;
-  const others = allPackages
-    .filter(
-      (p) =>
-        p.code !== code &&
-        String(p.categoryName || "")
-          .toLowerCase()
-          .includes("bảo dưỡng")
-    )
-    .slice(0, 4);
+  const title = publicPackageTitle(pkg.name);
+  const description = cleanPublicText(pkg.description);
+  const purpose = cleanPublicText(pkg.purpose);
+
+  // Goi lien quan: gop theo moc, bo trung lap ten sau khi an mau xe.
+  const relatedMap = new Map();
+  allPackages.forEach((p) => {
+    if (p.code === code) return;
+    if (!String(p.categoryName || "").toLowerCase().includes("bảo dưỡng")) return;
+    const label = publicPackageTitle(p.name);
+    if (relatedMap.has(label)) return;
+    relatedMap.set(label, { code: p.code, name: label, totalPrice: p.totalPrice });
+  });
+  const others = [...relatedMap.values()].slice(0, 4);
 
   return (
     <>
@@ -71,18 +95,18 @@ export default async function ServicePackageDetailPage({ params }) {
               {pkg.categoryName}
             </span>
           )}
-          <h1>{pkg.name}</h1>
+          <h1>{title}</h1>
 
           <div className={styles.priceBox}>
             <span className={styles.price}>{formatPrice(pkg.totalPrice)}</span>
           </div>
 
-          {pkg.description && <p className={styles.intro}>{pkg.description}</p>}
+          {description && <p className={styles.intro}>{description}</p>}
 
-          {pkg.purpose && (
+          {purpose && (
             <section className={styles.block}>
               <h2>Gói này dùng để làm gì?</h2>
-              <p>{pkg.purpose}</p>
+              <p>{purpose}</p>
             </section>
           )}
 
