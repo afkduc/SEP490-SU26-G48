@@ -51,17 +51,15 @@ class ExportRequestController {
     }
   };
 
-  getNextCode = async (req, res, next) => {
+  /**
+   * GET /api/export-requests/technicians
+   * Danh sach tho may cho dropdown "Nguoi lay".
+   */
+  listTechnicians = async (req, res, next) => {
     try {
-      const { branchId } = req.query;
-      const branchIdToUse = branchId ? Number(branchId) : req.user?.branchId;
-      if (!branchIdToUse) {
-        throw new ApiError(400, 'branchId is required');
-      }
-      const data = await this.exportRequestService.getNextRequestCode({
-        branchId: branchIdToUse,
-      });
-      return success(res, data, 'Next request code generated');
+      const branchIdToUse = req.query.branchId ? Number(req.query.branchId) : req.user?.branchId;
+      const data = await this.exportRequestService.listTechnicians(branchIdToUse);
+      return success(res, data, 'Technicians retrieved');
     } catch (err) {
       next(err);
     }
@@ -101,6 +99,19 @@ class ExportRequestController {
     }
   };
 
+  /**
+   * GET /api/export-requests/:id/pickups
+   * Lich su cac lan lay hang/tra hang cua 1 phieu xuat.
+   */
+  getPickups = async (req, res, next) => {
+    try {
+      const data = await this.exportRequestService.getPickups(req.params.id);
+      return success(res, data, 'Export pickups retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   create = async (req, res, next) => {
     try {
       const performedBy = req.user?.userId;
@@ -111,7 +122,7 @@ class ExportRequestController {
       if (!payload.branchId && req.user?.branchId) {
         payload.branchId = req.user.branchId;
       }
-      const created = await this.exportRequestService.create(payload);
+      const created = await this.exportRequestService.confirmPickup(payload);
       const { exportRequestSnapshot } = require('../../utils/auditSnapshots');
       const code = created?.requestCode || created?.request_code || created?.code || null;
       const itemCount = created?.itemCount ?? (created?.items || []).length;
@@ -121,9 +132,9 @@ class ExportRequestController {
         recordId: created?.id || null,
         entityName: 'Phiếu xuất kho',
         step: 'created',
-        stepLabel: 'Tạo phiếu xuất kho',
+        stepLabel: 'Xác nhận xuất/trả phụ tùng',
         action: 'CREATE',
-        description: `Tạo phiếu xuất kho ${code || created?.id}`
+        description: `Xác nhận xuất/trả phụ tùng trên phiếu ${code || created?.id}`
           + (itemCount ? ` — ${itemCount} mặt hàng` : '')
           + (created?.repairOrderCode ? ` (LSC ${created.repairOrderCode})` : ''),
         snapshot: exportRequestSnapshot(created),

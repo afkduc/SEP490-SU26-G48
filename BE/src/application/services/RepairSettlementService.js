@@ -127,6 +127,12 @@ class RepairSettlementService {
     this.customerRepository = customerRepository;
   }
 
+  // To truong cua 1 chi nhanh - cho o "Chỉ định tổ trưởng" tren form tao phieu.
+  async getBranchTeamLeaders(branchId) {
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
+    return this.repairSettlementRepository.findBranchTeamLeaders(branchId);
+  }
+
   async getBranchAdvisors(branchId) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
     return this.repairSettlementRepository.findBranchAdvisors(branchId);
@@ -308,6 +314,21 @@ class RepairSettlementService {
     const data = this._validateAndNormalize(resolvedPayload);
     data.signatureData = payload.signatureData;
     data.signerName = (payload.signerName || '').trim() || null;
+    // Chi dinh to truong (tuy chon): phieu chi hien o bang "Việc chờ nhận"
+    // cua dung to truong nay. Bo trong = moi to truong deu thay, nhu cu.
+    //
+    // PHAI kiem nguoi duoc chi dinh co thuc su la to truong CUNG CHI NHANH
+    // khong - khong thi ai goi thang API co the chi dinh 1 id bat ky, phieu
+    // bien mat khoi bang cua moi to truong ma khong ai hieu tai sao.
+    data.assignedTeamLeaderId = null;
+    if (payload.assignedTeamLeaderId) {
+      const dsToTruong = await this.repairSettlementRepository.findBranchTeamLeaders(branchId);
+      const hopLe = dsToTruong.some((t) => String(t.id) === String(payload.assignedTeamLeaderId));
+      if (!hopLe) {
+        throw new ApiError(400, 'Tổ trưởng được chỉ định không thuộc chi nhánh này hoặc đã ngưng hoạt động');
+      }
+      data.assignedTeamLeaderId = Number(payload.assignedTeamLeaderId);
+    }
     await this._assertNoActiveDuplicate(data.customerId, data.vehicleId);
     const entity = await this.repairSettlementRepository.create(data, { branchId, advisorId });
 

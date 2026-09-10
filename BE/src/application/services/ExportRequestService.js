@@ -1,6 +1,6 @@
 const ApiError = require('../../utils/ApiError');
 const ExportRequestResponseDto = require('../dto/ExportRequestResponseDto');
-const { validateCreateExportRequest } = require('../dto/ExportRequestCreateDto');
+const { validateConfirmPickup } = require('../dto/ExportRequestCreateDto');
 const { runInTransaction } = require('../../utils/sqlTransaction');
 const { normalizeDateRange } = require('../../utils/dateRange');
 
@@ -27,6 +27,9 @@ class ExportRequestService {
       repairOrderId: repairOrderId ? Number(repairOrderId) : undefined,
       ...dateRange,
       search: search || undefined,
+      // Danh sach chinh chi hien phieu DA XONG (RO da chot). Rieng khi tra
+      // cuu dich danh 1 RO thi lay ca phieu dang lam do do la chu dich.
+      includeOpen: Boolean(repairOrderId),
     };
     const [items, total] = await Promise.all([
       this.exportRequestRepository.findAll({ ...filters, page: safePage, limit: safeLimit }),
@@ -48,13 +51,6 @@ class ExportRequestService {
     const result = await this.exportRequestRepository.findById(numId);
     if (!result) throw new ApiError(404, 'Khong tim thay phieu xuat');
     return ExportRequestResponseDto.fromEntity(result.request, result.items);
-  }
-
-  async getNextRequestCode({ branchId }) {
-    if (!branchId) throw new ApiError(400, 'branchId is required');
-    const d = new Date();
-    const code = await this.exportRequestRepository.getNextRequestCode(Number(branchId), d);
-    return { requestCode: code, date: d.toISOString().slice(0, 10) };
   }
 
   /**
@@ -94,35 +90,41 @@ class ExportRequestService {
     }
     const data = await this.exportRequestRepository.findRepairOrderForExport(numId);
     if (!data) throw new ApiError(404, 'Khong tim thay lenh sua chua');
-    if (data.alreadyExported) {
-      throw new ApiError(409, 'Lenh sua chua nay da duoc xuat kho');
-    }
+    // Khong con chan "da xuat roi" - phieu xuat theo doi lien tuc, chi khoa
+    // khi RO da chot (data.locked, tinh o repository).
     return data;
   }
 
   /**
-   * Tao phieu xuat (1 transaction):
-   *   1) INSERT export_requests (status='completed')
-   *   2) INSERT export_request_items (snapshot)
-   *   3) UPDATE products.stock_quantity -= quantity (CHECK stock >= quantity)
-   *   4) INSERT inventory_transactions (type='export')
-   * Neu loi (stock khong du, FK sai...) -> rollback.
+   * Danh sach tho may cho dropdown "Nguoi lay" khi tao phieu xuat.
    */
-  async create(payload) {
-    const data = validateCreateExportRequest(payload);
-    const requestCode = await this.exportRequestRepository.getNextRequestCode(
-      data.branch_id,
-      data.export_date,
-    );
+  async listTechnicians(branchId) {
+    if (!branchId) throw new ApiError(400, 'branchId is required');
+    return this.exportRequestRepository.findTechnicians(Number(branchId));
+  }
 
+  /**
+   * Xac nhan 1 lan lay hang (xuat them va/hoac tra hang) - toan bo trong 1
+   * transaction, so luong tung dong do SERVER tu tinh lai, FE chi gui danh
+   * sach productId duoc tick. Xem repository.confirmPickup().
+   */
+  async confirmPickup(payload) {
+    const data = validateConfirmPickup(payload);
     const result = await runInTransaction(async (tx) => {
-      return this.exportRequestRepository.create(tx, {
-        ...data,
-        request_code: requestCode,
-      }, data.items);
+      return this.exportRequestRepository.confirmPickup(tx, data);
     });
-
     return ExportRequestResponseDto.fromEntity(result.request, result.items);
+  }
+
+  /**
+   * Lich su cac lan lay hang/tra hang cua 1 phieu xuat.
+   */
+  async getPickups(exportRequestId) {
+    const numId = Number(exportRequestId);
+    if (!Number.isFinite(numId) || numId <= 0) {
+      throw new ApiError(400, 'id khong hop le');
+    }
+    return this.exportRequestRepository.findPickups(numId);
   }
 
   /**

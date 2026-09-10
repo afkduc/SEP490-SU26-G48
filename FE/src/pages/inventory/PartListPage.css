@@ -243,6 +243,13 @@
   border-bottom: 1px solid var(--md-outline-variant);
 }
 
+/* Bang canh bao ton kho thap: gia tri cac cot so can PHAI, nen tieu de cung
+   phai can phai moi thang hang. Phai viet rieng o day vi rule
+   `.part-list .table th` o tren de bep class .text-right chung trong
+   global.css (do uu tien cao hon). Chi scope trong .part-alert de khong
+   dung toi bang danh sach phu tung chinh (bang do gia tri can TRAI). */
+.part-list .part-alert .table th.text-right { text-align: right; }
+
 .part-list .table td {
   padding: 14px 16px;
   border-bottom: 1px solid var(--md-outline-variant);
