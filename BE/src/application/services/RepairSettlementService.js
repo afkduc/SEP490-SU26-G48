@@ -40,6 +40,13 @@ const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB', 'HUY'];
 const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS'];
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
 
+// Chan tren cua so km. Cot current_km la INT nen qua 2.147.483.647 la tran
+// kieu, nem loi SQL kho hieu; ma xe chay het doi cung khong toi 2 trieu km.
+const KM_TOI_DA = 2000000;
+// Do dai cot trong DB (nvarchar) - chan o day de bao duoc dung o nao qua dai,
+// thay vi de SQL Server nem loi "String or binary data would be truncated".
+const DAI_TOI_DA = { customerRequest: 1000, note: 1000 };
+
 // Tinh lai toan bo tong tien tu CHINH danh sach hang muc - khong tin theo
 // subtotal/discountAmount/vat/total FE gui len trong payload (truoc day BE
 // lay thang, ai goi API truc tiep bo qua FE co the tu khai total thap hon
@@ -329,6 +336,19 @@ class RepairSettlementService {
       }
       data.assignedTeamLeaderId = Number(payload.assignedTeamLeaderId);
     }
+    // Cong-to-met chi tang. Chan o day chu khong chi o FE - goi thang API thi
+    // FE khong con la cai chan nao ca.
+    //
+    // CHI kiem luc TAO: khi SUA phieu, vehicles.current_km thuong da duoc
+    // chinh phieu nay nang len roi (xem _bumpVehicleKm), so sanh lai se tu
+    // chan chinh no va khong con sua duoc so go nham.
+    const kmDaGhiNhan = await this.repairSettlementRepository.getVehicleCurrentKm(data.vehicleId);
+    if (kmDaGhiNhan != null && data.currentKm < kmDaGhiNhan) {
+      throw new ApiError(400,
+        `Số km hiện tại (${data.currentKm.toLocaleString('vi-VN')}) không được nhỏ hơn `
+        + `lần ghi nhận gần nhất của xe (${kmDaGhiNhan.toLocaleString('vi-VN')} km)`);
+    }
+
     await this._assertNoActiveDuplicate(data.customerId, data.vehicleId);
     const entity = await this.repairSettlementRepository.create(data, { branchId, advisorId });
 
@@ -718,8 +738,28 @@ class RepairSettlementService {
     if (payload.currentKm === '' || payload.currentKm == null) {
       throw new ApiError(400, 'Phải nhập số km hiện tại của xe');
     }
+    // Truoc day chi kiem "co nhap" - go chu, so am, hay 9 chu so deu lot qua
+    // BE (FE co chan nhung goi thang API thi khong). Km sai keo theo sai ca
+    // lich nhac bao duong va viec tinh con han bao hanh.
+    const km = Number(payload.currentKm);
+    if (!Number.isFinite(km) || !Number.isInteger(km)) {
+      throw new ApiError(400, 'Số km hiện tại phải là số nguyên');
+    }
+    if (km < 0) {
+      throw new ApiError(400, 'Số km hiện tại không được là số âm');
+    }
+    if (km > KM_TOI_DA) {
+      throw new ApiError(400, `Số km hiện tại vượt quá mức hợp lý (tối đa ${KM_TOI_DA.toLocaleString('vi-VN')} km)`);
+    }
+
     if (!(payload.customerRequest || '').trim()) {
       throw new ApiError(400, 'Phải nhập mô tả yêu cầu của khách hàng');
+    }
+    if ((payload.customerRequest || '').length > DAI_TOI_DA.customerRequest) {
+      throw new ApiError(400, `Mô tả yêu cầu của khách hàng quá dài (tối đa ${DAI_TOI_DA.customerRequest} ký tự)`);
+    }
+    if ((payload.note || '').length > DAI_TOI_DA.note) {
+      throw new ApiError(400, `Ghi chú quá dài (tối đa ${DAI_TOI_DA.note} ký tự)`);
     }
 
     const items = (payload.items || []).filter((i) => (i.description || '').trim().length > 0);
@@ -762,7 +802,7 @@ class RepairSettlementService {
       vehicleId: payload.vehicleId,
       customerRequest: payload.customerRequest || null,
       note: payload.note || null,
-      currentKm: payload.currentKm ? Number(payload.currentKm) : null,
+      currentKm: km,
       ...calcTotalsFromItems(items),
       items,
       intakeChecklist: payload.intakeChecklist || null,
