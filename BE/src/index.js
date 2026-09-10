@@ -204,6 +204,19 @@ async function start() {
       process.exit(1);
     }
 
+    // Xoa phieu quyet toan thi hang muc / tien do / tho / lich nhac tu xoa
+    // theo. Chi canh bao neu hong: day la tien ich don dep, thieu no thi xoa
+    // phieu phai xoa tay chu khong lam sai chuc nang nao dang chay.
+    try {
+      const { ensureRepairOrderCascade } = require('./infrastructure/database/ensureRepairOrderCascade');
+      const r = await ensureRepairOrderCascade();
+      console.log(r.skipped
+        ? '[BE] cascade xoa phieu: da co tu truoc, bo qua'
+        : `[BE] cascade xoa phieu: DA DAT XONG (${r.steps} khoa ngoai)`);
+    } catch (cascadeErr) {
+      console.warn('[BE] ensureRepairOrderCascade:', cascadeErr.message);
+    }
+
     // Cot chi dinh to truong cho phieu quyet toan. KHONG duoc nuot loi: cau
     // danh sach SELECT thang cot nay, thieu cot la 500 o ca man co van lan
     // man to truong.
