@@ -823,3 +823,82 @@ test('create: chan mo ta / ghi chu qua dai', async () => {
     (err) => err.statusCode === 400 && /Ghi chú quá dài/.test(err.message),
   );
 });
+
+test('create: chu ky phai kem TEN NGUOI KY', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.create(basePayload({ signerName: '   ' }), { branchId: 1, advisorId: 4 }),
+    (err) => err.statusCode === 400 && /tên người ký/.test(err.message),
+  );
+});
+
+// Cung 1 dich vu/phu tung 2 dong = tinh tien 2 lan cho cung mot thu.
+test('create: chan hang muc lap 2 lan', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  const it = { ...validItem, serviceId: 173 };
+  await assert.rejects(
+    () => service.create(basePayload({ items: [it, { ...it }] }), { branchId: 1, advisorId: 4 }),
+    (err) => err.statusCode === 400 && /lặp lại 2 lần/.test(err.message),
+  );
+  // Dong DA HUY thi khong tinh la lap - huy roi chon lai chinh thu do la hop le
+  const ok = await service.create(
+    basePayload({ items: [{ ...it, httt: 'HUY', qty: 0 }, { ...it }] }),
+    { branchId: 1, advisorId: 4 },
+  );
+  assert.ok(ok.id);
+});
+
+test('create: chan phieu qua nhieu hang muc', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  const nhieu = Array.from({ length: 201 }, (_, i) => ({ ...validItem, serviceId: 1000 + i }));
+  await assert.rejects(
+    () => service.create(basePayload({ items: nhieu }), { branchId: 1, advisorId: 4 }),
+    (err) => err.statusCode === 400 && /quá nhiều hạng mục/.test(err.message),
+  );
+});
+
+test('create: chan ghi chu hang muc qua dai', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.create(
+      basePayload({ items: [{ ...validItem, note: 'x'.repeat(501) }] }),
+      { branchId: 1, advisorId: 4 },
+    ),
+    (err) => err.statusCode === 400 && /Ghi chú của hạng mục.*quá dài/.test(err.message),
+  );
+});
+
+// Bien so sai dinh dang -> sinh ra xe rac trong danh muc, tra cuu lich su
+// khong ra va phai don tay.
+test('create: kiem dinh dang bien so khi tao xe moi', async () => {
+  const goiVoi = [];
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(),
+    customerRepository: {
+      findOrCreateForSettlement: async (x) => { goiVoi.push(x); return { customerId: 100, vehicleId: 200 }; },
+    },
+  });
+  const xeMoi = (bienSo) => basePayload({
+    customerId: null, vehicleId: null,
+    customer: { fullName: 'Trần Văn X', phone: '0912345678' },
+    vehicle: { licensePlate: bienSo },
+  });
+  for (const xau of ['xe cua toi', '233323', '30A123.45']) {
+    await assert.rejects(
+      () => service.create(xeMoi(xau), { branchId: 1, advisorId: 4 }),
+      (err) => err.statusCode === 400 && /không đúng định dạng/.test(err.message),
+      `bien so "${xau}" le ra phai bi tu choi`,
+    );
+  }
+  // Hop le, va duoc chuan hoa ve chu hoa khong dau cach
+  await service.create(xeMoi(' 30a-123.45 '), { branchId: 1, advisorId: 4 });
+  assert.equal(goiVoi.at(-1).licensePlate, '30A-123.45');
+});
