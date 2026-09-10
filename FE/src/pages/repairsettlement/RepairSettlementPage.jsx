@@ -1624,6 +1624,14 @@ function RepairSettlementList() {
 
   useEffect(() => { setPage(1); }, [tab, search, filterAdvisor, filterTeamLeader, filterPaymentMethod, filterDateFrom, filterDateTo]);
 
+  // O "Thao tác" chi co nut voi phieu dang cho sua / dang sua / cho thanh toan
+  // (Hủy, In phiếu và xuất hóa đơn). Phieu da xuat hoa don hoac da huy thi
+  // khong con thao tac nao - giu cot lai chi de mot cot trong tron tu tren
+  // xuong duoi, an di cho gon.
+  const coThaoTac = tab !== 'invoiced' && tab !== 'cancelled';
+  // 9 cot co dinh + 2 cot rieng cua tab "Đã xuất hóa đơn" + cot Thao tac neu con.
+  const soCot = 9 + (tab === 'invoiced' ? 2 : 0) + (coThaoTac ? 1 : 0);
+
   // Danh sach chi tra ve thong tin tom tat (khong co items - de tranh phai
   // gop them bang repair_order_items cho tung dong khi hien thi danh sach) -
   // moi cho can hang muc day du (xem chi tiet, in danh sach CV, xem/in phieu
@@ -1790,19 +1798,19 @@ function RepairSettlementList() {
               <th>Số RO</th><th>Người tạo</th><th>Khách hàng</th><th>Xe</th><th>Tổ trưởng</th><th>Thợ sửa</th>
               <th>Ngày tiếp nhận</th><th>Tổng tiền</th><th>Trạng thái</th>
               {tab === 'invoiced' && <><th>Hình thức TT</th><th>Thời gian TT</th></>}
-              <th>Thao tác</th>
+              {coThaoTac && <th>Thao tác</th>}
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={tab === 'invoiced' ? 12 : 10}>
+              <tr><td colSpan={soCot}>
                 <div className="empty-state">
                   <p>Đang tải danh sách phiếu…</p>
                 </div>
               </td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={tab === 'invoiced' ? 12 : 10}>
+              <tr><td colSpan={soCot}>
                 <div className="empty-state">
                   <h3>Chưa có phiếu quyết toán nào</h3>
                   <p>Không có phiếu nào ở trạng thái này.</p>
@@ -1888,6 +1896,7 @@ function RepairSettlementList() {
                       <td style={{ fontSize: 12 }}>{o.paidDate || '—'}</td>
                     </>
                   )}
+                  {coThaoTac && (
                   <td onClick={(e) => e.stopPropagation()}>
                     <div className="table-actions">
                       {o.status === 'waiting_repair' && (
@@ -1911,6 +1920,7 @@ function RepairSettlementList() {
                           (khoa "dang mo phieu" chi duoc dat khi truy cap phieu). */}
                     </div>
                   </td>
+                  )}
                 </tr>
               );
             })}
