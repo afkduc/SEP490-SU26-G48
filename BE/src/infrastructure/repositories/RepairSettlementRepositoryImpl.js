@@ -734,6 +734,16 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     }
   }
 
+  // So km cao nhat da ghi nhan cua xe. _bumpVehicleKm chi NANG len chu khong
+  // ha xuong, nen cot nay luon la moc cao nhat - dung lam chan duoi khi lap
+  // phieu moi (cong-to-met khong chay lui).
+  async getVehicleCurrentKm(vehicleId) {
+    const r = await query(`SELECT current_km FROM vehicles WHERE id = @vehicleId`,
+      { vehicleId: Number(vehicleId) });
+    const km = r.recordset[0]?.current_km;
+    return km == null ? null : Number(km);
+  }
+
   async _bumpVehicleKm(tx, vehicleId, currentKm) {
     if (!currentKm) return;
     await tx

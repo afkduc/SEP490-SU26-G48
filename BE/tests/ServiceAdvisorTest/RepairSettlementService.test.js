@@ -67,6 +67,7 @@ function mockRepos(overrides = {}) {
     markPayosTransactionCancelled: async () => {},
     hasPaidPayosTransaction: async () => false,
     findBranchTeamLeaders: async () => [{ id: 29, name: 'Nguyễn Đình Khương', phone: null }],
+    getVehicleCurrentKm: async () => null,
     findPublicHistoryByVehicleIdentifier: async () => [],
     findActiveByCustomerVehicle: async () => null,
     create: async (data, ctx) => ({
@@ -766,4 +767,138 @@ test('chi dinh to truong khong thuoc chi nhanh -> tu choi', async () => {
     ),
     (err) => err.statusCode === 400 && /không thuộc chi nhánh này/.test(err.message),
   );
+});
+
+// ─── Kiem so km va do dai chu o BE ─────────────────────────────────────────
+// FE co chan so km (vien do, khoa nut Luu, xoa o khi roi khoi o), nhung goi
+// thang API thi FE khong con la cai chan nao ca. Km sai keo theo sai lich
+// nhac bao duong va viec tinh con han bao hanh.
+
+test('create: chan so km khong hop le', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  const ctx = { branchId: 1, advisorId: 4 };
+  const truong = [
+    ['abc', /phải là số nguyên/],
+    [12.5, /phải là số nguyên/],
+    [-100, /không được là số âm/],
+    [9999999, /vượt quá mức hợp lý/],
+  ];
+  for (const [km, mong] of truong) {
+    await assert.rejects(
+      () => service.create(basePayload({ currentKm: km }), ctx),
+      (err) => err.statusCode === 400 && mong.test(err.message),
+      `km=${km} le ra phai bi tu choi`,
+    );
+  }
+});
+
+// Cong-to-met chi tang, khong chay lui.
+test('create: chan so km nho hon lan ghi nhan gan nhat cua xe', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos({ getVehicleCurrentKm: async () => 50000 }),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.create(basePayload({ currentKm: 45000 }), { branchId: 1, advisorId: 4 }),
+    (err) => err.statusCode === 400 && /không được nhỏ hơn/.test(err.message),
+  );
+  // Bang hoac lon hon thi cho qua
+  const ok = await service.create(basePayload({ currentKm: 50000 }), { branchId: 1, advisorId: 4 });
+  assert.ok(ok.id);
+});
+
+test('create: chan mo ta / ghi chu qua dai', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  const ctx = { branchId: 1, advisorId: 4 };
+  await assert.rejects(
+    () => service.create(basePayload({ customerRequest: 'a'.repeat(1001) }), ctx),
+    (err) => err.statusCode === 400 && /Mô tả yêu cầu.*quá dài/.test(err.message),
+  );
+  await assert.rejects(
+    () => service.create(basePayload({ note: 'b'.repeat(1001) }), ctx),
+    (err) => err.statusCode === 400 && /Ghi chú quá dài/.test(err.message),
+  );
+});
+
+test('create: chu ky phai kem TEN NGUOI KY', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.create(basePayload({ signerName: '   ' }), { branchId: 1, advisorId: 4 }),
+    (err) => err.statusCode === 400 && /tên người ký/.test(err.message),
+  );
+});
+
+// Cung 1 dich vu/phu tung 2 dong = tinh tien 2 lan cho cung mot thu.
+test('create: chan hang muc lap 2 lan', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  const it = { ...validItem, serviceId: 173 };
+  await assert.rejects(
+    () => service.create(basePayload({ items: [it, { ...it }] }), { branchId: 1, advisorId: 4 }),
+    (err) => err.statusCode === 400 && /lặp lại 2 lần/.test(err.message),
+  );
+  // Dong DA HUY thi khong tinh la lap - huy roi chon lai chinh thu do la hop le
+  const ok = await service.create(
+    basePayload({ items: [{ ...it, httt: 'HUY', qty: 0 }, { ...it }] }),
+    { branchId: 1, advisorId: 4 },
+  );
+  assert.ok(ok.id);
+});
+
+test('create: chan phieu qua nhieu hang muc', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  const nhieu = Array.from({ length: 201 }, (_, i) => ({ ...validItem, serviceId: 1000 + i }));
+  await assert.rejects(
+    () => service.create(basePayload({ items: nhieu }), { branchId: 1, advisorId: 4 }),
+    (err) => err.statusCode === 400 && /quá nhiều hạng mục/.test(err.message),
+  );
+});
+
+test('create: chan ghi chu hang muc qua dai', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(), customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.create(
+      basePayload({ items: [{ ...validItem, note: 'x'.repeat(501) }] }),
+      { branchId: 1, advisorId: 4 },
+    ),
+    (err) => err.statusCode === 400 && /Ghi chú của hạng mục.*quá dài/.test(err.message),
+  );
+});
+
+// Bien so sai dinh dang -> sinh ra xe rac trong danh muc, tra cuu lich su
+// khong ra va phai don tay.
+test('create: kiem dinh dang bien so khi tao xe moi', async () => {
+  const goiVoi = [];
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(),
+    customerRepository: {
+      findOrCreateForSettlement: async (x) => { goiVoi.push(x); return { customerId: 100, vehicleId: 200 }; },
+    },
+  });
+  const xeMoi = (bienSo) => basePayload({
+    customerId: null, vehicleId: null,
+    customer: { fullName: 'Trần Văn X', phone: '0912345678' },
+    vehicle: { licensePlate: bienSo },
+  });
+  for (const xau of ['xe cua toi', '233323', '30A123.45']) {
+    await assert.rejects(
+      () => service.create(xeMoi(xau), { branchId: 1, advisorId: 4 }),
+      (err) => err.statusCode === 400 && /không đúng định dạng/.test(err.message),
+      `bien so "${xau}" le ra phai bi tu choi`,
+    );
+  }
+  // Hop le, va duoc chuan hoa ve chu hoa khong dau cach
+  await service.create(xeMoi(' 30a-123.45 '), { branchId: 1, advisorId: 4 });
+  assert.equal(goiVoi.at(-1).licensePlate, '30A-123.45');
 });

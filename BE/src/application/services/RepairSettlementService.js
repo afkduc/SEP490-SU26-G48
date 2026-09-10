@@ -35,10 +35,31 @@ const LHSC_VALUES = ['DV', 'PT'];
 // muon lam nua) - mien thu khach giong BHH/BH/NB, nhung khac o cho: chi duoc
 // chon khi hang muc CHUA duoc tick hoan thanh (xem update() ben duoi).
 const HTTT_VALUES = ['KHT', 'BHH', 'BH', 'NB', 'HUY'];
+// "Khach huy" - hang muc bo giua chung, khong tinh tien khach (xem
+// EXEMPT_HTTT_VALUES trong utils/settlementTotals.js).
+const HTTT_CANCELLED_VALUE = 'HUY';
 // REPAIR_CATEGORY = "Loai hinh sua chua" THAT (dung nhu thuc te tai dai ly xe -
 // khac voi LHSC o tren, vi LHSC da bi dung nham thanh "loai hang muc").
 const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS'];
 const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoiced', 'cancelled'];
+
+// Chan tren cua so km. Cot current_km la INT nen qua 2.147.483.647 la tran
+// kieu, nem loi SQL kho hieu; ma xe chay het doi cung khong toi 2 trieu km.
+const KM_TOI_DA = 2000000;
+// Do dai cot trong DB (nvarchar) - chan o day de bao duoc dung o nao qua dai,
+// thay vi de SQL Server nem loi "String or binary data would be truncated".
+const DAI_TOI_DA = { customerRequest: 1000, note: 1000, itemNote: 500 };
+
+// So hang muc toi da tren 1 phieu. Goi bao duong lon nhat khoang 35 dau muc +
+// phu tung di kem, nen 200 la rat rong rai. Chan lai vi moi hang muc keo theo
+// 1 dong repair_order_items VA 1 dong repair_order_tasks chen tung dong mot
+// (xem _syncRepairOrderTasks) - gui vai nghin dong la treo request.
+const SO_HANG_MUC_TOI_DA = 200;
+
+// Bien so xe Viet Nam: 2 so tinh + 1-2 chu (co the kem 1 so) + 4-5 so, viet
+// dang "30A-123.45" hoac "30A-02465". Chi ap cho xe MOI tao tu form - xe chon
+// tu tra cuu thi da co san trong DB, khong kiem lai.
+const BIEN_SO_REGEX = /^\d{2}[A-Z]{1,2}\d?-(\d{3}\.\d{2}|\d{4,5})$/;
 
 // Tinh lai toan bo tong tien tu CHINH danh sach hang muc - khong tin theo
 // subtotal/discountAmount/vat/total FE gui len trong payload (truoc day BE
@@ -247,9 +268,16 @@ class RepairSettlementService {
   // Chu ky dien tu tai cho (nguoi lien he ky truc tiep len man hinh CVDV luc
   // chot phieu) - bang chung xac nhan dong y, chi bat buoc luc TAO phieu, sua
   // phieu sau do khong doi lai chu ky goc.
-  _assertSignaturePresent(signatureData) {
+  _assertSignaturePresent(signatureData, signerName) {
     if (!(signatureData || '').startsWith('data:image/png;base64,')) {
       throw new ApiError(400, 'Vui lòng ký xác nhận trước khi lưu phiếu');
+    }
+    // Chu ky khong kem TEN NGUOI KY thi gan nhu khong doi chung duoc gi khi
+    // khach khieu nai - net ky ai cung ve duoc, phai co ten moi biet la ai da
+    // dong y. O nay tren form tu dien theo nguoi lien he/ten khach nen bat
+    // buoc cung khong lam kho ai, chi chan truong hop bi xoa trang.
+    if (!String(signerName || '').trim()) {
+      throw new ApiError(400, 'Vui lòng ghi rõ tên người ký xác nhận phiếu');
     }
   }
 
@@ -269,6 +297,13 @@ class RepairSettlementService {
     }
     if (!(vehicle.licensePlate || '').trim()) {
       throw new ApiError(400, 'Phải nhập biển số xe');
+    }
+    // Bien so sai dinh dang -> sinh ra xe rac trong danh muc, sau nay tra cuu
+    // lich su xe khong ra va phai don tay.
+    const bienSo = vehicle.licensePlate.trim().toUpperCase().replace(/\s+/g, '');
+    if (!BIEN_SO_REGEX.test(bienSo)) {
+      throw new ApiError(400,
+        `Biển số xe "${vehicle.licensePlate.trim()}" không đúng định dạng (ví dụ: 30A-123.45 hoặc 30A-02465)`);
     }
     if (!isValidPhone(customer.phone)) {
       throw new ApiError(400, 'Số điện thoại khách hàng không hợp lệ');
@@ -292,7 +327,7 @@ class RepairSettlementService {
       email: customer.email || null,
       contactName: customer.contactPerson || null,
       contactPhone: customer.contactPhone || null,
-      licensePlate: vehicle.licensePlate.trim(),
+      licensePlate: bienSo,
       // Ten loai xe luu DUNG ten trong danh muc (display_name), khong dan
       // nam san xuat vao duoi nhu truoc. Form khong con hoi nam san xuat nua
       // nen manufacture_year cua xe tao tu day de trong - cot do gio chi con
@@ -309,7 +344,7 @@ class RepairSettlementService {
   }
 
   async create(payload, { branchId, advisorId }) {
-    this._assertSignaturePresent(payload.signatureData);
+    this._assertSignaturePresent(payload.signatureData, payload.signerName);
     const resolvedPayload = await this._resolveCustomerAndVehicle(payload);
     const data = this._validateAndNormalize(resolvedPayload);
     data.signatureData = payload.signatureData;
@@ -329,6 +364,19 @@ class RepairSettlementService {
       }
       data.assignedTeamLeaderId = Number(payload.assignedTeamLeaderId);
     }
+    // Cong-to-met chi tang. Chan o day chu khong chi o FE - goi thang API thi
+    // FE khong con la cai chan nao ca.
+    //
+    // CHI kiem luc TAO: khi SUA phieu, vehicles.current_km thuong da duoc
+    // chinh phieu nay nang len roi (xem _bumpVehicleKm), so sanh lai se tu
+    // chan chinh no va khong con sua duoc so go nham.
+    const kmDaGhiNhan = await this.repairSettlementRepository.getVehicleCurrentKm(data.vehicleId);
+    if (kmDaGhiNhan != null && data.currentKm < kmDaGhiNhan) {
+      throw new ApiError(400,
+        `Số km hiện tại (${data.currentKm.toLocaleString('vi-VN')}) không được nhỏ hơn `
+        + `lần ghi nhận gần nhất của xe (${kmDaGhiNhan.toLocaleString('vi-VN')} km)`);
+    }
+
     await this._assertNoActiveDuplicate(data.customerId, data.vehicleId);
     const entity = await this.repairSettlementRepository.create(data, { branchId, advisorId });
 
@@ -718,8 +766,28 @@ class RepairSettlementService {
     if (payload.currentKm === '' || payload.currentKm == null) {
       throw new ApiError(400, 'Phải nhập số km hiện tại của xe');
     }
+    // Truoc day chi kiem "co nhap" - go chu, so am, hay 9 chu so deu lot qua
+    // BE (FE co chan nhung goi thang API thi khong). Km sai keo theo sai ca
+    // lich nhac bao duong va viec tinh con han bao hanh.
+    const km = Number(payload.currentKm);
+    if (!Number.isFinite(km) || !Number.isInteger(km)) {
+      throw new ApiError(400, 'Số km hiện tại phải là số nguyên');
+    }
+    if (km < 0) {
+      throw new ApiError(400, 'Số km hiện tại không được là số âm');
+    }
+    if (km > KM_TOI_DA) {
+      throw new ApiError(400, `Số km hiện tại vượt quá mức hợp lý (tối đa ${KM_TOI_DA.toLocaleString('vi-VN')} km)`);
+    }
+
     if (!(payload.customerRequest || '').trim()) {
       throw new ApiError(400, 'Phải nhập mô tả yêu cầu của khách hàng');
+    }
+    if ((payload.customerRequest || '').length > DAI_TOI_DA.customerRequest) {
+      throw new ApiError(400, `Mô tả yêu cầu của khách hàng quá dài (tối đa ${DAI_TOI_DA.customerRequest} ký tự)`);
+    }
+    if ((payload.note || '').length > DAI_TOI_DA.note) {
+      throw new ApiError(400, `Ghi chú quá dài (tối đa ${DAI_TOI_DA.note} ký tự)`);
     }
 
     const items = (payload.items || []).filter((i) => (i.description || '').trim().length > 0);
@@ -728,6 +796,30 @@ class RepairSettlementService {
     }
     if (!items.some((i) => Number(i.unitPrice) > 0)) {
       throw new ApiError(400, 'Phải có ít nhất 1 hạng mục có đơn giá lớn hơn 0');
+    }
+    if (items.length > SO_HANG_MUC_TOI_DA) {
+      throw new ApiError(400,
+        `Phiếu có quá nhiều hạng mục (${items.length}), tối đa ${SO_HANG_MUC_TOI_DA}`);
+    }
+
+    // Cung 1 dich vu / phu tung xuat hien 2 lan = tinh tien 2 lan cho cung mot
+    // thu. FE da chan luc chon, nhung goi thang API thi khong.
+    //
+    // Dong DA HUY khong tinh: huy roi thi chon lai chinh thu do la hop le.
+    // Dong con cua goi bao duong (don gia 0) cung khong tinh - 1 dich vu co
+    // the vua nam trong goi vua duoc them le voi gia rieng.
+    const daGap = new Map();
+    for (const item of items) {
+      if (item.httt === HTTT_CANCELLED_VALUE) continue;
+      if (item.lhsc === 'DV' && Number(item.unitPrice) === 0) continue;
+      const khoa = item.productId ? `PT:${item.productId}`
+        : (item.serviceId ? `DV:${item.serviceId}` : null);
+      if (!khoa) continue;
+      if (daGap.has(khoa)) {
+        throw new ApiError(400,
+          `Hạng mục "${item.description}" bị lặp lại 2 lần trong phiếu - gộp vào 1 dòng và sửa số lượng`);
+      }
+      daGap.set(khoa, true);
     }
     for (const item of items) {
       if (!LHSC_VALUES.includes(item.lhsc)) {
@@ -755,6 +847,10 @@ class RepairSettlementService {
       if (discountNum < 0 || discountNum > 100) {
         throw new ApiError(400, `Chiết khấu phải trong khoảng 0-100% ở hạng mục "${item.description}"`);
       }
+      if ((item.note || '').length > DAI_TOI_DA.itemNote) {
+        throw new ApiError(400,
+          `Ghi chú của hạng mục "${item.description}" quá dài (tối đa ${DAI_TOI_DA.itemNote} ký tự)`);
+      }
     }
 
     return {
@@ -762,7 +858,7 @@ class RepairSettlementService {
       vehicleId: payload.vehicleId,
       customerRequest: payload.customerRequest || null,
       note: payload.note || null,
-      currentKm: payload.currentKm ? Number(payload.currentKm) : null,
+      currentKm: km,
       ...calcTotalsFromItems(items),
       items,
       intakeChecklist: payload.intakeChecklist || null,
