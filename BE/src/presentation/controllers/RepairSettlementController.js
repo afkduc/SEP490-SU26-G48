@@ -22,6 +22,15 @@ class RepairSettlementController {
     }
   };
 
+  getBranchTeamLeaders = async (req, res, next) => {
+    try {
+      const items = await this.repairSettlementService.getBranchTeamLeaders(req.user.branchId);
+      return success(res, items, 'Branch team leaders retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getAll = async (req, res, next) => {
     try {
       const { status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 20, scope } = req.query;
@@ -40,6 +49,12 @@ class RepairSettlementController {
         // (man "Lenh sua chua") cung khong loc - bang dieu phoi chung ca chi
         // nhanh, moi co van deu phai thay het de gan to truong cho nhau duoc.
         advisorId: isServiceAdvisor && !customerId && !vehicleId && scope !== 'branch' ? req.user.userId : undefined,
+        // To truong chi thay phieu khong chi dinh ai, hoac chi dinh dung ho.
+        // Chi ap cho vai tro to truong - co van phai thay het phieu minh lap
+        // du da chi dinh cho ai. Man lich su khach/xe (customerId/vehicleId)
+        // cung khong ap: do la du lieu dung chung cua chiec xe.
+        forTeamLeaderId: req.user.roles?.includes('team_leader') && !isServiceAdvisor
+          && !customerId && !vehicleId ? req.user.userId : undefined,
         page: Number(page),
         limit: Number(limit),
       });

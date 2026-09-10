@@ -72,6 +72,13 @@ class RepairOrderService {
     if (order.status !== 'waiting_repair') {
       throw new ApiError(409, 'Phiếu này đã được nhận hoặc không còn ở trạng thái chờ sửa chữa');
     }
+    // Phieu duoc co van chi dinh cho 1 to truong cu the thi nguoi khac khong
+    // nhan duoc. Bang "Việc chờ nhận" da loc san, nhung chan o day moi that -
+    // FE chi la giao dien, goi thang API van phai bi tu choi.
+    if (order.assigned_team_leader_id
+        && String(order.assigned_team_leader_id) !== String(teamLeaderId)) {
+      throw new ApiError(403, 'Phiếu này được cố vấn dịch vụ chỉ định cho tổ trưởng khác');
+    }
 
     const entity = await this.repairOrderRepository.claim(
       repairOrderId,

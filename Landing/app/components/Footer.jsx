@@ -47,7 +47,7 @@ export default function Footer() {
           <p className={styles.logo}>
             <span>Auto</span>Gara
           </p>
-          <p className={styles.about}>Gara ủy quyền chính hãng Kia & Mazda.</p>
+          <p className={styles.about}>Gara ủy quyền chính hãng Mazda.</p>
           <a href="mailto:cskh@autogara.vn" className={styles.item}>
             <Mail className={styles.icon} />
             cskh@autogara.vn
@@ -100,7 +100,7 @@ export default function Footer() {
             </a>
           </div>
           <p className={styles.copy}>
-            © {new Date().getFullYear()} AutoGara. Gara chuyên Kia & Mazda.
+            © {new Date().getFullYear()} AutoGara. Gara chuyên Mazda.
           </p>
         </div>
       </div>

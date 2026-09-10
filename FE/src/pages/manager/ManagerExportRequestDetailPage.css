@@ -174,6 +174,26 @@
 .mer-detail .font-mono { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--md-primary); }
 .mer-detail .text-right { text-align: right; }
 
+/* ── Chu ky nguoi lay ── */
+.mer-detail__signature-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px;
+  background: var(--md-surface-container);
+  border-radius: var(--md-shape-md);
+}
+.mer-detail__signature-img {
+  display: block;
+  height: 90px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-sm);
+  background: #fff;
+}
+.mer-detail__signature-name { font-size: 13px; font-weight: 600; color: var(--md-on-surface); }
+.mer-detail__signature-date { font-size: 11px; color: var(--md-on-surface-variant); }
+
 /* ── Chips ── */
 .mer-detail .badge {
   display: inline-flex;

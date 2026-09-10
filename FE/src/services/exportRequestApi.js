@@ -2,17 +2,24 @@ import httpClient from './httpClient';
 
 /**
  * Export Request API (Phieu xuat kho) - module Kho.
- * Xuất theo Repair Order (LSC-...), không theo Service Order (RO-...).
+ *
+ * 1 Lenh sua chua = 1 phieu xuat duy nhat (ma phieu = ma RO), nhung duoc XUAT
+ * THEM / TRA HANG nhieu lan cho den khi RO roi khoi waiting_repair/inprogress.
  *
  * - getExportRequests(params): GET /api/export-requests voi filter branchId, status,
  *   repairOrderId, fromDate, toDate, search, page, limit.
  * - getExportRequestById(id): GET /api/export-requests/:id.
- * - getNextExportRequestCode(params): GET /api/export-requests/meta/next-code.
+ * - getExportPickups(id): GET /api/export-requests/:id/pickups - lich su tung lan
+ *   lay/tra hang kem chu ky.
  * - listExportableRepairOrders(params): GET /api/export-requests/repair-orders/exportable.
  * - getRepairOrderForExport(id): GET /api/export-requests/repair-orders/:id/for-export.
- * - createExportRequest(payload): POST /api/export-requests.
- *   payload: { branchId?, repairOrderId, exportDate?, notes?,
- *              items: [{ productId, productCode, productName, unit?, quantity }] }
+ *   Tra ve { locked, items: [{ productId, requiredQuantity, exportedQuantity,
+ *   pendingQuantity, currentStock, enoughStock }] } - pendingQuantity > 0 la con
+ *   phai xuat, < 0 la phai tra lai kho.
+ * - getExportTechnicians(params): GET /api/export-requests/technicians -> [{ id, employeeId, fullName }].
+ * - createExportRequest(payload): POST /api/export-requests - xac nhan 1 lan lay hang.
+ *   payload: { branchId?, repairOrderId, receivedBy, receivedSignatureData,
+ *              productIds: [] }  (KHONG gui so luong - server tu tinh)
  */
 function buildQuery(params = {}) {
   const sp = new URLSearchParams();
@@ -32,8 +39,8 @@ export async function getExportRequestByIdApi(id) {
   return httpClient.get(`/export-requests/${id}`);
 }
 
-export async function getNextExportRequestCodeApi(params = {}) {
-  return httpClient.get(`/export-requests/meta/next-code${buildQuery(params)}`);
+export async function getExportPickupsApi(id) {
+  return httpClient.get(`/export-requests/${id}/pickups`);
 }
 
 export async function listExportableRepairOrdersApi(params = {}) {
@@ -42,6 +49,10 @@ export async function listExportableRepairOrdersApi(params = {}) {
 
 export async function getRepairOrderForExportApi(id) {
   return httpClient.get(`/export-requests/repair-orders/${id}/for-export`);
+}
+
+export async function getExportTechniciansApi(params = {}) {
+  return httpClient.get(`/export-requests/technicians${buildQuery(params)}`);
 }
 
 export async function createExportRequestApi(payload) {

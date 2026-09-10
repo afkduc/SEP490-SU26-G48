@@ -30,11 +30,18 @@ class ServiceRequestService {
   // nhau) - lay tam theo chi nhanh id=1 (Ha Noi, chi nhanh dang co du lieu
   // goi day du nhat) lam gia tham khao chung.
   async getPublicServicePackages() {
+    // Landing chi quang cao goi bao duong (PM), khong hien goi sua chua
+    // (ER/CB/EE/BP) du co trong catalog CRM. Kem segment (Sedan/SUV/Pickup)
+    // de landing filter theo loai xe, khong liet ke tung dong Mazda.
     const result = await query(
-      `SELECT sp.package_code, sp.package_name, sp.total_price, sp.description, c.category_name
+      `SELECT sp.package_code, sp.package_name, sp.total_price, sp.description,
+              c.category_name, vm.segment
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
-       WHERE sp.branch_id = @branchId AND sp.is_active = 1
+       LEFT JOIN vehicle_models vm ON vm.id = sp.model_id
+       WHERE sp.branch_id = @branchId
+         AND sp.is_active = 1
+         AND sp.repair_category = 'PM'
        ORDER BY sp.total_price ASC`,
       { branchId: PUBLIC_SERVICE_PACKAGE_BRANCH_ID }
     );
@@ -44,6 +51,7 @@ class ServiceRequestService {
       totalPrice: Number(row.total_price || 0),
       description: row.description,
       categoryName: row.category_name,
+      segment: row.segment || null,
     }));
   }
 
@@ -54,7 +62,10 @@ class ServiceRequestService {
       `SELECT sp.id, sp.package_name, sp.total_price, sp.description, sp.purpose, c.category_name
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
-       WHERE sp.package_code = @code AND sp.branch_id = @branchId AND sp.is_active = 1`,
+       WHERE sp.package_code = @code
+         AND sp.branch_id = @branchId
+         AND sp.is_active = 1
+         AND sp.repair_category = 'PM'`,
       { code, branchId: PUBLIC_SERVICE_PACKAGE_BRANCH_ID }
     );
     const row = result.recordset[0];

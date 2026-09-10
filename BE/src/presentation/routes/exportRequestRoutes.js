@@ -17,12 +17,11 @@ function buildExportRequestRouter() {
   // Tat ca endpoint deu can authen.
   router.use(authenticate);
 
-  // Sinh ma phieu tiep theo.
-  // Dat TRUOC /:id de khong bi nuot.
+  // Danh sach tho may cho dropdown "Nguoi lay" - phai dat TRUOC /:id.
   router.get(
-    '/meta/next-code',
-    requirePerm('export_requests:read'),
-    controller.getNextCode,
+    '/technicians',
+    requirePerm('export_requests:create'),
+    controller.listTechnicians,
   );
 
   // Repair Order helpers - phai dat TRUOC /:id de khong bi nuot.
@@ -42,6 +41,11 @@ function buildExportRequestRouter() {
     '/',
     requirePerm('export_requests:read'),
     controller.list,
+  );
+  router.get(
+    '/:id/pickups',
+    requirePerm('export_requests:read'),
+    controller.getPickups,
   );
   router.get(
     '/:id',
