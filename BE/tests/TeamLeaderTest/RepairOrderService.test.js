@@ -9,7 +9,7 @@ function mockRepo(overrides = {}) {
     findPublicProgressByCode: async () => null,
     findByCode: async () => null,
     findEligibleRepairOrder: async () => null,
-    claim: async () => null,
+        claim: async () => null,
     searchTechnicians: async () => [],
     setTechnicians: async () => true,
     reopenTask: async () => null,
@@ -612,4 +612,47 @@ test('confirmCompleted khong bi chan boi dau muc da xu ly tai xuong', async () =
   });
   const dto = await service.confirmCompleted(70, { branchId: 1, teamLeaderId: 8 });
   assert.equal(dto.status, 'completed');
+});
+
+// ─── Phieu duoc co van chi dinh cho 1 to truong cu the ─────────────────────
+// Bang "Việc chờ nhận" da loc san theo assigned_team_leader_id, nhung do chi
+// la giao dien - goi thang API van phai bi tu choi.
+
+const phieuChoNhan = { id: 70, branch_id: 1, status: 'waiting_repair', vehicle_id: 9 };
+
+test('claim: to truong khac KHONG nhan duoc phieu da chi dinh cho nguoi khac', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findEligibleRepairOrder: async () => ({ ...phieuChoNhan, assigned_team_leader_id: 29 }),
+    }),
+  });
+  await assert.rejects(
+    () => service.claim(70, { branchId: 1, teamLeaderId: 30, bayId: 3 }),
+    (err) => err.statusCode === 403 && /chỉ định cho tổ trưởng khác/.test(err.message),
+  );
+});
+
+test('claim: dung to truong duoc chi dinh thi nhan binh thuong', async () => {
+  let daClaim = false;
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findEligibleRepairOrder: async () => ({ ...phieuChoNhan, assigned_team_leader_id: 29 }),
+      claim: async () => { daClaim = true; return { ...inProgressOrder, teamLeaderId: 29 }; },
+    }),
+  });
+  await service.claim(70, { branchId: 1, teamLeaderId: 29, bayId: 3 });
+  assert.equal(daClaim, true);
+});
+
+// Khong chi dinh = ai cung nhan duoc, dung hanh vi cu.
+test('claim: phieu khong chi dinh thi to truong nao cung nhan duoc', async () => {
+  let daClaim = false;
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findEligibleRepairOrder: async () => ({ ...phieuChoNhan, assigned_team_leader_id: null }),
+      claim: async () => { daClaim = true; return { ...inProgressOrder }; },
+    }),
+  });
+  await service.claim(70, { branchId: 1, teamLeaderId: 30, bayId: 3 });
+  assert.equal(daClaim, true);
 });

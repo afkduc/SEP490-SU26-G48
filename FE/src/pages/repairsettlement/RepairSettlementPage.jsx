@@ -22,6 +22,7 @@ import {
   logRepairSettlementPrintApi,
   createPayosPaymentLinkApi,
   listBranchAdvisorsApi,
+  listBranchTeamLeadersApi,
   lockSettlementApi,
   unlockSettlementApi,
   getSettlementActivityLogApi,
@@ -30,6 +31,7 @@ import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
 import IntakeChecklistView from './IntakeChecklistView';
+import VehicleHistoryModal from './VehicleHistoryModal';
 import SignaturePad from './SignaturePad';
 import './RepairSettlementPage.css';
 
@@ -3141,6 +3143,22 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // Khung "Thong tin khach hang va xe" co the dang thu gon, va o nhap thi nam
   // tit tren dau trang. Bao loi ma khong den duoc o do thi bao lam gi - nen mo
   // lai khung, cuon toi va focus thang vao o.
+  // Chi dinh to truong (tuy chon). Bo trong = moi to truong trong chi nhanh
+  // deu thay phieu o bang "Việc chờ nhận" - dung hanh vi cu.
+  //
+  // Chi co y nghia luc TAO phieu: sua phieu thi thuong da co nguoi nhan roi,
+  // doi chi dinh khong con tac dung gi.
+  const [assignedTeamLeaderId, setAssignedTeamLeaderId] = useState('');
+  const [dsToTruong, setDsToTruong] = useState([]);
+  useEffect(() => {
+    if (isEdit) return;
+    listBranchTeamLeadersApi().then(setDsToTruong).catch(() => setDsToTruong([]));
+  }, [isEdit]);
+
+  // Tra cuu nhanh lich su xe ngay tren form - khong phai roi trang (mat het
+  // nhung gi vua go) sang man Lich su dich vu.
+  const [xemLichSuXe, setXemLichSuXe] = useState(false);
+
   const kmInputRef = useRef(null);
   const nhayToiOKm = () => {
     setOpenSections((s) => ({ ...s, customer: true }));
@@ -3219,6 +3237,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       ? signaturePadRef.current.toDataURL()
       : null,
     signerName,
+    // Bo trong = khong chi dinh, moi to truong deu thay (BE hieu null nhu vay).
+    assignedTeamLeaderId: assignedTeamLeaderId || null,
   });
 
   const handleSave = async () => {
@@ -3386,7 +3406,18 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           <div className="form-grid form-grid-2">
             <div>
               <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
-                <label className="form-label required">Biển số xe</label>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <label className="form-label required" style={{ marginBottom: 0 }}>Biển số xe</label>
+                  {/* Chi bat khi xe da co trong he thong - xe moi tinh thi
+                      khong co lich su nao de tra. */}
+                  {vehicleInfo.id && (
+                    <button type="button" className="btn btn-secondary btn-sm"
+                      style={{ fontSize: 11, padding: '2px 8px', marginLeft: 'auto' }}
+                      onClick={() => setXemLichSuXe(true)}>
+                      Lịch sử xe
+                    </button>
+                  )}
+                </div>
                 <input className="form-input"
                   value={plateQuery}
                   readOnly={isFromLookup || isEdit}
@@ -3643,6 +3674,29 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             <label className="form-label required">Yêu cầu của khách hàng</label>
             <textarea className="form-textarea" rows={2} value={customerRequest} onChange={(e) => setCustomerRequest(e.target.value)} placeholder="Mô tả tình trạng xe / yêu cầu sửa chữa của khách hàng..." />
           </div>
+
+          {/* Chi dinh to truong - chi luc TAO phieu. Sua phieu thi thuong da
+              co nguoi nhan roi, doi chi dinh khong con tac dung gi. */}
+          {!isEdit && (
+            <div className="form-group" style={{ marginTop: 12, maxWidth: 460 }}>
+              <label className="form-label">Chỉ định tổ trưởng</label>
+              <select className="form-select"
+                value={assignedTeamLeaderId}
+                onChange={(e) => setAssignedTeamLeaderId(e.target.value)}>
+                <option value="">Không chỉ định — mọi tổ trưởng đều nhận được</option>
+                {dsToTruong.map((tt) => (
+                  <option key={tt.id} value={tt.id}>
+                    {tt.phone ? `${tt.name} — ${tt.phone}` : tt.name}
+                  </option>
+                ))}
+              </select>
+              <div style={{ fontSize: 11.5, color: 'var(--gray-600)', marginTop: 4 }}>
+                {assignedTeamLeaderId
+                  ? 'Phiếu chỉ hiện ở mục "Việc chờ nhận" của tổ trưởng này; tổ trưởng khác không nhận được.'
+                  : 'Phiếu hiện cho mọi tổ trưởng trong chi nhánh, ai rảnh thì nhận.'}
+              </div>
+            </div>
+          )}
         </div>
       </CollapsibleCard>
 
@@ -3947,6 +4001,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           </div>
         </div>
       </CollapsibleCard>
+
+      {xemLichSuXe && vehicleInfo.id && (
+        <VehicleHistoryModal
+          vehicleId={vehicleInfo.id}
+          licensePlate={vehicleInfo.licensePlate}
+          vehicleModel={vehicleInfo.vehicleModel}
+          excludeId={existingOrder?.id}
+          onClose={() => setXemLichSuXe(false)}
+        />
+      )}
 
       {isEdit && (
         <TaskProgressList tasks={liveOrderInfo.tasks}

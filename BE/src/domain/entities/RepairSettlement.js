@@ -77,6 +77,10 @@ class RepairSettlement {
     // Ten tho ghep san (chuoi) - cau danh sach tra ve cot nay thay vi nap
     // mang `technicians` cho tung dong. Man chi tiet van dung mang o tren.
     this.technicianNames = data.technicianNames ?? null;
+    // To truong duoc CHI DINH san (khac teamLeaderName = nguoi DA NHAN viec).
+    // null = khong chi dinh, moi to truong deu thay - xem ensureAssignedTeamLeader.js
+    this.assignedTeamLeaderId = data.assignedTeamLeaderId ?? null;
+    this.assignedTeamLeaderName = data.assignedTeamLeaderName ?? null;
   }
 
   static fromPersistence(headerRow, itemRows = [], taskRows = [], technicianRows = []) {
@@ -96,6 +100,8 @@ class RepairSettlement {
       hasCompletedTask: Boolean(headerRow.has_completed_task),
       hasTechnicians: Boolean(headerRow.has_technicians),
       technicianNames: headerRow.technician_names ?? null,
+      assignedTeamLeaderId: headerRow.assigned_team_leader_id ?? null,
+      assignedTeamLeaderName: headerRow.assigned_team_leader_name ?? null,
       customerRequest: headerRow.customer_request,
       currentKm: headerRow.current_km,
       status: headerRow.status,

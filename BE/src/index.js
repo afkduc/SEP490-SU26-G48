@@ -204,6 +204,21 @@ async function start() {
       process.exit(1);
     }
 
+    // Cot chi dinh to truong cho phieu quyet toan. KHONG duoc nuot loi: cau
+    // danh sach SELECT thang cot nay, thieu cot la 500 o ca man co van lan
+    // man to truong.
+    try {
+      const { ensureAssignedTeamLeader } = require('./infrastructure/database/ensureAssignedTeamLeader');
+      const r = await ensureAssignedTeamLeader();
+      console.log(r.skipped
+        ? '[BE] chi dinh to truong: da co tu truoc, bo qua'
+        : `[BE] chi dinh to truong: DA THEM XONG (${r.steps} buoc)`);
+    } catch (atlErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot chi dinh to truong that bai:');
+      console.error(atlErr.message);
+      process.exit(1);
+    }
+
     // Loai hinh sua chua 'CS' (Cham soc xe) - FE/BE da cho phep nhung rang
     // buoc CHECK cua repair_order_items thi chua, nen luu phieu co dich vu
     // cham soc xe la chet o INSERT. KHONG duoc nuot loi: bo qua thi CVDV van

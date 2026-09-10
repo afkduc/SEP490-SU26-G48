@@ -66,6 +66,7 @@ function mockRepos(overrides = {}) {
     findPendingPayosTransactions: async () => [],
     markPayosTransactionCancelled: async () => {},
     hasPaidPayosTransaction: async () => false,
+    findBranchTeamLeaders: async () => [{ id: 29, name: 'Nguyễn Đình Khương', phone: null }],
     findPublicHistoryByVehicleIdentifier: async () => [],
     findActiveByCustomerVehicle: async () => null,
     create: async (data, ctx) => ({
@@ -746,4 +747,23 @@ test('_huyCacMaQrCu bo qua dung ma vua duoc thanh toan', async () => {
   await service._huyCacMaQrCu(90, { exceptOrderCode: 777 });
   assert.equal(hoiVoi.id, 90);
   assert.equal(hoiVoi.opts.exceptOrderCode, 777);
+});
+
+// ─── Chi dinh to truong luc tao phieu ──────────────────────────────────────
+// Bo trong = moi to truong deu thay (hanh vi cu). Chi dinh 1 id la bat buoc
+// phai kiem: khong thi ai goi thang API co the truyen id bat ky, phieu bien
+// mat khoi bang cua MOI to truong ma khong ai hieu tai sao.
+
+test('chi dinh to truong khong thuoc chi nhanh -> tu choi', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(),
+    customerRepository: {},
+  });
+  await assert.rejects(
+    () => service.create(
+      basePayload({ assignedTeamLeaderId: 999 }),
+      { branchId: 1, advisorId: 4 },
+    ),
+    (err) => err.statusCode === 400 && /không thuộc chi nhánh này/.test(err.message),
+  );
 });
