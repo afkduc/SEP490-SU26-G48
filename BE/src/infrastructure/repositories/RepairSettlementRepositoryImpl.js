@@ -59,6 +59,15 @@ const HEADER_SELECT = `
            SELECT 1 FROM repair_order_technicians rot2
            WHERE rot2.repair_order_id = so.id
          ) THEN 1 ELSE 0 END AS has_technicians,
+         -- Ten tho ghep san thanh 1 chuoi ngay o cau danh sach. findAll khong
+         -- nap bang tho rieng cho tung dong (se thanh N+1 truy van), nen neu
+         -- khong ghep o day thi man danh sach/lich su phieu khong biet ai da
+         -- sua chiec xe do - trong khi do la thu khach hoi dau tien khi quay
+         -- lai khieu nai.
+         (SELECT STRING_AGG(u2.user_name, ', ') WITHIN GROUP (ORDER BY u2.user_name)
+          FROM   repair_order_technicians rot3
+          JOIN   users u2 ON u2.id = rot3.technician_id
+          WHERE  rot3.repair_order_id = so.id) AS technician_names,
          -- Khoa "dang mo phieu" - chi tra ve neu con hieu luc (chua qua
          -- LOCK_TTL_SECONDS ke tu nhip gia han gan nhat), qua han thi coi nhu
          -- khong ai mo (NULL) du cot goc trong DB co the van con gia tri cu -

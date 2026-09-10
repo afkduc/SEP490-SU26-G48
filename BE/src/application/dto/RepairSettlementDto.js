@@ -70,6 +70,8 @@ class RepairSettlementResponseDto {
       lockedAt: entity.lockedAt ? toDDMMYYYYHHmm(entity.lockedAt) : null,
       ngPendingCount: entity.ngPendingCount ?? 0,
       technicians: entity.technicians,
+      // Chuoi ten tho cho man danh sach (man chi tiet dung `technicians`).
+      technicianNames: entity.technicianNames ?? null,
       repairOrderId: entity.repairOrderId,
       bayNumber: entity.bayNumber,
       hasCompletedTask: entity.hasCompletedTask,
