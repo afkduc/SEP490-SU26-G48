@@ -3149,6 +3149,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // Chi co y nghia luc TAO phieu: sua phieu thi thuong da co nguoi nhan roi,
   // doi chi dinh khong con tac dung gi.
   const [assignedTeamLeaderId, setAssignedTeamLeaderId] = useState('');
+  const [hoiToTruong, setHoiToTruong] = useState(false);
   const [dsToTruong, setDsToTruong] = useState([]);
   useEffect(() => {
     if (isEdit) return;
@@ -3237,8 +3238,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       ? signaturePadRef.current.toDataURL()
       : null,
     signerName,
-    // Bo trong = khong chi dinh, moi to truong deu thay (BE hieu null nhu vay).
-    assignedTeamLeaderId: assignedTeamLeaderId || null,
   });
 
   const handleSave = async () => {
@@ -3296,10 +3295,25 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       setSaveError('Vui lòng ký xác nhận trước khi lưu phiếu.');
       return;
     }
+    // Tao phieu MOI: hoi chi dinh to truong truoc khi luu. Hoi o day chu
+    // khong de san 1 o tren form vi day la quyet dinh dieu phoi - co van chot
+    // xong noi dung phieu roi moi biet giao cho ai, dat san giua form thi vua
+    // de bo qua vua de chon nham tu luc chua biet.
+    if (!isEdit) {
+      setHoiToTruong(true);
+      return;
+    }
+    await thucHienLuu(assignedTeamLeaderId);
+  };
+
+  // Luu that su. assignedId truyen tu hop thoai chi dinh to truong (chuoi
+  // rong = khong chi dinh).
+  const thucHienLuu = async (assignedId) => {
+    setHoiToTruong(false);
     setSaving(true);
     setSaveError('');
     try {
-      const payload = buildPayload();
+      const payload = { ...buildPayload(), assignedTeamLeaderId: assignedId || null };
       if (isEdit) {
         const result = await updateRepairSettlementApi(existingOrder.id, payload);
         setSaving(false);
@@ -3432,6 +3446,90 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{row.licensePlate} — {row.vehicleModel}</div>
                         <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.fullName} • {row.phone}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">Địa chỉ</label>
+                <input className="form-input" value={customerInfo.address} readOnly={isFromLookup || isEdit} onChange={(e) => cInfoSet('address', e.target.value)} placeholder="Địa chỉ khách hàng" />
+              </div>
+              <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
+                <div className="form-group" style={{ position: 'relative' }}>
+                  <label className="form-label required">Điện thoại</label>
+                  <input className="form-input"
+                    value={customerInfo.phone}
+                    readOnly={isFromLookup || isEdit}
+                    onChange={(e) => { cInfoSet('phone', e.target.value); setIsFromLookup(false); setActiveField('phone'); setShowSuggestions(true); }}
+                    onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('phone'); setShowSuggestions(true); } }}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
+                    placeholder="0912345678" />
+                  {activeField === 'phone' && showSuggestions && suggestions.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
+                      {suggestions.map((row) => (
+                        <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
+                          style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{row.phone} — {row.fullName}</div>
+                          <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.licensePlate}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Mã Số Thuế</label>
+                  <input className="form-input" value={customerInfo.taxCode} readOnly={isFromLookup || isEdit} onChange={(e) => cInfoSet('taxCode', e.target.value)} placeholder="Mã số thuế" />
+                </div>
+              </div>
+              <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">CCCD</label>
+                  <input className="form-input"
+                    value={customerInfo.cccd}
+                    readOnly={isFromLookup || isEdit}
+                    onChange={(e) => { cInfoSet('cccd', e.target.value); setIsFromLookup(false); }}
+                    placeholder="Số CCCD / CMND" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input className="form-input"
+                    value={customerInfo.email}
+                    readOnly={isFromLookup || isEdit}
+                    onChange={(e) => { cInfoSet('email', e.target.value); setIsFromLookup(false); }}
+                    placeholder="email@example.com" />
+                </div>
+              </div>
+              <div className="form-grid form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Người liên hệ</label>
+                  <input className="form-input" value={customerInfo.contactPerson} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Tên người liên hệ" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Điện thoại liên hệ</label>
+                  <input className="form-input" value={customerInfo.contactPhone} onChange={(e) => cInfoSet('contactPhone', e.target.value)} placeholder="SĐT người liên hệ" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
+                <label className="form-label required">Tên khách hàng</label>
+                <input className="form-input"
+                  value={customerQuery}
+                  readOnly={isFromLookup || isEdit}
+                  onChange={(e) => { setCustomerQuery(e.target.value); cInfoSet('fullName', e.target.value); setIsFromLookup(false); setActiveField('customer'); setShowSuggestions(true); }}
+                  onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('customer'); setShowSuggestions(true); } }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
+                  placeholder="Nhập tên" />
+                {activeField === 'customer' && showSuggestions && suggestions.length > 0 && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
+                    {suggestions.map((row) => (
+                      <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
+                        style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{row.fullName}</div>
+                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.phone} • {row.licensePlate}</div>
                       </div>
                     ))}
                   </div>
@@ -3584,90 +3682,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 );
               })()}
             </div>
-
-            <div>
-              <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
-                <label className="form-label required">Tên khách hàng</label>
-                <input className="form-input"
-                  value={customerQuery}
-                  readOnly={isFromLookup || isEdit}
-                  onChange={(e) => { setCustomerQuery(e.target.value); cInfoSet('fullName', e.target.value); setIsFromLookup(false); setActiveField('customer'); setShowSuggestions(true); }}
-                  onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('customer'); setShowSuggestions(true); } }}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
-                  placeholder="Nhập tên" />
-                {activeField === 'customer' && showSuggestions && suggestions.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
-                    {suggestions.map((row) => (
-                      <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
-                        style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{row.fullName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.phone} • {row.licensePlate}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Địa chỉ</label>
-                <input className="form-input" value={customerInfo.address} readOnly={isFromLookup || isEdit} onChange={(e) => cInfoSet('address', e.target.value)} placeholder="Địa chỉ khách hàng" />
-              </div>
-              <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label className="form-label required">Điện thoại</label>
-                  <input className="form-input"
-                    value={customerInfo.phone}
-                    readOnly={isFromLookup || isEdit}
-                    onChange={(e) => { cInfoSet('phone', e.target.value); setIsFromLookup(false); setActiveField('phone'); setShowSuggestions(true); }}
-                    onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('phone'); setShowSuggestions(true); } }}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
-                    placeholder="0912345678" />
-                  {activeField === 'phone' && showSuggestions && suggestions.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
-                      {suggestions.map((row) => (
-                        <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
-                          style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
-                          <div style={{ fontWeight: 600, fontSize: 13 }}>{row.phone} — {row.fullName}</div>
-                          <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.licensePlate}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Mã Số Thuế</label>
-                  <input className="form-input" value={customerInfo.taxCode} readOnly={isFromLookup || isEdit} onChange={(e) => cInfoSet('taxCode', e.target.value)} placeholder="Mã số thuế" />
-                </div>
-              </div>
-              <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">CCCD</label>
-                  <input className="form-input"
-                    value={customerInfo.cccd}
-                    readOnly={isFromLookup || isEdit}
-                    onChange={(e) => { cInfoSet('cccd', e.target.value); setIsFromLookup(false); }}
-                    placeholder="Số CCCD / CMND" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email</label>
-                  <input className="form-input"
-                    value={customerInfo.email}
-                    readOnly={isFromLookup || isEdit}
-                    onChange={(e) => { cInfoSet('email', e.target.value); setIsFromLookup(false); }}
-                    placeholder="email@example.com" />
-                </div>
-              </div>
-              <div className="form-grid form-grid-2">
-                <div className="form-group">
-                  <label className="form-label">Người liên hệ</label>
-                  <input className="form-input" value={customerInfo.contactPerson} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Tên người liên hệ" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Điện thoại liên hệ</label>
-                  <input className="form-input" value={customerInfo.contactPhone} onChange={(e) => cInfoSet('contactPhone', e.target.value)} placeholder="SĐT người liên hệ" />
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="form-group" style={{ marginTop: 16 }}>
@@ -3675,28 +3689,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             <textarea className="form-textarea" rows={2} value={customerRequest} onChange={(e) => setCustomerRequest(e.target.value)} placeholder="Mô tả tình trạng xe / yêu cầu sửa chữa của khách hàng..." />
           </div>
 
-          {/* Chi dinh to truong - chi luc TAO phieu. Sua phieu thi thuong da
-              co nguoi nhan roi, doi chi dinh khong con tac dung gi. */}
-          {!isEdit && (
-            <div className="form-group" style={{ marginTop: 12, maxWidth: 460 }}>
-              <label className="form-label">Chỉ định tổ trưởng</label>
-              <select className="form-select"
-                value={assignedTeamLeaderId}
-                onChange={(e) => setAssignedTeamLeaderId(e.target.value)}>
-                <option value="">Không chỉ định — mọi tổ trưởng đều nhận được</option>
-                {dsToTruong.map((tt) => (
-                  <option key={tt.id} value={tt.id}>
-                    {tt.phone ? `${tt.name} — ${tt.phone}` : tt.name}
-                  </option>
-                ))}
-              </select>
-              <div style={{ fontSize: 11.5, color: 'var(--gray-600)', marginTop: 4 }}>
-                {assignedTeamLeaderId
-                  ? 'Phiếu chỉ hiện ở mục "Việc chờ nhận" của tổ trưởng này; tổ trưởng khác không nhận được.'
-                  : 'Phiếu hiện cho mọi tổ trưởng trong chi nhánh, ai rảnh thì nhận.'}
-              </div>
-            </div>
-          )}
         </div>
       </CollapsibleCard>
 
@@ -4001,6 +3993,45 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           </div>
         </div>
       </CollapsibleCard>
+
+      {/* Buoc cuoi truoc khi luu phieu moi: giao cho to truong nao. */}
+      {hoiToTruong && (
+        <div className="modal-overlay" onClick={() => setHoiToTruong(false)}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Giao phiếu cho tổ trưởng</h3>
+              <button className="modal-close" onClick={() => setHoiToTruong(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Chỉ định tổ trưởng</label>
+                <select className="form-select" autoFocus
+                  value={assignedTeamLeaderId}
+                  onChange={(e) => setAssignedTeamLeaderId(e.target.value)}>
+                  <option value="">Không chỉ định — mọi tổ trưởng đều nhận được</option>
+                  {dsToTruong.map((tt) => (
+                    <option key={tt.id} value={tt.id}>
+                      {tt.phone ? `${tt.name} — ${tt.phone}` : tt.name}
+                    </option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 12, color: 'var(--gray-600)', marginTop: 6, lineHeight: 1.5 }}>
+                  {assignedTeamLeaderId
+                    ? 'Phiếu chỉ hiện ở mục "Việc chờ nhận" của tổ trưởng này; tổ trưởng khác không nhận được.'
+                    : 'Phiếu hiện cho mọi tổ trưởng trong chi nhánh, ai rảnh thì nhận.'}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setHoiToTruong(false)}>Quay lại</button>
+              <button className="btn btn-primary" disabled={saving}
+                onClick={() => thucHienLuu(assignedTeamLeaderId)}>
+                {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {xemLichSuXe && vehicleInfo.id && (
         <VehicleHistoryModal
