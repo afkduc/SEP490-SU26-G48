@@ -1,3 +1,16 @@
+// dd/mm/yyyy hh:mm - dung getter UTC vi mssql (useUTC mac dinh true) doc cot
+// datetime theo truc UTC cua JS Date, khong lien quan mui gio may chu.
+function toDDMMYYYYHHmm(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const min = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${dd}/${mm}/${d.getUTCFullYear()} ${hh}:${min}`;
+}
+
 /**
  * DTO cho response cua module Export Request.
  * Mapping tu ExportRequest / ExportRequestItem entity -> payload FE.
@@ -20,6 +33,10 @@ class ExportRequestResponseDto {
       vehiclePlate: header.vehiclePlate,
       performedBy: header.performedBy,
       performedByName: header.performedByName,
+      receivedBy: header.receivedBy,
+      receivedByName: header.receivedByName,
+      receivedSignatureData: header.receivedSignatureData,
+      receivedSignedAt: toDDMMYYYYHHmm(header.receivedSignedAt),
       exportDate: this._formatDate(header.exportDate),
       status: header.status,
       notes: header.notes,

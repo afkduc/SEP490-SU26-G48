@@ -83,9 +83,57 @@
   margin: 0 0 12px;
 }
 
-.er-form__so-picker .input {
+.er-form__search-picker {
+  position: relative;
+}
+
+.er-form__search-picker .input {
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 0;
+}
+
+.er-form__search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-sm);
+  box-shadow: var(--md-elevation-2, 0 4px 12px rgba(0,0,0,0.15));
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.er-form__tech-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.er-form__tech-list li + li {
+  border-top: 1px solid var(--md-outline-variant);
+}
+.er-form__tech-list .er-form__search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.er-form__picked-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 44px;
+  padding: 0 8px 0 16px;
+  background: var(--md-primary-container);
+  border-radius: var(--md-shape-sm);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--md-on-primary-container);
 }
 
 .er-form__hint {
@@ -108,10 +156,22 @@
   justify-content: space-between;
   align-items: center;
   gap: 16px;
+  margin-top: 16px;
   padding: 16px;
   background: var(--md-primary-container);
   border-radius: var(--md-shape-md);
   flex-wrap: wrap;
+}
+
+.er-form__search-row {
+  cursor: pointer;
+}
+.er-form__search-row:hover {
+  background: var(--md-surface-variant);
+}
+.er-form__search-row--active {
+  background: var(--md-primary-container);
+  cursor: default;
 }
 
 .er-form__info-grid {
@@ -154,6 +214,10 @@
   color: var(--md-on-surface-variant);
 }
 
+.er-form__label .required {
+  color: var(--md-error);
+}
+
 .er-form__stock--low {
   color: var(--md-error);
   font-weight: 600;
@@ -185,14 +249,6 @@
   border-radius: var(--md-shape-md);
 }
 
-.er-form__add-product {
-  margin-top: 16px;
-  padding: 16px;
-  background: var(--md-surface-container);
-  border: 1px dashed var(--md-outline);
-  border-radius: var(--md-shape-md);
-}
-
 .er-form__add-title {
   font-size: 14px;
   font-weight: 600;
@@ -200,34 +256,55 @@
   margin: 0 0 8px;
 }
 
-.er-form__product-results {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--md-shape-sm);
-  background: var(--md-surface);
-  max-height: 280px;
-  overflow-y: auto;
+/* Dong co viec phai lam sau khi phieu da xuat (xuat them / tra hang /
+   thieu kho) - to do de NV Kho thay ngay la co thay doi phat sinh. */
+.er-form .er-form__row--alert td {
+  color: var(--md-error);
 }
-.er-form__product-results li + li { border-top: 1px solid var(--md-outline-variant); }
-
-.er-form__product-hit {
-  width: 100%;
+.er-form__confirm-label--alert {
+  color: var(--md-error);
+  font-weight: 600;
+}
+.er-form__confirm-cell {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  font-size: 14px;
+  gap: 8px;
+  font-size: 13px;
+  cursor: default;
 }
-.er-form__product-hit:hover { background: var(--md-surface-variant); }
+.er-form__confirm-cell input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--md-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
 
-.er-form__product-name { flex: 1; color: var(--md-on-surface); }
-.er-form__product-stock { font-size: 12px; color: var(--md-on-surface-variant); }
+.er-form__signature {
+  display: inline-block;
+  max-width: 260px;
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--md-surface-container);
+  border: 1px dashed var(--md-outline);
+  border-radius: var(--md-shape-md);
+}
+
+.er-form__signature-pad {
+  max-width: 220px;
+}
+.er-form__signature-pad > div {
+  height: 90px !important;
+}
+
+.er-form__signature-name {
+  max-width: 220px;
+  margin-top: 8px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
 
 .er-form__error {
   padding: 12px 14px;
@@ -241,9 +318,11 @@
 .er-form__actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 12px;
   padding-top: 24px;
   border-top: 1px solid var(--md-outline-variant);
+  flex-wrap: wrap;
 }
 
 /* ── MD3 inputs ── */

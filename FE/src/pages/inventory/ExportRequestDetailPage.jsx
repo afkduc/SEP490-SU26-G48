@@ -60,7 +60,7 @@ export default function ExportRequestDetailPage() {
             <InfoRow label="Xe" value={data.vehiclePlate} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
             <InfoRow label="Người xuất" value={data.performedByName} />
-            <InfoRow label="Ghi chú" value={data.notes} />
+            <InfoRow label="Người lấy" value={data.receivedByName} />
           </dl>
         </div>
 
@@ -103,6 +103,25 @@ export default function ExportRequestDetailPage() {
             </div>
           )}
         </div>
+
+        {data.receivedSignatureData && (
+          <div className="er-detail__section">
+            <h2 className="er-detail__section-title">Chữ ký người lấy</h2>
+            <div className="er-detail__signature-box">
+              <img
+                src={data.receivedSignatureData}
+                alt="Chữ ký người lấy"
+                className="er-detail__signature-img"
+              />
+              {data.receivedByName && (
+                <div className="er-detail__signature-name">{data.receivedByName}</div>
+              )}
+              {data.receivedSignedAt && (
+                <div className="er-detail__signature-date">Ký lúc: {data.receivedSignedAt}</div>
+              )}
+            </div>
+          </div>
+        )}
 
         {data.status === 'completed' && (
           <div className="er-detail__notice er-detail__notice--success">
