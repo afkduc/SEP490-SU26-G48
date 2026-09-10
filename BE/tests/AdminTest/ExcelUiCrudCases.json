@@ -1,0 +1,885 @@
+[
+  {
+    "sheet": "Admin_listUsers",
+    "caseId": "UTCID01",
+    "module": "AdminUserService",
+    "method": "listUsers",
+    "title": "Từ khóa=Nguyễn, Chi nhánh=Hà Nội, Vai trò=Quản lý, Trạng thái=Đang hoạt động",
+    "inputs": {
+      "Từ khóa": "Nguyễn",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản lý",
+      "Trạng thái": "Đang hoạt động"
+    },
+    "expectedOutput": "Hiển thị danh sách người dùng phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_listUsers",
+    "caseId": "UTCID02",
+    "module": "AdminUserService",
+    "method": "listUsers",
+    "title": "Từ khóa=không tồn tại, Chi nhánh=Tất cả, Vai trò=Tất cả, Trạng thái=Tất cả",
+    "inputs": {
+      "Từ khóa": "không tồn tại",
+      "Chi nhánh": "Tất cả",
+      "Vai trò": "Tất cả",
+      "Trạng thái": "Tất cả"
+    },
+    "expectedOutput": "Hiển thị Không có người dùng",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_getUserDetail",
+    "caseId": "UTCID01",
+    "module": "AdminUserService",
+    "method": "getUserDetail",
+    "title": "Mã người dùng=1",
+    "inputs": {
+      "Mã người dùng": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin người dùng",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_getUserDetail",
+    "caseId": "UTCID02",
+    "module": "AdminUserService",
+    "method": "getUserDetail",
+    "title": "Mã người dùng=99999",
+    "inputs": {
+      "Mã người dùng": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Người dùng không tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID01",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": "Hiển thị người dùng vừa tạo",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID02",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=null, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "null",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập tên đăng nhập",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID03",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=a, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "a",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Tên đăng nhập không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID04",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=null, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "null",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập email",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID05",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=abc, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "abc",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID06",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=null, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "null",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập mật khẩu",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID07",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=123, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "123",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Mật khẩu không hợp lệ",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID08",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=null, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "null",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập tên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID09",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=123, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "123",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID10",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=null, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "null",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng chọn chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID11",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=null",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "null"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng chọn vai trò",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_createUser",
+    "caseId": "UTCID12",
+    "module": "AdminUserService",
+    "method": "createUser",
+    "title": "Tên đăng nhập=admin01, Email=existing@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên",
+    "inputs": {
+      "Tên đăng nhập": "admin01",
+      "Email": "existing@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email đã tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_updateUser",
+    "caseId": "UTCID01",
+    "module": "AdminUserService",
+    "method": "updateUser",
+    "title": "Mã người dùng=1, Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên, Trạng thái=Đang hoạt động",
+    "inputs": {
+      "Mã người dùng": "1",
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên",
+      "Trạng thái": "Đang hoạt động"
+    },
+    "expectedOutput": "Hiển thị thông tin đã cập nhật",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_updateUser",
+    "caseId": "UTCID02",
+    "module": "AdminUserService",
+    "method": "updateUser",
+    "title": "Mã người dùng=99999, Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên, Trạng thái=N/A",
+    "inputs": {
+      "Mã người dùng": "99999",
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên",
+      "Trạng thái": "N/A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Người dùng không tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_updateUser",
+    "caseId": "UTCID03",
+    "module": "AdminUserService",
+    "method": "updateUser",
+    "title": "Mã người dùng=1, Tên đăng nhập=admin01, Email=abc, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên, Trạng thái=N/A",
+    "inputs": {
+      "Mã người dùng": "1",
+      "Tên đăng nhập": "admin01",
+      "Email": "abc",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên",
+      "Trạng thái": "N/A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_updateUser",
+    "caseId": "UTCID04",
+    "module": "AdminUserService",
+    "method": "updateUser",
+    "title": "Mã người dùng=1, Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=123, Chi nhánh=Hà Nội, Vai trò=Quản trị viên, Trạng thái=N/A",
+    "inputs": {
+      "Mã người dùng": "1",
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "123",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên",
+      "Trạng thái": "N/A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_updateUser",
+    "caseId": "UTCID05",
+    "module": "AdminUserService",
+    "method": "updateUser",
+    "title": "Mã người dùng=1, Tên đăng nhập=admin01, Email=admin01@autogara.com, Mật khẩu=Password1, Họ=Nguyễn Văn, Tên=An, Số điện thoại=0912345678, Chi nhánh=Hà Nội, Vai trò=Quản trị viên, Trạng thái=invalid",
+    "inputs": {
+      "Mã người dùng": "1",
+      "Tên đăng nhập": "admin01",
+      "Email": "admin01@autogara.com",
+      "Mật khẩu": "Password1",
+      "Họ": "Nguyễn Văn",
+      "Tên": "An",
+      "Số điện thoại": "0912345678",
+      "Chi nhánh": "Hà Nội",
+      "Vai trò": "Quản trị viên",
+      "Trạng thái": "invalid"
+    },
+    "expectedOutput": null,
+    "expectedError": "Trạng thái không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_updateUser",
+    "caseId": "UTCID06",
+    "module": "AdminUserService",
+    "method": "updateUser",
+    "title": "Mã người dùng=Tài khoản hiện tại, Tên đăng nhập=N/A, Email=N/A, Mật khẩu=N/A, Họ=N/A, Tên=N/A, Số điện thoại=N/A, Chi nhánh=N/A, Vai trò=N/A, Trạng thái=Ngừng hoạt động",
+    "inputs": {
+      "Mã người dùng": "Tài khoản hiện tại",
+      "Tên đăng nhập": "N/A",
+      "Email": "N/A",
+      "Mật khẩu": "N/A",
+      "Họ": "N/A",
+      "Tên": "N/A",
+      "Số điện thoại": "N/A",
+      "Chi nhánh": "N/A",
+      "Vai trò": "N/A",
+      "Trạng thái": "Ngừng hoạt động"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không thể tự khóa tài khoản",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_resetPassword",
+    "caseId": "UTCID01",
+    "module": "AdminUserService",
+    "method": "resetPassword",
+    "title": "Mã người dùng=1, Chế độ=Tạo mật khẩu tự động, Mật khẩu mới=N/A, Xác nhận mật khẩu=N/A",
+    "inputs": {
+      "Mã người dùng": "1",
+      "Chế độ": "Tạo mật khẩu tự động",
+      "Mật khẩu mới": "N/A",
+      "Xác nhận mật khẩu": "N/A"
+    },
+    "expectedOutput": "Hiển thị mật khẩu mới",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_resetPassword",
+    "caseId": "UTCID02",
+    "module": "AdminUserService",
+    "method": "resetPassword",
+    "title": "Mã người dùng=1, Chế độ=Nhập thủ công, Mật khẩu mới=Password2, Xác nhận mật khẩu=Password2",
+    "inputs": {
+      "Mã người dùng": "1",
+      "Chế độ": "Nhập thủ công",
+      "Mật khẩu mới": "Password2",
+      "Xác nhận mật khẩu": "Password2"
+    },
+    "expectedOutput": "Hiển thị Đặt lại mật khẩu thành công",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_resetPassword",
+    "caseId": "UTCID03",
+    "module": "AdminUserService",
+    "method": "resetPassword",
+    "title": "Mã người dùng=1, Chế độ=N/A, Mật khẩu mới=123, Xác nhận mật khẩu=N/A",
+    "inputs": {
+      "Mã người dùng": "1",
+      "Chế độ": "N/A",
+      "Mật khẩu mới": "123",
+      "Xác nhận mật khẩu": "N/A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Mật khẩu không hợp lệ",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "Admin_resetPassword",
+    "caseId": "UTCID04",
+    "module": "AdminUserService",
+    "method": "resetPassword",
+    "title": "Mã người dùng=1, Chế độ=N/A, Mật khẩu mới=Password2, Xác nhận mật khẩu=Different",
+    "inputs": {
+      "Mã người dùng": "1",
+      "Chế độ": "N/A",
+      "Mật khẩu mới": "Password2",
+      "Xác nhận mật khẩu": "Different"
+    },
+    "expectedOutput": null,
+    "expectedError": "Xác nhận mật khẩu không khớp",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_resetPassword",
+    "caseId": "UTCID05",
+    "module": "AdminUserService",
+    "method": "resetPassword",
+    "title": "Mã người dùng=99999, Chế độ=N/A, Mật khẩu mới=N/A, Xác nhận mật khẩu=N/A",
+    "inputs": {
+      "Mã người dùng": "99999",
+      "Chế độ": "N/A",
+      "Mật khẩu mới": "N/A",
+      "Xác nhận mật khẩu": "N/A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Người dùng không tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_list",
+    "caseId": "UTCID01",
+    "module": "BranchService",
+    "method": "list",
+    "title": "Từ khóa=Hà Nội, Trạng thái=Đang hoạt động",
+    "inputs": {
+      "Từ khóa": "Hà Nội",
+      "Trạng thái": "Đang hoạt động"
+    },
+    "expectedOutput": "Hiển thị danh sách chi nhánh phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_list",
+    "caseId": "UTCID02",
+    "module": "BranchService",
+    "method": "list",
+    "title": "Từ khóa=không tồn tại, Trạng thái=Tất cả",
+    "inputs": {
+      "Từ khóa": "không tồn tại",
+      "Trạng thái": "Tất cả"
+    },
+    "expectedOutput": "Hiển thị Không có chi nhánh",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_getById",
+    "caseId": "UTCID01",
+    "module": "BranchService",
+    "method": "getById",
+    "title": "Mã chi nhánh=1",
+    "inputs": {
+      "Mã chi nhánh": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin và thống kê chi nhánh",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_getById",
+    "caseId": "UTCID02",
+    "module": "BranchService",
+    "method": "getById",
+    "title": "Mã chi nhánh=99999",
+    "inputs": {
+      "Mã chi nhánh": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Chi nhánh không tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_create",
+    "caseId": "UTCID01",
+    "module": "BranchService",
+    "method": "create",
+    "title": "Mã chi nhánh=HN01, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "HN01",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": "Hiển thị chi nhánh vừa tạo",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_create",
+    "caseId": "UTCID02",
+    "module": "BranchService",
+    "method": "create",
+    "title": "Mã chi nhánh=null, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "null",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập mã chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_create",
+    "caseId": "UTCID03",
+    "module": "BranchService",
+    "method": "create",
+    "title": "Mã chi nhánh=AAAAAAAAAAAAAAAAAAAAA, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "AAAAAAAAAAAAAAAAAAAAA",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Mã chi nhánh tối đa 20 ký tự",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "Admin_create",
+    "caseId": "UTCID04",
+    "module": "BranchService",
+    "method": "create",
+    "title": "Mã chi nhánh=EXIST, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "EXIST",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Mã chi nhánh đã tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_create",
+    "caseId": "UTCID05",
+    "module": "BranchService",
+    "method": "create",
+    "title": "Mã chi nhánh=HN01, Tên chi nhánh=null, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "HN01",
+      "Tên chi nhánh": "null",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập tên chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_create",
+    "caseId": "UTCID06",
+    "module": "BranchService",
+    "method": "create",
+    "title": "Mã chi nhánh=HN01, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=123, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "HN01",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "123",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_create",
+    "caseId": "UTCID07",
+    "module": "BranchService",
+    "method": "create",
+    "title": "Mã chi nhánh=HN01, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=abc, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "HN01",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "abc",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_update",
+    "caseId": "UTCID01",
+    "module": "BranchService",
+    "method": "update",
+    "title": "Mã chi nhánh=HN01, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "HN01",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": "Hiển thị thông tin đã cập nhật",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_update",
+    "caseId": "UTCID02",
+    "module": "BranchService",
+    "method": "update",
+    "title": "Mã chi nhánh=HN01, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "HN01",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Chi nhánh không tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_update",
+    "caseId": "UTCID03",
+    "module": "BranchService",
+    "method": "update",
+    "title": "Mã chi nhánh=HN01, Tên chi nhánh=null, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "HN01",
+      "Tên chi nhánh": "null",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập tên chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_update",
+    "caseId": "UTCID04",
+    "module": "BranchService",
+    "method": "update",
+    "title": "Mã chi nhánh=HN01, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=123, Email=hanoi@autogara.com, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "HN01",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "123",
+      "Email": "hanoi@autogara.com",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_update",
+    "caseId": "UTCID05",
+    "module": "BranchService",
+    "method": "update",
+    "title": "Mã chi nhánh=HN01, Tên chi nhánh=AutoGara Hà Nội, Địa chỉ=Hà Nội, Số điện thoại=0912345678, Email=abc, Quản lý=Nguyễn Văn A",
+    "inputs": {
+      "Mã chi nhánh": "HN01",
+      "Tên chi nhánh": "AutoGara Hà Nội",
+      "Địa chỉ": "Hà Nội",
+      "Số điện thoại": "0912345678",
+      "Email": "abc",
+      "Quản lý": "Nguyễn Văn A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_deactivate",
+    "caseId": "UTCID01",
+    "module": "BranchService",
+    "method": "deactivate",
+    "title": "Mã chi nhánh=1, Nút=Ngừng hoạt động",
+    "inputs": {
+      "Mã chi nhánh": "1",
+      "Nút": "Ngừng hoạt động"
+    },
+    "expectedOutput": "Trạng thái ngừng hoạt động",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_deactivate",
+    "caseId": "UTCID02",
+    "module": "BranchService",
+    "method": "deactivate",
+    "title": "Mã chi nhánh=99999, Nút=Ngừng hoạt động",
+    "inputs": {
+      "Mã chi nhánh": "99999",
+      "Nút": "Ngừng hoạt động"
+    },
+    "expectedOutput": null,
+    "expectedError": "Chi nhánh không tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Admin_reactivate",
+    "caseId": "UTCID01",
+    "module": "BranchService",
+    "method": "reactivate",
+    "title": "Mã chi nhánh=1, Nút=Kích hoạt lại",
+    "inputs": {
+      "Mã chi nhánh": "1",
+      "Nút": "Kích hoạt lại"
+    },
+    "expectedOutput": "Trạng thái hoạt động",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Admin_reactivate",
+    "caseId": "UTCID02",
+    "module": "BranchService",
+    "method": "reactivate",
+    "title": "Mã chi nhánh=99999, Nút=Kích hoạt lại",
+    "inputs": {
+      "Mã chi nhánh": "99999",
+      "Nút": "Kích hoạt lại"
+    },
+    "expectedOutput": null,
+    "expectedError": "Chi nhánh không tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  }
+]

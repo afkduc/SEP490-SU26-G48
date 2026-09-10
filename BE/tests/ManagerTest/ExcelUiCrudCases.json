@@ -1,0 +1,1953 @@
+[
+  {
+    "sheet": "InventorySvc_getStockList",
+    "caseId": "UTCID01",
+    "module": "InventoryService",
+    "method": "getStockList",
+    "title": "Từ khóa=lọc dầu, Danh mục=Động cơ, Trang=1, Chi nhánh=N/A",
+    "inputs": {
+      "Từ khóa": "lọc dầu",
+      "Danh mục": "Động cơ",
+      "Trang": "1",
+      "Chi nhánh": "N/A"
+    },
+    "expectedOutput": "Hiển thị danh sách phụ tùng phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "InventorySvc_getStockList",
+    "caseId": "UTCID02",
+    "module": "InventoryService",
+    "method": "getStockList",
+    "title": "Từ khóa=không có, Danh mục=Tất cả danh mục, Trang=1, Chi nhánh=N/A",
+    "inputs": {
+      "Từ khóa": "không có",
+      "Danh mục": "Tất cả danh mục",
+      "Trang": "1",
+      "Chi nhánh": "N/A"
+    },
+    "expectedOutput": "Hiển thị Chưa có dữ liệu",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "InventorySvc_getStockList",
+    "caseId": "UTCID03",
+    "module": "InventoryService",
+    "method": "getStockList",
+    "title": "Từ khóa=N/A, Danh mục=N/A, Trang=N/A, Chi nhánh=null",
+    "inputs": {
+      "Từ khóa": "N/A",
+      "Danh mục": "N/A",
+      "Trang": "N/A",
+      "Chi nhánh": "null"
+    },
+    "expectedOutput": null,
+    "expectedError": "Tài khoản chưa được gán chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ImportRequestSvc_list",
+    "caseId": "UTCID01",
+    "module": "ImportRequestService",
+    "method": "list",
+    "title": "Từ khóa=IRB, Trạng thái=Chờ duyệt, Từ ngày=2026-09-01, Đến ngày=2026-09-10",
+    "inputs": {
+      "Từ khóa": "IRB",
+      "Trạng thái": "Chờ duyệt",
+      "Từ ngày": "2026-09-01",
+      "Đến ngày": "2026-09-10"
+    },
+    "expectedOutput": "Hiển thị danh sách phiếu nhập phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ImportRequestSvc_list",
+    "caseId": "UTCID02",
+    "module": "ImportRequestService",
+    "method": "list",
+    "title": "Từ khóa=không có, Trạng thái=Tất cả, Từ ngày=null, Đến ngày=null",
+    "inputs": {
+      "Từ khóa": "không có",
+      "Trạng thái": "Tất cả",
+      "Từ ngày": "null",
+      "Đến ngày": "null"
+    },
+    "expectedOutput": "Hiển thị Chưa có phiếu nhập",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ImportRequestSvc_getById",
+    "caseId": "UTCID01",
+    "module": "ImportRequestService",
+    "method": "getById",
+    "title": "Mã phiếu nhập=7",
+    "inputs": {
+      "Mã phiếu nhập": "7"
+    },
+    "expectedOutput": "Hiển thị chi tiết phiếu nhập",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ImportRequestSvc_getById",
+    "caseId": "UTCID02",
+    "module": "ImportRequestService",
+    "method": "getById",
+    "title": "Mã phiếu nhập=99999",
+    "inputs": {
+      "Mã phiếu nhập": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy phiếu nhập",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ExportRequestSvc_list",
+    "caseId": "UTCID01",
+    "module": "ExportRequestService",
+    "method": "list",
+    "title": "Từ khóa=EXB, Trạng thái=Hoàn thành, Từ ngày=2026-09-01, Đến ngày=2026-09-10",
+    "inputs": {
+      "Từ khóa": "EXB",
+      "Trạng thái": "Hoàn thành",
+      "Từ ngày": "2026-09-01",
+      "Đến ngày": "2026-09-10"
+    },
+    "expectedOutput": "Hiển thị danh sách phiếu xuất phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ExportRequestSvc_list",
+    "caseId": "UTCID02",
+    "module": "ExportRequestService",
+    "method": "list",
+    "title": "Từ khóa=không có, Trạng thái=Tất cả, Từ ngày=null, Đến ngày=null",
+    "inputs": {
+      "Từ khóa": "không có",
+      "Trạng thái": "Tất cả",
+      "Từ ngày": "null",
+      "Đến ngày": "null"
+    },
+    "expectedOutput": "Hiển thị Chưa có phiếu xuất",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_listEmployees",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "listEmployees",
+    "title": "Từ khóa=Nguyễn, Vai trò=Tất cả vai trò, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Từ khóa": "Nguyễn",
+      "Vai trò": "Tất cả vai trò",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": "Hiển thị danh sách nhân viên phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_listEmployees",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "listEmployees",
+    "title": "Từ khóa=không có, Vai trò=Tất cả vai trò, Trạng thái=Tất cả trạng thái",
+    "inputs": {
+      "Từ khóa": "không có",
+      "Vai trò": "Tất cả vai trò",
+      "Trạng thái": "Tất cả trạng thái"
+    },
+    "expectedOutput": "Hiển thị Chưa có nhân viên",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getEmployeeById",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "getEmployeeById",
+    "title": "Mã nhân viên=1",
+    "inputs": {
+      "Mã nhân viên": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin nhân viên",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getEmployeeById",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "getEmployeeById",
+    "title": "Mã nhân viên=99999",
+    "inputs": {
+      "Mã nhân viên": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy nhân viên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": "true",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=null, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "null",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập họ và tên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID03",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=null, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "null",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập email",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID04",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=abc, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "abc",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID05",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=null, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "null",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập số điện thoại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID06",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=123, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "123",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID07",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=null, Mật khẩu=Password1, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "null",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng chọn vai trò",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID08",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=null, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "null",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập mật khẩu",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID09",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=1234567, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "1234567",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Mật khẩu tối thiểu 8 ký tự",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID10",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Different1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Different1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Xác nhận mật khẩu không khớp",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createEmployee",
+    "caseId": "UTCID11",
+    "module": "ManagerService",
+    "method": "createEmployee",
+    "title": "Họ và tên=Nguyễn Văn A, Email=existing@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "existing@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email đã tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateEmployee",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "updateEmployee",
+    "title": "Mã nhân viên=1, Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã nhân viên": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": "true",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_updateEmployee",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "updateEmployee",
+    "title": "Mã nhân viên=99999, Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã nhân viên": "99999",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy nhân viên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateEmployee",
+    "caseId": "UTCID03",
+    "module": "ManagerService",
+    "method": "updateEmployee",
+    "title": "Mã nhân viên=1, Họ và tên=null, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã nhân viên": "1",
+      "Họ và tên": "null",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập họ và tên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateEmployee",
+    "caseId": "UTCID04",
+    "module": "ManagerService",
+    "method": "updateEmployee",
+    "title": "Mã nhân viên=1, Họ và tên=Nguyễn Văn A, Email=abc, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã nhân viên": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "abc",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateEmployee",
+    "caseId": "UTCID05",
+    "module": "ManagerService",
+    "method": "updateEmployee",
+    "title": "Mã nhân viên=1, Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=123, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã nhân viên": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "123",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateEmployee",
+    "caseId": "UTCID06",
+    "module": "ManagerService",
+    "method": "updateEmployee",
+    "title": "Mã nhân viên=1, Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=null, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã nhân viên": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "null",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng chọn vai trò",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateEmployee",
+    "caseId": "UTCID07",
+    "module": "ManagerService",
+    "method": "updateEmployee",
+    "title": "Mã nhân viên=1, Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Trạng thái=invalid",
+    "inputs": {
+      "Mã nhân viên": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Trạng thái": "invalid"
+    },
+    "expectedOutput": null,
+    "expectedError": "Trạng thái không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateEmployee",
+    "caseId": "UTCID08",
+    "module": "ManagerService",
+    "method": "updateEmployee",
+    "title": "Mã nhân viên=1, Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=1234567, Xác nhận mật khẩu=Password1, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã nhân viên": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "1234567",
+      "Xác nhận mật khẩu": "Password1",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Mật khẩu tối thiểu 8 ký tự",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_updateEmployee",
+    "caseId": "UTCID09",
+    "module": "ManagerService",
+    "method": "updateEmployee",
+    "title": "Mã nhân viên=1, Họ và tên=Nguyễn Văn A, Email=nguyenvana@autogara.com, Số điện thoại=0912345678, Vai trò=Cố vấn dịch vụ, Mật khẩu=Password1, Xác nhận mật khẩu=Different1, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã nhân viên": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "nguyenvana@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Vai trò": "Cố vấn dịch vụ",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Different1",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Xác nhận mật khẩu không khớp",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_listServices",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "listServices",
+    "title": "Từ khóa=thay dầu, Trạng thái=Đang áp dụng, Loại sửa chữa=Bảo dưỡng",
+    "inputs": {
+      "Từ khóa": "thay dầu",
+      "Trạng thái": "Đang áp dụng",
+      "Loại sửa chữa": "Bảo dưỡng"
+    },
+    "expectedOutput": "Hiển thị danh sách dịch vụ phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_listServices",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "listServices",
+    "title": "Từ khóa=không có, Trạng thái=Tất cả trạng thái, Loại sửa chữa=Tất cả",
+    "inputs": {
+      "Từ khóa": "không có",
+      "Trạng thái": "Tất cả trạng thái",
+      "Loại sửa chữa": "Tất cả"
+    },
+    "expectedOutput": "Hiển thị Chưa có dịch vụ",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getServiceById",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "getServiceById",
+    "title": "Service ID=1",
+    "inputs": {
+      "Service ID": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin dịch vụ",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getServiceById",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "getServiceById",
+    "title": "Service ID=99999",
+    "inputs": {
+      "Service ID": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy dịch vụ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createService",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "createService",
+    "title": "Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1",
+    "inputs": {
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1"
+    },
+    "expectedOutput": "true",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_createService",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "createService",
+    "title": "Tên dịch vụ=null, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1",
+    "inputs": {
+      "Tên dịch vụ": "null",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập tên dịch vụ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createService",
+    "caseId": "UTCID03",
+    "module": "ManagerService",
+    "method": "createService",
+    "title": "Tên dịch vụ=Thay dầu máy, Đơn giá=null, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1",
+    "inputs": {
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "null",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Đơn giá không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createService",
+    "caseId": "UTCID04",
+    "module": "ManagerService",
+    "method": "createService",
+    "title": "Tên dịch vụ=Thay dầu máy, Đơn giá=-1, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1",
+    "inputs": {
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "-1",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Đơn giá không hợp lệ",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_createService",
+    "caseId": "UTCID05",
+    "module": "ManagerService",
+    "method": "createService",
+    "title": "Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=-1, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1",
+    "inputs": {
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "-1",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Thời gian không hợp lệ",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_createService",
+    "caseId": "UTCID06",
+    "module": "ManagerService",
+    "method": "createService",
+    "title": "Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=0",
+    "inputs": {
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "0"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số lượng phụ tùng phải lớn hơn 0",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_createService",
+    "caseId": "UTCID07",
+    "module": "ManagerService",
+    "method": "createService",
+    "title": "Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Trùng phụ tùng, Số lượng=1",
+    "inputs": {
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Trùng phụ tùng",
+      "Số lượng": "1"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không được chọn trùng 1 phụ tùng nhiều lần",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateService",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "updateService",
+    "title": "Service ID=1, Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Service ID": "1",
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": "true",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_updateService",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "updateService",
+    "title": "Service ID=99999, Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Service ID": "99999",
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy dịch vụ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateService",
+    "caseId": "UTCID03",
+    "module": "ManagerService",
+    "method": "updateService",
+    "title": "Service ID=1, Tên dịch vụ=null, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Service ID": "1",
+      "Tên dịch vụ": "null",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập tên dịch vụ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateService",
+    "caseId": "UTCID04",
+    "module": "ManagerService",
+    "method": "updateService",
+    "title": "Service ID=1, Tên dịch vụ=Thay dầu máy, Đơn giá=-1, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Service ID": "1",
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "-1",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Đơn giá không hợp lệ",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_updateService",
+    "caseId": "UTCID05",
+    "module": "ManagerService",
+    "method": "updateService",
+    "title": "Service ID=1, Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=-1, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Service ID": "1",
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "-1",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Thời gian không hợp lệ",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_updateService",
+    "caseId": "UTCID06",
+    "module": "ManagerService",
+    "method": "updateService",
+    "title": "Service ID=1, Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=0, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Service ID": "1",
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "0",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số lượng phụ tùng phải lớn hơn 0",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_updateService",
+    "caseId": "UTCID07",
+    "module": "ManagerService",
+    "method": "updateService",
+    "title": "Service ID=1, Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Trùng phụ tùng, Số lượng=1, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Service ID": "1",
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Trùng phụ tùng",
+      "Số lượng": "1",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không được chọn trùng 1 phụ tùng nhiều lần",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateService",
+    "caseId": "UTCID08",
+    "module": "ManagerService",
+    "method": "updateService",
+    "title": "Service ID=1, Tên dịch vụ=Thay dầu máy, Đơn giá=500000, Thời gian (phút)=30, Loại sửa chữa=Bảo dưỡng, Mô tả=Thay dầu động cơ, Phụ tùng=Dầu động cơ, Số lượng=1, Trạng thái=Ngừng áp dụng",
+    "inputs": {
+      "Service ID": "1",
+      "Tên dịch vụ": "Thay dầu máy",
+      "Đơn giá": "500000",
+      "Thời gian (phút)": "30",
+      "Loại sửa chữa": "Bảo dưỡng",
+      "Mô tả": "Thay dầu động cơ",
+      "Phụ tùng": "Dầu động cơ",
+      "Số lượng": "1",
+      "Trạng thái": "Ngừng áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Dịch vụ đã được ngừng áp dụng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_listServicePackages",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "listServicePackages",
+    "title": "Từ khóa=bảo dưỡng, Trạng thái=Đang áp dụng, Mục đích=Bảo dưỡng",
+    "inputs": {
+      "Từ khóa": "bảo dưỡng",
+      "Trạng thái": "Đang áp dụng",
+      "Mục đích": "Bảo dưỡng"
+    },
+    "expectedOutput": "Hiển thị danh sách gói bảo dưỡng phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_listServicePackages",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "listServicePackages",
+    "title": "Từ khóa=không có, Trạng thái=Tất cả trạng thái, Mục đích=Tất cả",
+    "inputs": {
+      "Từ khóa": "không có",
+      "Trạng thái": "Tất cả trạng thái",
+      "Mục đích": "Tất cả"
+    },
+    "expectedOutput": "Hiển thị Chưa có gói bảo dưỡng",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getServicePackageByI",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "getServicePackageById",
+    "title": "Package ID=1",
+    "inputs": {
+      "Package ID": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin gói bảo dưỡng",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getServicePackageByI",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "getServicePackageById",
+    "title": "Package ID=99999",
+    "inputs": {
+      "Package ID": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy gói bảo dưỡng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createServicePackage",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "createServicePackage",
+    "title": "Tên gói=Gói bảo dưỡng cơ bản, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh",
+    "inputs": {
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh"
+    },
+    "expectedOutput": "true",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_createServicePackage",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "createServicePackage",
+    "title": "Tên gói=null, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh",
+    "inputs": {
+      "Tên gói": "null",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập tên gói",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createServicePackage",
+    "caseId": "UTCID03",
+    "module": "ManagerService",
+    "method": "createServicePackage",
+    "title": "Tên gói=Gói bảo dưỡng cơ bản, Giá gói=null, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh",
+    "inputs": {
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "null",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh"
+    },
+    "expectedOutput": null,
+    "expectedError": "Giá gói không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createServicePackage",
+    "caseId": "UTCID04",
+    "module": "ManagerService",
+    "method": "createServicePackage",
+    "title": "Tên gói=Gói bảo dưỡng cơ bản, Giá gói=-1, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh",
+    "inputs": {
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "-1",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh"
+    },
+    "expectedOutput": null,
+    "expectedError": "Giá gói không hợp lệ",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_createServicePackage",
+    "caseId": "UTCID05",
+    "module": "ManagerService",
+    "method": "createServicePackage",
+    "title": "Tên gói=Gói bảo dưỡng cơ bản, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=null, Thao tác=I - Kiểm tra/điều chỉnh",
+    "inputs": {
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "null",
+      "Thao tác": "I - Kiểm tra/điều chỉnh"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng chọn ít nhất 1 dịch vụ cho gói",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createServicePackage",
+    "caseId": "UTCID06",
+    "module": "ManagerService",
+    "method": "createServicePackage",
+    "title": "Tên gói=Gói bảo dưỡng cơ bản, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Không tồn tại, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh",
+    "inputs": {
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Không tồn tại",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh"
+    },
+    "expectedOutput": null,
+    "expectedError": "Mẫu xe không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createServicePackage",
+    "caseId": "UTCID07",
+    "module": "ManagerService",
+    "method": "createServicePackage",
+    "title": "Tên gói=Gói bảo dưỡng cơ bản, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=X",
+    "inputs": {
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "X"
+    },
+    "expectedOutput": null,
+    "expectedError": "Thao tác dịch vụ không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateServicePackage",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "updateServicePackage",
+    "title": "Package ID=1, Tên gói=Gói bảo dưỡng cơ bản, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Package ID": "1",
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": "true",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_updateServicePackage",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "updateServicePackage",
+    "title": "Package ID=99999, Tên gói=Gói bảo dưỡng cơ bản, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Package ID": "99999",
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy gói bảo dưỡng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateServicePackage",
+    "caseId": "UTCID03",
+    "module": "ManagerService",
+    "method": "updateServicePackage",
+    "title": "Package ID=1, Tên gói=null, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Package ID": "1",
+      "Tên gói": "null",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập tên gói",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateServicePackage",
+    "caseId": "UTCID04",
+    "module": "ManagerService",
+    "method": "updateServicePackage",
+    "title": "Package ID=1, Tên gói=Gói bảo dưỡng cơ bản, Giá gói=-1, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Package ID": "1",
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "-1",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Giá gói không hợp lệ",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "ManagerSvc_updateServicePackage",
+    "caseId": "UTCID05",
+    "module": "ManagerService",
+    "method": "updateServicePackage",
+    "title": "Package ID=1, Tên gói=Gói bảo dưỡng cơ bản, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=null, Thao tác=I - Kiểm tra/điều chỉnh, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Package ID": "1",
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "null",
+      "Thao tác": "I - Kiểm tra/điều chỉnh",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng chọn ít nhất 1 dịch vụ cho gói",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateServicePackage",
+    "caseId": "UTCID06",
+    "module": "ManagerService",
+    "method": "updateServicePackage",
+    "title": "Package ID=1, Tên gói=Gói bảo dưỡng cơ bản, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Không tồn tại, Dịch vụ=Thay dầu máy, Thao tác=I - Kiểm tra/điều chỉnh, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Package ID": "1",
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Không tồn tại",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "I - Kiểm tra/điều chỉnh",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Mẫu xe không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateServicePackage",
+    "caseId": "UTCID07",
+    "module": "ManagerService",
+    "method": "updateServicePackage",
+    "title": "Package ID=1, Tên gói=Gói bảo dưỡng cơ bản, Giá gói=1200000, Mô tả=Bảo dưỡng định kỳ, Mục đích=Bảo dưỡng, Mẫu xe=Toyota Vios, Dịch vụ=Thay dầu máy, Thao tác=X, Trạng thái=Đang áp dụng",
+    "inputs": {
+      "Package ID": "1",
+      "Tên gói": "Gói bảo dưỡng cơ bản",
+      "Giá gói": "1200000",
+      "Mô tả": "Bảo dưỡng định kỳ",
+      "Mục đích": "Bảo dưỡng",
+      "Mẫu xe": "Toyota Vios",
+      "Dịch vụ": "Thay dầu máy",
+      "Thao tác": "X",
+      "Trạng thái": "Đang áp dụng"
+    },
+    "expectedOutput": null,
+    "expectedError": "Thao tác dịch vụ không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_listTechnicians",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "listTechnicians",
+    "title": "Từ khóa=Trần, Tổ trưởng=Tất cả tổ trưởng, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Từ khóa": "Trần",
+      "Tổ trưởng": "Tất cả tổ trưởng",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": "Hiển thị danh sách thợ máy phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_listTechnicians",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "listTechnicians",
+    "title": "Từ khóa=không có, Tổ trưởng=Tất cả tổ trưởng, Trạng thái=Tất cả trạng thái",
+    "inputs": {
+      "Từ khóa": "không có",
+      "Tổ trưởng": "Tất cả tổ trưởng",
+      "Trạng thái": "Tất cả trạng thái"
+    },
+    "expectedOutput": "Hiển thị Chưa có thợ máy",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getTechnicianById",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "getTechnicianById",
+    "title": "Mã thợ máy=1",
+    "inputs": {
+      "Mã thợ máy": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin kỹ thuật viên",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getTechnicianById",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "getTechnicianById",
+    "title": "Mã thợ máy=99999",
+    "inputs": {
+      "Mã thợ máy": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy kỹ thuật viên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createTechnician",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "createTechnician",
+    "title": "Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm",
+    "inputs": {
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm"
+    },
+    "expectedOutput": "true",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_createTechnician",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "createTechnician",
+    "title": "Họ và tên=null, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm",
+    "inputs": {
+      "Họ và tên": "null",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập họ và tên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createTechnician",
+    "caseId": "UTCID03",
+    "module": "ManagerService",
+    "method": "createTechnician",
+    "title": "Họ và tên=Trần Văn B, Email=abc, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm",
+    "inputs": {
+      "Họ và tên": "Trần Văn B",
+      "Email": "abc",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createTechnician",
+    "caseId": "UTCID04",
+    "module": "ManagerService",
+    "method": "createTechnician",
+    "title": "Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=123, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm",
+    "inputs": {
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "123",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createTechnician",
+    "caseId": "UTCID05",
+    "module": "ManagerService",
+    "method": "createTechnician",
+    "title": "Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=null, Chuyên môn=Máy - gầm",
+    "inputs": {
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "null",
+      "Chuyên môn": "Máy - gầm"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng chọn tổ trưởng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createTechnician",
+    "caseId": "UTCID06",
+    "module": "ManagerService",
+    "method": "createTechnician",
+    "title": "Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Khác chi nhánh, Chuyên môn=Máy - gầm",
+    "inputs": {
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Khác chi nhánh",
+      "Chuyên môn": "Máy - gầm"
+    },
+    "expectedOutput": null,
+    "expectedError": "Tổ trưởng không thuộc chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_createTechnician",
+    "caseId": "UTCID07",
+    "module": "ManagerService",
+    "method": "createTechnician",
+    "title": "Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Không tồn tại",
+    "inputs": {
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Không tồn tại"
+    },
+    "expectedOutput": null,
+    "expectedError": "Chuyên môn không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateTechnician",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "updateTechnician",
+    "title": "Mã thợ máy=1, Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã thợ máy": "1",
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": "true",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_updateTechnician",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "updateTechnician",
+    "title": "Mã thợ máy=99999, Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã thợ máy": "99999",
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy kỹ thuật viên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateTechnician",
+    "caseId": "UTCID03",
+    "module": "ManagerService",
+    "method": "updateTechnician",
+    "title": "Mã thợ máy=1, Họ và tên=null, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã thợ máy": "1",
+      "Họ và tên": "null",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập họ và tên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateTechnician",
+    "caseId": "UTCID04",
+    "module": "ManagerService",
+    "method": "updateTechnician",
+    "title": "Mã thợ máy=1, Họ và tên=Trần Văn B, Email=abc, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã thợ máy": "1",
+      "Họ và tên": "Trần Văn B",
+      "Email": "abc",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateTechnician",
+    "caseId": "UTCID05",
+    "module": "ManagerService",
+    "method": "updateTechnician",
+    "title": "Mã thợ máy=1, Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=123, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã thợ máy": "1",
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "123",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateTechnician",
+    "caseId": "UTCID06",
+    "module": "ManagerService",
+    "method": "updateTechnician",
+    "title": "Mã thợ máy=1, Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Khác chi nhánh, Chuyên môn=Máy - gầm, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã thợ máy": "1",
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Khác chi nhánh",
+      "Chuyên môn": "Máy - gầm",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Tổ trưởng không thuộc chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateTechnician",
+    "caseId": "UTCID07",
+    "module": "ManagerService",
+    "method": "updateTechnician",
+    "title": "Mã thợ máy=1, Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Không tồn tại, Trạng thái=Đang làm việc",
+    "inputs": {
+      "Mã thợ máy": "1",
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Không tồn tại",
+      "Trạng thái": "Đang làm việc"
+    },
+    "expectedOutput": null,
+    "expectedError": "Chuyên môn không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ManagerSvc_updateTechnician",
+    "caseId": "UTCID08",
+    "module": "ManagerService",
+    "method": "updateTechnician",
+    "title": "Mã thợ máy=1, Họ và tên=Trần Văn B, Email=tranvanb@autogara.com, Số điện thoại=0987654321, Tổ trưởng=Nguyễn Văn T, Chuyên môn=Máy - gầm, Trạng thái=invalid",
+    "inputs": {
+      "Mã thợ máy": "1",
+      "Họ và tên": "Trần Văn B",
+      "Email": "tranvanb@autogara.com",
+      "Số điện thoại": "0987654321",
+      "Tổ trưởng": "Nguyễn Văn T",
+      "Chuyên môn": "Máy - gầm",
+      "Trạng thái": "invalid"
+    },
+    "expectedOutput": null,
+    "expectedError": "Trạng thái không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "CustomerSvc_getAll",
+    "caseId": "UTCID01",
+    "module": "CustomerService",
+    "method": "getAll",
+    "title": "Từ khóa=Nguyễn Văn A, Trang=1",
+    "inputs": {
+      "Từ khóa": "Nguyễn Văn A",
+      "Trang": "1"
+    },
+    "expectedOutput": "Hiển thị danh sách khách hàng phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "CustomerSvc_getAll",
+    "caseId": "UTCID02",
+    "module": "CustomerService",
+    "method": "getAll",
+    "title": "Từ khóa=0912345678, Trang=1",
+    "inputs": {
+      "Từ khóa": "0912345678",
+      "Trang": "1"
+    },
+    "expectedOutput": "Hiển thị khách hàng có số điện thoại phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "CustomerSvc_getAll",
+    "caseId": "UTCID03",
+    "module": "CustomerService",
+    "method": "getAll",
+    "title": "Từ khóa=30A12345, Trang=1",
+    "inputs": {
+      "Từ khóa": "30A12345",
+      "Trang": "1"
+    },
+    "expectedOutput": "Hiển thị khách hàng có biển số phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "CustomerSvc_getAll",
+    "caseId": "UTCID04",
+    "module": "CustomerService",
+    "method": "getAll",
+    "title": "Từ khóa=không có, Trang=1",
+    "inputs": {
+      "Từ khóa": "không có",
+      "Trang": "1"
+    },
+    "expectedOutput": "Hiển thị Chưa có khách hàng",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "CustomerSvc_getById",
+    "caseId": "UTCID01",
+    "module": "CustomerService",
+    "method": "getById",
+    "title": "Mã khách hàng=1",
+    "inputs": {
+      "Mã khách hàng": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin khách hàng và danh sách xe",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "CustomerSvc_getById",
+    "caseId": "UTCID02",
+    "module": "CustomerService",
+    "method": "getById",
+    "title": "Mã khách hàng=99999",
+    "inputs": {
+      "Mã khách hàng": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy khách hàng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "CustomerSvc_update",
+    "caseId": "UTCID01",
+    "module": "CustomerService",
+    "method": "update",
+    "title": "Mã khách hàng=1, Họ và tên=Nguyễn Văn B, Số điện thoại=0987654321, Email=b@example.com, Địa chỉ=Hà Nội",
+    "inputs": {
+      "Mã khách hàng": "1",
+      "Họ và tên": "Nguyễn Văn B",
+      "Số điện thoại": "0987654321",
+      "Email": "b@example.com",
+      "Địa chỉ": "Hà Nội"
+    },
+    "expectedOutput": "Hiển thị thông tin khách hàng đã cập nhật",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "CustomerSvc_update",
+    "caseId": "UTCID02",
+    "module": "CustomerService",
+    "method": "update",
+    "title": "Mã khách hàng=1, Họ và tên=null, Số điện thoại=0987654321, Email=b@example.com, Địa chỉ=Hà Nội",
+    "inputs": {
+      "Mã khách hàng": "1",
+      "Họ và tên": "null",
+      "Số điện thoại": "0987654321",
+      "Email": "b@example.com",
+      "Địa chỉ": "Hà Nội"
+    },
+    "expectedOutput": null,
+    "expectedError": "Họ và tên không được để trống",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "CustomerSvc_update",
+    "caseId": "UTCID03",
+    "module": "CustomerService",
+    "method": "update",
+    "title": "Mã khách hàng=1, Họ và tên=Nguyễn Văn B, Số điện thoại=null, Email=b@example.com, Địa chỉ=Hà Nội",
+    "inputs": {
+      "Mã khách hàng": "1",
+      "Họ và tên": "Nguyễn Văn B",
+      "Số điện thoại": "null",
+      "Email": "b@example.com",
+      "Địa chỉ": "Hà Nội"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không được để trống",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "CustomerSvc_update",
+    "caseId": "UTCID04",
+    "module": "CustomerService",
+    "method": "update",
+    "title": "Mã khách hàng=99999, Họ và tên=Nguyễn Văn B, Số điện thoại=0987654321, Email=b@example.com, Địa chỉ=Hà Nội",
+    "inputs": {
+      "Mã khách hàng": "99999",
+      "Họ và tên": "Nguyễn Văn B",
+      "Số điện thoại": "0987654321",
+      "Email": "b@example.com",
+      "Địa chỉ": "Hà Nội"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy khách hàng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "RepairSettlementSvc_getAll",
+    "caseId": "UTCID01",
+    "module": "RepairSettlementService",
+    "method": "getAll",
+    "title": "Mã khách hàng=1, Xe=30A-123.45, Trạng thái=Tất cả, Từ ngày=null, Đến ngày=null",
+    "inputs": {
+      "Mã khách hàng": "1",
+      "Xe": "30A-123.45",
+      "Trạng thái": "Tất cả",
+      "Từ ngày": "null",
+      "Đến ngày": "null"
+    },
+    "expectedOutput": "Hiển thị lịch sử dịch vụ của xe",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "RepairSettlementSvc_getAll",
+    "caseId": "UTCID02",
+    "module": "RepairSettlementService",
+    "method": "getAll",
+    "title": "Mã khách hàng=1, Xe=Tất cả xe, Trạng thái=Đã xuất hóa đơn, Từ ngày=2026-01-01, Đến ngày=2026-09-10",
+    "inputs": {
+      "Mã khách hàng": "1",
+      "Xe": "Tất cả xe",
+      "Trạng thái": "Đã xuất hóa đơn",
+      "Từ ngày": "2026-01-01",
+      "Đến ngày": "2026-09-10"
+    },
+    "expectedOutput": "Hiển thị lịch sử dịch vụ phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "RepairSettlementSvc_getAll",
+    "caseId": "UTCID03",
+    "module": "RepairSettlementService",
+    "method": "getAll",
+    "title": "Mã khách hàng=1, Xe=Tất cả xe, Trạng thái=Tất cả, Từ ngày=null, Đến ngày=null",
+    "inputs": {
+      "Mã khách hàng": "1",
+      "Xe": "Tất cả xe",
+      "Trạng thái": "Tất cả",
+      "Từ ngày": "null",
+      "Đến ngày": "null"
+    },
+    "expectedOutput": "Hiển thị Chưa có lịch sử dịch vụ",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getSettlementReportB",
+    "caseId": "UTCID01",
+    "module": "ManagerService",
+    "method": "getSettlementReportById",
+    "title": "Mã quyết toán=1",
+    "inputs": {
+      "Mã quyết toán": "1"
+    },
+    "expectedOutput": "Hiển thị chi tiết quyết toán",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ManagerSvc_getSettlementReportB",
+    "caseId": "UTCID02",
+    "module": "ManagerService",
+    "method": "getSettlementReportById",
+    "title": "Mã quyết toán=99999",
+    "inputs": {
+      "Mã quyết toán": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy quyết toán",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "ExportRequestSvc_getById",
+    "caseId": "UTCID01",
+    "module": "ExportRequestService",
+    "method": "getById",
+    "title": "Mã phiếu xuất=7",
+    "inputs": {
+      "Mã phiếu xuất": "7"
+    },
+    "expectedOutput": "Hiển thị chi tiết phiếu xuất",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "ExportRequestSvc_getById",
+    "caseId": "UTCID02",
+    "module": "ExportRequestService",
+    "method": "getById",
+    "title": "Mã phiếu xuất=99999",
+    "inputs": {
+      "Mã phiếu xuất": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy phiếu xuất",
+    "logMessage": "N/A",
+    "type": "A"
+  }
+]

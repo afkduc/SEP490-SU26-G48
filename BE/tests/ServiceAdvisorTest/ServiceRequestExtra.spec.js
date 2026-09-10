@@ -1,7 +1,6 @@
-const test = require('node:test');
+const { test } = require('@jest/globals');
 const assert = require('node:assert/strict');
 
-const sqlPath = require.resolve('../../src/infrastructure/database/sqlServer');
 // Stable query() so ServiceRequestService's destructured `query` can be redirected.
 const mockSql = {
   queryImpl: async () => ({ recordset: [] }),
@@ -12,15 +11,7 @@ const mockSql = {
   executeTransaction: async (cb) => cb(async () => ({ recordset: [] })),
   sql: {},
 };
-require.cache[sqlPath] = {
-  id: sqlPath,
-  filename: sqlPath,
-  loaded: true,
-  exports: mockSql,
-};
-
-const servicePath = require.resolve('../../src/application/services/ServiceRequestService');
-delete require.cache[servicePath];
+jest.mock('../../src/infrastructure/database/sqlServer', () => mockSql);
 const ServiceRequestService = require('../../src/application/services/ServiceRequestService');
 
 function mockRepo(overrides = {}) {

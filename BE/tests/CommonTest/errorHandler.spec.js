@@ -1,4 +1,4 @@
-const test = require('node:test');
+const { test } = require('@jest/globals');
 const assert = require('node:assert/strict');
 const errorHandler = require('../../src/middlewares/errorHandler');
 const ApiError = require('../../src/utils/ApiError');

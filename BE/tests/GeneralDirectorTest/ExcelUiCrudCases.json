@@ -1,0 +1,584 @@
+[
+  {
+    "sheet": "Director_listSettlementReports",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "listSettlementReports",
+    "title": "Chi nhánh=Hà Nội, Trạng thái=Đã xuất hóa đơn, Từ ngày=2026-01-01, Đến ngày=2026-09-10, Từ khóa=N/A",
+    "inputs": {
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "Đã xuất hóa đơn",
+      "Từ ngày": "2026-01-01",
+      "Đến ngày": "2026-09-10",
+      "Từ khóa": "N/A"
+    },
+    "expectedOutput": "Hiển thị báo cáo phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_listSettlementReports",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "listSettlementReports",
+    "title": "Chi nhánh=Tất cả, Trạng thái=Tất cả, Từ ngày=N/A, Đến ngày=N/A, Từ khóa=không tồn tại",
+    "inputs": {
+      "Chi nhánh": "Tất cả",
+      "Trạng thái": "Tất cả",
+      "Từ ngày": "N/A",
+      "Đến ngày": "N/A",
+      "Từ khóa": "không tồn tại"
+    },
+    "expectedOutput": "Hiển thị Không có báo cáo",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_getSettlementReportByI",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "getSettlementReportById",
+    "title": "Mã quyết toán=1",
+    "inputs": {
+      "Mã quyết toán": "1"
+    },
+    "expectedOutput": "Hiển thị chi tiết quyết toán",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_getSettlementReportByI",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "getSettlementReportById",
+    "title": "Mã quyết toán=99999",
+    "inputs": {
+      "Mã quyết toán": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy phiếu quyết toán",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_listEmployees",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "listEmployees",
+    "title": "Từ khóa=Nguyễn, Chi nhánh=Hà Nội, Trạng thái=Đang hoạt động",
+    "inputs": {
+      "Từ khóa": "Nguyễn",
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "Đang hoạt động"
+    },
+    "expectedOutput": "Hiển thị danh sách nhân viên phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_listEmployees",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "listEmployees",
+    "title": "Từ khóa=không tồn tại, Chi nhánh=Tất cả, Trạng thái=Tất cả",
+    "inputs": {
+      "Từ khóa": "không tồn tại",
+      "Chi nhánh": "Tất cả",
+      "Trạng thái": "Tất cả"
+    },
+    "expectedOutput": "Hiển thị Không có nhân viên",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_getEmployeeById",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "getEmployeeById",
+    "title": "Mã nhân viên=1",
+    "inputs": {
+      "Mã nhân viên": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin nhân viên",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_getEmployeeById",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "getEmployeeById",
+    "title": "Mã nhân viên=99999",
+    "inputs": {
+      "Mã nhân viên": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy nhân viên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_listTechnicians",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "listTechnicians",
+    "title": "Từ khóa=Nguyễn, Chi nhánh=Hà Nội, Trạng thái=Đang hoạt động",
+    "inputs": {
+      "Từ khóa": "Nguyễn",
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "Đang hoạt động"
+    },
+    "expectedOutput": "Hiển thị danh sách thợ máy phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_listTechnicians",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "listTechnicians",
+    "title": "Từ khóa=không tồn tại, Chi nhánh=Tất cả, Trạng thái=Tất cả",
+    "inputs": {
+      "Từ khóa": "không tồn tại",
+      "Chi nhánh": "Tất cả",
+      "Trạng thái": "Tất cả"
+    },
+    "expectedOutput": "Hiển thị Không có thợ máy",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_getTechnicianById",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "getTechnicianById",
+    "title": "Mã thợ máy=1",
+    "inputs": {
+      "Mã thợ máy": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin thợ máy",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_getTechnicianById",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "getTechnicianById",
+    "title": "Mã thợ máy=99999",
+    "inputs": {
+      "Mã thợ máy": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy thợ máy",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_listBranchManagers",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "listBranchManagers",
+    "title": "Từ khóa=Nguyễn, Chi nhánh=Hà Nội, Trạng thái=Đang hoạt động",
+    "inputs": {
+      "Từ khóa": "Nguyễn",
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "Đang hoạt động"
+    },
+    "expectedOutput": "Hiển thị danh sách quản lý chi nhánh phù hợp",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_listBranchManagers",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "listBranchManagers",
+    "title": "Từ khóa=không tồn tại, Chi nhánh=Tất cả, Trạng thái=Tất cả",
+    "inputs": {
+      "Từ khóa": "không tồn tại",
+      "Chi nhánh": "Tất cả",
+      "Trạng thái": "Tất cả"
+    },
+    "expectedOutput": "Hiển thị Không có quản lý chi nhánh",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_getBranchManagerById",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "getBranchManagerById",
+    "title": "Mã quản lý chi nhánh=1",
+    "inputs": {
+      "Mã quản lý chi nhánh": "1"
+    },
+    "expectedOutput": "Hiển thị thông tin quản lý chi nhánh",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_getBranchManagerById",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "getBranchManagerById",
+    "title": "Mã quản lý chi nhánh=99999",
+    "inputs": {
+      "Mã quản lý chi nhánh": "99999"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy quản lý chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_createBranchManager",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "createBranchManager",
+    "title": "Họ và tên=Nguyễn Văn A, Email=manager@autogara.com, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội"
+    },
+    "expectedOutput": "Hiển thị quản lý vừa tạo",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_createBranchManager",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "createBranchManager",
+    "title": "Họ và tên=null, Email=manager@autogara.com, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội",
+    "inputs": {
+      "Họ và tên": "null",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập họ và tên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_createBranchManager",
+    "caseId": "UTCID03",
+    "module": "GeneralDirectorService",
+    "method": "createBranchManager",
+    "title": "Họ và tên=Nguyễn Văn A, Email=null, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "null",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập email",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_createBranchManager",
+    "caseId": "UTCID04",
+    "module": "GeneralDirectorService",
+    "method": "createBranchManager",
+    "title": "Họ và tên=Nguyễn Văn A, Email=abc, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "abc",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_createBranchManager",
+    "caseId": "UTCID05",
+    "module": "GeneralDirectorService",
+    "method": "createBranchManager",
+    "title": "Họ và tên=Nguyễn Văn A, Email=manager@autogara.com, Số điện thoại=123, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "123",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_createBranchManager",
+    "caseId": "UTCID06",
+    "module": "GeneralDirectorService",
+    "method": "createBranchManager",
+    "title": "Họ và tên=Nguyễn Văn A, Email=manager@autogara.com, Số điện thoại=0912345678, Mật khẩu=123, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "123",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội"
+    },
+    "expectedOutput": null,
+    "expectedError": "Mật khẩu không hợp lệ",
+    "logMessage": "N/A",
+    "type": "B"
+  },
+  {
+    "sheet": "Director_createBranchManager",
+    "caseId": "UTCID07",
+    "module": "GeneralDirectorService",
+    "method": "createBranchManager",
+    "title": "Họ và tên=Nguyễn Văn A, Email=manager@autogara.com, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Different, Chi nhánh=Hà Nội",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Different",
+      "Chi nhánh": "Hà Nội"
+    },
+    "expectedOutput": null,
+    "expectedError": "Xác nhận mật khẩu không khớp",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_createBranchManager",
+    "caseId": "UTCID08",
+    "module": "GeneralDirectorService",
+    "method": "createBranchManager",
+    "title": "Họ và tên=Nguyễn Văn A, Email=manager@autogara.com, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=null",
+    "inputs": {
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "null"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng chọn chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_updateBranchManager",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "updateBranchManager",
+    "title": "Mã quản lý chi nhánh=1, Họ và tên=Nguyễn Văn A, Email=manager@autogara.com, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội, Trạng thái=Đang hoạt động",
+    "inputs": {
+      "Mã quản lý chi nhánh": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "Đang hoạt động"
+    },
+    "expectedOutput": "Hiển thị thông tin đã cập nhật",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_updateBranchManager",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "updateBranchManager",
+    "title": "Mã quản lý chi nhánh=99999, Họ và tên=Nguyễn Văn A, Email=manager@autogara.com, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội, Trạng thái=N/A",
+    "inputs": {
+      "Mã quản lý chi nhánh": "99999",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "N/A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Không tìm thấy quản lý chi nhánh",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_updateBranchManager",
+    "caseId": "UTCID03",
+    "module": "GeneralDirectorService",
+    "method": "updateBranchManager",
+    "title": "Mã quản lý chi nhánh=1, Họ và tên=null, Email=manager@autogara.com, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội, Trạng thái=N/A",
+    "inputs": {
+      "Mã quản lý chi nhánh": "1",
+      "Họ và tên": "null",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "N/A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Vui lòng nhập họ và tên",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_updateBranchManager",
+    "caseId": "UTCID04",
+    "module": "GeneralDirectorService",
+    "method": "updateBranchManager",
+    "title": "Mã quản lý chi nhánh=1, Họ và tên=Nguyễn Văn A, Email=abc, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội, Trạng thái=N/A",
+    "inputs": {
+      "Mã quản lý chi nhánh": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "abc",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "N/A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Email không đúng định dạng",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_updateBranchManager",
+    "caseId": "UTCID05",
+    "module": "GeneralDirectorService",
+    "method": "updateBranchManager",
+    "title": "Mã quản lý chi nhánh=1, Họ và tên=Nguyễn Văn A, Email=manager@autogara.com, Số điện thoại=123, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội, Trạng thái=N/A",
+    "inputs": {
+      "Mã quản lý chi nhánh": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "123",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "N/A"
+    },
+    "expectedOutput": null,
+    "expectedError": "Số điện thoại không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_updateBranchManager",
+    "caseId": "UTCID06",
+    "module": "GeneralDirectorService",
+    "method": "updateBranchManager",
+    "title": "Mã quản lý chi nhánh=1, Họ và tên=Nguyễn Văn A, Email=manager@autogara.com, Số điện thoại=0912345678, Mật khẩu=Password1, Xác nhận mật khẩu=Password1, Chi nhánh=Hà Nội, Trạng thái=invalid",
+    "inputs": {
+      "Mã quản lý chi nhánh": "1",
+      "Họ và tên": "Nguyễn Văn A",
+      "Email": "manager@autogara.com",
+      "Số điện thoại": "0912345678",
+      "Mật khẩu": "Password1",
+      "Xác nhận mật khẩu": "Password1",
+      "Chi nhánh": "Hà Nội",
+      "Trạng thái": "invalid"
+    },
+    "expectedOutput": null,
+    "expectedError": "Trạng thái không hợp lệ",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_deactivateBranch",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "deactivateBranch",
+    "title": "Mã chi nhánh=1, Nút=Ngừng hoạt động",
+    "inputs": {
+      "Mã chi nhánh": "1",
+      "Nút": "Ngừng hoạt động"
+    },
+    "expectedOutput": "Trạng thái ngừng hoạt động",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_deactivateBranch",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "deactivateBranch",
+    "title": "Mã chi nhánh=99999, Nút=Ngừng hoạt động",
+    "inputs": {
+      "Mã chi nhánh": "99999",
+      "Nút": "Ngừng hoạt động"
+    },
+    "expectedOutput": null,
+    "expectedError": "Chi nhánh không tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  },
+  {
+    "sheet": "Director_reactivateBranch",
+    "caseId": "UTCID01",
+    "module": "GeneralDirectorService",
+    "method": "reactivateBranch",
+    "title": "Mã chi nhánh=1, Nút=Kích hoạt lại",
+    "inputs": {
+      "Mã chi nhánh": "1",
+      "Nút": "Kích hoạt lại"
+    },
+    "expectedOutput": "Trạng thái hoạt động",
+    "expectedError": null,
+    "logMessage": "N/A",
+    "type": "N"
+  },
+  {
+    "sheet": "Director_reactivateBranch",
+    "caseId": "UTCID02",
+    "module": "GeneralDirectorService",
+    "method": "reactivateBranch",
+    "title": "Mã chi nhánh=99999, Nút=Kích hoạt lại",
+    "inputs": {
+      "Mã chi nhánh": "99999",
+      "Nút": "Kích hoạt lại"
+    },
+    "expectedOutput": null,
+    "expectedError": "Chi nhánh không tồn tại",
+    "logMessage": "N/A",
+    "type": "A"
+  }
+]

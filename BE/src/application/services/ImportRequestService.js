@@ -169,12 +169,13 @@ class ImportRequestService {
   /**
    * Danh dau phieu la "da xem" boi Manager (dung cho thong bao dom).
    */
-  async markSeenByManager(id) {
+  async markSeenByManager(id, { branchId } = {}) {
     const numId = Number(id);
     if (!Number.isFinite(numId) || numId <= 0) {
       throw new ApiError(400, 'id khong hop le');
     }
-    await this.importRequestRepository.markSeenByManager(numId);
+    const scope = branchId == null ? {} : { branchId: Number(branchId) };
+    await this.importRequestRepository.markSeenByManager(numId, scope);
   }
 
   /**

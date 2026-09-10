@@ -1,32 +1,24 @@
-const test = require('node:test');
+const { test } = require('@jest/globals');
 const assert = require('node:assert/strict');
 
-// Mock PayOS + audit BEFORE loading service (module cache)
-const Module = require('module');
-const originalRequire = Module.prototype.require;
-Module.prototype.require = function mockRequire(id) {
-  if (id === '@payos/node') {
-    return {
-      PayOS: class PayOS {
-        constructor() {}
-        paymentRequests = {
-          create: async () => ({
-            paymentLinkId: 'plink_1',
-            qrCode: 'qr-data',
-            checkoutUrl: 'https://pay.example/checkout',
-          }),
-        };
-        webhooks = {
-          verify: async (raw) => ({
-            orderCode: (raw && raw.orderCode) || 123456,
-            reference: 'REF-1',
-          }),
-        };
-      },
+jest.mock('@payos/node', () => ({
+  PayOS: class PayOS {
+    paymentRequests = {
+      create: async () => ({
+        paymentLinkId: 'plink_1',
+        qrCode: 'qr-data',
+        checkoutUrl: 'https://pay.example/checkout',
+      }),
+      cancel: async () => ({}),
     };
-  }
-  return originalRequire.apply(this, arguments);
-};
+    webhooks = {
+      verify: async (raw) => ({
+        orderCode: (raw && raw.orderCode) || 123456,
+        reference: 'REF-1',
+      }),
+    };
+  },
+}));
 
 const auditHelper = require('../../src/utils/auditHelper');
 auditHelper.auditCrud.lifecycle = async () => ({});

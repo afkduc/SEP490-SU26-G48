@@ -115,7 +115,9 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     return result.recordset[0].total;
   }
 
-  async findById(id) {
+  async findById(id, { branchId } = {}) {
+    const scopedBranchId = branchId == null ? null : Number(branchId);
+    const branchFilter = scopedBranchId ? ' AND er.branch_id = @branchId' : '';
     const headerResult = await query(
       `SELECT
          er.*,
@@ -128,8 +130,8 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
        LEFT JOIN customers c ON c.id = ro.customer_id
        LEFT JOIN vehicles v ON v.id = ro.vehicle_id
        LEFT JOIN users u_perf ON u_perf.id = er.performed_by
-       WHERE er.id = @id`,
-      { id }
+       WHERE er.id = @id${branchFilter}`,
+      scopedBranchId ? { id, branchId: scopedBranchId } : { id }
     );
     const headerRow = headerResult.recordset[0];
     if (!headerRow) return null;
@@ -528,10 +530,12 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   /**
    * Danh dau 1 phieu xuat la "da xem" boi Manager (dung cho thong bao dom).
    */
-  async markSeenByManager(id) {
+  async markSeenByManager(id, { branchId } = {}) {
+    const scopedBranchId = branchId == null ? null : Number(branchId);
+    const branchFilter = scopedBranchId ? ' AND branch_id = @branchId' : '';
     await query(
-      `UPDATE export_requests SET seen_by_manager_at = GETDATE() WHERE id = @id AND seen_by_manager_at IS NULL`,
-      { id }
+      `UPDATE export_requests SET seen_by_manager_at = GETDATE() WHERE id = @id${branchFilter} AND seen_by_manager_at IS NULL`,
+      scopedBranchId ? { id, branchId: scopedBranchId } : { id }
     );
   }
 

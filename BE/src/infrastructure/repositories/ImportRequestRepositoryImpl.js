@@ -365,10 +365,12 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
   /**
    * Danh dau 1 phieu nhap la "da xem" boi Manager (dung cho thong bao dom).
    */
-  async markSeenByManager(id) {
+  async markSeenByManager(id, { branchId } = {}) {
+    const scopedBranchId = branchId == null ? null : Number(branchId);
+    const branchFilter = scopedBranchId ? ' AND branch_id = @branchId' : '';
     await query(
-      `UPDATE import_requests SET seen_by_manager_at = GETDATE() WHERE id = @id AND seen_by_manager_at IS NULL`,
-      { id }
+      `UPDATE import_requests SET seen_by_manager_at = GETDATE() WHERE id = @id${branchFilter} AND seen_by_manager_at IS NULL`,
+      scopedBranchId ? { id, branchId: scopedBranchId } : { id }
     );
   }
 
