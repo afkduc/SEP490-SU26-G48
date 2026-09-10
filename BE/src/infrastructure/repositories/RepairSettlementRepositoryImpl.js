@@ -36,6 +36,11 @@ const HEADER_SELECT = `
          adv.user_name AS advisor_name,
          adv.phone     AS advisor_phone,
          tl.user_name  AS team_leader_name,
+         -- To truong duoc co van CHI DINH san (khac team_leader_name o tren -
+         -- do la nguoi DA NHAN viec). NULL = khong chi dinh, moi to truong deu
+         -- thay phieu trong bang "Việc chờ nhận".
+         so.assigned_team_leader_id,
+         atl.user_name AS assigned_team_leader_name,
          inv.issued_at AS invoice_issued_at,
          inv.payment_method,
          vb.bay_number AS bay_number,
@@ -59,6 +64,15 @@ const HEADER_SELECT = `
            SELECT 1 FROM repair_order_technicians rot2
            WHERE rot2.repair_order_id = so.id
          ) THEN 1 ELSE 0 END AS has_technicians,
+         -- Ten tho ghep san thanh 1 chuoi ngay o cau danh sach. findAll khong
+         -- nap bang tho rieng cho tung dong (se thanh N+1 truy van), nen neu
+         -- khong ghep o day thi man danh sach/lich su phieu khong biet ai da
+         -- sua chiec xe do - trong khi do la thu khach hoi dau tien khi quay
+         -- lai khieu nai.
+         (SELECT STRING_AGG(u2.user_name, ', ') WITHIN GROUP (ORDER BY u2.user_name)
+          FROM   repair_order_technicians rot3
+          JOIN   users u2 ON u2.id = rot3.technician_id
+          WHERE  rot3.repair_order_id = so.id) AS technician_names,
          -- Khoa "dang mo phieu" - chi tra ve neu con hieu luc (chua qua
          -- LOCK_TTL_SECONDS ke tu nhip gia han gan nhat), qua han thi coi nhu
          -- khong ai mo (NULL) du cot goc trong DB co the van con gia tri cu -
@@ -78,6 +92,7 @@ const HEADER_SELECT = `
   JOIN   vehicles  v   ON v.id = so.vehicle_id
   JOIN   users     adv ON adv.id = so.advisor_id
   LEFT JOIN users  tl  ON tl.id = so.team_leader_id
+  LEFT JOIN users  atl ON atl.id = so.assigned_team_leader_id
   LEFT JOIN users  lockUser ON lockUser.id = so.locked_by_user_id
   OUTER APPLY (
       SELECT TOP 1 w.purchase_date
@@ -114,7 +129,7 @@ function itemTypeFor(lhsc) {
 // service_advisor (chi xem phieu cua chinh minh) - KHONG ap dung cho man lich
 // su khach hang/xe (customerId/vehicleId) vi do la du lieu dung chung, 1 xe co
 // the da qua tay nhieu co van khac nhau.
-function buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId }) {
+function buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, forTeamLeaderId }) {
   const params = {};
   const conditions = [];
 
@@ -133,6 +148,14 @@ function buildConditions({ branchId, status, search, customerId, vehicleId, from
       params.advisorId = advisorId;
       conditions.push('so.advisor_id = @advisorId');
     }
+  }
+
+  // To truong chi thay phieu KHONG chi dinh ai, hoac chi dinh dung minh.
+  // Chi ap cho vai tro to truong (xem controller) - co van van phai thay het
+  // de biet phieu minh lap dang nam o dau.
+  if (forTeamLeaderId) {
+    params.forTeamLeaderId = forTeamLeaderId;
+    conditions.push('(so.assigned_team_leader_id IS NULL OR so.assigned_team_leader_id = @forTeamLeaderId)');
   }
 
   if (status) {
@@ -176,9 +199,26 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.recordset.map((r) => ({ id: r.id, name: r.user_name, phone: r.phone || null }));
   }
 
-  async findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page = 1, limit = 20 } = {}) {
+  // To truong dang hoat dong cua 1 chi nhanh - cho o "Chỉ định tổ trưởng".
+  // Lay theo VAI TRO (giong findBranchAdvisors) chu khong suy tu cac phieu da
+  // co, de to truong moi chua nhan viec nao van chi dinh duoc.
+  async findBranchTeamLeaders(branchId) {
+    const result = await query(
+      `SELECT u.id, u.user_name, u.phone
+       FROM   users u
+       JOIN   user_role ur ON ur.user_id = u.id
+       JOIN   roles r      ON r.id = ur.role_id
+       WHERE  r.role_name = 'team_leader'
+         AND  u.branch_id = @branchId AND u.status = 'active'
+       ORDER  BY u.user_name`,
+      { branchId: Number(branchId) }
+    );
+    return result.recordset.map((r) => ({ id: r.id, name: r.user_name, phone: r.phone || null }));
+  }
+
+  async findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, forTeamLeaderId, page = 1, limit = 20 } = {}) {
     const offset = (page - 1) * limit;
-    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId });
+    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, forTeamLeaderId });
 
     const sqlText = `${HEADER_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY so.id DESC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
     params.offset = offset;
@@ -188,8 +228,8 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.recordset.map((row) => RepairSettlement.fromPersistence(row, []));
   }
 
-  async count({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId } = {}) {
-    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId });
+  async count({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, forTeamLeaderId } = {}) {
+    const { params, conditions } = buildConditions({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, forTeamLeaderId });
 
     const sqlText = `
       SELECT COUNT(*) AS total
@@ -327,20 +367,23 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('signatureData', sql.NVarChar(sql.MAX), data.signatureData)
         .input('signerName', sql.NVarChar(255), data.signerName || null)
         .input('signedAt', sql.DateTime, nowVN())
+        .input('assignedTeamLeaderId', sql.BigInt, data.assignedTeamLeaderId || null)
         .query(`
           INSERT INTO repair_orders (
             repair_code, branch_id, vehicle_id, customer_id, advisor_id,
             customer_request, note, current_km, status,
             subtotal, discount_amount, after_discount, vat, free_amount, total,
             is_warranty, intake_date, intake_checklist,
-            signature_data, signature_signer_name, signature_signed_at
+            signature_data, signature_signer_name, signature_signed_at,
+            assigned_team_leader_id
           )
           VALUES (
             '', @branchId, @vehicleId, @customerId, @advisorId,
             @customerRequest, @note, @currentKm, @status,
             @subtotal, @discountAmount, @afterDiscount, @vat, @freeAmount, @total,
             @isWarranty, @intakeDate, @intakeChecklist,
-            @signatureData, @signerName, @signedAt
+            @signatureData, @signerName, @signedAt,
+            @assignedTeamLeaderId
           );
           SELECT SCOPE_IDENTITY() AS id;
         `);

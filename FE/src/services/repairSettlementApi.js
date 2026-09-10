@@ -61,6 +61,12 @@ export async function listBranchAdvisorsApi() {
   return httpClient.get('/repair-settlements/advisors'); // [{ id, name, phone }]
 }
 
+// Tổ trưởng của chính chi nhánh người đang đăng nhập - dùng cho ô "Chỉ định
+// tổ trưởng" khi tạo phiếu.
+export async function listBranchTeamLeadersApi() {
+  return httpClient.get('/repair-settlements/team-leaders'); // [{ id, name, phone }]
+}
+
 // { lockedByUserId, lockedByName, lockedAt } khi dang bi nguoi khac giu.
 export async function lockSettlementApi(id) {
   return httpClient.post(`/repair-settlements/${id}/lock`);

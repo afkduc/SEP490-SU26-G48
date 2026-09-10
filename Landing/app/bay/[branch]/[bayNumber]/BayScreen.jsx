@@ -241,6 +241,9 @@ function ActiveJobPanel({ order, onTaskDone, busyTaskId }) {
     <div className={styles.job}>
       <div className={styles.jobHeader}>
         <div>
+          {/* Ma phieu de o tren cung: tho bao viec gi len to truong/cố vấn
+              cung noi theo ma nay, khong the ta "cai xe mau trang o khoang 2". */}
+          {order.code && <div className={styles.jobCode}>{order.code}</div>}
           <div className={styles.jobCustomer}>Khách hàng: <b>{order.customer?.fullName}</b></div>
           <div className={styles.jobVehicle}>{order.vehicle?.licensePlate} · {order.vehicle?.vehicleModel}</div>
           {order.advisorName && (

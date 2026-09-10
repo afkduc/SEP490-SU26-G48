@@ -212,6 +212,15 @@
   max-width: 640px;
 }
 .jobHeader { margin-bottom: 12px; }
+/* Ma phieu (RO-...) - tho doc ma nay khi bao viec, nen de noi bat va dung
+   font monospace cho de doc tung ky tu. */
+.jobCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--accent);
+}
 .jobCustomer { font-weight: 700; font-size: 17px; margin-top: 2px; }
 .jobVehicle { font-size: 13px; color: var(--text-muted); }
 .jobTechnician { font-size: 13px; color: var(--text-muted); margin-top: 2px; }

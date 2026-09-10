@@ -222,7 +222,9 @@ class RepairOrderRepositoryImpl extends RepairOrderRepository {
 
   async findEligibleRepairOrder(repairOrderId, branchId) {
     const result = await query(
-      `SELECT ro.id, ro.branch_id, ro.status, ro.vehicle_id
+      // assigned_team_leader_id: phieu duoc co van chi dinh cho 1 to truong cu
+      // the thi nguoi khac khong nhan duoc (xem RepairOrderService.claim).
+      `SELECT ro.id, ro.branch_id, ro.status, ro.vehicle_id, ro.assigned_team_leader_id
        FROM   repair_orders ro
        WHERE  ro.id = @repairOrderId AND ro.branch_id = @branchId`,
       { repairOrderId, branchId }
