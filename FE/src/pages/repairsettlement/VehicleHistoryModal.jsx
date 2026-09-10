@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
 import { formatCurrency } from '../../utils';
 import { actionLabel } from '../../constants/maintenanceChecklist';
+import { tachCongViecVaPhuTung } from './settlementItems';
 
 // Tra cuu nhanh lich su vao xuong cua 1 chiec xe, mo ngay tren form tao phieu
 // quyet toan.
@@ -19,7 +20,19 @@ import { actionLabel } from '../../constants/maintenanceChecklist';
 // Bung chi tiet NGAY TRONG bang thay vi mo them 1 modal chong len modal - o
 // day dang la modal roi, chong them 1 lop nua thi bam Esc/bam ra ngoai khong
 // biet dong cai nao.
+function DongHangMuc({ item }) {
+  return (
+    <tr>
+      <td>{item.description}</td>
+      <td style={{ color: 'var(--gray-600)' }}>{actionLabel(item.actionCode) || '—'}</td>
+      <td style={{ textAlign: 'center' }}>{item.qty}</td>
+      <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.total)}</td>
+    </tr>
+  );
+}
+
 function ChiTietPhieu({ detail }) {
+  const { congViec, phuTung } = tachCongViecVaPhuTung(detail.items);
   const dauMucDichVu = (detail.tasks || []).filter((t) => t.taskType === 'service');
   const soXong = dauMucDichVu.filter((t) => t.isDone).length;
   const khongDat = dauMucDichVu.filter((t) => t.checkResult === 'NG');
@@ -62,20 +75,35 @@ function ChiTietPhieu({ detail }) {
         )}
       </div>
 
-      <div style={{ maxHeight: 240, overflowY: 'auto', background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 6 }}>
+      {/* Gop goi bao duong lai con 1 dong (dung ham chung voi ban in) va tach
+          2 nhom nhu bang o form tao phieu - de lien mot mach thi khong biet
+          dau la cong tho, dau la vat tu. */}
+      <div style={{ maxHeight: 260, overflowY: 'auto', background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 6 }}>
         <table className="data-table" style={{ fontSize: 11.5 }}>
           <thead>
             <tr><th>Nội dung</th><th style={{ width: 130 }}>Yêu cầu</th><th style={{ width: 50 }}>SL</th><th style={{ width: 90 }}>Thành tiền</th></tr>
           </thead>
           <tbody>
-            {(detail.items || []).map((item, i) => (
-              <tr key={i}>
-                <td>{item.description}</td>
-                <td style={{ color: 'var(--gray-600)' }}>{actionLabel(item.actionCode) || '—'}</td>
-                <td style={{ textAlign: 'center' }}>{item.qty}</td>
-                <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.total)}</td>
-              </tr>
-            ))}
+            <tr>
+              <td colSpan={4} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 11, padding: '4px 8px' }}>
+                CÔNG VIỆC CẦN THỰC HIỆN
+              </td>
+            </tr>
+            {congViec.map(({ item, i }) => <DongHangMuc key={`dv-${i}`} item={item} />)}
+            {congViec.length === 0 && (
+              <tr><td colSpan={4} style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Không có</td></tr>
+            )}
+
+            {phuTung.length > 0 && (
+              <>
+                <tr>
+                  <td colSpan={4} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 11, padding: '4px 8px' }}>
+                    PHỤ TÙNG, VẬT TƯ
+                  </td>
+                </tr>
+                {phuTung.map(({ item, i }) => <DongHangMuc key={`pt-${i}`} item={item} />)}
+              </>
+            )}
           </tbody>
         </table>
       </div>
@@ -156,8 +184,8 @@ export default function VehicleHistoryModal({ vehicleId, licensePlate, vehicleMo
                   <thead>
                     <tr>
                       <th style={{ width: 24 }}></th>
-                      <th>Số RO</th><th>Ngày tiếp nhận</th><th>Yêu cầu của khách</th>
-                      <th>Tổ trưởng</th><th>Thợ sửa</th><th>Tổng tiền</th><th>Trạng thái</th>
+                      <th>Số RO</th><th>Ngày tiếp nhận</th><th>Chi nhánh</th>
+                      <th>Tổng tiền</th><th>Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -170,9 +198,7 @@ export default function VehicleHistoryModal({ vehicleId, licensePlate, vehicleMo
                           </td>
                           <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{o.code}</td>
                           <td style={{ fontSize: 12 }}>{o.date}</td>
-                          <td style={{ fontSize: 12, maxWidth: 260 }}>{o.customerRequest || '—'}</td>
-                          <td style={{ fontSize: 12 }}>{o.teamLeader || '—'}</td>
-                          <td style={{ fontSize: 12 }}>{o.technicianNames || '—'}</td>
+                          <td style={{ fontSize: 12 }}>{o.branch || '—'}</td>
                           <td style={{ fontSize: 12, fontWeight: 700, color: '#C62828', whiteSpace: 'nowrap' }}>
                             {formatCurrency(o.total)}
                           </td>
@@ -180,7 +206,7 @@ export default function VehicleHistoryModal({ vehicleId, licensePlate, vehicleMo
                         </tr>
                         {dangMo === o.id && (
                           <tr>
-                            <td colSpan={8} style={{ padding: 0 }}>
+                            <td colSpan={6} style={{ padding: 0 }}>
                               {dangTai === o.id
                                 ? <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--gray-600)' }}>Đang tải chi tiết…</div>
                                 : (chiTiet[o.id] && <ChiTietPhieu detail={chiTiet[o.id]} />)}
