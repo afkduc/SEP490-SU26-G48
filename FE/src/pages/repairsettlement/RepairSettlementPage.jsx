@@ -255,6 +255,26 @@ function laDongDaThayDoi(item) {
   return item.httt === HTTT_CANCELLED_VALUE || isQuantityReturned(item);
 }
 
+// Danh sach hang muc dung cho BAN IN va MODAL XEM TRUOC - phai la MOT ham,
+// khong the moi cho tu dung mot kieu: modal ten la "xem truoc" nen no phai
+// ra dung cai se in ra giay.
+//
+// Goi bao duong bung ra 30+ dau muc con, in het thi phieu dai 3-4 trang trong
+// khi khach chi tra 1 gia goi - chi can dong ten goi. Chi tiet ben trong da
+// nam o "Phieu kiem tra BDDK" rieng.
+//
+// Goi bi TACH (khach huy 1 muc trong goi -> moi dich vu ve gia le cua no, xem
+// handleCancelItem) thi khong con dong dau goi nua, luc do liet ke tung dich
+// vu la dung: khach dang tra tien theo tung cai chu khong theo gia goi.
+//
+// STT danh lai SAU khi bo dong - giu so goc thi phieu nhay coc 1, 2, 3, 38, 39.
+function dongHangMucDeIn(items) {
+  let demNhom = 0;
+  return assignGroupIds(items || [], () => { demNhom += 1; return demNhom; })
+    .filter((it) => !(it.groupId && !it.isGroupParent && it.lhsc === 'DV'))
+    .map((item, i) => ({ item, i }));
+}
+
 // Nhan hien thi 1 tho trong "Thợ thực hiện" - kem "(Điều động)" neu tho nay
 // khong cung to voi to truong dang phu trach lenh sua chua (dieu dong tu to
 // khac sang giup, xem RepairOrder.sameTeam/RepairSettlement.technicians[].sameTeam).
@@ -539,19 +559,7 @@ function printSettlement(order, payosQrCode) {
   // Tach 2 nhom "Cong viec can thuc hien" / "Phu tung, vat tu" khi in - giong
   // cach hien thi ben form tao/sua phieu va modal Xem chi tiet (giu nguyen so
   // thu tu goc trong mang items, khong danh lai tu 1 cho tung nhom).
-  // Goi bao duong bung ra 30+ dau muc con, in het thi phieu dai 4-5 trang
-  // trong khi khach chi tra 1 gia goi - in DUNG dong ten goi la du. Chi tiet
-  // ben trong da nam o "Phieu kiem tra BDDK" rieng.
-  //
-  // assignGroupIds suy lai quan he cha-con tu chinh du lieu (BE khong luu
-  // groupId) - dong con cua goi la dong DV gia 0 nam duoi 1 dau goi.
-  let demNhom = 0;
-  const dsCoNhom = assignGroupIds(order.items || [], () => { demNhom += 1; return demNhom; });
-  // Danh lai STT SAU khi bo dong - giu so goc thi phieu in ra nhay coc
-  // 1, 2, 3, 38, 39 vi 30+ dau muc con da bi an di.
-  const indexedItems = dsCoNhom
-    .filter((item) => !(item.groupId && !item.isGroupParent && item.lhsc === 'DV'))
-    .map((item, i) => ({ item, i }));
+  const indexedItems = dongHangMucDeIn(order.items);
   const laborItems = indexedItems.filter(({ item }) => item.lhsc !== 'PT');
   const partItems = indexedItems.filter(({ item }) => item.lhsc === 'PT');
   const laborSubtotal = laborItems.reduce((s, { item }) => s + (item.total || 0), 0);
@@ -835,7 +843,9 @@ function SettlementPreviewModal({ order, onClose }) {
               </thead>
               <tbody>
                 {(() => {
-                  const indexed = (order.items || []).map((s, i) => ({ s, i }));
+                  // Dung chung ham voi ban in - modal nay la "xem truoc" nen
+                  // phai ra dung cai se in ra giay.
+                  const indexed = dongHangMucDeIn(order.items).map(({ item, i }) => ({ s: item, i }));
                   const laborRows = indexed.filter(({ s }) => s.lhsc !== 'PT');
                   const partRows = indexed.filter(({ s }) => s.lhsc === 'PT');
                   const laborSubtotal = laborRows.reduce((sum, { s }) => sum + (s.total || 0), 0);
