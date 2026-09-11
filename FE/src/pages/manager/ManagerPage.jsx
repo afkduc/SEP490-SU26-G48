@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { usePermission } from '../../contexts/PermissionContext';
 import { formatCurrency, formatDate } from '../../utils';
 import managerApi from '../../services/managerApi';
+import { listVehicleModelsApi } from '../../services/vehicleApi';
 import { PermissionGate } from '../../components/PermissionGate';
 import ManagerImportRequestListPage from './ManagerImportRequestListPage';
 import ManagerImportRequestDetailPage from './ManagerImportRequestDetailPage';
@@ -12,27 +13,6 @@ import ManagerExportRequestDetailPage from './ManagerExportRequestDetailPage';
 import ManagerDashboardPage from './ManagerDashboardPage';
 import ManagerInventoryPage from './ManagerInventoryPage';
 import SettlementDetailModal, { settlementStatusBadge } from './SettlementDetailModal';
-
-const IconSearch = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="11" cy="11" r="7" />
-    <path d="M20 20l-3.5-3.5" />
-  </svg>
-);
-
-const IconView = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-
-const IconEdit = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-  </svg>
-);
 
 const SERVICE_STATUS_OPTIONS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -53,6 +33,7 @@ const SETTLEMENT_STATUS_TABS = [
   { value: 'invoiced', label: 'Đã xuất hóa đơn' },
   { value: 'cancelled', label: 'Đã hủy' },
 ];
+
 
 // Ngoai "Ngay tiep nhan" (luon loc duoc o moi tab tru "Tat ca"), moi tab con
 // co the loc them theo 1 moc thoi gian rieng phan anh dung y nghia cua tab do -
@@ -151,7 +132,7 @@ const STATUS_BADGE = {
   inactive: { label: 'Nghỉ', className: 'badge-inactive' },
 };
 
-const AVATAR_COLORS = ['#3f3f46', '#3f3f46', '#52525b', '#52525b', '#3f3f46', '#3f3f46'];
+const AVATAR_COLORS = ['#2563EB', '#059669', '#D97706', '#DB2777', '#7C3AED', '#0891B2'];
 const PAGE_SIZE = 10;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^0[0-9]{9,10}$/;
@@ -404,7 +385,7 @@ function EmployeeListPage() {
         <div className="page-header-right">
           <PermissionGate permission="screen:manager:employees:view">
             <button type="button" className="btn btn-secondary" onClick={() => exportEmployeesCsv(employees)}>
-              Xuất Excel
+              📊 Xuất Excel
             </button>
           </PermissionGate>
           <PermissionGate permission="screen:manager:employees:create">
@@ -417,7 +398,7 @@ function EmployeeListPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon"><IconSearch /></span>
+          <span className="search-icon">🔍</span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã NV, tên, email..." />
         </div>
 
@@ -440,7 +421,7 @@ function EmployeeListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
@@ -504,10 +485,10 @@ function EmployeeListPage() {
                   <td>
                     <div className="table-actions">
                       <PermissionGate permission="screen:manager:employees:view">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}><IconView /></button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveEmployee(employee)}>👁</button>
                       </PermissionGate>
                       <PermissionGate permission="screen:manager:employees:update">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}><IconEdit /></button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/employees/${employee.id}/edit`)}>✏️</button>
                       </PermissionGate>
                     </div>
                   </td>
@@ -551,9 +532,8 @@ function EmployeeFormPage({ mode }) {
 
   const [branch, setBranch] = useState(null);
   const [roles, setRoles] = useState([]);
-  const [specialtyOptions, setSpecialtyOptions] = useState([]);
   const [form, setForm] = useState({
-    fullName: '', email: '', phone: '', roleId: '', status: 'active', password: '', confirmPassword: '', specialtyIds: [],
+    fullName: '', email: '', phone: '', roleId: '', status: 'active', password: '', confirmPassword: '',
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -577,7 +557,6 @@ function EmployeeFormPage({ mode }) {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
     managerApi.getRoles().then((data) => { if (mounted) setRoles(data || []); }).catch(() => {});
-    managerApi.getSpecialties().then((data) => { if (mounted) setSpecialtyOptions(data || []); }).catch(() => {});
 
     if (isEdit && id) {
       managerApi
@@ -592,7 +571,6 @@ function EmployeeFormPage({ mode }) {
             status: data.status || 'active',
             password: '',
             confirmPassword: '',
-            specialtyIds: (data.specialties || []).map((s) => s.id),
           });
           setMembers(data.members || []);
           setBayNumbers(data.bays || []);
@@ -611,16 +589,6 @@ function EmployeeFormPage({ mode }) {
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
-  };
-
-  const toggleSpecialty = (specialtyId) => {
-    setForm((prev) => {
-      const exists = prev.specialtyIds.includes(specialtyId);
-      return {
-        ...prev,
-        specialtyIds: exists ? prev.specialtyIds.filter((sid) => sid !== specialtyId) : [...prev.specialtyIds, specialtyId],
-      };
-    });
   };
 
   // Go ten tim tho may de them vao doi - loc san nhung nguoi da co trong
@@ -697,7 +665,6 @@ function EmployeeFormPage({ mode }) {
         phone: form.phone.trim(),
         roleId: Number(form.roleId),
         status: form.status,
-        specialtyIds: isTeamLeaderRole ? form.specialtyIds : [],
       };
 
       if (isEdit) {
@@ -745,14 +712,14 @@ function EmployeeFormPage({ mode }) {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">Thông tin nhân viên</div>
+          <div className="form-section-title">👥 Thông tin nhân viên</div>
 
           {branch && (
             <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
@@ -786,8 +753,8 @@ function EmployeeFormPage({ mode }) {
                   />
                   <span
                     style={{
-                      display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 14, color: 'var(--gray-600, #52525b)',
-                      background: 'var(--gray-100, #f4f4f5)', border: '1px solid var(--gray-300, #d4d4d8)', borderLeft: 'none',
+                      display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 14, color: 'var(--gray-600, #4b5563)',
+                      background: 'var(--gray-100, #f3f4f6)', border: '1px solid var(--gray-300, #d1d5db)', borderLeft: 'none',
                       borderTopRightRadius: 'var(--radius-sm, 6px)', borderBottomRightRadius: 'var(--radius-sm, 6px)', whiteSpace: 'nowrap',
                     }}
                   >
@@ -826,26 +793,6 @@ function EmployeeFormPage({ mode }) {
             )}
           </div>
 
-          {isTeamLeaderRole && (
-            <div className="form-group" style={{ marginTop: 14 }}>
-              <label className="form-label">Chuyên môn</label>
-              {specialtyOptions.length === 0 ? (
-                <p className="form-hint">Chưa có danh mục chuyên môn nào trong hệ thống.</p>
-              ) : (
-                <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', maxHeight: 220, overflowY: 'auto' }}>
-                  {specialtyOptions.map((s) => (
-                    <label
-                      key={s.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, cursor: 'pointer' }}
-                    >
-                      <input type="checkbox" checked={form.specialtyIds.includes(s.id)} onChange={() => toggleSpecialty(s.id)} />
-                      <span>{s.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {isTeamLeaderRole && isEdit && (
             <div className="form-group" style={{ marginTop: 14, position: 'relative' }}>
@@ -917,7 +864,7 @@ function EmployeeFormPage({ mode }) {
 
           {!isEdit && (
             <>
-              <div className="form-section-title" style={{ marginTop: 24 }}>Thông tin đăng nhập</div>
+              <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Thông tin đăng nhập</div>
               <div className="form-grid form-grid-2">
                 <div className="form-group">
                   <label className="form-label required">Mật khẩu tạm thời</label>
@@ -936,7 +883,7 @@ function EmployeeFormPage({ mode }) {
 
           {isEdit && (
             <>
-              <div className="form-section-title" style={{ marginTop: 24 }}>Mật khẩu</div>
+              <div className="form-section-title" style={{ marginTop: 24 }}>🔒 Mật khẩu</div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input
                   type="checkbox"
@@ -1016,7 +963,7 @@ function ServiceDetailModal({ service, onClose }) {
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{service.description || '—'}</div></div>
           </div>
 
-          <div className="form-section-title" style={{ marginTop: 16 }}>Phụ tùng cần thiết</div>
+          <div className="form-section-title" style={{ marginTop: 16 }}>🔩 Phụ tùng cần thiết</div>
           {parts === null && <div style={{ fontSize: 13, color: 'var(--gray-500)' }}>Đang tải…</div>}
           {parts && parts.length === 0 && <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Chưa khai báo phụ tùng nào</div>}
           {parts && parts.length > 0 && (
@@ -1115,7 +1062,7 @@ function ServiceListPage() {
                 services.map((s) => [s.code, s.name, repairCategoryLabel(s.repairCategory), s.unitPrice, s.durationMin, activeBadge(s.isActive).label])
               )}
             >
-              Xuất Excel
+              📊 Xuất Excel
             </button>
           </PermissionGate>
           <PermissionGate permission="screen:manager:services:create">
@@ -1128,7 +1075,7 @@ function ServiceListPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon"><IconSearch /></span>
+          <span className="search-icon">🔍</span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã DV, tên dịch vụ..." />
         </div>
 
@@ -1151,7 +1098,7 @@ function ServiceListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
@@ -1207,10 +1154,10 @@ function ServiceListPage() {
                   <td>
                     <div className="table-actions">
                       <PermissionGate permission="screen:manager:services:view">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}><IconView /></button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveService(service)}>👁</button>
                       </PermissionGate>
                       <PermissionGate permission="screen:manager:services:update">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}><IconEdit /></button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/services/${service.id}/edit`)}>✏️</button>
                       </PermissionGate>
                     </div>
                   </td>
@@ -1248,6 +1195,7 @@ const REPAIR_CATEGORY_OPTIONS = [
   { value: 'EE', label: 'Sửa chữa điện - điện tử' },
   { value: 'BP', label: 'Đồng sơn' },
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
+  { value: 'CS', label: 'Chăm sóc xe' },
 ];
 
 function repairCategoryLabel(code) {
@@ -1395,10 +1343,10 @@ function ServiceFormPage({ mode }) {
             <div className="breadcrumb">Dịch vụ lẻ / Chỉnh sửa</div>
           </div>
         </div>
-        <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', color: '#52525b', borderRadius: 12, padding: 18 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Dịch vụ đã được ngừng áp dụng</div>
+        <div style={{ background: '#FFF3E0', border: '1px solid #FFD9A0', color: '#B45309', borderRadius: 12, padding: 18 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>⚠️ Dịch vụ đã được ngừng áp dụng</div>
           <p style={{ marginBottom: 10 }}>
-            Dịch vụ này vẫn đang nằm trong {packageWarning.length} gói dịch vụ đang hoạt động. Các gói đó sẽ
+            Dịch vụ này vẫn đang nằm trong {packageWarning.length} gói bảo dưỡng đang hoạt động. Các gói đó sẽ
             KHÔNG tự động cập nhật — nếu muốn, hãy vào từng gói để bỏ dịch vụ này ra:
           </p>
           <ul style={{ margin: '0 0 14px 20px' }}>
@@ -1433,14 +1381,14 @@ function ServiceFormPage({ mode }) {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">Thông tin dịch vụ</div>
+          <div className="form-section-title">🛠️ Thông tin dịch vụ</div>
 
           {branch && (
             <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
@@ -1496,7 +1444,7 @@ function ServiceFormPage({ mode }) {
         </div>
 
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">Phụ tùng cần thiết</div>
+          <div className="form-section-title">🔩 Phụ tùng cần thiết</div>
           <div style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 12 }}>
             Khai báo phụ tùng và số lượng cần dùng để hoàn thành dịch vụ này (không bắt buộc).
           </div>
@@ -1548,23 +1496,94 @@ function ServiceFormPage({ mode }) {
   );
 }
 
+// Ma xe theo dung thu tu 12 xe trong bang vehicle_models, dung de sap xep nhom.
+const VEHICLE_CODE_ORDER = ['MZ2', 'MZ3', 'MZ6-LX', 'MZ6-PR', 'CX3-LX', 'CX3-PR', 'CX5-LX', 'CX5-PR', 'CX8-LX', 'CX8-PR', 'BT50-LX', 'BT50-PR'];
+// Mazda khong co cot "ma ngan" (MZ2, CX3-LX...) trong vehicle_models that -
+// day la quy uoc rieng dung khi dat ten phu tung/dich vu "hang cung" (vd
+// "Loc dau dong co (Mazda2 1.5 Premium) [MZ2]"). Anh xa theo dung ten hien
+// thi (displayName) de biet 1 model_id that ung voi ma ngan nao khi loc.
+const VEHICLE_DISPLAY_NAME_TO_CODE = {
+  'Mazda2 1.5 Premium': 'MZ2',
+  'Mazda3 1.5 Luxury (Sedan)': 'MZ3',
+  'Mazda6 2.0 Luxury': 'MZ6-LX',
+  'Mazda6 2.0 Premium': 'MZ6-PR',
+  'Mazda CX-3 1.5 Luxury': 'CX3-LX',
+  'Mazda CX-3 1.5 Premium': 'CX3-PR',
+  'Mazda CX-5 2.0 Luxury': 'CX5-LX',
+  'Mazda CX-5 2.0 Premium': 'CX5-PR',
+  'Mazda CX-8 2.5 Luxury (2WD)': 'CX8-LX',
+  'Mazda CX-8 2.5 Premium (2WD)': 'CX8-PR',
+  'Mazda BT-50 1.9 Luxury': 'BT50-LX',
+  'Mazda BT-50 1.9 Premium': 'BT50-PR',
+};
+// cap = 0 dai dien cho moc "1.000km dau" (truoc Cap 1), de sap xep/loc dung chung
+// co che voi Cap 1..5.
+function parsePackageCode(code) {
+  const m = /^PKG-(.+)-CAP(\d)$/.exec(code || '');
+  if (m) return { vehicleCode: m[1], cap: Number(m[2]) };
+  const m2 = /^PKG-(.+)-1000KM$/.exec(code || '');
+  if (m2) return { vehicleCode: m2[1], cap: 0 };
+  return { vehicleCode: null, cap: null };
+}
+function parseVehicleName(name) {
+  const m = /^Gói bảo dưỡng (?:Cấp \d+|1\.000km đầu) - (.+)$/.exec(name || '');
+  return m ? m[1] : (name || '');
+}
+function capLabel(cap) {
+  return cap === 0 ? '1.000km đầu' : `Cấp ${cap}`;
+}
+// Ten dich vu "hang cung" duoc sinh dang "<ten goc> – <ten xe> [<ma xe>]" -
+// tach ra de loc dich vu theo dung xe khi tao/sua goi bao duong.
+function parseServiceVehicle(name) {
+  const m = /^(.*) – (.+) \[([A-Za-z0-9-]+)\]$/.exec(name || '');
+  if (!m) return null;
+  return { base: m[1], vehicleName: m[2], vehicleCode: m[3] };
+}
+function fuelOfVehicleCode(vehicleCode) {
+  if (!vehicleCode) return null;
+  return vehicleCode.startsWith('BT50') ? 'diesel' : 'petrol';
+}
+function fuelBadge(fuel) {
+  if (fuel === 'diesel') return { label: 'Diesel', className: 'badge-pending' };
+  if (fuel === 'petrol') return { label: 'Xăng', className: 'badge-approved' };
+  return null;
+}
+// R/I/M/V theo dung chu giai cua Phu luc 3: chi "R" (Thay the) moi tieu hao phu tung.
+const ACTION_CODE_BADGE = {
+  R: { label: 'Thay thế', className: 'badge-active' },
+  I: { label: 'Kiểm tra/điều chỉnh', className: 'badge-approved' },
+  M: { label: 'Tháo vệ sinh', className: 'badge-inprogress' },
+  V: { label: 'Kiểm tra mắt', className: 'badge-inactive' },
+};
+function actionCodeBadge(code) {
+  return ACTION_CODE_BADGE[code] || { label: code || '—', className: 'badge-inactive' };
+}
+
 function ServicePackageDetailModal({ pkg, onClose }) {
   if (!pkg) return null;
   const badge = activeBadge(pkg.isActive);
+  const { vehicleCode, cap } = parsePackageCode(pkg.code);
+  const vehicleName = pkg.modelName || parseVehicleName(pkg.name);
+  const fBadge = fuelBadge(fuelOfVehicleCode(vehicleCode));
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">Chi tiết gói dịch vụ</h3>
+          <h3 className="modal-title">Chi tiết gói bảo dưỡng</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 10, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-900)' }}>{pkg.name}</div>
-            <span className={`badge ${badge.className}`}>{badge.label}</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {fBadge && <span className={`badge ${fBadge.className}`}>{fBadge.label}</span>}
+              <span className={`badge ${badge.className}`}>{badge.label}</span>
+            </div>
           </div>
           <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 16 }}>
             <div className="detail-row"><div className="detail-label">Mã gói</div><div className="detail-value">{pkg.code}</div></div>
+            <div className="detail-row"><div className="detail-label">Dòng xe áp dụng</div><div className="detail-value">{vehicleName}</div></div>
+            <div className="detail-row"><div className="detail-label">Cấp bảo dưỡng</div><div className="detail-value">{cap != null ? capLabel(cap) : '—'}</div></div>
             <div className="detail-row"><div className="detail-label">Loại hình sửa chữa</div><div className="detail-value">{repairCategoryLabel(pkg.repairCategory)}</div></div>
             <div className="detail-row"><div className="detail-label">Giá gói</div><div className="detail-value">{formatCurrency(pkg.totalPrice)}</div></div>
             <div className="detail-row"><div className="detail-label">Mô tả</div><div className="detail-value">{pkg.description || '—'}</div></div>
@@ -1573,16 +1592,34 @@ function ServicePackageDetailModal({ pkg, onClose }) {
           <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13, color: 'var(--gray-700)' }}>
             Dịch vụ trong gói ({(pkg.services || []).length})
           </div>
+          <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 8 }}>
+            Cột "Hành động" lấy đúng theo Phụ lục 3 — chỉ dòng <strong>Thay thế (R)</strong> mới tiêu hao phụ tùng; các dòng Kiểm tra/Tháo vệ sinh/Kiểm tra mắt chỉ là công kiểm tra, không thay đồ.
+          </div>
           <div className="table-wrapper">
             <table className="data-table">
-              <thead><tr><th>Mã DV</th><th>Tên dịch vụ</th><th>Đơn giá</th><th>Trạng thái</th></tr></thead>
+              <thead><tr><th>Mã DV</th><th>Tên dịch vụ</th><th>Loại hình</th><th>Hành động</th><th>Phụ tùng thay thế</th><th>Đơn giá</th><th>Trạng thái</th></tr></thead>
               <tbody>
                 {(pkg.services || []).map((s) => {
                   const svcBadge = activeBadge(s.isActive);
+                  const acBadge = actionCodeBadge(s.actionCode);
                   return (
                     <tr key={s.id}>
                       <td style={{ fontFamily: 'monospace' }}>{s.code}</td>
                       <td>{s.name}</td>
+                      {/* Trong ngu canh 1 goi bao duong, moi dich vu con deu hien
+                          THEO LOAI HINH CUA GOI (luon la "Bao duong dinh ky") -
+                          de nguoi dung biet dich vu nay dang nam trong goi BDDK,
+                          khac voi khi xem no o man "Dich vu le" (hien loai hinh
+                          THAT cua rieng dich vu do, vd "Dong son"). */}
+                      <td>{repairCategoryLabel(pkg.repairCategory)}</td>
+                      <td><span className={`badge ${acBadge.className}`}>{acBadge.label}</span></td>
+                      <td>
+                        {s.actionCode === 'R'
+                          ? ((s.parts || []).length
+                            ? s.parts.map((p) => p.productName).join(', ')
+                            : <span style={{ color: 'var(--gray-400)' }}>Chưa gán phụ tùng</span>)
+                          : <span style={{ color: 'var(--gray-400)' }}>—</span>}
+                      </td>
                       <td>{formatCurrency(s.unitPrice)}</td>
                       <td><span className={`badge ${svcBadge.className}`}>{svcBadge.label}</span></td>
                     </tr>
@@ -1604,13 +1641,14 @@ function ServicePackageListPage() {
   const navigate = useNavigate();
   const [packages, setPackages] = useState([]);
   const [search, setSearch] = useState('');
-  const [repairCategory, setRepairCategory] = useState('all');
   const [status, setStatus] = useState('all');
+  const [vehicleFilter, setVehicleFilter] = useState('all');
+  const [capFilter, setCapFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activePackage, setActivePackage] = useState(null);
   const [activePackageLoading, setActivePackageLoading] = useState(false);
-  const [page, setPage] = useState(1);
+  const [expanded, setExpanded] = useState(() => new Set());
   const searchTimer = useRef(null);
   const requestSeq = useRef(0);
 
@@ -1619,16 +1657,15 @@ function ServicePackageListPage() {
     setLoading(true);
     setError('');
     managerApi
-      .getServicePackages({ search: search.trim(), repairCategory, status })
+      .getServicePackages({ search: search.trim(), status })
       .then((data) => {
         if (seq !== requestSeq.current) return;
         setPackages(data || []);
-        setPage(1);
       })
       .catch((err) => {
         if (seq !== requestSeq.current) return;
         setPackages([]);
-        setError(err.message || 'Không tải được danh sách gói dịch vụ');
+        setError(err.message || 'Không tải được danh sách gói bảo dưỡng');
       })
       .finally(() => {
         if (seq === requestSeq.current) setLoading(false);
@@ -1640,12 +1677,13 @@ function ServicePackageListPage() {
     searchTimer.current = setTimeout(reload, 300);
     return () => clearTimeout(searchTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, repairCategory, status]);
+  }, [search, status]);
 
   const clearFilters = () => {
     setSearch('');
-    setRepairCategory('all');
     setStatus('all');
+    setVehicleFilter('all');
+    setCapFilter('all');
   };
 
   const openDetail = (pkg) => {
@@ -1657,15 +1695,67 @@ function ServicePackageListPage() {
       .finally(() => setActivePackageLoading(false));
   };
 
-  const totalPages = Math.max(1, Math.ceil(packages.length / PAGE_SIZE));
-  const pageItems = packages.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Danh sach dong xe co trong du lieu da tai (khong phu thuoc bo loc xe/cap
+  // hien tai) de dropdown "Dong xe" luon du 12 lua chon.
+  const vehicleOptions = useMemo(() => {
+    const map = new Map();
+    for (const p of packages) {
+      const { vehicleCode } = parsePackageCode(p.code);
+      if (vehicleCode && !map.has(vehicleCode)) map.set(vehicleCode, p.modelName || parseVehicleName(p.name));
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => VEHICLE_CODE_ORDER.indexOf(a) - VEHICLE_CODE_ORDER.indexOf(b))
+      .map(([code, name]) => ({ code, name }));
+  }, [packages]);
+
+  const filteredPackages = useMemo(() => packages.filter((p) => {
+    const { vehicleCode, cap } = parsePackageCode(p.code);
+    if (vehicleFilter !== 'all' && vehicleCode !== vehicleFilter) return false;
+    if (capFilter !== 'all' && cap !== Number(capFilter)) return false;
+    return true;
+  }), [packages, vehicleFilter, capFilter]);
+
+  // Nhom theo tung dong xe, moi nhom co toi da 5 goi (Cap 1..5), sap xep theo
+  // dung thu tu 12 xe va theo cap tang dan trong tung nhom.
+  const groups = useMemo(() => {
+    const map = new Map();
+    for (const p of filteredPackages) {
+      const { vehicleCode, cap } = parsePackageCode(p.code);
+      const key = vehicleCode || p.code;
+      if (!map.has(key)) map.set(key, { vehicleCode: key, vehicleName: p.modelName || parseVehicleName(p.name), fuel: fuelOfVehicleCode(vehicleCode), items: [] });
+      map.get(key).items.push({ ...p, cap });
+    }
+    const arr = [...map.values()];
+    arr.forEach((g) => g.items.sort((a, b) => (a.cap || 0) - (b.cap || 0)));
+    arr.sort((a, b) => {
+      const ia = VEHICLE_CODE_ORDER.indexOf(a.vehicleCode);
+      const ib = VEHICLE_CODE_ORDER.indexOf(b.vehicleCode);
+      if (ia === -1 && ib === -1) return a.vehicleName.localeCompare(b.vehicleName, 'vi');
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+    return arr;
+  }, [filteredPackages]);
+
+  const filtersActive = Boolean(search.trim()) || vehicleFilter !== 'all' || capFilter !== 'all';
+  const isExpanded = (vehicleCode) => filtersActive || expanded.has(vehicleCode);
+  const toggleGroup = (vehicleCode) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(vehicleCode)) next.delete(vehicleCode); else next.add(vehicleCode);
+      return next;
+    });
+  };
+  const expandAll = () => setExpanded(new Set(groups.map((g) => g.vehicleCode)));
+  const collapseAll = () => setExpanded(new Set());
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Quản lý gói dịch vụ</h1>
-          <div className="breadcrumb">Trang chủ / Gói dịch vụ</div>
+          <h1>Quản lý gói bảo dưỡng</h1>
+          <div className="breadcrumb">Trang chủ / Gói bảo dưỡng</div>
         </div>
         <div className="page-header-right">
           <PermissionGate permission="screen:manager:services:view">
@@ -1674,16 +1764,19 @@ function ServicePackageListPage() {
               className="btn btn-secondary"
               onClick={() => exportCsv(
                 'danh-sach-goi-dich-vu.csv',
-                ['Mã gói', 'Tên gói', 'Loại hình sửa chữa', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
-                packages.map((p) => [p.code, p.name, repairCategoryLabel(p.repairCategory), p.itemCount, p.totalPrice, activeBadge(p.isActive).label])
+                ['Mã gói', 'Dòng xe', 'Cấp', 'Tên gói', 'Loại hình sửa chữa', 'Số dịch vụ', 'Giá gói', 'Trạng thái'],
+                packages.map((p) => {
+                  const { cap } = parsePackageCode(p.code);
+                  return [p.code, parseVehicleName(p.name), cap != null ? capLabel(cap) : '', p.name, repairCategoryLabel(p.repairCategory), p.itemCount, p.totalPrice, activeBadge(p.isActive).label];
+                })
               )}
             >
-              Xuất Excel
+              📊 Xuất Excel
             </button>
           </PermissionGate>
           <PermissionGate permission="screen:manager:services:create">
             <button type="button" className="btn btn-primary" onClick={() => navigate('/manager/service-packages/create')}>
-              + Thêm gói dịch vụ
+              + Thêm gói bảo dưỡng
             </button>
           </PermissionGate>
         </div>
@@ -1691,14 +1784,21 @@ function ServicePackageListPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon"><IconSearch /></span>
+          <span className="search-icon">🔍</span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã gói, tên gói..." />
         </div>
 
-        <select className="filter-select" value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)}>
-          <option value="all">Tất cả loại hình sửa chữa</option>
-          {REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+        <select className="filter-select" value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)}>
+          <option value="all">Tất cả dòng xe</option>
+          {vehicleOptions.map((v) => (
+            <option key={v.code} value={v.code}>{v.name}</option>
+          ))}
+        </select>
+
+        <select className="filter-select" value={capFilter} onChange={(e) => setCapFilter(e.target.value)}>
+          <option value="all">Tất cả cấp</option>
+          {[0, 1, 2, 3, 4, 5].map((c) => (
+            <option key={c} value={c}>{capLabel(c)}</option>
           ))}
         </select>
 
@@ -1714,86 +1814,103 @@ function ServicePackageListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
       )}
 
-      <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 8, textAlign: 'right' }}>
-        Hiển thị {pageItems.length}/{packages.length} gói dịch vụ
-      </div>
-
-      <div className="table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Mã gói</th>
-              <th>Tên gói</th>
-              <th>Loại hình sửa chữa</th>
-              <th>Số dịch vụ</th>
-              <th>Giá gói</th>
-              <th>Trạng thái</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7}>
-                <div className="empty-state">
-                  <div className="empty-state-icon">⏳</div>
-                  <h3>Đang tải danh sách gói dịch vụ</h3>
-                </div>
-              </td></tr>
-            )}
-
-            {!loading && pageItems.length === 0 && !error && (
-              <tr><td colSpan={7}>
-                <div className="empty-state">
-                  <div className="empty-state-icon">📭</div>
-                  <h3>Không có gói dịch vụ phù hợp</h3>
-                  <p>Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc, hoặc thêm gói mới.</p>
-                </div>
-              </td></tr>
-            )}
-
-            {!loading && pageItems.map((pkg) => {
-              const badge = activeBadge(pkg.isActive);
-              return (
-                <tr key={pkg.id}>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{pkg.code}</td>
-                  <td style={{ fontWeight: 700, color: 'var(--gray-900)' }}>{pkg.name}</td>
-                  <td>{repairCategoryLabel(pkg.repairCategory)}</td>
-                  <td>{pkg.itemCount}</td>
-                  <td>{formatCurrency(pkg.totalPrice)}</td>
-                  <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
-                  <td>
-                    <div className="table-actions">
-                      <PermissionGate permission="screen:manager:services:view">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}><IconView /></button>
-                      </PermissionGate>
-                      <PermissionGate permission="screen:manager:services:update">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}><IconEdit /></button>
-                      </PermissionGate>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <div className="pagination">
-          <span className="pagination-info">
-            {packages.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, packages.length)} trong {packages.length} kết quả
-          </span>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)' }}>{page}</span>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>›</button>
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+          Hiển thị {filteredPackages.length} gói bảo dưỡng thuộc {groups.length} dòng xe
         </div>
+        {!filtersActive && groups.length > 1 && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={expandAll}>Mở tất cả</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={collapseAll}>Thu tất cả</button>
+          </div>
+        )}
       </div>
+
+      {loading && (
+        <div className="empty-state">
+          <div className="empty-state-icon">⏳</div>
+          <h3>Đang tải danh sách gói bảo dưỡng</h3>
+        </div>
+      )}
+
+      {!loading && groups.length === 0 && !error && (
+        <div className="empty-state">
+          <div className="empty-state-icon">📭</div>
+          <h3>Không có gói bảo dưỡng phù hợp</h3>
+          <p>Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc, hoặc thêm gói mới.</p>
+        </div>
+      )}
+
+      {!loading && groups.map((g) => {
+        const fBadge = fuelBadge(g.fuel);
+        const prices = g.items.map((it) => it.totalPrice);
+        const priceRange = prices.length ? (Math.min(...prices) === Math.max(...prices) ? formatCurrency(prices[0]) : `${formatCurrency(Math.min(...prices))} – ${formatCurrency(Math.max(...prices))}`) : '—';
+        const open = isExpanded(g.vehicleCode);
+        return (
+          <div key={g.vehicleCode} style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', marginBottom: 10, overflow: 'hidden', background: '#fff' }}>
+            <button
+              type="button"
+              onClick={() => toggleGroup(g.vehicleCode)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: 'var(--gray-50, #f8fafc)', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: 'var(--gray-500)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', display: 'inline-block' }}>▶</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--gray-900)' }}>{g.vehicleName}</span>
+                {fBadge && <span className={`badge ${fBadge.className}`}>{fBadge.label}</span>}
+                <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>{g.items.length} gói ({g.items.map((it) => capLabel(it.cap)).join(', ')})</span>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary-dark)' }}>{priceRange}</div>
+            </button>
+
+            {open && (
+              <div className="table-wrapper" style={{ margin: 0, border: 'none', borderTop: '1px solid var(--gray-200)' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Mã gói</th>
+                      <th>Cấp</th>
+                      <th>Số dịch vụ</th>
+                      <th>Giá gói</th>
+                      <th>Trạng thái</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.items.map((pkg) => {
+                      const badge = activeBadge(pkg.isActive);
+                      return (
+                        <tr key={pkg.id}>
+                          <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{pkg.code}</td>
+                          <td>{capLabel(pkg.cap)}</td>
+                          <td>{pkg.itemCount}</td>
+                          <td>{formatCurrency(pkg.totalPrice)}</td>
+                          <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
+                          <td>
+                            <div className="table-actions">
+                              <PermissionGate permission="screen:manager:services:view">
+                                <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => openDetail(pkg)}>👁</button>
+                              </PermissionGate>
+                              <PermissionGate permission="screen:manager:services:update">
+                                <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/service-packages/${pkg.id}/edit`)}>✏️</button>
+                              </PermissionGate>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {!activePackageLoading && <ServicePackageDetailModal pkg={activePackage} onClose={() => setActivePackage(null)} />}
     </div>
@@ -1811,9 +1928,11 @@ function ServicePackageFormPage({ mode }) {
 
   const [branch, setBranch] = useState(null);
   const [availableServices, setAvailableServices] = useState([]);
-  const [serviceSearch, setServiceSearch] = useState('');
+  const [vehicleModels, setVehicleModels] = useState([]);
+  const [selectedSearch, setSelectedSearch] = useState('');
+  const [availableSearch, setAvailableSearch] = useState('');
   const [form, setForm] = useState({
-    packageName: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', serviceIds: [],
+    packageName: '', totalPrice: '', description: '', purpose: '', isActive: true, repairCategory: '', modelId: '', serviceIds: [], actionCodes: {},
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -1824,6 +1943,7 @@ function ServicePackageFormPage({ mode }) {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
     managerApi.getServices({ status: 'all' }).then((data) => { if (mounted) setAvailableServices(data || []); }).catch(() => {});
+    listVehicleModelsApi().then((data) => { if (mounted) setVehicleModels(data || []); }).catch(() => {});
 
     if (isEdit && id) {
       managerApi
@@ -1837,10 +1957,12 @@ function ServicePackageFormPage({ mode }) {
             purpose: data.purpose || '',
             isActive: data.isActive,
             repairCategory: data.repairCategory || '',
+            modelId: data.modelId != null ? String(data.modelId) : '',
             serviceIds: (data.services || []).map((s) => s.id),
+            actionCodes: Object.fromEntries((data.services || []).map((s) => [s.id, s.actionCode || 'I'])),
           });
         })
-        .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin gói dịch vụ'); })
+        .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin gói bảo dưỡng'); })
         .finally(() => { if (mounted) setLoading(false); });
     }
 
@@ -1856,12 +1978,24 @@ function ServicePackageFormPage({ mode }) {
   const toggleService = (serviceId) => {
     setForm((prev) => {
       const exists = prev.serviceIds.includes(serviceId);
+      if (exists) {
+        const nextActionCodes = { ...prev.actionCodes };
+        delete nextActionCodes[serviceId];
+        return { ...prev, serviceIds: prev.serviceIds.filter((sid) => sid !== serviceId), actionCodes: nextActionCodes };
+      }
       return {
         ...prev,
-        serviceIds: exists ? prev.serviceIds.filter((sid) => sid !== serviceId) : [...prev.serviceIds, serviceId],
+        serviceIds: [...prev.serviceIds, serviceId],
+        // Mac dinh "I - Kiem tra/dieu chinh" khi vua them - an toan hon vi
+        // khong tu nhan la se thay phu tung (R) khi chua chac chan.
+        actionCodes: { ...prev.actionCodes, [serviceId]: prev.actionCodes[serviceId] || 'I' },
       };
     });
     setFieldErrors((prev) => ({ ...prev, serviceIds: undefined }));
+  };
+
+  const setActionCode = (serviceId, code) => {
+    setForm((prev) => ({ ...prev, actionCodes: { ...prev.actionCodes, [serviceId]: code } }));
   };
 
   const validate = () => {
@@ -1889,7 +2023,8 @@ function ServicePackageFormPage({ mode }) {
         purpose: form.purpose.trim(),
         isActive: form.isActive,
         repairCategory: form.repairCategory || null,
-        serviceIds: form.serviceIds,
+        modelId: form.modelId || null,
+        services: form.serviceIds.map((sid) => ({ serviceId: sid, actionCode: form.actionCodes[sid] || 'I' })),
       };
 
       if (isEdit) {
@@ -1913,7 +2048,7 @@ function ServicePackageFormPage({ mode }) {
     return (
       <div className="empty-state">
         <div className="empty-state-icon">⏳</div>
-        <h3>Đang tải thông tin gói dịch vụ</h3>
+        <h3>Đang tải thông tin gói bảo dưỡng</h3>
       </div>
     );
   }
@@ -1922,43 +2057,72 @@ function ServicePackageFormPage({ mode }) {
     .filter((s) => form.serviceIds.includes(s.id))
     .reduce((sum, s) => sum + Number(s.unitPrice || 0), 0);
 
-  const needle = serviceSearch.trim().toLowerCase();
-  const filteredServices = needle
-    ? availableServices.filter(
-        (s) => s.name.toLowerCase().includes(needle) || s.code.toLowerCase().includes(needle)
-      )
-    : availableServices;
+  const selectedNeedle = selectedSearch.trim().toLowerCase();
+  const availableNeedle = availableSearch.trim().toLowerCase();
+  const matchesNeedle = (s, needle) => !needle || s.name.toLowerCase().includes(needle) || s.code.toLowerCase().includes(needle);
+  const selectedServices = availableServices.filter((s) => form.serviceIds.includes(s.id) && matchesNeedle(s, selectedNeedle));
+
+  // Danh sach xe THAT tu vehicle_models (khong con tu suy ra tu ten dich vu nua).
+  const vehicleModelOptions = [...vehicleModels].sort(
+    (a, b) => VEHICLE_CODE_ORDER.indexOf(VEHICLE_DISPLAY_NAME_TO_CODE[a.displayName]) - VEHICLE_CODE_ORDER.indexOf(VEHICLE_DISPLAY_NAME_TO_CODE[b.displayName])
+  );
+  // Dich vu "hang cung" (loc dau, bugi, ac quy...) co 12 bien the rieng theo
+  // tung xe - loc theo dong xe de khong phai doc lan trong list 140 dich vu.
+  // Dich vu dung chung (dau may, cham soc xe...) luon hien du moi luc.
+  const selectedVehicleModel = vehicleModels.find((v) => String(v.id) === String(form.modelId));
+  const selectedVehicleCode = selectedVehicleModel ? VEHICLE_DISPLAY_NAME_TO_CODE[selectedVehicleModel.displayName] : null;
+  const matchesVehicleFilter = (s) => {
+    if (!form.modelId) return true;
+    const parsed = parseServiceVehicle(s.name);
+    return !parsed || parsed.vehicleCode === selectedVehicleCode; // khong co bien the xe -> dung chung, luon hien
+  };
+  const unselectedServices = availableServices.filter(
+    (s) => !form.serviceIds.includes(s.id) && matchesNeedle(s, availableNeedle) && matchesVehicleFilter(s)
+  );
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>{isEdit ? 'Chỉnh sửa gói dịch vụ' : 'Thêm gói dịch vụ'}</h1>
-          <div className="breadcrumb">Gói dịch vụ / {isEdit ? 'Chỉnh sửa' : 'Thêm mới'}</div>
+          <h1>{isEdit ? 'Chỉnh sửa gói bảo dưỡng' : 'Thêm gói bảo dưỡng'}</h1>
+          <div className="breadcrumb">Gói bảo dưỡng / {isEdit ? 'Chỉnh sửa' : 'Thêm mới'}</div>
         </div>
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">Thông tin gói dịch vụ</div>
+          <div className="form-section-title">📦 Thông tin gói bảo dưỡng</div>
 
           {branch && (
             <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
               📍 Chi nhánh: <strong>{branch.name}</strong>
-              {!isEdit && ' — Gói dịch vụ mới sẽ được thêm vào danh mục chi nhánh này.'}
+              {!isEdit && ' — Gói bảo dưỡng mới sẽ được thêm vào danh mục chi nhánh này.'}
             </div>
           )}
 
           <div className="form-grid form-grid-2">
             <div className="form-group">
-              <label className="form-label required">Tên gói dịch vụ</label>
-              <input className="form-input" value={form.packageName} onChange={(e) => setField('packageName', e.target.value)} placeholder="Nhập tên gói dịch vụ" />
+              <label className="form-label">Dòng xe áp dụng</label>
+              <select className="form-select" value={form.modelId} onChange={(e) => setField('modelId', e.target.value)}>
+                <option value="">— Chưa chọn / dùng chung nhiều xe —</option>
+                {vehicleModelOptions.map((v) => (
+                  <option key={v.id} value={v.id}>{v.displayName}</option>
+                ))}
+              </select>
+              <div className="form-hint">
+                Lưu thật vào gói (dùng để lọc/nhóm ở trang danh sách) và lọc bớt danh sách dịch vụ "hàng cứng" bên dưới cho đúng xe.
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label required">Tên gói bảo dưỡng</label>
+              <input className="form-input" value={form.packageName} onChange={(e) => setField('packageName', e.target.value)} placeholder="Nhập tên gói bảo dưỡng" />
               {fieldErrors.packageName && <span className="form-error">{fieldErrors.packageName}</span>}
             </div>
 
@@ -1969,16 +2133,6 @@ function ServicePackageFormPage({ mode }) {
               {form.serviceIds.length > 0 && (
                 <span className="form-hint">Tổng giá các dịch vụ đã chọn: {formatCurrency(selectedTotal)}</span>
               )}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Loại hình sửa chữa</label>
-              <select className="form-select" value={form.repairCategory} onChange={(e) => setField('repairCategory', e.target.value)}>
-                {REPAIR_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <div style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
-                Dùng để tự điền khi cố vấn dịch vụ chọn gói này trên phiếu quyết toán.
-              </div>
             </div>
 
             {isEdit && (
@@ -1994,7 +2148,7 @@ function ServicePackageFormPage({ mode }) {
 
           <div className="form-group" style={{ marginTop: 14 }}>
             <label className="form-label">Mô tả</label>
-            <textarea className="form-textarea" value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Mô tả ngắn về gói dịch vụ" />
+            <textarea className="form-textarea" value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Mô tả ngắn về gói bảo dưỡng" />
           </div>
 
           <div className="form-group" style={{ marginTop: 14 }}>
@@ -2012,34 +2166,111 @@ function ServicePackageFormPage({ mode }) {
             <label className="form-label required">
               Dịch vụ trong gói {form.serviceIds.length > 0 && `(đã chọn ${form.serviceIds.length})`}
             </label>
+            <div className="form-hint" style={{ marginBottom: 8 }}>
+              Với mỗi dịch vụ đã chọn, chọn đúng hành động ở cột "Trong gói này": chỉ <strong>R (Thay thế)</strong> mới gắn phụ tùng của dịch vụ đó vào gói; I/M/V (kiểm tra/tháo vệ sinh/kiểm tra mắt) không tiêu hao phụ tùng.
+            </div>
             {availableServices.length === 0 ? (
               <p className="form-hint">Chi nhánh chưa có dịch vụ lẻ nào đang áp dụng — hãy thêm Dịch vụ lẻ trước.</p>
             ) : (
               <>
-                <div className="search-input" style={{ maxWidth: '100%', marginBottom: 8 }}>
-                  <span className="search-icon"><IconSearch /></span>
-                  <input
-                    value={serviceSearch}
-                    onChange={(e) => setServiceSearch(e.target.value)}
-                    placeholder="Tìm dịch vụ theo tên hoặc mã..."
-                  />
-                </div>
-                <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', maxHeight: 260, overflowY: 'auto' }}>
-                  {filteredServices.length === 0 ? (
-                    <p style={{ padding: 12, fontSize: 13, color: 'var(--gray-500)' }}>Không tìm thấy dịch vụ phù hợp.</p>
-                  ) : (
-                    filteredServices.map((s) => (
-                      <label
-                        key={s.id}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, cursor: 'pointer', opacity: s.isActive ? 1 : 0.65 }}
-                      >
-                        <input type="checkbox" checked={form.serviceIds.includes(s.id)} onChange={() => toggleService(s.id)} />
-                        <span style={{ flex: 1 }}>{s.name}</span>
-                        {!s.isActive && <span className="badge badge-inactive">Ngừng áp dụng</span>}
-                        <span style={{ color: 'var(--gray-500)' }}>{formatCurrency(s.unitPrice)}</span>
-                      </label>
-                    ))
-                  )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+                      Trong gói này ({selectedServices.length})
+                    </div>
+                    <div className="search-input" style={{ maxWidth: '100%', marginBottom: 8 }}>
+                      <span className="search-icon">🔍</span>
+                      <input
+                        value={selectedSearch}
+                        onChange={(e) => setSelectedSearch(e.target.value)}
+                        placeholder="Tìm trong dịch vụ đã chọn..."
+                      />
+                    </div>
+                    <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', height: 300, overflowY: 'auto' }}>
+                      {selectedServices.length === 0 ? (
+                        <p style={{ padding: 12, fontSize: 13, color: 'var(--gray-500)' }}>
+                          {selectedSearch.trim()
+                            ? 'Không tìm thấy dịch vụ phù hợp trong số đã chọn.'
+                            : 'Chưa có dịch vụ nào — bấm dịch vụ ở cột bên phải để thêm vào đây.'}
+                        </p>
+                      ) : (
+                        selectedServices.map((s) => (
+                          <div
+                            key={s.id}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, opacity: s.isActive ? 1 : 0.65 }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => toggleService(s.id)}
+                              title="Bấm để bỏ khỏi gói"
+                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--red-600, #dc2626)', fontWeight: 700 }}
+                            >
+                              ✕
+                            </button>
+                            <span style={{ flex: 1 }}>{s.name}</span>
+                            {!s.isActive && <span className="badge badge-inactive">Ngừng áp dụng</span>}
+                            <select
+                              className="form-select"
+                              value={form.actionCodes[s.id] || 'I'}
+                              onChange={(e) => setActionCode(s.id, e.target.value)}
+                              title="Hành động - chỉ R (Thay thế) mới gắn phụ tùng"
+                              style={{ fontSize: 12, padding: '2px 4px', width: 'auto' }}
+                            >
+                              <option value="R">R - Thay thế</option>
+                              <option value="I">I - Kiểm tra/điều chỉnh</option>
+                              <option value="M">M - Tháo vệ sinh</option>
+                              <option value="V">V - Kiểm tra mắt</option>
+                            </select>
+                            <span style={{ color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>{formatCurrency(s.unitPrice)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray-700)', marginBottom: 6 }}>
+                      Tất cả dịch vụ ({unselectedServices.length})
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <div className="search-input" style={{ flex: 1, maxWidth: 'none' }}>
+                        <span className="search-icon">🔍</span>
+                        <input
+                          value={availableSearch}
+                          onChange={(e) => setAvailableSearch(e.target.value)}
+                          placeholder="Tìm dịch vụ theo tên hoặc mã..."
+                        />
+                      </div>
+                      <select className="filter-select" value={form.modelId} onChange={(e) => setField('modelId', e.target.value)} title="Lọc dịch vụ hàng cứng theo dòng xe">
+                        <option value="">Tất cả dòng xe</option>
+                        {vehicleModelOptions.map((v) => (
+                          <option key={v.id} value={v.id}>{v.displayName}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', height: 300, overflowY: 'auto' }}>
+                      {unselectedServices.length === 0 ? (
+                        <p style={{ padding: 12, fontSize: 13, color: 'var(--gray-500)' }}>
+                          {availableSearch.trim() ? 'Không tìm thấy dịch vụ phù hợp.' : 'Đã thêm hết dịch vụ vào gói.'}
+                        </p>
+                      ) : (
+                        unselectedServices.map((s) => (
+                          <button
+                            type="button"
+                            key={s.id}
+                            onClick={() => toggleService(s.id)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--gray-100)', background: 'none', fontSize: 13, textAlign: 'left', cursor: 'pointer', opacity: s.isActive ? 1 : 0.65 }}
+                            title="Bấm để thêm vào gói"
+                          >
+                            <span style={{ color: 'var(--primary, #4f46e5)', fontWeight: 700 }}>+</span>
+                            <span style={{ flex: 1 }}>{s.name}</span>
+                            {!s.isActive && <span className="badge badge-inactive">Ngừng áp dụng</span>}
+                            <span style={{ color: 'var(--gray-500)' }}>{formatCurrency(s.unitPrice)}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               </>
             )}
@@ -2050,13 +2281,14 @@ function ServicePackageFormPage({ mode }) {
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/manager/service-packages')}>Hủy</button>
           <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Đang lưu...' : isEdit ? '🔄 Cập nhật' : '+ Thêm gói dịch vụ'}
+            {submitting ? 'Đang lưu...' : isEdit ? '🔄 Cập nhật' : '+ Thêm gói bảo dưỡng'}
           </button>
         </div>
       </form>
     </div>
   );
 }
+
 
 function SettlementReportsPage() {
   const [reports, setReports] = useState([]);
@@ -2164,7 +2396,7 @@ function SettlementReportsPage() {
 
       <div className="filter-bar">
         <div className="search-input" style={{ maxWidth: 420 }}>
-          <span className="search-icon"><IconSearch /></span>
+          <span className="search-icon">🔍</span>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -2221,7 +2453,7 @@ function SettlementReportsPage() {
       )}
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
@@ -2283,7 +2515,7 @@ function SettlementReportsPage() {
                   </td>
                   <td style={{ fontSize: 12 }}>{formatDate(report.intakeDate)}</td>
                   {activeTab !== 'cancelled' && <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>}
-                  <td style={{ fontWeight: 800, color: '#27272a' }}>{formatCurrency(report.total)}</td>
+                  <td style={{ fontWeight: 800, color: '#C62828' }}>{formatCurrency(report.total)}</td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
                       {badge.label}
@@ -2304,13 +2536,13 @@ function SettlementReportsPage() {
       </div>
 
       {detailError && (
-        <div style={{ marginTop: 12, background: '#f4f4f5', border: '1px solid #e4e4e7', color: '#52525b', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ marginTop: 12, background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', borderRadius: 10, padding: '12px 14px' }}>
           {detailError}
         </div>
       )}
 
       {detailLoading && (
-        <div style={{ marginTop: 12, background: '#fafafa', border: '1px solid #e4e4e7', color: '#3f3f46', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ marginTop: 12, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#334155', borderRadius: 10, padding: '12px 14px' }}>
           Đang tải chi tiết phiếu quyết toán...
         </div>
       )}
@@ -2436,15 +2668,14 @@ function TechnicianListPage() {
               className="btn btn-secondary"
               onClick={() => exportCsv(
                 'danh-sach-tho-may.csv',
-                ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Chuyên môn', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
+                ['Mã NV', 'Họ và tên', 'Email', 'Tổ trưởng', 'Số điện thoại', 'Ngày vào', 'Trạng thái'],
                 technicians.map((t) => [
                   t.employeeId, t.fullName, t.email, t.teamLeaderName,
-                  (t.specialties || []).map((s) => s.name).join('; '),
                   t.phone, formatDate(t.createdAt), statusBadge(t.status).label,
                 ])
               )}
             >
-              Xuất Excel
+              📊 Xuất Excel
             </button>
           </PermissionGate>
           <PermissionGate permission="screen:manager:technicians:create">
@@ -2457,7 +2688,7 @@ function TechnicianListPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon"><IconSearch /></span>
+          <span className="search-icon">🔍</span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã NV, tên, email..." />
         </div>
 
@@ -2480,7 +2711,7 @@ function TechnicianListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
@@ -2497,7 +2728,6 @@ function TechnicianListPage() {
               <th>Mã NV</th>
               <th>Thợ máy</th>
               <th>Tổ trưởng</th>
-              <th>Chuyên môn</th>
               <th>Số điện thoại</th>
               <th>Ngày vào</th>
               <th>Trạng thái</th>
@@ -2506,7 +2736,7 @@ function TechnicianListPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8}>
+              <tr><td colSpan={7}>
                 <div className="empty-state">
                   <div className="empty-state-icon">⏳</div>
                   <h3>Đang tải danh sách thợ máy</h3>
@@ -2515,7 +2745,7 @@ function TechnicianListPage() {
             )}
 
             {!loading && pageItems.length === 0 && !error && (
-              <tr><td colSpan={8}>
+              <tr><td colSpan={7}>
                 <div className="empty-state">
                   <div className="empty-state-icon">📭</div>
                   <h3>Không có thợ máy phù hợp</h3>
@@ -2539,25 +2769,16 @@ function TechnicianListPage() {
                     </div>
                   </td>
                   <td>{technician.teamLeaderName || 'Chưa gán'}</td>
-                  <td>
-                    {(technician.specialties || []).slice(0, 2).map((s) => (
-                      <span key={s.id} className="tag">{s.name}</span>
-                    ))}
-                    {(technician.specialties || []).length > 2 && (
-                      <span className="tag">+{technician.specialties.length - 2}</span>
-                    )}
-                    {(technician.specialties || []).length === 0 && '—'}
-                  </td>
                   <td>{technician.phone || '—'}</td>
                   <td>{formatDate(technician.createdAt)}</td>
                   <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                   <td>
                     <div className="table-actions">
                       <PermissionGate permission="screen:manager:technicians:view">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}><IconView /></button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Xem chi tiết" onClick={() => setActiveTechnician(technician)}>👁</button>
                       </PermissionGate>
                       <PermissionGate permission="screen:manager:technicians:update">
-                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}><IconEdit /></button>
+                        <button type="button" className="btn btn-secondary btn-icon btn-sm" title="Chỉnh sửa" onClick={() => navigate(`/manager/technicians/${technician.id}/edit`)}>✏️</button>
                       </PermissionGate>
                     </div>
                   </td>
@@ -2595,9 +2816,8 @@ function TechnicianFormPage({ mode }) {
 
   const [branch, setBranch] = useState(null);
   const [teamLeaderOptions, setTeamLeaderOptions] = useState([]);
-  const [specialtyOptions, setSpecialtyOptions] = useState([]);
   const [form, setForm] = useState({
-    fullName: '', email: '', phone: '', teamLeaderId: '', status: 'active', password: '', confirmPassword: '', specialtyIds: [],
+    fullName: '', email: '', phone: '', teamLeaderId: '', status: 'active',
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
@@ -2608,7 +2828,6 @@ function TechnicianFormPage({ mode }) {
     let mounted = true;
     managerApi.getBranch().then((data) => { if (mounted) setBranch(data); }).catch(() => {});
     managerApi.getTeamLeaderOptions().then((data) => { if (mounted) setTeamLeaderOptions(data || []); }).catch(() => {});
-    managerApi.getSpecialties().then((data) => { if (mounted) setSpecialtyOptions(data || []); }).catch(() => {});
 
     if (isEdit && id) {
       managerApi
@@ -2621,9 +2840,6 @@ function TechnicianFormPage({ mode }) {
             phone: data.phone || '',
             teamLeaderId: data.teamLeaderId ? String(data.teamLeaderId) : '',
             status: data.status || 'active',
-            password: '',
-            confirmPassword: '',
-            specialtyIds: (data.specialties || []).map((s) => s.id),
           });
         })
         .catch((err) => { if (mounted) setError(err.message || 'Không tải được thông tin thợ máy'); })
@@ -2639,16 +2855,6 @@ function TechnicianFormPage({ mode }) {
     setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
-  const toggleSpecialty = (specialtyId) => {
-    setForm((prev) => {
-      const exists = prev.specialtyIds.includes(specialtyId);
-      return {
-        ...prev,
-        specialtyIds: exists ? prev.specialtyIds.filter((sid) => sid !== specialtyId) : [...prev.specialtyIds, specialtyId],
-      };
-    });
-  };
-
   const validate = () => {
     const errors = {};
     if (!form.fullName.trim()) errors.fullName = 'Vui lòng nhập họ và tên';
@@ -2657,11 +2863,6 @@ function TechnicianFormPage({ mode }) {
     if (!form.phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại';
     else if (!PHONE_REGEX.test(form.phone.trim())) errors.phone = 'Số điện thoại không hợp lệ';
     if (!form.teamLeaderId) errors.teamLeaderId = 'Vui lòng chọn tổ trưởng phụ trách';
-    if (!isEdit) {
-      if (!form.password) errors.password = 'Vui lòng nhập mật khẩu tạm thời';
-      else if (form.password.length < 8) errors.password = 'Mật khẩu tối thiểu 8 ký tự';
-      if (form.confirmPassword !== form.password) errors.confirmPassword = 'Xác nhận mật khẩu không khớp';
-    }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -2679,13 +2880,12 @@ function TechnicianFormPage({ mode }) {
         phone: form.phone.trim(),
         teamLeaderId: Number(form.teamLeaderId),
         status: form.status,
-        specialtyIds: form.specialtyIds,
       };
 
       if (isEdit) {
         await managerApi.updateTechnician(id, payload);
       } else {
-        await managerApi.createTechnician({ ...payload, password: form.password, confirmPassword: form.confirmPassword });
+        await managerApi.createTechnician(payload);
       }
       navigate('/manager/technicians');
     } catch (err) {
@@ -2718,20 +2918,20 @@ function TechnicianFormPage({ mode }) {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
 
       {teamLeaderOptions.length === 0 && (
-        <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', color: '#52525b', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
-          Chi nhánh chưa có tổ trưởng nào đang hoạt động. Hãy thêm Tổ trưởng trước khi thêm thợ máy.
+        <div style={{ background: '#FFF3E0', border: '1px solid #FFD9A0', color: '#B45309', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+          ⚠️ Chi nhánh chưa có tổ trưởng nào đang hoạt động. Hãy thêm Tổ trưởng trước khi thêm thợ máy.
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
-          <div className="form-section-title">Thông tin thợ máy</div>
+          <div className="form-section-title">🛠️ Thông tin thợ máy</div>
 
           {branch && (
             <div style={{ background: 'var(--primary-very-light)', border: '1px solid var(--primary-light)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 18, fontSize: 13, color: 'var(--primary-dark)' }}>
@@ -2781,43 +2981,6 @@ function TechnicianFormPage({ mode }) {
             )}
           </div>
 
-          <div className="form-group" style={{ marginTop: 14 }}>
-            <label className="form-label">Chuyên môn</label>
-            {specialtyOptions.length === 0 ? (
-              <p className="form-hint">Chưa có danh mục chuyên môn nào trong hệ thống.</p>
-            ) : (
-              <div style={{ border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', maxHeight: 220, overflowY: 'auto' }}>
-                {specialtyOptions.map((s) => (
-                  <label
-                    key={s.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--gray-100)', fontSize: 13, cursor: 'pointer' }}
-                  >
-                    <input type="checkbox" checked={form.specialtyIds.includes(s.id)} onChange={() => toggleSpecialty(s.id)} />
-                    <span>{s.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {!isEdit && (
-            <>
-              <div className="form-section-title" style={{ marginTop: 24 }}>Thông tin đăng nhập</div>
-              <div className="form-grid form-grid-2">
-                <div className="form-group">
-                  <label className="form-label required">Mật khẩu tạm thời</label>
-                  <input type="password" className="form-input" value={form.password} onChange={(e) => setField('password', e.target.value)} placeholder="Tối thiểu 8 ký tự" />
-                  {fieldErrors.password && <span className="form-error">{fieldErrors.password}</span>}
-                </div>
-                <div className="form-group">
-                  <label className="form-label required">Xác nhận mật khẩu</label>
-                  <input type="password" className="form-input" value={form.confirmPassword} onChange={(e) => setField('confirmPassword', e.target.value)} placeholder="Nhập lại mật khẩu" />
-                  {fieldErrors.confirmPassword && <span className="form-error">{fieldErrors.confirmPassword}</span>}
-                </div>
-              </div>
-              <p className="form-hint" style={{ marginTop: 8 }}>Hãy gửi mật khẩu cho thợ máy qua kênh an toàn.</p>
-            </>
-          )}
         </div>
 
         <div className="form-actions">

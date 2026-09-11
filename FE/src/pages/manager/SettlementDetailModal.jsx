@@ -5,22 +5,22 @@ import { formatCurrency, formatDateTime } from '../../utils';
 // thu theo thang) - tranh import vong (ManagerPage da import ManagerDashboardPage).
 
 export const SETTLEMENT_STATUS_META = {
-  waiting_repair: { label: 'Chờ sửa chữa', color: '#52525b', background: '#f4f4f5' },
-  inprogress: { label: 'Đang sửa chữa', color: '#3f3f46', background: '#f4f4f5' },
-  waiting_payment: { label: 'Chờ thanh toán', color: '#3f3f46', background: '#e4e4e7' },
-  invoiced: { label: 'Đã xuất hóa đơn', color: '#3f3f46', background: '#F5F5F5' },
-  cancelled: { label: 'Đã hủy', color: '#52525b', background: '#f4f4f5' },
+  waiting_repair: { label: 'Chờ sửa chữa', color: '#E65100', background: '#FFF3E0' },
+  inprogress: { label: 'Đang sửa chữa', color: '#1565C0', background: '#E3F2FD' },
+  waiting_payment: { label: 'Chờ thanh toán', color: '#2E7D32', background: '#E8F5E9' },
+  invoiced: { label: 'Đã xuất hóa đơn', color: '#424242', background: '#F5F5F5' },
+  cancelled: { label: 'Đã hủy', color: '#B91C1C', background: '#FEF2F2' },
 };
 
 export function settlementStatusBadge(status) {
-  return SETTLEMENT_STATUS_META[status] || { label: status || 'Không rõ', color: '#3f3f46', background: '#f4f4f5' };
+  return SETTLEMENT_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
 }
 
 function DetailRow({ label, value }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 8, padding: '7px 0', borderBottom: '1px solid #f4f4f5' }}>
-      <div style={{ color: '#71717a', fontSize: 12, fontWeight: 600 }}>{label}</div>
-      <div style={{ fontSize: 13, color: '#18181b' }}>{value || '—'}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 8, padding: '7px 0', borderBottom: '1px solid #ECEFF1' }}>
+      <div style={{ color: '#6B7280', fontSize: 12, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 13, color: '#111827' }}>{value || '—'}</div>
     </div>
   );
 }

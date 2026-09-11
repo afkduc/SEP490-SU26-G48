@@ -274,11 +274,11 @@ function buildSSERouter() {
   /**
    * GET /api/sse/bay-board?branchId=1
    *
-   * Public (khong dang nhap) - man khoang xe "/khoang/<chi nhanh>/<so
+   * Public (khong dang nhap) - man khoang xe "/bay/<chi nhanh>/<so
    * khoang>" tren Landing (xem publicRoutes.js /public/bays/*). Forward
    * nguyen payload cho 'new-pending' | 'claimed' | 'order-cancelled' |
    * 'task-updated' - cac event nay von khong chua SDT/tong tien (chi
-   * settlementId/code/bayNumber/cancelReason/orderId/taskId), da o muc chap
+   * orderId/code/bayNumber/cancelReason/taskId), da o muc chap
    * nhan duoc de lo qua kenh khong xac thuc (giong nhu da chap nhan cho
    * /sse/gate). 'task-updated' o day con bao ca truong hop CVDV sua phieu
    * (vd khach huy 1 hang muc giua chung) lam checklist thay doi, khong chi
@@ -298,7 +298,12 @@ function buildSSERouter() {
 
     res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected' })}\n\n`);
 
-    const RELEVANT_TYPES = new Set(['new-pending', 'claimed', 'order-cancelled', 'task-updated']);
+    // 'order-completed' (to truong bam Hoan thanh, khoang duoc giai phong)
+    // cung chi chua orderId/code/bayId nhu cac event con lai - khong lo them
+    // gi qua kenh khong xac thuc.
+    const RELEVANT_TYPES = new Set([
+      'new-pending', 'claimed', 'order-cancelled', 'task-updated', 'order-completed',
+    ]);
     const unsubscribe = onRepairOrderEvent(branchId, (eventData) => {
       if (!RELEVANT_TYPES.has(eventData.type)) return;
       res.write(`event: bay-board\ndata: ${JSON.stringify(eventData)}\n\n`);

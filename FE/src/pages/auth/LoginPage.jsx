@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
 import { routeAfterLogin } from '../../utils/roleRedirect';
 import httpClient from '../../services/httpClient';
+import { BASE_PATH } from '../../config';
 import './LoginPage.css';
 
 const WRONG_BRANCH_MESSAGE = 'Tài khoản của bạn không có quyền đăng nhập vào chi nhánh này';
@@ -164,7 +165,7 @@ export default function LoginPage() {
     <div className="login-bg">
       <div className="login-shell">
         <div className="login-panel-left">
-          <div className="login-panel-brand">AutoGara</div>
+          <img className="login-panel-logo" src={`${BASE_PATH}/AutoGaraLogo-Photoroom.png`} alt="AutoGara" />
           <span className="login-panel-eyebrow">Hệ thống quản lý</span>
           <h2 className="login-panel-headline">Sửa chữa/Bảo dưỡng ô tô chuyên nghiệp</h2>
         </div>
@@ -256,7 +257,7 @@ export default function LoginPage() {
 
             {error && <p className="login-error">{error}</p>}
             {lockoutSeconds > 0 && (
-              <p className="login-error" style={{ color: '#52525b' }}>
+              <p className="login-error" style={{ color: '#b45309' }}>
                 Thử lại sau <strong>{lockoutSeconds}s</strong>. Nếu không phải bạn, hãy đổi mật khẩu.
               </p>
             )}

@@ -2,14 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { useToast } from '../../components/common/ToastContext';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { ROLES } from '../../constants/roles';
+import { actionLabel, consumesPart } from '../../constants/maintenanceChecklist';
 import { formatCurrency } from '../../utils';
-import { searchVehiclesApi, listVehicleBrandsApi, searchVehicleModelsApi, createVehicleModelApi } from '../../services/vehicleApi';
+import { searchVehiclesApi, listVehicleModelsApi } from '../../services/vehicleApi';
 import { searchCatalogApi } from '../../services/catalogApi';
 import { searchProductsApi } from '../../services/productApi';
 import {
   listRepairSettlementsApi,
+  decideNgTaskApi,
   getRepairSettlementApi,
   checkDuplicateSettlementApi,
   createRepairSettlementApi,
@@ -17,11 +21,17 @@ import {
   updateRepairSettlementStatusApi,
   logRepairSettlementPrintApi,
   createPayosPaymentLinkApi,
+  listBranchAdvisorsApi,
+  listBranchTeamLeadersApi,
+  lockSettlementApi,
+  unlockSettlementApi,
+  getSettlementActivityLogApi,
 } from '../../services/repairSettlementApi';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
 import IntakeChecklistView from './IntakeChecklistView';
+import VehicleHistoryModal from './VehicleHistoryModal';
 import SignaturePad from './SignaturePad';
 import './RepairSettlementPage.css';
 
@@ -44,6 +54,7 @@ const REPAIR_CATEGORY_OPTIONS = [
   { value: 'EE', label: 'Sửa chữa điện - điện tử' },
   { value: 'BP', label: 'Đồng sơn' },
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
+  { value: 'CS', label: 'Chăm sóc xe' },
 ];
 const REPAIR_CATEGORY_LABEL_BY_VALUE = Object.fromEntries(REPAIR_CATEGORY_OPTIONS.map((o) => [o.value, o.label]));
 // HTTT = nơi DUY NHẤT xác định ai trả tiền cho dòng này. "Hợp đồng bảo dưỡng"
@@ -102,7 +113,7 @@ const TABS = [
 ];
 // Mau dong nhat cho tab dang duoc chon - de khi doi tab, tat ca deu chuyen
 // sang cung 1 mau (cam) thay vi moi tab co mau active rieng.
-const ACTIVE_TAB_COLOR = '#52525b';
+const ACTIVE_TAB_COLOR = '#E65100';
 
 // ─── Số tiền bằng chữ ────────────────────────────────────────────────
 function numberToVietnamese(num) {
@@ -134,7 +145,7 @@ function emptyItem() {
   // httt de trong (chua chon) - chi mac dinh "Khach hang thanh toan" SAU KHI
   // co van chon 1 dich vu/goi/phu tung that tu catalog (xem selectCatalog*),
   // tranh hien thi san 1 gia tri nhu da chon roi trong khi dong con dang trong.
-  return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: '', repairCategory: '', unit: 'Công', qty: 1, unitPrice: 0, discount: 0, total: 0, note: '' };
+  return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: '', repairCategory: '', unit: 'Công', qty: 1, unitPrice: 0, discount: 0, total: 0, note: '', actionCode: null };
 }
 
 // Suy luan lai nhom "dich vu/goi da chon + phu tung/dich vu con tu dong chen
@@ -168,12 +179,12 @@ function assignGroupIds(items, nextGroupId) {
 // không dùng hàm này). Dòng không thuộc nhóm nào (gói đơn/phụ tùng thêm gõ tay,
 // không groupId) dùng 1 mau trung tinh rieng, khac voi mau cua bat ky nhom nao.
 const GROUP_ROW_COLORS = [
-  '#f4f4f5', // xanh duong nhat
-  '#f4f4f5', // xanh la nhat
-  '#f4f4f5', // vang nhat
-  '#f4f4f5', // hong nhat
-  '#f4f4f5', // tim nhat
-  '#f4f4f5', // xanh ngoc nhat
+  '#EEF4FF', // xanh duong nhat
+  '#F1FBEA', // xanh la nhat
+  '#FFF7E6', // vang nhat
+  '#FDEEF6', // hong nhat
+  '#F1EEFE', // tim nhat
+  '#E9FBF7', // xanh ngoc nhat
 ];
 const UNGROUPED_ROW_COLOR = '#FAFAFA';
 
@@ -235,6 +246,35 @@ function isQuantityReturned(item) {
   return item.lhsc === 'PT' && item.originalQty != null && Number(item.qty) < Number(item.originalQty);
 }
 
+// Dong bi THAY DOI sau khi phieu da chot voi khach - khach huy giua chung,
+// hoac tra bot phu tung da lap. Ca 2 deu la thay doi do BEN KHAC (khach, tho,
+// to truong) gay ra chu khong phai co van tu go, nen phai noi bat len de nguoi
+// doc phieu khong luot qua: chinh may dong nay la ly do tien cuoi cung khac
+// voi bao gia ban dau.
+function laDongDaThayDoi(item) {
+  return item.httt === HTTT_CANCELLED_VALUE || isQuantityReturned(item);
+}
+
+// Danh sach hang muc dung cho BAN IN va MODAL XEM TRUOC - phai la MOT ham,
+// khong the moi cho tu dung mot kieu: modal ten la "xem truoc" nen no phai
+// ra dung cai se in ra giay.
+//
+// Goi bao duong bung ra 30+ dau muc con, in het thi phieu dai 3-4 trang trong
+// khi khach chi tra 1 gia goi - chi can dong ten goi. Chi tiet ben trong da
+// nam o "Phieu kiem tra BDDK" rieng.
+//
+// Goi bi TACH (khach huy 1 muc trong goi -> moi dich vu ve gia le cua no, xem
+// handleCancelItem) thi khong con dong dau goi nua, luc do liet ke tung dich
+// vu la dung: khach dang tra tien theo tung cai chu khong theo gia goi.
+//
+// STT danh lai SAU khi bo dong - giu so goc thi phieu nhay coc 1, 2, 3, 38, 39.
+function dongHangMucDeIn(items) {
+  let demNhom = 0;
+  return assignGroupIds(items || [], () => { demNhom += 1; return demNhom; })
+    .filter((it) => !(it.groupId && !it.isGroupParent && it.lhsc === 'DV'))
+    .map((item, i) => ({ item, i }));
+}
+
 // Nhan hien thi 1 tho trong "Thợ thực hiện" - kem "(Điều động)" neu tho nay
 // khong cung to voi to truong dang phu trach lenh sua chua (dieu dong tu to
 // khac sang giup, xem RepairOrder.sameTeam/RepairSettlement.technicians[].sameTeam).
@@ -281,6 +321,127 @@ function TaskNameLabel({ t }) {
   );
 }
 
+// "Tien do cong viec" hien cho co van - dung chung cho modal Truy cap phieu
+// va man Sua phieu (truoc day 2 cho copy y het nhau nen sua 1 ben la lech).
+//
+// QUAN TRONG - phan biet Dat va KHONG DAT: dau muc kiem tra bi danh "Khong
+// dat" van co is_done = 1 (tho DA lam xong viec kiem tra, chi la ket qua
+// khong dat). Neu chi nhin is_done thi no hien tich xanh y het dau muc dat,
+// co van doc phieu se tuong xe khong co van de gi. Phai to do + dau X rieng.
+function TaskProgressRow({ t, onDecideNg, decidingId }) {
+  const ng = t.checkResult === 'NG';
+  const ok = t.isDone && !ng;
+  const yeuCau = actionLabel(t.actionCode);
+  return (
+    <label
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px',
+        background: t.isCancelled ? 'var(--gray-50)' : (ng ? '#FDECEA' : (ok ? '#E8F5E9' : 'var(--gray-50)')),
+        borderRadius: 6,
+        fontSize: 13,
+        color: t.isCancelled ? 'var(--gray-400)' : (ng ? '#B91C1C' : (ok ? '#2E7D32' : 'var(--gray-900)')),
+      }}
+    >
+      {ng ? (
+        <span style={{ fontWeight: 700, width: 13, textAlign: 'center', flexShrink: 0, lineHeight: '16px' }}>✕</span>
+      ) : (
+        <input type="checkbox" checked={t.isDone} disabled readOnly
+          style={{ accentColor: '#2E7D32', marginTop: 2, flexShrink: 0 }} />
+      )}
+      <span>
+        <TaskNameLabel t={t} />
+        {/* Yeu cau thuc hien ghi ngay trong ngoac sau ten cong viec - co van
+            nhin phieu la biet dau muc do chi kiem tra hay phai thay. */}
+        {yeuCau && <span style={{ color: 'var(--gray-600)' }}> ({yeuCau})</span>}
+        {ng && (
+          <span style={{ fontWeight: 700 }}>
+            {' — Không đạt'}{t.checkNote ? ` — ${t.checkNote}` : ''}
+          </span>
+        )}
+        {ok && t.checkResult === 'OK' && <span style={{ fontWeight: 600 }}> — Đạt</span>}
+        {/* Quyet dinh cua khach cho dau muc Khong dat. 'reported' = tho vua
+            bao, con nam o to truong; 'pending' = to truong da chuyen len, den
+            luot co van goi khach - ca 2 deu chan to truong bam Hoan thanh. */}
+        {t.ngDecision === 'reported' && (
+          <div style={{ color: 'var(--gray-600)', fontWeight: 600, fontSize: 12 }}>
+            Thợ báo cần thay — chờ tổ trưởng xác nhận, chưa cần liên hệ khách
+          </div>
+        )}
+        {t.ngDecision === 'accepted' && (
+          <div style={{ color: t.isDone ? '#2E7D32' : '#B45309', fontWeight: 600, fontSize: 12 }}>
+            Khách đồng ý thay{t.ngNote ? ` — ${t.ngNote}` : ''}
+            {t.isDone ? ' · đã thay xong' : ' · phụ tùng đã thêm vào phiếu, chờ thợ thay'}
+          </div>
+        )}
+        {/* Xuong tu khac phuc: ket qua da la "Đạt" nhung van phai noi ro
+            tung co van de, khong thi co van khong hieu vi sao lich su xe co
+            ghi chu cua tho ma ket qua lai Dat. */}
+        {t.ngDecision === 'resolved' && (
+          <div style={{ color: 'var(--gray-600)', fontWeight: 600, fontSize: 12 }}>
+            Thợ báo không đạt{t.checkNote ? ` (${t.checkNote})` : ''} — xưởng đã xử lý tại chỗ,
+            không phát sinh chi phí{t.ngNote ? `: ${t.ngNote}` : ''}
+          </div>
+        )}
+        {t.ngDecision === 'declined' && (
+          <div style={{ color: 'var(--gray-600)', fontWeight: 600, fontSize: 12 }}>
+            Khách từ chối thay — {t.ngNote}
+          </div>
+        )}
+        {t.ngDecision === 'pending' && onDecideNg && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-primary btn-sm" disabled={decidingId === t.id}
+              onClick={(e) => { e.preventDefault(); onDecideNg(t, 'accepted'); }}>
+              Khách đồng ý thay
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={decidingId === t.id}
+              onClick={(e) => { e.preventDefault(); onDecideNg(t, 'declined'); }}>
+              Khách từ chối
+            </button>
+          </div>
+        )}
+        {t.ngDecision === 'pending' && !onDecideNg && (
+          <div style={{ color: '#B45309', fontWeight: 600, fontSize: 12 }}>Chờ trao đổi với khách</div>
+        )}
+      </span>
+    </label>
+  );
+}
+
+function TaskProgressList({ tasks, bayNumber, technicians, onDecideNg, decidingId }) {
+  const serviceTasks = (tasks || []).filter((t) => t.taskType === 'service');
+  if (serviceTasks.length === 0) return null;
+  const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
+  const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
+  const ngCount = activeServiceTasks.filter((t) => t.checkResult === 'NG').length;
+  const pendingCount = activeServiceTasks.filter((t) => t.ngDecision === 'pending').length;
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div className="form-section-title">
+        Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
+        {/* Bao ro co bao nhieu dau muc KHONG DAT ngay tren tieu de - day la
+            thu co van can tu van lai cho khach, khong the de lan trong danh
+            sach dai. */}
+        {ngCount > 0 && (
+          <span style={{ color: '#B91C1C', fontWeight: 700 }}>{`  ·  ${ngCount} không đạt`}</span>
+        )}
+        {pendingCount > 0 && (
+          <span style={{ color: '#B45309', fontWeight: 700 }}>{`  ·  ${pendingCount} chờ hỏi khách`}</span>
+        )}
+      </div>
+      {(bayNumber || technicians?.length > 0) && (
+        <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
+          {bayNumber && <>Khoang đang thực hiện: <b>{bayNumber}</b></>}
+          {bayNumber && technicians?.length > 0 && '  ·  '}
+          {technicians?.length > 0 && <>Thợ thực hiện: <b>{technicians.map(formatTechnicianLabel).join(', ')}</b></>}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {serviceTasks.map((t) => <TaskProgressRow key={t.id} t={t} onDecideNg={onDecideNg} decidingId={decidingId} />)}
+      </div>
+    </div>
+  );
+}
+
 function calcTotals(items) {
   const billable = (i) => !i.isFree && !isExemptFromCustomerBilling(i);
   const subtotal = items.reduce((s, i) => s + (billable(i) ? (i.qty || 0) * (i.unitPrice || 0) * (1 - (i.discount || 0) / 100) : 0), 0);
@@ -299,6 +460,43 @@ function calcTotals(items) {
     exemptedAmount: Math.round(exemptedAmount),
     total: Math.round(subtotal) + vat,
   };
+}
+
+// Mo 1 cua so moi va in noi dung HTML da dung san.
+//
+// 2 loi that da gap khi tu viet doan nay o moi cho:
+//
+// 1. `w.onload = () => w.print()` gan SAU khi document.close(): neu trang
+//    khong co anh nao (phieu in luc chua co ma QR) thi no da load xong TRUOC
+//    luc gan, su kien load khong bao gio ban nua -> bam In khong ra hop thoai
+//    nao, nguoi dung tuong nut hong. Phai xet readyState truoc.
+//
+// 2. window.open tra ve null khi bi trinh duyet chan popup - goi thang
+//    w.document.write se nem "Cannot read properties of null" giua chung,
+//    khong ai biet chuyen gi. Tra ve ly do de cho goi bao cho tu te.
+//
+// Tra ve '' neu in duoc, hoac cau thong bao loi.
+function moCuaSoIn(html) {
+  const w = window.open('', '_blank');
+  if (!w) {
+    return 'Trình duyệt đã chặn cửa sổ in. Hãy cho phép pop-up cho trang này rồi bấm In lại.';
+  }
+  w.document.write(html);
+  w.document.close();
+
+  const inRa = () => {
+    try {
+      w.focus();
+      w.print();
+    } catch {
+      /* nguoi dung dong cua so truoc khi kip in - khong co gi de lam */
+    }
+  };
+  // 'complete' = anh (neu co) da tai xong. Chua xong thi doi load; anh QR lay
+  // qua network nen in ngay se ra phieu thieu ma QR.
+  if (w.document.readyState === 'complete') inRa();
+  else w.addEventListener('load', inRa, { once: true });
+  return '';
 }
 
 function logPrintBestEffort(order, kind) {
@@ -349,10 +547,7 @@ export function printWorkList(order) {
   <div class="sign-box"><b>KỸ THUẬT VIÊN</b><div class="sign-line">Ký và ghi rõ họ tên</div></div>
 </div>
 </body></html>`;
-  const w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  w.print();
+  return moCuaSoIn(html);
 }
 
 // ─── In phiếu quyết toán sửa chữa ────────────────────────────────────
@@ -364,14 +559,14 @@ function printSettlement(order, payosQrCode) {
   // Tach 2 nhom "Cong viec can thuc hien" / "Phu tung, vat tu" khi in - giong
   // cach hien thi ben form tao/sua phieu va modal Xem chi tiet (giu nguyen so
   // thu tu goc trong mang items, khong danh lai tu 1 cho tung nhom).
-  const indexedItems = (order.items || []).map((item, i) => ({ item, i }));
+  const indexedItems = dongHangMucDeIn(order.items);
   const laborItems = indexedItems.filter(({ item }) => item.lhsc !== 'PT');
   const partItems = indexedItems.filter(({ item }) => item.lhsc === 'PT');
   const laborSubtotal = laborItems.reduce((s, { item }) => s + (item.total || 0), 0);
   const partSubtotal = partItems.reduce((s, { item }) => s + (item.total || 0), 0);
 
   const renderItemRow = ({ item, i }) => `
-    <tr>
+    <tr${laDongDaThayDoi(item) ? ' class="doi-sau"' : ''}>
       <td style="text-align:center">${i + 1}</td>
       <td style="text-align:center">${item.code}</td>
       <td>${item.description}</td>
@@ -387,8 +582,8 @@ function printSettlement(order, payosQrCode) {
 
   const groupHeaderRow = (label) => `
     <tr>
-      <td colspan="2" style="background:#e4e4e7;border-right:none"></td>
-      <td colspan="9" style="background:#e4e4e7;font-weight:bold;padding:5px 7px;border-left:none">${label}</td>
+      <td colspan="2" style="background:#e2e8f0;border-right:none"></td>
+      <td colspan="9" style="background:#e2e8f0;font-weight:bold;padding:5px 7px;border-left:none">${label}</td>
     </tr>`;
 
   const groupSubtotalRow = (amount) => `
@@ -428,6 +623,10 @@ function printSettlement(order, payosQrCode) {
   .sign-row { display:flex; justify-content:space-between; margin-top:30px; }
   .sign-box { text-align:center; width:22%; }
   .sign-line { margin-top:40px; border-top:1px solid #000; padding-top:3px; font-size:10px; }
+  /* Dong bi doi sau khi chot voi khach (khach huy / tra bot phu tung) - in
+     mau do de nguoi doc thay ngay vi sao tien cuoi khac bao gia ban dau.
+     print-color-adjust de trinh duyet khong bo mau khi in ra giay. */
+  tr.doi-sau td { color:#c00; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   @media print { body { margin:8mm 12mm; } }
 </style></head><body>
 <div class="center bold" style="font-size:12px">CÔNG TY TNHH AUTOGARA – CHI NHÁNH ${(order.branch || MOCK_BRANCH).toUpperCase()}</div>
@@ -486,7 +685,7 @@ function printSettlement(order, payosQrCode) {
     <tr><td class="lbl">Tổng cộng sau giảm giá:</td><td class="val">${(order.afterDiscount || 0).toLocaleString('vi-VN')}</td></tr>
     <tr><td class="lbl">Tiền thuế GTGT (8%):</td><td class="val">${(order.vat || 0).toLocaleString('vi-VN')}</td></tr>
     <tr><td class="lbl">Miễn phí:</td><td class="val">${(order.freeAmount || 0).toLocaleString('vi-VN')}</td></tr>
-    <tr style="font-size:13px"><td class="lbl"><b>Tổng giá trị thanh toán:</b></td><td class="val" style="color:#27272a"><b>${(order.total || 0).toLocaleString('vi-VN')}</b></td></tr>
+    <tr style="font-size:13px"><td class="lbl"><b>Tổng giá trị thanh toán:</b></td><td class="val" style="color:#C62828"><b>${(order.total || 0).toLocaleString('vi-VN')}</b></td></tr>
     <tr><td colspan="2" style="font-size:10px; font-style:italic; text-align:right">Bằng chữ: ${numberToVietnamese(order.total)}</td></tr>
   </table>
 </div>
@@ -498,18 +697,16 @@ function printSettlement(order, payosQrCode) {
   <div class="sign-box"><div class="bold">QĐ/TP/PP DVPT</div><div class="sign-line"></div></div>
 </div>
 </body></html>`;
-  const w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  // Anh QR tai qua network (img.vietqr.io) - phai doi load xong roi moi in,
-  // goi print() ngay sau document.close() se in truoc khi anh kip hien.
-  w.onload = () => w.print();
+  return moCuaSoIn(html);
 }
 
 // ─── Modal xem trước & xuất phiếu quyết toán ────────────────────────
 function SettlementPreviewModal({ order, onClose }) {
   // Chi con dung de doi chu nut in ("In phieu" vs "In lai phieu").
   const [hasPrinted, setHasPrinted] = useState(false);
+  // Trinh duyet chan popup thi bam In khong ra gi ca - phai noi ro, khong thi
+  // nguoi dung bam di bam lai tuong nut hong.
+  const [printError, setPrintError] = useState('');
 
   // PayOS: QR dong that, tu tao ngay khi mo modal cho phieu dang cho thanh
   // toan (khong doi CVDV bam them nut nao) - het han sau 60s, khach quet la
@@ -579,7 +776,12 @@ function SettlementPreviewModal({ order, onClose }) {
   }, [payos]);
 
   const handlePrint = () => {
-    printSettlement(order, payos?.qrCode);
+    const loi = printSettlement(order, payos?.qrCode);
+    if (loi) {
+      setPrintError(loi);
+      return;
+    }
+    setPrintError('');
     setHasPrinted(true);
   };
 
@@ -641,7 +843,9 @@ function SettlementPreviewModal({ order, onClose }) {
               </thead>
               <tbody>
                 {(() => {
-                  const indexed = (order.items || []).map((s, i) => ({ s, i }));
+                  // Dung chung ham voi ban in - modal nay la "xem truoc" nen
+                  // phai ra dung cai se in ra giay.
+                  const indexed = dongHangMucDeIn(order.items).map(({ item, i }) => ({ s: item, i }));
                   const laborRows = indexed.filter(({ s }) => s.lhsc !== 'PT');
                   const partRows = indexed.filter(({ s }) => s.lhsc === 'PT');
                   const laborSubtotal = laborRows.reduce((sum, { s }) => sum + (s.total || 0), 0);
@@ -731,13 +935,13 @@ function SettlementPreviewModal({ order, onClose }) {
                         </button>
                       )
                     )}
-                    {cashError && <div style={{ fontSize: 9, color: '#27272a', maxWidth: 130, textAlign: 'center' }}>{cashError}</div>}
+                    {cashError && <div style={{ fontSize: 9, color: '#C62828', maxWidth: 130, textAlign: 'center' }}>{cashError}</div>}
                   </>
                 ) : (
                   <div style={{
                     width: 130, height: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    border: '1px solid #a1a1aa', borderRadius: 8, background: '#e4e4e7',
-                    textAlign: 'center', fontSize: 12, color: '#3f3f46', fontWeight: 600, padding: 6, gap: 4,
+                    border: '1px solid #A5D6A7', borderRadius: 8, background: '#E8F5E9',
+                    textAlign: 'center', fontSize: 12, color: '#2E7D32', fontWeight: 600, padding: 6, gap: 4,
                   }}>
                     <span>✓ Đã thanh toán</span>
                     {order.paymentMethod && (
@@ -768,6 +972,15 @@ function SettlementPreviewModal({ order, onClose }) {
           </div>
         </div>
 
+        {printError && (
+          <div style={{
+            margin: '0 16px 8px', padding: '8px 10px', borderRadius: 6,
+            background: '#FFEBEE', border: '1px solid #EF9A9A',
+            fontSize: 12.5, color: '#C62828',
+          }}>
+            {printError}
+          </div>
+        )}
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
           {order.status === 'waiting_payment' && (
@@ -791,7 +1004,7 @@ function SettlementPreviewModal({ order, onClose }) {
             <div className="modal-body">
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
                 Bạn xác nhận đã nhận được số tiền{' '}
-                <b style={{ color: '#27272a' }}>{(order.total || 0).toLocaleString('vi-VN')}đ</b>{' '}
+                <b style={{ color: 'red' }}>{(order.total || 0).toLocaleString('vi-VN')}đ</b>{' '}
                 từ khách hàng <b>{order.customer?.fullName}</b>?
               </p>
             </div>
@@ -799,7 +1012,7 @@ function SettlementPreviewModal({ order, onClose }) {
               <button className="btn btn-danger" onClick={() => setShowCashConfirm(false)}>Hủy</button>
               <button
                 className="btn btn-primary"
-                style={{ background: '#3f3f46', borderColor: '#3f3f46' }}
+                style={{ background: '#2E7D32', borderColor: '#2E7D32' }}
                 onClick={handleConfirmCash}
               >
                 Xác nhận
@@ -823,7 +1036,44 @@ function displayStatus(o) {
 }
 
 // ─── Modal xem chi tiết phiếu ────────────────────────────────────────
-function DetailModal({ order, onClose, onPreview }) {
+// Khung thu gon duoc cua form tao/sua phieu. Form nay rat dai (khach hang +
+// xe, tiep nhan/ban giao, hang muc, chu ky) nen cho phep gap tung khung lai
+// de con vien tap trung vao phan dang lam.
+//
+// Noi dung KHONG bi unmount khi thu gon (chi display:none) - phai giu nguyen
+// canvas chu ky (SignaturePad giu ref + net ve), o dang go do, va vi tri cuon.
+// Neu render co dieu kien thi chu ky da ve se mat khi gap khung lai.
+//
+// Bam vao mui ten hoac tieu de de gap/mo; cac nut thao tac o ben phai (Chon
+// lai khach hang, Them dich vu...) nam ngoai vung bam nen khong bi anh huong.
+function CollapsibleCard({ title, note, summary, actions, open, onToggle, bodyStyle, children }) {
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button type="button" onClick={onToggle} aria-expanded={open}
+          title={open ? 'Thu gọn' : 'Mở rộng'}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, border: 'none', background: 'none',
+            padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit',
+          }}>
+          <span style={{
+            fontSize: 11, color: 'var(--gray-500)', width: 16, textAlign: 'center',
+            transition: 'transform .15s', transform: open ? 'rotate(90deg)' : 'none',
+          }}>▶</span>
+          <span className="card-title">{title}</span>
+        </button>
+        {note}
+        {!open && summary && (
+          <span style={{ fontSize: 12, color: 'var(--gray-600)', fontStyle: 'italic' }}>{summary}</span>
+        )}
+        {actions && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>{actions}</div>}
+      </div>
+      <div className="card-body" style={open ? bodyStyle : { display: 'none' }}>{children}</div>
+    </div>
+  );
+}
+
+function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, decidingId }) {
   const st = STATUS_LABELS[displayStatus(order)];
   const [showIntake, setShowIntake] = useState(false);
   return (
@@ -888,7 +1138,7 @@ function DetailModal({ order, onClose, onPreview }) {
           {order.cancelReason && (
             <>
               <div className="form-section-title">Lý do hủy</div>
-              <div style={{ background: '#e4e4e7', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#27272a' }}>
+              <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#C62828' }}>
                 {order.cancelReason}
               </div>
             </>
@@ -908,13 +1158,20 @@ function DetailModal({ order, onClose, onPreview }) {
                   const laborSubtotal = laborRows.reduce((s, { item }) => s + (item.total || 0), 0);
                   const partSubtotal = partRows.reduce((s, { item }) => s + (item.total || 0), 0);
 
+                  // To do CA DONG neu no bi doi sau khi chot voi khach - giong
+                  // ban in, de nguoi doc thay ngay vi sao tien khac bao gia dau.
                   const renderRow = ({ item, i }) => (
-                    <tr key={i}>
+                    <tr key={i} style={laDongDaThayDoi(item) ? { color: 'var(--red)' } : undefined}>
                       <td style={{ textAlign: 'center' }}>{i + 1}</td>
                       <td><span style={{ fontFamily: 'monospace', fontSize: 11 }}>{item.code}</span></td>
                       <td>
                         {item.description}
                         {!item.isFree && isExemptFromCustomerBilling(item) && <span className="tag" style={{ marginLeft: 6 }}>Miễn thu KH</span>}
+                        {/* Yêu cầu thực hiện của biểu mẫu "Phiếu kiểm tra BDĐK" -
+                            chỉ đầu mục con của gói bảo dưỡng mới có. */}
+                        {actionLabel(item.actionCode) && (
+                          <div style={{ fontSize: 11, color: 'var(--gray-600)', fontStyle: 'italic' }}>{actionLabel(item.actionCode)}</div>
+                        )}
                       </td>
                       <td style={{ textAlign: 'center' }}><span className="tag">{REPAIR_CATEGORY_LABEL_BY_VALUE[item.repairCategory] || '—'}</span></td>
                       <td style={{ textAlign: 'center' }}>{HTTT_LABEL_BY_VALUE[item.httt] || '—'}</td>
@@ -924,7 +1181,7 @@ function DetailModal({ order, onClose, onPreview }) {
                       <td style={{ textAlign: 'center' }}>{item.discount || 0}%</td>
                       <td style={{ textAlign: 'right', fontWeight: 700 }}>
                         {(item.total || 0).toLocaleString('vi-VN')}
-                        {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
+                        {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: laDongDaThayDoi(item) ? 'var(--red)' : 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
                       </td>
                       <td style={{ color: 'var(--gray-600)', fontStyle: item.note ? 'normal' : 'italic' }}>{item.note || '—'}</td>
                     </tr>
@@ -964,42 +1221,8 @@ function DetailModal({ order, onClose, onPreview }) {
             </table>
           </div>
 
-          {(() => {
-            const serviceTasks = (order.tasks || []).filter((t) => t.taskType === 'service');
-            if (serviceTasks.length === 0) return null;
-            const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
-            const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
-            return (
-              <div style={{ marginTop: 16 }}>
-                <div className="form-section-title">
-                  Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
-                </div>
-                {(order.bayNumber || order.technicians?.length > 0) && (
-                  <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
-                    {order.bayNumber && <>Khoang đang thực hiện: <b>{order.bayNumber}</b></>}
-                    {order.bayNumber && order.technicians?.length > 0 && '  ·  '}
-                    {order.technicians?.length > 0 && <>Thợ thực hiện: <b>{order.technicians.map(formatTechnicianLabel).join(', ')}</b></>}
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {serviceTasks.map((t) => (
-                    <label
-                      key={t.id}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                        background: t.isCancelled ? 'var(--gray-50)' : (t.isDone ? '#e4e4e7' : 'var(--gray-50)'), borderRadius: 6,
-                        fontSize: 13,
-                        color: t.isCancelled ? 'var(--gray-400)' : (t.isDone ? '#3f3f46' : 'var(--gray-900)'),
-                      }}
-                    >
-                      <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#3f3f46' }} />
-                      <TaskNameLabel t={t} />
-                    </label>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          <TaskProgressList tasks={order.tasks} bayNumber={order.bayNumber} technicians={order.technicians}
+            onDecideNg={onDecideNg} decidingId={decidingId} />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
             {order.signatureData ? (
@@ -1048,6 +1271,9 @@ function DetailModal({ order, onClose, onPreview }) {
             {showIntake ? 'Ẩn xem tình trạng xe ban đầu' : 'Xem tình trạng xe ban đầu'}
           </button>
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
+          {canEdit && (
+            <button className="btn btn-warning" onClick={onEdit}>Chỉnh sửa phiếu</button>
+          )}
           {(order.status === 'waiting_payment' || order.status === 'invoiced') && (
             <button className="btn btn-primary" style={{ background: '#3f3f46', borderColor: '#3f3f46' }}
               onClick={() => { onClose(); onPreview(order); }}>
@@ -1071,11 +1297,11 @@ function DetailModal({ order, onClose, onPreview }) {
           }}
         >
           <div className="modal-header">
-            <h3 className="modal-title">Phiếu tiếp nhận và bàn giao xe</h3>
+            <h3 className="modal-title">Tiếp nhận và bàn giao xe</h3>
             <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
           </div>
           <div className="modal-body">
-            <IntakeChecklistView value={order.intakeChecklist} />
+            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} />
           </div>
         </div>
       )}
@@ -1106,10 +1332,115 @@ function RepairSettlementList() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
+  const confirm = useConfirm();
+  // Ghi nhan quyet dinh cua khach cho dau muc "Khong dat" (xem BE
+  // RepairSettlementService.decideNgTask). Khach tu choi thi BAT BUOC ghi ly
+  // do - ly do nay se in vao muc "Cac hang muc can lam som" cua phieu.
+  const [decidingId, setDecidingId] = useState(null);
+  const handleDecideNg = async (task, decision) => {
+    let note = '';
+    if (decision === 'declined') {
+      const lyDo = await confirm({
+        title: 'Khách từ chối thay',
+        message: `Khách từ chối thay "${task.taskName}".`,
+        detail: task.checkNote ? `Thợ ghi: ${task.checkNote}` : undefined,
+        confirmText: 'Ghi nhận từ chối',
+        tone: 'warning',
+        input: {
+          label: 'Lý do khách từ chối',
+          placeholder: 'VD: khách hẹn lần bảo dưỡng sau',
+          required: true,
+        },
+      });
+      if (!lyDo) return;
+      note = lyDo;
+    } else {
+      const ok = await confirm({
+        title: 'Khách đồng ý thay',
+        message: `Khách đồng ý thay "${task.taskName}"?`,
+        detail: 'Hệ thống sẽ tự thêm phụ tùng vào phiếu, tính lại tổng tiền, và mở lại đầu mục này để thợ thay.',
+        confirmText: 'Khách đồng ý',
+        tone: 'success',
+      });
+      if (!ok) return;
+    }
+    setDecidingId(task.id);
+    try {
+      const updated = await decideNgTaskApi(view.id, task.id, decision, note);
+      setView(updated);
+      loadAll({ silent: true });
+      // Bao ro da them phu tung gi - co van con doi chieu voi gia da bao
+      // khach qua dien thoai truoc khi chot.
+      const daThem = updated?.ngAddedParts || [];
+      if (decision === 'accepted') {
+        if (daThem.length > 0) {
+          toast.success(`Đã thêm vào phiếu: ${daThem.map((p) => `${p.name} (${p.quantity} ${p.unit || 'Cái'})`).join(', ')}. Đầu mục đã mở lại để thợ thay.`);
+        } else {
+          // Dich vu khong khai dinh muc phu tung - co van phai tu them
+          // tay, khong de im lang tuong la da xong.
+          toast.warning('Đã ghi nhận khách đồng ý, nhưng đầu mục này chưa khai định mức phụ tùng - hãy vào Chỉnh sửa phiếu để thêm tay');
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || 'Không ghi nhận được quyết định');
+    } finally {
+      setDecidingId(null);
+    }
+  };
   const canManage = user?.primaryRole !== ROLES.ADMIN;
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  // Menu 2 lua chon (Truy cap phieu / Nhat ky hoat dong) tren tung dong - chi
+  // 1 dong mo cung luc, luu id phieu dang mo menu. Render qua portal (xem
+  // menuRect - toa do viewport cua nut vua bam) ra NGOAI .table-wrapper (von
+  // overflow:auto de cuon ngang bang, xem catalogDropdownRect o form Tao/Sua
+  // cho 1 truong hop tuong tu) de khong bi cat mat o cot cuoi cung ben phai.
+  const [menuOpenId, setMenuOpenId] = useState(null);
+  const [menuRect, setMenuRect] = useState(null);
+  // Menu nao dang mo NGAY TRUOC cu bam hien tai - dung de bam lai dung dong
+  // dang mo thi dong menu (toggle), xem handler mousedown ben duoi.
+  const menuOpenBeforeClickRef = useRef(null);
+
+  // Dong menu khi bam ra ngoai. Truoc day dung 1 lop phu toan man hinh
+  // (position:fixed; inset:0) - no dong menu that, nhung NUOT luon cu bam:
+  // bam nut "Huy" thi menu dong ma nut khong chay, bam sang dong khac thi menu
+  // cua dong do khong mo len. Nghe o tang document (pha capture, chay TRUOC
+  // onClick cua React) thi menu van dong ma cu bam van toi duoc dich that su.
+  useEffect(() => {
+    if (menuOpenId === null) return undefined;
+    const onDocMouseDown = (e) => {
+      // Bam trong chinh menu: de cac muc tu xu ly (chung tu dong menu).
+      if (e.target.closest?.('[data-row-menu]')) return;
+      menuOpenBeforeClickRef.current = menuOpenId;
+      setMenuOpenId(null);
+      setMenuRect(null);
+    };
+    document.addEventListener('mousedown', onDocMouseDown, true);
+    return () => document.removeEventListener('mousedown', onDocMouseDown, true);
+  }, [menuOpenId]);
+  // Phieu dang xem "Nhat ky hoat dong" (modal rieng, khong lien quan view/khoa).
+  const [activityLogFor, setActivityLogFor] = useState(null);
+  // Khoa "dang mo phieu" (xem lockSettlementApi) - id phieu dang giu khoa +
+  // interval gia han 20s/lan trong luc con mo view. Dung ref (khong phai
+  // state) vi chi doc/ghi trong callback/cleanup, khong can re-render.
+  const lockedIdRef = useRef(null);
+  const lockIntervalRef = useRef(null);
+  const releaseLockIfHeld = useCallback(() => {
+    if (lockIntervalRef.current) {
+      clearInterval(lockIntervalRef.current);
+      lockIntervalRef.current = null;
+    }
+    if (lockedIdRef.current) {
+      unlockSettlementApi(lockedIdRef.current).catch(() => {});
+      lockedIdRef.current = null;
+    }
+  }, []);
+  // Nha khoa neu con giu luc roi khoi man hinh (chuyen tab/route khac) ma
+  // chua bam nut dong view - luoi an toan cuoi cung truoc khi cho TTL 60s tu
+  // het han (xem RepairSettlementRepositoryImpl.acquireLock).
+  useEffect(() => () => releaseLockIfHeld(), [releaseLockIfHeld]);
   // Sau khi phan cong to truong xong (RepairOrderCreate) hoac tu cac luong
   // dieu huong khac muon mo san 1 tab cu the, co the truyen state: { tab }
   // khi navigate() toi day - vd chuyen thang sang "Dang sua chua" sau khi
@@ -1120,6 +1451,23 @@ function RepairSettlementList() {
   // ap dung moi tab (phieu nao chua co to truong se khong khop khi loc chon 1
   // ten cu the, dung nhu ky vong); hinh thuc thanh toan chi co y nghia o tab
   // "Đã xuất hóa đơn" nen chi hien dropdown do o dung tab nay.
+  //
+  // Bo loc theo co van dich vu. Mac dinh 'me' - mo phan mem len la thay viec
+  // CUA MINH truoc, khong phai loi ca chi nhanh ra roi tu tim. Van doi sang
+  // 'all' hoac 1 co van cu the duoc (vd truc thay ca, hoac xem giup dong
+  // nghiep dang nghi).
+  //
+  // Danh sach lay tu CHINH cac phieu da tai ve - ma phieu tai ve luon bi BE
+  // gioi han trong chi nhanh cua nguoi dang dang nhap (branchId lay tu token,
+  // khong nhan tu client), nen khong co duong nao loc sang chi nhanh khac.
+  const [filterAdvisor, setFilterAdvisor] = useState('me');
+  // Lay theo VAI TRO tu BE, khong suy tu cac phieu da tai ve: suy tu phieu thi
+  // ai bi gan nham vao o co van cung hien ra (dang co 1 to truong nam trong
+  // do), va co van moi chua lam phieu nao thi lai khong hien.
+  const [advisorOptions, setAdvisorOptions] = useState([]);
+  useEffect(() => {
+    listBranchAdvisorsApi().then(setAdvisorOptions).catch(() => setAdvisorOptions([]));
+  }, []);
   const [filterTeamLeader, setFilterTeamLeader] = useState('');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -1138,7 +1486,11 @@ function RepairSettlementList() {
   const loadAll = ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     if (!silent) setLoadError('');
-    return listRepairSettlementsApi({ limit: 200 })
+    // scope=branch: bo loc "chi phieu cua chinh minh" - moi CVDV trong chi
+    // nhanh deu thay het phieu cua nhau (kem "dang mo boi ai" tren tung dong,
+    // xem cot lockedByName/lockedAt tra ve). BE da ho tro san co nay (dung
+    // chung voi man "Lenh sua chua").
+    return listRepairSettlementsApi({ limit: 200, scope: 'branch' })
       .then((result) => setOrders(result.items || []))
       .catch((err) => { if (!silent) setLoadError(err.message || 'Không tải được danh sách phiếu quyết toán'); })
       .finally(() => { if (!silent) setLoading(false); });
@@ -1183,7 +1535,7 @@ function RepairSettlementList() {
   //     nhanh vua tao) -> nap lai danh sach ngay, tranh phai doi poll/F5 moi
   //     thay phieu moi.
   const handleRepairOrderEvent = (event) => {
-    if (event.type === 'task-updated' && view && String(view.id) === String(event.settlementId)) {
+    if (event.type === 'task-updated' && view && String(view.id) === String(event.orderId)) {
       getRepairSettlementApi(view.id).then(setView).catch(() => { });
     }
     if (event.type === 'new-pending') {
@@ -1191,20 +1543,20 @@ function RepairSettlementList() {
     }
     if (event.type === 'claimed') {
       loadAll({ silent: true });
-      if (view && String(view.id) === String(event.settlementId)) {
+      if (view && String(view.id) === String(event.orderId)) {
         getRepairSettlementApi(view.id).then(setView).catch(() => { });
       }
     }
     if (event.type === 'order-completed') {
       loadAll({ silent: true });
-      if (view && String(view.id) === String(event.settlementId)) {
+      if (view && String(view.id) === String(event.orderId)) {
         setView(null);
         setTab('waiting_payment');
       }
     }
     if (event.type === 'invoiced') {
       loadAll({ silent: true });
-      if (previewOrder && String(previewOrder.id) === String(event.settlementId)) {
+      if (previewOrder && String(previewOrder.id) === String(event.orderId)) {
         setPreviewOrder(null);
         setView(null);
         setTab('invoiced');
@@ -1213,20 +1565,36 @@ function RepairSettlementList() {
     if (event.type === 'order-cancelled') {
       loadAll({ silent: true });
     }
+    // 1 CVDV khac vua chiem/nha khoa "dang mo phieu" - nap lai danh sach de
+    // cot "Đang mở bởi" cap nhat ngay, khong can cho poll 20s.
+    if (event.type === 'locked' || event.type === 'unlocked') {
+      loadAll({ silent: true });
+    }
   };
   useRepairOrderEventsSSE(handleRepairOrderEvent, true);
 
+  // Bo loc co van ap cho CA so dem tren tab lan danh sach - neu chi ap cho
+  // danh sach thi tab ghi "Đang sửa chữa 2" trong khi ben duoi chi co 1 dong,
+  // nguoi dung tuong mat phieu.
+  const dungCoVan = (o) => {
+    if (filterAdvisor === 'me') return String(o.advisorId) === String(user?.id);
+    if (filterAdvisor === 'all') return true;
+    return String(o.advisorId) === filterAdvisor;
+  };
+  const theoCoVan = orders.filter(dungCoVan);
+
   const counts = {
-    waiting_repair: orders.filter((o) => displayStatus(o) === 'waiting_repair').length,
-    inprogress: orders.filter((o) => displayStatus(o) === 'inprogress').length,
-    waiting_payment: orders.filter((o) => o.status === 'waiting_payment').length,
-    invoiced: orders.filter((o) => o.status === 'invoiced').length,
-    cancelled: orders.filter((o) => o.status === 'cancelled').length,
+    waiting_repair: theoCoVan.filter((o) => displayStatus(o) === 'waiting_repair').length,
+    inprogress: theoCoVan.filter((o) => displayStatus(o) === 'inprogress').length,
+    waiting_payment: theoCoVan.filter((o) => o.status === 'waiting_payment').length,
+    invoiced: theoCoVan.filter((o) => o.status === 'invoiced').length,
+    cancelled: theoCoVan.filter((o) => o.status === 'cancelled').length,
   };
 
   // Danh sach Tổ trưởng duy nhat tu chinh du lieu dang co, cho dropdown loc -
   // khong goi API rieng, tranh phai dong bo them 1 nguon du lieu khac.
   const teamLeaderOptions = [...new Set(orders.map((o) => o.teamLeader).filter(Boolean))].sort();
+
 
   const filtered = orders.filter((o) => {
     if (displayStatus(o) !== tab) return false;
@@ -1237,6 +1605,7 @@ function RepairSettlementList() {
         || (o.vehicle?.licensePlate || '').toLowerCase().includes(s);
       if (!matches) return false;
     }
+    if (!dungCoVan(o)) return false;
     if (filterTeamLeader && o.teamLeader !== filterTeamLeader) return false;
     if (tab === 'invoiced' && filterPaymentMethod && o.paymentMethod !== filterPaymentMethod) return false;
     const orderDate = toComparableDate(o.date);
@@ -1253,10 +1622,18 @@ function RepairSettlementList() {
   const pageSafe = Math.min(page, totalPages);
   const paginated = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
-  useEffect(() => { setPage(1); }, [tab, search, filterTeamLeader, filterPaymentMethod, filterDateFrom, filterDateTo]);
+  useEffect(() => { setPage(1); }, [tab, search, filterAdvisor, filterTeamLeader, filterPaymentMethod, filterDateFrom, filterDateTo]);
+
+  // O "Thao tác" chi co nut voi phieu dang cho sua / dang sua / cho thanh toan
+  // (Hủy, In phiếu và xuất hóa đơn). Phieu da xuat hoa don hoac da huy thi
+  // khong con thao tac nao - giu cot lai chi de mot cot trong tron tu tren
+  // xuong duoi, an di cho gon.
+  const coThaoTac = tab !== 'invoiced' && tab !== 'cancelled';
+  // 9 cot co dinh + 2 cot rieng cua tab "Đã xuất hóa đơn" + cot Thao tac neu con.
+  const soCot = 9 + (tab === 'invoiced' ? 2 : 0) + (coThaoTac ? 1 : 0);
 
   // Danh sach chi tra ve thong tin tom tat (khong co items - de tranh phai
-  // gop them bang service_order_items cho tung dong khi hien thi danh sach) -
+  // gop them bang repair_order_items cho tung dong khi hien thi danh sach) -
   // moi cho can hang muc day du (xem chi tiet, in danh sach CV, xem/in phieu
   // quyet toan) phai goi rieng getById de lay day du, khong dung truc tiep
   // dong danh sach.
@@ -1276,6 +1653,34 @@ function RepairSettlementList() {
   const handlePreview = async (o) => {
     setPreviewOrder(await fetchFullOrder(o));
   };
+
+  // "Truy cập phiếu" (thay cho nut "Xem chi tiet" cu) - chiem khoa truoc khi
+  // mo, chan 2 CVDV cung vao sua 1 phieu 1 luc. Neu dang bi nguoi khac giu
+  // (409) thi bao ro ten + gio, khong mo view. Sau khi mo thanh cong, cu 20s
+  // gui 1 nhip gia han (khop chu ky poll 20s da co san) de khoa khong tu het
+  // han trong luc van con dang xem - xem RepairSettlementRepositoryImpl
+  // .acquireLock (LOCK_TTL_SECONDS = 60, gap 3 lan chu ky nay).
+  const handleAccessSettlement = async (o) => {
+    try {
+      await lockSettlementApi(o.id);
+    } catch (err) {
+      if (err.status === 409) {
+        const name = err.details?.lockedByName || 'người khác';
+        toast.warning(`Phiếu đang được ${name} mở, vui lòng thử lại sau.`);
+      } else {
+        toast.error(err.message || 'Không thể mở phiếu, vui lòng thử lại');
+      }
+      return;
+    }
+    releaseLockIfHeld(); // phong khi truoc do dang giu khoa 1 phieu khac chua nha.
+    lockedIdRef.current = o.id;
+    lockIntervalRef.current = setInterval(() => {
+      lockSettlementApi(o.id).catch(() => {});
+    }, 20000);
+    await handleViewDetail(o);
+  };
+
+  const handleOpenActivityLog = (o) => setActivityLogFor(o);
 
   // Huy phieu quyet toan la MOT chieu du dang o trang thai nao (chua nhan
   // hay dang sua chua deu duoc) - BE tu cascade huy luon lenh sua chua neu
@@ -1331,6 +1736,19 @@ function RepairSettlementList() {
 
       {/* Bo loc bo sung - tat ca AND voi nhau va voi o Search/tab o tren (loc kep). */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select className="form-select" style={{ fontSize: 12, width: 'auto', minWidth: 180 }}
+          value={filterAdvisor} onChange={(e) => setFilterAdvisor(e.target.value)}
+          title="Lọc theo cố vấn dịch vụ phụ trách phiếu (trong cùng chi nhánh)">
+          <option value="me">Phiếu của tôi</option>
+          <option value="all">Tất cả cố vấn</option>
+          {advisorOptions
+            .filter((cv) => String(cv.id) !== String(user?.id))
+            .map((cv) => (
+              <option key={cv.id} value={cv.id}>
+                {cv.phone ? `${cv.name} — ${cv.phone}` : cv.name}
+              </option>
+            ))}
+        </select>
         <select className="form-select" style={{ fontSize: 12, width: 'auto', minWidth: 160 }}
           value={filterTeamLeader} onChange={(e) => setFilterTeamLeader(e.target.value)}>
           <option value="">Tất cả Tổ trưởng</option>
@@ -1350,11 +1768,11 @@ function RepairSettlementList() {
           <span>đến</span>
           <input className="form-input" type="date" style={{ fontSize: 12, width: 'auto' }} value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
         </div>
-        {(filterTeamLeader || filterPaymentMethod || filterDateFrom || filterDateTo) && (
+        {(filterAdvisor !== 'me' || filterTeamLeader || filterPaymentMethod || filterDateFrom || filterDateTo) && (
           <button
             className="btn btn-secondary btn-sm"
             style={{ fontSize: 11 }}
-            onClick={() => { setFilterTeamLeader(''); setFilterPaymentMethod(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+            onClick={() => { setFilterAdvisor('me'); setFilterTeamLeader(''); setFilterPaymentMethod(''); setFilterDateFrom(''); setFilterDateTo(''); }}
           >
             Xóa lọc
           </button>
@@ -1362,13 +1780,13 @@ function RepairSettlementList() {
       </div>
 
       {loadError && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#27272a' }}>
+        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
           {loadError}
         </div>
       )}
 
       {tab === 'waiting_payment' && counts.waiting_payment > 0 && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#3f3f46' }}>
+        <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#2E7D32' }}>
           Nhấn <b>In phiếu và xuất hóa đơn</b> để xem/in phiếu quyết toán và hoàn tất dịch vụ.
         </div>
       )}
@@ -1377,22 +1795,22 @@ function RepairSettlementList() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Số RO</th><th>Khách hàng</th><th>Xe</th><th>Tổ trưởng</th>
+              <th>Số RO</th><th>Người tạo</th><th>Khách hàng</th><th>Xe</th><th>Tổ trưởng</th><th>Thợ sửa</th>
               <th>Ngày tiếp nhận</th><th>Tổng tiền</th><th>Trạng thái</th>
               {tab === 'invoiced' && <><th>Hình thức TT</th><th>Thời gian TT</th></>}
-              <th>Thao tác</th>
+              {coThaoTac && <th>Thao tác</th>}
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={tab === 'invoiced' ? 10 : 8}>
+              <tr><td colSpan={soCot}>
                 <div className="empty-state">
                   <p>Đang tải danh sách phiếu…</p>
                 </div>
               </td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={tab === 'invoiced' ? 10 : 8}>
+              <tr><td colSpan={soCot}>
                 <div className="empty-state">
                   <h3>Chưa có phiếu quyết toán nào</h3>
                   <p>Không có phiếu nào ở trạng thái này.</p>
@@ -1402,8 +1820,38 @@ function RepairSettlementList() {
             {paginated.map((o) => {
               const st = STATUS_LABELS[displayStatus(o)];
               return (
-                <tr key={o.id} style={{ background: o.status === 'waiting_payment' ? '#f4f4f5' : undefined }}>
+                <tr key={o.id}
+                  style={{ background: o.status === 'waiting_payment' ? '#F9FBE7' : undefined, cursor: 'pointer' }}
+                  onClick={(e) => {
+                    // Handler mousedown o tang document da dong menu truoc do va ghi lai
+                    // no vua mo cho dong nao. Bam lai dung dong dang mo = y muon DONG,
+                    // nen khong mo lai; bam dong khac thi mo menu cua dong do.
+                    const wasOpen = menuOpenBeforeClickRef.current;
+                    menuOpenBeforeClickRef.current = null;
+                    if (wasOpen === o.id) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setMenuRect({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                    setMenuOpenId(o.id);
+                  }}>
+                  {menuOpenId === o.id && menuRect && createPortal(
+                    // Khong con lop phu chan click - viec dong menu do handler mousedown
+                    // o tang document lo (xem useEffect ben tren), nho vay cu bam van
+                    // toi duoc nut/dong ben duoi.
+                    <div data-row-menu
+                      style={{ position: 'fixed', top: menuRect.top, right: menuRect.right, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000, minWidth: 180 }}>
+                      <div onMouseDown={() => { setMenuOpenId(null); setMenuRect(null); handleAccessSettlement(o); }}
+                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)', whiteSpace: 'nowrap' }}>
+                        Truy cập phiếu
+                      </div>
+                      <div onMouseDown={() => { setMenuOpenId(null); setMenuRect(null); handleOpenActivityLog(o); }}
+                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}>
+                        Nhật ký hoạt động phiếu
+                      </div>
+                    </div>,
+                    document.body
+                  )}
                   <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{o.code}</span></td>
+                  <td style={{ fontSize: 12 }}>{o.advisor || <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>—</span>}</td>
                   <td>
                     <div style={{ fontWeight: 700 }}>{o.customer?.fullName}</div>
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{o.customer?.phone}</div>
@@ -1415,9 +1863,31 @@ function RepairSettlementList() {
                   <td style={{ fontSize: 12 }}>
                     {o.teamLeader ? <span>{o.teamLeader}</span> : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa gán</span>}
                   </td>
+                  {/* Ai da cam may chiec xe nay - thu khach hoi dau tien khi
+                      quay lai khieu nai, truoc day phai mo tung phieu ra xem. */}
+                  <td style={{ fontSize: 12 }}>
+                    {o.technicianNames
+                      ? <span>{o.technicianNames}</span>
+                      : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa gán</span>}
+                  </td>
                   <td style={{ fontSize: 12 }}>{o.date}</td>
-                  <td style={{ fontWeight: 700, color: '#27272a' }}>{formatCurrency(o.total)}</td>
-                  <td><span className={`badge ${st?.badge}`}>{st?.label}</span></td>
+                  <td style={{ fontWeight: 700, color: '#C62828' }}>{formatCurrency(o.total)}</td>
+                  <td>
+                    <span className={`badge ${st?.badge}`}>{st?.label}</span>
+                    {/* Tho da cham "Khong dat" ma chua ai goi hoi khach - viec
+                        cua co van, phai thay ngay o danh sach chu khong doi mo
+                        tung phieu. To truong cung dang bi chan dong lenh vi no. */}
+                    {o.ngPendingCount > 0 && (
+                      <div style={{ fontSize: 10.5, color: '#B45309', fontWeight: 700, marginTop: 3 }}>
+                        ⚠ {o.ngPendingCount} mục không đạt — cần hỏi khách
+                      </div>
+                    )}
+                    {o.lockedByName && (
+                      <div style={{ fontSize: 10, color: 'var(--gray-500)', marginTop: 3, fontStyle: 'italic' }}>
+                        Đang mở: {o.lockedByName}{o.lockedAt ? ` lúc ${o.lockedAt.slice(-5)}` : ''}
+                      </div>
+                    )}
+                  </td>
                   {tab === 'invoiced' && (
                     <>
                       <td style={{ fontSize: 12 }}>
@@ -1426,10 +1896,9 @@ function RepairSettlementList() {
                       <td style={{ fontSize: 12 }}>{o.paidDate || '—'}</td>
                     </>
                   )}
-                  <td>
+                  {coThaoTac && (
+                  <td onClick={(e) => e.stopPropagation()}>
                     <div className="table-actions">
-                      <button className="btn btn-info btn-sm" style={{ fontSize: 11 }} onClick={() => handleViewDetail(o)}>Xem chi tiết</button>
-
                       {o.status === 'waiting_repair' && (
                         <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => setCancelTarget({ kind: 'settlement', id: o.id, code: o.code })}>Hủy</button>
                       )}
@@ -1439,21 +1908,19 @@ function RepairSettlementList() {
                       )}
 
                       {o.status === 'waiting_payment' && (
-                        <button className="btn btn-primary btn-sm" style={{ fontSize: 11, background: '#3f3f46', borderColor: '#3f3f46' }}
+                        <button className="btn btn-primary btn-sm" style={{ fontSize: 11, background: '#2E7D32', borderColor: '#2E7D32' }}
                           onClick={() => handlePreview(o)}>
                           In phiếu và xuất hóa đơn
                         </button>
                       )}
 
-                      {canManage && o.status !== 'invoiced' && o.status !== 'waiting_payment' && o.status !== 'cancelled' && (
-                        // Khong truyen state={{ order: o }} - dong o lay tu danh sach KHONG co
-                        // items day du (xem fetchFullOrder), truyen thang vao se lam form luu
-                        // ghi de mat het hang muc cong viec cua phieu. De trang Chinh sua tu
-                        // goi getRepairSettlementApi(id) lay day du.
-                        <Link to={`/repair-settlement/edit/${o.id}`} className="btn btn-warning btn-sm" style={{ fontSize: 11 }}>Chỉnh sửa</Link>
-                      )}
+                      {/* "Chinh sua" da chuyen vao trong modal "Truy cap phieu"
+                          (xem DetailModal) - de thao tac sua phieu luon di qua
+                          buoc mo phieu, tranh 2 nguoi cung sua ma khong ai biet
+                          (khoa "dang mo phieu" chi duoc dat khi truy cap phieu). */}
                     </div>
                   </td>
+                  )}
                 </tr>
               );
             })}
@@ -1475,8 +1942,31 @@ function RepairSettlementList() {
       {view && (
         <DetailModal
           order={view}
-          onClose={() => setView(null)}
+          onClose={() => { releaseLockIfHeld(); setView(null); }}
           onPreview={setPreviewOrder}
+          onDecideNg={canManage ? handleDecideNg : undefined}
+          decidingId={decidingId}
+          canEdit={canManage && view.status !== 'invoiced' && view.status !== 'waiting_payment' && view.status !== 'cancelled'}
+          // Nha khoa "dang mo phieu" truoc khi roi sang trang Chinh sua - trang
+          // do khong gui nhip gia han khoa, giu lai se thanh khoa "ma" treo den
+          // khi het han (xem LOCK_TTL_SECONDS ben BE).
+          //
+          // KHONG truyen state={{ order: view }} - dong lay tu danh sach KHONG
+          // co items day du (xem fetchFullOrder), truyen thang vao se lam form
+          // luu ghi de mat het hang muc cua phieu. De trang Chinh sua tu goi
+          // getRepairSettlementApi(id) lay ban day du.
+          onEdit={() => {
+            releaseLockIfHeld();
+            setView(null);
+            navigate(`/repair-settlement/edit/${view.id}`);
+          }}
+        />
+      )}
+
+      {activityLogFor && (
+        <ActivityLogModal
+          order={activityLogFor}
+          onClose={() => setActivityLogFor(null)}
         />
       )}
 
@@ -1496,6 +1986,120 @@ function RepairSettlementList() {
           onClose={() => setCancelTarget(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Modal "Nhật ký hoạt động phiếu" - hien lai cac buoc (tao/truy cap/sua/
+// doi trang thai/in...) cua 1 phieu, ai lam luc nao. Tai su dung dung audit
+// log dang "lifecycle" da co san o BE (1 dong/1 phieu, xem
+// RepairSettlementService.getActivityLog), khong tao nguon du lieu rieng ──
+// Hien 1 gia tri truoc/sau trong bang so sanh - trong/null hien "(trống)" de
+// phan biet voi chuoi rong that su, khong dung formatCurrency o day vi ap
+// dung chung cho ca so km/CK%/chuoi (chi rieng unitPrice moi format tien te,
+// xem renderChangeLine).
+function formatDiffValue(v) {
+  if (v === null || v === undefined || v === '') return '(trống)';
+  if (typeof v === 'boolean') return v ? 'Có' : 'Không';
+  return String(v);
+}
+
+// "Bản ghi so sánh" cho 1 buoc "Cập nhật nội dung phiếu" - liet ke tung thay
+// doi cu the (truoc -> sau) thay vi chi 1 dong mo ta chung chung, de phieu
+// nhieu hang muc van biet ro sua CAI GI (xem RepairSettlementService
+// .diffSettlementForActivityLog o BE, noi tinh ra mang changes nay).
+function ChangesList({ changes }) {
+  return (
+    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {changes.map((c, i) => {
+        if (c.type === 'field') {
+          return (
+            <div key={i} style={{ fontSize: 12, color: 'var(--gray-700)' }}>
+              <b>{c.label}:</b> {formatDiffValue(c.before)} → {formatDiffValue(c.after)}
+            </div>
+          );
+        }
+        if (c.type === 'item_added') {
+          return (
+            <div key={i} style={{ fontSize: 12, color: '#2E7D32' }}>
+              + Thêm: {c.label} ({c.qty} × {formatCurrency(c.unitPrice)})
+            </div>
+          );
+        }
+        if (c.type === 'item_removed') {
+          return (
+            <div key={i} style={{ fontSize: 12, color: '#C62828' }}>
+              − Xóa: {c.label} ({c.qty} × {formatCurrency(c.unitPrice)})
+            </div>
+          );
+        }
+        if (c.type === 'item_changed') {
+          return (
+            <div key={i} style={{ fontSize: 12, color: '#B45309' }}>
+              <div>± Sửa: {c.label}</div>
+              <div style={{ marginLeft: 12 }}>
+                {(c.fields || []).map((f, j) => (
+                  <div key={j}>
+                    {f.label}: {f.key === 'unitPrice' ? formatCurrency(f.before) : formatDiffValue(f.before)}
+                    {' → '}
+                    {f.key === 'unitPrice' ? formatCurrency(f.after) : formatDiffValue(f.after)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })}
+    </div>
+  );
+}
+
+function ActivityLogModal({ order, onClose }) {
+  const [steps, setSteps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getSettlementActivityLogApi(order.id)
+      .then((data) => { if (!cancelled) setSteps(data?.steps || []); })
+      .catch((err) => { if (!cancelled) setError(err.message || 'Không tải được nhật ký hoạt động'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [order.id]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="modal-header">
+          <h3 className="modal-title">Nhật ký hoạt động — {order.code}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          {loading && <p style={{ fontSize: 13, color: 'var(--gray-500)' }}>Đang tải…</p>}
+          {!loading && error && <p style={{ fontSize: 13, color: 'var(--danger)' }}>{error}</p>}
+          {!loading && !error && steps.length === 0 && (
+            <p style={{ fontSize: 13, color: 'var(--gray-500)' }}>Chưa có hoạt động nào được ghi nhận.</p>
+          )}
+          {!loading && !error && steps.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto' }}>
+              {[...steps].reverse().map((s, i) => {
+                const at = s.at ? new Date(s.at) : null;
+                return (
+                  <div key={i} style={{ borderLeft: '3px solid var(--primary)', paddingLeft: 10 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{s.label || s.step}</div>
+                    <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+                      {s.by || 'Hệ thống'}{at && !Number.isNaN(at.getTime()) ? ` · ${at.toLocaleString('vi-VN')}` : ''}
+                    </div>
+                    {Array.isArray(s.changes) && s.changes.length > 0 && <ChangesList changes={s.changes} />}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1601,66 +2205,60 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const [isFromLookup, setIsFromLookup] = useState(Boolean(existingOrder?.customer?.phone));
   const searchSeq = useRef(0);
 
-  const [customerInfo, setCustomerInfo] = useState(existingOrder?.customer || {
-    fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '',
+  // Fallback contactPerson/contactPhone ve fullName/phone cua khach hang khi
+  // customer chua tung nhap rieng nguoi lien he - dong bo voi selectSuggestion
+  // ben duoi (luc CVDV tra cuu chon khach hang co san luc TAO moi), tranh 2
+  // duong nap du lieu (tao moi vs sua) cho ra ket qua khac nhau.
+  const [customerInfo, setCustomerInfo] = useState(() => {
+    const c = existingOrder?.customer;
+    if (!c) return { fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' };
+    return { ...c, contactPerson: c.contactPerson || c.fullName || '', contactPhone: c.contactPhone || c.phone || '' };
   });
   const [vehicleInfo, setVehicleInfo] = useState(() => {
     const base = existingOrder?.vehicle || {
       licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '',
-      warrantyEndDate: '', warrantyKmLimit: null, brandId: null,
+      warrantyEndDate: '', warrantyKmLimit: null, modelId: null,
     };
     // Km luc mo trang (man Sua) - dung lam moc doi chieu canh bao neu CVDV
     // sua currentKm xuong THAP HON, xem handleSave.
     return { ...base, lastKnownKm: base.currentKm || null };
   });
-  // Hang xe (Kia/Mazda) cho dropdown "Hãng xe" khi tao xe MOI (khong tu tra
-  // cuu) - xem listVehicleBrandsApi. Khong can cho man Sua (isEdit luon khoa
-  // toan bo vung khach hang/xe, xem readOnly={isFromLookup || isEdit}).
-  const [vehicleBrands, setVehicleBrands] = useState([]);
+  // Catalog dong+doi xe that (vehicle_models) - de o "Loai xe" chon dung tu
+  // danh sach that (gan duoc model_id) thay vi go tu do khong lien ket duoc
+  // voi catalog. Chi vai chuc dong nen tai het 1 lan, loc ngay tren FE.
+  const [vehicleModels, setVehicleModels] = useState([]);
+  const [showModelSuggestions, setShowModelSuggestions] = useState(false);
+  // Tu khoa tim kiem trong o "Loai xe" - TACH RIENG khoi vehicleInfo.vehicleModel
+  // (gia tri that). Go vao day khong lam thay doi loai xe da chon.
+  const [modelQuery, setModelQuery] = useState('');
+  const toast = useToast();
+  // Dong/mo 3 khung chinh cua form. Mac dinh mo het; chi la trang thai hien
+  // thi nen khong can luu lai giua cac lan mo form.
+  const [openSections, setOpenSections] = useState({ customer: true, intake: true, items: true });
+  const toggleSection = (key) => setOpenSections((p) => ({ ...p, [key]: !p[key] }));
   useEffect(() => {
     if (isEdit) return;
-    listVehicleBrandsApi().then(setVehicleBrands).catch(() => {});
+    listVehicleModelsApi().then(setVehicleModels).catch(() => {});
   }, [isEdit]);
-
-  // Goi y "Tên xe" (doi xe) khi go tay cho xe MOI - tim theo dung Hang xe da
-  // chon (neu co) de goi y sat hon, kem nut "+ Thêm tên xe mới" khi khong
-  // khop dong nao san (vd doi xe that su chua co trong danh sach).
-  const [modelSuggestions, setModelSuggestions] = useState([]);
-  const [showModelSuggestions, setShowModelSuggestions] = useState(false);
-  const [creatingModel, setCreatingModel] = useState(false);
-  useEffect(() => {
-    if (isFromLookup || isEdit) return undefined;
-    const term = (vehicleInfo.vehicleModel || '').trim();
-    let alive = true;
-    const timer = setTimeout(() => {
-      searchVehicleModelsApi(term, vehicleInfo.brandId)
-        .then((data) => { if (alive) setModelSuggestions(data || []); })
-        .catch(() => { if (alive) setModelSuggestions([]); });
-    }, 300);
-    return () => { alive = false; clearTimeout(timer); };
-  }, [vehicleInfo.vehicleModel, vehicleInfo.brandId, isFromLookup, isEdit]);
-
-  const hasExactModelMatch = modelSuggestions.some(
-    (m) => m.modelName.trim().toLowerCase() === (vehicleInfo.vehicleModel || '').trim().toLowerCase()
-  );
-
-  const handleCreateModel = async () => {
-    const name = (vehicleInfo.vehicleModel || '').trim();
-    if (!name || creatingModel) return;
-    setCreatingModel(true);
-    try {
-      const created = await createVehicleModelApi(name, vehicleInfo.brandId);
-      if (created) vInfoSet('vehicleModel', created.modelName);
-      setShowModelSuggestions(false);
-    } catch {
-      /* im lang - CVDV van dung duoc ten vua go, chi la khong luu vao goi y */
-    } finally {
-      setCreatingModel(false);
-    }
-  };
+  // O "Loai xe" la DANH SACH CHON, khong cho go tay: chu go vao chi de LOC
+  // (modelQuery), khong bao gio tro thanh gia tri. Truoc day go tay duoc nen
+  // CVDV luu duoc 1 loai xe khong co trong catalog (modelId = null) - xe do
+  // sau nay khong loc duoc goi bao duong theo doi xe, va khong tra ra dung
+  // phu tung/dinh muc. Xem them ensureMaintenancePackageMeta.js.
+  //
+  // Bo trong o tim kiem -> hien TOAN BO danh sach (khong cat 8 dong nhu truoc,
+  // catalog chi hon chuc dong nen cuon thoai mai).
+  const modelSuggestions = (() => {
+    const term = modelQuery.trim().toLowerCase();
+    if (!term) return vehicleModels;
+    return vehicleModels.filter((m) => (
+      m.displayName.toLowerCase().includes(term)
+      || (m.modelLine || '').toLowerCase().includes(term)
+      || (m.trimName || '').toLowerCase().includes(term)
+    ));
+  })();
 
   const [customerRequest, setCustomerRequest] = useState(existingOrder?.customerRequest || '');
-  const [note, setNote] = useState(existingOrder?.note || '');
   const [intakeChecklist, setIntakeChecklist] = useState(existingOrder?.intakeChecklist || DEFAULT_INTAKE_CHECKLIST);
 
   // Chu ky dien tu tai cho - bat buoc luc tao phieu moi (khong ap dung khi sua
@@ -1708,26 +2306,28 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // bản ghi vừa lưu để cho in lại ngay tại chỗ, không bắt quay về danh sách
   // rồi tìm lại phiếu để in.
   const [savedOrder, setSavedOrder] = useState(null);
-  // Vua luu thanh cong trong phien nay (chua bam "Chinh sua lai phieu") -
-  // khoa toan bo form lai, tranh go them ma khong con nut Luu nao de bam nua
-  // (xem fieldset disabled ben duoi va nut trong Tong ket thanh toan).
-  const locked = Boolean(savedOrder);
 
-  // Tien do (tasks/thợ/khoang) cua lenh sua chua - tach RIENG khoi
+  // Tien do (tasks/thợ/khoang/status) cua lenh sua chua - tach RIENG khoi
   // existingOrder (prop bat dong, chi nap 1 lan luc mount) vi to
   // truong/tho co the tick/hoan thanh NGAY LUC CVDV dang mo trang nay -
   // phai nap lai realtime, khong thi cac kiem tra "da hoan thanh chua"
   // (canOfferCancel/canRemoveGroup) se dung du lieu cu, cho phep Huy/Xoa
-  // nham 1 hang muc vua duoc tick that ra ngoai doi.
+  // nham 1 hang muc vua duoc tick that ra ngoai doi. status cung phai theo
+  // doi realtime (khong chi tasks/thợ/khoang) - to truong/tho co the vua
+  // tick xong dau muc CUOI CUNG va lenh tu chuyen "Cho thanh toan" (xem
+  // RepairOrderRepositoryImpl.updateStatus) NGAY luc CVDV dang mo san man
+  // Chinh sua nay - phai khoa form lai ngay, khong thi CVDV van bam Luu duoc
+  // (BE tu 08/2026 da chan roi nhung FE nen khoa som, khong doi loi 409).
   const [liveOrderInfo, setLiveOrderInfo] = useState({
     tasks: existingOrder?.tasks || [],
     technicians: existingOrder?.technicians || [],
     bayNumber: existingOrder?.bayNumber || null,
+    status: existingOrder?.status || null,
   });
   const refreshLiveOrderInfo = useCallback(() => {
     if (!isEdit || !existingOrder?.id) return;
     getRepairSettlementApi(existingOrder.id)
-      .then((o) => setLiveOrderInfo({ tasks: o.tasks || [], technicians: o.technicians || [], bayNumber: o.bayNumber || null }))
+      .then((o) => setLiveOrderInfo({ tasks: o.tasks || [], technicians: o.technicians || [], bayNumber: o.bayNumber || null, status: o.status || null }))
       .catch(() => {});
   }, [isEdit, existingOrder?.id]);
   useEffect(() => {
@@ -1740,8 +2340,68 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     if (event.type === 'task-updated' && Number(event.orderId) === Number(existingOrder.repairOrderId)) {
       refreshLiveOrderInfo();
     }
+    // 'order-completed': to truong bam Hoan thanh lenh sua chua -> phieu
+    // quyet toan tu chuyen "waiting_payment" (xem RepairOrderService.updateStatus).
+    // Phai nap lai NGAY (khong doi 15s poll) de khoa form kip thoi.
+    if (event.type === 'order-completed' && Number(event.orderId) === Number(existingOrder.repairOrderId)) {
+      refreshLiveOrderInfo();
+    }
   }, [existingOrder?.repairOrderId, refreshLiveOrderInfo]);
   useRepairOrderEventsSSE(handleOrderInfoSSE, isEdit);
+
+  // Phieu da roi khoi trang thai cho sua ("waiting_repair"/"inprogress") o
+  // Khoa "dang mo phieu" cho chinh trang Chinh sua.
+  //
+  // Truoc day CHI man danh sach giu khoa (luc mo modal xem chi tiet), con bam
+  // "Chỉnh sửa" la NHA khoa roi moi dieu huong sang day - nen trong suot luc
+  // 1 CVDV ngoi sua, phieu hoan toan khong co khoa: nguoi thu 2 van vao sua
+  // duoc, va ai bam Luu sau thi de len ban cua nguoi kia. Sua ngay chinh la
+  // luc va cham nguy hiem nhat, khong phai luc xem.
+  //
+  // Nay trang nay tu chiem khoa khi mo, cu 20s gia han 1 lan (TTL ben BE la
+  // 60s, gap 3 lan chu ky) va nha khi roi trang.
+  const [khoaBoiNguoiKhac, setKhoaBoiNguoiKhac] = useState(null);
+  useEffect(() => {
+    if (!isEdit || !existingOrder?.id) return undefined;
+    const id = existingOrder.id;
+    let nhipGiaHan = null;
+    let dangGiu = false;
+    let daRoiTrang = false;
+
+    lockSettlementApi(id)
+      .then(() => {
+        // Roi trang trong luc dang cho API tra loi -> nha ngay, khong de lai
+        // khoa "ma" treo den het TTL.
+        if (daRoiTrang) {
+          unlockSettlementApi(id).catch(() => {});
+          return;
+        }
+        dangGiu = true;
+        nhipGiaHan = setInterval(() => { lockSettlementApi(id).catch(() => {}); }, 20000);
+      })
+      .catch((err) => {
+        if (daRoiTrang) return;
+        setKhoaBoiNguoiKhac(err.status === 409
+          ? (err.details?.lockedByName || 'người khác')
+          : (err.message || 'người khác'));
+      });
+
+    return () => {
+      daRoiTrang = true;
+      if (nhipGiaHan) clearInterval(nhipGiaHan);
+      if (dangGiu) unlockSettlementApi(id).catch(() => {});
+    };
+  }, [isEdit, existingOrder?.id]);
+
+  // NOI KHAC (to truong hoan thanh lenh, hoac CVDV khac huy/xuat hoa don)
+  // trong luc man Chinh sua nay van dang mo - khong the sua tiep duoc nua,
+  // xem comment liveOrderInfo o tren. Vua luu thanh cong trong phien nay
+  // (savedOrder, chua bam "Chinh sua lai phieu") cung khoa form tuong tu.
+  const closedElsewhere = isEdit && Boolean(liveOrderInfo.status)
+    && liveOrderInfo.status !== 'waiting_repair' && liveOrderInfo.status !== 'inprogress';
+  // khoa toan bo form lai, tranh go them ma khong con nut Luu nao de bam nua
+  // (xem fieldset disabled ben duoi va nut trong Tong ket thanh toan).
+  const locked = Boolean(savedOrder) || closedElsewhere || Boolean(khoaBoiNguoiKhac);
 
   // Lỗi lưu phiếu hiện giữa màn hình dạng mockup, tự ẩn sau ~4s (không cần
   // đóng tay) - thay cho banner cố định trên đầu trang như trước.
@@ -1798,11 +2458,20 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     const seq = ++catalogSearchSeq.current;
     const timer = setTimeout(async () => {
       try {
+        // Gói, dịch vụ lẻ và phụ tùng đều được khai báo riêng cho TỪNG đời xe
+        // (vd "Guốc phanh đỗ – Mazda CX-8 2.5 Luxury"), nên chỉ gợi ý thứ dùng
+        // được cho đúng chiếc xe đang lập phiếu — trước đây gõ "phanh" cho một
+        // chiếc CX-8 vẫn hiện guốc phanh của BT-50, CX-3, CX-5.
+        //
+        // Việc lọc nằm ở BE chứ không ở đây: danh sách bị cắt còn 10 dòng nên
+        // lọc phía FE thì 10 dòng lấy về có thể toàn của đời xe khác, đúng cái
+        // cần tìm thì đã bị cắt mất. Xe cũ chưa gán được đời (modelId rỗng) thì
+        // BE trả về đủ, không chặn cố vấn lập phiếu.
         if (lhsc === 'PT') {
-          const products = await searchProductsApi(term);
+          const products = await searchProductsApi(term, undefined, vehicleInfo.modelId);
           if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'product', products } }));
         } else {
-          const result = await searchCatalogApi(term);
+          const result = await searchCatalogApi(term, vehicleInfo.modelId);
           if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'catalog', ...result } }));
         }
       } catch {
@@ -1811,7 +2480,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCatalogIdx, items[activeCatalogIdx]?.description, items[activeCatalogIdx]?.lhsc]);
+  }, [activeCatalogIdx, items[activeCatalogIdx]?.description, items[activeCatalogIdx]?.lhsc, vehicleInfo.modelId]);
 
   const fillFromRow = async (row) => {
     setShowSuggestions(false);
@@ -1840,6 +2509,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       purchaseDate: row.purchaseDate ? String(row.purchaseDate).slice(0, 10) : '', currentKm: '',
       warrantyEndDate: row.warrantyEndDate ? String(row.warrantyEndDate).slice(0, 10) : '',
       warrantyKmLimit: row.warrantyKmLimit ?? null,
+      // Doi xe that trong catalog - de o "Hang muc" chi goi y dung goi bao
+      // duong cua chiec xe nay (xem effect tra cuu catalog o tren).
+      modelId: row.modelId ?? null,
       // Km lan ghi nhan gan nhat (khong hien len o) - chi de doi chieu canh
       // bao neu CVDV nhap so km MOI thap hon, xem handleSave.
       lastKnownKm: row.currentKm ?? null,
@@ -1857,7 +2529,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // khi autofill nen khong the sua tay duoc nua.
   const resetLookup = () => {
     setCustomerInfo({ fullName: '', address: '', phone: '', taxCode: '', cccd: '', email: '', contactPerson: '', contactPhone: '' });
-    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, brandId: null, lastKnownKm: null });
+    setVehicleInfo({ licensePlate: '', vehicleModel: '', frameNumber: '', engineNumber: '', purchaseDate: '', currentKm: '', warrantyEndDate: '', warrantyKmLimit: null, modelId: null, lastKnownKm: null });
+    setModelQuery('');
     setCustomerQuery('');
     setPlateQuery('');
     setIsFromLookup(false);
@@ -1890,6 +2563,38 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // co the lech thuc te, can co van dieu chinh duoc ma khong phai doi so luong
   // ca dau nhom (se keo theo ty le lam sai cac phu tung khac cung nhom).
   const isChildRow = (it) => Boolean(it.groupId) && !it.isGroupParent;
+  const isPackageHeadRow = (it) => (
+    it.isGroupParent && it.lhsc === 'DV' && !it.serviceId && Boolean(it.groupId)
+  );
+
+  // Goi bao duong bung ra 30+ dong con lam bang rat dai - cho thu gon lai,
+  // giong 3 khung chinh cua form. Chi AN dong, KHONG bo khoi items nen tien
+  // va cac phep tinh khong doi gi.
+  const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const toggleGroup = (groupId) => setCollapsedGroups((prev) => {
+    const next = new Set(prev);
+    if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
+    return next;
+  });
+
+  // Dong "dau goi" dang co trong phieu (neu co). Moi phieu CHI duoc 1 goi bao
+  // duong: goi la 1 cap bao duong dinh ky theo so km, khong the vua Cap 1 vua
+  // Cap 3 tren cung 1 lan vao xuong. exceptIdx = dong dang go de doi goi -
+  // dong do khong tinh la "da co", neu khong se tu chan chinh no.
+  const findPackageRow = (exceptIdx) => items.find((it, i) => (
+    i !== exceptIdx && it.isGroupParent && it.lhsc === 'DV' && !it.serviceId && Boolean(it.groupId)
+  ));
+
+  // Ly do 1 goi KHONG duoc chon o dong dang go - tra ve '' neu chon duoc.
+  const packageBlockedReason = (pkg, idx) => {
+    const dangCo = findPackageRow(idx);
+    if (dangCo && dangCo.code === pkg.code) return 'Gói này đã có trong phiếu';
+    if (dangCo) return `Phiếu đã có gói "${dangCo.description}" — mỗi phiếu chỉ 1 gói bảo dưỡng`;
+    if (vehicleInfo.modelId && pkg.modelId && String(pkg.modelId) !== String(vehicleInfo.modelId)) {
+      return 'Gói của đời xe khác';
+    }
+    return '';
+  };
 
   // Dong PT (phu tung) nay dang "di kem" dich vu con nao trong cung nhom -
   // luc chen (selectCatalogPackage/selectCatalogService) da chen NGAY SAU
@@ -1970,8 +2675,19 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // coi nhu da la 1 ban ghi chinh thuc trong he thong - bat buoc phai di qua
   // "Huy" (giu lai lam ho so, van tinh tien cong da lam neu co) thay vi xoa
   // trang, KE CA khi dong do van chua co viec lam gi (chua tick hoan thanh).
+  // NGOAI LE: phieu con o "Chờ sửa chữa" thi chua ai nhan viec - chua co lenh
+  // sua chua, chua sinh dau muc nao ben To truong, khong tho nao nhin thay
+  // hang muc nay. Xoa han luc do an toan y het luc dang tao phieu, khong co gi
+  // de "giu lam ho so".
+  //
+  // Truoc day chan cung theo item.id nen sua 1 phieu "Chờ sửa chữa" khong con
+  // duong nao bo bot hang muc: nut "Xóa" bi an vi dong da co id, con nut "Hủy"
+  // lai chi hien khi phieu DA sang "Đang sửa chữa" (xem canOfferCancel) - o
+  // truong hop nay 2 dieu kien loai tru nhau, o thao tac trong tron.
+  const notStartedYet = !isEdit || existingOrder?.status === 'waiting_repair';
+
   const canRemoveGroup = (item) => {
-    if (item.id) return false;
+    if (item.id && !notStartedYet) return false;
     if (item.httt === HTTT_CANCELLED_VALUE) return false;
     if (item.lhsc !== 'DV' || !item.isGroupParent || !item.groupId) return true;
     return !isItemOrGroupDone(item, items, liveOrderInfo.tasks);
@@ -2032,12 +2748,17 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     if (!headRow) return;
 
     let priceByServiceId = new Map();
+    let categoryByServiceId = new Map();
     let serviceIdByProductId = new Map();
     try {
       const result = await searchCatalogApi(headRow.code);
       const pkg = (result.packages || []).find((p) => p.code === headRow.code);
       if (pkg) {
         priceByServiceId = new Map(pkg.items.map((it) => [String(it.serviceId), it.unitPrice]));
+        // Loai hinh sua chua THAT cua tung dich vu - khi con nguyen goi thi ca
+        // nhom deu mang loai hinh cua GOI ("Bảo dưỡng định kỳ"); vo goi roi thi
+        // moi dich vu tro ve dich vu le nen phai tra ve dung loai hinh rieng.
+        categoryByServiceId = new Map(pkg.items.map((it) => [String(it.serviceId), it.repairCategory || '']));
         for (const svc of pkg.items) {
           for (const part of svc.parts || []) {
             serviceIdByProductId.set(String(part.productId), String(svc.serviceId));
@@ -2068,12 +2789,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         if (it.lhsc === 'DV') {
           const newGid = nextGroupId();
           newGroupIdByOwnerIdx.set(i, newGid);
+          // Tro ve dich vu le -> lay lai loai hinh sua chua rieng cua dich vu
+          // (khong con la "Bảo dưỡng định kỳ" cua goi nua).
+          const cat = categoryByServiceId.get(String(it.serviceId));
+          const repairCategory = cat != null ? cat : it.repairCategory;
           if (i === cancelledIdx) {
             // Huy tu (chua lam) -> so luong ve 0 luon.
-            replacement.push(recalcItem({ ...it, httt: HTTT_CANCELLED_VALUE, qty: 0, groupId: newGid, isGroupParent: true }));
+            replacement.push(recalcItem({ ...it, repairCategory, httt: HTTT_CANCELLED_VALUE, qty: 0, groupId: newGid, isGroupParent: true }));
           } else {
             const price = priceByServiceId.get(String(it.serviceId));
-            replacement.push(recalcItem({ ...it, unitPrice: price != null ? price : it.unitPrice, groupId: newGid, isGroupParent: true }));
+            replacement.push(recalcItem({ ...it, repairCategory, unitPrice: price != null ? price : it.unitPrice, groupId: newGid, isGroupParent: true }));
           }
           continue;
         }
@@ -2087,7 +2812,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           : findOwningServiceIdx(prev, i);
         const ownerNewGid = newGroupIdByOwnerIdx.get(ownerIdx);
         const cancelled = ownerIdx === cancelledIdx;
-        replacement.push(recalcItem({ ...it, groupId: ownerNewGid ?? it.groupId, httt: cancelled ? HTTT_CANCELLED_VALUE : it.httt, qty: cancelled ? 0 : it.qty }));
+        // Phu tung theo dung loai hinh cua dich vu so huu no (dich vu do vua
+        // tro ve loai hinh rieng khi vo goi).
+        const ownerCat = ownerServiceId != null ? categoryByServiceId.get(ownerServiceId) : undefined;
+        replacement.push(recalcItem({
+          ...it,
+          repairCategory: ownerCat != null ? ownerCat : it.repairCategory,
+          groupId: ownerNewGid ?? it.groupId,
+          httt: cancelled ? HTTT_CANCELLED_VALUE : it.httt,
+          qty: cancelled ? 0 : it.qty,
+        }));
       }
 
       const result = [];
@@ -2254,6 +2988,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // này ngay bên dưới (giống phiếu quyết toán thực tế - phụ tùng tiêu hao
   // liệt kê riêng bên dưới phần công việc), cùng 1 Loại hình sửa chữa.
   const selectCatalogService = (idx, svc) => {
+    // Dich vu nay DA nam trong goi bao duong dang co tren phieu -> chan han.
+    // Cong tho cua no da tinh trong gia goi roi; them lan nua chi lam phieu
+    // ghi "lam 2 lan" cung 1 viec, va tho khong biet phai lam may lan.
+    const trongGoi = items.find((it) => it.serviceId === svc.id && isChildRow(it));
+    if (trongGoi) {
+      const dauGoi = items.find((it) => it.groupId === trongGoi.groupId && it.isGroupParent);
+      toast.warning(`"${svc.name}" đã có sẵn trong ${dauGoi ? `gói "${dauGoi.description}"` : 'gói bảo dưỡng'} — không cần thêm lại`);
+      closeCatalogSuggestions(idx);
+      return;
+    }
     const repairCategory = svc.repairCategory || '';
     setItems((prev) => {
       // Dong nay truoc do da la dau nhom (vd doi sang dich vu khac) -> bo het
@@ -2265,11 +3009,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         return true;
       });
 
-      // Dich vu vua chon da TRUNG voi 1 dong co san o noi khac (vd dich vu con
-      // duoc goi lon tu dong chen kem truoc do) -> cong don +1 so luong vao
-      // dong do, mo khoa cho sua so luong tay, KHONG tao them dong/nhom moi
-      // (tranh liet ke trung lap cung 1 hang muc 2 lan).
-      const dupIdx = withoutCurrent.findIndex((it) => it.serviceId === svc.id);
+      // Dich vu vua chon da TRUNG voi 1 dong dich vu LE co san -> cong don +1
+      // so luong vao dong do, mo khoa cho sua so luong tay, KHONG tao them
+      // dong/nhom moi (tranh liet ke trung lap cung 1 hang muc 2 lan). Vd
+      // khach muon thay 2 lop cung loai.
+      //
+      // Dong con cua goi bao duong thi da bi chan o tren roi, khong xuong toi
+      // day - cong so luong o do la sai, khong phai la "lam 2 lan".
+      const dupIdx = withoutCurrent.findIndex((it) => it.serviceId === svc.id && !isChildRow(it));
       if (dupIdx !== -1) {
         const next = [...withoutCurrent];
         const target = next[dupIdx];
@@ -2279,7 +3026,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       }
 
       const groupId = nextGroupId();
-      const newHead = recalcItem({ ...emptyItem(), code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', httt: 'KHT', discount: 0, repairCategory, groupId, isGroupParent: true });
+      // note: giu lai ghi chu CVDV da go tren dong nay TRUOC khi tra cuu/chon
+      // dich vu (vd go "Lưu ý cho thợ..." roi moi go ten dich vu de tim trong
+      // catalog) - truoc day spread ...emptyItem() lam mat trang ghi chu nay,
+      // trong khi selectCatalogPackage/selectProduct (2 duong chon catalog
+      // con lai) da spread dung tu dong hien co nen khong bi mat.
+      const newHead = recalcItem({ ...emptyItem(), note: prev[idx]?.note || '', code: svc.code, serviceId: svc.id, productId: null, description: svc.name, unitPrice: svc.unitPrice, unit: 'Công', lhsc: 'DV', httt: 'KHT', discount: 0, repairCategory, groupId, isGroupParent: true });
       const partRows = buildPartRows(svc.parts, repairCategory).map((r) => ({ ...r, groupId }));
       const next = [...withoutCurrent];
       next.splice(idx, 0, newHead, ...partRows);
@@ -2298,6 +3050,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // (xem findOwningServiceIdx/handleCancelItem) - có thể trùng phụ tùng
   // giữa 2 dịch vụ con (mỗi dịch vụ giữ dòng riêng), chấp nhận đánh đổi này.
   const selectCatalogPackage = (idx, pkg) => {
+    // Chan lan 2 ngay tai day - danh sach goi y da lam mo cac goi khong chon
+    // duoc, nhung giu them chot nay de khong co duong nao lot qua.
+    const chan = packageBlockedReason(pkg, idx);
+    if (chan) { toast.warning(chan); return; }
     // Uu tien Loai hinh sua chua khai bao rieng cho GOI; neu goi chua khai
     // bao thi lay tam theo dich vu con dau tien co khai bao - van tot hon
     // de trong, cho van chi can sua lai 1 lan neu chua dung.
@@ -2339,8 +3095,20 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           httt: 'KHT',
           repairCategory,
           groupId,
+          // Yêu cầu thực hiện của cấp bảo dưỡng này (Thay thế / Kiểm tra...) -
+          // chỉ để hiển thị, không lưu xuống repair_order_items (BE tự tra lại
+          // từ catalog khi sinh checklist cho tổ trưởng, xem
+          // repairOrderTaskBuilder.js).
+          actionCode: it.actionCode || null,
         }));
-        rows.push(...buildPartRows(it.parts, repairCategory).map((r) => ({ ...r, groupId })));
+        // Chỉ đầu mục PHẢI THAY mới kèm sẵn phụ tùng. Đầu mục kiểm tra (I/M/V)
+        // theo biểu mẫu chỉ "thay nếu cần thiết" - kèm sẵn phụ tùng cho cả 30
+        // đầu mục như trước là xuất kho thừa và đội tiền của khách; khi thợ
+        // xác định cần thay thật thì cố vấn thêm dòng phụ tùng sau (dòng thêm
+        // sau được đánh dấu "(Khách thêm)", xem _syncRepairOrderTasks).
+        if (consumesPart(it.actionCode)) {
+          rows.push(...buildPartRows(it.parts, repairCategory).map((r) => ({ ...r, groupId })));
+        }
       }
       next.splice(idx + 1, 0, ...rows);
       return next;
@@ -2387,6 +3155,74 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const totals = calcTotals(items);
   const signatureDate = new Date();
 
+  // Cong-to-met ve nguyen tac chi tang. Bao NGAY luc go chu khong doi den luc
+  // bam Luu: CVDV go xong o nay con dien tiep ca form dai ben duoi, den luc
+  // luu moi bao thi phai cuon nguoc len tim, va thuong la da quen so dung.
+  //
+  // handleSave VAN kiem lai - day chi la canh bao som, khong phai cai chan.
+  // Khung "Thong tin khach hang va xe" co the dang thu gon, va o nhap thi nam
+  // tit tren dau trang. Bao loi ma khong den duoc o do thi bao lam gi - nen mo
+  // lai khung, cuon toi va focus thang vao o.
+  // Chi dinh to truong (tuy chon). Bo trong = moi to truong trong chi nhanh
+  // deu thay phieu o bang "Việc chờ nhận" - dung hanh vi cu.
+  //
+  // Chi co y nghia luc TAO phieu: sua phieu thi thuong da co nguoi nhan roi,
+  // doi chi dinh khong con tac dung gi.
+  const [assignedTeamLeaderId, setAssignedTeamLeaderId] = useState('');
+  const [hoiToTruong, setHoiToTruong] = useState(false);
+  const [dsToTruong, setDsToTruong] = useState([]);
+  useEffect(() => {
+    if (isEdit) return;
+    listBranchTeamLeadersApi().then(setDsToTruong).catch(() => setDsToTruong([]));
+  }, [isEdit]);
+
+  // Tra cuu nhanh lich su xe ngay tren form - khong phai roi trang (mat het
+  // nhung gi vua go) sang man Lich su dich vu.
+  const [xemLichSuXe, setXemLichSuXe] = useState(false);
+
+  const kmInputRef = useRef(null);
+  const nhayToiOKm = () => {
+    setOpenSections((s) => ({ ...s, customer: true }));
+    // doi React mo khung xong roi moi cuon, khong thi o van dang display:none
+    setTimeout(() => {
+      kmInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      kmInputRef.current?.focus();
+    }, 0);
+  };
+
+  const kmLoi = (() => {
+    const { currentKm, lastKnownKm } = vehicleInfo;
+    if (currentKm === '' || currentKm == null) return '';
+    const km = Number(currentKm);
+    if (Number.isNaN(km)) return 'Số km phải là số.';
+    if (km < 0) return 'Số km không được là số âm.';
+    if (lastKnownKm != null && km < Number(lastKnownKm)) {
+      return `Nhỏ hơn lần ghi nhận gần nhất (${Number(lastKnownKm).toLocaleString('vi-VN')} km). `
+        + 'Công-tơ-mét chỉ tăng — kiểm tra lại số vừa nhập.';
+    }
+    return '';
+  })();
+
+  // Roi khoi o ma so km van sai: bao ro 1 lan roi XOA so vua go va tra con
+  // tro ve chinh o do. Khong de lai so sai trong form - de lai thi CVDV dien
+  // tiep phan duoi, luc quay lai khong con nho la so nay chua sua.
+  //
+  // Xoa xong thi o rong -> kmLoi ve rong -> lan blur sau khong ban lai thong
+  // bao nua, nen khong co vong lap focus/blur.
+  const kiemTraKmKhiRoiO = () => {
+    if (!kmLoi) return;
+    const truoc = vehicleInfo.lastKnownKm;
+    toast.error(
+      truoc != null
+        ? `Số km vừa nhập nhỏ hơn lần trước (${Number(truoc).toLocaleString('vi-VN')} km). Vui lòng nhập lại.`
+        : 'Số km vừa nhập không hợp lệ. Vui lòng nhập lại.',
+      3000
+    );
+    vInfoSet('currentKm', '');
+    // Doi trinh duyet chuyen focus xong roi moi doi lai, khong thi bi no ghi de.
+    setTimeout(() => kmInputRef.current?.focus(), 0);
+  };
+
   // Neu chon tu goi y tra cuu (co id that trong DB) thi luon du dieu kien Luu.
   // Neu KHONG chon tu tra cuu (khach hang/xe hoan toan moi, chi luc TAO phieu
   // moi) - van cho Luu binh thuong, khong bat buoc phai co san trong DB nua:
@@ -2399,8 +3235,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       && Boolean((customerInfo.fullName || '').trim())
       && Boolean((customerInfo.phone || '').trim())
       && Boolean((vehicleInfo.licensePlate || '').trim())
-      && Boolean(vehicleInfo.brandId)
-      && Boolean((vehicleInfo.vehicleModel || '').trim()));
+      // Loai xe BAT BUOC chon tu catalog (modelId), khong con go tay duoc -
+      // xe khong gan duoc doi xe thi sau nay khong loc duoc goi bao duong va
+      // khong tra dung dinh muc phu tung.
+      && Boolean(vehicleInfo.modelId));
 
   const buildPayload = () => ({
     customerId: customerInfo.id || null,
@@ -2412,7 +3250,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     customer: customerInfo,
     vehicle: vehicleInfo,
     customerRequest,
-    note,
     currentKm: vehicleInfo.currentKm || null,
     items,
     ...totals,
@@ -2424,6 +3261,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   });
 
   const handleSave = async () => {
+    if (closedElsewhere) {
+      setSaveError('Lệnh sửa chữa của phiếu này vừa hoàn thành (hoặc phiếu đã bị hủy/xuất hóa đơn) - không thể lưu chỉnh sửa nữa.');
+      return;
+    }
     if (!canSave) {
       setSaveError(isFromLookup
         ? 'Vui lòng chọn khách hàng và xe từ gợi ý tra cứu trước khi lưu.'
@@ -2467,27 +3308,43 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       return;
     }
     if (!isEdit && !isIntakeChecklistComplete(intakeChecklist)) {
-      setSaveError('Vui lòng hoàn thành tất cả các mục trong Phiếu tiếp nhận và bàn giao xe (trừ các ô nhập văn bản) trước khi lưu.');
+      setSaveError('Vui lòng hoàn thành tất cả các mục trong Tiếp nhận và bàn giao xe (trừ các ô nhập văn bản) trước khi lưu.');
       return;
     }
     if (!isEdit && signatureEmpty) {
       setSaveError('Vui lòng ký xác nhận trước khi lưu phiếu.');
       return;
     }
+    // Tao phieu MOI: hoi chi dinh to truong truoc khi luu. Hoi o day chu
+    // khong de san 1 o tren form vi day la quyet dinh dieu phoi - co van chot
+    // xong noi dung phieu roi moi biet giao cho ai, dat san giua form thi vua
+    // de bo qua vua de chon nham tu luc chua biet.
+    if (!isEdit) {
+      setHoiToTruong(true);
+      return;
+    }
+    await thucHienLuu(assignedTeamLeaderId);
+  };
+
+  // Luu that su. assignedId truyen tu hop thoai chi dinh to truong (chuoi
+  // rong = khong chi dinh).
+  const thucHienLuu = async (assignedId) => {
+    setHoiToTruong(false);
     setSaving(true);
     setSaveError('');
     try {
-      const payload = buildPayload();
+      const payload = { ...buildPayload(), assignedTeamLeaderId: assignedId || null };
       if (isEdit) {
         const result = await updateRepairSettlementApi(existingOrder.id, payload);
         setSaving(false);
         setSaved(true);
         setSavedOrder(result);
-        // BE xoa het + ghi lai toan bo service_order_items moi lan luu (xem
+        // BE xoa het + ghi lai toan bo repair_order_items moi lan luu (xem
         // RepairSettlementService.update) nen result.items co id THAT moi -
-        // nap lai items local theo id nay de "Xoa" tu dong khoa lai (chi con
-        // "Huy") cho MOI dong, ke ca dong vua moi them trong phien nay -
-        // xem canRemoveGroup.
+        // nap lai items local theo id nay. Voi phieu DA sang "Đang sửa chữa",
+        // co id nghia la "Xoa" tu dong khoa lai (chi con "Huy") cho MOI dong,
+        // ke ca dong vua them trong phien nay; con phieu van o "Chờ sửa chữa"
+        // thi van xoa han duoc - xem canRemoveGroup/notStartedYet.
         setItems(assignGroupIds(
           (result.items || []).map((it) => ({ ...it, originalQty: it.qty })),
           nextGroupId
@@ -2517,22 +3374,26 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       </div>
 
       {saved && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#3f3f46' }}>
+        <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#2E7D32' }}>
           {savedOrder ? 'Đã lưu thay đổi phiếu quyết toán.' : 'Đã lưu phiếu quyết toán. Đang quay lại danh sách…'}
         </div>
       )}
 
       {saveError && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, pointerEvents: 'none' }}>
-          <div style={{ background: '#27272a', color: '#fff', borderRadius: 10, padding: '18px 28px', maxWidth: 520, fontSize: 14, fontWeight: 600, textAlign: 'center', boxShadow: 'var(--shadow-lg)' }}>
+          <div style={{ background: '#C62828', color: '#fff', borderRadius: 10, padding: '18px 28px', maxWidth: 520, fontSize: 14, fontWeight: 600, textAlign: 'center', boxShadow: 'var(--shadow-lg)' }}>
             {saveError}
           </div>
         </div>
       )}
 
       {locked && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#3f3f46' }}>
-          Phiếu đã lưu - đang ở chế độ chỉ xem. Bấm "Chỉnh sửa lại phiếu" nếu muốn sửa thêm.
+        <div style={{ background: '#FFF7E6', border: '1px solid #FFE0A3', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#8A6100' }}>
+          {khoaBoiNguoiKhac
+            ? `Phiếu đang được ${khoaBoiNguoiKhac} mở - chỉ xem, không sửa được. Đợi họ đóng phiếu rồi vào lại.`
+            : (closedElsewhere
+              ? 'Lệnh sửa chữa của phiếu này vừa hoàn thành (hoặc phiếu đã bị hủy/xuất hóa đơn) - không thể chỉnh sửa nữa. Vui lòng quay lại danh sách.'
+              : 'Phiếu đã lưu - đang ở chế độ chỉ xem. Bấm "Chỉnh sửa lại phiếu" nếu muốn sửa thêm.')}
         </div>
       )}
 
@@ -2558,32 +3419,53 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       </div>
 
       {/* SECTION 1: Khách hàng & xe */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
-          <span className="card-title">Thông tin khách hàng & xe</span>
-          {isFromLookup && !isEdit && (
-            <button className="btn btn-secondary btn-sm" onClick={resetLookup}>Chọn lại khách hàng</button>
-          )}
-        </div>
-        <div className="card-body">
+      <CollapsibleCard
+        title="Thông tin khách hàng & xe"
+        open={openSections.customer}
+        onToggle={() => toggleSection('customer')}
+        summary={(() => {
+          // Gap khung lai van phai biet da du thong tin bat buoc chua - o
+          // "Yeu cau cua khach hang" nam trong khung nay, khuat di rat de
+          // bam Luu hut roi khong hieu vi sao nut bi khoa.
+          const daNhap = [customerInfo.fullName, vehicleInfo.licensePlate, vehicleInfo.vehicleModel]
+            .filter(Boolean).join(' · ');
+          const thieu = !canSave || !(customerRequest || '').trim();
+          return `${daNhap || 'Chưa nhập'}${thieu ? ' — ⚠ còn thiếu thông tin bắt buộc' : ''}`;
+        })()}
+        actions={isFromLookup && !isEdit && (
+          <button className="btn btn-secondary btn-sm" onClick={resetLookup}>Chọn lại khách hàng</button>
+        )}
+      >
+        <div>
           <div className="form-grid form-grid-2">
             <div>
               <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
-                <label className="form-label required">Tên khách hàng</label>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <label className="form-label required" style={{ marginBottom: 0 }}>Biển số xe</label>
+                  {/* Chi bat khi xe da co trong he thong - xe moi tinh thi
+                      khong co lich su nao de tra. */}
+                  {vehicleInfo.id && (
+                    <button type="button" className="btn btn-secondary btn-sm"
+                      style={{ fontSize: 11, padding: '2px 8px', marginLeft: 'auto' }}
+                      onClick={() => setXemLichSuXe(true)}>
+                      Lịch sử xe
+                    </button>
+                  )}
+                </div>
                 <input className="form-input"
-                  value={customerQuery}
+                  value={plateQuery}
                   readOnly={isFromLookup || isEdit}
-                  onChange={(e) => { setCustomerQuery(e.target.value); cInfoSet('fullName', e.target.value); setIsFromLookup(false); setActiveField('customer'); setShowSuggestions(true); }}
-                  onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('customer'); setShowSuggestions(true); } }}
+                  onChange={(e) => { setPlateQuery(e.target.value); vInfoSet('licensePlate', e.target.value); setIsFromLookup(false); setActiveField('plate'); setShowSuggestions(true); }}
+                  onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('plate'); setShowSuggestions(true); } }}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
-                  placeholder="Nhập tên" />
-                {activeField === 'customer' && showSuggestions && suggestions.length > 0 && (
+                  placeholder="Nhập biển số xe" />
+                {activeField === 'plate' && showSuggestions && suggestions.length > 0 && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
                     {suggestions.map((row) => (
                       <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
                         style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{row.fullName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.phone} • {row.licensePlate}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{row.licensePlate} — {row.vehicleModel}</div>
+                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.fullName} • {row.phone}</div>
                       </div>
                     ))}
                   </div>
@@ -2653,58 +3535,86 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
             <div>
               <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
-                <label className="form-label required">Biển số xe</label>
+                <label className="form-label required">Tên khách hàng</label>
                 <input className="form-input"
-                  value={plateQuery}
+                  value={customerQuery}
                   readOnly={isFromLookup || isEdit}
-                  onChange={(e) => { setPlateQuery(e.target.value); vInfoSet('licensePlate', e.target.value); setIsFromLookup(false); setActiveField('plate'); setShowSuggestions(true); }}
-                  onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('plate'); setShowSuggestions(true); } }}
+                  onChange={(e) => { setCustomerQuery(e.target.value); cInfoSet('fullName', e.target.value); setIsFromLookup(false); setActiveField('customer'); setShowSuggestions(true); }}
+                  onFocus={() => { if (!isFromLookup && !isEdit) { setActiveField('customer'); setShowSuggestions(true); } }}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 180)}
-                  placeholder="Nhập biển số xe" />
-                {activeField === 'plate' && showSuggestions && suggestions.length > 0 && (
+                  placeholder="Nhập tên" />
+                {activeField === 'customer' && showSuggestions && suggestions.length > 0 && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
                     {suggestions.map((row) => (
                       <div key={`${row.customerId}-${row.vehicleId}`} onMouseDown={() => fillFromRow(row)}
                         style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)' }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{row.licensePlate} — {row.vehicleModel}</div>
-                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.fullName} • {row.phone}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{row.fullName}</div>
+                        <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{row.phone} • {row.licensePlate}</div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {!isFromLookup && !isEdit && (
-                <div className="form-group" style={{ marginBottom: 12 }}>
-                  <label className="form-label required">Hãng xe</label>
-                  <select className="form-select" value={vehicleInfo.brandId || ''} onChange={(e) => vInfoSet('brandId', e.target.value ? Number(e.target.value) : null)}>
-                    <option value="">-- Chọn hãng xe --</option>
-                    {vehicleBrands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                </div>
-              )}
               <div className="form-group" style={{ position: 'relative', marginBottom: 12 }}>
-                <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Tên xe</label>
-                <input className="form-input" value={vehicleInfo.vehicleModel}
-                  readOnly={isFromLookup || isEdit}
-                  onChange={(e) => { vInfoSet('vehicleModel', e.target.value); setShowModelSuggestions(true); }}
-                  onFocus={() => { if (!isFromLookup && !isEdit) setShowModelSuggestions(true); }}
-                  onBlur={() => setTimeout(() => setShowModelSuggestions(false), 180)}
-                  placeholder={isFromLookup || isEdit ? ' ' : 'VD: K3 1.6 Deluxe 2024'} />
-                {!isFromLookup && !isEdit && showModelSuggestions && (vehicleInfo.vehicleModel || '').trim() && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100 }}>
-                    {modelSuggestions.map((m) => (
-                      <div key={m.id} onMouseDown={() => { vInfoSet('vehicleModel', m.modelName); setShowModelSuggestions(false); }}
-                        style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)', fontSize: 13, fontWeight: 600 }}>
-                        {m.modelName}
+                <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Loại xe</label>
+                {/* Danh sach chon, KHONG go tay duoc: o input chi de tim kiem.
+                    Dang mo -> hien tu khoa dang go; dong lai -> hien loai xe da
+                    chon. Muon doi thi bam vao o (tu xoa tu khoa, mo lai danh
+                    sach) hoac bam dau x. */}
+                <div style={{ position: 'relative' }}>
+                  <input className="form-input" style={{ paddingRight: 30 }}
+                    value={showModelSuggestions ? modelQuery : (vehicleInfo.vehicleModel || '')}
+                    readOnly={isFromLookup || isEdit}
+                    onChange={(e) => { setModelQuery(e.target.value); setShowModelSuggestions(true); }}
+                    onFocus={() => {
+                      if (isFromLookup || isEdit) return;
+                      setModelQuery('');
+                      setShowModelSuggestions(true);
+                    }}
+                    onBlur={() => setTimeout(() => setShowModelSuggestions(false), 180)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') { setShowModelSuggestions(false); e.target.blur(); }
+                      // Enter khi danh sach loc con dung 1 dong -> chon luon,
+                      // go nhanh khong can roi tay khoi ban phim.
+                      if (e.key === 'Enter' && showModelSuggestions && modelSuggestions.length === 1) {
+                        e.preventDefault();
+                        const m = modelSuggestions[0];
+                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id }));
+                        setShowModelSuggestions(false);
+                      }
+                    }}
+                    placeholder={isFromLookup || isEdit ? ' ' : 'Chọn loại xe'} />
+                  {!isFromLookup && !isEdit && (
+                    vehicleInfo.modelId && !showModelSuggestions ? (
+                      <button type="button" title="Bỏ chọn loại xe"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setVehicleInfo((p) => ({ ...p, vehicleModel: '', modelId: null }));
+                          setModelQuery('');
+                        }}
+                        style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--gray-500)', fontSize: 14, lineHeight: 1, padding: 4 }}>✕</button>
+                    ) : (
+                      <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-500)', fontSize: 10, pointerEvents: 'none' }}>▼</span>
+                    )
+                  )}
+                </div>
+                {!isFromLookup && !isEdit && showModelSuggestions && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 100, maxHeight: 260, overflowY: 'auto' }}>
+                    {modelSuggestions.length === 0 ? (
+                      <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--gray-500)' }}>
+                        Không có đời xe nào khớp “{modelQuery}”
+                      </div>
+                    ) : modelSuggestions.map((m) => (
+                      <div key={m.id} onMouseDown={() => {
+                        setVehicleInfo((p) => ({ ...p, vehicleModel: m.displayName, modelId: m.id }));
+                        setModelQuery('');
+                        setShowModelSuggestions(false);
+                      }}
+                        style={{ padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)', background: m.id === vehicleInfo.modelId ? 'var(--primary-very-light)' : undefined }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{m.displayName}</div>
                       </div>
                     ))}
-                    {!hasExactModelMatch && (
-                      <div onMouseDown={handleCreateModel}
-                        style={{ padding: '8px 14px', cursor: 'pointer', color: 'var(--primary)', fontSize: 13, fontWeight: 600 }}>
-                        {creatingModel ? 'Đang thêm…' : `+ Thêm tên xe mới: "${(vehicleInfo.vehicleModel || '').trim()}"`}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -2762,7 +3672,18 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       </span>
                     )}
                   </label>
-                  <input className="form-input" type="number" min={vehicleInfo.lastKnownKm || 0} value={vehicleInfo.currentKm} onChange={(e) => vInfoSet('currentKm', e.target.value)} />
+                  <input
+                    className="form-input"
+                    type="number"
+                    min={vehicleInfo.lastKnownKm || 0}
+                    value={vehicleInfo.currentKm}
+                    ref={kmInputRef}
+                    aria-invalid={Boolean(kmLoi)}
+                    style={kmLoi ? { borderColor: 'var(--red)' } : undefined}
+                    onChange={(e) => vInfoSet('currentKm', e.target.value)}
+                    onBlur={kiemTraKmKhiRoiO}
+                  />
+                  {kmLoi && <div className="form-error" style={{ marginTop: 4 }}>{kmLoi}</div>}
                 </div>
               </div>
               {(() => {
@@ -2772,8 +3693,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   <div
                     style={{
                       marginTop: 10, fontSize: 12, fontWeight: 700, borderRadius: 6, padding: '6px 10px',
-                      background: warranty.covered ? '#e4e4e7' : '#F5F5F5',
-                      color: warranty.covered ? '#3f3f46' : '#757575',
+                      background: warranty.covered ? '#E8F5E9' : '#F5F5F5',
+                      color: warranty.covered ? '#2E7D32' : '#757575',
                     }}
                   >
                     {warranty.label}
@@ -2788,32 +3709,57 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             <textarea className="form-textarea" rows={2} value={customerRequest} onChange={(e) => setCustomerRequest(e.target.value)} placeholder="Mô tả tình trạng xe / yêu cầu sửa chữa của khách hàng..." />
           </div>
 
-          <div className="form-group" style={{ marginTop: 16 }}>
-            <label className="form-label">Ghi chú</label>
-            <textarea className="form-textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú thêm (nếu có)..." />
-          </div>
         </div>
-      </div>
+      </CollapsibleCard>
 
-      {/* SECTION 1b: Phiếu tiếp nhận và bàn giao xe */}
-      <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist} />
+      {/* SECTION 1b: Phiếu tiếp nhận và bàn giao xe.
+          Khi SUA phieu thi CHI XEM - phan nay ghi lai tinh trang xe DUNG LUC
+          tiep nhan, kem chu ky xac nhan cua khach (chu ky cung da khoa khi sua,
+          xem ben duoi). Sua lai sau do se lam sai lech ban ghi goc va khien chu
+          ky khong con khop voi noi dung khach da ky. */}
+      {isEdit ? (
+        <CollapsibleCard
+          title="Tiếp nhận và bàn giao xe"
+          open={openSections.intake}
+          onToggle={() => toggleSection('intake')}
+          note={(
+            <span style={{ fontSize: 12, color: 'var(--gray-500)', fontStyle: 'italic' }}>
+              (Chỉ xem — ghi nhận lúc tiếp nhận xe, không sửa được)
+            </span>
+          )}
+        >
+          <IntakeChecklistView value={intakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
+        </CollapsibleCard>
+      ) : (
+        <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist}
+          vehicleModelText={vehicleInfo.vehicleModel}
+          open={openSections.intake} onToggle={() => toggleSection('intake')} />
+      )}
 
-      {/* SECTION 2: Hạng mục công việc */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
-          <span className="card-title">Hạng mục công việc / phụ tùng</span>
-          <div style={{ display: 'flex', gap: 8 }}>
+      {/* SECTION 3: Hạng mục công việc */}
+      <CollapsibleCard
+        title="Hạng mục công việc / phụ tùng"
+        open={openSections.items}
+        onToggle={() => toggleSection('items')}
+        summary={`${items.filter((it) => (it.description || '').trim()).length} hạng mục · ${formatCurrency(totals.total || 0)}`}
+        bodyStyle={{ padding: 0 }}
+        actions={(
+          <>
             <button className="btn btn-secondary btn-sm" onClick={addItem} disabled={!canSave}
               title={canSave ? undefined : 'Vui lòng chọn khách hàng và xe trước'}>Thêm dịch vụ</button>
             <button className="btn btn-secondary btn-sm" onClick={addPartItem} disabled={!canSave}
               title={canSave ? undefined : 'Vui lòng chọn khách hàng và xe trước'}>Thêm phụ tùng</button>
-          </div>
-        </div>
-        <div className="card-body" style={{ padding: 0 }}>
+          </>
+        )}
+      >
+        <div>
           <div className="table-wrapper" style={{ border: 'none', boxShadow: 'none', borderRadius: 0 }}>
             <table className="data-table">
               <thead>
                 <tr>
+                  {/* Cot rieng cho nut thu gon goi - de chung o "Mã số" thi
+                      o do bi bop lai chi con 1 nua, doc khong ra ma. */}
+                  <th style={{ width: 26, padding: 0 }}></th>
                   <th style={{ width: 110 }}>Mã số</th>
                   <th style={{ minWidth: 260 }}>Nội dung công việc</th>
                   <th style={{ width: 180 }}>Loại hình sửa chữa</th>
@@ -2834,6 +3780,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   const partRows = indexed.filter(({ item }) => item.lhsc === 'PT');
                   const laborSubtotal = laborRows.reduce((s, { item }) => s + (item.total || 0), 0);
                   const partSubtotal = partRows.reduce((s, { item }) => s + (item.total || 0), 0);
+                  // Tinh tien TRUOC roi moi loc dong an di - thu gon goi khong
+                  // duoc lam thay doi tong tien.
+                  //
+                  // CHI thu gon phan "Công việc cần thực hiện" (30+ dau muc
+                  // kiem tra la thu lam bang dai ngoang). Phu tung luon hien
+                  // day du - do la phan khach nhin vao de doi chieu tien, an
+                  // di thi phieu trong nhu chua co gi.
+                  const hienThi = ({ item }) => !(isChildRow(item) && collapsedGroups.has(item.groupId));
 
                   const renderRow = ({ item, idx }) => {
                     const suggestion = catalogSuggestions[idx];
@@ -2846,6 +3800,21 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                     );
                     return (
                       <tr key={idx} style={{ background: rowColorForGroup(item.groupId) }}>
+                        {/* O rieng cho nut thu gon 30+ dau muc cong viec cua
+                            goi. Chi an dong tren bang, tien khong doi. */}
+                        <td style={{ padding: 0, textAlign: 'center' }}>
+                          {isPackageHeadRow(item) && (
+                            <button type="button"
+                              onClick={() => toggleGroup(item.groupId)}
+                              title={collapsedGroups.has(item.groupId) ? 'Xem các đầu mục công việc trong gói' : 'Thu gọn các đầu mục công việc trong gói'}
+                              style={{
+                                border: 'none', background: 'none', cursor: 'pointer', padding: 0,
+                                fontSize: 10, color: 'var(--gray-600)', lineHeight: 1,
+                                display: 'inline-block',
+                                transform: collapsedGroups.has(item.groupId) ? 'none' : 'rotate(90deg)',
+                              }}>▶</button>
+                          )}
+                        </td>
                         <td>
                           <input className="form-input" style={{ fontSize: 11, fontFamily: 'monospace', background: 'transparent' }} value={item.code || ''} readOnly />
                         </td>
@@ -2855,6 +3824,19 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                             onFocus={(e) => !isChild && openCatalogDropdown(idx, e.target)}
                             onBlur={() => setTimeout(() => closeCatalogSuggestions(idx), 180)}
                             placeholder={canSave ? (isPartRow ? 'Nhập tên/mã phụ tùng trong kho...' : 'Nhập tên dịch vụ / gói combo...') : 'Vui lòng chọn khách hàng và xe trước'} />
+                          {/* Yêu cầu thực hiện của đầu mục theo biểu mẫu "Phiếu kiểm
+                              tra BDĐK" - ghi hẳn chữ, không hiện mã I/R/M/V. Chỉ đầu
+                              mục con của gói bảo dưỡng mới có. */}
+                          {isPackageHeadRow(item) && collapsedGroups.has(item.groupId) && (
+                            <div style={{ fontSize: 10.5, color: 'var(--gray-600)', padding: '1px 8px 2px', fontStyle: 'italic' }}>
+                              {items.filter((it) => it.groupId === item.groupId && !it.isGroupParent && it.lhsc !== 'PT').length} đầu mục công việc đang thu gọn
+                            </div>
+                          )}
+                          {actionLabel(item.actionCode) && (
+                            <div style={{ fontSize: 10.5, lineHeight: 1.3, color: 'var(--gray-600)', padding: '1px 8px 2px', fontStyle: 'italic' }}>
+                              {actionLabel(item.actionCode)}
+                            </div>
+                          )}
                           {hasSuggestions && catalogDropdownRect && createPortal(
                             <div style={{ position: 'fixed', top: catalogDropdownRect.top, left: catalogDropdownRect.left, width: 440, maxHeight: 420, overflowY: 'auto', background: '#fff', border: '1px solid var(--primary-light)', borderRadius: 6, boxShadow: 'var(--shadow-md)', zIndex: 1000 }}>
                               {suggestion.type === 'product' && suggestion.products?.length > 0 && (
@@ -2866,7 +3848,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                                       <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
                                       <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>
                                         {formatCurrency(p.unitPrice)} / {p.unitName} · Tồn: {p.stockQuantity}
-                                        {p.isLowStock && <span style={{ color: '#27272a', fontWeight: 600 }}> (sắp hết)</span>}
+                                        {p.isLowStock && <span style={{ color: '#C62828', fontWeight: 600 }}> (sắp hết)</span>}
                                       </div>
                                     </div>
                                   ))}
@@ -2875,13 +3857,27 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                               {suggestion.type === 'catalog' && suggestion.packages?.length > 0 && (
                                 <div>
                                   <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Gói combo</div>
-                                  {suggestion.packages.map((pkg) => (
-                                    <div key={`pkg-${pkg.id}`} onMouseDown={() => selectCatalogPackage(idx, pkg)}
-                                      style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
+                                  {suggestion.packages.map((pkg) => {
+                                    // Goi khong chon duoc (da co trong phieu / phieu da co goi
+                                    // khac / khac doi xe) van HIEN nhung lam mo va ghi ro ly do -
+                                    // an di thi co van khong hieu tai sao khong tim thay goi.
+                                    const chan = packageBlockedReason(pkg, idx);
+                                    return (
+                                    <div key={`pkg-${pkg.id}`}
+                                      onMouseDown={() => (chan ? toast.warning(chan) : selectCatalogPackage(idx, pkg))}
+                                      style={{
+                                        padding: '8px 10px', cursor: chan ? 'not-allowed' : 'pointer', fontSize: 12,
+                                        borderBottom: '1px solid var(--gray-100)',
+                                        background: chan ? 'var(--gray-50)' : undefined,
+                                        color: chan ? 'var(--gray-400)' : undefined,
+                                      }}>
                                       <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pkg.name} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({pkg.items.length} hạng mục)</span></div>
-                                      <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{formatCurrency(pkg.totalPrice)}</div>
+                                      <div style={{ fontSize: 11, color: chan ? '#B45309' : 'var(--gray-600)', fontStyle: chan ? 'italic' : undefined }}>
+                                        {chan || formatCurrency(pkg.totalPrice)}
+                                      </div>
                                     </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                               {suggestion.type === 'catalog' && suggestion.services?.length > 0 && (
@@ -2945,9 +3941,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                           {(item.total || 0).toLocaleString('vi-VN')}
                           {exemptionShortLabel(item) ? (
-                            <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>
+                            <span style={{ fontWeight: 400, color: laDongDaThayDoi(item) ? 'var(--red)' : 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>
                           ) : isQuantityReturned(item) && (
-                            <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> (Khách hoàn trả hàng SL x {item.originalQty - item.qty})</span>
+                            <span style={{ fontWeight: 400, color: 'var(--red)' }}> (Khách hoàn trả hàng SL x {item.originalQty - item.qty})</span>
                           )}
                         </td>
                         <td>
@@ -2981,12 +3977,13 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   return (
                     <>
                       <tr>
+                        <td style={{ background: 'var(--gray-200)', padding: 0 }}></td>
                         <td style={{ background: 'var(--gray-200)' }}></td>
                         <td colSpan={10} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>CÔNG VIỆC CẦN THỰC HIỆN</td>
                       </tr>
-                      {laborRows.map(renderRow)}
+                      {laborRows.filter(hienThi).map(renderRow)}
                       <tr>
-                        <td colSpan={8} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                        <td colSpan={9} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
                         <td style={{ fontWeight: 700 }}>{laborSubtotal.toLocaleString('vi-VN')}</td>
                         <td></td>
                         <td></td>
@@ -2995,12 +3992,13 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                       {partRows.length > 0 && (
                         <>
                           <tr>
+                            <td style={{ background: 'var(--gray-200)', padding: 0 }}></td>
                             <td style={{ background: 'var(--gray-200)' }}></td>
                             <td colSpan={10} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>PHỤ TÙNG, VẬT TƯ</td>
                           </tr>
                           {partRows.map(renderRow)}
                           <tr>
-                            <td colSpan={8} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                            <td colSpan={9} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
                             <td style={{ fontWeight: 700 }}>{partSubtotal.toLocaleString('vi-VN')}</td>
                             <td></td>
                             <td></td>
@@ -3014,23 +4012,34 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             </table>
           </div>
         </div>
-      </div>
+      </CollapsibleCard>
 
-      {isEdit && (() => {
-        const serviceTasks = (liveOrderInfo.tasks || []).filter((t) => t.taskType === 'service');
-        if (serviceTasks.length === 0) return null;
-        const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
-        const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
-        return (
-          <div style={{ marginTop: 16 }}>
-            <div className="form-section-title">
-              Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
+      {/* Buoc cuoi truoc khi luu phieu moi: giao cho to truong nao. */}
+      {hoiToTruong && (
+        <div className="modal-overlay" onClick={() => setHoiToTruong(false)}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Giao phiếu cho tổ trưởng</h3>
+              <button className="modal-close" onClick={() => setHoiToTruong(false)}>✕</button>
             </div>
-            {(liveOrderInfo.bayNumber || liveOrderInfo.technicians?.length > 0) && (
-              <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
-                {liveOrderInfo.bayNumber && <>Khoang đang thực hiện: <b>{liveOrderInfo.bayNumber}</b></>}
-                {liveOrderInfo.bayNumber && liveOrderInfo.technicians?.length > 0 && '  ·  '}
-                {liveOrderInfo.technicians?.length > 0 && <>Thợ thực hiện: <b>{liveOrderInfo.technicians.map(formatTechnicianLabel).join(', ')}</b></>}
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Chỉ định tổ trưởng</label>
+                <select className="form-select" autoFocus
+                  value={assignedTeamLeaderId}
+                  onChange={(e) => setAssignedTeamLeaderId(e.target.value)}>
+                  <option value="">Không chỉ định — mọi tổ trưởng đều nhận được</option>
+                  {dsToTruong.map((tt) => (
+                    <option key={tt.id} value={tt.id}>
+                      {tt.phone ? `${tt.name} — ${tt.phone}` : tt.name}
+                    </option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 12, color: 'var(--gray-600)', marginTop: 6, lineHeight: 1.5 }}>
+                  {assignedTeamLeaderId
+                    ? 'Phiếu chỉ hiện ở mục "Việc chờ nhận" của tổ trưởng này; tổ trưởng khác không nhận được.'
+                    : 'Phiếu hiện cho mọi tổ trưởng trong chi nhánh, ai rảnh thì nhận.'}
+                </div>
               </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -3049,9 +4058,31 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 </label>
               ))}
             </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setHoiToTruong(false)}>Quay lại</button>
+              <button className="btn btn-primary" disabled={saving}
+                onClick={() => thucHienLuu(assignedTeamLeaderId)}>
+                {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
+              </button>
+            </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
+
+      {xemLichSuXe && vehicleInfo.id && (
+        <VehicleHistoryModal
+          vehicleId={vehicleInfo.id}
+          licensePlate={vehicleInfo.licensePlate}
+          vehicleModel={vehicleInfo.vehicleModel}
+          excludeId={existingOrder?.id}
+          onClose={() => setXemLichSuXe(false)}
+        />
+      )}
+
+      {isEdit && (
+        <TaskProgressList tasks={liveOrderInfo.tasks}
+          bayNumber={liveOrderInfo.bayNumber} technicians={liveOrderInfo.technicians} />
+      )}
 
       </fieldset>
 
@@ -3123,15 +4154,33 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               Bằng chữ: {numberToVietnamese(totals.total)}
             </div>
 
-            {!canSave && (
-              <div style={{ fontSize: 12, color: '#52525b', marginBottom: 8 }}>
+            {!canSave && !closedElsewhere && (
+              <div style={{ fontSize: 12, color: '#E65100', marginBottom: 8 }}>
                 {isFromLookup
                   ? 'Vui lòng chọn khách hàng và xe từ gợi ý tra cứu để có thể lưu.'
                   : 'Vui lòng nhập đủ tên khách hàng, số điện thoại, biển số xe, hãng xe và tên xe để có thể lưu.'}
               </div>
             )}
+            {/* Nut Luu bi khoa thi phai noi ro vi sao, khong thi CVDV tuong
+                trang hong roi ngoi bam mai. */}
+            {Boolean(kmLoi) && !closedElsewhere && (
+              <button type="button" onClick={nhayToiOKm}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left', marginBottom: 8,
+                  padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                  background: '#FEF2F2', border: '1px solid var(--red)',
+                  fontSize: 12, color: 'var(--red)', fontWeight: 600, fontFamily: 'inherit',
+                }}>
+                Chưa lưu được: số km hiện tại chưa hợp lệ — bấm vào đây để nhập lại.
+              </button>
+            )}
 
-            {savedOrder ? (
+            {closedElsewhere ? (
+              <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => navigate('/repair-settlement')}>
+                Quay lại danh sách
+              </button>
+            ) : savedOrder ? (
               <>
                 <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
                   onClick={() => setSavedOrder(null)}>
@@ -3145,7 +4194,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             ) : (
               <>
                 <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
-                  disabled={!canSave || saving || (!isEdit && signatureEmpty)}
+                  disabled={!canSave || saving || locked || Boolean(kmLoi) || (!isEdit && signatureEmpty)}
+                  title={kmLoi ? 'Số km hiện tại chưa hợp lệ — sửa lại rồi mới lưu được' : undefined}
                   onClick={handleSave}>
                   {saving ? 'Đang lưu…' : 'Lưu phiếu quyết toán'}
                 </button>
@@ -3166,17 +4216,24 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 export default function RepairSettlementPage() {
   const { user } = useAuth();
   const canManage = user?.primaryRole !== ROLES.ADMIN;
+  const location = useLocation();
 
+  // key={location.pathname}: "create" va "edit/:id" deu render cung 1
+  // component RepairSettlementForm o cung vi tri trong cay - React Router
+  // khong tu unmount/remount khi chi doi Route nao khop (cung type, cung
+  // cho), nen state cu (fetchedOrder, form da nhap...) bi giu lai khi tu
+  // Sua chuyen sang Tao moi qua navbar. Key theo pathname (khac nhau giua
+  // create/edit/:id) ep remount that su moi lan doi mode hoac doi id.
   return (
     <Routes>
       <Route index element={<RepairSettlementList />} />
       <Route
         path="create"
-        element={canManage ? <RepairSettlementForm /> : <Navigate to="/repair-settlement" replace />}
+        element={canManage ? <RepairSettlementForm key={location.pathname} /> : <Navigate to="/repair-settlement" replace />}
       />
       <Route
         path="edit/:id"
-        element={canManage ? <RepairSettlementForm isEdit /> : <Navigate to="/repair-settlement" replace />}
+        element={canManage ? <RepairSettlementForm key={location.pathname} isEdit /> : <Navigate to="/repair-settlement" replace />}
       />
     </Routes>
   );

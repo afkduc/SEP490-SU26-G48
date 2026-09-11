@@ -13,7 +13,7 @@ function mapSettlementRow(row) {
 
   return {
     id: row.id,
-    code: row.order_code,
+    code: row.repair_code,
     serviceType: row.service_type || 'Khác',
     status: row.status,
     intakeDate: normalizeDate(row.intake_date),
@@ -319,7 +319,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
 
        WITH current_orders AS (
          SELECT so.id, so.total
-         FROM service_orders so
+         FROM repair_orders so
          WHERE so.status = 'invoiced'
            AND so.completed_date >= @month_start
            AND so.completed_date < @next_month_start
@@ -330,7 +330,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
          ISNULL((
            SELECT SUM(soi.total)
            FROM current_orders co
-           INNER JOIN service_order_items soi ON soi.service_order_id = co.id
+           INNER JOIN repair_order_items soi ON soi.repair_order_id = co.id
            WHERE soi.item_type = 'DV'
          ), 0) AS current_month_service_revenue,
          ISNULL((
@@ -358,7 +358,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
          SELECT
            DATEFROMPARTS(YEAR(so.completed_date), MONTH(so.completed_date), 1) AS month_start,
            SUM(so.total) AS total_revenue
-         FROM service_orders so
+         FROM repair_orders so
          WHERE so.status = 'invoiced'
            AND so.completed_date >= DATEADD(MONTH, -(@monthsBack - 1), @current_month_start)
            AND so.completed_date < DATEADD(MONTH, 1, @current_month_start)
@@ -387,7 +387,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        ),
        current_orders AS (
          SELECT so.id, so.branch_id, so.total
-         FROM service_orders so
+         FROM repair_orders so
          WHERE so.status = 'invoiced'
            AND so.completed_date >= @month_start
            AND so.completed_date < @next_month_start
@@ -408,7 +408,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
            co.branch_id,
            ISNULL(SUM(CASE WHEN soi.item_type = 'DV' THEN soi.total ELSE 0 END), 0) AS service_revenue
          FROM current_orders co
-         LEFT JOIN service_order_items soi ON soi.service_order_id = co.id
+         LEFT JOIN repair_order_items soi ON soi.repair_order_id = co.id
          GROUP BY co.branch_id
        ),
        overall AS (
@@ -478,7 +478,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
     const where = ['1 = 1'];
     if (params.search) {
       where.push(`(
-        so.order_code LIKE @search
+        so.repair_code LIKE @search
         OR c.full_name LIKE @search
         OR c.phone LIKE @search
         OR v.license_plate LIKE @search
@@ -498,7 +498,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
     const result = await query(
       `SELECT
           so.id,
-          so.order_code,
+          so.repair_code,
           service_type_info.service_type,
           so.branch_id,
           b.branch_code,
@@ -536,16 +536,16 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           so.total,
           so.intake_date,
           so.completed_date
-       FROM service_orders so
+       FROM repair_orders so
        OUTER APPLY (
          SELECT STRING_AGG(service_type_name, ', ') AS service_type
          FROM (
            SELECT DISTINCT service_type_name
            FROM (
              SELECT s.service_name AS service_type_name
-             FROM service_order_items soi
+             FROM repair_order_items soi
              INNER JOIN services s ON s.id = soi.service_id
-             WHERE soi.service_order_id = so.id
+             WHERE soi.repair_order_id = so.id
                AND (
                  soi.lhsc = 'DV'
                  OR soi.item_type IN ('DV', 'service')
@@ -554,11 +554,11 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
              UNION
 
              SELECT ps.service_name AS service_type_name
-             FROM service_order_items soi
+             FROM repair_order_items soi
              INNER JOIN service_packages sp ON sp.package_code = soi.item_code
              INNER JOIN service_package_items spi ON spi.package_id = sp.id
              INNER JOIN services ps ON ps.id = spi.service_id
-             WHERE soi.service_order_id = so.id
+             WHERE soi.repair_order_id = so.id
                AND (
                  soi.lhsc = 'DV'
                  OR soi.item_type IN ('DV', 'service')
@@ -584,7 +584,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
     const result = await query(
       `SELECT TOP 1
           so.id,
-          so.order_code,
+          so.repair_code,
           service_type_info.service_type,
           so.branch_id,
           b.branch_code,
@@ -622,16 +622,16 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           so.total,
           so.intake_date,
           so.completed_date
-       FROM service_orders so
+       FROM repair_orders so
        OUTER APPLY (
          SELECT STRING_AGG(service_type_name, ', ') AS service_type
          FROM (
            SELECT DISTINCT service_type_name
            FROM (
              SELECT s.service_name AS service_type_name
-             FROM service_order_items soi
+             FROM repair_order_items soi
              INNER JOIN services s ON s.id = soi.service_id
-             WHERE soi.service_order_id = so.id
+             WHERE soi.repair_order_id = so.id
                AND (
                  soi.lhsc = 'DV'
                  OR soi.item_type IN ('DV', 'service')
@@ -640,11 +640,11 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
              UNION
 
              SELECT ps.service_name AS service_type_name
-             FROM service_order_items soi
+             FROM repair_order_items soi
              INNER JOIN service_packages sp ON sp.package_code = soi.item_code
              INNER JOIN service_package_items spi ON spi.package_id = sp.id
              INNER JOIN services ps ON ps.id = spi.service_id
-             WHERE soi.service_order_id = so.id
+             WHERE soi.repair_order_id = so.id
                AND (
                  soi.lhsc = 'DV'
                  OR soi.item_type IN ('DV', 'service')
@@ -681,8 +681,8 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           soi.discount_pct,
           soi.is_free,
           soi.total
-       FROM service_order_items soi
-       WHERE soi.service_order_id = @id
+       FROM repair_order_items soi
+       WHERE soi.repair_order_id = @id
        ORDER BY soi.id ASC`,
       { id: Number(id) }
     );
@@ -948,12 +948,11 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           ro.id,
           ro.repair_code,
           ro.status,
-          ro.created_at,
-          ro.completed_at,
-          ro.notes,
-          so.order_code,
-          so.total,
-          so.completed_date,
+          ro.repair_started_at   AS created_at,
+          ro.repair_completed_at AS completed_at,
+          ro.repair_notes        AS notes,
+          ro.total,
+          ro.completed_date,
           b.id AS branch_id,
           b.branch_code,
           b.branch_name,
@@ -961,12 +960,12 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
           v.vehicle_model_text AS vehicle_model,
           c.full_name AS customer_name
        FROM repair_orders ro
-       LEFT JOIN service_orders so ON so.id = ro.service_order_id
        LEFT JOIN branches b ON b.id = ro.branch_id
        LEFT JOIN vehicles v ON v.id = ro.vehicle_id
-       LEFT JOIN customers c ON c.id = so.customer_id
+       LEFT JOIN customers c ON c.id = ro.customer_id
        WHERE ro.team_leader_id = @id
-       ORDER BY ro.created_at DESC, ro.id DESC`,
+         AND ro.repair_started_at IS NOT NULL
+       ORDER BY ro.repair_started_at DESC, ro.id DESC`,
       { id: Number(id) }
     );
 
@@ -977,7 +976,10 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
       createdAt: normalizeDate(row.created_at),
       completedAt: normalizeDate(row.completed_at),
       notes: row.notes,
-      orderCode: row.order_code,
+      // Truoc day phieu quyet toan va lenh sua chua co 2 ma khac nhau nen o
+      // day tra ve ca 2. Gio chi con 1 ma duy nhat - giu nguyen ten truong
+      // orderCode cho FE khong phai doi, chi tro ve cung 1 gia tri.
+      orderCode: row.repair_code,
       settlementTotal: Number(row.total || 0),
       settlementCompletedDate: normalizeDate(row.completed_date),
       branch: row.branch_id

@@ -76,7 +76,7 @@ function mapSettlementRow(row) {
 
   return {
     id: row.id,
-    code: row.order_code,
+    code: row.repair_code,
     status: row.status,
     intakeDate: normalizeDate(row.intake_date),
     completedDate: normalizeDate(row.completed_date),
@@ -176,6 +176,8 @@ function mapPackageRow(row) {
     purpose: row.purpose,
     isActive: !!row.is_active,
     repairCategory: row.repair_category,
+    modelId: row.model_id,
+    modelName: row.model_name,
   };
 }
 
@@ -578,9 +580,11 @@ class ManagerRepositoryImpl {
     const result = await query(
       `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
               sp.total_price, sp.description, sp.purpose, sp.is_active, sp.repair_category,
+              sp.model_id, vm.display_name AS model_name,
               (SELECT COUNT(*) FROM service_package_items spi WHERE spi.package_id = sp.id) AS item_count
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
+       LEFT JOIN vehicle_models vm ON vm.id = sp.model_id
        WHERE sp.branch_id = @branchId
          AND (@status IS NULL OR sp.is_active = @status)
          AND (@repairCategory IS NULL OR sp.repair_category = @repairCategory)
@@ -599,9 +603,11 @@ class ManagerRepositoryImpl {
   async getServicePackageById(branchId, id) {
     const result = await query(
       `SELECT sp.id, sp.package_code, sp.package_name, sp.category_id, c.category_name,
-              sp.total_price, sp.description, sp.purpose, sp.is_active, sp.repair_category
+              sp.total_price, sp.description, sp.purpose, sp.is_active, sp.repair_category,
+              sp.model_id, vm.display_name AS model_name
        FROM service_packages sp
        LEFT JOIN service_categories c ON c.id = sp.category_id
+       LEFT JOIN vehicle_models vm ON vm.id = sp.model_id
        WHERE sp.id = @id AND sp.branch_id = @branchId`,
       { id: Number(id), branchId: Number(branchId) }
     );
@@ -609,7 +615,7 @@ class ManagerRepositoryImpl {
     if (!row) return null;
 
     const itemsResult = await query(
-      `SELECT s.id, s.service_code, s.service_name, s.unit_price, s.is_active
+      `SELECT s.id, s.service_code, s.service_name, s.unit_price, s.is_active, spi.action_code
        FROM service_package_items spi
        JOIN services s ON s.id = spi.service_id
        WHERE spi.package_id = @id
@@ -617,16 +623,24 @@ class ManagerRepositoryImpl {
       { id: Number(id) }
     );
 
-    return {
-      ...mapPackageRow(row),
-      services: itemsResult.recordset.map((r) => ({
-        id: r.id,
-        code: r.service_code,
-        name: r.service_name,
-        unitPrice: Number(r.unit_price || 0),
-        isActive: !!r.is_active,
-      })),
-    };
+    // Phu tung chi thuc su duoc thay khi hanh dong la "R" (Thay the) - cac dong
+    // I/M/V (kiem tra/thao ve sinh/kiem tra mat) khong tieu hao phu tung.
+    const services = await Promise.all(itemsResult.recordset.map(async (r) => ({
+      id: r.id,
+      code: r.service_code,
+      name: r.service_name,
+      unitPrice: Number(r.unit_price || 0),
+      isActive: !!r.is_active,
+      actionCode: r.action_code,
+      parts: r.action_code === 'R' ? await this._listServiceParts(r.id) : [],
+    })));
+
+    return { ...mapPackageRow(row), services };
+  }
+
+  async isValidVehicleModel(modelId) {
+    const result = await query('SELECT id FROM vehicle_models WHERE id = @modelId', { modelId: Number(modelId) });
+    return result.recordset.length > 0;
   }
 
   async listPackagesUsingService(branchId, serviceId) {
@@ -640,21 +654,21 @@ class ManagerRepositoryImpl {
     return result.recordset.map((row) => ({ id: row.id, code: row.package_code, name: row.package_name }));
   }
 
-  async _syncPackageItems(packageId, serviceIds = []) {
+  async _syncPackageItems(packageId, services = []) {
     await query('DELETE FROM service_package_items WHERE package_id = @packageId', { packageId: Number(packageId) });
-    for (const serviceId of serviceIds) {
-      await query('INSERT INTO service_package_items (package_id, service_id) VALUES (@packageId, @serviceId)', {
-        packageId: Number(packageId),
-        serviceId: Number(serviceId),
-      });
+    for (const item of services) {
+      await query(
+        'INSERT INTO service_package_items (package_id, service_id, action_code) VALUES (@packageId, @serviceId, @actionCode)',
+        { packageId: Number(packageId), serviceId: Number(item.serviceId), actionCode: item.actionCode }
+      );
     }
   }
 
-  async createServicePackage({ branchId, packageCode, packageName, categoryId, totalPrice, description, purpose, repairCategory, serviceIds }) {
+  async createServicePackage({ branchId, packageCode, packageName, categoryId, totalPrice, description, purpose, repairCategory, modelId, services }) {
     const result = await query(
-      `INSERT INTO service_packages (package_code, package_name, category_id, total_price, description, purpose, is_active, branch_id, repair_category)
+      `INSERT INTO service_packages (package_code, package_name, category_id, total_price, description, purpose, is_active, branch_id, repair_category, model_id)
        OUTPUT INSERTED.id
-       VALUES (@packageCode, @packageName, @categoryId, @totalPrice, @description, @purpose, 1, @branchId, @repairCategory)`,
+       VALUES (@packageCode, @packageName, @categoryId, @totalPrice, @description, @purpose, 1, @branchId, @repairCategory, @modelId)`,
       {
         packageCode,
         packageName,
@@ -664,14 +678,15 @@ class ManagerRepositoryImpl {
         purpose: purpose || null,
         branchId: Number(branchId),
         repairCategory: repairCategory || null,
+        modelId: modelId != null ? Number(modelId) : null,
       }
     );
     const packageId = result.recordset[0].id;
-    await this._syncPackageItems(packageId, serviceIds);
+    await this._syncPackageItems(packageId, services);
     return this.getServicePackageById(branchId, packageId);
   }
 
-  async updateServicePackage(branchId, id, { packageName, categoryId, totalPrice, description, purpose, isActive, repairCategory, serviceIds }) {
+  async updateServicePackage(branchId, id, { packageName, categoryId, totalPrice, description, purpose, isActive, repairCategory, modelId, services }) {
     await query(
       `UPDATE service_packages
        SET package_name = @packageName,
@@ -680,7 +695,8 @@ class ManagerRepositoryImpl {
            description = @description,
            purpose = @purpose,
            is_active = @isActive,
-           repair_category = @repairCategory
+           repair_category = @repairCategory,
+           model_id = @modelId
        WHERE id = @id AND branch_id = @branchId`,
       {
         packageName,
@@ -690,13 +706,14 @@ class ManagerRepositoryImpl {
         purpose: purpose || null,
         isActive: isActive ? 1 : 0,
         repairCategory: repairCategory || null,
+        modelId: modelId != null ? Number(modelId) : null,
         id: Number(id),
         branchId: Number(branchId),
       }
     );
 
-    if (serviceIds) {
-      await this._syncPackageItems(id, serviceIds);
+    if (services) {
+      await this._syncPackageItems(id, services);
     }
 
     return this.getServicePackageById(branchId, id);
@@ -712,7 +729,7 @@ class ManagerRepositoryImpl {
     const result = await query(
       `SELECT
           so.id,
-          so.order_code,
+          so.repair_code,
           so.branch_id,
           b.branch_code,
           b.branch_name,
@@ -745,7 +762,7 @@ class ManagerRepositoryImpl {
           so.completed_date,
           so.cancelled_at,
           inv.issued_at AS invoice_issued_at
-       FROM service_orders so
+       FROM repair_orders so
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
@@ -754,14 +771,14 @@ class ManagerRepositoryImpl {
        OUTER APPLY (
            SELECT TOP 1 i.issued_at
            FROM   invoices i
-           WHERE  i.service_order_id = so.id
+           WHERE  i.repair_order_id = so.id
            ORDER  BY i.issued_at DESC
        ) inv
        WHERE so.branch_id = @branchId
          AND (@status IS NULL OR so.status = @status)
          AND (
            @search IS NULL
-           OR so.order_code LIKE @search
+           OR so.repair_code LIKE @search
            OR c.full_name LIKE @search
            OR c.phone LIKE @search
            OR v.license_plate LIKE @search
@@ -777,7 +794,7 @@ class ManagerRepositoryImpl {
     const result = await query(
       `SELECT TOP 1
           so.id,
-          so.order_code,
+          so.repair_code,
           so.branch_id,
           b.branch_code,
           b.branch_name,
@@ -812,9 +829,9 @@ class ManagerRepositoryImpl {
           inv.issued_at AS invoice_issued_at,
           CASE WHEN EXISTS (
             SELECT 1 FROM payos_transactions pt
-            WHERE pt.service_order_id = so.id AND pt.status = 'paid'
+            WHERE pt.repair_order_id = so.id AND pt.status = 'paid'
           ) THEN 1 ELSE 0 END AS paid_via_payos
-       FROM service_orders so
+       FROM repair_orders so
        INNER JOIN branches b ON b.id = so.branch_id
        INNER JOIN customers c ON c.id = so.customer_id
        INNER JOIN vehicles v ON v.id = so.vehicle_id
@@ -823,7 +840,7 @@ class ManagerRepositoryImpl {
        OUTER APPLY (
            SELECT TOP 1 i.issued_at
            FROM   invoices i
-           WHERE  i.service_order_id = so.id
+           WHERE  i.repair_order_id = so.id
            ORDER  BY i.issued_at DESC
        ) inv
        WHERE so.id = @id AND so.branch_id = @branchId`,
@@ -849,8 +866,8 @@ class ManagerRepositoryImpl {
           soi.discount_pct,
           soi.is_free,
           soi.total
-       FROM service_order_items soi
-       WHERE soi.service_order_id = @id
+       FROM repair_order_items soi
+       WHERE soi.repair_order_id = @id
        ORDER BY soi.id ASC`,
       { id: Number(id) }
     );

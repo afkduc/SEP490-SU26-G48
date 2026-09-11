@@ -7,8 +7,12 @@ const {
 } = require('../../utils/vietnamese');
 
 /**
- * Chuyen gia tri Date tu mssql thanh ISO8601 UTC string ('...Z').
+ * Thiết bị = phiên LOGIN trên login_sessions (đã gộp bỏ user_devices).
+ * - id / deviceId JWT = login_sessions.id
+ * - is_current = (status = 'active')
+ * - Danh sách admin: 1 dòng / (user + ip + browser + os) lấy phiên mới nhất
  */
+
 function toIsoUtc(value) {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString();
@@ -19,128 +23,163 @@ function toIsoUtc(value) {
   return value;
 }
 
-let trustedSchemaReady = false;
-let trustedSchemaPromise = null;
+let schemaReady = false;
+let schemaPromise = null;
 
-/** Dam bao cot is_trusted / trusted_at ton tai (idempotent). */
-async function ensureTrustedSchema() {
-  if (trustedSchemaReady) return;
-  if (trustedSchemaPromise) return trustedSchemaPromise;
-  trustedSchemaPromise = (async () => {
+/** Đảm bảo cột device_* trên login_sessions (idempotent). */
+async function ensureSessionDeviceSchema() {
+  if (schemaReady) return;
+  if (schemaPromise) return schemaPromise;
+  schemaPromise = (async () => {
     try {
       await query(`
-        IF COL_LENGTH('dbo.user_devices', 'is_trusted') IS NULL
+        IF COL_LENGTH('dbo.login_sessions', 'device_name') IS NULL
         BEGIN
-          ALTER TABLE dbo.user_devices
-            ADD is_trusted BIT NOT NULL
-              CONSTRAINT DF_user_devices_is_trusted DEFAULT (0);
+          ALTER TABLE dbo.login_sessions ADD device_name NVARCHAR(255) NULL;
         END
       `);
       await query(`
-        IF COL_LENGTH('dbo.user_devices', 'trusted_at') IS NULL
+        IF COL_LENGTH('dbo.login_sessions', 'is_trusted') IS NULL
         BEGIN
-          ALTER TABLE dbo.user_devices ADD trusted_at DATETIME2 NULL;
+          ALTER TABLE dbo.login_sessions
+            ADD is_trusted BIT NOT NULL
+              CONSTRAINT DF_login_sessions_is_trusted DEFAULT (0);
         END
       `);
-      trustedSchemaReady = true;
+      await query(`
+        IF COL_LENGTH('dbo.login_sessions', 'trusted_at') IS NULL
+        BEGIN
+          ALTER TABLE dbo.login_sessions ADD trusted_at DATETIME2 NULL;
+        END
+      `);
+      schemaReady = true;
     } catch (err) {
-      console.warn('[DeviceRepository] ensureTrustedSchema failed:', err.message);
-      trustedSchemaPromise = null;
+      console.warn('[DeviceRepository] ensureSessionDeviceSchema failed:', err.message);
+      schemaPromise = null;
       throw err;
     }
   })();
-  return trustedSchemaPromise;
+  return schemaPromise;
 }
 
 function mapRow(row) {
+  const isCurrent = row.is_current === 1 || row.is_current === true
+    || String(row.status || '').toLowerCase() === 'active';
+  const browser = row.browser || null;
+  const os = row.os || null;
+  const deviceName = row.device_name
+    || ([browser, os].filter(Boolean).join(' on ') || 'Unknown');
   return {
     id: Number(row.id),
     userId: row.user_id,
     userName: row.user_name,
-    deviceName: row.device_name,
-    browser: row.browser,
-    os: row.os,
+    deviceName,
+    browser,
+    os,
     ipAddress: row.ip_address,
     userAgent: row.user_agent,
-    isCurrent: row.is_current === 1 || row.is_current === true,
+    isCurrent,
     isTrusted: row.is_trusted === 1 || row.is_trusted === true,
     trustedAt: toIsoUtc(row.trusted_at),
-    lastLoginAt: toIsoUtc(row.last_login_at),
+    lastLoginAt: toIsoUtc(row.login_time || row.last_login_at),
     lastActivityAt: toIsoUtc(row.last_activity_at),
-    createdAt: toIsoUtc(row.created_at),
+    createdAt: toIsoUtc(row.login_time || row.created_at),
   };
 }
 
+/** CTE: 1 đại diện / fingerprint (user+ip+browser+os). */
+const RANKED_DEVICES_CTE = `
+  ranked_devices AS (
+    SELECT
+      ls.id,
+      ls.user_id,
+      ls.ip_address,
+      ls.user_agent,
+      ls.browser,
+      ls.os,
+      ls.status,
+      ls.login_time,
+      ls.last_activity_at,
+      ls.is_trusted,
+      ls.trusted_at,
+      ls.device_name,
+      CASE WHEN ls.status = N'active' THEN 1 ELSE 0 END AS is_current,
+      ROW_NUMBER() OVER (
+        PARTITION BY ls.user_id,
+          ISNULL(ls.ip_address, N''),
+          ISNULL(ls.browser, N''),
+          ISNULL(ls.os, N'')
+        ORDER BY
+          CASE WHEN ls.status = N'active' THEN 0 ELSE 1 END,
+          COALESCE(ls.last_activity_at, ls.login_time) DESC,
+          ls.id DESC
+      ) AS rn
+    FROM login_sessions ls
+    WHERE ls.action_type = N'LOGIN'
+  )
+`;
+
 class DeviceRepository {
   async ensureSchema() {
-    return ensureTrustedSchema();
+    return ensureSessionDeviceSchema();
   }
 
   async findByUserId(userId) {
-    await ensureTrustedSchema();
+    await ensureSessionDeviceSchema();
     const result = await query(`
+      WITH ${RANKED_DEVICES_CTE}
       SELECT
         d.id, d.user_id, d.device_name, d.browser, d.os, d.ip_address, d.user_agent,
-        d.is_current, d.is_trusted, d.trusted_at, d.last_login_at, d.last_activity_at, d.created_at,
+        d.is_current, d.is_trusted, d.trusted_at, d.login_time, d.last_activity_at, d.status,
         u.user_name
-      FROM user_devices d
+      FROM ranked_devices d
       LEFT JOIN users u ON u.id = d.user_id
-      WHERE d.user_id = @p1
+      WHERE d.rn = 1 AND d.user_id = @p1
       ORDER BY
         CASE WHEN d.is_trusted = 1 THEN 0 ELSE 1 END,
         CASE WHEN d.is_current = 1 THEN 0 ELSE 1 END,
-        ISNULL(d.last_activity_at, d.last_login_at) DESC,
-        d.last_login_at DESC
+        ISNULL(d.last_activity_at, d.login_time) DESC,
+        d.login_time DESC
     `, { p1: userId });
     return result.recordset.map(mapRow);
   }
 
   async findActiveByUserId(userId) {
-    await ensureTrustedSchema();
+    await ensureSessionDeviceSchema();
     const result = await query(`
       SELECT
-        d.id, d.user_id, d.device_name, d.browser, d.os, d.ip_address,
-        d.is_current, d.is_trusted, d.trusted_at, d.last_login_at, d.last_activity_at,
-        u.user_name
-      FROM user_devices d
-      LEFT JOIN users u ON u.id = d.user_id
-      WHERE d.user_id = @p1 AND d.is_current = 1
-      ORDER BY ISNULL(d.last_activity_at, d.last_login_at) DESC, d.last_login_at DESC
+        ls.id, ls.user_id, ls.device_name, ls.browser, ls.os, ls.ip_address,
+        1 AS is_current, ls.is_trusted, ls.trusted_at, ls.login_time, ls.last_activity_at,
+        ls.status, u.user_name
+      FROM login_sessions ls
+      LEFT JOIN users u ON u.id = ls.user_id
+      WHERE ls.user_id = @p1
+        AND ls.status = N'active'
+        AND ls.action_type = N'LOGIN'
+      ORDER BY ISNULL(ls.last_activity_at, ls.login_time) DESC, ls.login_time DESC
     `, { p1: userId });
-    return result.recordset.map((row) => ({
-      id: Number(row.id),
-      userId: row.user_id,
-      userName: row.user_name,
-      deviceName: row.device_name,
-      browser: row.browser,
-      os: row.os,
-      ipAddress: row.ip_address,
-      isCurrent: true,
-      isTrusted: row.is_trusted === 1 || row.is_trusted === true,
-      trustedAt: toIsoUtc(row.trusted_at),
-      lastLoginAt: toIsoUtc(row.last_login_at),
-      lastActivityAt: toIsoUtc(row.last_activity_at),
-    }));
+    return result.recordset.map(mapRow);
   }
 
   async findById(id) {
-    await ensureTrustedSchema();
+    await ensureSessionDeviceSchema();
     const result = await query(`
       SELECT
-        d.id, d.user_id, d.device_name, d.browser, d.os, d.ip_address, d.user_agent,
-        d.is_current, d.is_trusted, d.trusted_at, d.last_login_at, d.last_activity_at, d.created_at,
+        ls.id, ls.user_id, ls.device_name, ls.browser, ls.os, ls.ip_address, ls.user_agent,
+        CASE WHEN ls.status = N'active' THEN 1 ELSE 0 END AS is_current,
+        ls.is_trusted, ls.trusted_at, ls.login_time, ls.last_activity_at, ls.status,
         u.user_name
-      FROM user_devices d
-      LEFT JOIN users u ON u.id = d.user_id
-      WHERE d.id = @p1
+      FROM login_sessions ls
+      LEFT JOIN users u ON u.id = ls.user_id
+      WHERE ls.id = @p1 AND ls.action_type = N'LOGIN'
     `, { p1: id });
     if (!result.recordset.length) return null;
     return mapRow(result.recordset[0]);
   }
 
   async findAll({ userId, search, browser, os, isCurrent, dateFrom, dateTo, page = 1, pageSize = 20 }) {
-    await ensureTrustedSchema();
-    const conditions = ['1=1'];
+    await ensureSessionDeviceSchema();
+    const conditions = ['d.rn = 1'];
     const params = {};
     let idx = 1;
 
@@ -193,13 +232,13 @@ class DeviceRepository {
     }
 
     if (dateFrom) {
-      conditions.push(`d.last_login_at >= @p${idx}`);
+      conditions.push(`d.login_time >= @p${idx}`);
       params[`p${idx}`] = dateFrom;
       idx++;
     }
 
     if (dateTo) {
-      conditions.push(`d.last_login_at <= @p${idx}`);
+      conditions.push(`d.login_time <= @p${idx}`);
       params[`p${idx}`] = dateTo;
       idx++;
     }
@@ -208,47 +247,38 @@ class DeviceRepository {
     const offset = (page - 1) * pageSize;
 
     const countResult = await query(
-      `SELECT COUNT(*) AS total
-       FROM user_devices d
+      `WITH ${RANKED_DEVICES_CTE}
+       SELECT COUNT(*) AS total
+       FROM ranked_devices d
        LEFT JOIN users u ON u.id = d.user_id
        WHERE ${where}`,
       params
     );
 
     const dataResult = await query(`
+      WITH ${RANKED_DEVICES_CTE}
       SELECT
         d.id, d.user_id, d.device_name, d.browser, d.os, d.ip_address,
-        d.is_current, d.is_trusted, d.trusted_at, d.last_login_at, d.last_activity_at,
+        d.is_current, d.is_trusted, d.trusted_at, d.login_time, d.last_activity_at, d.status,
         u.user_name, u.first_name, u.last_name, b.branch_name
-      FROM user_devices d
+      FROM ranked_devices d
       LEFT JOIN users u ON u.id = d.user_id
       LEFT JOIN branches b ON b.id = u.branch_id
       WHERE ${where}
       ORDER BY
         CASE WHEN d.is_trusted = 1 THEN 0 ELSE 1 END,
         CASE WHEN d.is_current = 1 THEN 0 ELSE 1 END,
-        ISNULL(d.last_activity_at, d.last_login_at) DESC,
-        d.last_login_at DESC
+        ISNULL(d.last_activity_at, d.login_time) DESC,
+        d.login_time DESC
       OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
     `, { ...params, offset, pageSize });
 
     const items = dataResult.recordset.map((row) => ({
-      id: Number(row.id),
-      userId: row.user_id,
-      userName: row.user_name,
+      ...mapRow(row),
       displayName: row.first_name && row.last_name
         ? `${row.first_name} ${row.last_name}`
         : row.user_name || null,
       branchName: row.branch_name,
-      deviceName: row.device_name,
-      browser: row.browser,
-      os: row.os,
-      ipAddress: row.ip_address,
-      isCurrent: row.is_current === 1 || row.is_current === true,
-      isTrusted: row.is_trusted === 1 || row.is_trusted === true,
-      trustedAt: toIsoUtc(row.trusted_at),
-      lastLoginAt: toIsoUtc(row.last_login_at),
-      lastActivityAt: toIsoUtc(row.last_activity_at),
     }));
 
     return {
@@ -259,64 +289,91 @@ class DeviceRepository {
     };
   }
 
+  /** Không còn bảng riêng — “xóa thiết bị” = đóng phiên nếu còn active. */
   async delete(id) {
-    await query('DELETE FROM user_devices WHERE id = @p1', { p1: id });
+    await query(`
+      UPDATE login_sessions
+      SET    logout_time = SYSUTCDATETIME(),
+             logout_reason = N'DEVICE_DELETED',
+             session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+             status = N'ended'
+      WHERE  id = @p1 AND status = N'active' AND action_type = N'LOGIN'
+    `, { p1: id });
   }
 
-  async deleteOtherDevices(userId, currentDeviceId) {
+  async deleteOtherDevices(userId, currentSessionId) {
     const result = await query(`
-      DELETE FROM user_devices
-      WHERE user_id = @p1
-        AND (@p2 IS NULL OR id != @p2)
-    `, { p1: userId, p2: currentDeviceId || null });
+      UPDATE login_sessions
+      SET    logout_time = SYSUTCDATETIME(),
+             logout_reason = N'DEVICE_DELETED',
+             session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+             status = N'ended'
+      WHERE  user_id = @p1
+        AND  status = N'active'
+        AND  action_type = N'LOGIN'
+        AND  (@p2 IS NULL OR id != @p2)
+    `, { p1: userId, p2: currentSessionId || null });
     return result.rowsAffected[0];
   }
 
   async deleteByUserAndIp(userId, ipAddress) {
-    await query(
-      `DELETE FROM user_devices WHERE user_id = @p1 AND ip_address = @p2`,
-      { p1: userId, p2: ipAddress }
-    );
+    await query(`
+      UPDATE login_sessions
+      SET    logout_time = SYSUTCDATETIME(),
+             logout_reason = N'DEVICE_DELETED',
+             session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+             status = N'ended'
+      WHERE  user_id = @p1
+        AND  ip_address = @p2
+        AND  status = N'active'
+        AND  action_type = N'LOGIN'
+    `, { p1: userId, p2: ipAddress });
   }
 
   async revokeAllDevices(userId) {
     await query(`
-      UPDATE user_devices
-      SET last_activity_at = SYSUTCDATETIME(), is_current = 0
-      WHERE user_id = @p1 AND is_current = 1
+      UPDATE login_sessions
+      SET    logout_time = SYSUTCDATETIME(),
+             logout_reason = N'FORCE_LOGO',
+             session_duration_seconds = DATEDIFF_BIG(SECOND, login_time, SYSUTCDATETIME()),
+             status = N'ended',
+             last_activity_at = SYSUTCDATETIME()
+      WHERE  user_id = @p1
+        AND  status = N'active'
+        AND  action_type = N'LOGIN'
     `, { p1: userId });
   }
 
   async countActiveByUserId(userId) {
     const result = await query(
-      'SELECT COUNT(*) AS total FROM user_devices WHERE user_id = @p1 AND is_current = 1',
+      `SELECT COUNT(*) AS total FROM login_sessions
+       WHERE user_id = @p1 AND status = N'active' AND action_type = N'LOGIN'`,
       { p1: userId }
     );
     return Number(result.recordset[0].total);
   }
 
-  async updateLastActivityIfNeeded(deviceId) {
+  async updateLastActivityIfNeeded(sessionId) {
     const before = await query(
-      `SELECT TOP 1 last_activity_at, is_current FROM user_devices WHERE id = @p1`,
-      { p1: deviceId }
+      `SELECT TOP 1 last_activity_at, status FROM login_sessions WHERE id = @p1 AND action_type = N'LOGIN'`,
+      { p1: sessionId }
     );
     if (!before.recordset.length) return false;
     const row = before.recordset[0];
-    const isCurrent = row.is_current === 1 || row.is_current === true;
-    if (!isCurrent) return false;
+    if (String(row.status || '').toLowerCase() !== 'active') return false;
 
     const now = Date.now();
     const lastMs = row.last_activity_at ? new Date(row.last_activity_at).getTime() : null;
     if (lastMs !== null && now - lastMs < 60_000) return false;
 
     await query(
-      `UPDATE user_devices SET last_activity_at = SYSUTCDATETIME() WHERE id = @p1`,
-      { p1: deviceId }
+      `UPDATE login_sessions SET last_activity_at = SYSUTCDATETIME() WHERE id = @p1`,
+      { p1: sessionId }
     );
 
     const after = await query(
-      `SELECT TOP 1 last_activity_at FROM user_devices WHERE id = @p1`,
-      { p1: deviceId }
+      `SELECT TOP 1 last_activity_at FROM login_sessions WHERE id = @p1`,
+      { p1: sessionId }
     );
     const afterMs = after.recordset[0]?.last_activity_at
       ? new Date(after.recordset[0].last_activity_at).getTime()
@@ -327,4 +384,5 @@ class DeviceRepository {
 }
 
 module.exports = DeviceRepository;
-module.exports.ensureTrustedSchema = ensureTrustedSchema;
+module.exports.ensureTrustedSchema = ensureSessionDeviceSchema;
+module.exports.ensureSessionDeviceSchema = ensureSessionDeviceSchema;

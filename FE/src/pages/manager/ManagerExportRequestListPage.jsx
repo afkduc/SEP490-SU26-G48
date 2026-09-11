@@ -146,7 +146,7 @@ export default function ManagerExportRequestListPage() {
                         <span className="font-mono">{r.requestCode}</span>
                       </td>
                       <td>{formatDateTime(r.createdAt)}</td>
-                      <td><span className="font-mono">{r.serviceOrderCode || '—'}</span></td>
+                      <td><span className="font-mono">{r.repairOrderCode || '—'}</span></td>
                       <td>{r.customerName || '—'}</td>
                       <td className="text-right">{r.itemCount ?? 0}</td>
                       <td className="text-right">{r.totalQuantity ?? 0}</td>

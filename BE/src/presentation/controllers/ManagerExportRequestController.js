@@ -14,7 +14,7 @@ class ManagerExportRequestController {
 
   list = async (req, res, next) => {
     try {
-      const { branchId, status, serviceOrderId, fromDate, toDate, search, page, limit } = req.query;
+      const { branchId, status, fromDate, toDate, search, page, limit } = req.query;
       const branchIdToUse = branchId
         ? Number(branchId)
         : req.user?.branchId;
@@ -23,7 +23,7 @@ class ManagerExportRequestController {
       }
       const result = await this.exportRequestService.list({
         branchId: branchIdToUse,
-        status, serviceOrderId, fromDate, toDate, search, page, limit,
+        status, fromDate, toDate, search, page, limit,
       });
       return success(res, result, 'Lay danh sach phieu xuat thanh cong');
     } catch (err) {

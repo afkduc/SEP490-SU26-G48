@@ -33,33 +33,33 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: linear-gradient(135deg, #18181b, #3f3f46 55%, #3f3f46);
-  box-shadow: 0 8px 22px rgba(24, 24, 27, 0.35);
+  background: linear-gradient(135deg, #4338ca, #6366f1 55%, #0891b2);
+  box-shadow: 0 8px 22px rgba(67, 56, 202, 0.35);
   flex-shrink: 0;
 }
 
 .admin-hub__title-icon--security {
-  background: linear-gradient(135deg, #27272a, #52525b);
-  box-shadow: 0 8px 22px rgba(24, 24, 27, 0.35);
+  background: linear-gradient(135deg, #e11d48, #f97316);
+  box-shadow: 0 8px 22px rgba(225, 29, 72, 0.32);
 }
 
 .admin-hub__title-icon--account {
-  background: linear-gradient(135deg, #3f3f46, #3f3f46);
-  box-shadow: 0 8px 22px rgba(24, 24, 27, 0.35);
+  background: linear-gradient(135deg, #0f766e, #06b6d4);
+  box-shadow: 0 8px 22px rgba(15, 118, 110, 0.32);
 }
 
 .admin-hub__title-group h1 {
   margin: 0;
   font-size: 1.375rem;
   font-weight: 700;
-  color: var(--ag-text-primary, #111111);
+  color: var(--ag-text-primary, #0b1220);
   letter-spacing: -0.01em;
 }
 
 .admin-hub__subtitle {
   margin: 4px 0 0;
   font-size: 0.875rem;
-  color: var(--ag-text-muted, #71717a);
+  color: var(--ag-text-muted, #52657a);
 }
 
 .admin-hub__tabs {
@@ -67,8 +67,8 @@
   align-items: center;
   gap: 4px;
   padding: 4px;
-  background: linear-gradient(180deg, #e4e4e7, #d4d4d8);
-  border: 1px solid var(--ag-border, #d4d4d8);
+  background: linear-gradient(180deg, #dbe4f3, #cfd9eb);
+  border: 1px solid var(--ag-border, #c7d5ea);
   border-radius: 12px;
   width: fit-content;
   max-width: 100%;
@@ -80,7 +80,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #52525b;
+  color: #3f5168;
   font-size: 0.875rem;
   font-weight: 600;
   padding: 8px 14px;
@@ -93,14 +93,14 @@
 }
 
 .admin-hub__tab:hover {
-  color: #111111;
+  color: #0b1220;
   background: rgba(255, 255, 255, 0.55);
 }
 
 .admin-hub__tab--active {
-  background: linear-gradient(135deg, #18181b, #3f3f46);
+  background: linear-gradient(135deg, #4338ca, #6366f1);
   color: #fff;
-  box-shadow: 0 6px 14px rgba(24, 24, 27, 0.3);
+  box-shadow: 0 6px 14px rgba(67, 56, 202, 0.3);
 }
 
 .admin-hub__tab-count {
@@ -108,7 +108,7 @@
   height: 18px;
   padding: 0 6px;
   border-radius: 999px;
-  background: #52525b;
+  background: #ef4444;
   color: #fff;
   font-size: 0.7rem;
   font-weight: 700;
@@ -137,9 +137,9 @@
   flex-wrap: wrap;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid #d4d4d8;
-  background: linear-gradient(135deg, #e4e4e7 0%, #e4e4e7 100%);
-  color: #18181b;
+  border: 1px solid #c7d2fe;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  color: #312e81;
   font-size: 0.875rem;
 }
 

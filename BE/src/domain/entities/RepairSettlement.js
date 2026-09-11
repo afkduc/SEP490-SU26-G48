@@ -1,6 +1,6 @@
 /**
- * RepairSettlement entity - tuong ung bang `service_orders` (header)
- * + `service_order_items` (danh sach hang muc/phu tung), kem thong tin
+ * RepairSettlement entity - tuong ung bang `repair_orders` (header)
+ * + `repair_order_items` (danh sach hang muc/phu tung), kem thong tin
  * join tu customers/vehicles/users de tra ve du du lieu cho phieu.
  */
 class RepairSettlement {
@@ -14,11 +14,14 @@ class RepairSettlement {
     this.advisorId = data.advisorId ?? null;
     this.teamLeaderId = data.teamLeaderId ?? null;
     this.teamLeaderName = data.teamLeaderName ?? null;
-    // Lenh sua chua dang hien hanh cua phieu nay (null neu chua gan to
-    // truong) - dung de CVDV huy truc tiep tu man Phieu quyet toan.
+    // Truoc khi gop bang, day la id cua dong trong bang lenh sua chua RIENG
+    // (null neu chua gan to truong). Sau khi gop, lenh sua chua CHINH LA phieu
+    // nay nen gia tri bang chinh `id` - van giu null khi chua ai nhan viec de
+    // FE khong phai doi: no dang dung truong nay dung theo nghia "da co lenh
+    // sua chua chua?" (xem RepairSettlementPage.jsx).
     this.repairOrderId = data.repairOrderId ?? null;
-    // So khoang xe dang thuc hien lenh sua chua nay (vehicle_bays.bay_number
-    // qua repair_orders.bay_id) - null neu chua gan to truong/khoang.
+    // So khoang xe dang sua phieu nay (vehicle_bays.bay_number qua
+    // repair_orders.bay_id) - null neu chua gan to truong/khoang.
     this.bayNumber = data.bayNumber ?? null;
     // Da co it nhat 1 dau muc cua lenh sua chua nay duoc tick hoan thanh -
     // dung de khoa nut "Huy" o man danh sach khi dang "inprogress" (xem
@@ -53,6 +56,13 @@ class RepairSettlement {
     this.signatureData = data.signatureData ?? null;
     this.signerName = data.signerName ?? null;
     this.signedAt = data.signedAt ?? null;
+    // CVDV dang mo phieu nay (man Phieu quyet toan sua chua) - null neu khong
+    // ai dang mo hoac khoa da het han (xem RepairSettlementRepositoryImpl
+    // HEADER_SELECT, da loc TTL san trong SQL nen o day luon la "con hieu luc").
+    this.lockedBy = data.lockedBy ?? null; // { id, name }
+    this.lockedAt = data.lockedAt ?? null;
+    // So dau muc "Khong dat" cho co van hoi khach - man danh sach hien canh bao.
+    this.ngPendingCount = data.ngPendingCount ?? 0;
 
     this.customer = data.customer ?? null; // { id, fullName, phone, address, taxCode, cccd, email, contactPerson, contactPhone }
     this.vehicle = data.vehicle ?? null; // { id, licensePlate, vehicleModel, frameNumber, engineNumber, purchaseDate, currentKm }
@@ -64,13 +74,20 @@ class RepairSettlement {
     // Tho thuc hien lenh sua chua (repair_order_technicians, co the nhieu tho) -
     // chi co khi da gan to truong, xem [{ id, fullName, phone }].
     this.technicians = data.technicians ?? [];
+    // Ten tho ghep san (chuoi) - cau danh sach tra ve cot nay thay vi nap
+    // mang `technicians` cho tung dong. Man chi tiet van dung mang o tren.
+    this.technicianNames = data.technicianNames ?? null;
+    // To truong duoc CHI DINH san (khac teamLeaderName = nguoi DA NHAN viec).
+    // null = khong chi dinh, moi to truong deu thay - xem ensureAssignedTeamLeader.js
+    this.assignedTeamLeaderId = data.assignedTeamLeaderId ?? null;
+    this.assignedTeamLeaderName = data.assignedTeamLeaderName ?? null;
   }
 
   static fromPersistence(headerRow, itemRows = [], taskRows = [], technicianRows = []) {
     if (!headerRow) return null;
     return new RepairSettlement({
       id: headerRow.id,
-      code: headerRow.order_code,
+      code: headerRow.repair_code,
       branchId: headerRow.branch_id,
       branchName: headerRow.branch_name,
       customerId: headerRow.customer_id,
@@ -78,10 +95,13 @@ class RepairSettlement {
       advisorId: headerRow.advisor_id,
       teamLeaderId: headerRow.team_leader_id,
       teamLeaderName: headerRow.team_leader_name,
-      repairOrderId: headerRow.repair_order_id,
+      repairOrderId: headerRow.repair_started_at ? headerRow.id : null,
       bayNumber: headerRow.bay_number,
       hasCompletedTask: Boolean(headerRow.has_completed_task),
       hasTechnicians: Boolean(headerRow.has_technicians),
+      technicianNames: headerRow.technician_names ?? null,
+      assignedTeamLeaderId: headerRow.assigned_team_leader_id ?? null,
+      assignedTeamLeaderName: headerRow.assigned_team_leader_name ?? null,
       customerRequest: headerRow.customer_request,
       currentKm: headerRow.current_km,
       status: headerRow.status,
@@ -104,6 +124,11 @@ class RepairSettlement {
       signatureData: headerRow.signature_data ?? null,
       signerName: headerRow.signature_signer_name ?? null,
       signedAt: headerRow.signature_signed_at ?? null,
+      lockedBy: headerRow.active_locked_by_user_id
+        ? { id: headerRow.active_locked_by_user_id, name: headerRow.active_locked_by_name }
+        : null,
+      lockedAt: headerRow.active_locked_at ?? null,
+      ngPendingCount: Number(headerRow.ng_pending_count || 0),
       customer: {
         id: headerRow.customer_id,
         fullName: headerRow.customer_full_name,
@@ -123,6 +148,9 @@ class RepairSettlement {
         engineNumber: headerRow.vehicle_engine_number,
         purchaseDate: headerRow.vehicle_purchase_date,
         currentKm: headerRow.vehicle_current_km,
+        // Doi xe that trong catalog - de man sua phieu van loc dung goi bao
+        // duong cua xe do (giong luc tao moi), xem RepairSettlementPage.
+        modelId: headerRow.vehicle_model_id ?? null,
       },
       advisor: {
         id: headerRow.advisor_id,
@@ -145,6 +173,9 @@ class RepairSettlement {
         isFree: Boolean(r.is_free),
         total: r.total,
         note: r.note ?? null,
+        // Yeu cau thuc hien cua bieu mau BDDK - de mo lai phieu cu van hien
+        // dung "Thay the"/"Kiem tra..." tren tung dau muc con cua goi.
+        actionCode: r.action_code ?? null,
       })),
       tasks: taskRows.map((r) => ({
         id: r.id,
@@ -157,6 +188,20 @@ class RepairSettlement {
         isQtyIncreased: Boolean(r.is_qty_increased),
         prevQuantity: r.prev_quantity ?? null,
         note: r.note ?? null,
+        // PHAI map giong RepairOrder.js: man Phieu quyet toan cua co van doc
+        // task qua entity NAY, con man to truong/khoang doc qua RepairOrder.
+        // Thieu 3 truong duoi thi dau muc bi cham "Khong dat" se hien y het
+        // dau muc dat ben man co van (chi con is_done de nhin).
+        actionCode: r.action_code ?? null,
+        checklistGroup: r.checklist_group ?? null,
+        checklistOrder: r.checklist_order ?? null,
+        checkResult: r.check_result ?? null,
+        checkNote: r.check_note ?? null,
+        // Xu ly dau muc Khong dat - co van CHI phai xu ly muc 'pending'
+        // (to truong da xem lai va bao len); muc 'reported' la tho vua
+        // cham, con nam o to truong (xem ensureNgDecision.js).
+        ngDecision: r.ng_decision ?? null,
+        ngNote: r.ng_note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

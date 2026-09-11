@@ -26,8 +26,7 @@ function buildVehicleRouter() {
 
   router.use(authenticate, trackActivity);
   router.get('/search', searchController.search);
-  router.get('/models', modelController.search);
-  router.post('/models', modelController.create);
+  router.get('/models', modelController.list);
   router.get('/:id/owners', ownershipController.getHistory);
   router.post('/:id/transfer', ownershipController.transfer);
 

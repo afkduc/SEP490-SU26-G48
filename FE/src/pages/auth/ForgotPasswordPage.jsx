@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { forgotPasswordApi } from '../../services/authApi';
+import { BASE_PATH } from '../../config';
 import './LoginPage.css';
 
 export default function ForgotPasswordPage() {
@@ -42,7 +43,7 @@ export default function ForgotPasswordPage() {
     <div className="login-bg">
       <div className="login-shell login-shell--narrow">
         <div className="login-panel-left">
-          <div className="login-panel-brand">AutoGara</div>
+          <img className="login-panel-logo" src={`${BASE_PATH}/AutoGaraLogo-Photoroom.png`} alt="AutoGara" />
           <span className="login-panel-eyebrow">Bảo mật tài khoản</span>
           <h2 className="login-panel-headline">Khôi phục mật khẩu an toàn qua email</h2>
         </div>

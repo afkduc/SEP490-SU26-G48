@@ -27,6 +27,11 @@
  *   - 'gate-exit-confirmed' : Bao ve xac nhan xe da ra cong (man hinh cong,
  *                           public khong dang nhap) - xem publicRoutes.js
  *                           /public/gate/*, sseRoutes.js /sse/gate.
+ *   - 'locked'/'unlocked' : 1 CVDV vua chiem/nha khoa "dang mo phieu" o man
+ *                           danh sach Phieu quyet toan (nut "Truy cap phieu") -
+ *                           xem RepairSettlementService.acquireLock/releaseLock.
+ *                           Chi phat khi CHIEM MOI that su, khong phat lai o
+ *                           moi nhip gia han 20s.
  */
 
 const { EventEmitter } = require('events');

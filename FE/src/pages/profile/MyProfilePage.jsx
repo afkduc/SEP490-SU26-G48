@@ -14,6 +14,7 @@ import {
 } from '../../utils/profilePaths';
 import { useCrmSearchSync } from '../../utils/crmUrl';
 import { useToast } from '../../components/common/ToastContext';
+import { useConfirm } from '../../components/common/ConfirmDialog';
 import {
   EMAIL_HINT,
   getPersonNameError,
@@ -151,6 +152,7 @@ export default function MyProfilePage({
 } = {}) {
   const { user, setUser, reloadPermissions, logout } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const syncSearch = useCrmSearchSync();
   const location = useLocation();
@@ -327,9 +329,13 @@ export default function MyProfilePage({
     : '?';
 
   async function handleLogoutAllDevices() {
-    const ok = window.confirm(
-      'Đăng xuất mọi thiết bị (kể cả máy này)? Bạn sẽ phải đăng nhập lại.'
-    );
+    const ok = await confirm({
+      title: 'Đăng xuất mọi thiết bị',
+      message: 'Đăng xuất mọi thiết bị, kể cả máy này?',
+      detail: 'Bạn sẽ phải đăng nhập lại trên tất cả thiết bị.',
+      confirmText: 'Đăng xuất tất cả',
+      tone: 'danger',
+    });
     if (!ok) return;
 
     setLoggingOutAll(true);

@@ -7,7 +7,10 @@ const { query } = require('../database/sqlServer');
 class CatalogSearchRepositoryImpl extends CatalogSearchRepository {
   async findAllActiveServices(branchId) {
     const result = await query(
-      `SELECT id, service_code, service_name, category_id, unit_price, repair_category
+      // model_id: dich vu phu thuoc doi xe (vd "Guoc phanh do - Mazda CX-8...")
+      // de FE chi goi y do dung cho chiec xe dang lap phieu. NULL = dung chung
+      // moi doi xe (dau dong co, dau phanh...) - xem ensureCatalogModel.js.
+      `SELECT id, service_code, service_name, category_id, unit_price, repair_category, model_id
        FROM services
        WHERE is_active = 1 AND branch_id = @branchId
        ORDER BY service_name`,
@@ -18,14 +21,21 @@ class CatalogSearchRepositoryImpl extends CatalogSearchRepository {
 
   async findAllActivePackagesWithItems(branchId) {
     const result = await query(
+      // spi.action_code (I/R/M/V) + s.checklist_group/order la du lieu cua bieu
+      // mau "Phieu kiem tra BDDK" - FE dung de ghi ro "Thay the"/"Kiem tra..."
+      // tren tung dau muc, va de chi tu chen phu tung cho dau muc PHAI THAY.
+      // sp.model_id de FE chi goi y goi dung doi xe dang bao duong.
       `SELECT sp.id AS package_id, sp.package_code, sp.package_name, sp.category_id,
-              sp.total_price, sp.repair_category AS package_repair_category,
-              s.id AS service_id, s.service_code, s.service_name, s.unit_price, s.repair_category AS service_repair_category
+              sp.total_price, sp.repair_category AS package_repair_category, sp.model_id,
+              s.id AS service_id, s.service_code, s.service_name, s.unit_price, s.repair_category AS service_repair_category,
+              spi.action_code, s.checklist_group, s.checklist_order
        FROM   service_packages sp
        JOIN   service_package_items spi ON spi.package_id = sp.id
        JOIN   services s ON s.id = spi.service_id
        WHERE  sp.is_active = 1 AND s.is_active = 1 AND sp.branch_id = @branchId
-       ORDER  BY sp.package_name, s.service_name`,
+       ORDER  BY sp.package_name,
+                 CASE WHEN s.checklist_order IS NULL THEN 1 ELSE 0 END,
+                 s.checklist_order, s.service_name`,
       { branchId: Number(branchId) }
     );
     return result.recordset;

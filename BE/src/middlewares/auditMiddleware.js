@@ -28,7 +28,7 @@ const SENSITIVE_FIELDS = [
 ];
 
 const ENTITY_CODE_FIELDS = [
-  'order_code',
+  'repair_code',
   'contract_code',
   'customer_code',
   'vehicle_code',

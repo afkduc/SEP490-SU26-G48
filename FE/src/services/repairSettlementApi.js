@@ -1,5 +1,12 @@
 import httpClient from './httpClient';
 
+// Co van ghi nhan quyet dinh cua khach cho 1 dau muc "Khong dat":
+// decision = 'accepted' (khach dong y thay) | 'declined' (khach tu choi, bat
+// buoc kem note la ly do). Xem BE RepairSettlementService.decideNgTask.
+export async function decideNgTaskApi(id, taskId, decision, note) {
+  return httpClient.patch(`/repair-settlements/${id}/tasks/${taskId}/ng-decision`, { decision, note });
+}
+
 export async function listRepairSettlementsApi({ status, search, customerId, vehicleId, fromDate, toDate, page = 1, limit = 100, scope } = {}) {
   const params = new URLSearchParams();
   if (status) params.set('status', status);
@@ -43,5 +50,34 @@ export async function logRepairSettlementPrintApi(id, kind = 'settlement') {
 
 export async function createPayosPaymentLinkApi(id) {
   return httpClient.post(`/repair-settlements/${id}/payos/create-payment-link`);
+}
+
+// Khoa "dang mo phieu" (man danh sach) - chiem/gia han khi bam "Truy cập
+// phiếu" (goi lai moi 20s trong luc con mo), nha khi dong. Xem
+// RepairSettlementService.acquireLock/releaseLock. 409 kem err.details =
+// Cố vấn dịch vụ của chính chi nhánh người đang đăng nhập (branchId lấy từ
+// token) - dùng cho ô lọc "theo cố vấn" ở màn danh sách.
+export async function listBranchAdvisorsApi() {
+  return httpClient.get('/repair-settlements/advisors'); // [{ id, name, phone }]
+}
+
+// Tổ trưởng của chính chi nhánh người đang đăng nhập - dùng cho ô "Chỉ định
+// tổ trưởng" khi tạo phiếu.
+export async function listBranchTeamLeadersApi() {
+  return httpClient.get('/repair-settlements/team-leaders'); // [{ id, name, phone }]
+}
+
+// { lockedByUserId, lockedByName, lockedAt } khi dang bi nguoi khac giu.
+export async function lockSettlementApi(id) {
+  return httpClient.post(`/repair-settlements/${id}/lock`);
+}
+
+export async function unlockSettlementApi(id) {
+  return httpClient.delete(`/repair-settlements/${id}/lock`);
+}
+
+/** Nhat ky hoat dong 1 phieu (ai truy cap/tao/sua/doi trang thai, luc nao). */
+export async function getSettlementActivityLogApi(id) {
+  return httpClient.get(`/repair-settlements/${id}/activity-log`);
 }
 

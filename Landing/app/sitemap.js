@@ -9,7 +9,7 @@ export default function sitemap() {
       priority: 1,
     },
     {
-      url: `${SITE_URL}/tra-cuu`,
+      url: `${SITE_URL}/lookup`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.6,

@@ -2,7 +2,7 @@ const express = require('express');
 const ImportRequestController = require('../controllers/ImportRequestController');
 const { makeImportRequestService } = require('../../application/services');
 const { authenticate } = require('../../middlewares/auth');
-const { requirePerm } = require('../../middlewares/inventory/rbac');
+const { requirePerm } = require('../../middlewares');
 
 function makeImportRequestController() {
   return new ImportRequestController({

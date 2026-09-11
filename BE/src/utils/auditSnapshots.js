@@ -31,7 +31,6 @@ function exportRequestSnapshot(created) {
     status: created.status || null,
     repairOrderId: created.repairOrderId || null,
     repairOrderCode: created.repairOrderCode || null,
-    serviceOrderCode: created.serviceOrderCode || null,
     customerName: created.customerName || null,
     vehiclePlate: created.vehiclePlate || null,
     exportDate: created.exportDate || null,

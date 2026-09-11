@@ -24,8 +24,13 @@ function toDDMMYYYYHHmm(value) {
 }
 
 // Format ve yyyy-mm-dd (khop voi vehicleInfo.purchaseDate FE dang dung).
+// Bug lich su: String(value) tren 1 Date object goi Date.prototype.toString()
+// (vd "Wed May 10 2023 07:00:00 GMT+0700 ...") chu KHONG phai ISO, khien
+// slice(0,10) ra chuoi rac ("Wed May 10") - input type=date o FE render rong
+// dù DB co du lieu. Phai check instanceof Date va goi toISOString() truoc.
 function toISODate(value) {
   if (!value) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value).slice(0, 10);
 }
 
@@ -39,6 +44,9 @@ class RepairSettlementResponseDto {
       paidDate: entity.paidAt ? toDDMMYYYYHHmm(entity.paidAt) : null,
       paymentMethod: entity.paymentMethod,
       advisor: entity.advisor?.name || null,
+      // Kem ID chu khong chi ten: bo loc "Phiếu của tôi" o man danh sach khop
+      // theo id, 2 co van trung ten thi loc theo ten se ra sai.
+      advisorId: entity.advisor?.id ?? entity.advisorId ?? null,
       advisorPhone: entity.advisor?.phone || null,
       branch: entity.branchName,
       customer: entity.customer,
@@ -58,7 +66,14 @@ class RepairSettlementResponseDto {
       total: entity.total,
       isWarranty: entity.isWarranty,
       teamLeader: entity.teamLeaderName,
+      lockedByName: entity.lockedBy?.name || null,
+      lockedAt: entity.lockedAt ? toDDMMYYYYHHmm(entity.lockedAt) : null,
+      ngPendingCount: entity.ngPendingCount ?? 0,
       technicians: entity.technicians,
+      // Chuoi ten tho cho man danh sach (man chi tiet dung `technicians`).
+      technicianNames: entity.technicianNames ?? null,
+      assignedTeamLeaderId: entity.assignedTeamLeaderId ?? null,
+      assignedTeamLeaderName: entity.assignedTeamLeaderName ?? null,
       repairOrderId: entity.repairOrderId,
       bayNumber: entity.bayNumber,
       hasCompletedTask: entity.hasCompletedTask,
@@ -86,7 +101,7 @@ const PUBLIC_STATUS_LABELS = {
 class PublicVehicleHistoryDto {
   static fromRow(row) {
     return {
-      code: row.order_code,
+      code: row.repair_code,
       status: row.status,
       statusLabel: PUBLIC_STATUS_LABELS[row.status] || row.status,
       intakeDate: toDDMMYYYY(row.intake_date),

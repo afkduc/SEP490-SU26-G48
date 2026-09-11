@@ -5,13 +5,6 @@ import { useManagerInventoryNotify } from '../../contexts/ManagerInventoryNotify
 import { markProductSeenApi } from '../../services/productApi';
 import { formatCurrency } from '../../utils';
 
-const IconSearch = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="11" cy="11" r="7" />
-    <path d="M20 20l-3.5-3.5" />
-  </svg>
-);
-
 // ─── Trang Kho riêng cho Quản lý - liệt kê từng phụ tùng ───────────────
 // Dung lai hook useStock (da co san, dang dung chung o StockPage cho Nhan
 // vien kho) - chi lam giao dien rieng theo dung style cac man Quan ly, khong
@@ -50,7 +43,7 @@ export default function ManagerInventoryPage() {
 
       <div className="filter-bar">
         <div className="search-input">
-          <span className="search-icon"><IconSearch /></span>
+          <span className="search-icon">🔍</span>
           <input value={params.search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mã, tên phụ tùng..." />
         </div>
         <select className="filter-select" value={params.category} onChange={(e) => setCategory(e.target.value)}>
@@ -62,7 +55,7 @@ export default function ManagerInventoryPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
@@ -101,7 +94,7 @@ export default function ManagerInventoryPage() {
                       title="Sản phẩm mới do Nhân viên kho tạo"
                       style={{
                         display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                        background: '#3f3f46', marginRight: 8,
+                        background: '#DC2626', marginRight: 8,
                       }}
                     />
                   )}

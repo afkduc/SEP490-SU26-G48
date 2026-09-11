@@ -121,21 +121,21 @@ export default function SessionExpiredModal() {
           width: 72px;
           height: 72px;
           border-radius: 50%;
-          background: #f4f4f5;
+          background: #fef3c7;
           display: flex;
           align-items: center;
           justify-content: center;
           margin: 0 auto 20px;
-          color: #52525b;
+          color: #d97706;
         }
         .modal-title {
           font-size: 1.25rem;
           font-weight: 700;
-          color: #27272a;
+          color: #1e293b;
           margin: 0 0 12px;
         }
         .modal-message {
-          color: #71717a;
+          color: #64748b;
           margin: 0 0 24px;
           line-height: 1.6;
         }

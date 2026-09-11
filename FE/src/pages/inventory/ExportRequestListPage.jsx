@@ -15,6 +15,16 @@ function formatDateTime(d) {
   return s.length >= 16 ? s.slice(0, 16).replace('T', ' ') : s;
 }
 
+// Gioi han khoang chon ngay o bo loc: chi cho chon trong +-5 nam quanh hom nay,
+// tranh chon nham nam qua xa (vd 2042) do cuon lich date-picker qua tay.
+function yearsFromToday(offset) {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + offset);
+  return d.toISOString().slice(0, 10);
+}
+const MIN_FILTER_DATE = yearsFromToday(-5);
+const MAX_FILTER_DATE = yearsFromToday(5);
+
 export default function ExportRequestListPage() {
   const { branchId, loadingBranches, branchError } = useInventoryBranch();
 
@@ -63,9 +73,6 @@ export default function ExportRequestListPage() {
       <div className="er-list__header">
         <div>
           <h1 className="er-list__title">Phiếu xuất kho</h1>
-          <p className="er-list__subtitle">
-            Xuất phụ tùng theo phiếu sửa chữa (Service Order). NV kho tự xuất - không cần Manager duyệt.
-          </p>
         </div>
         <PermissionGate permission="export_requests:create">
           <Link to="/inventory/export-requests/new" className="btn btn--primary">
@@ -89,7 +96,8 @@ export default function ExportRequestListPage() {
           type="date"
           value={draftFromDate}
           onChange={(e) => setDraftFromDate(e.target.value)}
-          max={draftToDate || undefined}
+          min={MIN_FILTER_DATE}
+          max={draftToDate || MAX_FILTER_DATE}
           title="Từ ngày"
         />
         <input
@@ -97,7 +105,8 @@ export default function ExportRequestListPage() {
           type="date"
           value={draftToDate}
           onChange={(e) => setDraftToDate(e.target.value)}
-          min={draftFromDate || undefined}
+          min={draftFromDate || MIN_FILTER_DATE}
+          max={MAX_FILTER_DATE}
           title="Đến ngày"
         />
         <button type="button" className="btn btn--secondary" onClick={handleApplyFilter}>
@@ -140,7 +149,7 @@ export default function ExportRequestListPage() {
                     <tr key={r.id}>
                       <td><span className="font-mono">{r.requestCode}</span></td>
                       <td>{formatDateTime(r.createdAt)}</td>
-                      <td><span className="font-mono">{r.serviceOrderCode || '—'}</span></td>
+                      <td><span className="font-mono">{r.repairOrderCode || '—'}</span></td>
                       <td>{r.customerName || '—'}</td>
                       <td className="text-right">{r.itemCount ?? 0}</td>
                       <td className="text-right">{r.totalQuantity ?? 0}</td>

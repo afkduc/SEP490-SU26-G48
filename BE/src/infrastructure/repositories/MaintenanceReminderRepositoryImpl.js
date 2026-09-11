@@ -18,37 +18,37 @@ const LIST_SELECT = `
 // ngay tao phieu (intake_date) - khong con phu thuoc CVDV go tay so
 // km/ngay bao duong ke tiep nua (da bo han 2 truong nay, xem
 // RepairSettlementRepositoryImpl): 1 tuan (cham soc/hoi tham sau sua chua),
-// 1 thang va 2 thang (nhac bao duong dinh ky). Dedup theo (service_order_id,
+// 1 thang va 2 thang (nhac bao duong dinh ky). Dedup theo (repair_order_id,
 // reminder_type) - moi phieu chi sinh dung 1 nhac nho cho moi moc, du ham
 // nay duoc goi lap lai nhieu lan (startup/interval/truoc moi lan liet ke).
 const SYNC_SQL = `
   ;WITH milestones AS (
-    SELECT so.id AS service_order_id, so.vehicle_id, so.customer_id, so.branch_id,
+    SELECT so.id AS repair_order_id, so.vehicle_id, so.customer_id, so.branch_id,
            N'Chăm sóc sau sửa chữa (1 tuần)' AS reminder_type,
            CAST(DATEADD(DAY, 7, so.intake_date) AS DATE) AS due_date
-    FROM   service_orders so
+    FROM   repair_orders so
     WHERE  so.status <> 'cancelled'
     UNION ALL
     SELECT so.id, so.vehicle_id, so.customer_id, so.branch_id,
            N'Nhắc bảo dưỡng định kỳ (1 tháng)',
            CAST(DATEADD(MONTH, 1, so.intake_date) AS DATE)
-    FROM   service_orders so
+    FROM   repair_orders so
     WHERE  so.status <> 'cancelled'
     UNION ALL
     SELECT so.id, so.vehicle_id, so.customer_id, so.branch_id,
            N'Nhắc bảo dưỡng định kỳ (2 tháng)',
            CAST(DATEADD(MONTH, 2, so.intake_date) AS DATE)
-    FROM   service_orders so
+    FROM   repair_orders so
     WHERE  so.status <> 'cancelled'
   )
   INSERT INTO maintenance_reminders (
-    service_order_id, vehicle_id, customer_id, branch_id, reminder_type, due_date, is_sent, is_confirmed, created_at
+    repair_order_id, vehicle_id, customer_id, branch_id, reminder_type, due_date, is_sent, is_confirmed, created_at
   )
-  SELECT m.service_order_id, m.vehicle_id, m.customer_id, m.branch_id, m.reminder_type, m.due_date, 0, 0, GETDATE()
+  SELECT m.repair_order_id, m.vehicle_id, m.customer_id, m.branch_id, m.reminder_type, m.due_date, 0, 0, GETDATE()
   FROM   milestones m
   WHERE  NOT EXISTS (
     SELECT 1 FROM maintenance_reminders mr
-    WHERE mr.service_order_id = m.service_order_id
+    WHERE mr.repair_order_id = m.repair_order_id
       AND mr.reminder_type = m.reminder_type
   )
 `;

@@ -15,6 +15,9 @@ function toVehicleSearchDto(row) {
     frameNumber: row.frame_number,
     engineNumber: row.engine_number,
     currentKm: row.current_km,
+    // Doi xe that trong catalog (vehicles.model_id) - dung de loc goi bao
+    // duong dung doi xe khi CVDV lap phieu, xem RepairSettlementPage.
+    modelId: row.model_id ?? null,
     purchaseDate: row.purchase_date,
     warrantyEndDate: row.warranty_end_date,
     warrantyKmLimit: row.warranty_km_limit,

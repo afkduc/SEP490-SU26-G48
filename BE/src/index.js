@@ -76,12 +76,71 @@ async function start() {
       console.warn('[BE] Failed to start background jobs:', jobErr.message);
     }
 
-    // Dam bao cot thiet bi tin cay
+    // Dam bao cot thiet bi tren login_sessions (da gop bo user_devices)
     try {
-      await require('./infrastructure/repositories/DeviceRepository').ensureTrustedSchema();
-      console.log('[BE] user_devices trusted columns ready');
+      await require('./infrastructure/repositories/DeviceRepository').ensureSessionDeviceSchema();
+      console.log('[BE] login_sessions device columns ready');
     } catch (schemaErr) {
-      console.warn('[BE] ensureTrustedSchema:', schemaErr.message);
+      console.warn('[BE] ensureSessionDeviceSchema:', schemaErr.message);
+    }
+
+    // PHAI chay TRUOC cac buoc ensure* khac vi no doi ten bang
+    // (service_orders -> repair_orders, service_order_items ->
+    // repair_order_items) - cac buoc sau deu tham chieu ten MOI.
+    //
+    // Va KHAC cac buoc ensure* o duoi: doi ten bang/cot chu khong chi them
+    // cot, nen KHONG duoc nuot loi. Neu no hong (da rollback) thi schema van
+    // la ban cu trong khi code da la ban moi - chay tiep chi tao ra loi 500
+    // kho hieu o khap noi. Dung han cho de con biet duong sua.
+    try {
+      const { ensureRepairOrderMerge } = require('./infrastructure/database/ensureRepairOrderMerge');
+      const result = await ensureRepairOrderMerge();
+      console.log(result.skipped
+        ? '[BE] repair_orders merge: da gop tu truoc, bo qua'
+        : `[BE] repair_orders merge: DA GOP XONG (${result.steps} buoc)`);
+    } catch (mergeErr) {
+      console.error('[BE] KHONG THE KHOI DONG - gop bang repair_orders that bai:');
+      console.error(mergeErr.message);
+      process.exit(1);
+    }
+
+    // Dat lai ten rang buoc/index cho khop ten bang moi - THUAN THAM MY, hong
+    // cung khong sao nen chi canh bao (khac buoc gop bang o tren).
+    try {
+      const { ensureRepairOrderConstraintNames } = require('./infrastructure/database/ensureRepairOrderConstraintNames');
+      const r = await ensureRepairOrderConstraintNames();
+      if (r.renamed > 0) console.log(`[BE] doi ten ${r.renamed} rang buoc/index cho khop bang repair_orders`);
+    } catch (nameErr) {
+      console.warn('[BE] ensureRepairOrderConstraintNames:', nameErr.message);
+    }
+
+    // Bo bang `brands` (chi con Mazda) - doi cot nen KHONG duoc nuot loi:
+    // hong ma van chay tiep thi code moi (da bo brand_id) gap schema cu se
+    // loi kho hieu. Dung han cho de con biet duong sua.
+    try {
+      const { ensureDropBrands } = require('./infrastructure/database/ensureDropBrands');
+      const r = await ensureDropBrands();
+      console.log(r.skipped
+        ? '[BE] brands: da bo tu truoc, bo qua'
+        : `[BE] brands: DA BO XONG (${r.steps} buoc)`);
+    } catch (brandErr) {
+      console.error('[BE] KHONG THE KHOI DONG - bo bang brands that bai:');
+      console.error(brandErr.message);
+      process.exit(1);
+    }
+
+    // Bo 5 cot chet cua vehicle_models - doi cot nen KHONG duoc nuot loi,
+    // giong ensureDropBrands: code moi da bo cac cot nay khoi cau SELECT.
+    try {
+      const { ensureTrimVehicleModelColumns } = require('./infrastructure/database/ensureTrimVehicleModelColumns');
+      const r = await ensureTrimVehicleModelColumns();
+      console.log(r.skipped
+        ? '[BE] vehicle_models: cot chet da bo tu truoc, bo qua'
+        : `[BE] vehicle_models: DA BO 5 COT CHET (${r.steps} buoc)`);
+    } catch (trimErr) {
+      console.error('[BE] KHONG THE KHOI DONG - bo cot chet vehicle_models that bai:');
+      console.error(trimErr.message);
+      process.exit(1);
     }
 
     try {
@@ -100,7 +159,7 @@ async function start() {
 
     try {
       await require('./infrastructure/database/ensureRepairOrderTasksColumns').ensureRepairOrderTasksColumns();
-      console.log('[BE] repair_order_tasks/service_order_items note+prev_quantity columns ready');
+      console.log('[BE] repair_order_tasks/repair_order_items note+prev_quantity columns ready');
     } catch (schemaErr) {
       console.warn('[BE] ensureRepairOrderTasksColumns:', schemaErr.message);
     }
@@ -110,6 +169,160 @@ async function start() {
       console.log('[BE] invoices.payment_method column ready');
     } catch (schemaErr) {
       console.warn('[BE] ensureInvoicePaymentMethod:', schemaErr.message);
+    }
+
+    // Metadata goi bao duong dinh ky (doi xe cua goi, nhom + yeu cau thuc hien
+    // I/R/M/V theo bieu mau "Phieu kiem tra BDDK"). KHONG duoc nuot loi: code
+    // moi SELECT thang cac cot nay o catalog va o checklist to truong/khoang -
+    // thieu cot la 500 o khap noi thay vi mat 1 tinh nang.
+    try {
+      const { ensureMaintenancePackageMeta } = require('./infrastructure/database/ensureMaintenancePackageMeta');
+      const r = await ensureMaintenancePackageMeta();
+      console.log(r.skipped
+        ? '[BE] metadata goi bao duong: da co tu truoc, bo qua'
+        : `[BE] metadata goi bao duong: DA THEM XONG (${r.steps} buoc)`);
+    } catch (metaErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them metadata goi bao duong that bai:');
+      console.error(metaErr.message);
+      process.exit(1);
+    }
+
+    // Cot repair_orders.bay_completed_at. Ban dau dung cho luong 2 buoc
+    // (khoang bao xong -> to truong xac nhan); nay khoang khong con nut ket
+    // thuc nua nen cot KHONG con duoc doc/ghi o dau. Giu buoc ensure lai de
+    // dung schema giua cac may van khop nhau; muon bo han thi phai co
+    // migration DROP COLUMN rieng.
+    try {
+      const { ensureBayCompletionConfirm } = require('./infrastructure/database/ensureBayCompletionConfirm');
+      const r = await ensureBayCompletionConfirm();
+      console.log(r.skipped
+        ? '[BE] moc xac nhan hoan thanh: da co tu truoc, bo qua'
+        : `[BE] moc xac nhan hoan thanh: DA THEM XONG (${r.steps} buoc)`);
+    } catch (confirmErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them moc xac nhan hoan thanh that bai:');
+      console.error(confirmErr.message);
+      process.exit(1);
+    }
+
+    // Xoa phieu quyet toan thi hang muc / tien do / tho / lich nhac tu xoa
+    // theo. Chi canh bao neu hong: day la tien ich don dep, thieu no thi xoa
+    // phieu phai xoa tay chu khong lam sai chuc nang nao dang chay.
+    try {
+      const { ensureRepairOrderCascade } = require('./infrastructure/database/ensureRepairOrderCascade');
+      const r = await ensureRepairOrderCascade();
+      console.log(r.skipped
+        ? '[BE] cascade xoa phieu: da co tu truoc, bo qua'
+        : `[BE] cascade xoa phieu: DA DAT XONG (${r.steps} khoa ngoai)`);
+    } catch (cascadeErr) {
+      console.warn('[BE] ensureRepairOrderCascade:', cascadeErr.message);
+    }
+
+    // Cot chi dinh to truong cho phieu quyet toan. KHONG duoc nuot loi: cau
+    // danh sach SELECT thang cot nay, thieu cot la 500 o ca man co van lan
+    // man to truong.
+    try {
+      const { ensureAssignedTeamLeader } = require('./infrastructure/database/ensureAssignedTeamLeader');
+      const r = await ensureAssignedTeamLeader();
+      console.log(r.skipped
+        ? '[BE] chi dinh to truong: da co tu truoc, bo qua'
+        : `[BE] chi dinh to truong: DA THEM XONG (${r.steps} buoc)`);
+    } catch (atlErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot chi dinh to truong that bai:');
+      console.error(atlErr.message);
+      process.exit(1);
+    }
+
+    // Loai hinh sua chua 'CS' (Cham soc xe) - FE/BE da cho phep nhung rang
+    // buoc CHECK cua repair_order_items thi chua, nen luu phieu co dich vu
+    // cham soc xe la chet o INSERT. KHONG duoc nuot loi: bo qua thi CVDV van
+    // gap dung loi do.
+    try {
+      const { ensureRepairCategoryCS } = require('./infrastructure/database/ensureRepairCategoryCS');
+      const r = await ensureRepairCategoryCS();
+      console.log(r.skipped
+        ? '[BE] loai hinh sua chua CS: da mo tu truoc, bo qua'
+        : `[BE] loai hinh sua chua CS: DA MO XONG (${r.steps} buoc)`);
+    } catch (csErr) {
+      console.error('[BE] KHONG THE KHOI DONG - mo rang buoc loai hinh sua chua that bai:');
+      console.error(csErr.message);
+      process.exit(1);
+    }
+
+    // Gan doi xe cho dich vu le + phu tung (services/products.model_id) de
+    // form quyet toan chi goi y do dung cho chinh chiec xe dang lam. KHONG
+    // duoc nuot loi: thieu cot thi cau SELECT cua catalog gay 500 o form tao
+    // phieu - hong han chuc nang chinh cua CVDV.
+    try {
+      const { ensureCatalogModel } = require('./infrastructure/database/ensureCatalogModel');
+      const r = await ensureCatalogModel();
+      console.log(r.skipped
+        ? '[BE] doi xe cho catalog: da co tu truoc, bo qua'
+        : `[BE] doi xe cho catalog: DA GAN XONG (${r.steps} buoc)`);
+    } catch (catErr) {
+      console.error('[BE] KHONG THE KHOI DONG - gan doi xe cho catalog that bai:');
+      console.error(catErr.message);
+      process.exit(1);
+    }
+
+    // Xu ly dau muc "Khong dat": cot ng_decision/ng_note/ng_decided_*.
+    // KHONG duoc nuot loi - thieu cot thi to truong bam Hoan thanh duoc ca khi
+    // con dau muc chua hoi khach, dung lo hong ma tinh nang nay sinh ra de va.
+    try {
+      const { ensureNgDecision } = require('./infrastructure/database/ensureNgDecision');
+      const r = await ensureNgDecision();
+      console.log(r.skipped
+        ? '[BE] xu ly dau muc khong dat: da co tu truoc, bo qua'
+        : `[BE] xu ly dau muc khong dat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (ngErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot xu ly dau muc khong dat that bai:');
+      console.error(ngErr.message);
+      process.exit(1);
+    }
+
+    // Cot export_requests.received_by (tho nhan phu tung khi xuat kho, thay
+    // cho o "Ghi chu" tu do). KHONG duoc nuot loi: thieu cot thi tao phieu
+    // xuat kho gui receivedBy len se chet ngay o INSERT.
+    try {
+      const { ensureExportRequestReceivedBy } = require('./infrastructure/database/ensureExportRequestReceivedBy');
+      const r = await ensureExportRequestReceivedBy();
+      console.log(r.skipped
+        ? '[BE] tho nhan hang phieu xuat: da co tu truoc, bo qua'
+        : `[BE] tho nhan hang phieu xuat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (recvErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot tho nhan hang phieu xuat that bai:');
+      console.error(recvErr.message);
+      process.exit(1);
+    }
+
+    // Cot export_requests.received_signature_data/received_signed_at (tho
+    // nhan phu tung tu ky xac nhan, giong khach hang ky phieu quyet toan).
+    // KHONG duoc nuot loi: thieu cot thi tao phieu xuat gui chu ky len se
+    // chet ngay o INSERT.
+    try {
+      const { ensureExportRequestReceivedSignature } = require('./infrastructure/database/ensureExportRequestReceivedSignature');
+      const r = await ensureExportRequestReceivedSignature();
+      console.log(r.skipped
+        ? '[BE] chu ky nguoi lay phieu xuat: da co tu truoc, bo qua'
+        : `[BE] chu ky nguoi lay phieu xuat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (sigErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot chu ky nguoi lay phieu xuat that bai:');
+      console.error(sigErr.message);
+      process.exit(1);
+    }
+
+    // Bang export_request_pickups + cot inventory_transactions.pickup_id -
+    // cho phep xuat kho nhieu lan / tra hang tren cung 1 phieu xuat. KHONG
+    // duoc nuot loi: thieu bang thi man xuat kho hong hoan toan.
+    try {
+      const { ensureExportPickups } = require('./infrastructure/database/ensureExportPickups');
+      const r = await ensureExportPickups();
+      console.log(r.skipped
+        ? '[BE] lich su lay hang phieu xuat: da co tu truoc, bo qua'
+        : `[BE] lich su lay hang phieu xuat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (pickupErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them lich su lay hang phieu xuat that bai:');
+      console.error(pickupErr.message);
+      process.exit(1);
     }
 
     const server = http.createServer({ maxHeaderSize: 32768 }, app);

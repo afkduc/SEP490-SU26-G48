@@ -149,6 +149,21 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
    * Sinh ma phieu: IRB-{branchId}-{YYYYMMDD}-{sequence:4}.
    * Sequence dem so phieu cung branch cung ngay.
    */
+  /**
+   * Kiem tra 1 nha cung cap da co phieu nhap nao dung so hoa don nay chua
+   * (tranh nhap trung 1 hoa don 2 lan). Trung theo (supplier_id, supplier_invoice_no),
+   * khong phan biet chi nhanh vi nha cung cap la du lieu dung chung toan he thong.
+   * @returns {Promise<boolean>}
+   */
+  async existsBySupplierInvoice(supplierId, supplierInvoiceNo) {
+    const result = await query(
+      `SELECT TOP 1 id FROM import_requests
+       WHERE supplier_id = @supplierId AND supplier_invoice_no = @supplierInvoiceNo`,
+      { supplierId: Number(supplierId), supplierInvoiceNo }
+    );
+    return result.recordset.length > 0;
+  }
+
   async getNextRequestCode(branchId, date, tx = null) {
     const d = date instanceof Date ? date : new Date();
     const yyyy = d.getFullYear();

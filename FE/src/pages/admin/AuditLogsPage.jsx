@@ -562,7 +562,7 @@ export default function AuditLogsPage() {
               </select>
             </div>
 
-            <div className="filter-field filter-field--date">
+            <div className="filter-field">
               <label className="filter-field__label">Khoảng ngày</label>
               <DateRangeInputs
                 startDate={audit.params.startDate || ''}

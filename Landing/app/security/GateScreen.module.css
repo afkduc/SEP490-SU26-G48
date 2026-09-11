@@ -1,0 +1,181 @@
+.centerFill {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+.error {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+/* ─── Chon chi nhanh ─── */
+.pickerWrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px;
+  text-align: center;
+}
+
+.pickerTitle {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.pickerDesc {
+  color: var(--text-muted);
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.pickerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  width: 100%;
+  max-width: 720px;
+}
+
+.pickerCard {
+  display: block;
+  text-align: center;
+  padding: 24px 16px;
+  border-radius: var(--radius);
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pickerCard:active {
+  transform: scale(0.97);
+}
+
+/* ─── Man hinh chinh ─── */
+.screen {
+  min-height: 100vh;
+  padding: 24px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: var(--bg);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 16px;
+}
+
+.eyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.branchName {
+  font-size: 30px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.updatedAt {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.errorBanner {
+  background: #fdecea;
+  border: 1px solid #f3c1bb;
+  color: var(--accent);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.emptyText {
+  font-size: 20px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 6px solid var(--success);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 2px 10px rgba(33, 29, 26, 0.06);
+}
+
+.cardCode {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.plate {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.vehicleModel {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.customerName {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.confirmBtn {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  background: var(--success);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.confirmBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirmBtn:active:not(:disabled) {
+  transform: scale(0.98);
+}

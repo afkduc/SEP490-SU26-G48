@@ -3,14 +3,14 @@ import { getExportRequestsApi } from '../../services/exportRequestApi';
 
 /**
  * Quan ly trang thai trang Danh sach phieu xuat kho:
- * - Filter theo status / serviceOrderId / date range / search.
+ * - Filter theo status / repairOrderId / date range / search.
  * - Phan trang page/limit.
  */
 export function useExportRequests(initialBranchId) {
   const [params, setParams] = useState({
     branchId: initialBranchId,
     status: 'completed',
-    serviceOrderId: '',
+    repairOrderId: '',
     fromDate: '',
     toDate: '',
     search: '',
@@ -22,7 +22,7 @@ export function useExportRequests(initialBranchId) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const { branchId, status, serviceOrderId, fromDate, toDate, search, page, limit } = params;
+  const { branchId, status, repairOrderId, fromDate, toDate, search, page, limit } = params;
 
   useEffect(() => {
     setParams((current) => (
@@ -41,7 +41,7 @@ export function useExportRequests(initialBranchId) {
     setError(null);
     try {
       const res = await getExportRequestsApi({
-        branchId, status, serviceOrderId, fromDate, toDate, search, page, limit,
+        branchId, status, repairOrderId, fromDate, toDate, search, page, limit,
       });
       setResult(res || { items: [], total: 0, page, limit });
     } catch (err) {
@@ -49,7 +49,7 @@ export function useExportRequests(initialBranchId) {
     } finally {
       setLoading(false);
     }
-  }, [branchId, status, serviceOrderId, fromDate, toDate, search, page, limit]);
+  }, [branchId, status, repairOrderId, fromDate, toDate, search, page, limit]);
 
   useEffect(() => {
     fetchAll();

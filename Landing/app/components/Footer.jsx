@@ -11,11 +11,11 @@ const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61592097516986";
 const menuLinks = [
   { href: "/#trang-chu", label: "Trang chủ" },
   { href: "/#vi-sao-chon", label: "Vì sao chọn AutoGara" },
-  { href: "/#goi-dich-vu", label: "Gói dịch vụ" },
+  { href: "/#service-packages", label: "Gói dịch vụ" },
   { href: "/#chi-nhanh", label: "Chi nhánh" },
   { href: "/#meo-bao-duong", label: "Kinh nghiệm" },
   { href: "/#gui-yeu-cau", label: "Liên hệ" },
-  { href: "/tra-cuu", label: "Tra cứu tiến độ" },
+  { href: "/lookup", label: "Tra cứu tiến độ" },
 ];
 
 // Icon Facebook don gian tu ve (khong dung anh/logo chinh hang) - chi la
@@ -47,7 +47,7 @@ export default function Footer() {
           <p className={styles.logo}>
             <span>Auto</span>Gara
           </p>
-          <p className={styles.about}>Gara ủy quyền chính hãng Kia & Mazda.</p>
+          <p className={styles.about}>Gara ủy quyền chính hãng Mazda.</p>
           <a href="mailto:cskh@autogara.vn" className={styles.item}>
             <Mail className={styles.icon} />
             cskh@autogara.vn
@@ -100,7 +100,7 @@ export default function Footer() {
             </a>
           </div>
           <p className={styles.copy}>
-            © {new Date().getFullYear()} AutoGara. Gara chuyên Kia & Mazda.
+            © {new Date().getFullYear()} AutoGara. Gara chuyên Mazda.
           </p>
         </div>
       </div>

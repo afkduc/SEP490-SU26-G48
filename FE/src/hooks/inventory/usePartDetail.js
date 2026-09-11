@@ -3,13 +3,9 @@ import { getProductByIdApi } from '../../services/productApi';
 
 /**
  * Tai chi tiet mot phu tung. Tu dong fetch khi partId thay doi.
- *
- * Luu y: lich su ton kho (stock history) chua co endpoint BE, se bo sung
- * o phase nhap/xuat kho. Hien tai tra ve mang rong.
  */
 export function usePartDetail(partId) {
   const [part, setPart] = useState(null);
-  const [history] = useState([]); // placeholder - BE chua co endpoint
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -31,5 +27,5 @@ export function usePartDetail(partId) {
     fetch();
   }, [fetch]);
 
-  return { part, history, loading, error, refetch: fetch };
+  return { part, loading, error, refetch: fetch };
 }

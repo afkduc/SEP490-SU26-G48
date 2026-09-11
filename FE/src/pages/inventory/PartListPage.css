@@ -5,25 +5,25 @@
 ============================================================ */
 .part-list {
   /* MD3 color roles (map từ indigo hệ thống) */
-  --md-primary: #18181b;
+  --md-primary: #4f46e5;
   --md-on-primary: #ffffff;
-  --md-primary-container: #e4e4e7;
-  --md-on-primary-container: #18181b;
+  --md-primary-container: #e0e7ff;
+  --md-on-primary-container: #1e1b4b;
   --md-surface: #ffffff;
-  --md-surface-variant: #f4f4f5;
-  --md-surface-container: #f4f4f5;
-  --md-on-surface: #18181b;
-  --md-on-surface-variant: #52525b;
-  --md-outline: #d4d4d8;
-  --md-outline-variant: #e4e4e7;
-  --md-error: #27272a;
-  --md-error-container: #e4e4e7;
-  --md-on-error-container: #27272a;
-  --md-success: #3f3f46;
-  --md-success-container: #e4e4e7;
-  --md-on-success-container: #18181b;
-  --md-warning-container: #e4e4e7;
-  --md-on-warning-container: #27272a;
+  --md-surface-variant: #f4f4fb;
+  --md-surface-container: #f7f7fd;
+  --md-on-surface: #1c1b1f;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #cac4d0;
+  --md-outline-variant: #e7e0ec;
+  --md-error: #ba1a1a;
+  --md-error-container: #ffdad6;
+  --md-on-error-container: #410002;
+  --md-success: #146c2e;
+  --md-success-container: #c6f0cd;
+  --md-on-success-container: #002106;
+  --md-warning-container: #ffdea8;
+  --md-on-warning-container: #2a1800;
 
   /* MD3 elevation */
   --md-elevation-1: 0 1px 2px rgba(0,0,0,0.30), 0 1px 3px 1px rgba(0,0,0,0.15);
@@ -134,6 +134,25 @@
 
 .part-list .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
 
+/* ── Cảnh báo tồn kho thấp ── */
+.part-alert {
+  background: var(--md-warning-container);
+  border-radius: var(--md-shape-lg);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.part-alert__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--md-on-warning-container);
+}
+.part-alert__desc {
+  margin: 0 0 12px;
+  color: var(--md-on-warning-container);
+  font-size: 14px;
+}
+
 /* ── Filters bar (MD3 surface container) ── */
 .part-list__filters {
   display: flex;
@@ -224,6 +243,13 @@
   border-bottom: 1px solid var(--md-outline-variant);
 }
 
+/* Bang canh bao ton kho thap: gia tri cac cot so can PHAI, nen tieu de cung
+   phai can phai moi thang hang. Phai viet rieng o day vi rule
+   `.part-list .table th` o tren de bep class .text-right chung trong
+   global.css (do uu tien cao hon). Chi scope trong .part-alert de khong
+   dung toi bang danh sach phu tung chinh (bang do gia tri can TRAI). */
+.part-list .part-alert .table th.text-right { text-align: right; }
+
 .part-list .table td {
   padding: 14px 16px;
   border-bottom: 1px solid var(--md-outline-variant);
@@ -236,7 +262,7 @@
 .part-list .table tbody tr:hover { background-color: var(--md-surface-container); }
 
 .part-list .row--low-stock { background: var(--md-warning-container); }
-.part-list .row--low-stock:hover { background: #e4e4e7 !important; }
+.part-list .row--low-stock:hover { background: #ffd591 !important; }
 
 .part-list .table a {
   color: var(--md-primary);

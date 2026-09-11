@@ -4,8 +4,8 @@ import httpClient from './httpClient';
 // tu bang tin chung ca chi nhanh, gan cho 1 khoang cua minh - bayNumber
 // truyen kem de BE echo lai dung so khoang trong event SSE 'claimed' cho
 // cac khoang khac (bayId la id noi bo trong DB, khong phai so khoang hien thi).
-export async function claimRepairOrderApi(serviceOrderId, bayId, bayNumber) {
-  return httpClient.post('/repair-orders/claim', { serviceOrderId, bayId, bayNumber });
+export async function claimRepairOrderApi(repairOrderId, bayId, bayNumber) {
+  return httpClient.post('/repair-orders/claim', { repairOrderId, bayId, bayNumber });
 }
 
 // Goi y tho (chi trong doi cua to truong dang dang nhap, ke ca dieu dong tu
@@ -17,6 +17,33 @@ export async function searchTechniciansApi(q) {
 // technicianIds: mang id - thay the toan bo danh sach tho thuc hien.
 export async function setRepairOrderTechniciansApi(id, technicianIds) {
   return httpClient.patch(`/repair-orders/${id}/technicians`, { technicianIds });
+}
+
+// To truong xac nhan lenh da xong, SAU KHI khoang xe bam "Hoàn thành" (báo
+// xong việc). Đây mới là bước làm phiếu quyết toán bên màn CVDV chuyển sang
+// "Chờ thanh toán" và giải phóng khoang - xem BE RepairOrderService
+// .reportBayCompleted / .confirmCompleted.
+export async function confirmRepairOrderCompleteApi(id) {
+  return httpClient.patch(`/repair-orders/${id}/confirm-complete`, {});
+}
+
+// To truong gỡ tích 1 đầu mục đã hoàn thành = yêu cầu làm lại đầu mục đó.
+// Lệnh đang chờ xác nhận sẽ tự quay về "đang làm" cho khoang làm tiếp.
+export async function reopenRepairOrderTaskApi(id, taskId) {
+  return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/reopen`, {});
+}
+
+// To truong bam "Báo cố vấn" cho 1 đầu mục thợ chấm Không đạt: đầu mục
+// chuyển từ 'reported' (thợ vừa báo) sang 'pending' (chờ cố vấn hỏi khách).
+export async function forwardNgTaskApi(id, taskId) {
+  return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/forward-ng`, {});
+}
+
+// To truong tu khac phuc luon 1 đầu mục "Không đạt" (điều chỉnh nằm trong
+// giá gói, không phát sinh tiền nên không phải hỏi khách): đầu mục chuyển
+// sang 'resolved' và kết quả kiểm tra đổi thành "Đạt". Bắt buộc ghi đã làm gì.
+export async function resolveNgTaskApi(id, taskId, note) {
+  return httpClient.patch(`/repair-orders/${id}/tasks/${taskId}/resolve-ng`, { note });
 }
 
 // Toan bo lenh sua chua cua to truong dang dang nhap (inprogress + hoan

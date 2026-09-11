@@ -11,29 +11,30 @@ export const STATUS_ORDER = ['waiting_repair', 'inprogress', 'waiting_payment', 
 // Mau trang thai (co dinh, khong doi theo theme) - khop voi mau chu cua cac
 // badge trang thai da dung o RepairSettlementPage/CustomerHistoryPage.
 export const STATUS_HUES = {
-  waiting_repair: '#a1a1aa',
-  inprogress: '#52525b',
-  waiting_payment: '#3f3f46',
-  invoiced: '#18181b',
-  cancelled: '#d4d4d8',
+  waiting_repair: '#e65100',
+  inprogress: '#f57f17',
+  waiting_payment: '#1565c0',
+  invoiced: '#2e7d32',
+  cancelled: '#c62828',
 };
 
 // Bang mau danh muc dich vu (8 slot, thu tu co dinh - da validate CVD-safe).
 // "Phu tung" khong phai 1 danh muc dich vu (khong co category_id) nen dung
 // mau xam trung tinh rieng thay vi sinh mau thu 9.
-export const CATEGORY_HUES = ['#18181b', '#3f3f46', '#52525b', '#71717a', '#27272a', '#a1a1aa', '#09090b', '#d4d4d8'];
-export const PARTS_HUE = '#a1a1aa';
+export const CATEGORY_HUES = ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7', '#e34948', '#e87ba4', '#eb6834'];
+export const PARTS_HUE = '#94a3b8';
 
-// Loai hinh sua chua THAT (service_order_items.repair_category) - khop voi
+// Loai hinh sua chua THAT (repair_order_items.repair_category) - khop voi
 // REPAIR_CATEGORY_OPTIONS trong RepairSettlementPage.jsx. Tai su dung bang mau
 // CATEGORY_HUES da validate; "Khac" dung mau xam trung tinh nhu PARTS_HUE.
-export const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'OTHER'];
+export const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS', 'OTHER'];
 export const REPAIR_CATEGORY_LABELS = {
   ER: 'Sửa chữa động cơ',
   CB: 'Sửa chữa gầm',
   EE: 'Sửa chữa điện - điện tử',
   BP: 'Đồng sơn',
   PM: 'Bảo dưỡng định kỳ',
+  CS: 'Chăm sóc xe',
   OTHER: 'Khác',
 };
 export const REPAIR_CATEGORY_HUES = {
@@ -42,6 +43,7 @@ export const REPAIR_CATEGORY_HUES = {
   EE: CATEGORY_HUES[2],
   BP: CATEGORY_HUES[3],
   PM: CATEGORY_HUES[4],
+  CS: CATEGORY_HUES[5],
   OTHER: PARTS_HUE,
 };
 

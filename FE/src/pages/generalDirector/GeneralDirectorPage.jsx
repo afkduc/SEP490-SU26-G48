@@ -5,24 +5,7 @@ import { usePermission } from '../../contexts/PermissionContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency, formatDate } from '../../utils';
 import generalDirectorApi from '../../services/generalDirectorApi';
-
-const IconSearch = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-
-const ic = {
-  stroke: 'currentColor',
-  fill: 'none',
-  strokeWidth: 2,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-  width: 18,
-  height: 18,
-  viewBox: '0 0 24 24',
-};
+import { useConfirm } from '../../components/common/ConfirmDialog';
 
 const IconBuilding = () => (
   <svg {...ic}><rect x="4" y="2" width="16" height="20" rx="2" /><line x1="9" y1="6" x2="9" y2="6.01" /><line x1="15" y1="6" x2="15" y2="6.01" /><line x1="9" y1="10" x2="9" y2="10.01" /><line x1="15" y1="10" x2="15" y2="10.01" /><line x1="9" y1="14" x2="9" y2="14.01" /><line x1="15" y1="14" x2="15" y2="14.01" /><path d="M10 22v-4h4v4" /></svg>
@@ -99,6 +82,47 @@ const FILTER_ROW_STYLE = {
   whiteSpace: 'nowrap',
 };
 
+const EMPLOYEE_STATUS_OPTIONS = [
+  { value: 'all', label: 'Tất cả trạng thái' },
+  { value: 'active', label: 'Đang làm' },
+  { value: 'inactive', label: 'Nghỉ' },
+];
+
+const EMPLOYEE_ROLE_OPTIONS = [
+  { value: 'all', label: 'Tất cả chức vụ' },
+  { value: 'manager', label: 'Giám đốc chi nhánh' },
+  { value: 'service_advisor', label: 'Cố vấn dịch vụ' },
+  { value: 'team_leader', label: 'Tổ trưởng kỹ thuật' },
+  { value: 'warehouse_staff', label: 'Nhân viên kho' },
+];
+
+const TECHNICIAN_SKILL_OPTIONS = [
+  { value: 'all', label: 'Tất cả kỹ năng' },
+  { value: 'mechanical', label: 'Cơ khí' },
+  { value: 'electrical', label: 'Điện - Điện tử' },
+  { value: 'painting', label: 'Sơn - Đồng' },
+  { value: 'diagnostic', label: 'Chuẩn đoán' },
+  { value: 'maintenance', label: 'Bảo dưỡng' },
+  { value: 'other', label: 'Khác' },
+];
+
+const EMPLOYEE_STATUS_META = {
+  active: { label: 'Đang làm', color: '#0F766E', background: '#ECFDF5' },
+  inactive: { label: 'Nghỉ', color: '#B91C1C', background: '#FEF2F2' },
+};
+
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const FILTER_ROW_STYLE = {
+  display: 'flex',
+  gap: 10,
+  flexWrap: 'nowrap',
+  alignItems: 'center',
+  overflowX: 'auto',
+  paddingBottom: 4,
+  whiteSpace: 'nowrap',
+};
+
 function statusBadge(status) {
   const meta = STATUS_META[status] || STATUS_META.waiting_repair;
   return {
@@ -112,7 +136,7 @@ function currency(value) {
 }
 
 function employeeStatusBadge(status) {
-  return EMPLOYEE_STATUS_META[status] || { label: status || 'Không rõ', color: '#3f3f46', background: '#f4f4f5' };
+  return EMPLOYEE_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
 }
 
 function repairStatusLabel(status) {
@@ -206,7 +230,7 @@ function DataPagination({ total, page, pageSize, onPageChange, onPageSizeChange,
 
         {buildPageItems(currentPage, totalPages).map((item, index) => (
           item === '...'
-            ? <span key={`ellipsis-${index}`} style={{ color: '#a1a1aa' }}>...</span>
+            ? <span key={`ellipsis-${index}`} style={{ color: '#94A3B8' }}>...</span>
             : (
               <button
                 key={item}
@@ -390,7 +414,7 @@ function PlaceholderPanel({ title, uc, description, actions, children }) {
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
           <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>{title}</div>
         <h2 style={{ margin: '8px 0', fontSize: 28, lineHeight: 1.15 }}>{title}</h2>
         <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.82)' }}>{description}</p>
@@ -824,13 +848,13 @@ function EmployeeListPage() {
           <div className="breadcrumb">General Director / Danh sách nhân sự</div>
         </div>
         <div className="page-header-right">
-          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><IconUser />{user?.name || 'General Director'}</span></span>
+          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
         </div>
       </div>
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Danh sách nhân sự toàn hệ thống</h2>
@@ -849,7 +873,7 @@ function EmployeeListPage() {
 
       <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
-          <span className="search-icon"><IconSearch /></span>
+          <span className="search-icon">🔍</span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -909,7 +933,7 @@ function EmployeeListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
           {error}
         </div>
       )}
@@ -932,7 +956,7 @@ function EmployeeListPage() {
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
-                    <div className="empty-state-icon"><IconWait /></div>
+                    <div className="empty-state-icon">⏳</div>
                     <h3>Đang tải danh sách nhân sự</h3>
                     <p>Vui lòng chờ trong giây lát.</p>
                   </div>
@@ -944,7 +968,7 @@ function EmployeeListPage() {
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state">
-                    <div className="empty-state-icon"><IconEmpty /></div>
+                    <div className="empty-state-icon">📭</div>
                     <h3>Không có dữ liệu nhân sự</h3>
                     <p>Không tìm thấy nhân sự phù hợp với từ khóa hoặc bộ lọc hiện tại.</p>
                   </div>
@@ -1005,13 +1029,13 @@ function EmployeeListPage() {
             <div className="modal-body" style={{ maxHeight: '78vh', overflow: 'auto' }}>
               {detailLoading && (
                 <div className="empty-state" style={{ minHeight: 220 }}>
-                  <div className="empty-state-icon"><IconWait /></div>
+                  <div className="empty-state-icon">⏳</div>
                   <h3>Đang tải hồ sơ nhân sự</h3>
                 </div>
               )}
 
               {!detailLoading && detailError && (
-                <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
                   {detailError}
                 </div>
               )}
@@ -1019,13 +1043,13 @@ function EmployeeListPage() {
               {!detailLoading && !detailError && activeEmployee && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
-                    <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#52525b' }}>Mã nhân sự</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#18181b', marginTop: 4 }}>{activeEmployee.employeeId || '—'}</div>
+                    <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeEmployee.employeeId || '—'}</div>
                     </div>
-                    <div style={{ background: '#F7F7F8', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#71717a' }}>Chức vụ chính</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#18181b', marginTop: 4 }}>{activeEmployee.primaryRoleLabel || '—'}</div>
+                    <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#6B7280' }}>Chức vụ chính</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{activeEmployee.primaryRoleLabel || '—'}</div>
                     </div>
                     <div style={{ background: detailBadge.background, border: `1px solid ${detailBadge.color}33`, borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: detailBadge.color }}>Trạng thái</div>
@@ -1033,7 +1057,7 @@ function EmployeeListPage() {
                     </div>
                   </div>
 
-                  <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16 }}>
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
                     <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin hồ sơ</div>
                     <DetailRow label="Họ và tên" value={activeEmployee.fullName} />
                     <DetailRow label="Email" value={activeEmployee.email} />
@@ -1189,13 +1213,13 @@ function TechnicianListPage() {
           <div className="breadcrumb">General Director / Danh sách kỹ thuật viên</div>
         </div>
         <div className="page-header-right">
-          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><IconUser />{user?.name || 'General Director'}</span></span>
+          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>👤 {user?.name || 'General Director'}</span>
         </div>
       </div>
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Điều phối kỹ thuật viên toàn hệ thống</h2>
@@ -1214,7 +1238,7 @@ function TechnicianListPage() {
 
       <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
-          <span className="search-icon"><IconSearch /></span>
+          <span className="search-icon">🔍</span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -1264,12 +1288,12 @@ function TechnicianListPage() {
         </button>
       </div>
 
-      <div style={{ marginBottom: 12, fontSize: 12, color: '#71717a' }}>
+      <div style={{ marginBottom: 12, fontSize: 12, color: '#64748B' }}>
         Đang lọc: {selectedBranchName} · {selectedSkillName}
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reloadTechnicians}>
             ↻ Tải lại
@@ -1296,7 +1320,7 @@ function TechnicianListPage() {
               <tr>
                 <td colSpan={8}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
-                    <div className="empty-state-icon"><IconWait /></div>
+                    <div className="empty-state-icon">⏳</div>
                     <h3>Đang tải danh sách kỹ thuật viên</h3>
                     <p>Vui lòng chờ trong giây lát.</p>
                   </div>
@@ -1308,7 +1332,7 @@ function TechnicianListPage() {
               <tr>
                 <td colSpan={8}>
                   <div className="empty-state">
-                    <div className="empty-state-icon"><IconEmpty /></div>
+                    <div className="empty-state-icon">📭</div>
                     <h3>Không có dữ liệu kỹ thuật viên</h3>
                     <p>Không tìm thấy kỹ thuật viên phù hợp với bộ lọc chi nhánh và kỹ năng.</p>
                   </div>
@@ -1327,7 +1351,7 @@ function TechnicianListPage() {
                   </td>
                   <td><BranchBadge branch={technician.branch} /></td>
                   <td>{technician.specialty || '—'}</td>
-                  <td style={{ fontWeight: 800, color: '#3f3f46' }}>{technician.activeAssignments || 0}</td>
+                  <td style={{ fontWeight: 800, color: '#0F766E' }}>{technician.activeAssignments || 0}</td>
                   <td style={{ fontWeight: 700 }}>{technician.totalRepairs || 0}</td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
@@ -1370,13 +1394,13 @@ function TechnicianListPage() {
             <div className="modal-body" style={{ maxHeight: '80vh', overflow: 'auto' }}>
               {detailLoading && (
                 <div className="empty-state" style={{ minHeight: 220 }}>
-                  <div className="empty-state-icon"><IconWait /></div>
+                  <div className="empty-state-icon">⏳</div>
                   <h3>Đang tải hồ sơ kỹ thuật viên</h3>
                 </div>
               )}
 
               {!detailLoading && detailError && (
-                <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
                   {detailError}
                 </div>
               )}
@@ -1384,17 +1408,17 @@ function TechnicianListPage() {
               {!detailLoading && !detailError && activeTechnician && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
-                    <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#52525b' }}>Mã nhân sự</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#18181b', marginTop: 4 }}>{activeTechnician.employeeId || '—'}</div>
+                    <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeTechnician.employeeId || '—'}</div>
                     </div>
-                    <div style={{ background: '#F7F7F8', border: '1px solid #e4e4e7', borderRadius: 12, padding: 14 }}>
-                      <div style={{ fontSize: 12, color: '#71717a' }}>Chi nhánh</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#18181b', marginTop: 4 }}>{activeTechnician.branch?.name || '—'}</div>
+                    <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 12, color: '#6B7280' }}>Chi nhánh</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 4 }}>{activeTechnician.branch?.name || '—'}</div>
                     </div>
                   </div>
 
-                  <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16, marginBottom: 16 }}>
                     <div style={{ fontWeight: 800, marginBottom: 10 }}>Hồ sơ kỹ thuật viên</div>
                     <DetailRow label="Họ và tên" value={activeTechnician.fullName} />
                     <DetailRow label="Email" value={activeTechnician.email} />
@@ -1406,7 +1430,7 @@ function TechnicianListPage() {
                     <DetailRow label="Ghi chú" value={activeTechnician.notes} />
                   </div>
 
-                  <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 12, padding: 16 }}>
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 16 }}>
                     <div style={{ fontWeight: 800, marginBottom: 10 }}>Lịch sử sửa chữa</div>
                     <div className="table-wrapper" style={{ boxShadow: 'none', marginBottom: 0 }}>
                       <table className="data-table">
@@ -1426,7 +1450,7 @@ function TechnicianListPage() {
                             <tr>
                               <td colSpan={7}>
                                 <div className="empty-state" style={{ minHeight: 180 }}>
-                                  <div className="empty-state-icon"><IconEmpty /></div>
+                                  <div className="empty-state-icon">📭</div>
                                   <h3>Chưa có lịch sử sửa chữa</h3>
                                 </div>
                               </td>
@@ -1439,7 +1463,7 @@ function TechnicianListPage() {
                               <td style={{ fontFamily: 'monospace' }}>{item.orderCode || '—'}</td>
                               <td>
                                 <div style={{ fontWeight: 700 }}>{item.vehicle?.licensePlate || '—'}</div>
-                                <div style={{ fontSize: 11, color: '#71717a' }}>{item.vehicle?.model || ''}</div>
+                                <div style={{ fontSize: 11, color: '#6B7280' }}>{item.vehicle?.model || ''}</div>
                               </td>
                               <td>{item.customerName || '—'}</td>
                               <td>{repairStatusLabel(item.repairStatus)}</td>
@@ -1463,6 +1487,7 @@ function TechnicianListPage() {
 
 function BranchManagerListPage() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { canScreenAction } = usePermission();
   const navigate = useNavigate();
   const canViewManagers = canScreenAction('director:branch_managers', 'view');
@@ -1557,11 +1582,15 @@ function BranchManagerListPage() {
     if (!row?.branch?.id) return;
 
     const actionLabel = nextActive ? 'kích hoạt lại' : 'ngưng hoạt động';
-    const confirmed = window.confirm(
-      nextActive
-        ? `Kích hoạt lại chi nhánh ${row.branch.name}? Nhân sự thuộc chi nhánh này sẽ có thể đăng nhập lại.`
-        : `Ngưng hoạt động chi nhánh ${row.branch.name}? Tất cả tài khoản thuộc chi nhánh này sẽ bị dừng hoạt động và các phiên đăng nhập hiện tại sẽ hết hiệu lực.`
-    );
+    const confirmed = await confirm({
+      title: nextActive ? 'Kích hoạt lại chi nhánh' : 'Ngưng hoạt động chi nhánh',
+      message: `${nextActive ? 'Kích hoạt lại' : 'Ngưng hoạt động'} chi nhánh ${row.branch.name}?`,
+      detail: nextActive
+        ? 'Nhân sự thuộc chi nhánh này sẽ có thể đăng nhập lại.'
+        : 'Tất cả tài khoản thuộc chi nhánh này sẽ bị dừng hoạt động và các phiên đăng nhập hiện tại sẽ hết hiệu lực.',
+      confirmText: nextActive ? 'Kích hoạt lại' : 'Ngưng hoạt động',
+      tone: nextActive ? 'primary' : 'danger',
+    });
     if (!confirmed) return;
 
     setActionLoadingId(row.branch.id);
@@ -1592,7 +1621,7 @@ function BranchManagerListPage() {
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(9, 9, 11, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Danh sách giám đốc chi nhánh toàn hệ thống</h2>
@@ -1607,7 +1636,7 @@ function BranchManagerListPage() {
             <div style={{ fontWeight: 800, fontSize: 18, marginTop: 4 }}>{filteredManagers.filter((item) => item.status === 'active').length}</div>
           </div>
         </div>
-        <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><IconUser />{user?.name || 'General Director'}</span></div>
+        <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>👤 {user?.name || 'General Director'}</div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
@@ -1627,7 +1656,7 @@ function BranchManagerListPage() {
 
       <div style={{ ...FILTER_ROW_STYLE, marginBottom: 12 }}>
         <div className="search-input" style={{ minWidth: 320, flex: '1 1 320px' }}>
-          <span className="search-icon"><IconSearch /></span>
+          <span className="search-icon">🔍</span>
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo mã, tên, email, điện thoại..." />
         </div>
 
@@ -1679,7 +1708,7 @@ function BranchManagerListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
           {error}
         </div>
       )}
@@ -1702,7 +1731,7 @@ function BranchManagerListPage() {
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
-                    <div className="empty-state-icon"><IconWait /></div>
+                    <div className="empty-state-icon">⏳</div>
                     <h3>Đang tải danh sách giám đốc chi nhánh</h3>
                     <p>Vui lòng chờ trong giây lát.</p>
                   </div>
@@ -1714,7 +1743,7 @@ function BranchManagerListPage() {
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state">
-                    <div className="empty-state-icon"><IconEmpty /></div>
+                    <div className="empty-state-icon">📭</div>
                     <h3>Không có dữ liệu giám đốc chi nhánh</h3>
                     <p>Không tìm thấy dữ liệu phù hợp với bộ lọc hiện tại.</p>
                   </div>
@@ -1732,7 +1761,7 @@ function BranchManagerListPage() {
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <BranchBadge branch={row.branch} />
-                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: isBranchActive ? '#f4f4f5' : '#e4e4e7', color: isBranchActive ? '#3f3f46' : '#27272a', fontSize: 11, fontWeight: 800 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: isBranchActive ? '#ECFDF5' : '#FEF2F2', color: isBranchActive ? '#0F766E' : '#B91C1C', fontSize: 11, fontWeight: 800 }}>
                         {isBranchActive ? 'CN hoạt động' : 'CN bị khóa'}
                       </span>
                     </div>
@@ -1849,35 +1878,35 @@ function BranchManagerDetailPage() {
       <ModuleActionBar />
 
       {loading && (
-        <div className="empty-state" style={{ minHeight: 280, background: 'white', borderRadius: 16, border: '1px solid #e4e4e7' }}>
-          <div className="empty-state-icon"><IconWait /></div>
+        <div className="empty-state" style={{ minHeight: 280, background: 'white', borderRadius: 16, border: '1px solid #E5E7EB' }}>
+          <div className="empty-state-icon">⏳</div>
           <h3>Đang tải hồ sơ giám đốc chi nhánh</h3>
         </div>
       )}
 
       {!loading && error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
           {error}
         </div>
       )}
 
       {!loading && !error && manager && (
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 16 }}>
-          <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16 }}>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
             <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin cá nhân</div>
             <DetailRow label="Mã quản lý" value={manager.managerId} />
             <DetailRow label="Họ tên" value={manager.fullName} />
             <DetailRow label="Email" value={manager.email} />
             <DetailRow label="Số điện thoại" value={manager.phone} />
           </div>
-          <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16 }}>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
             <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin công việc</div>
             <DetailRow label="Chức vụ" value={manager.role?.label || 'Giám đốc chi nhánh'} />
             <DetailRow label="Chi nhánh" value={manager.branch?.name || '—'} />
             <DetailRow label="Trạng thái" value={employeeStatusBadge(manager.status).label} />
             <DetailRow label="Ngày tạo tài khoản" value={formatDate(manager.createdAt)} />
           </div>
-          <div style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 16 }}>
+          <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 16 }}>
             <div style={{ fontWeight: 800, marginBottom: 10 }}>Thông tin tài khoản</div>
             <DetailRow label="Email đăng nhập" value={manager.email} />
             <DetailRow label="Vai trò" value={manager.role?.label || 'Giám đốc chi nhánh'} />
@@ -1971,10 +2000,10 @@ function BranchManagerCreatePage() {
 
       <ModuleActionBar />
 
-      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 18 }}>
-        <div style={{ fontSize: 13, color: '#52525b', marginBottom: 14 }}>Tài khoản đăng nhập của giám đốc chi nhánh sử dụng email trong hệ thống hiện tại.</div>
+      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
+        <div style={{ fontSize: 13, color: '#475569', marginBottom: 14 }}>Tài khoản đăng nhập của giám đốc chi nhánh sử dụng email trong hệ thống hiện tại.</div>
         {error && (
-          <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
             {error}
           </div>
         )}
@@ -2119,9 +2148,9 @@ function BranchManagerEditPage() {
 
       <ModuleActionBar />
 
-      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #e4e4e7', borderRadius: 14, padding: 18 }}>
+      <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
         {error && (
-          <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
             {error}
           </div>
         )}
@@ -2432,7 +2461,7 @@ function SettlementReportsPage() {
               <tr>
                 <td colSpan={11}>
                   <div className="empty-state" style={{ minHeight: 220 }}>
-                    <div className="empty-state-icon"><IconWait /></div>
+                    <div className="empty-state-icon">⏳</div>
                     <h3>Đang tải dữ liệu</h3>
                     <p>Vui lòng chờ trong giây lát.</p>
                   </div>

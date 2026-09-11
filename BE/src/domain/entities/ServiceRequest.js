@@ -14,8 +14,6 @@ class ServiceRequest {
     this.purchaseBranchId = data.purchaseBranchId ?? null;
     this.purchaseBranchName = data.purchaseBranchName ?? null;
     this.purchaseBranchOther = data.purchaseBranchOther ?? null;
-    this.vehicleBrandId = data.vehicleBrandId ?? null;
-    this.vehicleBrandName = data.vehicleBrandName ?? null;
     this.vehicleBrandOther = data.vehicleBrandOther ?? null;
     this.nearestBranchId = data.nearestBranchId ?? null;
     this.nearestBranchName = data.nearestBranchName ?? null;
@@ -40,8 +38,6 @@ class ServiceRequest {
       purchaseBranchId: row.purchase_branch_id,
       purchaseBranchName: row.purchase_branch_name,
       purchaseBranchOther: row.purchase_branch_other,
-      vehicleBrandId: row.vehicle_brand_id,
-      vehicleBrandName: row.vehicle_brand_name,
       vehicleBrandOther: row.vehicle_brand_other,
       nearestBranchId: row.nearest_branch_id,
       nearestBranchName: row.nearest_branch_name,

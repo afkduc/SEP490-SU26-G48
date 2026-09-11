@@ -51,7 +51,7 @@ function computeDateRange(presetKey) {
 // Cac loai su kien SSE (/sse/repair-orders) anh huong so lieu Dashboard:
 // phieu moi tao, hoan thanh (cho thanh toan), thanh toan xong (xuat hoa
 // don), hoac bi huy. Bo qua cac event khac (claimed, task-updated,
-// bay-occupied...) vi khong doi status/total cua service_orders.
+// bay-occupied...) vi khong doi status/total cua repair_orders.
 const DASHBOARD_RELEVANT_EVENTS = new Set([
   'new-pending', 'order-completed', 'invoiced', 'order-cancelled',
 ]);
@@ -116,7 +116,7 @@ function MonthPaidSettlementsModal({ month, monthLabel, onClose }) {
 
         <div className="modal-body" style={{ maxHeight: '80vh', overflow: 'auto' }}>
           {error && (
-            <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+            <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
               {error}
             </div>
           )}
@@ -292,7 +292,7 @@ export default function ManagerDashboardPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#27272a' }}>
+        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#C62828' }}>
           {error}
         </div>
       )}

@@ -1,13 +1,12 @@
 /**
  * RepairOrder entity - tuong ung bang `repair_orders` (header) + `repair_order_tasks`
- * (danh sach cong viec sao chep tu service_order_items cua phieu quyet toan goc),
+ * (danh sach cong viec sao chep tu repair_order_items cua phieu quyet toan goc),
  * kem thong tin join tu branches/users/vehicles/customers de tra ve du du lieu.
  */
 class RepairOrder {
   constructor(data = {}) {
     this.id = data.id ?? null;
     this.code = data.code ?? null;
-    this.serviceOrderId = data.serviceOrderId ?? null;
     this.branchId = data.branchId ?? null;
     this.branchName = data.branchName ?? null;
     this.teamLeaderId = data.teamLeaderId ?? null;
@@ -18,8 +17,10 @@ class RepairOrder {
     this.vehicleId = data.vehicleId ?? null;
     this.createdBy = data.createdBy ?? null;
     this.createdByName = data.createdByName ?? null;
-    this.advisorId = data.advisorId ?? null; // co van dich vu cua phieu quyet toan goc (service_orders.advisor_id)
-    this.status = data.status ?? 'inprogress';
+    this.advisorId = data.advisorId ?? null; // co van dich vu phu trach phieu (repair_orders.advisor_id)
+    this.advisorName = data.advisorName ?? null;
+    this.intakeChecklist = data.intakeChecklist ?? null; // "Tiep nhan va ban giao xe" - ro.intake_checklist
+    this.status = data.status ?? 'inprogress'; // suy ra, khong phai cot DB
     this.notes = data.notes ?? null;
     this.createdAt = data.createdAt ?? null;
     this.completedAt = data.completedAt ?? null;
@@ -36,7 +37,6 @@ class RepairOrder {
     return new RepairOrder({
       id: headerRow.id,
       code: headerRow.repair_code,
-      serviceOrderId: headerRow.service_order_id,
       branchId: headerRow.branch_id,
       branchName: headerRow.branch_name,
       teamLeaderId: headerRow.team_leader_id,
@@ -45,13 +45,15 @@ class RepairOrder {
       bayId: headerRow.bay_id,
       bayNumber: headerRow.vb_bay_number,
       vehicleId: headerRow.vehicle_id,
-      createdBy: headerRow.created_by,
+      createdBy: headerRow.repair_created_by,
       createdByName: headerRow.created_by_name,
       advisorId: headerRow.advisor_id,
-      status: headerRow.status,
-      notes: headerRow.notes,
-      createdAt: headerRow.created_at,
-      completedAt: headerRow.completed_at,
+      advisorName: headerRow.advisor_name,
+      intakeChecklist: headerRow.intake_checklist ? JSON.parse(headerRow.intake_checklist) : null,
+      status: headerRow.repair_status,
+      notes: headerRow.repair_notes,
+      createdAt: headerRow.repair_started_at,
+      completedAt: headerRow.repair_completed_at,
       cancelReason: headerRow.cancel_reason,
       customer: {
         id: headerRow.customer_id,
@@ -68,6 +70,8 @@ class RepairOrder {
         taskType: r.task_type,
         productId: r.product_id,
         quantity: r.quantity,
+        // DVT lay tu kho qua product_id (xem TASK_SELECT) - dich vu de trong.
+        unit: r.unit ?? null,
         unitPrice: r.unit_price,
         isDone: Boolean(r.is_done),
         isCancelled: Boolean(r.is_cancelled),
@@ -75,6 +79,19 @@ class RepairOrder {
         isQtyIncreased: Boolean(r.is_qty_increased),
         prevQuantity: r.prev_quantity ?? null,
         note: r.note ?? null,
+        // Bieu mau "Phieu kiem tra BDDK": yeu cau thuc hien (I/R/M/V), nhom
+        // cong viec, va ket qua kiem tra OK/NG + mo ta khi NG.
+        actionCode: r.action_code ?? null,
+        checklistGroup: r.checklist_group ?? null,
+        checklistOrder: r.checklist_order ?? null,
+        checkResult: r.check_result ?? null,
+        checkNote: r.check_note ?? null,
+        // Xu ly dau muc Khong dat: 'reported' (tho bao, cho to truong) ->
+        // 'resolved' (xuong tu xu ly, khong qua co van) HOAC 'pending' (da
+        // bao co van, cho hoi khach) -> 'accepted' (khach dong y thay) /
+        // 'declined' (khach tu choi). Xem ensureNgDecision.js.
+        ngDecision: r.ng_decision ?? null,
+        ngNote: r.ng_note ?? null,
       })),
       technicians: technicianRows.map((r) => ({
         id: r.id,

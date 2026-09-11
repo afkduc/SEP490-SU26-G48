@@ -226,7 +226,7 @@ class ManagerController {
         status: req.query.status || 'all',
         repairCategory: req.query.repairCategory || 'all',
       });
-      return success(res, data, 'Lấy danh sách gói dịch vụ thành công');
+      return success(res, data, 'Lấy danh sách gói bảo dưỡng thành công');
     } catch (err) {
       next(err);
     }
@@ -235,7 +235,7 @@ class ManagerController {
   async getServicePackageById(req, res, next) {
     try {
       const data = await this.managerService.getServicePackageById(req.user.branchId, req.params.id);
-      return success(res, data, 'Lấy chi tiết gói dịch vụ thành công');
+      return success(res, data, 'Lấy chi tiết gói bảo dưỡng thành công');
     } catch (err) {
       next(err);
     }
@@ -248,11 +248,11 @@ class ManagerController {
         tableName: 'service_packages',
         entityCode: data?.code || null,
         recordId: data?.id || null,
-        entityName: 'Gói dịch vụ',
+        entityName: 'Gói bảo dưỡng',
         data: req.body,
-        description: `Thêm gói dịch vụ ${data?.code || data?.name || ''}`.trim(),
+        description: `Thêm gói bảo dưỡng ${data?.code || data?.name || ''}`.trim(),
       });
-      return success(res, data, 'Thêm gói dịch vụ thành công', 201);
+      return success(res, data, 'Thêm gói bảo dưỡng thành công', 201);
     } catch (err) {
       next(err);
     }
@@ -265,11 +265,11 @@ class ManagerController {
         tableName: 'service_packages',
         entityCode: data?.code || `ID-${req.params.id}`,
         recordId: data?.id || Number(req.params.id) || null,
-        entityName: 'Gói dịch vụ',
+        entityName: 'Gói bảo dưỡng',
         newData: req.body,
-        description: `Cập nhật gói dịch vụ ${data?.code || req.params.id}`,
+        description: `Cập nhật gói bảo dưỡng ${data?.code || req.params.id}`,
       });
-      return success(res, data, 'Cập nhật gói dịch vụ thành công');
+      return success(res, data, 'Cập nhật gói bảo dưỡng thành công');
     } catch (err) {
       next(err);
     }

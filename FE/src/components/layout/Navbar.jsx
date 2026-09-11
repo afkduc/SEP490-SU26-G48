@@ -4,6 +4,7 @@ import { useAuth, getPrimaryRole } from '../../contexts/AppContext';
 import { useServiceRequests } from '../../contexts/ServiceRequestsContext';
 import { useManagerInventoryNotify } from '../../contexts/ManagerInventoryNotifyContext';
 import { ROLES } from '../../constants/roles';
+import { BASE_PATH } from '../../config';
 import ScrollToggleButton from '../common/ScrollToggleButton';
 import UserProfileMenu from './UserProfileMenu';
 import './Navbar.css';
@@ -65,7 +66,7 @@ const MANAGER_NAV = [
     label: 'Dịch vụ',
     children: [
       { label: 'Dịch vụ lẻ', path: '/manager/services' },
-      { label: 'Gói dịch vụ', path: '/manager/service-packages' },
+      { label: 'Gói bảo dưỡng', path: '/manager/service-packages' },
     ],
   },
 ];
@@ -74,7 +75,6 @@ const MANAGER_NAV = [
 const WAREHOUSE_STAFF_NAV = [
   { label: 'Tổng quan kho', path: '/inventory', end: true },
   { label: 'Phụ tùng', path: '/inventory/parts' },
-  { label: 'Tồn kho', path: '/inventory/stock' },
   { label: 'Phiếu nhập', path: '/inventory/import-requests' },
   { label: 'Phiếu xuất', path: '/inventory/export-requests' },
   { label: 'Nhà cung cấp', path: '/inventory/suppliers' },
@@ -263,9 +263,9 @@ export default function Navbar() {
 
   return (
     <header className="navbar">
-        <div className="navbar__brand">
-          <span className="navbar__brand-text">AutoGara</span>
-        </div>
+      <div className="navbar__brand">
+        <img className="navbar__logo" src={`${BASE_PATH}/AutoGaraLogo-Photoroom.png`} alt="AutoGara" />
+      </div>
 
       {navItems.length > 0 && (
         <button

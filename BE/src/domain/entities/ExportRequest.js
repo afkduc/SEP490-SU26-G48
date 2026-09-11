@@ -13,8 +13,10 @@ class ExportRequest {
     this.requestCode = data.request_code ?? data.requestCode ?? null;
     this.branchId = data.branch_id ?? data.branchId ?? null;
     this.repairOrderId = data.repair_order_id ?? data.repairOrderId ?? null;
-    this.serviceOrderId = data.service_order_id ?? data.serviceOrderId ?? null;
     this.performedBy = data.performed_by ?? data.performedBy ?? null;
+    this.receivedBy = data.received_by ?? data.receivedBy ?? null;
+    this.receivedSignatureData = data.received_signature_data ?? data.receivedSignatureData ?? null;
+    this.receivedSignedAt = data.received_signed_at ?? data.receivedSignedAt ?? null;
     this.exportDate = data.export_date ?? data.exportDate ?? null;
     this.status = data.status ?? 'completed';
     this.notes = data.notes ?? null;
@@ -22,10 +24,10 @@ class ExportRequest {
     // Thong tin mo rong (join)
     this.items = data.items ?? null;
     this.repairOrderCode = data.repair_order_code ?? data.repairOrderCode ?? null;
-    this.serviceOrderCode = data.service_order_code ?? data.serviceOrderCode ?? null;
     this.customerName = data.customer_name ?? data.customerName ?? null;
     this.vehiclePlate = data.vehicle_plate ?? data.vehiclePlate ?? null;
     this.performedByName = data.performed_by_name ?? data.performedByName ?? null;
+    this.receivedByName = data.received_by_name ?? data.receivedByName ?? null;
     this.totalQuantity = data.total_quantity ?? data.totalQuantity ?? null;
     this.itemCount = data.item_count ?? data.itemCount ?? null;
     this.seenByManagerAt = data.seen_by_manager_at ?? data.seenByManagerAt ?? null;
@@ -39,17 +41,19 @@ class ExportRequest {
       request_code: row.request_code,
       branch_id: row.branch_id,
       repair_order_id: row.repair_order_id,
-      service_order_id: row.service_order_id,
       performed_by: row.performed_by,
+      received_by: row.received_by,
+      received_signature_data: row.received_signature_data,
+      received_signed_at: row.received_signed_at,
       export_date: row.export_date,
       status: row.status,
       notes: row.notes,
       created_at: row.created_at,
       repair_order_code: row.repair_order_code,
-      service_order_code: row.service_order_code,
       customer_name: row.customer_name,
       vehicle_plate: row.vehicle_plate,
       performed_by_name: row.performed_by_name,
+      received_by_name: row.received_by_name,
       total_quantity: row.total_quantity,
       item_count: row.item_count,
       seen_by_manager_at: row.seen_by_manager_at,
@@ -63,6 +67,9 @@ class ExportRequest {
       branch_id: this.branchId,
       repair_order_id: this.repairOrderId,
       performed_by: this.performedBy,
+      received_by: this.receivedBy,
+      received_signature_data: this.receivedSignatureData,
+      received_signed_at: this.receivedSignedAt,
       export_date: this.exportDate,
       status: this.status,
       notes: this.notes,

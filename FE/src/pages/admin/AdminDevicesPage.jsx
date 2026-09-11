@@ -64,30 +64,16 @@ const IconChevronDown = () => (
   </svg>
 );
 
-// ─── Browser icon helper (grayscale SVG — tránh emoji màu) ──────────
+// ─── Browser icon helper ────────────────────────────────────────────
 
-function BrowserIcon({ browser }) {
+function getBrowserIcon(browser) {
   const b = (browser || '').toLowerCase();
-  const isDesktop = !b || b.includes('unknown') || b.includes('windows') || b.includes('mac') || b.includes('linux');
-  const showMonitor = !b.includes('chrome') && !b.includes('firefox') && !b.includes('safari') && !b.includes('edge') && !b.includes('opera') && (isDesktop || b.includes('unknown'));
-
-  return (
-    <span className="admin-devices__browser-icon" aria-hidden="true">
-      {showMonitor ? (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2" />
-          <line x1="8" y1="21" x2="16" y2="21" />
-          <line x1="12" y1="17" x2="12" y2="21" />
-        </svg>
-      ) : (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="2" y1="12" x2="22" y2="12" />
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
-      )}
-    </span>
-  );
+  if (b.includes('chrome')) return '🌐';
+  if (b.includes('firefox')) return '🦊';
+  if (b.includes('safari')) return '🧭';
+  if (b.includes('edge')) return '🔷';
+  if (b.includes('opera')) return '🔴';
+  return '💻';
 }
 
 function formatDate(dateStr) {
@@ -195,7 +181,7 @@ function Pagination({ page, pageSize, total, onPageChange }) {
         >‹</button>
         {pages.map((p, i) =>
           p === '...' ? (
-            <span key={`ellipsis-${i}`} style={{ color: '#a1a1aa', padding: '0 4px' }}>…</span>
+            <span key={`ellipsis-${i}`} style={{ color: '#94a3b8', padding: '0 4px' }}>…</span>
           ) : (
             <button
               key={p}
@@ -635,7 +621,7 @@ export default function AdminDevicesPage({
       {/* Content */}
       {loading && devices.length === 0 && (
         <div className="admin-devices__loading">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="2">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
             <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
           </svg>
           <span>Đang tải danh sách thiết bị...</span>
@@ -688,7 +674,7 @@ export default function AdminDevicesPage({
                   <td>
                     <div className="admin-devices__cell-stack">
                       <span className="admin-devices__cell-title">
-                        <BrowserIcon browser={device.browser} /> {device.deviceName || 'Thiết bị không xác định'}
+                        {getBrowserIcon(device.browser)} {device.deviceName || 'Thiết bị không xác định'}
                       </span>
                       <span className="admin-devices__cell-sub">{device.browser} · {device.os}</span>
                     </div>

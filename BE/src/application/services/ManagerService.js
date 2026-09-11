@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const ApiError = require('../../utils/ApiError');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -7,7 +8,7 @@ const VALID_STATUSES = ['active', 'inactive'];
 // Phai giu dong bo voi REPAIR_CATEGORY_VALUES trong RepairSettlementService.js -
 // khai bao san Loai hinh sua chua cho dich vu/goi tai day de man tao phieu
 // quyet toan tu dong dien theo, khong phai chon tay tung lan.
-const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM'];
+const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS'];
 
 let vehicleBayRepository = null;
 function getVehicleBayRepository() {
@@ -380,15 +381,15 @@ class ManagerService {
 
   async getServicePackageById(branchId, id) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-    if (!id) throw new ApiError(400, 'Thiếu mã gói dịch vụ');
+    if (!id) throw new ApiError(400, 'Thiếu mã gói bảo dưỡng');
 
     const pkg = await this.managerRepository.getServicePackageById(branchId, id);
-    if (!pkg) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+    if (!pkg) throw new ApiError(404, 'Không tìm thấy gói bảo dưỡng');
     return pkg;
   }
 
   async _validateServicePackagePayload(branchId, payload, { requireServiceIds }) {
-    const { packageName, totalPrice, serviceIds } = payload;
+    const { packageName, totalPrice, services } = payload;
 
     if (!packageName || totalPrice === undefined || totalPrice === null || totalPrice === '') {
       throw new ApiError(400, 'Tên gói và giá gói là bắt buộc');
@@ -403,26 +404,32 @@ class ManagerService {
       throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
     }
 
-    let normalizedServiceIds;
-    if (requireServiceIds || serviceIds !== undefined) {
-      if (!Array.isArray(serviceIds) || serviceIds.length === 0) {
+    if (payload.modelId != null && payload.modelId !== '') {
+      const validModel = await this.managerRepository.isValidVehicleModel(payload.modelId);
+      if (!validModel) throw new ApiError(400, 'Dòng xe áp dụng không hợp lệ');
+    }
+
+    let normalizedServices;
+    if (requireServiceIds || services !== undefined) {
+      if (!Array.isArray(services) || services.length === 0) {
         throw new ApiError(400, 'Vui lòng chọn ít nhất 1 dịch vụ cho gói');
       }
       const branchServices = await this.managerRepository.listServices(branchId, {});
       const validIds = new Set(branchServices.map((s) => Number(s.id)));
-      if (!serviceIds.every((sid) => validIds.has(Number(sid)))) {
-        throw new ApiError(400, 'Có dịch vụ không thuộc chi nhánh này');
+      const validActionCodes = new Set(['R', 'I', 'M', 'V']);
+      if (!services.every((s) => validIds.has(Number(s.serviceId)) && validActionCodes.has(s.actionCode))) {
+        throw new ApiError(400, 'Có dịch vụ không thuộc chi nhánh này hoặc hành động không hợp lệ');
       }
-      normalizedServiceIds = serviceIds.map(Number);
+      normalizedServices = services.map((s) => ({ serviceId: Number(s.serviceId), actionCode: s.actionCode }));
     }
 
-    return { price, serviceIds: normalizedServiceIds };
+    return { price, services: normalizedServices };
   }
 
   async createServicePackage(branchId, payload) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
 
-    const { price, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
+    const { price, services } = await this._validateServicePackagePayload(branchId, payload, {
       requireServiceIds: true,
     });
     const packageCode = await this.managerRepository.nextPackageCode(branchId);
@@ -436,18 +443,19 @@ class ManagerService {
       description: (payload.description || '').trim() || null,
       purpose: (payload.purpose || '').trim() || null,
       repairCategory: payload.repairCategory || null,
-      serviceIds,
+      modelId: payload.modelId || null,
+      services,
     });
   }
 
   async updateServicePackage(branchId, id, payload) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
-    if (!id) throw new ApiError(400, 'Thiếu mã gói dịch vụ');
+    if (!id) throw new ApiError(400, 'Thiếu mã gói bảo dưỡng');
 
     const existing = await this.managerRepository.getServicePackageById(branchId, id);
-    if (!existing) throw new ApiError(404, 'Không tìm thấy gói dịch vụ');
+    if (!existing) throw new ApiError(404, 'Không tìm thấy gói bảo dưỡng');
 
-    const { price, serviceIds } = await this._validateServicePackagePayload(branchId, payload, {
+    const { price, services } = await this._validateServicePackagePayload(branchId, payload, {
       requireServiceIds: false,
     });
 
@@ -459,7 +467,8 @@ class ManagerService {
       purpose: (payload.purpose || '').trim() || null,
       isActive: payload.isActive !== undefined ? !!payload.isActive : existing.isActive,
       repairCategory: payload.repairCategory || null,
-      serviceIds,
+      modelId: payload.modelId !== undefined ? (payload.modelId || null) : existing.modelId,
+      services,
     });
   }
 
@@ -568,7 +577,7 @@ class ManagerService {
   async createTechnician(branchId, payload) {
     if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
 
-    await this._validateStaffContact(payload, { requirePassword: true });
+    await this._validateStaffContact(payload, { requirePassword: false });
     await this._validateTeamLeaderAssignment(branchId, payload.teamLeaderId);
     const specialtyIds = await this._validateSpecialtyIds(payload.specialtyIds);
 
@@ -577,7 +586,9 @@ class ManagerService {
     const existed = await this.managerRepository.findByEmail(payload.email);
     if (existed) throw new ApiError(409, 'Email đã tồn tại');
 
-    const passwordHash = bcrypt.hashSync(payload.password, 10);
+    // Tho may khong dang nhap qua form nay - sinh mat khau ngau nhien, ho dat
+    // lai qua "Quen mat khau" khi thuc su can dang nhap.
+    const passwordHash = bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10);
     const pseudoId = await this.managerRepository.nextPseudoId();
 
     return this.managerRepository.createTechnician({

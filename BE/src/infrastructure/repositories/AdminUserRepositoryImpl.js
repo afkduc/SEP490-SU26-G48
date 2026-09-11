@@ -45,7 +45,7 @@ const ADMIN_USER_COLUMNS = `
   u.status,
   u.created_at,
   ${assignedBranchCountSql('u')},
-  (SELECT MAX(ud.last_login_at) FROM user_devices ud WHERE ud.user_id = u.id) AS last_login_at
+  (SELECT MAX(ls.login_time) FROM login_sessions ls WHERE ls.user_id = u.id AND ls.action_type = N'LOGIN') AS last_login_at
 `;
 
 function toAdminUserRow(row) {
