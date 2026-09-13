@@ -136,12 +136,17 @@ function TaskMeta({ t }) {
   return (
     <>
       {label && <div className="tld-task__action">{label}</div>}
-      {t.checkResult && (
+      {/* Khach da dong y thay va tho da thay xong thi ket qua hien "Đã thay"
+          mau xanh - khong con la "Không đạt" nua du checkResult trong DB van
+          la NG (ket qua kiem tra ban dau, giu nguyen lam lich su). */}
+      {t.checkResult && (t.ngDecision === 'accepted' && t.isDone ? (
+        <div className="tld-task__result tld-task__result--ok">Đã thay</div>
+      ) : (
         <div className={`tld-task__result tld-task__result--${t.checkResult === 'NG' ? 'ng' : 'ok'}`}>
           {t.checkResult === 'NG' ? 'Không đạt' : 'Đạt'}
           {t.checkResult === 'NG' && t.checkNote ? ` — ${t.checkNote}` : ''}
         </div>
-      )}
+      ))}
     </>
   );
 }

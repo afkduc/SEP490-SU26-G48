@@ -285,8 +285,15 @@ function TaskNameLabel({ t }) {
 // dat" van co is_done = 1 (tho DA lam xong viec kiem tra, chi la ket qua
 // khong dat). Neu chi nhin is_done thi no hien tich xanh y het dau muc dat,
 // co van doc phieu se tuong xe khong co van de gi. Phai to do + dau X rieng.
+//
+// Rieng dau muc Khong dat ma khach DA dong y thay va tho DA thay xong
+// (ngDecision='accepted' + isDone) thi viec da xong that - hien tich xanh
+// nhu moi dau muc hoan thanh khac, khong de dau X do nua. checkResult van la
+// 'NG' trong DB (do la ket qua kiem tra ban dau, khong sua lai lich su), nen
+// phai xet them ngDecision o day chu khong nhin moi checkResult.
 function TaskProgressRow({ t, onDecideNg, decidingId }) {
-  const ng = t.checkResult === 'NG';
+  const daThayXong = t.ngDecision === 'accepted' && t.isDone;
+  const ng = t.checkResult === 'NG' && !daThayXong;
   const ok = t.isDone && !ng;
   const yeuCau = actionLabel(t.actionCode);
   return (
@@ -316,6 +323,7 @@ function TaskProgressRow({ t, onDecideNg, decidingId }) {
           </span>
         )}
         {ok && t.checkResult === 'OK' && <span style={{ fontWeight: 600 }}> — Đạt</span>}
+        {daThayXong && <span style={{ fontWeight: 600 }}> — Đã thay</span>}
         {/* Quyet dinh cua khach cho dau muc Khong dat. 'reported' = tho vua
             bao, con nam o to truong; 'pending' = to truong da chuyen len, den
             luot co van goi khach - ca 2 deu chan to truong bam Hoan thanh. */}
@@ -369,7 +377,9 @@ function TaskProgressList({ tasks, bayNumber, technicians, onDecideNg, decidingI
   if (serviceTasks.length === 0) return null;
   const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
   const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
-  const ngCount = activeServiceTasks.filter((t) => t.checkResult === 'NG').length;
+  // Dau muc da thay xong theo y khach khong tinh la "khong dat" nua - no da
+  // duoc giai quyet, dem vao chi lam co van tuong xe van con van de.
+  const ngCount = activeServiceTasks.filter((t) => t.checkResult === 'NG' && !(t.ngDecision === 'accepted' && t.isDone)).length;
   const pendingCount = activeServiceTasks.filter((t) => t.ngDecision === 'pending').length;
   return (
     <div style={{ marginTop: 16 }}>
