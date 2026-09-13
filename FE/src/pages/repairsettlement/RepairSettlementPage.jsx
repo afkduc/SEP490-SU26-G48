@@ -32,6 +32,7 @@ import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
 import IntakeChecklistView from './IntakeChecklistView';
 import VehicleHistoryModal from './VehicleHistoryModal';
+import { assignGroupIds, dongHangMucDeIn } from './settlementItems';
 import SignaturePad from './SignaturePad';
 import './RepairSettlementPage.css';
 
@@ -148,30 +149,6 @@ function emptyItem() {
   return { code: '', serviceId: null, productId: null, description: '', lhsc: 'DV', httt: '', repairCategory: '', unit: 'Công', qty: 1, unitPrice: 0, discount: 0, total: 0, note: '', actionCode: null };
 }
 
-// Suy luan lai nhom "dich vu/goi da chon + phu tung/dich vu con tu dong chen
-// kem theo" tu du lieu da luu (BE khong luu quan he cha-con, groupId chi ton
-// tai o FE). Dau nhom la 1 dich vu le that (co serviceId, don gia > 0) hoac 1
-// dong goi combo (khong co serviceId). Cac dong ngay sau no la PT hoac DV gia
-// 0 (dich vu con cua goi) deu la "con" cua dau nhom gan nhat, cho den khi gap
-// dau nhom tiep theo - dung de khi Xoa/chon lai dau nhom thi don dep dung cac
-// dong con di kem, khong de sot lai orphan.
-function assignGroupIds(items, nextGroupId) {
-  let currentGroupId = null;
-  return items.map((it) => {
-    const isHead = it.lhsc === 'DV' && (!it.serviceId || (it.unitPrice || 0) > 0);
-    if (isHead) {
-      currentGroupId = nextGroupId();
-      return { ...it, groupId: currentGroupId, isGroupParent: true };
-    }
-    const isChild = currentGroupId && (it.lhsc === 'PT' || (it.lhsc === 'DV' && (it.unitPrice || 0) === 0));
-    if (isChild) {
-      return { ...it, groupId: currentGroupId };
-    }
-    currentGroupId = null;
-    return it;
-  });
-}
-
 // Mau nen nhat (pastel) rieng cho tung nhom (gói/dịch vụ + phụ tùng phụ thuộc
 // đi kèm) trên bảng "Hạng mục công việc / phụ tùng" của MÀN TẠO/SỬA QUYẾT
 // TOÁN - CHỈ để cố vấn dễ phân biệt nhóm nào với nhóm nào trên màn hình, cyclic
@@ -255,26 +232,6 @@ function laDongDaThayDoi(item) {
   return item.httt === HTTT_CANCELLED_VALUE || isQuantityReturned(item);
 }
 
-// Danh sach hang muc dung cho BAN IN va MODAL XEM TRUOC - phai la MOT ham,
-// khong the moi cho tu dung mot kieu: modal ten la "xem truoc" nen no phai
-// ra dung cai se in ra giay.
-//
-// Goi bao duong bung ra 30+ dau muc con, in het thi phieu dai 3-4 trang trong
-// khi khach chi tra 1 gia goi - chi can dong ten goi. Chi tiet ben trong da
-// nam o "Phieu kiem tra BDDK" rieng.
-//
-// Goi bi TACH (khach huy 1 muc trong goi -> moi dich vu ve gia le cua no, xem
-// handleCancelItem) thi khong con dong dau goi nua, luc do liet ke tung dich
-// vu la dung: khach dang tra tien theo tung cai chu khong theo gia goi.
-//
-// STT danh lai SAU khi bo dong - giu so goc thi phieu nhay coc 1, 2, 3, 38, 39.
-function dongHangMucDeIn(items) {
-  let demNhom = 0;
-  return assignGroupIds(items || [], () => { demNhom += 1; return demNhom; })
-    .filter((it) => !(it.groupId && !it.isGroupParent && it.lhsc === 'DV'))
-    .map((item, i) => ({ item, i }));
-}
-
 // Nhan hien thi 1 tho trong "Thợ thực hiện" - kem "(Điều động)" neu tho nay
 // khong cung to voi to truong dang phu trach lenh sua chua (dieu dong tu to
 // khac sang giup, xem RepairOrder.sameTeam/RepairSettlement.technicians[].sameTeam).
@@ -328,8 +285,15 @@ function TaskNameLabel({ t }) {
 // dat" van co is_done = 1 (tho DA lam xong viec kiem tra, chi la ket qua
 // khong dat). Neu chi nhin is_done thi no hien tich xanh y het dau muc dat,
 // co van doc phieu se tuong xe khong co van de gi. Phai to do + dau X rieng.
+//
+// Rieng dau muc Khong dat ma khach DA dong y thay va tho DA thay xong
+// (ngDecision='accepted' + isDone) thi viec da xong that - hien tich xanh
+// nhu moi dau muc hoan thanh khac, khong de dau X do nua. checkResult van la
+// 'NG' trong DB (do la ket qua kiem tra ban dau, khong sua lai lich su), nen
+// phai xet them ngDecision o day chu khong nhin moi checkResult.
 function TaskProgressRow({ t, onDecideNg, decidingId }) {
-  const ng = t.checkResult === 'NG';
+  const daThayXong = t.ngDecision === 'accepted' && t.isDone;
+  const ng = t.checkResult === 'NG' && !daThayXong;
   const ok = t.isDone && !ng;
   const yeuCau = actionLabel(t.actionCode);
   return (
@@ -359,6 +323,7 @@ function TaskProgressRow({ t, onDecideNg, decidingId }) {
           </span>
         )}
         {ok && t.checkResult === 'OK' && <span style={{ fontWeight: 600 }}> — Đạt</span>}
+        {daThayXong && <span style={{ fontWeight: 600 }}> — Đã thay</span>}
         {/* Quyet dinh cua khach cho dau muc Khong dat. 'reported' = tho vua
             bao, con nam o to truong; 'pending' = to truong da chuyen len, den
             luot co van goi khach - ca 2 deu chan to truong bam Hoan thanh. */}
@@ -412,7 +377,9 @@ function TaskProgressList({ tasks, bayNumber, technicians, onDecideNg, decidingI
   if (serviceTasks.length === 0) return null;
   const activeServiceTasks = serviceTasks.filter((t) => !t.isCancelled);
   const doneCount = activeServiceTasks.filter((t) => t.isDone).length;
-  const ngCount = activeServiceTasks.filter((t) => t.checkResult === 'NG').length;
+  // Dau muc da thay xong theo y khach khong tinh la "khong dat" nua - no da
+  // duoc giai quyet, dem vao chi lam co van tuong xe van con van de.
+  const ngCount = activeServiceTasks.filter((t) => t.checkResult === 'NG' && !(t.ngDecision === 'accepted' && t.isDone)).length;
   const pendingCount = activeServiceTasks.filter((t) => t.ngDecision === 'pending').length;
   return (
     <div style={{ marginTop: 16 }}>
