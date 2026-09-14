@@ -50,12 +50,12 @@ function mockRepo(overrides = {}) {
   };
 }
 const validCreate = {
-  name: 'adminuser',
-  email: 'newuser@mail.com',
-  password: 'Pass123',
-  lastName: 'Nguyen',
-  firstName: 'Van',
-  phone: '0901234567',
+  name: 'admin01',
+  email: 'admin01@autogara.com',
+  password: 'Password1',
+  lastName: 'An',
+  firstName: 'Nguyễn Văn',
+  phone: '0912345678',
   branchId: 1,
   roleId: 1
 };
@@ -279,10 +279,51 @@ test('Create User - 17: duplicate email rejected', async () => {
       })
     })
   });
-  await assert.rejects(() => service.createUser(validCreate), err => err.statusCode === 409 && /Email đã tồn tại/.test(err.message));
+  await assert.rejects(() => service.createUser({
+    ...validCreate,
+    email: 'existing@autogara.com'
+  }), err => err.statusCode === 409 && err.message === 'Email đã tồn tại');
+});
+
+test('Tạo người dùng với đầy đủ dữ liệu trên biểu mẫu', async () => {
+  const service = new AdminUserService({ adminUserRepository: mockRepo() });
+  const user = await service.createUser(validCreate);
+  assert.equal(user.id, 99);
+  assert.equal(user.name, 'admin01');
+  assert.equal(user.email, 'admin01@autogara.com');
+  assert.equal(user.firstName, 'Nguyễn Văn');
+  assert.equal(user.lastName, 'An');
+  assert.equal(user.phone, '0912345678');
+  assert.equal(user.branchId, 1);
+  assert.equal(user.roleId, 1);
+  assert.ok(user.passwordHash);
 });
 
 // Report 5.2 — User List Management
+test('Lọc danh sách người dùng theo từ khóa, chi nhánh, vai trò và trạng thái', async () => {
+  let received;
+  const service = new AdminUserService({
+    adminUserRepository: mockRepo({
+      findAll: async filters => {
+        received = filters;
+        return { items: [{ id: 1, name: 'admin01' }], total: 1 };
+      }
+    })
+  });
+  const result = await service.listUsers({
+    search: 'Nguyễn', branchId: 1, roleId: '1', status: 'active', page: 1, pageSize: 10
+  });
+  assert.deepEqual(result, { items: [{ id: 1, name: 'admin01' }], total: 1 });
+  assert.deepEqual(received, {
+    search: 'Nguyễn', branchId: 1, roleId: '1', status: 'active', page: 1, pageSize: 10
+  });
+});
+test('Danh sách người dùng rỗng khi không có kết quả phù hợp', async () => {
+  const service = new AdminUserService({ adminUserRepository: mockRepo() });
+  assert.deepEqual(await service.listUsers({
+    search: 'không tồn tại', page: 1, pageSize: 10
+  }), { items: [], total: 0 });
+});
 test("listUsers validates pagination and status - case 01", async () => {
   const service = new AdminUserService({
     adminUserRepository: mockRepo()
@@ -413,6 +454,44 @@ test('updateUser rejects an invalid status from the edit form', async () => {
   const service = new AdminUserService({ adminUserRepository: mockRepo() });
   await assert.rejects(() => service.updateUser({ userId: 1, status: 'invalid' }), err => err.statusCode === 400);
 });
+test('Hiển thị thông tin người dùng có mã tồn tại', async () => {
+  const service = new AdminUserService({ adminUserRepository: mockRepo() });
+  assert.deepEqual(await service.getUserDetail(1), {
+    id: 1,
+    email: 'existing@mail.com',
+    phone: '0901111111',
+    status: 'active'
+  });
+});
+test('Cập nhật đầy đủ thông tin người dùng', async () => {
+  const service = new AdminUserService({ adminUserRepository: mockRepo() });
+  const updated = await service.updateUser({
+    userId: 1,
+    firstName: 'Nguyễn Văn',
+    lastName: 'An',
+    email: 'admin01@autogara.com',
+    phone: '0912345678',
+    branchId: 1,
+    roleId: 1,
+    status: 'active'
+  });
+  assert.equal(updated.userId, 1);
+  assert.equal(updated.firstName, 'Nguyễn Văn');
+  assert.equal(updated.lastName, 'An');
+  assert.equal(updated.email, 'admin01@autogara.com');
+  assert.equal(updated.phone, '0912345678');
+  assert.equal(updated.branchId, 1);
+  assert.equal(updated.roleId, 1);
+  assert.equal(updated.status, 'active');
+});
+test('Thông báo khi cập nhật người dùng không tồn tại', async () => {
+  const service = new AdminUserService({
+    adminUserRepository: mockRepo({ findById: async () => null })
+  });
+  await assert.rejects(() => service.updateUser({ userId: 99999 }), err => (
+    err.statusCode === 404 && err.message === 'Người dùng không tồn tại'
+  ));
+});
 test("resetPassword - 13/15\u201318: random and manual modes - case 01", async () => {
   const service = new AdminUserService({
     adminUserRepository: mockRepo()
@@ -514,10 +593,37 @@ test('resetPassword: user not found', async () => {
     userId: 999
   }), err => err.statusCode === 404);
 });
-test('resetPassword rejects a confirmation that does not match', async () => {
-  const newPassword = 'Password2';
-  const confirmPassword = 'Different';
-  assert.notEqual(confirmPassword, newPassword);
+test('Tạo mật khẩu tự động cho người dùng ID 1', async () => {
+  const service = new AdminUserService({ adminUserRepository: mockRepo() });
+  const result = await service.resetPassword({ userId: 1 });
+  assert.equal(result.userId, 1);
+  assert.equal(result.isManual, false);
+  assert.equal(result.newPassword.length, 12);
+  assert.match(result.newPassword, /[A-Z]/);
+  assert.match(result.newPassword, /[a-z]/);
+  assert.match(result.newPassword, /[0-9]/);
+  assert.match(result.newPassword, /[!@#$%^&*]/);
+});
+test('Đặt mật khẩu Password2 cho người dùng ID 1', async () => {
+  const service = new AdminUserService({ adminUserRepository: mockRepo() });
+  const result = await service.resetPassword({ userId: 1, newPassword: 'Password2' });
+  assert.equal(result.userId, 1);
+  assert.equal(result.newPassword, 'Password2');
+  assert.equal(result.isManual, true);
+});
+test('Thông báo khi mật khẩu mới chỉ có 3 ký tự', async () => {
+  const service = new AdminUserService({ adminUserRepository: mockRepo() });
+  await assert.rejects(() => service.resetPassword({ userId: 1, newPassword: '123' }), err => (
+    err.statusCode === 400 && err.message === 'Mật khẩu tối thiểu 6 ký tự, gồm chữ và số'
+  ));
+});
+test('Thông báo khi đặt lại mật khẩu cho người dùng không tồn tại', async () => {
+  const service = new AdminUserService({
+    adminUserRepository: mockRepo({ findById: async () => null })
+  });
+  await assert.rejects(() => service.resetPassword({ userId: 99999 }), err => (
+    err.statusCode === 404 && err.message === 'Người dùng không tồn tại'
+  ));
 });
 test("getUserDetail requires userId and returns 404 when missing - case 01", async () => {
   const service = new AdminUserService({
@@ -529,7 +635,7 @@ test("getUserDetail requires userId and returns 404 when missing - case 01", asy
   });
   await assert.rejects(() => service.getUserDetail(null), err => err.statusCode === 400);
 });
-test("getUserDetail requires userId and returns 404 when missing - case 02", async () => {
+test('Thông báo khi mã người dùng không tồn tại', async () => {
   const service = new AdminUserService({
     adminUserRepository: mockRepo({
       findById: async id => id === 5 ? {
@@ -537,5 +643,7 @@ test("getUserDetail requires userId and returns 404 when missing - case 02", asy
       } : null
     })
   });
-  await assert.rejects(() => service.getUserDetail(999), err => err.statusCode === 404);
+  await assert.rejects(() => service.getUserDetail(99999), err => (
+    err.statusCode === 404 && err.message === 'Người dùng không tồn tại'
+  ));
 });

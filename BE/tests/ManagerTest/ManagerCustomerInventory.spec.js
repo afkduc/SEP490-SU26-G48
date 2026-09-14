@@ -59,12 +59,19 @@ test('Không tìm thấy khách hàng theo từ khóa', async () => {
 
 test('Hiển thị khách hàng có mã tồn tại', async () => {
   const service = new CustomerService({ customerRepository: customerRepo() });
-  assert.equal((await service.getById(1)).id, 1);
+  assert.deepEqual(await service.getById(1), {
+    id: 1,
+    fullName: 'Nguyễn Văn A',
+    phone: '0912345678',
+    vehicles: []
+  });
 });
 
 test('Thông báo khi mã khách hàng không tồn tại', async () => {
   const service = new CustomerService({ customerRepository: customerRepo({ findByIdWithDetails: async () => null }) });
-  await assert.rejects(() => service.getById(99999), error => error.statusCode === 404);
+  await assert.rejects(() => service.getById(99999), error => (
+    error.statusCode === 404 && error.message === 'Không tìm thấy khách hàng'
+  ));
 });
 
 const customerUpdate = { fullName: 'Nguyễn Văn B', phone: '0987654321', email: 'b@example.com', address: 'Hà Nội' };
@@ -76,17 +83,23 @@ test('Cập nhật đầy đủ thông tin khách hàng', async () => {
 
 test('Không nhập họ và tên khi cập nhật khách hàng', async () => {
   const service = new CustomerService({ customerRepository: customerRepo() });
-  await assert.rejects(() => service.update(1, { ...customerUpdate, fullName: '' }), error => error.statusCode === 400);
+  await assert.rejects(() => service.update(1, { ...customerUpdate, fullName: '' }), error => (
+    error.statusCode === 400 && error.message === 'Họ và tên không được để trống'
+  ));
 });
 
 test('Không nhập số điện thoại khi cập nhật khách hàng', async () => {
   const service = new CustomerService({ customerRepository: customerRepo() });
-  await assert.rejects(() => service.update(1, { ...customerUpdate, phone: '' }), error => error.statusCode === 400);
+  await assert.rejects(() => service.update(1, { ...customerUpdate, phone: '' }), error => (
+    error.statusCode === 400 && error.message === 'Số điện thoại không được để trống'
+  ));
 });
 
 test('Cập nhật khách hàng không tồn tại', async () => {
   const service = new CustomerService({ customerRepository: customerRepo({ findByIdWithDetails: async () => null }) });
-  await assert.rejects(() => service.update(99999, customerUpdate), error => error.statusCode === 404);
+  await assert.rejects(() => service.update(99999, customerUpdate), error => (
+    error.statusCode === 404 && error.message === 'Không tìm thấy khách hàng'
+  ));
 });
 
 function settlementService(items = []) {

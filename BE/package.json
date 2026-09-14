@@ -11,6 +11,8 @@
     "test:manager": "jest --runInBand tests/ManagerTest",
     "test:admin": "jest --runInBand tests/AdminTest",
     "test:director": "jest --runInBand tests/GeneralDirectorTest",
+    "test:advisor": "jest --runInBand tests/ServiceAdvisorTest",
+    "test:common": "jest --runInBand tests/CommonTest",
     "test:jest:watch": "jest --watch",
     "test:jest:coverage": "jest --coverage --passWithNoTests"
   },

@@ -36,12 +36,12 @@ function mockBranchRepo(overrides = {}) {
 test('BranchService.list shows all branches', async () => {
   const service = new BranchService({
     branchRepository: mockBranchRepo({
-      findAll: async () => [{
-        id: 1
-      }]
+      findAll: async () => [{ id: 1, branchCode: 'HN01', branchName: 'AutoGara Hà Nội', isActive: true }]
     })
   });
-  assert.equal((await service.list()).length, 1);
+  assert.deepEqual(await service.list(), [{
+    id: 1, branchCode: 'HN01', branchName: 'AutoGara Hà Nội', isActive: true
+  }]);
 });
 test('BranchService.list shows no branch for a missing keyword', async () => {
   const service = new BranchService({ branchRepository: mockBranchRepo({ findAll: async () => [] }) });
@@ -129,7 +129,7 @@ test("Branch Catalog - 10\u201311: blank branch name and code rejected - case 02
   await assert.rejects(() => service.create({
     branchCode: '',
     branchName: 'AutoGara Hà Nội'
-  }), err => err.statusCode === 400 && /branchCode la bat buoc/.test(err.message));
+  }), err => err.statusCode === 400 && err.message === 'Mã chi nhánh là bắt buộc');
 });
 test('Branch Catalog - 12: branch code max 20 characters', async () => {
   const service = new BranchService({
@@ -138,7 +138,7 @@ test('Branch Catalog - 12: branch code max 20 characters', async () => {
   await assert.rejects(() => service.create({
     branchCode: 'A'.repeat(21),
     branchName: 'Test Branch'
-  }), err => err.statusCode === 400 && /branchCode toi da 20/.test(err.message));
+  }), err => err.statusCode === 400 && err.message === 'Mã chi nhánh tối đa 20 ký tự');
 });
 test('Branch Catalog - 13: duplicate branch code rejected', async () => {
   const service = new BranchService({
@@ -151,7 +151,7 @@ test('Branch Catalog - 13: duplicate branch code rejected', async () => {
   await assert.rejects(() => service.create({
     branchCode: 'HN01',
     branchName: 'AutoGara Hà Nội'
-  }), err => err.statusCode === 409 && /Ma chi nhanh da ton tai/.test(err.message));
+  }), err => err.statusCode === 409 && err.message === 'Mã chi nhánh đã tồn tại');
 });
 test("Branch Catalog - 14\u201316: invalid phone and email rejected - case 01", async () => {
   const service = new BranchService({
@@ -261,7 +261,9 @@ test('getById returns 404 for missing branch', async () => {
   const service = new BranchService({
     branchRepository: mockBranchRepo()
   });
-  await assert.rejects(() => service.getById(999), err => err.statusCode === 404);
+  await assert.rejects(() => service.getById(99999), err => (
+    err.statusCode === 404 && err.message === 'Chi nhánh không tồn tại'
+  ));
 });
 test('deactivate reports a missing branch', async () => {
   const service = new BranchService({ branchRepository: mockBranchRepo() });
@@ -270,4 +272,53 @@ test('deactivate reports a missing branch', async () => {
 test('reactivate reports a missing branch', async () => {
   const service = new BranchService({ branchRepository: mockBranchRepo() });
   await assert.rejects(() => service.reactivate(99999, {}), err => err.statusCode === 404);
+});
+
+test('Tạo chi nhánh với đầy đủ dữ liệu trên biểu mẫu', async () => {
+  let saved;
+  const service = new BranchService({
+    branchRepository: mockBranchRepo({
+      create: async data => {
+        saved = data;
+        return 1;
+      },
+      findById: async () => ({ id: 1, ...saved })
+    })
+  });
+  const branch = await service.create({
+    branchCode: 'HN01',
+    branchName: 'AutoGara Hà Nội',
+    address: 'Hà Nội',
+    phone: '0912345678',
+    email: 'hanoi@autogara.com',
+    managerId: 1
+  }, {});
+  assert.deepEqual(branch, {
+    id: 1,
+    branchCode: 'HN01',
+    branchName: 'AutoGara Hà Nội',
+    address: 'Hà Nội',
+    phone: '0912345678',
+    email: 'hanoi@autogara.com',
+    managerId: 1
+  });
+});
+
+test('Cập nhật đầy đủ dữ liệu chi nhánh', async () => {
+  const service = new BranchService({ branchRepository: mockBranchRepo() });
+  const branch = await service.update(1, {
+    branchName: 'AutoGara Hà Nội',
+    address: 'Hà Nội',
+    phone: '0912345678',
+    email: 'hanoi@autogara.com',
+    managerId: 1
+  }, {});
+  assert.deepEqual(branch, {
+    id: 1,
+    branchName: 'AutoGara Hà Nội',
+    address: 'Hà Nội',
+    phone: '0912345678',
+    email: 'hanoi@autogara.com',
+    managerId: 1
+  });
 });

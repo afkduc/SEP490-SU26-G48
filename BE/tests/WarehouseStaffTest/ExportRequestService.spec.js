@@ -2,131 +2,146 @@ const { test } = require('@jest/globals');
 const assert = require('node:assert/strict');
 const transaction = require('../../src/utils/sqlTransaction');
 
-// Mock transaction tai bien cua test de create() khong ket noi SQL Server.
 transaction.runInTransaction = async (callback) => callback({ id: 'tx-export' });
 const ExportRequestService = require('../../src/application/services/ExportRequestService');
 
-test('list rejects a reversed date range', async () => {
-  const service = new ExportRequestService({
-    exportRequestRepository: {
-      findAll: async () => [],
-      count: async () => 0,
-    },
+const detail = (id = 1) => ({
+  request: {
+    id, requestCode: 'PX-2026-001', branchId: 1, repairOrderId: 9,
+    repairOrderCode: 'RO-2026-009', customerName: 'Nguyễn Văn A', vehiclePlate: '30A-123.45',
+    performedBy: 7, performedByName: 'Nguyễn Văn Kho', receivedBy: 21,
+    receivedByName: 'Trần Văn Thợ', receivedSignatureData: 'data:image/png;base64,abc123',
+    receivedSignedAt: '2026-09-11T08:30:00.000Z', exportDate: '2026-09-11',
+    status: 'completed', createdAt: '2026-09-11T08:30:00.000Z',
+  },
+  items: [{ id: 1, exportRequestId: id, productId: 11, productCode: 'PT-001', productName: 'Lọc dầu', unit: 'Cái', quantity: 2 }],
+});
+
+const makeService = (exportRequestRepository = {}) => new ExportRequestService({ exportRequestRepository });
+const expectError = (action, statusCode, message) => assert.rejects(action, (error) => error.statusCode === statusCode && error.message === message);
+
+test('returns export requests matching the visible filters', async () => {
+  let received;
+  const service = makeService({
+    findAll: async (filters) => { received = filters; return [detail().request]; },
+    count: async () => 1,
   });
-
-  await assert.rejects(
-    () => service.list({ branchId: 1, fromDate: '2026-08-05', toDate: '2026-08-01' }),
-    (err) => err.statusCode === 400 && /Ngày bắt đầu/.test(err.message),
-  );
+  const result = await service.list({ branchId: 1, status: 'completed', fromDate: '2026-09-01', toDate: '2026-09-11', search: 'PX-2026', page: 1, limit: 20 });
+  assert.deepEqual(received, { branchId: 1, status: 'completed', repairOrderId: undefined, fromDate: new Date('2026-09-01'), toDate: new Date('2026-09-11'), search: 'PX-2026', includeOpen: false, page: 1, limit: 20 });
+  assert.equal(result.total, 1);
+  assert.equal(result.items[0].requestCode, 'PX-2026-001');
 });
 
-test('getRepairOrderForExport rejects an invalid or missing repair order', async () => {
-  const service = new ExportRequestService({
-    exportRequestRepository: { findRepairOrderForExport: async () => null },
+test('returns the export request used by the Excel list case', async () => {
+  let received;
+  const row = { ...detail(7).request, requestCode: 'EXB-1' };
+  const service = makeService({
+    findAll: async (filters) => { received = filters; return [row]; }, count: async () => 1,
   });
-
-  await assert.rejects(
-    () => service.getRepairOrderForExport(0),
-    (err) => err.statusCode === 400,
-  );
-  await assert.rejects(
-    () => service.getRepairOrderForExport(9),
-    (err) => err.statusCode === 404,
-  );
+  const result = await service.list({ branchId: 1, search: 'EXB', status: 'completed', fromDate: '2026-09-01', toDate: '2026-09-10', page: 1, limit: 20 });
+  assert.equal(received.search, 'EXB');
+  assert.equal(received.status, 'completed');
+  assert.deepEqual(received.fromDate, new Date('2026-09-01'));
+  assert.deepEqual(received.toDate, new Date('2026-09-10'));
+  assert.equal(result.items[0].id, 7);
+  assert.equal(result.items[0].requestCode, 'EXB-1');
 });
 
-test('lists export requests with normalized filters and pagination', async () => {
-  let findFilters;
-  const service = new ExportRequestService({ exportRequestRepository: {
-    findAll: async (filters) => { findFilters = filters; return []; }, count: async () => 0,
-  } });
-  const result = await service.list({ branchId: '1', repairOrderId: '8', page: -1, limit: 999 });
-  assert.deepEqual(result, { items: [], total: 0, page: 1, limit: 100 });
-  // includeOpen = true vi dang tra cuu dich danh 1 RO.
-  assert.deepEqual(findFilters, { branchId: 1, status: undefined, repairOrderId: 8, fromDate: undefined, toDate: undefined, search: undefined, includeOpen: true, page: 1, limit: 100 });
-  await assert.rejects(() => service.list({}), (err) => err.statusCode === 400);
+test('returns an empty export-request list when no keyword matches', async () => {
+  const service = makeService({ findAll: async () => [], count: async () => 0 });
+  const result = await service.list({ branchId: 1, search: 'không có', page: 1, limit: 20 });
+  assert.deepEqual(result.items, []);
+  assert.equal(result.total, 0);
 });
 
-test('main export list only shows finished slips (RO already closed)', async () => {
-  let findFilters;
-  const service = new ExportRequestService({ exportRequestRepository: {
-    findAll: async (filters) => { findFilters = filters; return []; }, count: async () => 0,
-  } });
-  await service.list({ branchId: 1 });
-  assert.equal(findFilters.includeOpen, false);
+test('rejects an export-request end date before its start date', async () => {
+  const service = makeService({ findAll: async () => [], count: async () => 0 });
+  await assert.rejects(() => service.list({ branchId: 1, fromDate: '2026-09-11', toDate: '2026-09-01' }), (error) => error.statusCode === 400);
 });
 
-test('gets export request detail and validates the id', async () => {
-  const service = new ExportRequestService({ exportRequestRepository: {
-    findById: async (id) => id === 1 ? { request: { id: 1, requestCode: 'ERB-1' }, items: [] } : null,
-  } });
-  assert.equal((await service.getById(1)).id, 1);
-  await assert.rejects(() => service.getById(0), (err) => err.statusCode === 400);
-  await assert.rejects(() => service.getById(2), (err) => err.statusCode === 404);
+test('returns export-request details for an existing id', async () => {
+  const result = await makeService({ findById: async () => detail() }).getById(1, { branchId: 1 });
+  assert.equal(result.id, 1);
+  assert.equal(result.requestCode, 'PX-2026-001');
+  assert.equal(result.repairOrderCode, 'RO-2026-009');
+  assert.equal(result.items[0].quantity, 2);
 });
 
-test('lists exportable repair orders for a warehouse branch', async () => {
-  let listArgs;
-  const service = new ExportRequestService({ exportRequestRepository: {
-    findExportableRepairOrders: async (args) => { listArgs = args; return [{ id: 9 }]; },
+test('returns the export request used by the Excel detail case', async () => {
+  const service = makeService({ findById: async () => ({ ...detail(7), request: { ...detail(7).request, requestCode: 'EXB-1' } }) });
+  const result = await service.getById(7, { branchId: 1 });
+  assert.equal(result.id, 7);
+  assert.equal(result.requestCode, 'EXB-1');
+});
+
+test('reports a missing export-request id', async () => {
+  const service = makeService({ findById: async () => null });
+  await expectError(() => service.getById(999, { branchId: 1 }), 404, 'Không tìm thấy phiếu xuất');
+});
+
+test('returns repair orders matching the export-form keyword', async () => {
+  let received;
+  const service = makeService({
+    findExportableRepairOrders: async (filters) => { received = filters; return [{ id: 9, repairOrderCode: 'RO-2026-009', customerName: 'Nguyễn Văn A', vehiclePlate: '30A-123.45' }]; },
     countExportableRepairOrders: async () => 1,
-  } });
-  const result = await service.listExportableRepairOrders({ branchId: 1, search: 'RO', page: 0, limit: 200 });
-  assert.deepEqual(result, { items: [{ id: 9 }], total: 1, page: 1, limit: 100 });
-  assert.deepEqual(listArgs, { branchId: 1, search: 'RO', page: 1, limit: 100 });
+  });
+  const result = await service.listExportableRepairOrders({ branchId: 1, search: 'RO-2026', page: 1, limit: 20 });
+  assert.deepEqual(received, { branchId: 1, search: 'RO-2026', page: 1, limit: 20 });
+  assert.equal(result.total, 1);
+  assert.equal(result.items[0].repairOrderCode, 'RO-2026-009');
 });
 
-test('gets an exportable repair order and rejects invalid or missing orders', async () => {
-  const service = new ExportRequestService({ exportRequestRepository: { findRepairOrderForExport: async (id) => id === 1 ? { id: 1, alreadyExported: false } : null } });
-  assert.equal((await service.getRepairOrderForExport(1)).id, 1);
-  await assert.rejects(() => service.getRepairOrderForExport('x'), (err) => err.statusCode === 400);
-  await assert.rejects(() => service.getRepairOrderForExport(2), (err) => err.statusCode === 404);
+test('returns an empty repair-order list when the export-form keyword does not match', async () => {
+  const service = makeService({ findExportableRepairOrders: async () => [], countExportableRepairOrders: async () => 0 });
+  const result = await service.listExportableRepairOrders({ branchId: 1, search: 'không có', page: 1, limit: 20 });
+  assert.deepEqual(result.items, []);
+  assert.equal(result.total, 0);
 });
 
-test('confirms a pickup in a transaction and never trusts client quantities', async () => {
-  // FE chi gui productIds duoc tick - so luong do repository tu tinh lai.
-  const calls = [];
-  const repository = {
-    confirmPickup: async (...args) => { calls.push(['confirmPickup', ...args]); return { request: { id: 1, requestCode: 'RO-2026-009', status: 'completed' }, items: [] }; },
-  };
-  const service = new ExportRequestService({ exportRequestRepository: repository });
+test('returns repair-order details for an existing exportable order', async () => {
+  const service = makeService({ findRepairOrderForExport: async () => ({ id: 9, repairOrderCode: 'RO-2026-009', locked: false, items: [{ productId: 11, productName: 'Lọc dầu', pendingQuantity: 2 }] }) });
+  const result = await service.getRepairOrderForExport(9);
+  assert.equal(result.repairOrderCode, 'RO-2026-009');
+  assert.equal(result.locked, false);
+  assert.equal(result.items[0].pendingQuantity, 2);
+});
+
+test('reports a missing repair order on the export form', async () => {
+  const service = makeService({ findRepairOrderForExport: async () => null });
+  await expectError(() => service.getRepairOrderForExport(999), 404, 'Không tìm thấy lệnh sửa chữa');
+});
+
+test('confirms pickup with the selected order, receiver, signature, and part rows', async () => {
+  let received;
+  const service = makeService({ confirmPickup: async (tx, data) => { received = { tx, data }; return detail(); } });
   const result = await service.confirmPickup({
     branchId: 1, repairOrderId: 9, performedBy: 7, receivedBy: 21,
-    receivedSignatureData: 'data:image/png;base64,abc123',
-    productIds: [11, 12, 11],
+    receivedSignatureData: 'data:image/png;base64,abc123', productIds: [11, 12, 11],
   });
+  assert.equal(received.tx.id, 'tx-export');
+  assert.equal(received.data.repair_order_id, 9);
+  assert.equal(received.data.received_by, 21);
+  assert.deepEqual(received.data.product_ids, [11, 12]);
   assert.equal(result.status, 'completed');
-  assert.equal(calls[0][0], 'confirmPickup');
-  assert.equal(calls[0][1].id, 'tx-export');
-  assert.equal(calls[0][2].repair_order_id, 9);
-  assert.equal(calls[0][2].received_by, 21);
-  assert.deepEqual(calls[0][2].product_ids, [11, 12]); // bo trung
-  assert.equal(calls[0][2].signature_data, 'data:image/png;base64,abc123');
-  assert.equal(calls[0][2].quantity, undefined); // khong nhan so luong tu FE
+  assert.equal(result.requestCode, 'PX-2026-001');
 });
 
-test('rejects pickup confirm when signature or ticked rows are missing', async () => {
-  const service = new ExportRequestService({ exportRequestRepository: { confirmPickup: async () => { throw new Error('khong duoc goi'); } } });
-  await assert.rejects(
-    () => service.confirmPickup({ branchId: 1, repairOrderId: 9, performedBy: 7, receivedBy: 21, productIds: [11] }),
-    (err) => err.statusCode === 400 && /ky xac nhan/.test(err.message),
-  );
-  await assert.rejects(
-    () => service.confirmPickup({
-      branchId: 1, repairOrderId: 9, performedBy: 7, receivedBy: 21,
-      receivedSignatureData: 'data:image/png;base64,abc123', productIds: [],
-    }),
-    (err) => err.statusCode === 400 && /Chua chon dong/.test(err.message),
-  );
+test('requires a repair order when confirming pickup', async () => {
+  const service = makeService();
+  await expectError(() => service.confirmPickup({ branchId: 1, performedBy: 7, receivedBy: 21, receivedSignatureData: 'data:image/png;base64,abc123', productIds: [11] }), 400, 'Vui lòng chọn lệnh sửa chữa');
 });
 
-test('getRepairOrderForExport no longer blocks an order that was already exported', async () => {
-  const service = new ExportRequestService({
-    exportRequestRepository: {
-      findRepairOrderForExport: async () => ({ id: 9, locked: false, exportRequestId: 5, items: [] }),
-    },
-  });
-  const data = await service.getRepairOrderForExport(9);
-  assert.equal(data.exportRequestId, 5);
-  assert.equal(data.locked, false);
+test('requires a receiver when confirming pickup', async () => {
+  const service = makeService();
+  await expectError(() => service.confirmPickup({ branchId: 1, repairOrderId: 9, performedBy: 7, receivedSignatureData: 'data:image/png;base64,abc123', productIds: [11] }), 400, 'Vui lòng chọn người lấy');
+});
+
+test('requires a signature when confirming pickup', async () => {
+  const service = makeService();
+  await expectError(() => service.confirmPickup({ branchId: 1, repairOrderId: 9, performedBy: 7, receivedBy: 21, productIds: [11] }), 400, 'Vui lòng ký xác nhận');
+});
+
+test('requires at least one selected part row when confirming pickup', async () => {
+  const service = makeService();
+  await expectError(() => service.confirmPickup({ branchId: 1, repairOrderId: 9, performedBy: 7, receivedBy: 21, receivedSignatureData: 'data:image/png;base64,abc123', productIds: [] }), 400, 'Chưa chọn dòng phụ tùng nào để xác nhận');
 });

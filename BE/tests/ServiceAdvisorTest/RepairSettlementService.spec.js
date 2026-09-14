@@ -894,3 +894,262 @@ test('create: kiem dinh dang bien so khi tao xe moi', async () => {
   await service.create(xeMoi(' 30a-123.45 '), { branchId: 1, advisorId: 4 });
   assert.equal(goiVoi.at(-1).licensePlate, '30A-123.45');
 });
+
+const advisorItem = {
+  description: 'Thay dầu máy',
+  lhsc: 'DV',
+  httt: 'KHT',
+  repairCategory: 'PM',
+  qty: 1,
+  unitPrice: 500000,
+  discount: 0,
+};
+
+function advisorCreatePayload(overrides = {}) {
+  return {
+    signatureData: signature,
+    signerName: 'Nguyễn Văn A',
+    customerId: null,
+    vehicleId: null,
+    customer: { fullName: 'Nguyễn Văn A', phone: '0912345678' },
+    vehicle: { licensePlate: '30A-123.45' },
+    currentKm: 50000,
+    fuelLevel: '1/2',
+    customerRequest: 'Kiểm tra xe',
+    items: [{ ...advisorItem }],
+    ...overrides,
+  };
+}
+
+function advisorSettlementService(repoOverrides = {}, customerOverrides = {}) {
+  return new RepairSettlementService({
+    repairSettlementRepository: mockRepos(repoOverrides),
+    customerRepository: {
+      findOrCreateForSettlement: async () => ({ customerId: 100, vehicleId: 200 }),
+      ...customerOverrides,
+    },
+  });
+}
+
+test('Lọc phiếu quyết toán theo trạng thái, từ khóa, cố vấn và khoảng ngày', async () => {
+  let findFilters;
+  let countFilters;
+  const service = advisorSettlementService({
+    findAll: async filters => {
+      findFilters = filters;
+      return [{
+        id: 1,
+        code: 'RO-2026-001',
+        status: 'invoiced',
+        branchId: 1,
+        advisorId: 5,
+        items: [],
+        tasks: [],
+        customer: { fullName: 'Nguyễn Văn A' },
+        vehicle: { licensePlate: '30A-123.45' },
+      }];
+    },
+    count: async filters => { countFilters = filters; return 1; },
+  });
+  const filters = {
+    branchId: 1,
+    status: 'invoiced',
+    search: 'RO-2026',
+    advisorId: 5,
+    fromDate: '2026-09-01',
+    toDate: '2026-09-10',
+    page: 1,
+    limit: 20,
+  };
+  const result = await service.getAll(filters);
+  assert.equal(result.total, 1);
+  assert.equal(result.items[0].code, 'RO-2026-001');
+  assert.deepEqual(findFilters, {
+    ...filters,
+    customerId: undefined,
+    vehicleId: undefined,
+  });
+  assert.deepEqual(countFilters, {
+    branchId: 1,
+    status: 'invoiced',
+    search: 'RO-2026',
+    customerId: undefined,
+    vehicleId: undefined,
+    fromDate: '2026-09-01',
+    toDate: '2026-09-10',
+    advisorId: 5,
+  });
+});
+
+test('Danh sách phiếu quyết toán rỗng khi không có kết quả', async () => {
+  const service = advisorSettlementService();
+  assert.deepEqual(await service.getAll({ branchId: 1, status: 'waiting_repair', search: 'không có' }), {
+    items: [], total: 0, page: 1, limit: 20
+  });
+});
+
+test('Hiển thị phiếu quyết toán ID 1', async () => {
+  const service = advisorSettlementService({
+    findById: async () => ({
+      id: 1, code: 'RO-2026-001', status: 'waiting_repair', branchId: 1,
+      items: [], tasks: [], customer: { fullName: 'Nguyễn Văn A' }, vehicle: { licensePlate: '30A-123.45' }
+    })
+  });
+  const result = await service.getById(1);
+  assert.equal(result.id, 1);
+  assert.equal(result.code, 'RO-2026-001');
+  assert.equal(result.status, 'waiting_repair');
+});
+
+test('Thông báo khi phiếu quyết toán ID 99999 không tồn tại', async () => {
+  const service = advisorSettlementService();
+  await assert.rejects(() => service.getById(99999), err => (
+    err.statusCode === 404 && err.message === 'Không tìm thấy phiếu quyết toán'
+  ));
+});
+
+test('Tạo phiếu quyết toán từ thông tin khách hàng và xe trên biểu mẫu', async () => {
+  let customerVehicle;
+  let createdData;
+  const service = advisorSettlementService({
+    create: async (data, ctx) => {
+      createdData = data;
+      return {
+        id: 50, code: 'RO-2026-001', status: 'waiting_repair', branchId: ctx.branchId,
+        advisorId: ctx.advisorId, ...data, customer: { fullName: 'Nguyễn Văn A' },
+        vehicle: { licensePlate: '30A-123.45' }, items: data.items, tasks: []
+      };
+    }
+  }, {
+    findOrCreateForSettlement: async payload => {
+      customerVehicle = payload;
+      return { customerId: 100, vehicleId: 200 };
+    }
+  });
+  const result = await service.create(advisorCreatePayload(), { branchId: 1, advisorId: 5 });
+  assert.equal(result.id, 50);
+  assert.equal(result.code, 'RO-2026-001');
+  assert.equal(result.status, 'waiting_repair');
+  assert.equal(createdData.currentKm, 50000);
+  assert.equal(result.items[0].description, 'Thay dầu máy');
+  assert.equal(result.items[0].qty, 1);
+  assert.equal(result.items[0].discount, 0);
+  assert.equal(customerVehicle.fullName, 'Nguyễn Văn A');
+  assert.equal(customerVehicle.phone, '0912345678');
+  assert.equal(customerVehicle.licensePlate, '30A-123.45');
+});
+
+for (const [overrides, message] of [
+  [{ signatureData: null }, 'Vui lòng ký xác nhận trước khi lưu phiếu'],
+  [{ customer: { fullName: '', phone: '0912345678' } }, 'Phải nhập tên và số điện thoại khách hàng'],
+  [{ customer: { fullName: 'Nguyễn Văn A', phone: '123' } }, 'Số điện thoại khách hàng không hợp lệ'],
+  [{ vehicle: { licensePlate: '' } }, 'Phải nhập biển số xe'],
+  [{ currentKm: -1 }, 'Số km hiện tại không được là số âm'],
+  [{ items: [] }, 'Phải có ít nhất 1 hạng mục công việc/phụ tùng'],
+  [{ items: [{ ...advisorItem, qty: 0 }] }, 'Số lượng không hợp lệ ở hạng mục "Thay dầu máy"'],
+]) {
+  test(`Thông báo khi dữ liệu tạo phiếu không hợp lệ: ${message}`, async () => {
+    const service = advisorSettlementService();
+    await assert.rejects(() => service.create(advisorCreatePayload(overrides), {
+      branchId: 1, advisorId: 5
+    }), err => err.statusCode === 400 && err.message === message);
+  });
+}
+
+test('Cập nhật phiếu quyết toán ID 1', async () => {
+  let updatedData;
+  const service = advisorSettlementService({
+    findById: async () => ({
+      id: 1, code: 'RO-2026-001', status: 'waiting_repair', branchId: 1,
+      customerId: 100, vehicleId: 200, currentKm: 50000, items: [], tasks: []
+    }),
+    update: async (id, data) => {
+      updatedData = data;
+      return { id, code: 'RO-2026-001', status: 'waiting_repair', branchId: 1, ...data, items: data.items, tasks: [] };
+    }
+  });
+  const result = await service.update(1, basePayload({
+    customerId: 100,
+    vehicleId: 200,
+    currentKm: 51000,
+    customerRequest: 'Kiểm tra và thay dầu',
+    items: [{ ...advisorItem }]
+  }));
+  assert.equal(result.item.id, 1);
+  assert.equal(updatedData.currentKm, 51000);
+  assert.equal(result.item.items[0].description, 'Thay dầu máy');
+  assert.equal(result.item.items[0].qty, 1);
+});
+
+test('Thông báo khi cập nhật phiếu ID 99999 không tồn tại', async () => {
+  const service = advisorSettlementService();
+  await assert.rejects(() => service.update(99999, basePayload()), err => (
+    err.statusCode === 404 && err.message === 'Không tìm thấy phiếu quyết toán'
+  ));
+});
+
+test('Thông báo khi cập nhật phiếu đã xuất hóa đơn', async () => {
+  const service = advisorSettlementService({ findById: async () => ({ id: 1, status: 'invoiced' }) });
+  await assert.rejects(() => service.update(1, basePayload()), err => (
+    err.statusCode === 409 && err.message === 'Phiếu đã xuất hóa đơn, không thể chỉnh sửa'
+  ));
+});
+
+test('Thông báo khi cập nhật làm mất hạng mục đã hoàn thành', async () => {
+  const service = advisorSettlementService({
+    findById: async () => ({ id: 1, status: 'inprogress', branchId: 1, repairOrderId: 70 }),
+    wouldLoseCompletedTasks: async () => true,
+  });
+  await assert.rejects(() => service.update(1, basePayload()), err => (
+    err.statusCode === 409
+    && err.message === 'Có đầu mục công việc đã được xác nhận hoàn thành, không thể hủy hoặc xóa hạng mục tương ứng nữa'
+  ));
+});
+
+test('Hủy phiếu ID 1 với lý do đã nhập', async () => {
+  const service = advisorSettlementService({
+    findById: async () => ({ id: 1, status: 'waiting_repair', branchId: 1, tasks: [] })
+  });
+  const result = await service.updateStatus(1, 'cancelled', { cancelReason: 'Khách không tiếp tục sửa' });
+  assert.equal(result.id, 1);
+  assert.equal(result.status, 'cancelled');
+  assert.equal(result.cancelReason, 'Khách không tiếp tục sửa');
+});
+
+test('Thông báo khi hủy phiếu mà không nhập lý do', async () => {
+  const service = advisorSettlementService({
+    findById: async () => ({ id: 1, status: 'waiting_repair', branchId: 1, tasks: [] })
+  });
+  await assert.rejects(() => service.updateStatus(1, 'cancelled', { cancelReason: '' }), err => (
+    err.statusCode === 400 && err.message === 'Phải nhập lý do hủy'
+  ));
+});
+
+test('Thông báo khi hủy phiếu đang sửa đã có hạng mục hoàn thành', async () => {
+  const service = advisorSettlementService({
+    findById: async () => ({ id: 1, status: 'inprogress', branchId: 1, tasks: [{ id: 1, isDone: true }] })
+  });
+  await assert.rejects(() => service.updateStatus(1, 'cancelled', {
+    cancelReason: 'Khách không tiếp tục sửa'
+  }), err => err.statusCode === 409 && err.message === 'Đã có đầu mục công việc được xác nhận hoàn thành, không thể hủy phiếu này nữa');
+});
+
+test('Xác nhận thanh toán tiền mặt cho phiếu đang chờ thanh toán', async () => {
+  const service = advisorSettlementService({
+    findById: async () => ({ id: 1, status: 'waiting_payment', branchId: 1, tasks: [] })
+  });
+  const result = await service.updateStatus(1, 'invoiced', { issuedBy: 5 });
+  assert.equal(result.id, 1);
+  assert.equal(result.status, 'invoiced');
+  assert.equal(result.paymentMethod, 'CASH');
+});
+
+test('Thông báo khi xác nhận thanh toán lúc phiếu chưa chờ thanh toán', async () => {
+  const service = advisorSettlementService({
+    findById: async () => ({ id: 1, status: 'inprogress', branchId: 1, tasks: [] })
+  });
+  await assert.rejects(() => service.updateStatus(1, 'invoiced', { issuedBy: 5 }), err => (
+    err.statusCode === 409
+    && err.message === 'Phiếu phải ở trạng thái chờ thanh toán mới có thể xác nhận thanh toán'
+  ));
+});

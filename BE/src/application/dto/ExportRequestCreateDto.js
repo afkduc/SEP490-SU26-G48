@@ -19,27 +19,27 @@ function validateConfirmPickup(payload) {
 
   const branchId = Number(payload.branchId ?? payload.branch_id);
   if (!Number.isFinite(branchId) || branchId <= 0) {
-    throw new ApiError(400, 'branchId khong hop le');
+    throw new ApiError(400, 'Vui lòng chọn chi nhánh');
   }
 
   const repairOrderId = Number(payload.repairOrderId ?? payload.repair_order_id);
   if (!Number.isFinite(repairOrderId) || repairOrderId <= 0) {
-    throw new ApiError(400, 'repairOrderId khong hop le');
+    throw new ApiError(400, 'Vui lòng chọn lệnh sửa chữa');
   }
 
   const performedBy = Number(payload.performedBy ?? payload.performed_by);
   if (!Number.isFinite(performedBy) || performedBy <= 0) {
-    throw new ApiError(400, 'performedBy khong hop le');
+    throw new ApiError(400, 'Không xác định được nhân viên kho');
   }
 
   const receivedBy = Number(payload.receivedBy ?? payload.received_by);
   if (!Number.isFinite(receivedBy) || receivedBy <= 0) {
-    throw new ApiError(400, 'Vui long chon tho nhan phu tung');
+    throw new ApiError(400, 'Vui lòng chọn người lấy');
   }
 
   const signatureData = payload.receivedSignatureData ?? payload.signature_data;
   if (!(signatureData || '').startsWith('data:image/png;base64,')) {
-    throw new ApiError(400, 'Vui long ky xac nhan');
+    throw new ApiError(400, 'Vui lòng ký xác nhận');
   }
 
   const rawIds = Array.isArray(payload.productIds ?? payload.product_ids)
@@ -48,7 +48,7 @@ function validateConfirmPickup(payload) {
   const productIds = [...new Set(rawIds.map(Number))]
     .filter((n) => Number.isInteger(n) && n > 0);
   if (productIds.length === 0) {
-    throw new ApiError(400, 'Chua chon dong phu tung nao de xac nhan');
+    throw new ApiError(400, 'Chưa chọn dòng phụ tùng nào để xác nhận');
   }
   if (productIds.length > 100) {
     throw new ApiError(400, 'Toi da 100 dong moi lan xac nhan');

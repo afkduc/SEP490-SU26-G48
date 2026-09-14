@@ -54,6 +54,57 @@ test('BayScreen tick service task via teamLeaderId identity', async () => {
   assert.equal(updated, true);
 });
 
+test('BayScreen saves an inspection item as passed', async () => {
+  let received;
+  const inspectionOrder = {
+    ...bayOrder,
+    tasks: [{ id: 500, taskType: 'service', isDone: false, isCancelled: false, taskName: 'Kiểm tra phanh', actionCode: 'I' }],
+  };
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => inspectionOrder,
+      updateTaskStatus: async (taskId, isDone, options) => { received = { taskId, isDone, options }; },
+    }),
+  });
+  const dto = await service.updateTaskStatus(70, 500, true, { userId: 8, branchId: 1, checkResult: 'OK' });
+  assert.equal(received.taskId, 500);
+  assert.equal(received.isDone, true);
+  assert.equal(received.options.checkResult, 'OK');
+  assert.equal(dto.id, 70);
+});
+
+test('BayScreen saves an inspection item as failed with a note', async () => {
+  let received;
+  const inspectionOrder = {
+    ...bayOrder,
+    tasks: [{ id: 500, taskType: 'service', isDone: false, isCancelled: false, taskName: 'Kiểm tra phanh', actionCode: 'I' }],
+  };
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => inspectionOrder,
+      updateTaskStatus: async (taskId, isDone, options) => { received = { taskId, isDone, options }; },
+    }),
+  });
+  const dto = await service.updateTaskStatus(70, 500, true, {
+    userId: 8, branchId: 1, checkResult: 'NG', checkNote: 'Má phanh đã mòn',
+  });
+  assert.equal(received.options.checkResult, 'NG');
+  assert.equal(received.options.checkNote, 'Má phanh đã mòn');
+  assert.equal(dto.id, 70);
+});
+
+test('BayScreen requires a note for a failed inspection item', async () => {
+  const inspectionOrder = {
+    ...bayOrder,
+    tasks: [{ id: 500, taskType: 'service', isDone: false, isCancelled: false, taskName: 'Kiểm tra phanh', actionCode: 'I' }],
+  };
+  const service = new RepairOrderService({ repairOrderRepository: mockRepo({ findById: async () => inspectionOrder }) });
+  await assert.rejects(
+    () => service.updateTaskStatus(70, 500, true, { userId: 8, branchId: 1, checkResult: 'NG', checkNote: '' }),
+    (err) => err.statusCode === 400 && /phần ghi chú/.test(err.message),
+  );
+});
+
 test('BayScreen reject tick when bay mapped to wrong team leader', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({

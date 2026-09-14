@@ -2,7 +2,7 @@ const { test } = require('@jest/globals');
 const assert = require('node:assert/strict');
 jest.mock('../../src/infrastructure/repositories/BranchRepositoryImpl', () => class MockBranchRepository {
   async findById(id) {
-    if (Number(id) === 2) {
+    if ([1, 2].includes(Number(id))) {
       return {
         id: 2,
         branchCode: 'HN',
@@ -673,4 +673,164 @@ test("GeneralDirectorService.deactivateBranch and reactivateBranch update active
     id: 2,
     isActive: true
   });
+});
+
+const managerForm = {
+  fullName: 'Nguyễn Văn A',
+  email: 'manager@autogara.com',
+  phone: '0912345678',
+  password: 'Password1',
+  confirmPassword: 'Password1',
+  branchId: 1
+};
+
+test('Lọc quyết toán theo chi nhánh, trạng thái và khoảng ngày', async () => {
+  let received;
+  const service = new GeneralDirectorService(mockRepo({
+    listSettlementReports: async filters => {
+      received = filters;
+      return [{ id: 1, code: 'RO-2026-001', status: 'invoiced' }];
+    }
+  }));
+  const filters = {
+    branchId: 1,
+    status: 'invoiced',
+    fromDate: '2026-01-01',
+    toDate: '2026-09-10'
+  };
+  assert.deepEqual(await service.listSettlementReports(filters), [
+    { id: 1, code: 'RO-2026-001', status: 'invoiced' }
+  ]);
+  assert.deepEqual(received, filters);
+});
+
+test('Danh sách quyết toán rỗng khi từ khóa không có kết quả', async () => {
+  const service = new GeneralDirectorService(mockRepo({ listSettlementReports: async () => [] }));
+  assert.deepEqual(await service.listSettlementReports({ search: 'không tồn tại' }), []);
+});
+
+for (const [label, method, listMethod, result, filters] of [
+  ['nhân viên', 'getEmployeeById', 'listEmployees', { id: 1, fullName: 'Nguyễn Văn A' }, { search: 'Nguyễn', branchId: 1, status: 'active', role: 'all' }],
+  ['kỹ thuật viên', 'getTechnicianById', 'listTechnicians', { id: 1, fullName: 'Nguyễn Văn B' }, { search: 'Nguyễn', branchId: 1, status: 'active', skillGroup: 'all' }],
+  ['giám đốc chi nhánh', 'getBranchManagerById', 'listBranchManagers', { id: 1, fullName: 'Nguyễn Văn A' }, { search: 'Nguyễn', branchId: 1, status: 'active' }]
+]) {
+  test(`Lọc danh sách ${label} theo từ khóa, chi nhánh và trạng thái`, async () => {
+    let received;
+    const service = new GeneralDirectorService(mockRepo({
+      [listMethod]: async value => {
+        received = value;
+        return [result];
+      }
+    }));
+    assert.deepEqual(await service[listMethod](filters), [result]);
+    assert.deepEqual(received, filters);
+  });
+  test(`Danh sách ${label} rỗng khi không có kết quả`, async () => {
+    const service = new GeneralDirectorService(mockRepo({ [listMethod]: async () => [] }));
+    assert.deepEqual(await service[listMethod]({ search: 'không tồn tại' }), []);
+  });
+  test(`Hiển thị ${label} có mã tồn tại`, async () => {
+    const service = new GeneralDirectorService(mockRepo({ [method]: async () => result }));
+    assert.deepEqual(await service[method](1), result);
+  });
+  test(`Thông báo khi mã ${label} không tồn tại`, async () => {
+    const service = new GeneralDirectorService(mockRepo({ [method]: async () => null }));
+    await assert.rejects(() => service[method](99999), err => err.statusCode === 404);
+  });
+}
+
+test('Hiển thị quyết toán có mã tồn tại', async () => {
+  const service = new GeneralDirectorService(mockRepo({
+    getSettlementReportById: async () => ({ id: 1, code: 'RO-2026-001', status: 'invoiced' })
+  }));
+  assert.deepEqual(await service.getSettlementReportById(1), {
+    id: 1, code: 'RO-2026-001', status: 'invoiced'
+  });
+});
+
+test('Thông báo khi mã quyết toán không tồn tại', async () => {
+  const service = new GeneralDirectorService(mockRepo({ getSettlementReportById: async () => null }));
+  await assert.rejects(() => service.getSettlementReportById(99999), err => (
+    err.statusCode === 404 && err.message === 'Không tìm thấy phiếu quyết toán'
+  ));
+});
+
+test('Tạo giám đốc chi nhánh với đầy đủ dữ liệu trên biểu mẫu', async () => {
+  const service = new GeneralDirectorService(mockRepo());
+  const manager = await service.createBranchManager(managerForm);
+  assert.equal(manager.id, 99);
+  assert.equal(manager.fullName, 'Nguyễn Văn A');
+  assert.equal(manager.email, 'manager@autogara.com');
+  assert.equal(manager.phone, '0912345678');
+  assert.equal(manager.branchId, 1);
+  assert.equal(manager.status, 'active');
+  assert.ok(manager.passwordHash);
+});
+
+for (const [field, label] of [
+  ['fullName', 'họ và tên'],
+  ['email', 'email'],
+  ['branchId', 'chi nhánh']
+]) {
+  test(`Thông báo bắt buộc khi không nhập ${label} của giám đốc chi nhánh`, async () => {
+    const service = new GeneralDirectorService(mockRepo());
+    await assert.rejects(() => service.createBranchManager({ ...managerForm, [field]: null }), err => (
+      err.statusCode === 400
+      && err.message === 'Họ tên, email, số điện thoại, mật khẩu và chi nhánh là bắt buộc'
+    ));
+  });
+}
+
+test('Cập nhật giám đốc chi nhánh với đầy đủ dữ liệu trên biểu mẫu', async () => {
+  const service = new GeneralDirectorService(mockRepo());
+  const manager = await service.updateBranchManager(1, {
+    fullName: 'Nguyễn Văn A',
+    email: 'manager@autogara.com',
+    phone: '0912345678',
+    branchId: 1,
+    status: 'active'
+  });
+  assert.deepEqual(manager, {
+    id: 1,
+    fullName: 'Nguyễn Văn A',
+    email: 'manager@autogara.com',
+    phone: '0912345678',
+    branchId: 1,
+    status: 'active'
+  });
+});
+
+test('Thông báo khi cập nhật giám đốc chi nhánh không tồn tại', async () => {
+  const service = new GeneralDirectorService(mockRepo({ getBranchManagerById: async () => null }));
+  await assert.rejects(() => service.updateBranchManager(99999, {
+    fullName: 'Nguyễn Văn A', email: 'manager@autogara.com', phone: '0912345678', branchId: 1
+  }), err => err.statusCode === 404 && err.message === 'Không tìm thấy giám đốc chi nhánh');
+});
+
+for (const [overrides, message] of [
+  [{ fullName: '' }, 'Họ tên, email, số điện thoại và chi nhánh là bắt buộc'],
+  [{ email: 'abc' }, 'Email không đúng định dạng'],
+  [{ phone: '123' }, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số'],
+  [{ status: 'invalid' }, 'Trạng thái không hợp lệ']
+]) {
+  test(`Thông báo khi dữ liệu cập nhật giám đốc chi nhánh không hợp lệ: ${message}`, async () => {
+    const service = new GeneralDirectorService(mockRepo());
+    await assert.rejects(() => service.updateBranchManager(1, {
+      fullName: 'Nguyễn Văn A',
+      email: 'manager@autogara.com',
+      phone: '0912345678',
+      branchId: 1,
+      ...overrides
+    }), err => err.statusCode === 400 && err.message === message);
+  });
+}
+
+test('Ngừng hoạt động chi nhánh ID 1', async () => {
+  const service = new GeneralDirectorService(mockRepo());
+  assert.deepEqual(await service.deactivateBranch(1), { id: 1, isActive: false });
+});
+
+test('Kích hoạt lại chi nhánh ID 1', async () => {
+  const service = new GeneralDirectorService(mockRepo());
+  assert.deepEqual(await service.reactivateBranch(1), { id: 1, isActive: true });
 });

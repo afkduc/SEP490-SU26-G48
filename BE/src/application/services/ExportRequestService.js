@@ -46,11 +46,11 @@ class ExportRequestService {
   async getById(id, { branchId } = {}) {
     const numId = Number(id);
     if (!Number.isFinite(numId) || numId <= 0) {
-      throw new ApiError(400, 'id khong hop le');
+      throw new ApiError(400, 'ID phiếu xuất không hợp lệ');
     }
     const scope = branchId == null ? {} : { branchId: Number(branchId) };
     const result = await this.exportRequestRepository.findById(numId, scope);
-    if (!result) throw new ApiError(404, 'Khong tim thay phieu xuat');
+    if (!result) throw new ApiError(404, 'Không tìm thấy phiếu xuất');
     return ExportRequestResponseDto.fromEntity(result.request, result.items);
   }
 
@@ -87,10 +87,10 @@ class ExportRequestService {
   async getRepairOrderForExport(repairOrderId) {
     const numId = Number(repairOrderId);
     if (!Number.isFinite(numId) || numId <= 0) {
-      throw new ApiError(400, 'repairOrderId khong hop le');
+      throw new ApiError(400, 'ID lệnh sửa chữa không hợp lệ');
     }
     const data = await this.exportRequestRepository.findRepairOrderForExport(numId);
-    if (!data) throw new ApiError(404, 'Khong tim thay lenh sua chua');
+    if (!data) throw new ApiError(404, 'Không tìm thấy lệnh sửa chữa');
     // Khong con chan "da xuat roi" - phieu xuat theo doi lien tuc, chi khoa
     // khi RO da chot (data.locked, tinh o repository).
     return data;
