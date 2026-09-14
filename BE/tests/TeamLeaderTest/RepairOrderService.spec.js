@@ -1,4 +1,4 @@
-const test = require('node:test');
+const { test } = require('@jest/globals');
 const assert = require('node:assert/strict');
 const RepairOrderService = require('../../src/application/services/RepairOrderService');
 
@@ -69,12 +69,16 @@ test('getPublicProgressByCode 404 when not found', async () => {
   );
 });
 
-test('claim requires repairOrderId and teamLeader/bay', async () => {
+test('claim requires a repair order', async () => {
   const service = new RepairOrderService({ repairOrderRepository: mockRepo() });
   await assert.rejects(
     () => service.claim(null, { branchId: 1, teamLeaderId: 8, bayId: 3 }),
     (err) => err.statusCode === 400 && /Thiếu phiếu quyết toán/.test(err.message),
   );
+});
+
+test('claim requires a team leader and bay', async () => {
+  const service = new RepairOrderService({ repairOrderRepository: mockRepo() });
   await assert.rejects(
     () => service.claim(50, { branchId: 1, teamLeaderId: null, bayId: 3 }),
     (err) => err.statusCode === 400 && /Thiếu thông tin tổ trưởng\/khoang xe/.test(err.message),
@@ -177,7 +181,7 @@ test('setTechnicians dedupes ids and succeeds', async () => {
   assert.equal(dto.id, 70);
 });
 
-test('updateTaskStatus only allows service tasks one-way tick', async () => {
+test('updateTaskStatus rejects a part row', async () => {
   const service = new RepairOrderService({
     repairOrderRepository: mockRepo({
       findById: async () => ({ ...inProgressOrder }),
@@ -187,6 +191,14 @@ test('updateTaskStatus only allows service tasks one-way tick', async () => {
     () => service.updateTaskStatus(70, 501, true, { userId: 8, branchId: 1 }),
     (err) => err.statusCode === 400 && /đầu mục dịch vụ/.test(err.message),
   );
+});
+
+test('updateTaskStatus does not allow clearing a completed checkbox', async () => {
+  const service = new RepairOrderService({
+    repairOrderRepository: mockRepo({
+      findById: async () => ({ ...inProgressOrder }),
+    }),
+  });
   await assert.rejects(
     () => service.updateTaskStatus(70, 500, false, { userId: 8, branchId: 1 }),
     (err) => err.statusCode === 400 && /Không thể bỏ tích/.test(err.message),
@@ -461,7 +473,7 @@ test('forwardNgTask chan dau muc khong phai Khong dat', async () => {
   );
 });
 
-test('forwardNgTask chan bam 2 lan va chan to truong khac', async () => {
+test('forwardNgTask rejects a second forward action', async () => {
   const daBao = {
     ...ngOrder,
     tasks: [{ ...ngOrder.tasks[0], ngDecision: 'pending' }],
@@ -474,11 +486,14 @@ test('forwardNgTask chan bam 2 lan va chan to truong khac', async () => {
     (err) => err.statusCode === 409 && /đã được báo cho cố vấn/.test(err.message),
   );
 
-  const service2 = new RepairOrderService({
+});
+
+test('forwardNgTask rejects another team leader', async () => {
+  const service = new RepairOrderService({
     repairOrderRepository: mockRepo({ findById: async () => ({ ...ngOrder }) }),
   });
   await assert.rejects(
-    () => service2.forwardNgTask(70, 500, { branchId: 1, teamLeaderId: 999 }),
+    () => service.forwardNgTask(70, 500, { branchId: 1, teamLeaderId: 999 }),
     (err) => err.statusCode === 403,
   );
 });

@@ -42,11 +42,11 @@ class ImportRequestService {
   async getById(id, { branchId } = {}) {
     const numId = Number(id);
     if (!Number.isFinite(numId) || numId <= 0) {
-      throw new ApiError(400, 'id khong hop le');
+      throw new ApiError(400, 'ID phiếu nhập không hợp lệ');
     }
     const scopedBranchId = branchId == null ? undefined : Number(branchId);
     const result = await this.importRequestRepository.findById(numId, { branchId: scopedBranchId });
-    if (!result) throw new ApiError(404, 'Khong tim thay phieu nhap');
+    if (!result) throw new ApiError(404, 'Không tìm thấy phiếu nhập');
     return ImportRequestResponseDto.fromEntity(result.request, result.items);
   }
 
@@ -169,12 +169,13 @@ class ImportRequestService {
   /**
    * Danh dau phieu la "da xem" boi Manager (dung cho thong bao dom).
    */
-  async markSeenByManager(id) {
+  async markSeenByManager(id, { branchId } = {}) {
     const numId = Number(id);
     if (!Number.isFinite(numId) || numId <= 0) {
       throw new ApiError(400, 'id khong hop le');
     }
-    await this.importRequestRepository.markSeenByManager(numId);
+    const scope = branchId == null ? {} : { branchId: Number(branchId) };
+    await this.importRequestRepository.markSeenByManager(numId, scope);
   }
 
   /**

@@ -157,7 +157,10 @@ class GeneralDirectorService {
       throw new ApiError(400, 'Xác nhận mật khẩu không khớp');
     }
 
-    const normalizedStatus = VALID_STATUSES.includes(status) ? status : 'active';
+    if (status !== undefined && status !== null && !VALID_STATUSES.includes(status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+    const normalizedStatus = status || 'active';
     const passwordHash = bcrypt.hashSync(password, 10);
 
     return this.generalDirectorRepository.createBranchManager({
@@ -189,7 +192,10 @@ class GeneralDirectorService {
       throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
     }
 
-    const normalizedStatus = VALID_STATUSES.includes(status) ? status : 'active';
+    if (status !== undefined && status !== null && !VALID_STATUSES.includes(status)) {
+      throw new ApiError(400, 'Trạng thái không hợp lệ');
+    }
+    const normalizedStatus = status || 'active';
 
     const existing = await this.generalDirectorRepository.getBranchManagerById(id);
     if (!existing) {
