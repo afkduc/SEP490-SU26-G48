@@ -1,4 +1,4 @@
-const test = require('node:test');
+const { test } = require('@jest/globals');
 const assert = require('node:assert/strict');
 const RepairOrderService = require('../../src/application/services/RepairOrderService');
 
@@ -49,6 +49,12 @@ test('getAll returns DTO list for team leader filters', async () => {
   assert.equal(items[0].id, 70);
 });
 
+test('getAll returns an empty list when no repair order matches', async () => {
+  const service = new RepairOrderService({ repairOrderRepository: mockRepo({ findAll: async () => [] }) });
+  const items = await service.getAll({ branchId: 1, teamLeaderId: 8, status: 'completed' });
+  assert.deepEqual(items, []);
+});
+
 test('getById 404 when missing', async () => {
   const service = new RepairOrderService({ repairOrderRepository: mockRepo() });
   await assert.rejects(
@@ -87,4 +93,10 @@ test('searchTechnicians maps sameTeam and busy flags', async () => {
   assert.equal(rows[0].fullName, 'Tho An');
   assert.equal(rows[0].sameTeam, true);
   assert.equal(rows[1].busy, true);
+});
+
+test('searchTechnicians returns an empty list when no technician matches', async () => {
+  const service = new RepairOrderService({ repairOrderRepository: mockRepo({ searchTechnicians: async () => [] }) });
+  const rows = await service.searchTechnicians(8, 1, 'không có');
+  assert.deepEqual(rows, []);
 });
