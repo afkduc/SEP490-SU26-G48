@@ -96,7 +96,7 @@ class AdminUserService {
   async getUserDetail(userId) {
     if (!userId) throw new ApiError(400, 'userId la bat buoc');
     const user = await this.adminUserRepository.findById(Number(userId));
-    if (!user) throw new ApiError(404, 'Nguoi dung khong ton tai');
+    if (!user) throw new ApiError(404, 'Người dùng không tồn tại');
     return user;
   }
 
@@ -389,7 +389,7 @@ class AdminUserService {
     // Kiem tra user ton tai
     const existing = await this.adminUserRepository.findById(Number(userId));
     if (!existing) {
-      throw new ApiError(404, 'Nguoi dung khong ton tai');
+      throw new ApiError(404, 'Người dùng không tồn tại');
     }
 
     // Quyet dinh MK plain text:

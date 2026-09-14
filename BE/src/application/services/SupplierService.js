@@ -26,7 +26,7 @@ class SupplierService {
   async getSupplierById(id) {
     const supplier = await this.supplierRepository.findById(id);
     if (!supplier) {
-      const err = new Error('Supplier not found');
+      const err = new Error('Không tìm thấy nhà cung cấp');
       err.status = 404;
       throw err;
     }
