@@ -39,7 +39,7 @@ class BranchService {
   async getById(id) {
     const branch = await this.branchRepository.findById(Number(id));
     if (!branch) {
-      throw new ApiError(404, 'Chi nhanh khong ton tai');
+      throw new ApiError(404, 'Chi nhánh không tồn tại');
     }
     return branch;
   }
@@ -60,10 +60,10 @@ class BranchService {
     const { branchCode, branchName, address, phone, email, managerId } = payload;
 
     if (!branchCode || !String(branchCode).trim()) {
-      throw new ApiError(400, 'branchCode la bat buoc');
+      throw new ApiError(400, 'Mã chi nhánh là bắt buộc');
     }
     if (branchCode.trim().length > 20) {
-      throw new ApiError(400, 'branchCode toi da 20 ky tu');
+      throw new ApiError(400, 'Mã chi nhánh tối đa 20 ký tự');
     }
 
     const branchNameTrimmed = String(branchName || '').trim().replace(/\s+/g, ' ');
@@ -74,7 +74,7 @@ class BranchService {
 
     const existed = await this.branchRepository.findByCode(branchCode.trim());
     if (existed) {
-      throw new ApiError(409, 'Ma chi nhanh da ton tai');
+      throw new ApiError(409, 'Mã chi nhánh đã tồn tại');
     }
 
     const id = await this.branchRepository.create({
@@ -100,7 +100,7 @@ class BranchService {
   async update(id, payload, req = {}) {
     const existing = await this.branchRepository.findById(Number(id));
     if (!existing) {
-      throw new ApiError(404, 'Chi nhanh khong ton tai');
+      throw new ApiError(404, 'Chi nhánh không tồn tại');
     }
 
     const { branchName, address, phone, email, managerId } = payload;
@@ -138,7 +138,7 @@ class BranchService {
   async deactivate(id, req = {}) {
     const existing = await this.branchRepository.findById(Number(id));
     if (!existing) {
-      throw new ApiError(404, 'Chi nhanh khong ton tai');
+      throw new ApiError(404, 'Chi nhánh không tồn tại');
     }
     const updated = await this.branchRepository.setActive(id, false);
     await auditCrud.update(req, {
@@ -156,7 +156,7 @@ class BranchService {
   async reactivate(id, req = {}) {
     const existing = await this.branchRepository.findById(Number(id));
     if (!existing) {
-      throw new ApiError(404, 'Chi nhanh khong ton tai');
+      throw new ApiError(404, 'Chi nhánh không tồn tại');
     }
     const updated = await this.branchRepository.setActive(id, true);
     await auditCrud.update(req, {
