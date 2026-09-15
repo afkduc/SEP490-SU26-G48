@@ -99,12 +99,12 @@ export default function ForbiddenModal() {
       </div>
       <style>{`
         .modal-overlay {
-          position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+          position: fixed; inset: 0; background: rgba(9,9,11,0.45);
           display: flex; align-items: center; justify-content: center; z-index: 9998;
         }
         .modal-box {
           background: #fff; border-radius: 16px; padding: 28px 28px 24px;
-          box-shadow: 0 24px 60px rgba(15,23,42,0.22); width: 90%;
+          box-shadow: 0 24px 60px rgba(9,9,11,0.22); width: 90%;
         }
         .modal-icon {
           display: inline-flex; align-items: center; justify-content: center;
