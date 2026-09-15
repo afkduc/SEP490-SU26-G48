@@ -49,13 +49,13 @@ class ProductService {
 
   async getProductById(id) {
     const product = await this.productRepository.findById(id);
-    if (!product) throw new ApiError(404, 'Product not found');
+    if (!product) throw new ApiError(404, 'Không tìm thấy phụ tùng');
     return ProductResponseDto.fromEntity(product);
   }
 
   async getProductByCode(code, branchId) {
     const product = await this.productRepository.findByCode(code, branchId);
-    if (!product) throw new ApiError(404, 'Product not found');
+    if (!product) throw new ApiError(404, 'Không tìm thấy phụ tùng');
     return ProductResponseDto.fromEntity(product);
   }
 
@@ -92,20 +92,20 @@ class ProductService {
 
   async createProduct(payload) {
     if (!payload.productName) {
-      throw new ApiError(400, 'Product name is required');
+      throw new ApiError(400, 'Tên phụ tùng không được để trống');
     }
     if (!payload.productCode) {
-      throw new ApiError(400, 'Product code is required');
+      throw new ApiError(400, 'Mã phụ tùng không được để trống');
     }
     if (!payload.branchId) {
-      throw new ApiError(400, 'branchId is required');
+      throw new ApiError(400, 'Vui lòng chọn chi nhánh');
     }
     if (!payload.unitId) {
-      throw new ApiError(400, 'unitId is required');
+      throw new ApiError(400, 'Vui lòng chọn đơn vị');
     }
     const existing = await this.productRepository.findByCode(payload.productCode, payload.branchId);
     if (existing) {
-      throw new ApiError(409, 'Product code already exists in this branch');
+      throw new ApiError(409, 'Mã phụ tùng đã tồn tại trong chi nhánh');
     }
     // Dam bao stock_quantity luon bat dau tu 0 khi tao moi (khi chua co phieu nhap).
     const safePayload = stripStockFields(payload);
@@ -115,14 +115,14 @@ class ProductService {
 
   async updateProduct(id, payload) {
     const existing = await this.productRepository.findById(id);
-    if (!existing) throw new ApiError(404, 'Product not found');
+    if (!existing) throw new ApiError(404, 'Không tìm thấy phụ tùng');
 
     if (payload.productCode && payload.productCode !== existing.productCode) {
       const dup = await this.productRepository.findByCode(
         payload.productCode,
         existing.branchId,
       );
-      if (dup) throw new ApiError(409, 'Product code already exists in this branch');
+      if (dup) throw new ApiError(409, 'Mã phụ tùng đã tồn tại trong chi nhánh');
     }
 
     // Loai bo stock khoi payload de khong cho sua qua API nay.
@@ -134,13 +134,13 @@ class ProductService {
   async deleteProduct(id) {
     // Soft-disable (status=inactive). Giữ tên method để tương thích controller cũ.
     const deactivated = await this.productRepository.delete(id);
-    if (!deactivated) throw new ApiError(404, 'Product not found');
+    if (!deactivated) throw new ApiError(404, 'Không tìm thấy phụ tùng');
     return ProductResponseDto.fromEntity(deactivated);
   }
 
   async reactivateProduct(id) {
     const product = await this.productRepository.reactivate(id);
-    if (!product) throw new ApiError(404, 'Product not found');
+    if (!product) throw new ApiError(404, 'Không tìm thấy phụ tùng');
     return ProductResponseDto.fromEntity(product);
   }
 

@@ -65,15 +65,19 @@ class CustomerService {
       throw new ApiError(409, `Số điện thoại ${phone} đã thuộc khách hàng "${other.fullName}" (${other.customerCode || other.id})`);
     }
 
-    return this.customerRepository.update(id, {
+    // Chi chuan hoa truong nao CO gui len - khong tu them key null vao payload
+    // (repository da tu quy ve NULL khi trong).
+    const normalized = {
       ...data,
       fullName: String(data.fullName).trim().replace(/\s+/g, ' '),
       phone,
-      cccd: data.cccd ? String(data.cccd).trim() : null,
-      email: data.email ? String(data.email).trim() : null,
-      address: data.address ? String(data.address).trim() : null,
-      dateOfBirth: data.dateOfBirth || null,
-    });
+    };
+    for (const key of ['cccd', 'email', 'address']) {
+      if (key in data) normalized[key] = data[key] ? String(data[key]).trim() : null;
+    }
+    if ('dateOfBirth' in data) normalized.dateOfBirth = data.dateOfBirth || null;
+
+    return this.customerRepository.update(id, normalized);
   }
 
   // Them 1 xe cho khach da co - thay cho viec phai chen thang vao DB.

@@ -8,7 +8,7 @@ class InventoryService {
   }
 
   async getStockList({ branchId, search, category, lowStockOnly, page, limit } = {}) {
-    if (!branchId) throw new ApiError(400, 'branchId is required');
+    if (!branchId) throw new ApiError(400, 'Tài khoản chưa được gán chi nhánh');
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const [items, total] = await Promise.all([
@@ -36,7 +36,7 @@ class InventoryService {
     if (!productId) throw new ApiError(400, 'productId is required');
     if (!branchId) throw new ApiError(400, 'branchId is required');
     const product = await this.inventoryRepository.getStockByProduct(productId, branchId);
-    if (!product) throw new ApiError(404, 'Product not found in this branch');
+    if (!product) throw new ApiError(404, 'Không tìm thấy phụ tùng trong chi nhánh');
     return InventoryResponseDto.fromEntity(product);
   }
 
@@ -50,7 +50,7 @@ class InventoryService {
     // This avoids the read-modify-write race condition.
     const result = await this.inventoryRepository.adjustStock(productId, branchId, quantity, options);
     if (!result) {
-      throw new ApiError(404, 'Product not found in this branch or stock would go negative');
+      throw new ApiError(404, 'Không tìm thấy phụ tùng trong chi nhánh hoặc số lượng tồn không đủ');
     }
     return InventoryResponseDto.fromEntity(result);
   }

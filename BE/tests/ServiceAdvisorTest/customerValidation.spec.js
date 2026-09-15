@@ -1,4 +1,4 @@
-const test = require('node:test');
+const { test } = require('@jest/globals');
 const assert = require('node:assert/strict');
 const { getCustomerFieldErrors } = require('../../src/application/services/customerValidation');
 const CustomerService = require('../../src/application/services/CustomerService');

@@ -165,7 +165,9 @@ class ManagerImportRequestController {
    */
   markSeen = async (req, res, next) => {
     try {
-      await this.importRequestService.markSeenByManager(req.params.id);
+      await this.importRequestService.markSeenByManager(req.params.id, {
+        branchId: getManagerBranchScope(req.user),
+      });
       return success(res, { id: Number(req.params.id) }, 'Da danh dau da xem');
     } catch (err) {
       next(err);

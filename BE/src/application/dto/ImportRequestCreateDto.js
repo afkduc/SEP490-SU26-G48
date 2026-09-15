@@ -16,12 +16,12 @@ function validateCreateImportRequest(payload) {
 
   const branchId = Number(payload.branchId ?? payload.branch_id);
   if (!Number.isFinite(branchId) || branchId <= 0) {
-    throw new ApiError(400, 'branchId khong hop le');
+    throw new ApiError(400, 'Vui lòng chọn chi nhánh');
   }
 
   const requestedBy = Number(payload.requestedBy ?? payload.requested_by);
   if (!Number.isFinite(requestedBy) || requestedBy <= 0) {
-    throw new ApiError(400, 'requestedBy khong hop le');
+    throw new ApiError(400, 'Không xác định được người nhập kho');
   }
 
   const supplierIdRaw = payload.supplierId ?? payload.supplier_id;
@@ -29,14 +29,14 @@ function validateCreateImportRequest(payload) {
     ? null
     : Number(supplierIdRaw);
   if (supplierId !== null && !Number.isFinite(supplierId)) {
-    throw new ApiError(400, 'supplierId khong hop le');
+    throw new ApiError(400, 'Nhà cung cấp không hợp lệ');
   }
 
   const supplierInvoiceNo = String(
     payload.supplierInvoiceNo ?? payload.supplier_invoice_no ?? '',
   ).trim();
   if (!supplierInvoiceNo) {
-    throw new ApiError(400, 'So hoa don nha cung cap khong duoc trong');
+    throw new ApiError(400, 'Số hóa đơn nhà cung cấp không được để trống');
   }
   if (supplierInvoiceNo.length > 50) {
     throw new ApiError(400, 'supplierInvoiceNo qua dai (max 50 ky tu)');
@@ -52,7 +52,7 @@ function validateCreateImportRequest(payload) {
 
   const itemsRaw = Array.isArray(payload.items) ? payload.items : [];
   if (itemsRaw.length === 0) {
-    throw new ApiError(400, 'Phieu nhap phai co it nhat 1 dong');
+    throw new ApiError(400, 'Phiếu nhập phải có ít nhất 1 phụ tùng');
   }
   if (itemsRaw.length > 50) {
     throw new ApiError(400, 'Toi da 50 dong moi phieu');
@@ -65,13 +65,13 @@ function validateCreateImportRequest(payload) {
     const quantity = Number(raw.quantity);
 
     if (!productCode) {
-      throw new ApiError(400, `Dong ${idx + 1}: productCode khong duoc trong`);
+      throw new ApiError(400, `Dòng ${idx + 1}: mã phụ tùng không được để trống`);
     }
     if (!productName) {
-      throw new ApiError(400, `Dong ${idx + 1}: productName khong duoc trong`);
+      throw new ApiError(400, `Dòng ${idx + 1}: tên phụ tùng không được để trống`);
     }
     if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
-      throw new ApiError(400, `Dong ${idx + 1}: quantity phai la so nguyen duong`);
+      throw new ApiError(400, `Dòng ${idx + 1}: số lượng phải là số nguyên dương`);
     }
 
     const normalizedProductId = Number(productId);

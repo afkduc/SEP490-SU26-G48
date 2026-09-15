@@ -40,6 +40,16 @@ const SignaturePad = forwardRef(function SignaturePad({ onChange }, ref) {
     onChange?.(empty);
   };
 
+  // Modal ky KHONG co nut X, khong dong khi bam ra ngoai: khach ky xong phai
+  // tu bam "Luu chu ky" - do la hanh dong xac nhan cua khach, nhu dat but ky
+  // xong roi dua lai to giay. Bam X hay cham nham ra ngoai ma modal tat thi
+  // khong ro chu ky da duoc ghi nhan chua. Canvas trong ma bam Luu thi chi
+  // dong modal (o xem truoc van "Nhan de ky ten"), khong bat ky.
+  const luuChuKy = () => {
+    syncFromCanvas();
+    setZoomed(false);
+  };
+
   return (
     <>
       <div
@@ -59,30 +69,30 @@ const SignaturePad = forwardRef(function SignaturePad({ onChange }, ref) {
 
       {createPortal(
         <div
-          onClick={() => setZoomed(false)}
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000,
             display: zoomed ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: 16, maxWidth: 'calc(100vw - 32px)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Ký xác nhận</span>
-              <button type="button" className="modal-close" onClick={() => setZoomed(false)}>✕</button>
-            </div>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 16, maxWidth: 'calc(100vw - 32px)' }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Ký xác nhận</div>
             <div style={{ border: '1px dashed var(--gray-300)', borderRadius: 8, touchAction: 'none', width: 'fit-content' }}>
               <SignatureCanvas
                 ref={sigRef}
                 penColor="#111827"
                 backgroundColor="#ffffff"
                 canvasProps={{ width: canvasSize.width, height: canvasSize.height }}
-                onEnd={syncFromCanvas}
               />
             </div>
-            <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 8 }}
-              onClick={() => { sigRef.current?.clear(); syncFromCanvas(); }}>
-              Xoá
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+              <button type="button" className="btn btn-secondary btn-sm"
+                onClick={() => { sigRef.current?.clear(); syncFromCanvas(); }}>
+                Xoá
+              </button>
+              <button type="button" className="btn btn-primary" onClick={luuChuKy}>
+                Lưu chữ ký
+              </button>
+            </div>
           </div>
         </div>,
         document.body
