@@ -41,6 +41,17 @@ export async function getProductByIdApi(id) {
   return httpClient.get(`/products/${id}`);
 }
 
+/**
+ * Lich su bien dong ton kho cua 1 phu tung (bieu do o trang chi tiet).
+ * BE: GET /api/products/:id/stock-history ->
+ *   { productId, currentStock, openingStock,
+ *     events: [{ id, type: 'import'|'export'|'return', quantity, delta, balanceAfter,
+ *                slipCode, happenedAt, happenedAtLabel, performedByName }] }
+ */
+export async function getProductStockHistoryApi(id) {
+  return httpClient.get(`/products/${id}/stock-history`);
+}
+
 export async function createProductApi(payload) {
   return httpClient.post('/products', stripStock(payload));
 }

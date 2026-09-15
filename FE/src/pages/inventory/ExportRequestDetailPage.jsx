@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useExportRequestDetail } from '../../hooks/inventory/useExportRequestDetail';
+import ExportPickupHistoryModal from './ExportPickupHistoryModal';
 import './ExportRequestDetailPage.css';
 
 const STATUS_META = {
@@ -24,6 +26,7 @@ function InfoRow({ label, value }) {
 export default function ExportRequestDetailPage() {
   const { id } = useParams();
   const { data, loading, error } = useExportRequestDetail(id);
+  const [showHistory, setShowHistory] = useState(false);
 
   if (loading) return <div className="er-detail__loading">Đang tải...</div>;
   if (error) return <div className="er-detail__error">Lỗi: {error}</div>;
@@ -31,7 +34,6 @@ export default function ExportRequestDetailPage() {
 
   const meta = STATUS_META[data.status] || { label: data.status, className: '' };
   const items = data.items || [];
-  const totalQty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
 
   return (
     <div className="er-detail">
@@ -53,9 +55,9 @@ export default function ExportRequestDetailPage() {
         <div className="er-detail__section">
           <h2 className="er-detail__section-title">Thông tin chung</h2>
           <dl className="info-list">
-            <InfoRow label="Mã phiếu xuất" value={data.requestCode} />
+            {/* Ma phieu xuat = ma lenh sua chua (1 ma di cung phieu tu dau den
+                cuoi), da hien o tieu de - chi giu 1 dong tham chieu o day. */}
             <InfoRow label="Lệnh sửa chữa" value={data.repairOrderCode} />
-            <InfoRow label="Phiếu sửa chữa" value={data.repairOrderCode} />
             <InfoRow label="Khách hàng" value={data.customerName} />
             <InfoRow label="Xe" value={data.vehiclePlate} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
@@ -65,9 +67,15 @@ export default function ExportRequestDetailPage() {
         </div>
 
         <div className="er-detail__section">
-          <h2 className="er-detail__section-title">
-            Danh sách phụ tùng ({items.length} dòng, tổng SL: {totalQty})
-          </h2>
+          <div className="er-detail__section-head">
+            <h2 className="er-detail__section-title">
+              Danh sách phụ tùng ({items.length} dòng)
+            </h2>
+            {/* Bang duoi la so cong don MOI NHAT; lich su xem tung lan da luu. */}
+            <button type="button" className="btn btn--secondary btn--sm" onClick={() => setShowHistory(true)}>
+              Lịch sử lưu phiếu
+            </button>
+          </div>
           {items.length === 0 ? (
             <p className="er-detail__empty">Phiếu không có dòng phụ tùng nào.</p>
           ) : (
@@ -93,12 +101,6 @@ export default function ExportRequestDetailPage() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={4} className="text-right"><strong>Tổng cộng</strong></td>
-                    <td className="text-right"><strong>{totalQty}</strong></td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           )}
@@ -129,6 +131,14 @@ export default function ExportRequestDetailPage() {
            </div>
         )}
       </div>
+
+      {showHistory && (
+        <ExportPickupHistoryModal
+          exportRequestId={data.id}
+          repairOrderCode={data.requestCode}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 const ApiError = require('../../utils/ApiError');
 const { normalizeVietnamese } = require('../../utils/vietnamese');
 const { parseCustomerImportFile } = require('./customerImportParser');
+const { getCustomerFieldErrors, getVehicleFieldErrors, normalizePlate } = require('./customerValidation');
+const { phoneDigitsOnly } = require('../../utils/fieldValidation');
 
 class CustomerService {
   constructor({ customerRepository }) {
@@ -49,16 +51,49 @@ class CustomerService {
   }
 
   async update(id, data) {
-    if (!data.fullName || !data.fullName.trim()) {
-      throw new ApiError(400, 'Họ và tên không được để trống');
-    }
-    if (!data.phone || !data.phone.trim()) {
-      throw new ApiError(400, 'Số điện thoại không được để trống');
-    }
+    const errors = getCustomerFieldErrors(data);
+    if (errors.length) throw new ApiError(400, errors.join('. '));
+
     const existing = await this.customerRepository.findByIdWithDetails(id);
     if (!existing) throw new ApiError(404, 'Không tìm thấy khách hàng');
 
-    return this.customerRepository.update(id, data);
+    // SDT la khoa nhan dien khach (import Excel + tao phieu quyet toan deu
+    // tim khach theo SDT) nen KHONG duoc doi sang SDT cua khach khac.
+    const phone = phoneDigitsOnly(data.phone);
+    const other = await this.customerRepository.findByPhone(phone);
+    if (other && String(other.id) !== String(id)) {
+      throw new ApiError(409, `Số điện thoại ${phone} đã thuộc khách hàng "${other.fullName}" (${other.customerCode || other.id})`);
+    }
+
+    return this.customerRepository.update(id, {
+      ...data,
+      fullName: String(data.fullName).trim().replace(/\s+/g, ' '),
+      phone,
+      cccd: data.cccd ? String(data.cccd).trim() : null,
+      email: data.email ? String(data.email).trim() : null,
+      address: data.address ? String(data.address).trim() : null,
+      dateOfBirth: data.dateOfBirth || null,
+    });
+  }
+
+  // Them 1 xe cho khach da co - thay cho viec phai chen thang vao DB.
+  async addVehicle(customerId, data) {
+    const errors = getVehicleFieldErrors(data);
+    if (errors.length) throw new ApiError(400, errors.join('. '));
+
+    const existing = await this.customerRepository.findByIdWithDetails(customerId);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy khách hàng');
+
+    const toOptionalUpper = (v) => (v ? String(v).trim().toUpperCase() : null);
+    return this.customerRepository.addVehicle(Number(customerId), {
+      licensePlate: normalizePlate(data.licensePlate),
+      modelId: Number(data.modelId),
+      frameNumber: toOptionalUpper(data.frameNumber),
+      engineNumber: toOptionalUpper(data.engineNumber),
+      manufactureYear: data.manufactureYear === '' || data.manufactureYear == null ? null : Number(data.manufactureYear),
+      color: data.color ? String(data.color).trim() : null,
+      currentKm: data.currentKm === '' || data.currentKm == null ? 0 : Number(data.currentKm),
+    });
   }
 
   // Import khach hang + xe tu file Excel: moi dong = 1 khach hang + 1 xe.

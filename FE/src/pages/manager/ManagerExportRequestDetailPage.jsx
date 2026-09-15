@@ -40,7 +40,6 @@ export default function ManagerExportRequestDetailPage() {
   if (!data) return null;
 
   const items = data.items || [];
-  const totalQty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
 
   return (
     <div className="mer-detail">
@@ -61,8 +60,8 @@ export default function ManagerExportRequestDetailPage() {
         <div className="mer-detail__section">
           <h2 className="mer-detail__section-title">Thông tin chung</h2>
           <dl className="info-list">
-            <InfoRow label="Mã phiếu xuất" value={data.requestCode} />
-            <InfoRow label="Phiếu sửa chữa" value={data.repairOrderCode} />
+            {/* Ma phieu xuat = ma lenh sua chua, da hien o tieu de - giu 1 dong. */}
+            <InfoRow label="Lệnh sửa chữa" value={data.repairOrderCode} />
             <InfoRow label="Khách hàng" value={data.customerName} />
             <InfoRow label="Xe" value={data.vehiclePlate} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
@@ -73,7 +72,7 @@ export default function ManagerExportRequestDetailPage() {
 
         <div className="mer-detail__section">
           <h2 className="mer-detail__section-title">
-            Danh sách phụ tùng ({items.length} dòng, tổng SL: {totalQty})
+            Danh sách phụ tùng ({items.length} dòng)
           </h2>
           {items.length === 0 ? (
             <p className="mer-detail__empty">Phiếu không có dòng phụ tùng nào.</p>
@@ -100,12 +99,6 @@ export default function ManagerExportRequestDetailPage() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={4} className="text-right"><strong>Tổng cộng</strong></td>
-                    <td className="text-right"><strong>{totalQty}</strong></td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           )}

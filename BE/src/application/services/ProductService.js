@@ -8,6 +8,19 @@ const ProductResponseDto = require('../dto/ProductResponseDto');
  */
 const STOCK_FIELDS_NOT_ALLOWED = ['stockQuantity', 'stock_quantity'];
 
+// dd/mm/yyyy HH:mm - dung getter UTC vi mssql (useUTC) doc cot datetime theo
+// truc UTC cua JS Date, giong cac DTO khac trong du an.
+function toDDMMYYYYHHmm(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mi = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${dd}/${mm}/${d.getUTCFullYear()} ${hh}:${mi}`;
+}
+
 function stripStockFields(payload) {
   const out = { ...payload };
   for (const f of STOCK_FIELDS_NOT_ALLOWED) {
@@ -44,6 +57,37 @@ class ProductService {
     const product = await this.productRepository.findByCode(code, branchId);
     if (!product) throw new ApiError(404, 'Product not found');
     return ProductResponseDto.fromEntity(product);
+  }
+
+  // Bien dong ton kho cua 1 phu tung: tung giao dich nhap (+), hoan (+),
+  // xuat (-) kem so du SAU giao dich do. So du tinh NGUOC tu ton hien tai
+  // (nguon chan ly) tru dan cac giao dich, khong tin 1 so "ton ban dau" nao
+  // ca - vi ton kho co the da bi chinh tay ngoai so cai o giai doan seed.
+  async getStockHistory(id) {
+    const product = await this.productRepository.findById(id);
+    if (!product) throw new ApiError(404, 'Product not found');
+
+    const events = await this.productRepository.findStockHistory(Number(id));
+    const currentStock = Number(product.stockQuantity) || 0;
+
+    const signed = events.map((e) => ({
+      ...e,
+      delta: e.type === 'export' ? -e.quantity : e.quantity,
+    }));
+    const totalDelta = signed.reduce((s, e) => s + e.delta, 0);
+    let balance = currentStock - totalDelta;
+    const openingStock = balance;
+    const withBalance = signed.map((e) => {
+      balance += e.delta;
+      return { ...e, balanceAfter: balance, happenedAtLabel: toDDMMYYYYHHmm(e.happenedAt) };
+    });
+
+    return {
+      productId: product.id,
+      currentStock,
+      openingStock,
+      events: withBalance,
+    };
   }
 
   async createProduct(payload) {

@@ -8,6 +8,20 @@ export async function listVehicleModelsApi() {
   return httpClient.get('/vehicles/models');
 }
 
+// 3 phan khuc dang co (Sedan/Hatchback, SUV/Crossover, Pickup Truck) - lam
+// dropdown khi them dong xe moi.
+export async function listVehicleSegmentsApi() {
+  return httpClient.get('/vehicles/models/segments');
+}
+
+/**
+ * Them dong xe moi vao danh muc (Manager). BE: POST /api/vehicles/models
+ * payload: { modelLine, generationCode, trimName, segment, displayName }
+ */
+export async function createVehicleModelApi(data) {
+  return httpClient.post('/vehicles/models', data);
+}
+
 export async function searchVehiclesApi(term) {
   return httpClient.get(`/vehicles/search?q=${encodeURIComponent(term)}`); // mảng { customerId, fullName, ..., vehicleId, licensePlate, ... }
 }

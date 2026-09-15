@@ -4,6 +4,7 @@ const ExportRequest = require('../../domain/entities/ExportRequest');
 const ExportRequestItem = require('../../domain/entities/ExportRequestItem');
 const { query } = require('../database/sqlServer');
 const ApiError = require('../../utils/ApiError');
+const { toDDMMYYYYHHmm } = require('../../application/dto/ExportRequestResponseDto');
 
 // Chi con thao tac kho (xuat them / tra hang) khi Lenh sua chua CHUA chot -
 // dung dung 2 trang thai ma CVDV con sua duoc phieu quyet toan (xem
@@ -663,7 +664,9 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
 
   /**
    * Lich su cac lan lay hang / tra hang cua 1 phieu xuat (kem chu ky tung lan
-   * va chi tiet phu tung cua lan do).
+   * va chi tiet phu tung cua lan do). Moi lan NV Kho bam "Xac nhan xuat/tra"
+   * la 1 ban ghi (export_request_pickups) - seq danh so theo thu tu thoi gian
+   * (lan 1 = lan dau tien), tra ve MOI NHAT truoc de FE hien lich su.
    */
   async findPickups(exportRequestId) {
     const result = await query(
@@ -671,10 +674,12 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          pk.id, pk.signed_at, pk.signature_data,
          COALESCE(NULLIF(LTRIM(RTRIM(u.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u.first_name, N'') + N' ' + ISNULL(u.last_name, N''))), N''), u.pseudo_id) AS received_by_name,
          u.pseudo_id AS received_by_code,
-         it.transaction_type, it.quantity,
+         COALESCE(NULLIF(LTRIM(RTRIM(pf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(pf.first_name, N'') + N' ' + ISNULL(pf.last_name, N''))), N''), pf.pseudo_id) AS performed_by_name,
+         it.transaction_type, it.quantity, it.transaction_code,
          it.product_id, p.product_code, p.product_name, un.unit_name
        FROM export_request_pickups pk
        LEFT JOIN users u ON u.id = pk.received_by
+       LEFT JOIN users pf ON pf.id = pk.performed_by
        LEFT JOIN inventory_transactions it ON it.pickup_id = pk.id
        LEFT JOIN products p ON p.id = it.product_id
        LEFT JOIN units un ON un.id = p.unit_id
@@ -688,25 +693,35 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       if (!byPickup.has(r.id)) {
         byPickup.set(r.id, {
           id: r.id,
+          seq: byPickup.size + 1,
           signedAt: r.signed_at,
+          signedAtLabel: toDDMMYYYYHHmm(r.signed_at),
           signatureData: r.signature_data,
           receivedByName: r.received_by_name,
           receivedByCode: r.received_by_code,
+          performedByName: r.performed_by_name,
+          exportQuantity: 0,
+          returnQuantity: 0,
           lines: [],
         });
       }
       if (r.product_id) {
-        byPickup.get(r.id).lines.push({
+        const pickup = byPickup.get(r.id);
+        const quantity = Number(r.quantity) || 0;
+        if (r.transaction_type === 'return') pickup.returnQuantity += quantity;
+        else pickup.exportQuantity += quantity;
+        pickup.lines.push({
           productId: r.product_id,
           productCode: r.product_code,
           productName: r.product_name,
           unit: r.unit_name,
-          quantity: Number(r.quantity) || 0,
+          quantity,
           type: r.transaction_type,
+          transactionCode: r.transaction_code,
         });
       }
     }
-    return [...byPickup.values()];
+    return [...byPickup.values()].reverse();
   }
 
   /**

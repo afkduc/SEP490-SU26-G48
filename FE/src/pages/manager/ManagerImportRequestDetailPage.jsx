@@ -40,7 +40,6 @@ export default function ManagerImportRequestDetailPage() {
   if (!data) return null;
 
   const items = data.items || [];
-  const totalQty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
 
   return (
     <div className="mir-detail">
@@ -72,7 +71,7 @@ export default function ManagerImportRequestDetailPage() {
 
         <div className="mir-detail__section">
           <h2 className="mir-detail__section-title">
-            Danh sách phụ tùng ({items.length} dòng, tổng SL: {totalQty})
+            Danh sách phụ tùng ({items.length} dòng)
           </h2>
           {items.length === 0 ? (
             <p className="mir-detail__empty">Phiếu không có dòng phụ tùng nào.</p>
@@ -99,12 +98,6 @@ export default function ManagerImportRequestDetailPage() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={4} className="text-right"><strong>Tổng cộng</strong></td>
-                    <td className="text-right"><strong>{totalQty}</strong></td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           )}
