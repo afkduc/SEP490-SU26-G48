@@ -5,15 +5,15 @@ import { formatCurrency, formatDateTime } from '../../utils';
 // thu theo thang) - tranh import vong (ManagerPage da import ManagerDashboardPage).
 
 export const SETTLEMENT_STATUS_META = {
-  waiting_repair: { label: 'Chờ sửa chữa', color: '#E65100', background: '#FFF3E0' },
-  inprogress: { label: 'Đang sửa chữa', color: '#1565C0', background: '#E3F2FD' },
-  waiting_payment: { label: 'Chờ thanh toán', color: '#2E7D32', background: '#E8F5E9' },
+  waiting_repair: { label: 'Chờ sửa chữa', color: '#52525b', background: '#f4f4f5' },
+  inprogress: { label: 'Đang sửa chữa', color: '#3f3f46', background: '#e4e4e7' },
+  waiting_payment: { label: 'Chờ thanh toán', color: '#3f3f46', background: '#e4e4e7' },
   invoiced: { label: 'Đã xuất hóa đơn', color: '#424242', background: '#F5F5F5' },
-  cancelled: { label: 'Đã hủy', color: '#B91C1C', background: '#FEF2F2' },
+  cancelled: { label: 'Đã hủy', color: '#27272a', background: '#e4e4e7' },
 };
 
 export function settlementStatusBadge(status) {
-  return SETTLEMENT_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
+  return SETTLEMENT_STATUS_META[status] || { label: status || 'Không rõ', color: '#3f3f46', background: '#f4f4f5' };
 }
 
 function DetailRow({ label, value }) {
@@ -41,7 +41,7 @@ export default function SettlementDetailModal({ report, onClose }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
             <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 12, color: '#54708A' }}>Mã phiếu</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{report.code}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#18181b', marginTop: 4 }}>{report.code}</div>
             </div>
             <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 12, color: '#6B7280' }}>Chi nhánh</div>
@@ -159,7 +159,7 @@ export default function SettlementDetailModal({ report, onClose }) {
               <DetailRow label="Thuế GTGT" value={formatCurrency(report.vat)} />
               <DetailRow label="Miễn phí" value={formatCurrency(report.freeAmount)} />
             </div>
-            <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', borderRadius: 12, padding: 16, color: 'white' }}>
+            <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', borderRadius: 12, padding: 16, color: 'white' }}>
               <div style={{ fontSize: 13, opacity: 0.8 }}>Tổng thanh toán</div>
               <div style={{ fontSize: 28, fontWeight: 900, margin: '8px 0 6px' }}>{formatCurrency(report.total)}</div>
               <div style={{ fontSize: 12, opacity: 0.75 }}>Dữ liệu lấy trực tiếp từ SQL Server.</div>

@@ -19,7 +19,7 @@
   margin: 0 auto;
   padding: 48px;
   border-radius: 24px;
-  background: linear-gradient(120deg, #fdf1ea, #fbe6da 60%, #fdf1ea);
+  background: linear-gradient(120deg, #f4f4f5, #f4f4f5 60%, #f4f4f5);
   border: 1px solid var(--border);
 }
 
@@ -55,7 +55,7 @@
   font-weight: 700;
   font-size: 15px;
   white-space: nowrap;
-  box-shadow: 0 12px 30px -10px rgba(200, 55, 44, 0.45);
+  box-shadow: 0 12px 30px -10px rgba(24, 24, 27, 0.45);
   transition: transform 0.2s ease;
 }
 

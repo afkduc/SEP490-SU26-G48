@@ -28,9 +28,9 @@
   color: var(--gray-600);
 }
 
-.sr-stat--pending { border-left-color: #e65100; }
+.sr-stat--pending { border-left-color: #52525b; }
 .sr-stat--accepted { border-left-color: #1b5e20; }
-.sr-stat--cancelled { border-left-color: #c62828; }
+.sr-stat--cancelled { border-left-color: #27272a; }
 
 @media (max-width: 720px) {
   .sr-stats {
@@ -108,7 +108,7 @@
 }
 
 .sr-appt--cancelled {
-  background: #fef2f2;
+  background: #e4e4e7;
   color: #991b1b;
 }
 
@@ -123,7 +123,7 @@
 }
 
 .sr-btn-success {
-  background-color: #16a34a;
+  background-color: #3f3f46;
   color: #fff;
 }
 

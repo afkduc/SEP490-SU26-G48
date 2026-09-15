@@ -3,9 +3,9 @@
    Scope trong .mir-detail, cùng pattern với ImportRequestDetailPage (kho).
 ============================================================ */
 .mir-detail {
-  --md-primary: #4f46e5;
+  --md-primary: #18181b;
   --md-on-primary: #ffffff;
-  --md-primary-container: #e0e7ff;
+  --md-primary-container: #e4e4e7;
   --md-on-primary-container: #1e1b4b;
   --md-surface: #ffffff;
   --md-surface-variant: #f4f4fb;
@@ -228,7 +228,7 @@
 }
 .mir-detail .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .mir-detail .btn--ghost { background: transparent; color: var(--md-primary); padding: 0 12px; }
-.mir-detail .btn--ghost:hover:not(:disabled) { background-color: rgba(79, 70, 229, 0.08); }
+.mir-detail .btn--ghost:hover:not(:disabled) { background-color: rgba(24, 24, 27, 0.08); }
 .mir-detail .btn--success { background: var(--md-success); color: #ffffff; box-shadow: var(--md-elevation-1); }
 .mir-detail .btn--success:hover:not(:disabled) { box-shadow: var(--md-elevation-2); }
 .mir-detail .btn--danger { background: var(--md-error); color: #ffffff; box-shadow: var(--md-elevation-1); }

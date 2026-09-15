@@ -37,7 +37,7 @@
 }
 
 .submit:hover {
-  background: #a92a21;
+  background: #27272a;
 }
 
 .submit:disabled {
@@ -47,7 +47,7 @@
 
 .error {
   margin-top: 16px;
-  color: #b3261e;
+  color: #27272a;
   font-size: 14px;
   text-align: left;
 }

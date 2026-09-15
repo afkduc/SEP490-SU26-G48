@@ -5,9 +5,9 @@
 ============================================================ */
 .part-list {
   /* MD3 color roles (map từ indigo hệ thống) */
-  --md-primary: #4f46e5;
+  --md-primary: #18181b;
   --md-on-primary: #ffffff;
-  --md-primary-container: #e0e7ff;
+  --md-primary-container: #e4e4e7;
   --md-on-primary-container: #1e1b4b;
   --md-surface: #ffffff;
   --md-surface-variant: #f4f4fb;

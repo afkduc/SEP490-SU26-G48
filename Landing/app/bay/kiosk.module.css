@@ -93,8 +93,8 @@
 .leaderName { font-size: 22px; font-weight: 800; color: var(--accent); }
 
 .error {
-  background: #fdecea;
-  border: 1px solid #f3c1bb;
+  background: #e4e4e7;
+  border: 1px solid #a1a1aa;
   color: var(--accent);
   border-radius: 10px;
   padding: 12px 16px;
@@ -285,7 +285,7 @@
   cursor: pointer;
 }
 .task input { width: 22px; height: 22px; accent-color: var(--success); flex-shrink: 0; }
-.taskDone { background: #e6f4ea; color: var(--success); }
+.taskDone { background: #e4e4e7; color: var(--success); }
 /* text-decoration KHONG dat o day - de rieng cho span ten trong TaskNameLabel
    (BayScreen.jsx), tranh gach ngang lan qua ca phan "(Khách hủy)". */
 .taskCancelled { color: var(--text-muted); }
@@ -308,8 +308,8 @@
 .taskResultOk { font-size: 13px; font-weight: 700; color: var(--success); }
 .taskResultNg { font-size: 13px; font-weight: 700; color: var(--accent); white-space: normal; overflow-wrap: anywhere; }
 /* Dau muc Khong dat dang di den dau: tho bao -> to truong -> co van -> khach. */
-.taskNgFlow { font-size: 12px; font-weight: 600; color: #94a3b8; white-space: normal; overflow-wrap: anywhere; }
-.taskNgOk { font-size: 12px; font-weight: 700; color: #4ade80; white-space: normal; overflow-wrap: anywhere; }
+.taskNgFlow { font-size: 12px; font-weight: 600; color: #a1a1aa; white-space: normal; overflow-wrap: anywhere; }
+.taskNgOk { font-size: 12px; font-weight: 700; color: #3f3f46; white-space: normal; overflow-wrap: anywhere; }
 
 /* Nhom cong viec cua bieu mau (5 nhom + "Hang muc khac"). */
 .taskGroup { display: flex; flex-direction: column; gap: 8px; }
@@ -389,8 +389,8 @@
   font-size: 11px;
   font-weight: 700;
 }
-.intakeBadgeOk { background: #e6f4ea; color: var(--success); }
-.intakeBadgeNg { background: #fdeaea; color: #c0392b; }
+.intakeBadgeOk { background: #e4e4e7; color: var(--success); }
+.intakeBadgeNg { background: #e4e4e7; color: #27272a; }
 .intakeBadgeMuted { background: var(--bg-alt); color: var(--text-muted); }
 .intakeBadgeEmpty { font-size: 12px; color: var(--text-muted); }
 .intakeNoteText { font-size: 13px; color: var(--text); white-space: pre-wrap; }
@@ -418,7 +418,7 @@
   padding: 14px 16px;
   border-radius: 10px;
   border: 1px dashed var(--success);
-  background: #e6f4ea;
+  background: #e4e4e7;
   color: var(--success);
   font-size: 15px;
   font-weight: 700;

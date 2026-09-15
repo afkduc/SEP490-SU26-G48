@@ -85,10 +85,10 @@ const ICONS = {
 };
 
 const STYLES = {
-  success: { bg: '#f0fdf4', border: '#16a34a', color: '#15803d', iconColor: '#16a34a' },
-  error:   { bg: '#fef2f2', border: '#dc2626', color: '#b91c1c', iconColor: '#dc2626' },
-  warning: { bg: '#fffbeb', border: '#d97706', color: '#b45309', iconColor: '#d97706' },
-  info:    { bg: '#eff6ff', border: '#3b82f6', color: '#1d4ed8', iconColor: '#3b82f6' },
+  success: { bg: '#f0fdf4', border: '#3f3f46', color: '#3f3f46', iconColor: '#3f3f46' },
+  error:   { bg: '#e4e4e7', border: '#27272a', color: '#27272a', iconColor: '#27272a' },
+  warning: { bg: '#fffbeb', border: '#52525b', color: '#52525b', iconColor: '#52525b' },
+  info:    { bg: '#eff6ff', border: '#3f3f46', color: '#3f3f46', iconColor: '#3f3f46' },
 };
 
 function ToastItem({ toast, onRemove }) {

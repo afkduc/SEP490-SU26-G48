@@ -52,10 +52,10 @@ export function useConfirm() {
 }
 
 const TONES = {
-  primary: { bg: '#eff6ff', color: '#2563eb', btn: '#2563eb' },
-  danger: { bg: '#fee2e2', color: '#dc2626', btn: '#dc2626' },
-  warning: { bg: '#fffbeb', color: '#d97706', btn: '#d97706' },
-  success: { bg: '#f0fdf4', color: '#16a34a', btn: '#16a34a' },
+  primary: { bg: '#eff6ff', color: '#3f3f46', btn: '#3f3f46' },
+  danger: { bg: '#e4e4e7', color: '#27272a', btn: '#27272a' },
+  warning: { bg: '#fffbeb', color: '#52525b', btn: '#52525b' },
+  success: { bg: '#f0fdf4', color: '#3f3f46', btn: '#3f3f46' },
 };
 
 const ICONS = {
@@ -192,33 +192,33 @@ function ConfirmBox({ dialog, onClose }) {
           display: inline-flex; align-items: center; justify-content: center;
           width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
         }
-        .agc-confirm__title { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; }
+        .agc-confirm__title { margin: 0; font-size: 16px; font-weight: 700; color: #18181b; }
         .agc-confirm__message {
-          font-size: 14px; color: #334155; line-height: 1.55; white-space: pre-line;
+          font-size: 14px; color: #3f3f46; line-height: 1.55; white-space: pre-line;
         }
         .agc-confirm__detail {
           margin-top: 8px; padding: 8px 10px; border-radius: 8px;
-          background: #f8fafc; border: 1px solid #e2e8f0;
-          font-size: 13px; color: #475569; line-height: 1.5; white-space: pre-line;
+          background: #fafafa; border: 1px solid #e4e4e7;
+          font-size: 13px; color: #52525b; line-height: 1.5; white-space: pre-line;
         }
         .agc-confirm__field { display: block; margin-top: 12px; }
-        .agc-confirm__label { display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 4px; }
+        .agc-confirm__label { display: block; font-size: 13px; font-weight: 600; color: #3f3f46; margin-bottom: 4px; }
         .agc-confirm__field textarea, .agc-confirm__field input {
           width: 100%; box-sizing: border-box; padding: 8px 10px;
-          border: 1px solid #cbd5e1; border-radius: 8px;
-          font-size: 14px; font-family: inherit; color: #0f172a; resize: vertical;
+          border: 1px solid #d4d4d8; border-radius: 8px;
+          font-size: 14px; font-family: inherit; color: #18181b; resize: vertical;
         }
         .agc-confirm__field textarea:focus, .agc-confirm__field input:focus {
-          outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+          outline: none; border-color: #3f3f46; box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
         }
-        .agc-confirm__hint { display: block; margin-top: 4px; font-size: 12px; color: #94a3b8; }
+        .agc-confirm__hint { display: block; margin-top: 4px; font-size: 12px; color: #a1a1aa; }
         .agc-confirm__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
         .agc-confirm__btn {
           padding: 9px 16px; border-radius: 9px; font-size: 14px; font-weight: 600;
           border: 1px solid transparent; cursor: pointer; color: #fff;
         }
         .agc-confirm__btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .agc-confirm__btn--ghost { background: #fff; color: #334155; border-color: #e2e8f0; }
+        .agc-confirm__btn--ghost { background: #fff; color: #3f3f46; border-color: #e4e4e7; }
         @keyframes agcConfirmFade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes agcConfirmIn {
           from { opacity: 0; transform: translateY(-8px) scale(0.98); }

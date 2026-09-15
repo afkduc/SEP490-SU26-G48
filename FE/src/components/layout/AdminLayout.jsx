@@ -432,8 +432,8 @@ export default function AdminLayout({ children }) {
               width: 36,
               height: 36,
               borderRadius: '50%',
-              border: '3px solid #c7d2fe',
-              borderTopColor: '#4f46e5',
+              border: '3px solid #d4d4d8',
+              borderTopColor: '#18181b',
               animation: 'admin-nav-spin 0.7s linear infinite',
             }}
           />

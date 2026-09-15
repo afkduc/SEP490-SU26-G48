@@ -159,7 +159,7 @@ export default function DashboardPage() {
       </div>
 
       {partsError && (
-        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#C62828' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#27272a' }}>
           {partsError}
         </div>
       )}
@@ -217,12 +217,12 @@ export default function DashboardPage() {
                       </tr>
                       {isOpen && (
                         <tr>
-                          <td colSpan={4} style={{ padding: 0, background: 'var(--gray-50, #f8fafc)' }}>
+                          <td colSpan={4} style={{ padding: 0, background: 'var(--gray-50, #fafafa)' }}>
                             {loadingParts && (
                               <div style={{ padding: '12px 20px', fontSize: 13, color: 'var(--gray-600)' }}>Đang tải…</div>
                             )}
                             {partsError && (
-                              <div style={{ padding: '12px 20px', fontSize: 13, color: '#C62828' }}>{partsError}</div>
+                              <div style={{ padding: '12px 20px', fontSize: 13, color: '#27272a' }}>{partsError}</div>
                             )}
                             {!loadingParts && !partsError && parts && parts.length === 0 && (
                               <div style={{ padding: '12px 20px', fontSize: 13, color: 'var(--gray-600)' }}>Không có phụ tùng nào</div>

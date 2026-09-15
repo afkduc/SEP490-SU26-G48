@@ -204,7 +204,7 @@ export default function BranchFormPage({ mode: modeProp }) {
             maxLength={NAME_MAX_LENGTH}
             required
           />
-          <p className="form__hint" style={{ marginTop: 6, color: '#64748b', fontSize: '0.8rem' }}>
+          <p className="form__hint" style={{ marginTop: 6, color: '#71717a', fontSize: '0.8rem' }}>
             Không bắt đầu bằng số · tối đa {NAME_MAX_LENGTH} ký tự
           </p>
         </div>

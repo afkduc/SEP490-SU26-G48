@@ -137,7 +137,7 @@ export default function ManagerImportRequestListPage() {
                             title="Phiếu mới"
                             style={{
                               display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                              background: '#DC2626', marginRight: 6,
+                              background: '#27272a', marginRight: 6,
                             }}
                           />
                         )}

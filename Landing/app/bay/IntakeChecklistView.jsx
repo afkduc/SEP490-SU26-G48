@@ -78,7 +78,7 @@ function ExteriorBodyView({ exteriorBody, vehicleModelText }) {
                     key={m.id}
                     style={{
                       position: "absolute", left: `${m.xPct}%`, top: `${m.yPct}%`, transform: "translate(-50%, -50%)",
-                      color: "#dc2626", fontSize: 20, fontWeight: 900, lineHeight: 1,
+                      color: "#27272a", fontSize: 20, fontWeight: 900, lineHeight: 1,
                       textShadow: "0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff",
                     }}
                   >

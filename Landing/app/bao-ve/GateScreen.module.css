@@ -103,8 +103,8 @@
 }
 
 .errorBanner {
-  background: #fdecea;
-  border: 1px solid #f3c1bb;
+  background: #e4e4e7;
+  border: 1px solid #a1a1aa;
   color: var(--accent);
   border-radius: 10px;
   padding: 12px 16px;

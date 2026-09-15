@@ -40,7 +40,7 @@ function ChiTietPhieu({ detail }) {
   return (
     <div style={{ padding: '10px 14px', background: 'var(--gray-50)' }}>
       {detail.cancelReason && (
-        <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '6px 10px', fontSize: 12.5, color: '#C62828', marginBottom: 10 }}>
+        <div style={{ background: '#e4e4e7', borderRadius: 6, padding: '6px 10px', fontSize: 12.5, color: '#27272a', marginBottom: 10 }}>
           <b>Lý do hủy:</b> {detail.cancelReason}
         </div>
       )}
@@ -49,18 +49,18 @@ function ChiTietPhieu({ detail }) {
           truoc tho da phat hien gi, khach dong y thay hay tu choi. */}
       {khongDat.length > 0 && (
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: '#C62828', marginBottom: 4 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: '#27272a', marginBottom: 4 }}>
             {khongDat.length} hạng mục không đạt lần đó
           </div>
           {khongDat.map((t) => (
-            <div key={t.id} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: '2px solid #EF9A9A' }}>
+            <div key={t.id} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: '2px solid #a1a1aa' }}>
               <b>{t.taskName}</b>
               {t.checkNote ? ` — thợ ghi: ${t.checkNote}` : ''}
-              {t.ngDecision === 'accepted' && <span style={{ color: '#2E7D32' }}> · khách đồng ý thay</span>}
+              {t.ngDecision === 'accepted' && <span style={{ color: '#3f3f46' }}> · khách đồng ý thay</span>}
               {t.ngDecision === 'declined' && (
                 <span style={{ color: 'var(--gray-600)' }}> · khách từ chối{t.ngNote ? `: ${t.ngNote}` : ''}</span>
               )}
-              {t.ngDecision === 'resolved' && <span style={{ color: '#2E7D32' }}> · xưởng xử lý tại chỗ</span>}
+              {t.ngDecision === 'resolved' && <span style={{ color: '#3f3f46' }}> · xưởng xử lý tại chỗ</span>}
             </div>
           ))}
         </div>
@@ -160,7 +160,7 @@ export default function VehicleHistoryModal({ vehicleId, licensePlate, vehicleMo
 
         <div className="modal-body">
           {error && (
-            <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#C62828', marginBottom: 10 }}>
+            <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#27272a', marginBottom: 10 }}>
               {error}
             </div>
           )}
@@ -199,7 +199,7 @@ export default function VehicleHistoryModal({ vehicleId, licensePlate, vehicleMo
                           <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{o.code}</td>
                           <td style={{ fontSize: 12 }}>{o.date}</td>
                           <td style={{ fontSize: 12 }}>{o.branch || '—'}</td>
-                          <td style={{ fontSize: 12, fontWeight: 700, color: '#C62828', whiteSpace: 'nowrap' }}>
+                          <td style={{ fontSize: 12, fontWeight: 700, color: '#27272a', whiteSpace: 'nowrap' }}>
                             {formatCurrency(o.total)}
                           </td>
                           <td style={{ fontSize: 12 }}>{o.status === 'cancelled' ? 'Đã hủy' : (o.status === 'invoiced' ? 'Đã xuất hóa đơn' : 'Đang xử lý')}</td>

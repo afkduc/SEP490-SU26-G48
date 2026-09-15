@@ -10,10 +10,10 @@ import {
 } from './IntakeChecklistSection';
 
 const BADGE_COLORS = {
-  OK: { bg: '#ecfdf5', fg: '#16a34a' },
-  NG: { bg: '#fef2f2', fg: '#dc2626' },
-  CO: { bg: '#ecfdf5', fg: '#16a34a' },
-  KHONG: { bg: '#f1f5f9', fg: '#64748b' },
+  OK: { bg: '#ecfdf5', fg: '#3f3f46' },
+  NG: { bg: '#e4e4e7', fg: '#27272a' },
+  CO: { bg: '#ecfdf5', fg: '#3f3f46' },
+  KHONG: { bg: '#f4f4f5', fg: '#71717a' },
 };
 
 function ValueBadge({ styleKey, text }) {
@@ -28,7 +28,7 @@ function ValueBadge({ styleKey, text }) {
 function OkNgRow({ label, value }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '5px 0', borderBottom: '1px solid var(--gray-100)' }}>
-      <span style={{ fontSize: 12.5, color: '#334155' }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: '#3f3f46' }}>{label}</span>
       {value === 'OK' && <ValueBadge styleKey="OK" text="OK" />}
       {value === 'NG' && <ValueBadge styleKey="NG" text="NG" />}
       {value !== 'OK' && value !== 'NG' && <span style={{ fontSize: 12, color: 'var(--gray-400)' }}>—</span>}
@@ -39,7 +39,7 @@ function OkNgRow({ label, value }) {
 function CoKhongRow({ label, value }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '5px 0', borderBottom: '1px solid var(--gray-100)' }}>
-      <span style={{ fontSize: 12.5, color: '#334155' }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: '#3f3f46' }}>{label}</span>
       {value === true && <ValueBadge styleKey="CO" text="Có" />}
       {value === false && <ValueBadge styleKey="KHONG" text="K" />}
       {value !== true && value !== false && <span style={{ fontSize: 12, color: 'var(--gray-400)' }}>—</span>}
@@ -58,18 +58,18 @@ function FuelGaugeView({ value }) {
           <span key={o} style={{
             position: 'absolute', left: `${posPct(i)}%`,
             transform: i === 0 ? 'translateX(0)' : i === n - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
-            fontSize: 12, fontWeight: value === o ? 700 : 500, color: value === o ? '#334155' : '#64748b',
+            fontSize: 12, fontWeight: value === o ? 700 : 500, color: value === o ? '#3f3f46' : '#71717a',
           }}>
             {o}
           </span>
         ))}
       </div>
-      <div style={{ position: 'relative', height: 14, marginTop: 4, background: 'linear-gradient(180deg, #f8fafc, #e2e8f0)', border: '1px solid var(--gray-400)', borderRadius: 3 }}>
+      <div style={{ position: 'relative', height: 14, marginTop: 4, background: 'linear-gradient(180deg, #fafafa, #e4e4e7)', border: '1px solid var(--gray-400)', borderRadius: 3 }}>
         {[1, 2, 3].map((i) => (
           <div key={i} style={{ position: 'absolute', top: 0, left: `${posPct(i)}%`, transform: 'translateX(-50%)', width: 1, height: '100%', background: 'var(--gray-400)' }} />
         ))}
         {idx >= 0 && (
-          <div style={{ position: 'absolute', top: '100%', left: `${posPct(idx)}%`, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '10px solid #334155', marginTop: 2 }} />
+          <div style={{ position: 'absolute', top: '100%', left: `${posPct(idx)}%`, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '10px solid #3f3f46', marginTop: 2 }} />
         )}
       </div>
     </div>
@@ -88,7 +88,7 @@ function DiagramImage({ img, label, marks }) {
           key={m.id}
           style={{
             position: 'absolute', left: `${m.xPct}%`, top: `${m.yPct}%`, transform: 'translate(-50%, -50%)',
-            color: '#dc2626', fontSize: 22, fontWeight: 900, lineHeight: 1,
+            color: '#27272a', fontSize: 22, fontWeight: 900, lineHeight: 1,
             textShadow: '0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff',
           }}
         >
@@ -122,7 +122,7 @@ function ExteriorBodyView({ exteriorBody, vehicleModelText }) {
       </div>
       <div className="form-group">
         <label className="form-label">Ghi chú tình trạng thân vỏ</label>
-        <div style={{ fontSize: 12.5, color: exteriorBody?.notes ? '#334155' : 'var(--gray-400)', whiteSpace: 'pre-wrap' }}>{exteriorBody?.notes || '—'}</div>
+        <div style={{ fontSize: 12.5, color: exteriorBody?.notes ? '#3f3f46' : 'var(--gray-400)', whiteSpace: 'pre-wrap' }}>{exteriorBody?.notes || '—'}</div>
       </div>
     </div>
   );
@@ -152,7 +152,7 @@ export default function IntakeChecklistView({ value, vehicleModelText }) {
       </div>
       <div className="form-group">
         <label className="form-label">Đèn cảnh báo / chỉ báo bất thường</label>
-        <div style={{ fontSize: 12.5, color: v.warningLights ? '#334155' : 'var(--gray-400)' }}>{v.warningLights || '—'}</div>
+        <div style={{ fontSize: 12.5, color: v.warningLights ? '#3f3f46' : 'var(--gray-400)' }}>{v.warningLights || '—'}</div>
       </div>
 
       <div className="form-section-title">Vật dụng trong xe</div>
@@ -161,7 +161,7 @@ export default function IntakeChecklistView({ value, vehicleModelText }) {
       ))}
       <div className="form-group" style={{ marginTop: 10 }}>
         <label className="form-label">Vật dụng khác</label>
-        <div style={{ fontSize: 12.5, color: v.itemsInCarOther ? '#334155' : 'var(--gray-400)' }}>{v.itemsInCarOther || '—'}</div>
+        <div style={{ fontSize: 12.5, color: v.itemsInCarOther ? '#3f3f46' : 'var(--gray-400)' }}>{v.itemsInCarOther || '—'}</div>
       </div>
 
       <div className="form-section-title">Kiểm tra bên trái, phía trước xe</div>
@@ -188,14 +188,14 @@ export default function IntakeChecklistView({ value, vehicleModelText }) {
 
       <div className="form-group" style={{ marginTop: 12 }}>
         <label className="form-label">Lưu ý (hạng mục cần làm sớm, ghi chú)</label>
-        <div style={{ fontSize: 12.5, color: v.notes ? '#334155' : 'var(--gray-400)', whiteSpace: 'pre-wrap' }}>{v.notes || '—'}</div>
+        <div style={{ fontSize: 12.5, color: v.notes ? '#3f3f46' : 'var(--gray-400)', whiteSpace: 'pre-wrap' }}>{v.notes || '—'}</div>
       </div>
 
       {/* Cam ket khach da doc khi ky nhan xe - phai o cuoi, ngay tren cho ky. */}
       <div style={{
         marginTop: 14, padding: '10px 12px', borderRadius: 6,
         background: 'var(--gray-50)', border: '1px solid var(--gray-200)',
-        fontSize: 12.5, lineHeight: 1.6, color: '#334155',
+        fontSize: 12.5, lineHeight: 1.6, color: '#3f3f46',
       }}>
         {INTAKE_NOTICE_LINES.map((dong) => <div key={dong}>{dong}</div>)}
       </div>

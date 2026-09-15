@@ -1,7 +1,7 @@
 .footer {
   width: 100%;
   padding: 44px 0;
-  background: #16130f;
+  background: #18181b;
   color: #fff;
 }
 
@@ -105,7 +105,7 @@
 }
 
 .socialBtn:hover {
-  background: #1877f2;
+  background: #3f3f46;
   transform: translateY(-2px);
 }
 

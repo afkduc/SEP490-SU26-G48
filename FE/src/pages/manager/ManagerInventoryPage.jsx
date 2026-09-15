@@ -55,7 +55,7 @@ export default function ManagerInventoryPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
@@ -94,7 +94,7 @@ export default function ManagerInventoryPage() {
                       title="Sản phẩm mới do Nhân viên kho tạo"
                       style={{
                         display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                        background: '#DC2626', marginRight: 8,
+                        background: '#27272a', marginRight: 8,
                       }}
                     />
                   )}

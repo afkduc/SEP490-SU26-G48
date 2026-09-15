@@ -116,7 +116,7 @@ function MonthPaidSettlementsModal({ month, monthLabel, onClose }) {
 
         <div className="modal-body" style={{ maxHeight: '80vh', overflow: 'auto' }}>
           {error && (
-            <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+            <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
               {error}
             </div>
           )}
@@ -176,7 +176,7 @@ function MonthPaidSettlementsModal({ month, monthLabel, onClose }) {
                       </td>
                       <td style={{ fontSize: 12 }}>{formatDate(report.intakeDate)}</td>
                       <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>
-                      <td style={{ fontWeight: 800, color: '#C62828' }}>{formatCurrency(report.total)}</td>
+                      <td style={{ fontWeight: 800, color: '#27272a' }}>{formatCurrency(report.total)}</td>
                       <td>
                         <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
                           {badge.label}
@@ -202,7 +202,7 @@ function MonthPaidSettlementsModal({ month, monthLabel, onClose }) {
             </div>
           )}
           {detailLoading && (
-            <div style={{ marginTop: 12, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#334155', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ marginTop: 12, background: '#fafafa', border: '1px solid #e4e4e7', color: '#3f3f46', borderRadius: 10, padding: '12px 14px' }}>
               Đang tải chi tiết phiếu quyết toán...
             </div>
           )}
@@ -292,7 +292,7 @@ export default function ManagerDashboardPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#C62828' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#27272a' }}>
           {error}
         </div>
       )}

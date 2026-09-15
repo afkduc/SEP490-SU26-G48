@@ -123,7 +123,7 @@
 
 .login-field input:focus,
 .login-field select:focus {
-  border-color: #22c55e;
+  border-color: #3f3f46;
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.15);
 }
 
@@ -210,7 +210,7 @@
 
 .login-success-box {
   background: #f0fdf4;
-  border: 1px solid #bbf7d0;
+  border: 1px solid #a1a1aa;
   border-radius: 12px;
   padding: 16px 18px;
   color: #166534;
@@ -243,7 +243,7 @@
 .login-branch-hint {
   margin: 8px 0 0;
   font-size: 0.85rem;
-  color: #64748b;
+  color: #71717a;
   line-height: 1.4;
 }
 
@@ -255,7 +255,7 @@
 }
 
 .login-dev-link a {
-  color: #b45309;
+  color: #52525b;
 }
 
 .login-back-link {
@@ -265,7 +265,7 @@
 }
 
 .login-back-link a {
-  color: #4f46e5;
+  color: #18181b;
   text-decoration: none;
   font-weight: 600;
 }
@@ -348,8 +348,8 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: #fef2f2;
-  color: #dc2626;
+  background: #e4e4e7;
+  color: #27272a;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -372,7 +372,7 @@
 
 .login-modal-btn {
   padding: 10px 28px;
-  background: #22c55e;
+  background: #3f3f46;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -383,5 +383,5 @@
 }
 
 .login-modal-btn:hover {
-  background: #16a34a;
+  background: #3f3f46;
 }

@@ -27,7 +27,7 @@
 .error-page__shape--1 {
   width: 400px;
   height: 400px;
-  background: #3b82f6;
+  background: #3f3f46;
   top: -100px;
   right: -100px;
   animation: float 8s ease-in-out infinite;
@@ -36,7 +36,7 @@
 .error-page__shape--2 {
   width: 300px;
   height: 300px;
-  background: #10b981;
+  background: #3f3f46;
   bottom: -80px;
   left: -80px;
   animation: float 10s ease-in-out infinite reverse;
@@ -45,7 +45,7 @@
 .error-page__shape--3 {
   width: 200px;
   height: 200px;
-  background: #8b5cf6;
+  background: #52525b;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -85,12 +85,12 @@
   width: 100px;
   height: 100px;
   margin: 0 auto 24px;
-  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  background: linear-gradient(135deg, #e4e4e7, #e4e4e7);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ef4444;
+  color: #27272a;
 }
 
 .error-card__status {
@@ -98,12 +98,12 @@
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: #ef4444;
-  background: #fef2f2;
+  color: #27272a;
+  background: #e4e4e7;
   padding: 4px 16px;
   border-radius: 100px;
   margin-bottom: 16px;
-  border: 1px solid #fecaca;
+  border: 1px solid #a1a1aa;
 }
 
 /* ── Text ──────────────────────────────────────────────── */
@@ -216,7 +216,7 @@
 }
 
 .error-card__textarea:focus {
-  border-color: #3b82f6;
+  border-color: #3f3f46;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
@@ -225,13 +225,13 @@
   margin-top: 12px;
   background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
   color: #1e40af;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #a1a1aa;
   justify-content: center;
 }
 
 .error-card__btn--request:hover:not(:disabled) {
   background: linear-gradient(135deg, #e0f2fe, #bae6fd);
-  border-color: #93c5fd;
+  border-color: #a1a1aa;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
@@ -266,7 +266,7 @@
   background: #ecfdf5;
   border: 1px solid #a7f3d0;
   border-radius: 10px;
-  color: #059669;
+  color: #3f3f46;
   font-size: 14px;
   font-weight: 600;
 }

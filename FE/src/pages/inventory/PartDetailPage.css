@@ -3,9 +3,9 @@
    Scope trong .part-detail để không ảnh hưởng trang khác.
 ============================================================ */
 .part-detail {
-  --md-primary: #4f46e5;
+  --md-primary: #18181b;
   --md-on-primary: #ffffff;
-  --md-primary-container: #e0e7ff;
+  --md-primary-container: #e4e4e7;
   --md-on-primary-container: #1e1b4b;
   --md-surface: #ffffff;
   --md-surface-variant: #f4f4fb;
@@ -294,7 +294,7 @@
 }
 .part-detail .btn--secondary:hover:not(:disabled) { background: var(--md-surface-variant); }
 .part-detail .btn--ghost { background: transparent; color: var(--md-primary); padding: 0 12px; }
-.part-detail .btn--ghost:hover:not(:disabled) { background-color: rgba(79, 70, 229, 0.08); }
+.part-detail .btn--ghost:hover:not(:disabled) { background-color: rgba(24, 24, 27, 0.08); }
 .part-detail .btn--danger.btn--ghost { color: var(--md-error); }
 .part-detail .btn--danger.btn--ghost:hover:not(:disabled) { background-color: rgba(186, 26, 26, 0.08); }
 

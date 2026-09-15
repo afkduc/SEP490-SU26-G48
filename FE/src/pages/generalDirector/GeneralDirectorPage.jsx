@@ -82,47 +82,6 @@ const FILTER_ROW_STYLE = {
   whiteSpace: 'nowrap',
 };
 
-const EMPLOYEE_STATUS_OPTIONS = [
-  { value: 'all', label: 'Tất cả trạng thái' },
-  { value: 'active', label: 'Đang làm' },
-  { value: 'inactive', label: 'Nghỉ' },
-];
-
-const EMPLOYEE_ROLE_OPTIONS = [
-  { value: 'all', label: 'Tất cả chức vụ' },
-  { value: 'manager', label: 'Giám đốc chi nhánh' },
-  { value: 'service_advisor', label: 'Cố vấn dịch vụ' },
-  { value: 'team_leader', label: 'Tổ trưởng kỹ thuật' },
-  { value: 'warehouse_staff', label: 'Nhân viên kho' },
-];
-
-const TECHNICIAN_SKILL_OPTIONS = [
-  { value: 'all', label: 'Tất cả kỹ năng' },
-  { value: 'mechanical', label: 'Cơ khí' },
-  { value: 'electrical', label: 'Điện - Điện tử' },
-  { value: 'painting', label: 'Sơn - Đồng' },
-  { value: 'diagnostic', label: 'Chuẩn đoán' },
-  { value: 'maintenance', label: 'Bảo dưỡng' },
-  { value: 'other', label: 'Khác' },
-];
-
-const EMPLOYEE_STATUS_META = {
-  active: { label: 'Đang làm', color: '#0F766E', background: '#ECFDF5' },
-  inactive: { label: 'Nghỉ', color: '#B91C1C', background: '#FEF2F2' },
-};
-
-const DEFAULT_PAGE_SIZE = 10;
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
-const FILTER_ROW_STYLE = {
-  display: 'flex',
-  gap: 10,
-  flexWrap: 'nowrap',
-  alignItems: 'center',
-  overflowX: 'auto',
-  paddingBottom: 4,
-  whiteSpace: 'nowrap',
-};
-
 function statusBadge(status) {
   const meta = STATUS_META[status] || STATUS_META.waiting_repair;
   return {
@@ -136,7 +95,7 @@ function currency(value) {
 }
 
 function employeeStatusBadge(status) {
-  return EMPLOYEE_STATUS_META[status] || { label: status || 'Không rõ', color: '#334155', background: '#F1F5F9' };
+  return EMPLOYEE_STATUS_META[status] || { label: status || 'Không rõ', color: '#3f3f46', background: '#f4f4f5' };
 }
 
 function repairStatusLabel(status) {
@@ -230,7 +189,7 @@ function DataPagination({ total, page, pageSize, onPageChange, onPageSizeChange,
 
         {buildPageItems(currentPage, totalPages).map((item, index) => (
           item === '...'
-            ? <span key={`ellipsis-${index}`} style={{ color: '#94A3B8' }}>...</span>
+            ? <span key={`ellipsis-${index}`} style={{ color: '#a1a1aa' }}>...</span>
             : (
               <button
                 key={item}
@@ -414,7 +373,7 @@ function PlaceholderPanel({ title, uc, description, actions, children }) {
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
           <div style={{ fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', opacity: 0.75 }}>{title}</div>
         <h2 style={{ margin: '8px 0', fontSize: 28, lineHeight: 1.15 }}>{title}</h2>
         <p style={{ margin: 0, maxWidth: 760, color: 'rgba(255,255,255,0.82)' }}>{description}</p>
@@ -854,7 +813,7 @@ function EmployeeListPage() {
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Danh sách nhân sự toàn hệ thống</h2>
@@ -933,7 +892,7 @@ function EmployeeListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
           {error}
         </div>
       )}
@@ -1035,7 +994,7 @@ function EmployeeListPage() {
               )}
 
               {!detailLoading && detailError && (
-                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px' }}>
                   {detailError}
                 </div>
               )}
@@ -1045,7 +1004,7 @@ function EmployeeListPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
                     <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeEmployee.employeeId || '—'}</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#18181b', marginTop: 4 }}>{activeEmployee.employeeId || '—'}</div>
                     </div>
                     <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: '#6B7280' }}>Chức vụ chính</div>
@@ -1219,7 +1178,7 @@ function TechnicianListPage() {
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Điều phối kỹ thuật viên toàn hệ thống</h2>
@@ -1288,12 +1247,12 @@ function TechnicianListPage() {
         </button>
       </div>
 
-      <div style={{ marginBottom: 12, fontSize: 12, color: '#64748B' }}>
+      <div style={{ marginBottom: 12, fontSize: 12, color: '#71717a' }}>
         Đang lọc: {selectedBranchName} · {selectedSkillName}
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reloadTechnicians}>
             ↻ Tải lại
@@ -1400,7 +1359,7 @@ function TechnicianListPage() {
               )}
 
               {!detailLoading && detailError && (
-                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px' }}>
                   {detailError}
                 </div>
               )}
@@ -1410,7 +1369,7 @@ function TechnicianListPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
                     <div style={{ background: '#EEF6FF', border: '1px solid #D7E7FF', borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: '#54708A' }}>Mã nhân sự</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{activeTechnician.employeeId || '—'}</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#18181b', marginTop: 4 }}>{activeTechnician.employeeId || '—'}</div>
                     </div>
                     <div style={{ background: '#F7F7F8', border: '1px solid #E5E7EB', borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 12, color: '#6B7280' }}>Chi nhánh</div>
@@ -1621,7 +1580,7 @@ function BranchManagerListPage() {
 
       <ModuleActionBar />
 
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', color: 'white', borderRadius: 18, padding: 20, marginBottom: 16, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: '8px 0 8px', fontSize: 28, lineHeight: 1.15 }}>Danh sách giám đốc chi nhánh toàn hệ thống</h2>
@@ -1708,7 +1667,7 @@ function BranchManagerListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
           {error}
         </div>
       )}
@@ -1761,7 +1720,7 @@ function BranchManagerListPage() {
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <BranchBadge branch={row.branch} />
-                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: isBranchActive ? '#ECFDF5' : '#FEF2F2', color: isBranchActive ? '#0F766E' : '#B91C1C', fontSize: 11, fontWeight: 800 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999, background: isBranchActive ? '#ECFDF5' : '#e4e4e7', color: isBranchActive ? '#0F766E' : '#27272a', fontSize: 11, fontWeight: 800 }}>
                         {isBranchActive ? 'CN hoạt động' : 'CN bị khóa'}
                       </span>
                     </div>
@@ -1885,7 +1844,7 @@ function BranchManagerDetailPage() {
       )}
 
       {!loading && error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px' }}>
           {error}
         </div>
       )}
@@ -2001,9 +1960,9 @@ function BranchManagerCreatePage() {
       <ModuleActionBar />
 
       <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
-        <div style={{ fontSize: 13, color: '#475569', marginBottom: 14 }}>Tài khoản đăng nhập của giám đốc chi nhánh sử dụng email trong hệ thống hiện tại.</div>
+        <div style={{ fontSize: 13, color: '#52525b', marginBottom: 14 }}>Tài khoản đăng nhập của giám đốc chi nhánh sử dụng email trong hệ thống hiện tại.</div>
         {error && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
             {error}
           </div>
         )}
@@ -2150,7 +2109,7 @@ function BranchManagerEditPage() {
 
       <form onSubmit={handleSubmit} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 18 }}>
         {error && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
             {error}
           </div>
         )}

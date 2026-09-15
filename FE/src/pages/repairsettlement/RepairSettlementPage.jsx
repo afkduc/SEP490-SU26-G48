@@ -114,7 +114,7 @@ const TABS = [
 ];
 // Mau dong nhat cho tab dang duoc chon - de khi doi tab, tat ca deu chuyen
 // sang cung 1 mau (cam) thay vi moi tab co mau active rieng.
-const ACTIVE_TAB_COLOR = '#E65100';
+const ACTIVE_TAB_COLOR = '#52525b';
 
 // ─── Số tiền bằng chữ ────────────────────────────────────────────────
 function numberToVietnamese(num) {
@@ -300,17 +300,17 @@ function TaskProgressRow({ t, onDecideNg, decidingId }) {
     <label
       style={{
         display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px',
-        background: t.isCancelled ? 'var(--gray-50)' : (ng ? '#FDECEA' : (ok ? '#E8F5E9' : 'var(--gray-50)')),
+        background: t.isCancelled ? 'var(--gray-50)' : (ng ? '#e4e4e7' : (ok ? '#e4e4e7' : 'var(--gray-50)')),
         borderRadius: 6,
         fontSize: 13,
-        color: t.isCancelled ? 'var(--gray-400)' : (ng ? '#B91C1C' : (ok ? '#2E7D32' : 'var(--gray-900)')),
+        color: t.isCancelled ? 'var(--gray-400)' : (ng ? '#27272a' : (ok ? '#3f3f46' : 'var(--gray-900)')),
       }}
     >
       {ng ? (
         <span style={{ fontWeight: 700, width: 13, textAlign: 'center', flexShrink: 0, lineHeight: '16px' }}>✕</span>
       ) : (
         <input type="checkbox" checked={t.isDone} disabled readOnly
-          style={{ accentColor: '#2E7D32', marginTop: 2, flexShrink: 0 }} />
+          style={{ accentColor: '#3f3f46', marginTop: 2, flexShrink: 0 }} />
       )}
       <span>
         <TaskNameLabel t={t} />
@@ -333,7 +333,7 @@ function TaskProgressRow({ t, onDecideNg, decidingId }) {
           </div>
         )}
         {t.ngDecision === 'accepted' && (
-          <div style={{ color: t.isDone ? '#2E7D32' : '#B45309', fontWeight: 600, fontSize: 12 }}>
+          <div style={{ color: t.isDone ? '#3f3f46' : '#52525b', fontWeight: 600, fontSize: 12 }}>
             Khách đồng ý thay{t.ngNote ? ` — ${t.ngNote}` : ''}
             {t.isDone ? ' · đã thay xong' : ' · phụ tùng đã thêm vào phiếu, chờ thợ thay'}
           </div>
@@ -365,7 +365,7 @@ function TaskProgressRow({ t, onDecideNg, decidingId }) {
           </div>
         )}
         {t.ngDecision === 'pending' && !onDecideNg && (
-          <div style={{ color: '#B45309', fontWeight: 600, fontSize: 12 }}>Chờ trao đổi với khách</div>
+          <div style={{ color: '#52525b', fontWeight: 600, fontSize: 12 }}>Chờ trao đổi với khách</div>
         )}
       </span>
     </label>
@@ -389,10 +389,10 @@ function TaskProgressList({ tasks, bayNumber, technicians, onDecideNg, decidingI
             thu co van can tu van lai cho khach, khong the de lan trong danh
             sach dai. */}
         {ngCount > 0 && (
-          <span style={{ color: '#B91C1C', fontWeight: 700 }}>{`  ·  ${ngCount} không đạt`}</span>
+          <span style={{ color: '#27272a', fontWeight: 700 }}>{`  ·  ${ngCount} không đạt`}</span>
         )}
         {pendingCount > 0 && (
-          <span style={{ color: '#B45309', fontWeight: 700 }}>{`  ·  ${pendingCount} chờ hỏi khách`}</span>
+          <span style={{ color: '#52525b', fontWeight: 700 }}>{`  ·  ${pendingCount} chờ hỏi khách`}</span>
         )}
       </div>
       {(bayNumber || technicians?.length > 0) && (
@@ -549,8 +549,8 @@ function printSettlement(order, payosQrCode) {
 
   const groupHeaderRow = (label) => `
     <tr>
-      <td colspan="2" style="background:#e2e8f0;border-right:none"></td>
-      <td colspan="9" style="background:#e2e8f0;font-weight:bold;padding:5px 7px;border-left:none">${label}</td>
+      <td colspan="2" style="background:#e4e4e7;border-right:none"></td>
+      <td colspan="9" style="background:#e4e4e7;font-weight:bold;padding:5px 7px;border-left:none">${label}</td>
     </tr>`;
 
   const groupSubtotalRow = (amount) => `
@@ -652,7 +652,7 @@ function printSettlement(order, payosQrCode) {
     <tr><td class="lbl">Tổng cộng sau giảm giá:</td><td class="val">${(order.afterDiscount || 0).toLocaleString('vi-VN')}</td></tr>
     <tr><td class="lbl">Tiền thuế GTGT (8%):</td><td class="val">${(order.vat || 0).toLocaleString('vi-VN')}</td></tr>
     <tr><td class="lbl">Miễn phí:</td><td class="val">${(order.freeAmount || 0).toLocaleString('vi-VN')}</td></tr>
-    <tr style="font-size:13px"><td class="lbl"><b>Tổng giá trị thanh toán:</b></td><td class="val" style="color:#C62828"><b>${(order.total || 0).toLocaleString('vi-VN')}</b></td></tr>
+    <tr style="font-size:13px"><td class="lbl"><b>Tổng giá trị thanh toán:</b></td><td class="val" style="color:#27272a"><b>${(order.total || 0).toLocaleString('vi-VN')}</b></td></tr>
     <tr><td colspan="2" style="font-size:10px; font-style:italic; text-align:right">Bằng chữ: ${numberToVietnamese(order.total)}</td></tr>
   </table>
 </div>
@@ -902,13 +902,13 @@ function SettlementPreviewModal({ order, onClose }) {
                         </button>
                       )
                     )}
-                    {cashError && <div style={{ fontSize: 9, color: '#C62828', maxWidth: 130, textAlign: 'center' }}>{cashError}</div>}
+                    {cashError && <div style={{ fontSize: 9, color: '#27272a', maxWidth: 130, textAlign: 'center' }}>{cashError}</div>}
                   </>
                 ) : (
                   <div style={{
                     width: 130, height: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    border: '1px solid #A5D6A7', borderRadius: 8, background: '#E8F5E9',
-                    textAlign: 'center', fontSize: 12, color: '#2E7D32', fontWeight: 600, padding: 6, gap: 4,
+                    border: '1px solid #a1a1aa', borderRadius: 8, background: '#e4e4e7',
+                    textAlign: 'center', fontSize: 12, color: '#3f3f46', fontWeight: 600, padding: 6, gap: 4,
                   }}>
                     <span>✓ Đã thanh toán</span>
                     {order.paymentMethod && (
@@ -942,8 +942,8 @@ function SettlementPreviewModal({ order, onClose }) {
         {printError && (
           <div style={{
             margin: '0 16px 8px', padding: '8px 10px', borderRadius: 6,
-            background: '#FFEBEE', border: '1px solid #EF9A9A',
-            fontSize: 12.5, color: '#C62828',
+            background: '#e4e4e7', border: '1px solid #a1a1aa',
+            fontSize: 12.5, color: '#27272a',
           }}>
             {printError}
           </div>
@@ -979,7 +979,7 @@ function SettlementPreviewModal({ order, onClose }) {
               <button className="btn btn-danger" onClick={() => setShowCashConfirm(false)}>Hủy</button>
               <button
                 className="btn btn-primary"
-                style={{ background: '#2E7D32', borderColor: '#2E7D32' }}
+                style={{ background: '#3f3f46', borderColor: '#3f3f46' }}
                 onClick={handleConfirmCash}
               >
                 Xác nhận
@@ -1105,7 +1105,7 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
           {order.cancelReason && (
             <>
               <div className="form-section-title">Lý do hủy</div>
-              <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#C62828' }}>
+              <div style={{ background: '#e4e4e7', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16, color: '#27272a' }}>
                 {order.cancelReason}
               </div>
             </>
@@ -1747,13 +1747,13 @@ function RepairSettlementList() {
       </div>
 
       {loadError && (
-        <div style={{ background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#27272a' }}>
           {loadError}
         </div>
       )}
 
       {tab === 'waiting_payment' && counts.waiting_payment > 0 && (
-        <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#2E7D32' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 12, fontSize: 13, color: '#3f3f46' }}>
           Nhấn <b>In phiếu và xuất hóa đơn</b> để xem/in phiếu quyết toán và hoàn tất dịch vụ.
         </div>
       )}
@@ -1838,14 +1838,14 @@ function RepairSettlementList() {
                       : <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Chưa gán</span>}
                   </td>
                   <td style={{ fontSize: 12 }}>{o.date}</td>
-                  <td style={{ fontWeight: 700, color: '#C62828' }}>{formatCurrency(o.total)}</td>
+                  <td style={{ fontWeight: 700, color: '#27272a' }}>{formatCurrency(o.total)}</td>
                   <td>
                     <span className={`badge ${st?.badge}`}>{st?.label}</span>
                     {/* Tho da cham "Khong dat" ma chua ai goi hoi khach - viec
                         cua co van, phai thay ngay o danh sach chu khong doi mo
                         tung phieu. To truong cung dang bi chan dong lenh vi no. */}
                     {o.ngPendingCount > 0 && (
-                      <div style={{ fontSize: 10.5, color: '#B45309', fontWeight: 700, marginTop: 3 }}>
+                      <div style={{ fontSize: 10.5, color: '#52525b', fontWeight: 700, marginTop: 3 }}>
                         ⚠ {o.ngPendingCount} mục không đạt — cần hỏi khách
                       </div>
                     )}
@@ -1875,7 +1875,7 @@ function RepairSettlementList() {
                       )}
 
                       {o.status === 'waiting_payment' && (
-                        <button className="btn btn-primary btn-sm" style={{ fontSize: 11, background: '#2E7D32', borderColor: '#2E7D32' }}
+                        <button className="btn btn-primary btn-sm" style={{ fontSize: 11, background: '#3f3f46', borderColor: '#3f3f46' }}
                           onClick={() => handlePreview(o)}>
                           In phiếu và xuất hóa đơn
                         </button>
@@ -1988,21 +1988,21 @@ function ChangesList({ changes }) {
         }
         if (c.type === 'item_added') {
           return (
-            <div key={i} style={{ fontSize: 12, color: '#2E7D32' }}>
+            <div key={i} style={{ fontSize: 12, color: '#3f3f46' }}>
               + Thêm: {c.label} ({c.qty} × {formatCurrency(c.unitPrice)})
             </div>
           );
         }
         if (c.type === 'item_removed') {
           return (
-            <div key={i} style={{ fontSize: 12, color: '#C62828' }}>
+            <div key={i} style={{ fontSize: 12, color: '#27272a' }}>
               − Xóa: {c.label} ({c.qty} × {formatCurrency(c.unitPrice)})
             </div>
           );
         }
         if (c.type === 'item_changed') {
           return (
-            <div key={i} style={{ fontSize: 12, color: '#B45309' }}>
+            <div key={i} style={{ fontSize: 12, color: '#52525b' }}>
               <div>± Sửa: {c.label}</div>
               <div style={{ marginLeft: 12 }}>
                 {(c.fields || []).map((f, j) => (
@@ -3341,14 +3341,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       </div>
 
       {saved && (
-        <div style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#2E7D32' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#3f3f46' }}>
           {savedOrder ? 'Đã lưu thay đổi phiếu quyết toán.' : 'Đã lưu phiếu quyết toán. Đang quay lại danh sách…'}
         </div>
       )}
 
       {saveError && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, pointerEvents: 'none' }}>
-          <div style={{ background: '#C62828', color: '#fff', borderRadius: 10, padding: '18px 28px', maxWidth: 520, fontSize: 14, fontWeight: 600, textAlign: 'center', boxShadow: 'var(--shadow-lg)' }}>
+          <div style={{ background: '#27272a', color: '#fff', borderRadius: 10, padding: '18px 28px', maxWidth: 520, fontSize: 14, fontWeight: 600, textAlign: 'center', boxShadow: 'var(--shadow-lg)' }}>
             {saveError}
           </div>
         </div>
@@ -3660,8 +3660,8 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   <div
                     style={{
                       marginTop: 10, fontSize: 12, fontWeight: 700, borderRadius: 6, padding: '6px 10px',
-                      background: warranty.covered ? '#E8F5E9' : '#F5F5F5',
-                      color: warranty.covered ? '#2E7D32' : '#757575',
+                      background: warranty.covered ? '#e4e4e7' : '#F5F5F5',
+                      color: warranty.covered ? '#3f3f46' : '#71717a',
                     }}
                   >
                     {warranty.label}
@@ -3815,7 +3815,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                                       <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
                                       <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>
                                         {formatCurrency(p.unitPrice)} / {p.unitName} · Tồn: {p.stockQuantity}
-                                        {p.isLowStock && <span style={{ color: '#C62828', fontWeight: 600 }}> (sắp hết)</span>}
+                                        {p.isLowStock && <span style={{ color: '#27272a', fontWeight: 600 }}> (sắp hết)</span>}
                                       </div>
                                     </div>
                                   ))}
@@ -3839,7 +3839,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                                         color: chan ? 'var(--gray-400)' : undefined,
                                       }}>
                                       <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pkg.name} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({pkg.items.length} hạng mục)</span></div>
-                                      <div style={{ fontSize: 11, color: chan ? '#B45309' : 'var(--gray-600)', fontStyle: chan ? 'italic' : undefined }}>
+                                      <div style={{ fontSize: 11, color: chan ? '#52525b' : 'var(--gray-600)', fontStyle: chan ? 'italic' : undefined }}>
                                         {chan || formatCurrency(pkg.totalPrice)}
                                       </div>
                                     </div>
@@ -4008,22 +4008,6 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                     : 'Phiếu hiện cho mọi tổ trưởng trong chi nhánh, ai rảnh thì nhận.'}
                 </div>
               </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {serviceTasks.map((t) => (
-                <label
-                  key={t.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                    background: t.isCancelled ? 'var(--gray-50)' : (t.isDone ? '#e4e4e7' : 'var(--gray-50)'), borderRadius: 6,
-                    fontSize: 13,
-                    color: t.isCancelled ? 'var(--gray-400)' : (t.isDone ? '#3f3f46' : 'var(--gray-900)'),
-                  }}
-                >
-                  <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#3f3f46' }} />
-                  <TaskNameLabel t={t} />
-                </label>
-              ))}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setHoiToTruong(false)}>Quay lại</button>
@@ -4122,7 +4106,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             </div>
 
             {!canSave && !closedElsewhere && (
-              <div style={{ fontSize: 12, color: '#E65100', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: '#52525b', marginBottom: 8 }}>
                 {isFromLookup
                   ? 'Vui lòng chọn khách hàng và xe từ gợi ý tra cứu để có thể lưu.'
                   : 'Vui lòng nhập đủ tên khách hàng, số điện thoại, biển số xe, hãng xe và tên xe để có thể lưu.'}
@@ -4135,7 +4119,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 style={{
                   display: 'block', width: '100%', textAlign: 'left', marginBottom: 8,
                   padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
-                  background: '#FEF2F2', border: '1px solid var(--red)',
+                  background: '#e4e4e7', border: '1px solid var(--red)',
                   fontSize: 12, color: 'var(--red)', fontWeight: 600, fontFamily: 'inherit',
                 }}>
                 Chưa lưu được: số km hiện tại chưa hợp lệ — bấm vào đây để nhập lại.

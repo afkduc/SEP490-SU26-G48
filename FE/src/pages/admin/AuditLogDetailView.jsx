@@ -219,7 +219,7 @@ function DiffView({ oldValue, newValue, action }) {
         <AuditRowsView rows={summary.rows} summary={summary.summary} />
         {oldObj && (
           <details style={{ marginTop: 12 }}>
-            <summary style={{ cursor: 'pointer', color: '#64748b', fontSize: 13 }}>Xem giá trị cũ</summary>
+            <summary style={{ cursor: 'pointer', color: '#71717a', fontSize: 13 }}>Xem giá trị cũ</summary>
             <HumanizedDataView data={oldValue} />
           </details>
         )}
@@ -357,19 +357,19 @@ export function AuditLogDetailContent({ log }) {
 
       {lifecycleSteps.length > 0 && (
         <div className="audit-detail__lifecycle" style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+          <label style={{ display: 'block', fontSize: 12, color: '#71717a', marginBottom: 8 }}>
             Lịch sử các bước trên phiếu này
           </label>
           <ol style={{ margin: 0, paddingLeft: 18, display: 8 }}>
             {lifecycleSteps.map((s, i) => {
               const when = s?.at ? formatLocal(s.at) : null;
               return (
-                <li key={`${s?.step || 's'}-${i}`} style={{ fontSize: 13, color: '#334155' }}>
+                <li key={`${s?.step || 's'}-${i}`} style={{ fontSize: 13, color: '#3f3f46' }}>
                   <strong>{s?.label || s?.step || `Bước ${i + 1}`}</strong>
-                  {s?.by ? <span style={{ color: '#64748b' }}> — {s.by}</span> : null}
-                  {when?.main ? <span style={{ color: '#94a3b8' }}> · {when.main}</span> : null}
+                  {s?.by ? <span style={{ color: '#71717a' }}> — {s.by}</span> : null}
+                  {when?.main ? <span style={{ color: '#a1a1aa' }}> · {when.main}</span> : null}
                   {s?.description && s.description !== (s.label || s.step) ? (
-                    <div style={{ color: '#64748b', fontSize: 12 }}>{s.description}</div>
+                    <div style={{ color: '#71717a', fontSize: 12 }}>{s.description}</div>
                   ) : null}
                 </li>
               );
@@ -465,7 +465,7 @@ export function AuditLogDetailContent({ log }) {
 
       {(log.old_value || log.new_value) && (
         <div className="audit-detail__diff">
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#475569' }}>
+          <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#52525b' }}>
             Chi tiết thay đổi
           </label>
           <DiffView oldValue={log.old_value} newValue={log.new_value} action={log.action} />

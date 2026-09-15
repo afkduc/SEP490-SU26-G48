@@ -257,7 +257,7 @@ export default function LoginPage() {
 
             {error && <p className="login-error">{error}</p>}
             {lockoutSeconds > 0 && (
-              <p className="login-error" style={{ color: '#b45309' }}>
+              <p className="login-error" style={{ color: '#52525b' }}>
                 Thử lại sau <strong>{lockoutSeconds}s</strong>. Nếu không phải bạn, hãy đổi mật khẩu.
               </p>
             )}

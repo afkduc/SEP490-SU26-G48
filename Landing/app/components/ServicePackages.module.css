@@ -64,8 +64,8 @@
 }
 
 .filterBtnActive:hover {
-  background: #a92a21;
-  border-color: #a92a21;
+  background: #27272a;
+  border-color: #27272a;
   color: #fff;
 }
 
@@ -202,7 +202,7 @@
 }
 
 .ctaBtn:hover {
-  background: #a92a21;
+  background: #27272a;
   transform: translateY(-1px);
 }
 

@@ -3,9 +3,9 @@
    Scope trong .ir-form để không ảnh hưởng trang khác.
 ============================================================ */
 .ir-form {
-  --md-primary: #4f46e5;
+  --md-primary: #18181b;
   --md-on-primary: #ffffff;
-  --md-primary-container: #e0e7ff;
+  --md-primary-container: #e4e4e7;
   --md-on-primary-container: #1e1b4b;
   --md-surface: #ffffff;
   --md-surface-variant: #f4f4fb;
@@ -230,7 +230,7 @@
 }
 .ir-form .btn--secondary:hover:not(:disabled) { background: var(--md-surface-variant); }
 .ir-form .btn--ghost { background: transparent; color: var(--md-primary); padding: 0 12px; }
-.ir-form .btn--ghost:hover:not(:disabled) { background-color: rgba(79, 70, 229, 0.08); }
+.ir-form .btn--ghost:hover:not(:disabled) { background-color: rgba(24, 24, 27, 0.08); }
 .ir-form .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
 
 /* ── MD3 table ── */

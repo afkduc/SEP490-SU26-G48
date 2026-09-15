@@ -181,7 +181,7 @@ function Pagination({ page, pageSize, total, onPageChange }) {
         >‹</button>
         {pages.map((p, i) =>
           p === '...' ? (
-            <span key={`ellipsis-${i}`} style={{ color: '#94a3b8', padding: '0 4px' }}>…</span>
+            <span key={`ellipsis-${i}`} style={{ color: '#a1a1aa', padding: '0 4px' }}>…</span>
           ) : (
             <button
               key={p}
@@ -621,7 +621,7 @@ export default function AdminDevicesPage({
       {/* Content */}
       {loading && devices.length === 0 && (
         <div className="admin-devices__loading">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="2">
             <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
           </svg>
           <span>Đang tải danh sách thiết bị...</span>

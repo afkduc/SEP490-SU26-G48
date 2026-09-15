@@ -132,7 +132,7 @@ const STATUS_BADGE = {
   inactive: { label: 'Nghỉ', className: 'badge-inactive' },
 };
 
-const AVATAR_COLORS = ['#2563EB', '#059669', '#D97706', '#DB2777', '#7C3AED', '#0891B2'];
+const AVATAR_COLORS = ['#3f3f46', '#3f3f46', '#52525b', '#52525b', '#3f3f46', '#52525b'];
 const PAGE_SIZE = 10;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^0[0-9]{9,10}$/;
@@ -421,7 +421,7 @@ function EmployeeListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
@@ -712,7 +712,7 @@ function EmployeeFormPage({ mode }) {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
@@ -1098,7 +1098,7 @@ function ServiceListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
@@ -1343,7 +1343,7 @@ function ServiceFormPage({ mode }) {
             <div className="breadcrumb">Dịch vụ lẻ / Chỉnh sửa</div>
           </div>
         </div>
-        <div style={{ background: '#FFF3E0', border: '1px solid #FFD9A0', color: '#B45309', borderRadius: 12, padding: 18 }}>
+        <div style={{ background: '#f4f4f5', border: '1px solid #FFD9A0', color: '#52525b', borderRadius: 12, padding: 18 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>⚠️ Dịch vụ đã được ngừng áp dụng</div>
           <p style={{ marginBottom: 10 }}>
             Dịch vụ này vẫn đang nằm trong {packageWarning.length} gói bảo dưỡng đang hoạt động. Các gói đó sẽ
@@ -1381,7 +1381,7 @@ function ServiceFormPage({ mode }) {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
@@ -1814,7 +1814,7 @@ function ServicePackageListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
@@ -1857,7 +1857,7 @@ function ServicePackageListPage() {
             <button
               type="button"
               onClick={() => toggleGroup(g.vehicleCode)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: 'var(--gray-50, #f8fafc)', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: 'var(--gray-50, #fafafa)', border: 'none', cursor: 'pointer', textAlign: 'left' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: 'var(--gray-500)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', display: 'inline-block' }}>▶</span>
@@ -2090,7 +2090,7 @@ function ServicePackageFormPage({ mode }) {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
@@ -2203,7 +2203,7 @@ function ServicePackageFormPage({ mode }) {
                               type="button"
                               onClick={() => toggleService(s.id)}
                               title="Bấm để bỏ khỏi gói"
-                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--red-600, #dc2626)', fontWeight: 700 }}
+                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--red-600, #27272a)', fontWeight: 700 }}
                             >
                               ✕
                             </button>
@@ -2262,7 +2262,7 @@ function ServicePackageFormPage({ mode }) {
                             style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px', border: 'none', borderBottom: '1px solid var(--gray-100)', background: 'none', fontSize: 13, textAlign: 'left', cursor: 'pointer', opacity: s.isActive ? 1 : 0.65 }}
                             title="Bấm để thêm vào gói"
                           >
-                            <span style={{ color: 'var(--primary, #4f46e5)', fontWeight: 700 }}>+</span>
+                            <span style={{ color: 'var(--primary, #18181b)', fontWeight: 700 }}>+</span>
                             <span style={{ flex: 1 }}>{s.name}</span>
                             {!s.isActive && <span className="badge badge-inactive">Ngừng áp dụng</span>}
                             <span style={{ color: 'var(--gray-500)' }}>{formatCurrency(s.unitPrice)}</span>
@@ -2453,7 +2453,7 @@ function SettlementReportsPage() {
       )}
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
@@ -2515,7 +2515,7 @@ function SettlementReportsPage() {
                   </td>
                   <td style={{ fontSize: 12 }}>{formatDate(report.intakeDate)}</td>
                   {activeTab !== 'cancelled' && <td style={{ fontSize: 12 }}>{formatDate(report.completedDate)}</td>}
-                  <td style={{ fontWeight: 800, color: '#C62828' }}>{formatCurrency(report.total)}</td>
+                  <td style={{ fontWeight: 800, color: '#27272a' }}>{formatCurrency(report.total)}</td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 999, background: badge.background, color: badge.color, fontSize: 12, fontWeight: 800 }}>
                       {badge.label}
@@ -2542,7 +2542,7 @@ function SettlementReportsPage() {
       )}
 
       {detailLoading && (
-        <div style={{ marginTop: 12, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#334155', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ marginTop: 12, background: '#fafafa', border: '1px solid #e4e4e7', color: '#3f3f46', borderRadius: 10, padding: '12px 14px' }}>
           Đang tải chi tiết phiếu quyết toán...
         </div>
       )}
@@ -2711,7 +2711,7 @@ function TechnicianListPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <span>{error}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={reload}>↻ Tải lại</button>
         </div>
@@ -2918,13 +2918,13 @@ function TechnicianFormPage({ mode }) {
       </div>
 
       {error && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#e4e4e7', border: '1px solid #a1a1aa', color: '#27272a', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           {error}
         </div>
       )}
 
       {teamLeaderOptions.length === 0 && (
-        <div style={{ background: '#FFF3E0', border: '1px solid #FFD9A0', color: '#B45309', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ background: '#f4f4f5', border: '1px solid #FFD9A0', color: '#52525b', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
           ⚠️ Chi nhánh chưa có tổ trưởng nào đang hoạt động. Hãy thêm Tổ trưởng trước khi thêm thợ máy.
         </div>
       )}
