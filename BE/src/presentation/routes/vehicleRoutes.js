@@ -7,7 +7,7 @@ const VehicleOwnershipService = require('../../application/services/VehicleOwner
 const VehicleOwnershipRepositoryImpl = require('../../infrastructure/repositories/VehicleOwnershipRepositoryImpl');
 const VehicleModelController = require('../controllers/VehicleModelController');
 const VehicleModelRepository = require('../../infrastructure/repositories/VehicleModelRepository');
-const { authenticate } = require('../../middlewares/auth');
+const { authenticate, authorize } = require('../../middlewares/auth');
 const { trackActivity } = require('../../middlewares');
 
 function buildVehicleRouter() {
@@ -27,6 +27,9 @@ function buildVehicleRouter() {
   router.use(authenticate, trackActivity);
   router.get('/search', searchController.search);
   router.get('/models', modelController.list);
+  router.get('/models/segments', modelController.listSegments);
+  // Them dong xe vao danh muc - chi Quan ly (giong quyen import khach hang).
+  router.post('/models', authorize('manager'), modelController.create);
   router.get('/:id/owners', ownershipController.getHistory);
   router.post('/:id/transfer', ownershipController.transfer);
 

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency, formatDate } from '../../utils';
 import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
-import { listCustomersApi, getCustomerApi, updateCustomerApi, importCustomersApi } from '../../services/customerApi';
-import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi } from '../../services/vehicleApi';
+import { listCustomersApi, getCustomerApi, updateCustomerApi, importCustomersApi, addCustomerVehicleApi } from '../../services/customerApi';
+import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi, listVehicleModelsApi, listVehicleSegmentsApi, createVehicleModelApi } from '../../services/vehicleApi';
 import { STATUS_LABELS } from '../repairsettlement/mockData';
 import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
 import { useAuth } from '../../contexts';
@@ -553,6 +553,130 @@ function VehicleHistoryModal({ vehicle, onClose, onTransferred }) {
   );
 }
 
+// ─── Form "Thêm xe" cho khách đã có - thay cho việc phải chèn thẳng vào DB ──
+// Dòng xe BẮT BUỘC chọn từ catalog (modelId) giống form quyết toán, để sau
+// này lọc được gói bảo dưỡng và tra đúng định mức phụ tùng theo đời xe.
+const EMPTY_VEHICLE_FORM = { licensePlate: '', modelId: '', frameNumber: '', engineNumber: '', manufactureYear: '', color: '', currentKm: '' };
+
+function AddVehicleForm({ customerId, onAdded, onCancel }) {
+  const [form, setForm] = useState(EMPTY_VEHICLE_FORM);
+  const [models, setModels] = useState([]);
+  const [modelSearch, setModelSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    listVehicleModelsApi()
+      .then((res) => setModels(Array.isArray(res) ? res : (res?.items || [])))
+      .catch(() => setModels([]));
+  }, []);
+
+  const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const term = modelSearch.trim().toLowerCase();
+  const visibleModels = term
+    ? models.filter((m) => (m.displayName || '').toLowerCase().includes(term))
+    : models;
+  const pickedModel = models.find((m) => String(m.id) === String(form.modelId));
+
+  const canSave = Boolean(form.licensePlate.trim()) && Boolean(form.modelId) && !saving;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await addCustomerVehicleApi(customerId, {
+        licensePlate: form.licensePlate,
+        modelId: Number(form.modelId),
+        frameNumber: form.frameNumber || null,
+        engineNumber: form.engineNumber || null,
+        manufactureYear: form.manufactureYear === '' ? null : Number(form.manufactureYear),
+        color: form.color || null,
+        currentKm: form.currentKm === '' ? 0 : Number(form.currentKm),
+      });
+      onAdded?.();
+    } catch (err) {
+      setError(err.message || 'Không thêm được xe');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} style={{ border: '1px dashed var(--primary)', borderRadius: 8, padding: '14px 16px', marginBottom: 12, background: '#F8F9FF' }}>
+      <div style={{ fontWeight: 700, marginBottom: 10 }}>Thêm xe mới cho khách hàng</div>
+      {error && (
+        <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>{error}</div>
+      )}
+      <div className="form-grid form-grid-2">
+        <div className="form-group">
+          <label className="form-label required">Biển số xe</label>
+          <input className="form-input" placeholder="VD: 30A-123.45 hoặc 30A-02465" value={form.licensePlate}
+            onChange={(e) => setF('licensePlate', e.target.value.toUpperCase())} autoFocus />
+        </div>
+        <div className="form-group">
+          <label className="form-label required">Dòng xe</label>
+          {pickedModel ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input className="form-input" value={pickedModel.displayName} readOnly style={{ flex: 1, background: '#EEF2FF', fontWeight: 600 }} />
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setF('modelId', ''); setModelSearch(''); }}>Đổi</button>
+            </div>
+          ) : (
+            <div style={{ position: 'relative' }}>
+              <input className="form-input" placeholder="Gõ để tìm dòng xe..." value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)} />
+              {(term || visibleModels.length <= 12) && visibleModels.length > 0 && (
+                <div style={{
+                  position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 20, marginTop: 4,
+                  background: '#fff', border: '1px solid var(--gray-200)', borderRadius: 8,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
+                }}>
+                  {visibleModels.map((m) => (
+                    <div key={m.id} onClick={() => { setF('modelId', String(m.id)); setModelSearch(''); }}
+                      style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--gray-100)' }}>
+                      {m.displayName}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {term && visibleModels.length === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>Không có dòng xe nào khớp.</div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="form-group">
+          <label className="form-label">Số khung</label>
+          <input className="form-input" value={form.frameNumber} onChange={(e) => setF('frameNumber', e.target.value.toUpperCase())} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Số máy</label>
+          <input className="form-input" value={form.engineNumber} onChange={(e) => setF('engineNumber', e.target.value.toUpperCase())} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Năm sản xuất</label>
+          <input className="form-input" type="number" min="1980" max={new Date().getFullYear() + 1} value={form.manufactureYear}
+            onChange={(e) => setF('manufactureYear', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Màu xe</label>
+          <input className="form-input" value={form.color} onChange={(e) => setF('color', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Km hiện tại</label>
+          <input className="form-input" type="number" min="0" step="1" value={form.currentKm}
+            onChange={(e) => setF('currentKm', e.target.value)} placeholder="0" />
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+        <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={saving}>Hủy</button>
+        <button type="submit" className="btn btn-primary" disabled={!canSave}>{saving ? 'Đang lưu...' : 'Lưu xe'}</button>
+      </div>
+    </form>
+  );
+}
+
 // ─── Modal chi tiết khách hàng: tab Thông tin (xem/sửa) + tab Lịch sử ──
 function CustomerDetailModal({ customerId, onClose, onUpdated }) {
   const [customer, setCustomer] = useState(null);
@@ -564,6 +688,7 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [vehicleView, setVehicleView] = useState(null);
+  const [addingVehicle, setAddingVehicle] = useState(false);
 
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -710,8 +835,20 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
                   ))}
                 </div>
 
-                <div className="form-section-title">Xe của khách hàng ({customer.vehicles.length})</div>
-                {customer.vehicles.length === 0 && (
+                <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Xe của khách hàng ({customer.vehicles.length})</span>
+                  {!addingVehicle && (
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => setAddingVehicle(true)}>+ Thêm xe</button>
+                  )}
+                </div>
+                {addingVehicle && (
+                  <AddVehicleForm
+                    customerId={customerId}
+                    onCancel={() => setAddingVehicle(false)}
+                    onAdded={() => { setAddingVehicle(false); reloadAfterTransfer(); }}
+                  />
+                )}
+                {customer.vehicles.length === 0 && !addingVehicle && (
                   <p style={{ color: 'var(--gray-500)', fontSize: 13 }}>Khách hàng chưa có xe nào.</p>
                 )}
                 {customer.vehicles.map((v) => (
@@ -910,6 +1047,126 @@ function CustomerDetailModal({ customerId, onClose, onUpdated }) {
 }
 
 // ─── Modal nhập khách hàng (kèm 1 xe/dòng) từ file Excel ──────────────
+// ─── Modal "Thêm dòng xe" vào danh mục vehicle_models (Manager) ─────────
+// Thay cho việc phải chèn thẳng vào DB. Mỗi dòng = 1 đời xe + 1 phiên bản
+// (VD Mazda CX-5 / KF / Luxury). Phân khúc lấy từ DB, không hard-code.
+const EMPTY_MODEL_FORM = { modelLine: '', generationCode: '', trimName: '', segment: '', displayName: '' };
+
+function AddVehicleModelModal({ onClose, onCreated }) {
+  const [form, setForm] = useState(EMPTY_MODEL_FORM);
+  const [segments, setSegments] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [created, setCreated] = useState(null);
+
+  useEffect(() => {
+    listVehicleSegmentsApi()
+      .then((res) => setSegments(Array.isArray(res) ? res : []))
+      .catch(() => setSegments([]));
+  }, []);
+
+  const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  // Goi y ten hien thi theo dung mau dang co ("Mazda CX-5 2.0 Luxury") -
+  // van cho sua tay vi dung tich (2.0/1.5) khong co trong cac cot con lai.
+  const suggestDisplayName = () => {
+    if (form.displayName) return;
+    const line = form.modelLine.trim();
+    if (!line) return;
+    const prefix = /^mazda/i.test(line) ? line : `Mazda ${line}`;
+    setF('displayName', `${prefix}${form.trimName ? ` ${form.trimName.trim()}` : ''}`);
+  };
+
+  const canSave = Boolean(form.modelLine.trim() && form.generationCode.trim() && form.trimName.trim()
+    && form.segment && form.displayName.trim()) && !saving;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const res = await createVehicleModelApi(form);
+      setCreated(res);
+      onCreated?.(res);
+    } catch (err) {
+      setError(err.message || 'Không thêm được dòng xe');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">Thêm dòng xe vào danh mục</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={submit}>
+          <div className="modal-body">
+            {created ? (
+              <div style={{ background: '#E8F5E9', borderRadius: 8, padding: '12px 14px', color: '#1B5E20', fontSize: 14 }}>
+                Đã thêm <b>{created.displayName}</b> vào danh mục. Dòng xe này giờ chọn được khi đăng ký xe / lập phiếu.
+              </div>
+            ) : (
+              <>
+                {error && (
+                  <div style={{ background: '#FFEBEE', borderRadius: 6, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#C62828' }}>{error}</div>
+                )}
+                <div className="form-grid form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label required">Dòng xe</label>
+                    <input className="form-input" placeholder="VD: CX-5, Mazda3, BT-50" value={form.modelLine}
+                      onChange={(e) => setF('modelLine', e.target.value)} onBlur={suggestDisplayName} autoFocus />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label required">Mã đời xe</label>
+                    <input className="form-input" placeholder="VD: KF, BP, 2021-nay" value={form.generationCode}
+                      onChange={(e) => setF('generationCode', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label required">Phiên bản</label>
+                    <input className="form-input" placeholder="VD: Luxury, Premium" value={form.trimName}
+                      onChange={(e) => setF('trimName', e.target.value)} onBlur={suggestDisplayName} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label required">Phân khúc</label>
+                    <select className="form-input" value={form.segment} onChange={(e) => setF('segment', e.target.value)}>
+                      <option value="">-- Chọn phân khúc --</option>
+                      {segments.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label className="form-label required">Tên hiển thị</label>
+                    <input className="form-input" placeholder="VD: Mazda CX-5 2.0 Luxury" value={form.displayName}
+                      onChange={(e) => setF('displayName', e.target.value)} />
+                    <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
+                      Tên này hiện ở mọi nơi chọn dòng xe — nên ghi đủ dung tích/dẫn động như các dòng đang có.
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="modal-footer">
+            {created ? (
+              <>
+                <button type="button" className="btn btn-secondary" onClick={() => { setCreated(null); setForm(EMPTY_MODEL_FORM); }}>Thêm dòng khác</button>
+                <button type="button" className="btn btn-primary" onClick={onClose}>Đóng</button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Hủy</button>
+                <button type="submit" className="btn btn-primary" disabled={!canSave}>{saving ? 'Đang lưu...' : 'Thêm dòng xe'}</button>
+              </>
+            )}
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function ImportCustomersModal({ onClose, onImported }) {
   const [file, setFile] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -1038,6 +1295,7 @@ function CustomerList() {
   const [loadError, setLoadError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [showImport, setShowImport] = useState(false);
+  const [showAddModel, setShowAddModel] = useState(false);
 
   const { user } = useAuth();
   const canImport = normalizeRoles(user?.roles).some((r) => IMPORT_ALLOWED_ROLES.includes(r));
@@ -1073,7 +1331,10 @@ function CustomerList() {
           <div className="breadcrumb">Trang chủ / Khách hàng / Danh sách khách hàng</div>
         </div>
         {canImport && (
-          <div className="page-header-right">
+          <div className="page-header-right" style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowAddModel(true)}>
+              + Thêm dòng xe
+            </button>
             <button type="button" className="btn btn-primary" onClick={() => setShowImport(true)}>
               + Thêm khách hàng
             </button>
@@ -1112,14 +1373,14 @@ function CustomerList() {
       <div className="table-wrapper">
         <table className="data-table">
           <thead>
-            <tr><th>Họ và tên</th><th>Số điện thoại</th><th>Địa chỉ</th><th>Xe</th><th style={{ textAlign: 'center' }}>Lịch sử DV</th><th>Thao tác</th></tr>
+            <tr><th>Mã KH</th><th>Họ và tên</th><th>Số điện thoại</th><th>Địa chỉ</th><th>Xe</th><th style={{ textAlign: 'center' }}>Lịch sử DV</th><th>Thao tác</th></tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={6}><div className="empty-state"><p>Đang tải danh sách khách hàng…</p></div></td></tr>
+              <tr><td colSpan={7}><div className="empty-state"><p>Đang tải danh sách khách hàng…</p></div></td></tr>
             )}
             {!loading && items.length === 0 && (
-              <tr><td colSpan={6}>
+              <tr><td colSpan={7}>
                 <div className="empty-state">
                   <h3>Không tìm thấy khách hàng</h3>
                 </div>
@@ -1127,6 +1388,7 @@ function CustomerList() {
             )}
             {items.map((c) => (
               <tr key={c.id}>
+                <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{c.customerCode || '—'}</span></td>
                 <td style={{ fontWeight: 700 }}>{c.fullName}</td>
                 <td style={{ fontSize: 13 }}>{c.phone}</td>
                 <td style={{ fontSize: 12, color: 'var(--gray-600)', maxWidth: 220 }}>{c.address || '—'}</td>
@@ -1170,6 +1432,9 @@ function CustomerList() {
         <CustomerDetailModal customerId={selectedId} onClose={() => setSelectedId(null)} onUpdated={load} />
       )}
 
+      {showAddModel && (
+        <AddVehicleModelModal onClose={() => setShowAddModel(false)} />
+      )}
       {showImport && (
         <ImportCustomersModal onClose={() => setShowImport(false)} onImported={load} />
       )}

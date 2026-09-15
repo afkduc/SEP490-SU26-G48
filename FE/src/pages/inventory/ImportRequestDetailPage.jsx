@@ -31,7 +31,6 @@ export default function ImportRequestDetailPage() {
 
   const meta = STATUS_META[data.status] || { label: data.status, className: '' };
   const items = data.items || [];
-  const totalQty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
   return (
     <div className="ir-detail">
       <div className="ir-detail__header">
@@ -64,7 +63,7 @@ export default function ImportRequestDetailPage() {
 
         <div className="ir-detail__section">
           <h2 className="ir-detail__section-title">
-            Danh sách phụ tùng ({items.length} dòng, tổng SL: {totalQty})
+            Danh sách phụ tùng ({items.length} dòng)
           </h2>
           {items.length === 0 ? (
             <p className="ir-detail__empty">Phiếu không có dòng phụ tùng nào.</p>
@@ -91,12 +90,6 @@ export default function ImportRequestDetailPage() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={4} className="text-right"><strong>Tổng cộng</strong></td>
-                    <td className="text-right"><strong>{totalQty}</strong></td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           )}

@@ -84,6 +84,17 @@ test('requires at least two characters when searching parts', async () => {
   await assert.rejects(() => makeService().searchProducts('l', 1), (error) => error.statusCode === 400);
 });
 
+test('part search keeps parts of other vehicle models, only ranks the current model first', async () => {
+  const products = [
+    item({ id: 1, productCode: 'PT-1', productName: 'Lọc dầu [BT50]', modelId: 11 }),
+    item({ id: 2, productCode: 'PT-2', productName: 'Lọc dầu chung', modelId: null }),
+    item({ id: 3, productCode: 'PT-3', productName: 'Lọc dầu [MZ3]', modelId: 2 }),
+  ];
+  const result = await makeService({ findAllActiveProducts: async () => products }).searchProducts('loc dau', 1, 2);
+  // Khong loai bo doi xe khac (BT50 van co), dung doi -> dung chung -> doi khac.
+  assert.deepEqual(result.map((p) => p.productCode), ['PT-3', 'PT-2', 'PT-1']);
+});
+
 test('returns top-used parts for the selected period', async () => {
   let received;
   const service = makeService({ getTopUsedPartsStats: async (...args) => { received = args; return [{ productId: 1, productName: 'Lọc dầu' }]; } });

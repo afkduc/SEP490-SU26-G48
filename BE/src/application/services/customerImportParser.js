@@ -1,8 +1,8 @@
 const ExcelJS = require('exceljs');
 const ApiError = require('../../utils/ApiError');
 const { normalizeVietnamese } = require('../../utils/vietnamese');
+const { getCustomerFieldErrors } = require('./customerValidation');
 
-const PHONE_REGEX = /^0[0-9]{9,10}$/;
 const MAX_ROWS = 1000;
 
 // Tu khoa nhan dien ten cot (da chuan hoa: khong dau, chu thuong, khong khoang trang/dau cau)
@@ -121,24 +121,35 @@ async function parseCustomerImportFile(buffer) {
 
     if (!fullName && !phone && !licensePlate) continue; // dòng trống bỏ qua, không tính vào kết quả
 
-    const errors = [];
-    if (!fullName) errors.push('Thiếu họ và tên');
-    if (!phone || !PHONE_REGEX.test(phone)) errors.push('Số điện thoại không hợp lệ');
+    // Ngay sinh: neu o Excel co ghi ma khong doc duoc thi bao loi, khong
+    // lang le luu NULL (nguoi nhap se tuong da vao).
+    const rawDob = get('dateOfBirth');
+    const dateOfBirth = toDate(rawDob);
+    const dobUnreadable = rawDob != null && toStr(rawDob) !== '' && dateOfBirth === null;
+
+    const customer = {
+      fullName,
+      phone,
+      cccd: toStr(get('cccd')) || null,
+      dateOfBirth,
+      email: toStr(get('email')) || null,
+      address: toStr(get('address')) || null,
+      taxCode: toStr(get('taxCode')) || null,
+      contactName: toStr(get('contactName')) || null,
+      contactPhone: toStr(get('contactPhone')) || null,
+    };
+
+    // Dung chung 1 bo rang buoc voi form sua khach hang - khong de Excel
+    // "lach" duoc du lieu ma form khong cho.
+    const errors = getCustomerFieldErrors(customer);
+    if (dobUnreadable) errors.push('Ngày sinh không đúng định dạng (dd/mm/yyyy)');
     if (!licensePlate) errors.push('Thiếu biển số xe');
 
     rows.push({
       rowNumber: r,
       errors,
       payload: {
-        fullName,
-        phone,
-        cccd: toStr(get('cccd')) || null,
-        dateOfBirth: toDate(get('dateOfBirth')),
-        email: toStr(get('email')) || null,
-        address: toStr(get('address')) || null,
-        taxCode: toStr(get('taxCode')) || null,
-        contactName: toStr(get('contactName')) || null,
-        contactPhone: toStr(get('contactPhone')) || null,
+        ...customer,
         licensePlate,
         vehicleModel: toStr(get('vehicleModel')) || null,
         frameNumber: toStr(get('frameNumber')) || null,
@@ -153,4 +164,4 @@ async function parseCustomerImportFile(buffer) {
   return rows;
 }
 
-module.exports = { parseCustomerImportFile, PHONE_REGEX };
+module.exports = { parseCustomerImportFile };

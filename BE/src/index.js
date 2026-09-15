@@ -325,6 +325,50 @@ async function start() {
       process.exit(1);
     }
 
+    // Gio chinh xac cua tung giao dich kho (inventory_transactions.created_at)
+    // - PHAI chay SAU ensureExportPickups vi backfill doc export_request_pickups.
+    // KHONG duoc nuot loi: bieu do lich su ton kho SELECT thang cot nay.
+    try {
+      const { ensureInventoryTransactionCreatedAt } = require('./infrastructure/database/ensureInventoryTransactionCreatedAt');
+      const r = await ensureInventoryTransactionCreatedAt();
+      console.log(r.skipped
+        ? '[BE] gio giao dich kho: da co tu truoc, bo qua'
+        : `[BE] gio giao dich kho: DA THEM XONG (${r.steps} buoc)`);
+    } catch (itErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them gio giao dich kho that bai:');
+      console.error(itErr.message);
+      process.exit(1);
+    }
+
+    // Ma khach hang (customers.customer_code) bat buoc - khong khach nao duoc
+    // de trong. Doi rang buoc cot nen KHONG duoc nuot loi.
+    try {
+      const { ensureCustomerCodeNotNull } = require('./infrastructure/database/ensureCustomerCodeNotNull');
+      const r = await ensureCustomerCodeNotNull();
+      console.log(r.skipped
+        ? '[BE] ma khach hang bat buoc: da siet tu truoc, bo qua'
+        : `[BE] ma khach hang bat buoc: DA SIET XONG (${r.steps} buoc)`);
+    } catch (ccErr) {
+      console.error('[BE] KHONG THE KHOI DONG - siet ma khach hang that bai:');
+      console.error(ccErr.message);
+      process.exit(1);
+    }
+
+    // vehicle_models.year_from -> NULL (chi la ghi chu, khong logic nao dung;
+    // form them dong xe khong bat nhap nua). Doi rang buoc cot nen KHONG
+    // duoc nuot loi.
+    try {
+      const { ensureVehicleModelYearOptional } = require('./infrastructure/database/ensureVehicleModelYearOptional');
+      const r = await ensureVehicleModelYearOptional();
+      console.log(r.skipped
+        ? '[BE] nam san xuat dong xe: da noi tu truoc, bo qua'
+        : `[BE] nam san xuat dong xe: DA NOI XONG (${r.steps} buoc)`);
+    } catch (vmErr) {
+      console.error('[BE] KHONG THE KHOI DONG - noi cot nam san xuat dong xe that bai:');
+      console.error(vmErr.message);
+      process.exit(1);
+    }
+
     const server = http.createServer({ maxHeaderSize: 32768 }, app);
     server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);

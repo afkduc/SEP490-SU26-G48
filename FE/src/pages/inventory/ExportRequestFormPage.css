@@ -241,6 +241,14 @@
   margin: 0;
 }
 
+.er-form__items-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.er-form__history-btn { white-space: nowrap; }
+
 .er-form__empty {
   padding: 16px;
   text-align: center;

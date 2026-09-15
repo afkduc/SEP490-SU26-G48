@@ -34,6 +34,7 @@ function buildCustomerRouter() {
   router.get('/', controller.getAll);
   router.get('/:id', controller.getById);
   router.put('/:id', controller.update);
+  router.post('/:id/vehicles', controller.addVehicle);
   router.post('/import', authorize('manager'), upload.single('file'), controller.importExcel);
 
   return router;

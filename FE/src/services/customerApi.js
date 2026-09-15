@@ -16,6 +16,15 @@ export async function updateCustomerApi(id, data) {
   return httpClient.put(`/customers/${id}`, data);
 }
 
+/**
+ * Them 1 xe cho khach da co. BE: POST /api/customers/:id/vehicles
+ * payload: { licensePlate, modelId (bat buoc, chon tu catalog), frameNumber?,
+ *            engineNumber?, manufactureYear?, color?, currentKm? }
+ */
+export async function addCustomerVehicleApi(customerId, data) {
+  return httpClient.post(`/customers/${customerId}/vehicles`, data);
+}
+
 export async function importCustomersApi(file) {
   const formData = new FormData();
   formData.append('file', file);

@@ -105,6 +105,17 @@
   margin: 0 0 12px;
 }
 
+.er-detail__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.er-detail__section-head .er-detail__section-title { margin: 0; }
+.er-detail .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
 .er-detail__empty {
   padding: 16px;
   text-align: center;

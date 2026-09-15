@@ -45,6 +45,16 @@ class ProductController {
     }
   };
 
+  // GET /products/:id/stock-history - bieu do bien dong ton kho cua 1 phu tung.
+  getStockHistory = async (req, res, next) => {
+    try {
+      const data = await this.productService.getStockHistory(req.params.id);
+      return success(res, data, 'Stock history retrieved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   create = async (req, res, next) => {
     try {
       const payload = { ...req.body };

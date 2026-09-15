@@ -243,6 +243,43 @@ async getDistinctCategories() {
     const result = await query(`SELECT id, unit_name FROM units ORDER BY unit_name`);
     return result.recordset.map((r) => ({ id: r.id, name: r.unit_name }));
   }
+
+  /**
+   * Lich su bien dong ton kho cua 1 phu tung - moi dong la 1 giao dich trong
+   * so cai inventory_transactions, kem ma phieu goc (phieu nhap hoac phieu
+   * xuat = ma lenh sua chua) va gio chinh xac. Sap xep cu -> moi de FE ve
+   * bieu do va tinh so du sau moi giao dich.
+   */
+  async findStockHistory(productId) {
+    const result = await query(
+      `SELECT
+         it.id,
+         it.transaction_type,
+         it.quantity,
+         it.transaction_code,
+         COALESCE(it.created_at, CAST(it.transaction_date AS DATETIME)) AS happened_at,
+         ir.request_code AS import_code,
+         er.request_code AS export_code,
+         COALESCE(NULLIF(LTRIM(RTRIM(u.user_name)), N''), u.pseudo_id) AS performed_by_name
+       FROM inventory_transactions it
+       LEFT JOIN import_requests ir ON ir.id = it.import_request_id
+       LEFT JOIN export_requests er ON er.id = it.export_request_id
+       LEFT JOIN users u ON u.id = it.performed_by
+       WHERE it.product_id = @productId
+         AND it.status = 'completed'
+       ORDER BY happened_at ASC, it.id ASC`,
+      { productId }
+    );
+    return result.recordset.map((r) => ({
+      id: r.id,
+      type: r.transaction_type,
+      quantity: Number(r.quantity) || 0,
+      transactionCode: r.transaction_code,
+      happenedAt: r.happened_at,
+      slipCode: r.import_code || r.export_code || null,
+      performedByName: r.performed_by_name || null,
+    }));
+  }
 }
 
 module.exports = ProductRepositoryImpl;
