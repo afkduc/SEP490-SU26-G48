@@ -388,8 +388,12 @@ function PlaceholderPanel({ title, uc, description, actions, children }) {
 
 function RevenueOverviewPage() {
   const { user } = useAuth();
+  const today = new Date();
+  const defaultToDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState('all');
+  const [fromDate, setFromDate] = useState(`${today.getFullYear()}-01-01`);
+  const [toDate, setToDate] = useState(defaultToDate);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [branchStatsPage, setBranchStatsPage] = useState(1);
@@ -405,12 +409,18 @@ function RevenueOverviewPage() {
     branchStats: [],
   });
 
-  const loadRevenueReport = async (currentBranchId) => {
+  const loadRevenueReport = async (currentBranchId, currentFromDate = fromDate, currentToDate = toDate) => {
+    if (currentFromDate && currentToDate && currentFromDate > currentToDate) {
+      setError('Khoảng ngày không hợp lệ: Từ ngày phải trước hoặc bằng Đến ngày.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
       const response = await generalDirectorApi.getRevenueReports({
         branchId: currentBranchId,
+        fromDate: currentFromDate,
+        toDate: currentToDate,
       });
       setReport(response || {
         summary: {},
@@ -455,7 +465,9 @@ function RevenueOverviewPage() {
   }, []);
 
   useEffect(() => {
-    loadRevenueReport(branchId);
+    loadRevenueReport(branchId, fromDate, toDate);
+    // Ngày chỉ áp dụng khi người dùng nhấn nút; đổi chi nhánh thì tải lại ngay.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchId]);
 
   const summary = report?.summary || {};
@@ -465,7 +477,7 @@ function RevenueOverviewPage() {
 
   useEffect(() => {
     setBranchStatsPage(1);
-  }, [branchId]);
+  }, [branchId, fromDate, toDate]);
 
   useEffect(() => {
     if (branchStatsPagination.currentPage !== branchStatsPage) {
@@ -514,6 +526,19 @@ function RevenueOverviewPage() {
                 <option key={branch.id} value={branch.id}>{branch.name}</option>
               ))}
             </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+              <label style={{ fontSize: 12 }}>
+                Từ ngày
+                <input className="form-input" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+              </label>
+              <label style={{ fontSize: 12 }}>
+                Đến ngày
+                <input className="form-input" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+              </label>
+            </div>
+            <button type="button" className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: 10 }} onClick={() => loadRevenueReport(branchId, fromDate, toDate)}>
+              Áp dụng khoảng ngày
+            </button>
             <div style={{ marginTop: 10, fontSize: 12, opacity: 0.78 }}>Đang xem: {selectedBranchName}</div>
           </div>
         </div>

@@ -9,6 +9,7 @@ import './LoginPage.css';
 const WRONG_BRANCH_MESSAGE = 'Tài khoản của bạn không có quyền đăng nhập vào chi nhánh này';
 const LOGIN_REMEMBER_PREF_KEY = 'login_remember_pref';
 const LOGIN_IDENTIFIER_KEY = 'login_saved_identifier';
+const EMAIL_MAX_LENGTH = 255;
 
 function readRememberPref() {
   try {
@@ -147,7 +148,15 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.identifier || !form.password) {
-      setError('Vui lòng nhập đầy đủ email/số điện thoại và mật khẩu');
+      setError('Vui lòng nhập đầy đủ email và mật khẩu');
+      return;
+    }
+    if (form.identifier.trim().length > EMAIL_MAX_LENGTH) {
+      setError(`Email không được vượt quá ${EMAIL_MAX_LENGTH} ký tự`);
+      return;
+    }
+    if (!form.identifier.includes('@')) {
+      setError('Vui lòng đăng nhập bằng email được cấp');
       return;
     }
     if (branchRequired && !form.branchId) {
@@ -172,12 +181,12 @@ export default function LoginPage() {
 
         <div className="login-panel-right">
           <h2 className="login-title">Đăng nhập</h2>
-          <p className="login-subtitle">Dùng email hoặc số điện thoại đã đăng ký</p>
+          <p className="login-subtitle">Dùng email được cấp để đăng nhập</p>
 
           <form className="login-form" onSubmit={handleSubmit} noValidate>
             <div className="login-field">
               <label htmlFor="identifier">
-                Email hoặc số điện thoại <span className="required">*</span>
+                Email <span className="required">*</span>
               </label>
               <input
                 id="identifier"
@@ -186,7 +195,7 @@ export default function LoginPage() {
                 autoComplete="username"
                 value={form.identifier}
                 onChange={handleChange}
-                placeholder="email@autogara.vn hoặc 09xxxxxxxx"
+                placeholder="email@autogara.vn"
               />
             </div>
 

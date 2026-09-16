@@ -6,6 +6,7 @@ const config = require('../../config');
 const PermissionService = require('./PermissionService');
 const RoleRepositoryImpl = require('../../infrastructure/repositories/RoleRepositoryImpl');
 const PendingLoginStore = require('./PendingLoginStore');
+const { EMAIL_MAX_LENGTH } = require('../../utils/fieldValidation');
 
 // Khớp loginSessionCleanupJob: mặc định 30 phút không heartbeat = đóng tab / hết phiên.
 const STALE_MINUTES = parseInt(process.env.LOGIN_SESSION_STALE_MINUTES || '30', 10);
@@ -111,12 +112,24 @@ class AuthService {
       throw e;
     }
 
+    const email = String(identifier).trim();
+    if (email.length > EMAIL_MAX_LENGTH) {
+      const e = new ApiError(400, `Email không được vượt quá ${EMAIL_MAX_LENGTH} ký tự`);
+      e.audit = { skip: true };
+      throw e;
+    }
+    if (!email.includes('@')) {
+      const e = new ApiError(400, 'Vui lòng đăng nhập bằng email được cấp');
+      e.audit = { skip: true };
+      throw e;
+    }
+
     // Hoàn tất sau khi phiên cũ đã approve (legacy, chỉ khi LOGIN_CHALLENGE_ENABLED)
     if (pendingId) {
       return this._completePendingLogin(pendingId, identifier, password);
     }
 
-    const user = await this.authRepository.findUserByEmailOrPhone(identifier);
+    const user = await this.authRepository.findUserByEmailOrPhone(email);
     if (!user) {
       const e = new ApiError(401, 'Email/số điện thoại hoặc mật khẩu không đúng');
       e.audit = { userExists: false };

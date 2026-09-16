@@ -9,6 +9,7 @@ function mockRepo(overrides = {}) {
     countPendingByBranch: async () => 0,
     findById: async () => null,
     acceptAtomic: async () => null,
+    findAppointmentById: async () => null,
     createAppointment: async () => {},
     updateAppointment: async () => {},
     cancelAppointment: async () => {},
@@ -173,6 +174,50 @@ test('createAppointment only owner can create', async () => {
         { userId: 99, branchId: 1 },
       ),
     (err) => err.statusCode === 403,
+  );
+});
+
+test('createAppointment rejects a second appointment for the same request', async () => {
+  const service = new ServiceRequestService({
+    serviceRequestRepository: mockRepo({
+      findById: async () => ({
+        id: 10,
+        nearestBranchId: 1,
+        status: 'accepted',
+        acceptedBy: 5,
+        appointment: { id: 3, status: 'scheduled', appointmentAt: '2099-12-20T09:00:00+07:00' },
+      }),
+    }),
+  });
+
+  await assert.rejects(
+    () => service.createAppointment(10, { appointmentAt: '2099-12-20T09:00:00+07:00' }, { userId: 5, branchId: 1 }),
+    (err) => err.statusCode === 409 && /lịch hẹn/i.test(err.message),
+  );
+});
+
+test('cancelled appointment cannot be edited or recreated', async () => {
+  const request = {
+    id: 10,
+    nearestBranchId: 1,
+    status: 'accepted',
+    acceptedBy: 5,
+    appointment: { id: 3, serviceRequestId: 10, status: 'cancelled' },
+  };
+  const service = new ServiceRequestService({
+    serviceRequestRepository: mockRepo({
+      findById: async () => request,
+      findAppointmentById: async () => request.appointment,
+    }),
+  });
+
+  await assert.rejects(
+    () => service.createAppointment(10, { appointmentAt: '2099-12-20T09:00:00+07:00' }, { userId: 5, branchId: 1 }),
+    (err) => err.statusCode === 409 && /đã hủy/i.test(err.message),
+  );
+  await assert.rejects(
+    () => service.updateAppointment(10, 3, { appointmentAt: '2099-12-21T09:00:00+07:00' }, { userId: 5, branchId: 1 }),
+    (err) => err.statusCode === 409 && /đã hủy/i.test(err.message),
   );
 });
 

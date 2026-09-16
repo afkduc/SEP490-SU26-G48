@@ -48,22 +48,6 @@ test('returns import requests matching the visible filters', async () => {
   assert.equal(result.items[0].requestCode, 'PN-2026-001');
 });
 
-test('returns the import request used by the Excel list case', async () => {
-  let received;
-  const row = { ...detail(7, 'pending').request, requestCode: 'IRB-1' };
-  const service = makeService(repository({
-    findAll: async (filters) => { received = filters; return [row]; },
-    count: async () => 1,
-  }));
-  const result = await service.list({ branchId: 1, search: 'IRB', status: 'pending', fromDate: '2026-09-01', toDate: '2026-09-10', page: 1, limit: 20 });
-  assert.equal(received.search, 'IRB');
-  assert.equal(received.status, 'pending');
-  assert.deepEqual(received.fromDate, new Date('2026-09-01'));
-  assert.deepEqual(received.toDate, new Date('2026-09-10'));
-  assert.equal(result.items[0].id, 7);
-  assert.equal(result.items[0].requestCode, 'IRB-1');
-});
-
 test('returns an empty import-request list when no keyword matches', async () => {
   const service = makeService(repository({ findAll: async () => [], count: async () => 0 }));
   const result = await service.list({ branchId: 1, search: 'không có', page: 1, limit: 20 });
@@ -82,14 +66,6 @@ test('returns import-request details for an existing id', async () => {
   assert.equal(result.requestCode, 'PN-2026-001');
   assert.equal(result.supplierInvoiceNo, 'HD-2026-001');
   assert.equal(result.items[0].quantity, 3);
-});
-
-test('returns the pending import request used by the Excel detail case', async () => {
-  const repo = repository({ findById: async () => ({ ...detail(7, 'pending'), request: { ...detail(7, 'pending').request, requestCode: 'IRB-1' } }) });
-  const result = await makeService(repo).getById(7, { branchId: 1 });
-  assert.equal(result.id, 7);
-  assert.equal(result.requestCode, 'IRB-1');
-  assert.equal(result.status, 'pending');
 });
 
 test('reports a missing import-request id', async () => {

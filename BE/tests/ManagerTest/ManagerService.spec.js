@@ -58,6 +58,7 @@ function mockRepo(overrides = {}) {
       id: 501
     }],
     nextServiceCode: async () => 'SV-001',
+    findServiceByCode: async () => null,
     createService: async data => ({
       id: 200,
       ...data
@@ -394,7 +395,8 @@ test('Thông báo khi mã dịch vụ không tồn tại', async () => {
 });
 function baseServicePayload(overrides = {}) {
   return {
-    serviceName: 'Thay dầu máy',
+    serviceCode: 'SV-TEST-001',
+    serviceName: 'Dịch vụ kiểm thử',
     unitPrice: 500000,
     durationMin: 30,
     repairCategory: 'PM',
@@ -469,20 +471,26 @@ test("createService validates parts: shape, duplicates, and branch ownership - c
     }]
   })), err => err.statusCode === 400 && /không thuộc chi nhánh/i.test(err.message));
 });
-test("createService succeeds with generated service code - case 01", async () => {
+test('createService succeeds with a unique code and a valid part', async () => {
   const service = new ManagerService(mockRepo());
   const created = await service.createService(1, baseServicePayload());
-  assert.equal(created.serviceCode, 'SV-001');
-});
-test("createService succeeds with generated service code - case 02", async () => {
-  const service = new ManagerService(mockRepo());
-  const created = await service.createService(1, baseServicePayload());
+  assert.equal(created.serviceCode, 'SV-TEST-001');
   assert.equal(created.unitPrice, 500000);
-  assert.equal(created.serviceName, 'Thay dầu máy');
+  assert.equal(created.serviceName, 'Dịch vụ kiểm thử');
   assert.equal(created.durationMin, 30);
   assert.equal(created.repairCategory, 'PM');
   assert.equal(created.description, 'Thay dầu động cơ');
   assert.deepEqual(created.parts, [{ productId: 500, quantity: 1 }]);
+});
+
+test('createService rejects a duplicate service code in the branch', async () => {
+  const service = new ManagerService(mockRepo({
+    findServiceByCode: async () => ({ id: 33, code: 'SV-HCM-033' }),
+  }));
+  await assert.rejects(
+    () => service.createService(2, baseServicePayload({ serviceCode: 'SV-HCM-033' })),
+    (err) => err.statusCode === 409 && /mã dịch vụ đã tồn tại/i.test(err.message),
+  );
 });
 test('Thông báo khi cập nhật dịch vụ không tồn tại', async () => {
   const serviceMissing = new ManagerService(mockRepo({
@@ -518,7 +526,7 @@ test('Cập nhật dịch vụ và giữ trạng thái hoạt động', async ()
   const resultNoChange = await serviceNoChange.updateService(1, 1, baseServicePayload({
     isActive: true
   }));
-  assert.equal(resultNoChange.serviceName, 'Thay dầu máy');
+  assert.equal(resultNoChange.serviceName, 'Dịch vụ kiểm thử');
   assert.equal(resultNoChange.unitPrice, 500000);
   assert.equal(resultNoChange.durationMin, 30);
   assert.equal(resultNoChange.repairCategory, 'PM');

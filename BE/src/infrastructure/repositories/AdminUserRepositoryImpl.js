@@ -25,7 +25,8 @@ function pushUserSearchCondition(conditions, params, paramIndex, search) {
   ];
   let next = paramIndex + 1;
   const phoneKey = `p${next}`;
-  if (bindPhoneDigitsLikeParam(params, phoneKey, search)) {
+  const phoneLikeSearch = /^[\d\s()+.\-]+$/.test(String(search).trim());
+  if (phoneLikeSearch && bindPhoneDigitsLikeParam(params, phoneKey, search)) {
     parts.push(sqlPhoneDigitsLike('u.phone', phoneKey));
     next += 1;
   }
@@ -250,6 +251,7 @@ class AdminUserRepositoryImpl {
     const result = await query(
       `SELECT id, role_name
        FROM   roles
+       WHERE  ISNULL(is_active, 1) = 1
        ORDER  BY role_name ASC`
     );
     return result.recordset.map((row) => ({
