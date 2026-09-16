@@ -6,6 +6,7 @@ import { PermissionGate } from '../../components/PermissionGate';
 import SignaturePad from '../repairsettlement/SignaturePad';
 import ExportPickupHistoryModal from './ExportPickupHistoryModal';
 import { getExportPickupsApi } from '../../services/exportRequestApi';
+import { normalizeVietnamese } from '../../utils/vietnamese';
 import './ExportRequestFormPage.css';
 
 // Trang thai 1 dong phu tung, tinh tu du lieu server tra ve:
@@ -72,12 +73,14 @@ export default function ExportRequestFormPage() {
   const signaturePadRef = useRef(null);
   const [signatureEmpty, setSignatureEmpty] = useState(true);
 
+  // So khop KHONG dau: go "thanh" phai ra "Lê Công Thành", go "ktv-hn-01"
+  // van ra ma thoi thuong.
   const visibleTechnicians = (() => {
-    const term = technicianSearchTerm.trim().toLowerCase();
+    const term = normalizeVietnamese(technicianSearchTerm.trim());
     if (!term) return [];
     return technicians.filter((t) =>
-      t.fullName.toLowerCase().includes(term)
-      || (t.employeeId || '').toLowerCase().includes(term));
+      normalizeVietnamese(t.fullName).includes(term)
+      || normalizeVietnamese(t.employeeId).includes(term));
   })();
 
   function handlePickTechnician(t) {

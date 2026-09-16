@@ -96,9 +96,8 @@ export default function ExportPickupHistoryModal({ exportRequestId, repairOrderC
                             <th>Mã phụ tùng</th>
                             <th>Tên phụ tùng</th>
                             <th>Đơn vị</th>
-                            <th style={{ width: 110 }}>Loại</th>
+                            <th style={{ width: 110 }}>Trạng thái</th>
                             <th className="text-right" style={{ width: 90 }}>Số lượng</th>
-                            <th>Mã giao dịch</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -114,7 +113,6 @@ export default function ExportPickupHistoryModal({ exportRequestId, repairOrderC
                                 </span>
                               </td>
                               <td className="text-right">{ln.type === 'return' ? `+${ln.quantity}` : `−${ln.quantity}`}</td>
-                              <td><span className="font-mono">{ln.transactionCode || '—'}</span></td>
                             </tr>
                           ))}
                         </tbody>

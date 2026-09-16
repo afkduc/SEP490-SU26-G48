@@ -736,10 +736,19 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
 
   /**
    * Dem so phieu xuat chua duoc Manager xem (dung cho badge do tren Navbar).
+   * Chi dem phieu ma danh sach cua Manager CO HIEN (RO da chot - cung dieu
+   * kien mac dinh cua buildExportRequestFilters); phieu cua RO con dang sua
+   * chua vao danh sach thi cung khong dem, neu khong badge bao 2 ma mo ra
+   * chi thay 1.
    */
   async countNewForManager(branchId) {
     const result = await query(
-      `SELECT COUNT(*) AS total FROM export_requests WHERE branch_id = @branchId AND seen_by_manager_at IS NULL`,
+      `SELECT COUNT(*) AS total
+       FROM export_requests er
+       LEFT JOIN repair_orders ro ON ro.id = er.repair_order_id
+       WHERE er.branch_id = @branchId
+         AND er.seen_by_manager_at IS NULL
+         AND (ro.id IS NULL OR ro.status NOT IN ('waiting_repair', 'inprogress'))`,
       { branchId }
     );
     return result.recordset[0].total;
