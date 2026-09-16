@@ -75,6 +75,32 @@ function mockRepo(overrides = {}) {
 
 // --- Revenue reports ---
 
+test('getRevenueReports passes a valid date range to the repository', async () => {
+  let received;
+  const service = new GeneralDirectorService(mockRepo({
+    getRevenueReports: async (filters) => {
+      received = filters;
+      return { summary: {}, monthlyTrend: [], branchStats: [] };
+    },
+  }));
+
+  await service.getRevenueReports({ branchId: 2, fromDate: '2026-01-01', toDate: '2026-12-31' });
+  assert.deepEqual(received, {
+    branchId: 2,
+    monthsBack: 6,
+    fromDate: '2026-01-01',
+    toDate: '2026-12-31',
+  });
+});
+
+test('getRevenueReports rejects a reversed date range', async () => {
+  const service = new GeneralDirectorService(mockRepo());
+  await assert.rejects(
+    () => service.getRevenueReports({ fromDate: '2026-12-31', toDate: '2026-01-01' }),
+    (err) => err.statusCode === 400 && /khoảng ngày/i.test(err.message),
+  );
+});
+
 test("GeneralDirectorService.listSettlementReports returns filtered settlement reports - case 01", async () => {
   let filters;
   const service = new GeneralDirectorService(mockRepo({

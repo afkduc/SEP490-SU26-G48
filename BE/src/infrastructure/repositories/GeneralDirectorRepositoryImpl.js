@@ -312,10 +312,12 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
   async getRevenueReports(filters = {}) {
     const branchId = filters.branchId && filters.branchId !== 'all' ? Number(filters.branchId) : null;
     const monthsBack = Number(filters.monthsBack) || 6;
+    const fromDate = filters.fromDate ? new Date(`${filters.fromDate}T00:00:00.000Z`) : null;
+    const toDate = filters.toDate ? new Date(`${filters.toDate}T00:00:00.000Z`) : null;
 
     const summaryResult = await query(
-      `DECLARE @month_start DATE = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
-       DECLARE @next_month_start DATE = DATEADD(MONTH, 1, @month_start);
+      `DECLARE @month_start DATE = COALESCE(@fromDate, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1));
+       DECLARE @next_month_start DATE = COALESCE(DATEADD(DAY, 1, @toDate), DATEADD(MONTH, 1, @month_start));
 
        WITH current_orders AS (
          SELECT so.id, so.total
@@ -341,18 +343,21 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
              AND (@branchId IS NULL OR i.branch_id = @branchId)
          ), 0) AS outstanding_receivables,
          @month_start AS current_month_start`,
-      { branchId }
+      { branchId, fromDate, toDate }
     );
 
     const trendResult = await query(
-      `DECLARE @current_month_start DATE = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
+      `DECLARE @range_start DATE = COALESCE(@fromDate, DATEADD(MONTH, -(@monthsBack - 1), DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)));
+       DECLARE @range_end DATE = COALESCE(DATEADD(DAY, 1, @toDate), DATEADD(MONTH, 1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)));
+       DECLARE @first_month DATE = DATEFROMPARTS(YEAR(@range_start), MONTH(@range_start), 1);
+       DECLARE @last_month DATE = DATEFROMPARTS(YEAR(DATEADD(DAY, -1, @range_end)), MONTH(DATEADD(DAY, -1, @range_end)), 1);
 
        WITH month_series AS (
-         SELECT CAST(DATEADD(MONTH, -(@monthsBack - 1), @current_month_start) AS DATE) AS month_start
+         SELECT @first_month AS month_start
          UNION ALL
          SELECT DATEADD(MONTH, 1, month_start)
          FROM month_series
-         WHERE month_start < @current_month_start
+         WHERE month_start < @last_month
        ),
        monthly_orders AS (
          SELECT
@@ -360,8 +365,8 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
            SUM(so.total) AS total_revenue
          FROM repair_orders so
          WHERE so.status = 'invoiced'
-           AND so.completed_date >= DATEADD(MONTH, -(@monthsBack - 1), @current_month_start)
-           AND so.completed_date < DATEADD(MONTH, 1, @current_month_start)
+           AND so.completed_date >= @range_start
+           AND so.completed_date < @range_end
            AND (@branchId IS NULL OR so.branch_id = @branchId)
          GROUP BY DATEFROMPARTS(YEAR(so.completed_date), MONTH(so.completed_date), 1)
        )
@@ -372,12 +377,12 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN monthly_orders mo ON mo.month_start = ms.month_start
        ORDER BY ms.month_start ASC
        OPTION (MAXRECURSION 100);`,
-      { branchId, monthsBack }
+      { branchId, monthsBack, fromDate, toDate }
     );
 
     const branchStatsResult = await query(
-      `DECLARE @month_start DATE = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
-       DECLARE @next_month_start DATE = DATEADD(MONTH, 1, @month_start);
+      `DECLARE @month_start DATE = COALESCE(@fromDate, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1));
+       DECLARE @next_month_start DATE = COALESCE(DATEADD(DAY, 1, @toDate), DATEADD(MONTH, 1, @month_start));
 
        WITH branch_scope AS (
          SELECT b.id, b.branch_code, b.branch_name
@@ -429,7 +434,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
        LEFT JOIN branch_service bs ON bs.branch_id = bt.id
        CROSS JOIN overall o
        ORDER BY bt.total_revenue DESC, bt.branch_name ASC;`,
-      { branchId }
+      { branchId, fromDate, toDate }
     );
 
     const summaryRow = summaryResult.recordset[0] || {};
@@ -464,6 +469,8 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
       filters: {
         branchId: branchId || 'all',
         monthsBack,
+        fromDate: filters.fromDate || null,
+        toDate: filters.toDate || null,
       },
     };
   }
