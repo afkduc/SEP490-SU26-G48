@@ -2386,7 +2386,7 @@ function SettlementReportsPage() {
               <th>Mã phiếu</th>
               <th>Xe</th>
               <th>Khách hàng</th>
-              <th>Loại dịch vụ</th>
+              <th style={{ width: 180, maxWidth: 180 }}>Loại dịch vụ</th>
               <th>Chi nhánh</th>
               <th>Tư vấn</th>
               <th>Tiếp nhận</th>
@@ -2436,7 +2436,14 @@ function SettlementReportsPage() {
                     <div style={{ fontWeight: 700 }}>{report.customer?.fullName || '—'}</div>
                     <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{report.customer?.phone || '—'}</div>
                   </td>
-                  <td>{report.serviceType}</td>
+                  <td style={{ width: 180, maxWidth: 180 }}>
+                    <div
+                      title={report.serviceType || '—'}
+                      style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      {report.serviceType || '—'}
+                    </div>
+                  </td>
                   <td><BranchBadge branch={report.branch} /></td>
                   <td>
                     <div style={{ fontWeight: 700 }}>{report.advisor?.name || '—'}</div>
