@@ -428,7 +428,7 @@ function ClaimModal({ settlement, bays, onClose, onDone }) {
 // dau tien - xem RepairOrderService.setTechnicians), nen mo lai duoc o day
 // bang chinh TechnicianPicker dung chung voi ClaimModal.
 function AssignTechniciansModal({ order, onClose, onDone }) {
-  const [selectedTechs, setSelectedTechs] = useState([]);
+  const [selectedTechs, setSelectedTechs] = useState(order.technicians || []);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -579,6 +579,9 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                 {order.technicians?.length > 0 ? (
                   <div className="tld-bay-status-card__tech">
                     Thợ: <b>{order.technicians.map((t) => (t.sameTeam ? t.fullName : `${t.fullName} (điều động)`)).join(', ')}</b>
+                    <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 8 }} onClick={() => onAssignTechnicians(order)}>
+                      Thay đổi thợ
+                    </button>
                   </div>
                 ) : (
                   // Da claim() bay nhung chua co tho nao - thuong xay ra khi to

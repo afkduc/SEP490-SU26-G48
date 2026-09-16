@@ -368,7 +368,7 @@ function RequestCard({
             <button className="btn sr-btn-success btn-sm" disabled>
               Đã tiếp nhận
             </button>
-            {(!appt || appt.status === 'cancelled') && (
+            {!appt && (
               <button className="btn btn-primary btn-sm" onClick={onCreateAppointment}>
                 Tạo lịch hẹn
               </button>
