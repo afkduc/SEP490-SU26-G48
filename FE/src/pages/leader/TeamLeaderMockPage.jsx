@@ -108,6 +108,10 @@ function SectionCard({ title, items }) {
   );
 }
 
+/**
+ * Team Leader mockup variants used by route config.
+ * Supported view values: "team", "orders", "technicians".
+ */
 export default function TeamLeaderMockPage({ view }) {
   const content = MOCKUP_CONTENT[view];
 
