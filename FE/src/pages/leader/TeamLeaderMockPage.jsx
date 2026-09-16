@@ -109,7 +109,16 @@ function SectionCard({ title, items }) {
 }
 
 export default function TeamLeaderMockPage({ view }) {
-  const content = MOCKUP_CONTENT[view] || MOCKUP_CONTENT.team;
+  const content = MOCKUP_CONTENT[view];
+
+  if (!content) {
+    return (
+      <div className="empty-state">
+        <h3>Không tìm thấy mockup</h3>
+        <p>Màn hình Tổ trưởng bạn đang truy cập chưa được cấu hình.</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -129,7 +138,7 @@ export default function TeamLeaderMockPage({ view }) {
       }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <span className="tag" style={{ background: '#fff3e0', color: '#e65100', borderColor: '#ffcc80' }}>
-            Mockup Team Leader
+            Mockup Tổ trưởng
           </span>
         </div>
         <p style={{ margin: 0, color: 'var(--gray-700)', lineHeight: 1.6 }}>{content.subtitle}</p>
