@@ -49,6 +49,7 @@ const ImportRequestDetailPage = lazy(() => import('../pages/inventory/ImportRequ
 const ExportRequestListPage = lazy(() => import('../pages/inventory/ExportRequestListPage'));
 const ExportRequestFormPage = lazy(() => import('../pages/inventory/ExportRequestFormPage'));
 const ExportRequestDetailPage = lazy(() => import('../pages/inventory/ExportRequestDetailPage'));
+const TeamLeaderMockPage = lazy(() => import('../pages/leader/TeamLeaderMockPage'));
 
 /**
  * ErrorHandler — bắt lỗi 403 toàn cục từ error event.
@@ -266,6 +267,39 @@ function AppRoutes() {
             <ProtectedRoute permission="screen:repair-orders:access">
               <AppLayout>
                 <RepairOrderPage />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/leader/team"
+          element={
+            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]}>
+              <AppLayout>
+                <TeamLeaderMockPage view="team" />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/leader/orders"
+          element={
+            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]}>
+              <AppLayout>
+                <TeamLeaderMockPage view="orders" />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/leader/technicians"
+          element={
+            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]}>
+              <AppLayout>
+                <TeamLeaderMockPage view="technicians" />
               </AppLayout>
             </ProtectedRoute>
           }
