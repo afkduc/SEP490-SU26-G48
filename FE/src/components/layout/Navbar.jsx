@@ -116,10 +116,10 @@ const GENERAL_DIRECTOR_NAV = [
 // ===== Team Leader (Tổ trưởng kỹ thuật) - chỉ xem công việc được giao =====
 const TEAM_LEADER_NAV = [
   { label: 'Bảng điều khiển', path: '/dashboard', permission: 'screen:dashboard:access' },
-  { label: 'Đội nhóm', path: '/leader/team' },
-  { label: 'Lệnh sửa chữa', path: '/leader/orders' },
+  { label: 'Đội nhóm', path: '/leader/team', permission: 'screen:repair-orders:access' },
+  { label: 'Lệnh sửa chữa', path: '/leader/orders', permission: 'screen:repair-orders:access' },
   { label: 'Công việc của tôi', path: '/repair-orders', end: true, permission: 'screen:repair-orders:access' },
-  { label: 'Thợ máy', path: '/leader/technicians' },
+  { label: 'Thợ máy', path: '/leader/technicians', permission: 'screen:repair-orders:access' },
 ];
 
 const NAV_ITEMS_BY_ROLE = {

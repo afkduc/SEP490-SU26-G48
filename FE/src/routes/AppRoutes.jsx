@@ -275,7 +275,7 @@ function AppRoutes() {
         <Route
           path="/leader/team"
           element={
-            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]}>
+            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]} permission="screen:repair-orders:access">
               <AppLayout>
                 <TeamLeaderMockPage view="team" />
               </AppLayout>
@@ -286,7 +286,7 @@ function AppRoutes() {
         <Route
           path="/leader/orders"
           element={
-            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]}>
+            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]} permission="screen:repair-orders:access">
               <AppLayout>
                 <TeamLeaderMockPage view="orders" />
               </AppLayout>
@@ -297,7 +297,7 @@ function AppRoutes() {
         <Route
           path="/leader/technicians"
           element={
-            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]}>
+            <ProtectedRoute roles={[ROLES.TEAM_LEADER, ROLES.ADMIN]} permission="screen:repair-orders:access">
               <AppLayout>
                 <TeamLeaderMockPage view="technicians" />
               </AppLayout>
