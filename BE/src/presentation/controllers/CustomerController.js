@@ -51,6 +51,23 @@ class CustomerController {
     }
   };
 
+  // POST /customers/:id/vehicles - them xe cho khach da co.
+  addVehicle = async (req, res, next) => {
+    try {
+      const vehicle = await this.customerService.addVehicle(req.params.id, req.body);
+      await auditCrud.create(req, {
+        tableName: 'vehicles',
+        entityCode: vehicle?.licensePlate || null,
+        recordId: vehicle?.id || null,
+        entityName: 'Xe khách hàng',
+        data: { customerId: req.params.id, ...req.body },
+      });
+      return success(res, vehicle, 'Vehicle added');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   importExcel = async (req, res, next) => {
     try {
       if (!req.file) throw new ApiError(400, 'Vui lòng chọn file Excel (.xlsx)');

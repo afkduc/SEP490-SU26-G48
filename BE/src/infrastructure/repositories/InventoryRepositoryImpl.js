@@ -201,6 +201,9 @@ LEFT JOIN units u ON u.id = p.unit_id
    * quyet toan (repair_order_items, lhsc='PT') nhung chua xuat kho se KHONG
    * xuat hien trong danh sach nay. demand_quantity/demand_count van duoc
    * gop them cho cac phu tung da xuat, de FE so sanh "nhu cau" vs "thuc xuat".
+   * total_quantity (so hien tren chart) = export_quantity, KHONG cong them
+   * demand_quantity - cong vao se dem 2 lan phu tung da xuat va lam chart
+   * lech voi summary.totalExportQuantity (cung la SUM export_quantity).
    * summary.totalExportCount/totalImportCount la SO PHIEU phan biet (COUNT
    * DISTINCT export_request_id/import_request_id), khong phai so dong giao
    * dich - 1 phieu co nhieu dong (nhieu phu tung) van tinh la 1 lan.
@@ -290,11 +293,11 @@ LEFT JOIN units u ON u.id = p.unit_id
         p.product_code, p.product_name, p.category,
         u.unit_name, p.stock_quantity,
         c.export_quantity, c.export_count, c.demand_quantity, c.demand_count,
-        (c.export_quantity + c.demand_quantity) AS total_quantity
+        c.export_quantity AS total_quantity
       FROM combined c
       JOIN products p ON p.id = c.product_id
       LEFT JOIN units u ON u.id = p.unit_id
-      ORDER BY total_quantity DESC, c.export_quantity DESC, p.product_name ASC;
+      ORDER BY c.export_quantity DESC, c.export_count DESC, p.product_name ASC;
 
       ${cte}
       SELECT

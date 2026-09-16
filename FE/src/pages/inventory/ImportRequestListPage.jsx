@@ -73,9 +73,6 @@ export default function ImportRequestListPage() {
       <div className="ir-list__header">
         <div>
           <h1 className="ir-list__title">Phiếu nhập kho</h1>
-          <p className="ir-list__subtitle">
-            Phiếu nhập được cộng tồn kho ngay sau khi tạo và không cần chờ duyệt.
-          </p>
         </div>
         <PermissionGate permission="import_requests:create">
           <Link to="/inventory/import-requests/new" className="btn btn--primary">

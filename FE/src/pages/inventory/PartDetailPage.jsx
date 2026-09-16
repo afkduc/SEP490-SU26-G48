@@ -6,6 +6,7 @@ import { useInventoryBranch } from './InventoryLayout';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { listUnitsApi } from '../../services/productApi';
 import { PermissionGate } from '../../components/PermissionGate';
+import { StockHistoryChart, StockHistoryTable } from './StockHistoryChart';
 import './PartDetailPage.css';
 
 const STATUS_LABELS = {
@@ -18,7 +19,7 @@ export default function PartDetailPage() {
   const { id } = useParams();
   const confirm = useConfirm();
   const { branchId, loadingBranches, branchError } = useInventoryBranch();
-  const { part, loading, error, refetch } = usePartDetail(id);
+  const { part, history, loading, error, refetch } = usePartDetail(id);
   const { update, deactivate, reactivate } = useParts({ branchId });
 
   const [editing, setEditing] = useState(false);
@@ -278,6 +279,14 @@ export default function PartDetailPage() {
               </span>}
             />
           </div>
+        </div>
+
+        {/* Bien dong ton kho: moi lan nhap (+) / hoan (+) / xuat (-) la 1
+            diem tren bieu do, kem ma phieu va gio. */}
+        <div className="detail-card detail-card--full">
+          <h3 className="detail-card__title">Biến động tồn kho</h3>
+          <StockHistoryChart history={history} unit={part.unitName || ''} />
+          <StockHistoryTable history={history} unit={part.unitName || ''} />
         </div>
       </div>
     </div>

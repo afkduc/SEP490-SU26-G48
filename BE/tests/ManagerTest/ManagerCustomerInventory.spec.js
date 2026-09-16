@@ -35,6 +35,8 @@ function customerRepo(overrides = {}) {
   return {
     findAllWithDetails: async () => [],
     findByIdWithDetails: async id => ({ id, fullName: 'Nguyễn Văn A', phone: '0912345678', vehicles: [] }),
+    // update() kiem tra SDT moi chua thuoc khach khac (findByPhone) - mac dinh chua ai dung.
+    findByPhone: async () => null,
     update: async (id, data) => ({ id, ...data }),
     ...overrides,
   };

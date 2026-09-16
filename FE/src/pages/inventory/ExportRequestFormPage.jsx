@@ -4,6 +4,9 @@ import { useInventoryBranch } from './InventoryLayout';
 import { useExportRequestForm } from '../../hooks/inventory/useExportRequestForm';
 import { PermissionGate } from '../../components/PermissionGate';
 import SignaturePad from '../repairsettlement/SignaturePad';
+import ExportPickupHistoryModal from './ExportPickupHistoryModal';
+import { getExportPickupsApi } from '../../services/exportRequestApi';
+import { normalizeVietnamese } from '../../utils/vietnamese';
 import './ExportRequestFormPage.css';
 
 // Trang thai 1 dong phu tung, tinh tu du lieu server tra ve:
@@ -60,17 +63,24 @@ export default function ExportRequestFormPage() {
   const [formError, setFormError] = useState('');
   const [roSearchTerm, setRoSearchTerm] = useState('');
 
+  // Lich su luu phieu: moi lan "Xac nhan xuat/tra" = 1 ban ghi. Chi dem so lan
+  // o day de hien tren nut; chi tiet tung lan xem trong modal.
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyCount, setHistoryCount] = useState(null);
+
   // Chu ky cua chinh nguoi lay (tho) xac nhan da nhan phu tung - giong het
   // co che khach hang ky tren phieu quyet toan (SignaturePad dung chung).
   const signaturePadRef = useRef(null);
   const [signatureEmpty, setSignatureEmpty] = useState(true);
 
+  // So khop KHONG dau: go "thanh" phai ra "Lê Công Thành", go "ktv-hn-01"
+  // van ra ma thoi thuong.
   const visibleTechnicians = (() => {
-    const term = technicianSearchTerm.trim().toLowerCase();
+    const term = normalizeVietnamese(technicianSearchTerm.trim());
     if (!term) return [];
     return technicians.filter((t) =>
-      t.fullName.toLowerCase().includes(term)
-      || (t.employeeId || '').toLowerCase().includes(term));
+      normalizeVietnamese(t.fullName).includes(term)
+      || normalizeVietnamese(t.employeeId).includes(term));
   })();
 
   function handlePickTechnician(t) {
@@ -97,6 +107,19 @@ export default function ExportRequestFormPage() {
   }, [roSearchTerm, fetchRepairOrders]);
 
   const visibleRepairOrders = roSearchTerm.trim().length < 2 ? [] : repairOrders;
+
+  // Dem so lan da luu cua phieu xuat gan voi RO dang chon (RO chua tung xuat
+  // thi chua co phieu -> 0). Loi thi coi nhu chua biet (null), khong chan form.
+  const exportRequestId = selectedRo?.exportRequestId ?? null;
+  useEffect(() => {
+    if (!selectedRo) { setHistoryCount(null); return undefined; }
+    if (!exportRequestId) { setHistoryCount(0); return undefined; }
+    let mounted = true;
+    getExportPickupsApi(exportRequestId)
+      .then((res) => { if (mounted) setHistoryCount(Array.isArray(res) ? res.length : 0); })
+      .catch(() => { if (mounted) setHistoryCount(null); });
+    return () => { mounted = false; };
+  }, [selectedRo, exportRequestId]);
 
   async function loadRoState(roId) {
     const detail = await loadRepairOrder(roId);
@@ -140,6 +163,7 @@ export default function ExportRequestFormPage() {
     setSelectedRo(null);
     setItems([]);
     setTickedIds(new Set());
+    setShowHistory(false);
     signaturePadRef.current?.clear();
   }
 
@@ -339,7 +363,19 @@ export default function ExportRequestFormPage() {
 
             <div className="er-form__items">
               <div className="er-form__items-header">
-                <h2 className="er-form__items-title">Danh sách phụ tùng</h2>
+                <div className="er-form__items-title-row">
+                  <h2 className="er-form__items-title">Danh sách phụ tùng</h2>
+                  {/* Bang ben ngoai luon la trang thai MOI NHAT; nut nay mo xem
+                      tung lan da luu (moi lan Xac nhan xuat/tra = 1 ban ghi). */}
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm er-form__history-btn"
+                    onClick={() => setShowHistory(true)}
+                    title="Xem từng lần đã lưu phiếu này"
+                  >
+                    Lịch sử lưu phiếu{historyCount !== null && ` (${historyCount})`}
+                  </button>
+                </div>
                 <span className="er-form__hint">
                   Phải tích đủ tất cả các dòng rồi mới ký xác nhận được. Số lượng do hệ thống tính, không sửa tay.
                   {tickableCount > 0 && ` (đã tích ${tickedIds.size}/${tickableCount})`}
@@ -443,6 +479,14 @@ export default function ExportRequestFormPage() {
           </div>
         )}
       </form>
+
+      {showHistory && selectedRo && (
+        <ExportPickupHistoryModal
+          exportRequestId={exportRequestId}
+          repairOrderCode={selectedRo.repairOrderCode}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
     </div>
   );
 }

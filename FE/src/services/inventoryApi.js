@@ -46,6 +46,9 @@ export async function getStockSummaryApi(branchId) {
  * tra ve: { topParts: [{ productId, productCode, productName, category, unit,
  *                         currentStock, exportQuantity, exportCount, demandQuantity, demandCount, totalQuantity }],
  *           summary: { distinctParts, totalExportQuantity, totalExportCount, totalImportQuantity, totalImportCount } }
+ * totalQuantity = SL da xuat kho thuc te (rong, da tru hoan tra) = exportQuantity, nen tong cac
+ * dong topParts luon <= summary.totalExportQuantity. demandQuantity chi la nhu cau tren lenh sua
+ * chua (tham khao), khong cong vao so hien tren chart.
  */
 export async function getTopUsedPartsApi(params = {}) {
   return httpClient.get(`/inventory/top-used-parts${buildQuery(params)}`);

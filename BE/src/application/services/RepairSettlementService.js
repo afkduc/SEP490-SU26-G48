@@ -828,7 +828,10 @@ class RepairSettlementService {
       if (!HTTT_VALUES.includes(item.httt)) {
         throw new ApiError(400, `Hình thức thanh toán không hợp lệ: ${item.httt}`);
       }
-      if (!REPAIR_CATEGORY_VALUES.includes(item.repairCategory)) {
+      // Phu tung them roi (khach mua them, khong di kem dich vu nao) khong co
+      // loai hinh de thua huong -> cho phep de trong; dich vu/goi thi bat buoc.
+      const categoryOptional = item.lhsc === 'PT' && !item.repairCategory;
+      if (!categoryOptional && !REPAIR_CATEGORY_VALUES.includes(item.repairCategory)) {
         throw new ApiError(400, `Loại hình sửa chữa không hợp lệ: ${item.repairCategory}`);
       }
       // So luong: phu tung (PT) hoac hang muc DA HUY duoc phep = 0 (huy giua

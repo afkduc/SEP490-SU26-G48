@@ -40,6 +40,15 @@ class ProductRepository {
   async countNewForManager(branchId) {
     throw new Error('Method countNewForManager() must be implemented');
   }
+
+  /**
+   * Lich su giao dich kho cua 1 phu tung (cu -> moi).
+   * @param {number} productId
+   * @returns {Promise<Array<{ id, type, quantity, transactionCode, happenedAt, slipCode, performedByName }>>}
+   */
+  async findStockHistory(productId) {
+    throw new Error('Method findStockHistory() must be implemented');
+  }
 }
 
 module.exports = ProductRepository;

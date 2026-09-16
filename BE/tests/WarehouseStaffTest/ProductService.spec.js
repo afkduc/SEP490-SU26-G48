@@ -135,3 +135,29 @@ test('reports a missing part when reactivating', async () => {
   await expectError(() => service.reactivateProduct(999), 404, 'Không tìm thấy phụ tùng');
 });
 
+
+test('stock history: running balance walks backward from current stock (import/return +, export -)', async () => {
+  const service = makeService({
+    findById: async () => product({ id: 7, stockQuantity: 49 }),
+    findStockHistory: async (id) => {
+      assert.equal(id, 7);
+      return [
+        { id: 1, type: 'import', quantity: 50, slipCode: 'IRB-1', happenedAt: '2026-09-05T00:00:00.000Z' },
+        { id: 2, type: 'export', quantity: 4, slipCode: 'RO-2026-127', happenedAt: '2026-09-10T10:15:00.000Z' },
+        { id: 3, type: 'return', quantity: 3, slipCode: 'RO-2026-127', happenedAt: '2026-09-11T08:00:00.000Z' },
+      ];
+    },
+  });
+  const h = await service.getStockHistory(7);
+  assert.equal(h.currentStock, 49);
+  // 49 - (+50 -4 +3) = 0 ton dau ky
+  assert.equal(h.openingStock, 0);
+  assert.deepEqual(h.events.map((e) => [e.delta, e.balanceAfter]), [[50, 50], [-4, 46], [3, 49]]);
+  assert.equal(h.events[1].happenedAtLabel, '10/09/2026 10:15');
+  assert.equal(h.events[0].happenedAtLabel, '05/09/2026 00:00');
+});
+
+test('stock history rejects unknown product', async () => {
+  const service = makeService({ findById: async () => null });
+  await assert.rejects(() => service.getStockHistory(99), (err) => err.statusCode === 404);
+});
