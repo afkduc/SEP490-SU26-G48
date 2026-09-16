@@ -1,11 +1,10 @@
 const AuthService = require('../../src/application/services/AuthService');
-
 const activeUser = {
   id: 7,
-  user_name: 'Nguyễn Văn A',
-  email: 'advisor@autogara.vn',
-  phone: '0912345678',
-  user_password: 'Password@123',
+  user_name: 'Test Advisor',
+  email: 'advisor@test.local',
+  phone: '0901234567',
+  user_password: 'ValidPass123',
   status: 'active',
   branch_id: 2,
   branch_is_active: true,
@@ -29,7 +28,7 @@ describe('Đăng nhập dùng chung', () => {
   test('không nhập email hoặc số điện thoại', async () => {
     const { service, repository } = createService();
 
-    await expect(service.login('', 'Password@123', 2)).rejects.toMatchObject({
+    await expect(service.login('', 'ValidPass123', 2)).rejects.toMatchObject({
       statusCode: 400,
       message: 'Email/số điện thoại và mật khẩu không được để trống',
     });
@@ -39,7 +38,7 @@ describe('Đăng nhập dùng chung', () => {
   test('không nhập mật khẩu', async () => {
     const { service, repository } = createService();
 
-    await expect(service.login('advisor@autogara.vn', '', 2)).rejects.toMatchObject({
+    await expect(service.login(activeUser.email, '', 2)).rejects.toMatchObject({
       statusCode: 400,
       message: 'Email/số điện thoại và mật khẩu không được để trống',
     });
@@ -49,17 +48,17 @@ describe('Đăng nhập dùng chung', () => {
   test('email hoặc số điện thoại không tồn tại', async () => {
     const { service, repository } = createService({ user: null });
 
-    await expect(service.login('missing@autogara.vn', 'Password@123', 2)).rejects.toMatchObject({
+    await expect(service.login('missing@test.local', 'ValidPass123', 2)).rejects.toMatchObject({
       statusCode: 401,
       message: 'Email/số điện thoại hoặc mật khẩu không đúng',
     });
-    expect(repository.findUserByEmailOrPhone).toHaveBeenCalledWith('missing@autogara.vn');
+    expect(repository.findUserByEmailOrPhone).toHaveBeenCalledWith('missing@test.local');
   });
 
   test('mật khẩu không đúng', async () => {
     const { service } = createService();
 
-    await expect(service.login('advisor@autogara.vn', 'WrongPassword', 2)).rejects.toMatchObject({
+    await expect(service.login(activeUser.email, 'WrongPassword', 2)).rejects.toMatchObject({
       statusCode: 401,
       message: 'Email/số điện thoại hoặc mật khẩu không đúng',
     });
@@ -68,7 +67,7 @@ describe('Đăng nhập dùng chung', () => {
   test('tài khoản đã ngừng hoạt động', async () => {
     const { service } = createService({ user: { ...activeUser, status: 'inactive' } });
 
-    await expect(service.login('advisor@autogara.vn', 'Password@123', 2)).rejects.toMatchObject({
+    await expect(service.login(activeUser.email, 'ValidPass123', 2)).rejects.toMatchObject({
       statusCode: 403,
       code: 'ACCOUNT_DISABLED',
       message: 'Tài khoản đã ngừng hoạt động',
@@ -78,7 +77,7 @@ describe('Đăng nhập dùng chung', () => {
   test('chi nhánh của tài khoản đã ngừng hoạt động', async () => {
     const { service } = createService({ user: { ...activeUser, branch_is_active: false } });
 
-    await expect(service.login('advisor@autogara.vn', 'Password@123', 2)).rejects.toMatchObject({
+    await expect(service.login(activeUser.email, 'ValidPass123', 2)).rejects.toMatchObject({
       statusCode: 403,
       code: 'BRANCH_DISABLED',
       message: 'Chi nhánh của tài khoản này đang bị ngưng hoạt động',
@@ -88,7 +87,7 @@ describe('Đăng nhập dùng chung', () => {
   test('không chọn chi nhánh đối với tài khoản chi nhánh', async () => {
     const { service } = createService();
 
-    await expect(service.login('advisor@autogara.vn', 'Password@123')).rejects.toMatchObject({
+    await expect(service.login(activeUser.email, 'ValidPass123')).rejects.toMatchObject({
       statusCode: 400,
       code: 'BRANCH_REQUIRED',
       message: 'Vui lòng chọn chi nhánh trước khi đăng nhập',
@@ -98,7 +97,7 @@ describe('Đăng nhập dùng chung', () => {
   test('chọn sai chi nhánh của tài khoản', async () => {
     const { service } = createService();
 
-    await expect(service.login('advisor@autogara.vn', 'Password@123', 99)).rejects.toMatchObject({
+    await expect(service.login(activeUser.email, 'ValidPass123', 99)).rejects.toMatchObject({
       statusCode: 403,
       code: 'WRONG_BRANCH',
       message: 'Tài khoản của bạn không có quyền đăng nhập vào chi nhánh này',
@@ -108,27 +107,44 @@ describe('Đăng nhập dùng chung', () => {
   test('đăng nhập bằng email và đúng chi nhánh', async () => {
     const { service, repository } = createService();
 
-    await expect(service.login('advisor@autogara.vn', 'Password@123', 2)).resolves.toMatchObject({
-      user: { id: 7, token_version: 4 },
+    await expect(service.login(activeUser.email, 'ValidPass123', 2)).resolves.toMatchObject({
+      user: { id: activeUser.id, token_version: 4 },
       pendingComplete: false,
       replacedLive: false,
     });
-    expect(repository.incrementTokenVersion).toHaveBeenCalledWith(7);
+    expect(repository.incrementTokenVersion).toHaveBeenCalledWith(activeUser.id);
   });
 
-  test('đăng nhập bằng số điện thoại và đúng chi nhánh', async () => {
+  test('không cho phép đăng nhập bằng số điện thoại', async () => {
     const { service, repository } = createService();
 
-    await service.login('0912345678', 'Password@123', 2);
+    await expect(service.login(activeUser.phone, 'ValidPass123', 2)).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'Vui lòng đăng nhập bằng email được cấp',
+    });
 
-    expect(repository.findUserByEmailOrPhone).toHaveBeenCalledWith('0912345678');
+    expect(repository.findUserByEmailOrPhone).not.toHaveBeenCalled();
+  });
+
+  test('chặn email vượt quá độ dài cho phép trước khi truy vấn tài khoản', async () => {
+    const { service, repository } = createService();
+
+    await expect(service.login(`${'a'.repeat(244)}@example.com`, 'ValidPass123', 2)).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'Email không được vượt quá 255 ký tự',
+    });
+
+    expect(repository.findUserByEmailOrPhone).not.toHaveBeenCalled();
   });
 
   test('Admin đăng nhập không cần chọn chi nhánh', async () => {
-    const { service } = createService({ roles: [{ role_name: 'admin' }] });
+    const { service } = createService({
+      user: { ...activeUser, id: 1, email: 'admin@test.local', branch_id: null },
+      roles: [{ role_name: 'admin' }],
+    });
 
-    await expect(service.login('admin@autogara.vn', 'Password@123')).resolves.toMatchObject({
-      user: { id: 7, token_version: 4 },
+    await expect(service.login('admin@test.local', 'ValidPass123')).resolves.toMatchObject({
+      user: { id: 1, token_version: 4 },
       replacedLive: false,
     });
   });
@@ -136,9 +152,9 @@ describe('Đăng nhập dùng chung', () => {
   test('đăng nhập mới thay thế phiên đang hoạt động', async () => {
     const { service } = createService({ liveSession: { id: 88, browser: 'Chrome' } });
 
-    await expect(service.login('advisor@autogara.vn', 'Password@123', 2)).resolves.toMatchObject({
+    await expect(service.login(activeUser.email, 'ValidPass123', 2)).resolves.toMatchObject({
       replacedLive: true,
     });
-    expect(service._closeActiveSessionsForUser).toHaveBeenCalledWith(7, 'FORCE_NEW_LOGIN');
+    expect(service._closeActiveSessionsForUser).toHaveBeenCalledWith(activeUser.id, 'FORCE_NEW_LOGIN');
   });
 });
