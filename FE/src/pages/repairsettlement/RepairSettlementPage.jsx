@@ -3673,7 +3673,13 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
 
           <div className="form-group" style={{ marginTop: 16 }}>
             <label className="form-label required">Yêu cầu của khách hàng</label>
-            <textarea className="form-textarea" rows={2} value={customerRequest} onChange={(e) => setCustomerRequest(e.target.value)} placeholder="Mô tả tình trạng xe / yêu cầu sửa chữa của khách hàng..." />
+            {/* BE gioi han 1000 ky tu (DAI_TOI_DA.customerRequest) - chan ngay
+                luc go, khong de bam Luu moi bao roi phai cat lai. */}
+            <textarea className="form-textarea" rows={2} value={customerRequest} maxLength={1000}
+              onChange={(e) => setCustomerRequest(e.target.value)} placeholder="Mô tả tình trạng xe / yêu cầu sửa chữa của khách hàng..." />
+            <div style={{ fontSize: 11, color: customerRequest.length >= 1000 ? '#B91C1C' : 'var(--gray-500)', textAlign: 'right' }}>
+              {customerRequest.length}/1000
+            </div>
           </div>
 
         </div>
@@ -3933,7 +3939,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                           )}
                         </td>
                         <td>
-                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.note || ''}
+                          <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.note || ''} maxLength={500}
                             onChange={(e) => setItem(idx, 'note', e.target.value)}
                             placeholder="Lưu ý cho thợ…" title="Ghi chú riêng cho hạng mục này, hiển thị cho tổ trưởng/thợ ở màn Khoang xe" />
                         </td>

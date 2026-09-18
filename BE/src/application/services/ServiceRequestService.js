@@ -189,10 +189,19 @@ class ServiceRequestService {
     }
   }
 
+  // Cot service_appointments.notes la NVARCHAR(500) - khong chan o day thi
+  // INSERT chet o SQL Server (loi cat chuoi) va nguoi dung nhan 500 chung chung.
+  _assertNotesLength(notes) {
+    if (notes != null && String(notes).length > 500) {
+      throw new ApiError(400, 'Ghi chú lịch hẹn tối đa 500 ký tự');
+    }
+  }
+
   async createAppointment(id, payload, { userId, branchId }) {
     await this._assertOwnedByUser(id, { userId, branchId });
     if (!payload.appointmentAt) throw new ApiError(400, 'Vui lòng chọn ngày giờ hẹn');
     this._assertNotPastDate(payload.appointmentAt);
+    this._assertNotesLength(payload.notes);
 
     await this.serviceRequestRepository.createAppointment(
       id,
@@ -206,6 +215,7 @@ class ServiceRequestService {
     await this._assertOwnedByUser(id, { userId, branchId });
     if (!payload.appointmentAt) throw new ApiError(400, 'Vui lòng chọn ngày giờ hẹn');
     this._assertNotPastDate(payload.appointmentAt);
+    this._assertNotesLength(payload.notes);
 
     await this.serviceRequestRepository.updateAppointment(appointmentId, {
       appointmentAt: payload.appointmentAt,

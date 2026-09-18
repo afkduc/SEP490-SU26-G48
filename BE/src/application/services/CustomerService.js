@@ -1,5 +1,6 @@
 const ApiError = require('../../utils/ApiError');
 const { normalizeVietnamese } = require('../../utils/vietnamese');
+const { isValidPhone, isValidEmail, EMAIL_HINT } = require('../../utils/fieldValidation');
 const { parseCustomerImportFile } = require('./customerImportParser');
 
 class CustomerService {
@@ -54,6 +55,14 @@ class CustomerService {
     }
     if (!data.phone || !data.phone.trim()) {
       throw new ApiError(400, 'Số điện thoại không được để trống');
+    }
+    // Dung chung luat voi Admin/Profile - truoc day chi kiem tra khong rong nen
+    // "abc" cung luu duoc, sau do nhac bao duong goi/gui vao so sai.
+    if (!isValidPhone(data.phone.trim())) {
+      throw new ApiError(400, 'Số điện thoại phải bắt đầu bằng 0, gồm 10–11 chữ số');
+    }
+    if (data.email && data.email.trim() && !isValidEmail(data.email.trim())) {
+      throw new ApiError(400, EMAIL_HINT);
     }
     const existing = await this.customerRepository.findByIdWithDetails(id);
     if (!existing) throw new ApiError(404, 'Không tìm thấy khách hàng');
