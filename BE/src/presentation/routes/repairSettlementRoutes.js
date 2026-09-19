@@ -43,6 +43,9 @@ function buildRepairSettlementRouter() {
   router.put('/:id', chiCoVan, controller.update);
   router.patch('/:id/status', chiCoVan, controller.updateStatus);
   router.patch('/:id/tasks/:taskId/ng-decision', chiCoVan, controller.decideNgTask);
+  // Ky quyet toan (co van chot phieu + khach nhan xe) - phai ky xong moi
+  // xuat duoc hoa don / tao duoc ma QR, xem RepairSettlementService.
+  router.post('/:id/closing-signature', chiCoVan, controller.saveClosingSignature);
   router.post('/:id/lock', chiCoVan, controller.lock);
   router.delete('/:id/lock', chiCoVan, controller.unlock);
   router.post('/:id/payos/create-payment-link', chiCoVan, controller.createPaymentLink);

@@ -48,7 +48,7 @@ const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoi
 const KM_TOI_DA = 2000000;
 // Do dai cot trong DB (nvarchar) - chan o day de bao duoc dung o nao qua dai,
 // thay vi de SQL Server nem loi "String or binary data would be truncated".
-const DAI_TOI_DA = { customerRequest: 1000, note: 1000, itemNote: 500 };
+const DAI_TOI_DA = { customerRequest: 1000, note: 1000, itemNote: 500, signerName: 255 };
 
 // So hang muc toi da tren 1 phieu. Goi bao duong lon nhat khoang 35 dau muc +
 // phu tung di kem, nen 200 la rat rong rai. Chan lai vi moi hang muc keo theo
@@ -268,8 +268,14 @@ class RepairSettlementService {
   // Chu ky dien tu tai cho (nguoi lien he ky truc tiep len man hinh CVDV luc
   // chot phieu) - bang chung xac nhan dong y, chi bat buoc luc TAO phieu, sua
   // phieu sau do khong doi lai chu ky goc.
+  // Anh chu ky hop le = data URL PNG do SignaturePad sinh ra. Chuoi rong,
+  // chuoi rac hay anh that tai len deu bi chan o day.
+  _laChuKyHopLe(signatureData) {
+    return (signatureData || '').startsWith('data:image/png;base64,');
+  }
+
   _assertSignaturePresent(signatureData, signerName) {
-    if (!(signatureData || '').startsWith('data:image/png;base64,')) {
+    if (!this._laChuKyHopLe(signatureData)) {
       throw new ApiError(400, 'Vui lòng ký xác nhận trước khi lưu phiếu');
     }
     // Chu ky khong kem TEN NGUOI KY thi gan nhu khong doi chung duoc gi khi
@@ -345,10 +351,18 @@ class RepairSettlementService {
 
   async create(payload, { branchId, advisorId }) {
     this._assertSignaturePresent(payload.signatureData, payload.signerName);
+    // Phieu phai co IT NHAT 2 nguoi ky. Chu ky co van LAP phieu ky ngay tai
+    // moc tiep nhan, cung luc khach duyet bao gia - de sau nay doi chieu
+    // duoc "ai bao gia the nay". Ten nguoi ky lay tu tai khoan dang nhap
+    // (advisor_id) nen khong can nhap tay, khong can luu rieng.
+    if (!this._laChuKyHopLe(payload.advisorSignatureData)) {
+      throw new ApiError(400, 'Cố vấn dịch vụ phải ký xác nhận trên phiếu');
+    }
     const resolvedPayload = await this._resolveCustomerAndVehicle(payload);
     const data = this._validateAndNormalize(resolvedPayload);
     data.signatureData = payload.signatureData;
     data.signerName = (payload.signerName || '').trim() || null;
+    data.advisorSignatureData = payload.advisorSignatureData;
     // Chi dinh to truong (tuy chon): phieu chi hien o bang "Việc chờ nhận"
     // cua dung to truong nay. Bo trong = moi to truong deu thay, nhu cu.
     //
@@ -529,6 +543,50 @@ class RepairSettlementService {
     return { code: conflict.code, status: conflict.status, message: this._buildDuplicateMessage(conflict) };
   }
 
+  // ─── Ky quyet toan (MOC 2): co van chot phieu + khach nhan xe ───────
+  //
+  // Tach thanh 1 buoc rieng truoc khi xuat hoa don, khong gop vao updateStatus,
+  // vi con duong PayOS khong di qua updateStatus (webhook tu chuyen sang
+  // 'invoiced'). Ky truoc, sau do thu tien bang duong nao cung duoc.
+  async saveClosingSignature(id, { advisorId, advisorSignatureData, customerSignatureData, customerSignerName } = {}) {
+    const existing = await this.repairSettlementRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
+    if (existing.status !== 'waiting_payment') {
+      throw new ApiError(409, 'Chỉ ký quyết toán khi phiếu đã sửa xong và đang chờ thanh toán');
+    }
+    if (!this._laChuKyHopLe(advisorSignatureData)) {
+      throw new ApiError(400, 'Cố vấn dịch vụ phải ký xác nhận quyết toán');
+    }
+    if (!this._laChuKyHopLe(customerSignatureData)) {
+      throw new ApiError(400, 'Vui lòng cho khách hàng ký xác nhận nhận xe');
+    }
+    if (!String(customerSignerName || '').trim()) {
+      throw new ApiError(400, 'Vui lòng ghi rõ tên người nhận xe');
+    }
+    if (String(customerSignerName).length > DAI_TOI_DA.signerName) {
+      throw new ApiError(400, `Tên người nhận xe quá dài (tối đa ${DAI_TOI_DA.signerName} ký tự)`);
+    }
+
+    await this.repairSettlementRepository.saveClosingSignature(id, {
+      advisorId,
+      advisorSignatureData,
+      customerSignatureData,
+      customerSignerName: String(customerSignerName).trim(),
+    });
+    return this.repairSettlementRepository.findById(id);
+  }
+
+  // Chua du chu ky thi khong duoc thu tien - ap dung cho CA HAI duong: xac
+  // nhan tien mat (updateStatus) va tao ma QR PayOS. Chan o tao QR chu khong
+  // doi den luc webhook ve: webhook chay khong co nguoi dung ngoi truoc man
+  // hinh, luc do tien da chuyen roi thi chan cung vo nghia.
+  _assertClosingSigned(existing) {
+    if (!this._laChuKyHopLe(existing.closingSignatureData)
+        || !this._laChuKyHopLe(existing.customerFinalSignatureData)) {
+      throw new ApiError(409, 'Phiếu chưa có chữ ký quyết toán của cố vấn dịch vụ và khách hàng');
+    }
+  }
+
   async updateStatus(id, status, { issuedBy, cancelReason } = {}) {
     if (!STATUS_VALUES.includes(status)) {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
@@ -560,6 +618,7 @@ class RepairSettlementService {
     if (status === 'invoiced' && existing.status !== 'waiting_payment') {
       throw new ApiError(409, 'Phiếu phải ở trạng thái chờ thanh toán mới có thể xác nhận thanh toán');
     }
+    if (status === 'invoiced') this._assertClosingSigned(existing);
 
     const entity = await this.repairSettlementRepository.updateStatus(id, status, {
       issuedBy,
@@ -661,6 +720,7 @@ class RepairSettlementService {
     if (await this.repairSettlementRepository.hasPaidPayosTransaction(id)) {
       throw new ApiError(409, 'Phiếu này đã được thanh toán qua QR, không tạo mã mới được');
     }
+    this._assertClosingSigned(existing);
 
     // MOI phieu chi duoc 1 ma QR song tai 1 thoi diem: dong het ma cu truoc
     // khi phat ma moi. Neu khong, moi lan bam la them 1 duong thu tien - khach
@@ -734,7 +794,14 @@ class RepairSettlementService {
     const settlement = await this.repairSettlementRepository.findById(tx.repair_order_id);
     if (!settlement || settlement.status !== 'waiting_payment') return;
 
-    await this.repairSettlementRepository.updateStatus(tx.repair_order_id, 'invoiced', { issuedBy: settlement.advisorId, paymentMethod: 'TRANSFER' });
+    // issued_by = co van DA CHOT phieu (ky o moc quyet toan), khong phai
+    // nguoi lap phieu: webhook chay khong co user dang nhap, truoc day gan
+    // bua vao advisorId nen moi hoa don chuyen khoan deu ghi sai nguoi khi
+    // phieu duoc ban giao ca. Toi buoc nay chac chan da ky nen luon co.
+    await this.repairSettlementRepository.updateStatus(tx.repair_order_id, 'invoiced', {
+      issuedBy: settlement.closingAdvisorId || settlement.advisorId,
+      paymentMethod: 'TRANSFER',
+    });
     emitRepairOrderEvent(settlement.branchId, 'invoiced', { orderId: tx.repair_order_id });
 
     // Ghi audit sau khi xuat hoa don — khong doi logic thanh toan.

@@ -59,6 +59,10 @@ class RepairSettlementRepository {
     throw new Error('Method setNgDecision() must be implemented');
   }
 
+  async saveClosingSignature(id, { advisorId, advisorSignatureData, customerSignatureData, customerSignerName }) {
+    throw new Error('Method saveClosingSignature() must be implemented');
+  }
+
   async acquireLock(id, userId) {
     throw new Error('Method acquireLock() must be implemented');
   }

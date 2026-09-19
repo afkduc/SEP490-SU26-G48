@@ -175,6 +175,34 @@ class RepairSettlementController {
     }
   };
 
+  saveClosingSignature = async (req, res, next) => {
+    try {
+      const item = await this.repairSettlementService.saveClosingSignature(req.params.id, {
+        advisorId: req.user.userId,
+        advisorSignatureData: req.body.advisorSignatureData,
+        customerSignatureData: req.body.customerSignatureData,
+        customerSignerName: req.body.customerSignerName,
+      });
+      // Ghi vao nhat ky hoat dong phieu - day la cho DUY NHAT nhin lai duoc
+      // "ai lap, ai chot" theo thu tu thoi gian khi phieu duoc ban giao ca.
+      await auditCrud.lifecycle(req, {
+        tableName: 'repair_settlements',
+        entityCode: item?.code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Phiếu quyết toán',
+        step: 'closing_signed',
+        stepLabel: 'Ký quyết toán & giao xe',
+        action: 'UPDATE',
+        description: `Phiếu quyết toán ${item?.code || req.params.id}: cố vấn ${req.user?.name || ''} `
+          + `và khách hàng ${req.body.customerSignerName || ''} đã ký quyết toán`,
+        snapshot: settlementSnapshot(item, { closingAdvisor: req.user?.name || null }),
+      });
+      return success(res, item, 'Closing signature saved');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   updateStatus = async (req, res, next) => {
     try {
       const item = await this.repairSettlementService.updateStatus(req.params.id, req.body.status, {

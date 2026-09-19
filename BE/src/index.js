@@ -310,6 +310,21 @@ async function start() {
       process.exit(1);
     }
 
+    // 8 cot chu ky phieu quyet toan (co van lap phieu ky, co van chot phieu
+    // ky, khach ky nhan xe). KHONG duoc nuot loi: cau SELECT danh sach/chi
+    // tiet doc thang cac cot nay, thieu cot la 500 o toan bo man co van.
+    try {
+      const { ensureSettlementSignatures } = require('./infrastructure/database/ensureSettlementSignatures');
+      const r = await ensureSettlementSignatures();
+      console.log(r.skipped
+        ? '[BE] chu ky phieu quyet toan: da co tu truoc, bo qua'
+        : `[BE] chu ky phieu quyet toan: DA THEM XONG (${r.steps} buoc)`);
+    } catch (sigQtErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot chu ky phieu quyet toan that bai:');
+      console.error(sigQtErr.message);
+      process.exit(1);
+    }
+
     // Bang export_request_pickups + cot inventory_transactions.pickup_id -
     // cho phep xuat kho nhieu lan / tra hang tren cung 1 phieu xuat. KHONG
     // duoc nuot loi: thieu bang thi man xuat kho hong hoan toan.
