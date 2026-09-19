@@ -73,6 +73,14 @@ export default function ExportRequestFormPage() {
   const signaturePadRef = useRef(null);
   const [signatureEmpty, setSignatureEmpty] = useState(true);
 
+  // Chu ky NV KHO (nguoi xuat): ky DUNG 1 LAN cho ca phieu - o lan xuat dau
+  // tien. Cac lan xuat them / tra hang sau, BE tra ve chu ky da ky
+  // (selectedRo.issuerSignatureData) -> chi hien lai, khong ky nua. Nguoi lay
+  // thi van phai ky moi lan (o tren).
+  const issuerPadRef = useRef(null);
+  const [issuerSignatureEmpty, setIssuerSignatureEmpty] = useState(true);
+  const issuerAlreadySigned = Boolean(selectedRo?.issuerSignatureData);
+
   // So khop KHONG dau: go "thanh" phai ra "Lê Công Thành", go "ktv-hn-01"
   // van ra ma thoi thuong.
   const visibleTechnicians = (() => {
@@ -131,12 +139,17 @@ export default function ExportRequestFormPage() {
       vehiclePlate: detail.vehiclePlate,
       teamLeaderName: detail.teamLeaderName,
       exportRequestId: detail.exportRequestId,
+      issuerSignatureData: detail.issuerSignatureData || null,
+      issuerSignedAt: detail.issuerSignedAt || null,
+      issuerName: detail.issuerName || null,
       locked: detail.locked,
     });
     setItems(detail.items || []);
     // KHONG tick san dong nao: tick la hanh dong xac nhan chu dong cua NV Kho
     // ("da lay dong nay"), de san thi ky xac nhan mat y nghia.
     setTickedIds(new Set());
+    issuerPadRef.current?.clear();
+    setIssuerSignatureEmpty(true);
     return detail;
   }
 
@@ -165,6 +178,8 @@ export default function ExportRequestFormPage() {
     setTickedIds(new Set());
     setShowHistory(false);
     signaturePadRef.current?.clear();
+    issuerPadRef.current?.clear();
+    setIssuerSignatureEmpty(true);
   }
 
   function validate() {
@@ -178,6 +193,9 @@ export default function ExportRequestFormPage() {
     }
     if (!receivedBy) return 'Vui lòng chọn người lấy (thợ nhận phụ tùng)';
     if (signaturePadRef.current?.isEmpty() ?? true) return 'Vui lòng ký xác nhận đã lấy phụ tùng';
+    if (!issuerAlreadySigned && (issuerPadRef.current?.isEmpty() ?? true)) {
+      return 'Nhân viên kho ký xác nhận phiếu xuất (chỉ ký 1 lần cho cả phiếu)';
+    }
     return '';
   }
 
@@ -195,6 +213,9 @@ export default function ExportRequestFormPage() {
         repairOrderId: selectedRo.id,
         receivedBy: Number(receivedBy),
         receivedSignatureData: signaturePadRef.current.toDataURL(),
+        // Chu ky NV kho chi gui o lan dau (phieu chua co) - BE giu chu ky dau
+        // tien, cac lan sau khong ky lai.
+        issuerSignatureData: issuerAlreadySigned ? undefined : issuerPadRef.current.toDataURL(),
         productIds: [...tickedIds],
       });
       navigate(`/inventory/export-requests/${saved.id}`);
@@ -212,7 +233,8 @@ export default function ExportRequestFormPage() {
   const missing = [];
   if (!allTicked) missing.push(`tích đủ các dòng (${tickedIds.size}/${tickableCount})`);
   if (!receivedBy) missing.push('chọn người lấy');
-  if (signatureEmpty) missing.push('ký xác nhận');
+  if (signatureEmpty) missing.push('người lấy ký');
+  if (!issuerAlreadySigned && issuerSignatureEmpty) missing.push('nhân viên kho ký');
   const canSubmit = Boolean(selectedRo) && !selectedRo?.locked && missing.length === 0;
   const missingLabel = missing.length ? `Còn thiếu: ${missing.join(', ')}` : '';
 
@@ -445,14 +467,44 @@ export default function ExportRequestFormPage() {
               {/* Nguoi lay TU KY xac nhan da nhan phu tung - giong het co che
                   khach hang ky tren phieu quyet toan, de biet chac chan AI
                   da lay hang chu khong chi ghi ten qua dropdown. */}
-              <div className="er-form__signature">
-                <h3 className="er-form__add-title">Người lấy ký xác nhận <span className="required">*</span></h3>
-                <div className="er-form__signature-pad">
-                  <SignaturePad ref={signaturePadRef} onChange={setSignatureEmpty} />
+              <div className="er-form__signatures">
+                {/* NV KHO ky 1 LAN cho ca phieu: lan dau hien o ky; cac lan
+                    xuat them / tra hang sau chi hien lai chu ky da ky. */}
+                <div className={`er-form__signature ${issuerAlreadySigned ? 'er-form__signature--done' : ''}`}>
+                  <h3 className="er-form__add-title">
+                    Nhân viên kho ký xác nhận {!issuerAlreadySigned && <span className="required">*</span>}
+                  </h3>
+                  {issuerAlreadySigned ? (
+                    <>
+                      <div className="er-form__signature-img-box">
+                        <img src={selectedRo.issuerSignatureData} alt="Chữ ký nhân viên kho" className="er-form__signature-img" />
+                      </div>
+                      <div className="er-form__signature-name">{selectedRo.issuerName || '—'}</div>
+                      <div className="er-form__signature-note">
+                        Đã ký lúc {selectedRo.issuerSignedAt || '—'} (lần xuất đầu) — không cần ký lại.
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="er-form__signature-pad">
+                        <SignaturePad ref={issuerPadRef} onChange={setIssuerSignatureEmpty} />
+                      </div>
+                      <div className="er-form__signature-note">Ký 1 lần cho cả phiếu, dùng cho mọi lần xuất thêm / hoàn sau.</div>
+                    </>
+                  )}
                 </div>
-                {!signatureEmpty && receivedByName && (
-                  <div className="er-form__signature-name">{receivedByName}</div>
-                )}
+
+                {/* Nguoi lay (tho) ky MOI LAN lay/tra hang. */}
+                <div className="er-form__signature">
+                  <h3 className="er-form__add-title">Người lấy ký xác nhận <span className="required">*</span></h3>
+                  <div className="er-form__signature-pad">
+                    <SignaturePad ref={signaturePadRef} onChange={setSignatureEmpty} />
+                  </div>
+                  {!signatureEmpty && receivedByName && (
+                    <div className="er-form__signature-name">{receivedByName}</div>
+                  )}
+                  <div className="er-form__signature-note">Ký lại ở mỗi lần lấy / hoàn phụ tùng.</div>
+                </div>
               </div>
             </div>
           </>

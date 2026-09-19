@@ -104,20 +104,26 @@ export default function ManagerExportRequestDetailPage() {
           )}
         </div>
 
-        {data.receivedSignatureData && (
+        {(data.receivedSignatureData || data.issuerSignatureData) && (
           <div className="mer-detail__section">
-            <h2 className="mer-detail__section-title">Chữ ký người lấy</h2>
-            <div className="mer-detail__signature-box">
-              <img
-                src={data.receivedSignatureData}
-                alt="Chữ ký người lấy"
-                className="mer-detail__signature-img"
-              />
-              {data.receivedByName && (
-                <div className="mer-detail__signature-name">{data.receivedByName}</div>
+            <h2 className="mer-detail__section-title">Chữ ký xác nhận</h2>
+            <div className="mer-detail__signatures">
+              {/* NV kho ky 1 lan cho ca phieu (lan xuat dau tien). */}
+              {data.issuerSignatureData && (
+                <div className="mer-detail__signature-box">
+                  <div className="mer-detail__signature-role">Nhân viên kho</div>
+                  <img src={data.issuerSignatureData} alt="Chữ ký nhân viên kho" className="mer-detail__signature-img" />
+                  {data.issuerName && <div className="mer-detail__signature-name">{data.issuerName}</div>}
+                  {data.issuerSignedAt && <div className="mer-detail__signature-date">Ký lúc: {data.issuerSignedAt}</div>}
+                </div>
               )}
-              {data.receivedSignedAt && (
-                <div className="mer-detail__signature-date">Ký lúc: {data.receivedSignedAt}</div>
+              {data.receivedSignatureData && (
+                <div className="mer-detail__signature-box">
+                  <div className="mer-detail__signature-role">Người lấy (lần gần nhất)</div>
+                  <img src={data.receivedSignatureData} alt="Chữ ký người lấy" className="mer-detail__signature-img" />
+                  {data.receivedByName && <div className="mer-detail__signature-name">{data.receivedByName}</div>}
+                  {data.receivedSignedAt && <div className="mer-detail__signature-date">Ký lúc: {data.receivedSignedAt}</div>}
+                </div>
               )}
             </div>
           </div>

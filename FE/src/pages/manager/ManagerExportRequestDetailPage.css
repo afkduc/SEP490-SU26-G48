@@ -175,14 +175,28 @@
 .mer-detail .text-right { text-align: right; }
 
 /* ── Chu ky nguoi lay ── */
+.mer-detail__signatures {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
 .mer-detail__signature-box {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   padding: 16px;
+  min-width: 240px;
   background: var(--md-surface-container);
   border-radius: var(--md-shape-md);
+}
+.mer-detail__signature-role {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 .mer-detail__signature-img {
   display: block;
