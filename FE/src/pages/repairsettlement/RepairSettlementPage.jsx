@@ -758,7 +758,16 @@ function SettlementPreviewModal({ order, onClose }) {
   const [dangLuuChuKy, setDangLuuChuKy] = useState(false);
   const [loiChuKy, setLoiChuKy] = useState('');
 
+  // Ky xong la LUU LUON, khong bat bam them nut: 2 o ky deu da co chu ky va
+  // da co ten nguoi nhan xe thi khong con gi de cho nua. Nguoi dung ky tren
+  // iPad, bat ho tim them 1 nut nua chi de "xac nhan lan 2" la thua.
+  //
+  // dangGuiRef chan goi trung: effect co the chay lai (vd re-render do SSE)
+  // trong luc request chua ve.
+  const dangGuiRef = useRef(false);
   const luuChuKyQuyetToan = async () => {
+    if (dangGuiRef.current) return;
+    dangGuiRef.current = true;
     setDangLuuChuKy(true);
     setLoiChuKy('');
     try {
@@ -774,9 +783,19 @@ function SettlementPreviewModal({ order, onClose }) {
     } catch (err) {
       setLoiChuKy(err.message || 'Không lưu được chữ ký, vui lòng thử lại');
     } finally {
+      dangGuiRef.current = false;
       setDangLuuChuKy(false);
     }
   };
+
+  // Du 2 chu ky + ten nguoi nhan xe -> tu luu. Co loi thi dung lai cho nguoi
+  // dung bam "Thử lại" (khong tu goi lai vong lap khi server dang hong).
+  useEffect(() => {
+    if (daKyQuyetToan || loiChuKy) return;
+    if (closingAdvisorEmpty || closingCustomerEmpty || !tenNguoiNhanXe.trim()) return;
+    luuChuKyQuyetToan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closingAdvisorEmpty, closingCustomerEmpty, tenNguoiNhanXe, daKyQuyetToan, loiChuKy]);
 
   const requestPayosQr = async () => {
     setPayosLoading(true);
@@ -1075,16 +1094,23 @@ function SettlementPreviewModal({ order, onClose }) {
                     </div>
                   </div>
                 </div>
-                {loiChuKy && (
-                  <div style={{ fontSize: 12.5, color: '#C62828', marginTop: 8 }}>{loiChuKy}</div>
+                {loiChuKy ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12.5, color: '#C62828' }}>{loiChuKy}</span>
+                    <button className="btn btn-secondary btn-sm"
+                      onClick={() => { setLoiChuKy(''); luuChuKyQuyetToan(); }}>
+                      Thử lại
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginTop: 10, fontStyle: 'italic' }}>
+                    {dangLuuChuKy
+                      ? 'Đang lưu chữ ký…'
+                      : (!tenNguoiNhanXe.trim()
+                        ? 'Nhập tên người nhận xe để lưu được chữ ký.'
+                        : 'Ký đủ hai bên là chữ ký tự động được lưu.')}
+                  </div>
                 )}
-                <div style={{ textAlign: 'right', marginTop: 10 }}>
-                  <button className="btn btn-primary"
-                    disabled={dangLuuChuKy || closingAdvisorEmpty || closingCustomerEmpty || !tenNguoiNhanXe.trim()}
-                    onClick={luuChuKyQuyetToan}>
-                    {dangLuuChuKy ? 'Đang lưu…' : 'Lưu chữ ký quyết toán'}
-                  </button>
-                </div>
               </div>
             )}
           </div>
