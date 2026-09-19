@@ -2370,16 +2370,20 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const [intakeChecklist, setIntakeChecklist] = useState(existingOrder?.intakeChecklist || DEFAULT_INTAKE_CHECKLIST);
 
   // Chu ky dien tu tai cho - bat buoc luc tao phieu moi (khong ap dung khi sua
-  // phieu da co, chu ky goc khong doi lai). signerName auto-fill theo nguoi
-  // lien he - phai dong bo lai moi khi customerInfo doi (vd sau khi CVDV tra
-  // cuu/chon khach hang, KHONG chi luc mount form vi luc do chua chon khach),
-  // nhung ngung auto-fill ngay khi CVDV tu tay sua ten nguoi ky.
+  // phieu da co, chu ky goc khong doi lai).
+  //
+  // Khach TU VIET ten vao trong o ky (nhu phieu giay: "Ký và ghi rõ họ tên"),
+  // khong con o nhap ten rieng tren man hinh. signerName van duoc gui len BE
+  // nhung lay tu dong theo nguoi lien he / ten khach da nhap o khoi thong tin
+  // phia tren - phai dong bo lai moi khi customerInfo doi (vd sau khi CVDV tra
+  // cuu/chon khach hang, KHONG chi luc mount form vi luc do chua chon khach).
+  // Rieng luc SUA phieu da co thi giu nguyen ten da luu, khong ghi de.
   const signaturePadRef = useRef(null);
-  // Chu ky CO VAN o moc lap phieu - phieu phai co it nhat 2 nguoi ky. Ten
-  // nguoi ky lay tu tai khoan dang nhap nen khong co o nhap ten rieng.
+  // Chu ky CO VAN o moc lap phieu - phieu phai co it nhat 2 nguoi ky.
   const advisorPadRef = useRef(null);
   const [advisorSignatureEmpty, setAdvisorSignatureEmpty] = useState(true);
   const [signerName, setSignerName] = useState(existingOrder?.signerName || '');
+  // true = phieu da co ten nguoi ky tu truoc (man Chinh sua) -> khong auto-fill de.
   const signerNameEditedRef = useRef(Boolean(existingOrder?.signerName));
   useEffect(() => {
     if (!signerNameEditedRef.current) {
@@ -4224,14 +4228,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 Xác nhận đồng ý phiếu quyết toán
               </div>
               <SignaturePad ref={signaturePadRef} onChange={setSignatureEmpty} />
-              <input className="form-input"
-                style={{
-                  width: '100%', textAlign: 'center', fontWeight: 600, marginTop: 10,
-                  border: 'none', borderTop: '1px solid var(--gray-200)', borderRadius: 0, paddingTop: 10,
-                }}
-                placeholder="Tên người ký"
-                value={signerName}
-                onChange={(e) => { signerNameEditedRef.current = true; setSignerName(e.target.value); }} />
+              {/* Khach tu viet ten vao trong o ky luon (nhu phieu giay), khong
+                  con o nhap ten rieng. signerName van duoc gui len BE, lay tu
+                  ten nguoi lien he/ten khach da nhap o khoi thong tin phia tren. */}
+              <div style={{
+                textAlign: 'center', fontSize: 12.5, fontStyle: 'italic', color: 'var(--gray-600)',
+                marginTop: 10, borderTop: '1px solid var(--gray-200)', paddingTop: 10,
+              }}>
+                Ký và ghi rõ họ tên
+              </div>
             </div>
           </div>
         )}
@@ -4250,10 +4255,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               </div>
               <SignaturePad ref={advisorPadRef} onChange={setAdvisorSignatureEmpty} />
               <div style={{
-                textAlign: 'center', fontSize: 13, fontWeight: 600, marginTop: 10,
-                borderTop: '1px solid var(--gray-200)', paddingTop: 10,
+                textAlign: 'center', fontSize: 12.5, fontStyle: 'italic', color: 'var(--gray-600)',
+                marginTop: 10, borderTop: '1px solid var(--gray-200)', paddingTop: 10,
               }}>
-                {user?.name || 'Cố vấn dịch vụ'}
+                Ký và ghi rõ họ tên
               </div>
             </div>
           </div>
