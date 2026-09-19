@@ -315,6 +315,46 @@ function OChuKy({ tieuDe, anh, ten, luc }) {
   );
 }
 
+// Ca 4 chu ky cua phieu, chia theo 2 MOC - dung chung cho modal chi tiet va
+// modal xuat hoa don (truoc day copy y het o 2 cho).
+//
+// Ghi ro "TIẾP NHẬN XE" / "BÀN GIAO XE" tren tung cap: nhin phieu la biet
+// chu ky nao ky luc nao, khong phai doan theo tieu de tung o.
+function KhoiChuKy({ order }) {
+  const nhom = (tieuDe, cac_o) => (
+    <div style={{ flex: '1 1 320px', minWidth: 300 }}>
+      <div style={{
+        fontSize: 11.5, fontWeight: 700, letterSpacing: .4, color: 'var(--gray-600)',
+        textTransform: 'uppercase', textAlign: 'center',
+        borderBottom: '1px solid var(--gray-200)', paddingBottom: 6, marginBottom: 10,
+      }}>
+        {tieuDe}
+      </div>
+      <div style={{ display: 'flex', gap: 12 }}>{cac_o}</div>
+    </div>
+  );
+  return (
+    <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+      {nhom('Tiếp nhận xe', (
+        <>
+          <OChuKy tieuDe="Khách duyệt báo giá" anh={order.signatureData}
+            ten={order.signerName} luc={order.signedAt} />
+          <OChuKy tieuDe="CVDV lập phiếu" anh={order.advisorSignatureData}
+            ten={order.advisor} luc={order.advisorSignedAt} />
+        </>
+      ))}
+      {nhom('Bàn giao xe', (
+        <>
+          <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
+            ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} />
+          <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
+            ten={order.closingAdvisorName} luc={order.closingSignedAt} />
+        </>
+      ))}
+    </div>
+  );
+}
+
 // "Tien do cong viec" hien cho co van - dung chung cho modal Truy cap phieu
 // va man Sua phieu (truoc day 2 cho copy y het nhau nen sua 1 ben la lech).
 //
@@ -662,6 +702,12 @@ function printSettlement(order, payosQrCode) {
   /* O ky da co chu ky dien tu: anh chu ky nam ngay tren duong ke, khong con
      chua 40px trong de ky tay nua. */
   .sign-img { height:46px; max-width:100%; object-fit:contain; display:block; margin:2px auto 0; }
+  /* 4 o ky chia 2 nhom theo 2 moc: tiep nhan xe / ban giao xe */
+  .sign-group { width:48%; }
+  .sign-group-title { text-align:center; font-size:10px; font-weight:700; letter-spacing:.4px;
+    text-transform:uppercase; border-bottom:1px solid #999; padding-bottom:3px; margin-bottom:6px; }
+  .sign-group-boxes { display:flex; justify-content:space-around; }
+  .sign-group .sign-box { width:46%; }
   .sign-line.has-img { margin-top:0; }
   /* Dong bi doi sau khi chot voi khach (khach huy / tra bot phu tung) - in
      mau do de nguoi doc thay ngay vi sao tien cuoi khac bao gia ban dau.
@@ -731,10 +777,20 @@ function printSettlement(order, payosQrCode) {
 </div>
 
 <div class="sign-row">
-  ${oKy('Khách duyệt báo giá', order.signatureData, order.signerName || order.customer?.fullName)}
-  ${oKy('CVDV lập phiếu', order.advisorSignatureData, order.advisor)}
-  ${oKy('Khách nhận xe', order.customerFinalSignatureData, order.customerFinalSignerName)}
-  ${oKy('CVDV quyết toán', order.closingSignatureData, order.closingAdvisorName)}
+  <div class="sign-group">
+    <div class="sign-group-title">Tiếp nhận xe</div>
+    <div class="sign-group-boxes">
+      ${oKy('Khách duyệt báo giá', order.signatureData, order.signerName || order.customer?.fullName)}
+      ${oKy('CVDV lập phiếu', order.advisorSignatureData, order.advisor)}
+    </div>
+  </div>
+  <div class="sign-group">
+    <div class="sign-group-title">Bàn giao xe</div>
+    <div class="sign-group-boxes">
+      ${oKy('Khách nhận xe', order.customerFinalSignatureData, order.customerFinalSignerName)}
+      ${oKy('CVDV quyết toán', order.closingSignatureData, order.closingAdvisorName)}
+    </div>
+  </div>
 </div>
 </body></html>`;
   return moCuaSoIn(html);
@@ -1083,16 +1139,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                 </div>
                 {/* Van hien nguyen 4 chu ky sau khi ky - de nguoi dung nhin
                     thay minh vua ky cai gi, va de doi chieu truoc khi in. */}
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  <OChuKy tieuDe="Khách duyệt báo giá" anh={order.signatureData}
-                    ten={order.signerName} luc={order.signedAt} />
-                  <OChuKy tieuDe="CVDV lập phiếu" anh={order.advisorSignatureData}
-                    ten={order.advisor} luc={order.advisorSignedAt} />
-                  <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
-                    ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} />
-                  <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
-                    ten={order.closingAdvisorName} luc={order.closingSignedAt} />
-                </div>
+                <KhoiChuKy order={order} />
               </div>
             ) : (
               <div style={{ border: '1px solid var(--gray-300)', borderRadius: 8, padding: 12 }}>
@@ -1425,16 +1472,7 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
           <div className="card" style={{ marginTop: 12 }}>
             <div className="card-body">
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Chữ ký trên phiếu</div>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <OChuKy tieuDe="Khách duyệt báo giá" anh={order.signatureData}
-                  ten={order.signerName} luc={order.signedAt} />
-                <OChuKy tieuDe="CVDV lập phiếu" anh={order.advisorSignatureData}
-                  ten={order.advisor} luc={order.advisorSignedAt} />
-                <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
-                  ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} />
-                <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
-                  ten={order.closingAdvisorName} luc={order.closingSignedAt} />
-              </div>
+              <KhoiChuKy order={order} />
             </div>
           </div>
         </div>
