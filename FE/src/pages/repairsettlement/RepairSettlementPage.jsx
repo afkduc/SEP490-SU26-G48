@@ -295,7 +295,10 @@ function OChuKy({ tieuDe, anh, ten, luc }) {
       <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, marginBottom: 6 }}>{tieuDe}</div>
       {anh ? (
         <img src={anh} alt={tieuDe}
-          style={{ display: 'block', margin: '0 auto', height: 70, border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }} />
+          style={{
+            display: 'block', margin: '0 auto', height: 70, maxWidth: '100%', objectFit: 'contain',
+            border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff',
+          }} />
       ) : (
         <div style={{
           height: 70, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -635,7 +638,7 @@ function printSettlement(order, payosQrCode) {
   .sign-line { margin-top:40px; border-top:1px solid #000; padding-top:3px; font-size:10px; }
   /* O ky da co chu ky dien tu: anh chu ky nam ngay tren duong ke, khong con
      chua 40px trong de ky tay nua. */
-  .sign-img { height:46px; display:block; margin:2px auto 0; }
+  .sign-img { height:46px; max-width:100%; object-fit:contain; display:block; margin:2px auto 0; }
   .sign-line.has-img { margin-top:0; }
   /* Dong bi doi sau khi chot voi khach (khach huy / tra bot phu tung) - in
      mau do de nguoi doc thay ngay vi sao tien cuoi khac bao gia ban dau.
