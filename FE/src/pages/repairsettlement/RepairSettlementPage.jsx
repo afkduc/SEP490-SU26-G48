@@ -707,15 +707,20 @@ function printSettlement(order, payosQrCode) {
 <div class="sign-row">
   ${oKy('Khách duyệt báo giá', order.signatureData, order.signerName || order.customer?.fullName)}
   ${oKy('CVDV lập phiếu', order.advisorSignatureData, order.advisor)}
-  ${oKy('CVDV quyết toán', order.closingSignatureData, order.closingAdvisorName)}
   ${oKy('Khách nhận xe', order.customerFinalSignatureData, order.customerFinalSignerName)}
+  ${oKy('CVDV quyết toán', order.closingSignatureData, order.closingAdvisorName)}
 </div>
 </body></html>`;
   return moCuaSoIn(html);
 }
 
 // ─── Modal xem trước & xuất phiếu quyết toán ────────────────────────
-function SettlementPreviewModal({ order, onClose }) {
+function SettlementPreviewModal({ order: orderGoc, onClose }) {
+  // Sau khi ky quyet toan, BE tra ve phieu da kem 4 chu ky - giu lai o day de
+  // vua HIEN duoc chu ky vua ky, vua IN ra dung ban co chu ky (prop `order`
+  // la ban chup luc mo modal, khong tu cap nhat).
+  const [orderMoi, setOrderMoi] = useState(null);
+  const order = orderMoi || orderGoc;
   // Chi con dung de doi chu nut in ("In phieu" vs "In lai phieu").
   const [hasPrinted, setHasPrinted] = useState(false);
   // Trinh duyet chan popup thi bam In khong ra gi ca - phai noi ro, khong thi
@@ -771,11 +776,12 @@ function SettlementPreviewModal({ order, onClose }) {
     setDangLuuChuKy(true);
     setLoiChuKy('');
     try {
-      await saveClosingSignatureApi(order.id, {
+      const phieuSauKhiKy = await saveClosingSignatureApi(order.id, {
         advisorSignatureData: closingAdvisorPadRef.current.toDataURL(),
         customerSignatureData: closingCustomerPadRef.current.toDataURL(),
         customerSignerName: tenNguoiNhanXe,
       });
+      if (phieuSauKhiKy?.id) setOrderMoi(phieuSauKhiKy);
       setDaKyQuyetToan(true);
       // Ky xong moi xin ma QR duoc (truoc do BE tu choi) - xin luon de khach
       // quet ngay, khong bat bam them nut.
@@ -1051,13 +1057,22 @@ function SettlementPreviewModal({ order, onClose }) {
         {order.status === 'waiting_payment' && (
           <div style={{ margin: '0 16px 12px' }}>
             {daKyQuyetToan ? (
-              <div style={{
-                padding: '8px 10px', borderRadius: 6, background: '#E8F5E9',
-                border: '1px solid #A5D6A7', fontSize: 12.5, color: '#2E7D32', fontWeight: 600,
-              }}>
-                ✓ Đã ký quyết toán
-                {order.closingAdvisorName ? ` — Cố vấn: ${order.closingAdvisorName}` : ''}
-                {order.customerFinalSignerName ? ` · Người nhận xe: ${order.customerFinalSignerName}` : ''}
+              <div style={{ border: '1px solid #A5D6A7', borderRadius: 8, background: '#F1F8F2', padding: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#2E7D32', marginBottom: 10 }}>
+                  ✓ Đã ký quyết toán
+                </div>
+                {/* Van hien nguyen 4 chu ky sau khi ky - de nguoi dung nhin
+                    thay minh vua ky cai gi, va de doi chieu truoc khi in. */}
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <OChuKy tieuDe="Khách duyệt báo giá" anh={order.signatureData}
+                    ten={order.signerName} luc={order.signedAt} />
+                  <OChuKy tieuDe="CVDV lập phiếu" anh={order.advisorSignatureData}
+                    ten={order.advisor} luc={order.advisorSignedAt} />
+                  <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
+                    ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} />
+                  <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
+                    ten={order.closingAdvisorName} luc={order.closingSignedAt} />
+                </div>
               </div>
             ) : (
               <div style={{ border: '1px solid var(--gray-300)', borderRadius: 8, padding: 12 }}>
@@ -1379,10 +1394,10 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
                     ten={order.signerName} luc={order.signedAt} />
                   <OChuKy tieuDe="CVDV lập phiếu" anh={order.advisorSignatureData}
                     ten={order.advisor} luc={order.advisorSignedAt} />
-                  <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
-                    ten={order.closingAdvisorName} luc={order.closingSignedAt} />
                   <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
                     ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} />
+                  <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
+                    ten={order.closingAdvisorName} luc={order.closingSignedAt} />
                 </div>
               </div>
             </div>

@@ -573,7 +573,9 @@ class RepairSettlementService {
       customerSignatureData,
       customerSignerName: String(customerSignerName).trim(),
     });
-    return this.repairSettlementRepository.findById(id);
+    // Tra ve DTO (khong phai entity tho) - FE dung ngay ket qua nay de hien
+    // 4 o chu ky va de IN phieu, khong phai tai lai phieu.
+    return RepairSettlementResponseDto.fromEntity(await this.repairSettlementRepository.findById(id));
   }
 
   // Chua du chu ky thi khong duoc thu tien - ap dung cho CA HAI duong: xac
