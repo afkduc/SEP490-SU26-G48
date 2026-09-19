@@ -106,20 +106,27 @@ export default function ExportRequestDetailPage() {
           )}
         </div>
 
-        {data.receivedSignatureData && (
+        {(data.receivedSignatureData || data.issuerSignatureData) && (
           <div className="er-detail__section">
-            <h2 className="er-detail__section-title">Chữ ký người lấy</h2>
-            <div className="er-detail__signature-box">
-              <img
-                src={data.receivedSignatureData}
-                alt="Chữ ký người lấy"
-                className="er-detail__signature-img"
-              />
-              {data.receivedByName && (
-                <div className="er-detail__signature-name">{data.receivedByName}</div>
+            <h2 className="er-detail__section-title">Chữ ký xác nhận</h2>
+            <div className="er-detail__signatures">
+              {/* NV kho ky 1 lan cho ca phieu (lan xuat dau tien). */}
+              {data.issuerSignatureData && (
+                <div className="er-detail__signature-box">
+                  <div className="er-detail__signature-role">Nhân viên kho</div>
+                  <img src={data.issuerSignatureData} alt="Chữ ký nhân viên kho" className="er-detail__signature-img" />
+                  {data.issuerName && <div className="er-detail__signature-name">{data.issuerName}</div>}
+                  {data.issuerSignedAt && <div className="er-detail__signature-date">Ký lúc: {data.issuerSignedAt}</div>}
+                </div>
               )}
-              {data.receivedSignedAt && (
-                <div className="er-detail__signature-date">Ký lúc: {data.receivedSignedAt}</div>
+              {/* Nguoi lay: chu ky cua LAN GAN NHAT (tung lan xem o Lich su luu phieu). */}
+              {data.receivedSignatureData && (
+                <div className="er-detail__signature-box">
+                  <div className="er-detail__signature-role">Người lấy (lần gần nhất)</div>
+                  <img src={data.receivedSignatureData} alt="Chữ ký người lấy" className="er-detail__signature-img" />
+                  {data.receivedByName && <div className="er-detail__signature-name">{data.receivedByName}</div>}
+                  {data.receivedSignedAt && <div className="er-detail__signature-date">Ký lúc: {data.receivedSignedAt}</div>}
+                </div>
               )}
             </div>
           </div>

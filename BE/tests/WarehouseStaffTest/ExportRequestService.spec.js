@@ -119,6 +119,22 @@ test('requires a signature when confirming pickup', async () => {
   await expectError(() => service.confirmPickup({ branchId: 1, repairOrderId: 9, performedBy: 7, receivedBy: 21, productIds: [11] }), 400, 'Vui lòng ký xác nhận');
 });
 
+test('passes the warehouse-staff signature through when given, rejects a malformed one', async () => {
+  let received;
+  const service = makeService({ confirmPickup: async (tx, data) => { received = data; return detail(); } });
+  const base = { branchId: 1, repairOrderId: 9, performedBy: 7, receivedBy: 21, receivedSignatureData: 'data:image/png;base64,abc123', productIds: [11] };
+
+  // Lan dau: NV kho ky -> chuyen xuong repository (repository quyet dinh bat buoc hay khong).
+  await service.confirmPickup({ ...base, issuerSignatureData: 'data:image/png;base64,kho999' });
+  assert.equal(received.issuer_signature_data, 'data:image/png;base64,kho999');
+
+  // Lan sau: khong gui chu ky NV kho (da ky truoc do) -> null, khong loi o tang DTO.
+  await service.confirmPickup(base);
+  assert.equal(received.issuer_signature_data, null);
+
+  await expectError(() => service.confirmPickup({ ...base, issuerSignatureData: 'not-a-png' }), 400, 'Chữ ký nhân viên kho không hợp lệ');
+});
+
 test('requires at least one selected part row when confirming pickup', async () => {
   const service = makeService();
   await expectError(() => service.confirmPickup({ branchId: 1, repairOrderId: 9, performedBy: 7, receivedBy: 21, receivedSignatureData: 'data:image/png;base64,abc123', productIds: [] }), 400, 'Chưa chọn dòng phụ tùng nào để xác nhận');

@@ -186,14 +186,28 @@
 .er-detail .text-right { text-align: right; }
 
 /* ── Chu ky nguoi lay ── */
+.er-detail__signatures {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
 .er-detail__signature-box {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   padding: 16px;
+  min-width: 240px;
   background: var(--md-surface-container);
   border-radius: var(--md-shape-md);
+}
+.er-detail__signature-role {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 .er-detail__signature-img {
   display: block;

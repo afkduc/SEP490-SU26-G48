@@ -42,6 +42,14 @@ function validateConfirmPickup(payload) {
     throw new ApiError(400, 'Vui lòng ký xác nhận');
   }
 
+  // Chu ky NV KHO (nguoi xuat): chi bat buoc o LAN DAU cua phieu (header chua
+  // co chu ky) - repository kiem tra trong transaction vi phai biet phieu da
+  // ton tai chua. O day chi kiem dinh dang neu co gui len.
+  const issuerSignatureData = payload.issuerSignatureData ?? payload.issuer_signature_data ?? null;
+  if (issuerSignatureData && !String(issuerSignatureData).startsWith('data:image/png;base64,')) {
+    throw new ApiError(400, 'Chữ ký nhân viên kho không hợp lệ');
+  }
+
   const rawIds = Array.isArray(payload.productIds ?? payload.product_ids)
     ? (payload.productIds ?? payload.product_ids)
     : [];
@@ -60,6 +68,7 @@ function validateConfirmPickup(payload) {
     performed_by: performedBy,
     received_by: receivedBy,
     signature_data: signatureData,
+    issuer_signature_data: issuerSignatureData || null,
     product_ids: productIds,
   };
 }
