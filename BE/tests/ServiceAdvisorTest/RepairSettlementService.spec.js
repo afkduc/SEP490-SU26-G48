@@ -180,6 +180,34 @@ test('create rejects DV qty=0 but allows PT qty=0', async () => {
   assert.equal(dto.status, 'waiting_repair');
 });
 
+test('create allows an empty repair category on a standalone part, still requires it on a service', async () => {
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(),
+    customerRepository: {},
+  });
+
+  // Phu tung khach mua them, khong di kem dich vu nao -> khong co loai hinh.
+  const dto = await service.create(
+    basePayload({
+      items: [
+        { ...validItem },
+        { ...validItem, lhsc: 'PT', repairCategory: '', productId: 9, description: 'Lọc gió điều hòa', unitPrice: 900 },
+      ],
+    }),
+    { branchId: 1, advisorId: 5 },
+  );
+  assert.equal(dto.status, 'waiting_repair');
+
+  await assert.rejects(
+    () => service.create(basePayload({ items: [{ ...validItem, repairCategory: '' }] }), { branchId: 1, advisorId: 5 }),
+    (err) => err.statusCode === 400 && /Loại hình sửa chữa/i.test(err.message),
+  );
+  await assert.rejects(
+    () => service.create(basePayload({ items: [{ ...validItem, lhsc: 'PT', repairCategory: 'XX' }] }), { branchId: 1, advisorId: 5 }),
+    (err) => err.statusCode === 400 && /Loại hình sửa chữa/i.test(err.message),
+  );
+});
+
 test('create rejects active duplicate customer+vehicle', async () => {
   const service = new RepairSettlementService({
     repairSettlementRepository: mockRepos({

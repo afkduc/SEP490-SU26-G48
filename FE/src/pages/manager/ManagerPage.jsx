@@ -1214,7 +1214,7 @@ function ServiceFormPage({ mode }) {
   const [branch, setBranch] = useState(null);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
-    serviceName: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
+    serviceCode: '', serviceName: '', unitPrice: '', durationMin: '', description: '', isActive: true, repairCategory: '',
   });
   const [parts, setParts] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -1234,6 +1234,7 @@ function ServiceFormPage({ mode }) {
         .then((data) => {
           if (!mounted || !data) return;
           setForm({
+            serviceCode: data.code || '',
             serviceName: data.name || '',
             unitPrice: data.unitPrice ?? '',
             durationMin: data.durationMin ?? '',
@@ -1264,6 +1265,7 @@ function ServiceFormPage({ mode }) {
 
   const validate = () => {
     const errors = {};
+    if (!isEdit && !form.serviceCode.trim()) errors.serviceCode = 'Vui lòng nhập mã dịch vụ';
     if (!form.serviceName.trim()) errors.serviceName = 'Vui lòng nhập tên dịch vụ';
     if (form.unitPrice === '' || Number.isNaN(Number(form.unitPrice)) || Number(form.unitPrice) < 0) {
       errors.unitPrice = 'Đơn giá không hợp lệ';
@@ -1291,6 +1293,7 @@ function ServiceFormPage({ mode }) {
     setSubmitting(true);
     try {
       const payload = {
+        serviceCode: form.serviceCode.trim(),
         serviceName: form.serviceName.trim(),
         unitPrice: Number(form.unitPrice),
         durationMin: form.durationMin === '' ? null : Number(form.durationMin),
@@ -1398,6 +1401,13 @@ function ServiceFormPage({ mode }) {
           )}
 
           <div className="form-grid form-grid-2">
+            {!isEdit && (
+              <div className="form-group">
+                <label className="form-label required">Mã dịch vụ</label>
+                <input className="form-input" maxLength={50} value={form.serviceCode} onChange={(e) => setField('serviceCode', e.target.value.toUpperCase())} placeholder="Ví dụ: SV-HCM-034" />
+                {fieldErrors.serviceCode && <span className="form-error">{fieldErrors.serviceCode}</span>}
+              </div>
+            )}
             <div className="form-group">
               <label className="form-label required">Tên dịch vụ</label>
               <input className="form-input" value={form.serviceName} onChange={(e) => setField('serviceName', e.target.value)} placeholder="Nhập tên dịch vụ" />

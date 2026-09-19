@@ -315,7 +315,14 @@ class ManagerService {
 
     const { price, duration } = await this._validateServicePayload(payload);
     const parts = await this._validateServiceParts(branchId, payload.parts);
-    const serviceCode = await this.managerRepository.nextServiceCode(branchId);
+    const serviceCode = String(payload.serviceCode || '').trim().toUpperCase();
+    if (!serviceCode) throw new ApiError(400, 'Mã dịch vụ là bắt buộc');
+    if (serviceCode.length > 50 || !/^[A-Z0-9._-]+$/.test(serviceCode)) {
+      throw new ApiError(400, 'Mã dịch vụ chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang và tối đa 50 ký tự');
+    }
+    if (await this.managerRepository.findServiceByCode(branchId, serviceCode)) {
+      throw new ApiError(409, 'Mã dịch vụ đã tồn tại trong chi nhánh');
+    }
 
     return this.managerRepository.createService({
       branchId,

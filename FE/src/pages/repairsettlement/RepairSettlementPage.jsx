@@ -223,6 +223,12 @@ function isQuantityReturned(item) {
   return item.lhsc === 'PT' && item.originalQty != null && Number(item.qty) < Number(item.originalQty);
 }
 
+// Nguoc lai: phu tung TANG so luong so voi luc luu truoc (khach dung them) -
+// cung ghi chu de co van thay dong nao vua doi, kho se phai "Xuất thêm".
+function isQuantityIncreased(item) {
+  return item.lhsc === 'PT' && item.originalQty != null && Number(item.qty) > Number(item.originalQty);
+}
+
 // Dong bi THAY DOI sau khi phieu da chot voi khach - khach huy giua chung,
 // hoac tra bot phu tung da lap. Ca 2 deu la thay doi do BEN KHAC (khach, tho,
 // to truong) gay ra chu khong phai co van tu go, nen phai noi bat len de nguoi
@@ -2247,11 +2253,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const catalogGroupSeq = useRef(0);
   const nextGroupId = () => ++catalogGroupSeq.current;
   // originalQty = so luong da LUU tu lan truoc (chi dong da co san khi mo
-  // man Chinh sua, dong moi them trong phien nay khong co) - dung de: (1)
-  // chi cho GIAM so luong phu tung (khach hoan tra hang/huy bot), khong cho
-  // tang truc tiep qua o so luong nay - muon dung THEM phai them dong moi
-  // qua "Thêm phụ tùng"/chon lai tu catalog; (2) hien chu thich "(Khách hoàn
-  // trả hàng)" khi da giam - xem handleGroupQtyChange/isQuantityReturned.
+  // man Chinh sua, dong moi them trong phien nay khong co) - dung de hien
+  // chu thich canh cot thanh tien: "(Khách hoàn trả hàng SL x N)" khi giam,
+  // "(Khách thêm SL x N)" khi tang - xem isQuantityReturned/isQuantityIncreased.
   const [items, setItems] = useState(() => assignGroupIds(
     existingOrder?.items?.length
       ? existingOrder.items.map((it) => ({ ...it, originalQty: it.qty }))
@@ -2425,15 +2429,14 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     const seq = ++catalogSearchSeq.current;
     const timer = setTimeout(async () => {
       try {
-        // Gói, dịch vụ lẻ và phụ tùng đều được khai báo riêng cho TỪNG đời xe
-        // (vd "Guốc phanh đỗ – Mazda CX-8 2.5 Luxury"), nên chỉ gợi ý thứ dùng
-        // được cho đúng chiếc xe đang lập phiếu — trước đây gõ "phanh" cho một
-        // chiếc CX-8 vẫn hiện guốc phanh của BT-50, CX-3, CX-5.
+        // Gói và dịch vụ lẻ được khai báo riêng cho TỪNG đời xe (vd "Guốc
+        // phanh đỗ – Mazda CX-8 2.5 Luxury") nên chỉ gợi ý thứ dùng được cho
+        // đúng chiếc xe đang lập phiếu (BE lọc theo modelId).
         //
-        // Việc lọc nằm ở BE chứ không ở đây: danh sách bị cắt còn 10 dòng nên
-        // lọc phía FE thì 10 dòng lấy về có thể toàn của đời xe khác, đúng cái
-        // cần tìm thì đã bị cắt mất. Xe cũ chưa gán được đời (modelId rỗng) thì
-        // BE trả về đủ, không chặn cố vấn lập phiếu.
+        // Riêng PHỤ TÙNG thì gợi ý TẤT CẢ phụ tùng trong kho — cố vấn phải
+        // chọn được cả phụ tùng của đời xe khác (lắp tạm/thay thế tương
+        // đương, xe chưa gán đúng đời); BE chỉ xếp phụ tùng đúng đời xe lên
+        // đầu, tên đã kèm mã đời ([MZ3], [CX5-LX]...) để phân biệt.
         if (lhsc === 'PT') {
           const products = await searchProductsApi(term, undefined, vehicleInfo.modelId);
           if (seq === catalogSearchSeq.current) setCatalogSuggestions((prev) => ({ ...prev, [idx]: { type: 'product', products } }));
@@ -2653,7 +2656,23 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // truong hop nay 2 dieu kien loai tru nhau, o thao tac trong tron.
   const notStartedYet = !isEdit || existingOrder?.status === 'waiting_repair';
 
+  // Phu tung "goi them" - khach mua them, KHONG di kem dich vu/goi nao (them
+  // qua "Thêm phụ tùng"). Nhan biet bang loai hinh sua chua trong: phu tung
+  // sinh tu dich vu/goi luon thua huong loai hinh cua dich vu do, con phu tung
+  // roi thi de trong (xem RepairSettlementService validate). Khong dua vao
+  // groupId vi sau khi luu & tai lai, assignGroupIds suy nhom theo vi tri va
+  // co the gan nham dong nay vao goi dung truoc.
+  const isStandalonePart = (item) => item.lhsc === 'PT' && !item.repairCategory;
+
+  // Phu tung goi them ma khach tra lai het (so luong ve 0) thi cho XOA han
+  // dong, ke ca phieu da "Đang sửa chữa" - dong nay khong co cong tho, khong
+  // co dau muc checklist di kem, giu lai chi lam phieu ban rac.
+  const canRemoveZeroStandalonePart = (item) => (
+    isStandalonePart(item) && item.httt !== HTTT_CANCELLED_VALUE && Number(item.qty) === 0
+  );
+
   const canRemoveGroup = (item) => {
+    if (canRemoveZeroStandalonePart(item)) return true;
     if (item.id && !notStartedYet) return false;
     if (item.httt === HTTT_CANCELLED_VALUE) return false;
     if (item.lhsc !== 'DV' || !item.isGroupParent || !item.groupId) return true;
@@ -2829,14 +2848,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       const target = next[idx];
       const isEmpty = rawValue === '';
       const parsed = Number(rawValue);
-      let newQty = isEmpty || Number.isNaN(parsed) ? '' : parsed;
-      // Phu tung DA TUNG LUU (originalQty) chi duoc GIAM (khach hoan tra
-      // hang/dung it hon du kien), khong cho tang truc tiep qua o nay vuot
-      // qua so da tung dat ban dau - muon dung THEM phai them 1 dong moi
-      // (qua "Thêm phụ tùng"/chon lai tu catalog), khong sua thang dong cu.
-      if (target.lhsc === 'PT' && typeof newQty === 'number' && target.originalQty != null && newQty > target.originalQty) {
-        newQty = target.originalQty;
-      }
+      const newQty = isEmpty || Number.isNaN(parsed) ? '' : parsed;
+      // Phu tung DA TUNG LUU (originalQty) duoc sua ca tang lan giam ngay tai
+      // o nay: giam = khach hoan tra hang, tang = khach dung them. BE tu dong
+      // bo checklist to truong ("Khách thêm số lượng, tổng là: N") va kho se
+      // thay "Xuất thêm"/"Trả hàng" tuong ung - khong can them dong moi.
       const oldQty = target.qtyBasis || target.qty || 1;
       const updatedHead = recalcItem({ ...target, qty: newQty });
       if (typeof newQty === 'number' && newQty > 0) {
@@ -3819,9 +3835,10 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                                     <div key={`prod-${p.id}`} onMouseDown={() => selectProduct(idx, p)}
                                       style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
                                       <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
+                                      {/* Khong hien ton kho o day - CVDV chi chon phu tung, ton kho la
+                                          viec cua NV Kho khi xuat (form xuat kho tu bao thieu). */}
                                       <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>
-                                        {formatCurrency(p.unitPrice)} / {p.unitName} · Tồn: {p.stockQuantity}
-                                        {p.isLowStock && <span style={{ color: '#C62828', fontWeight: 600 }}> (sắp hết)</span>}
+                                        {formatCurrency(p.unitPrice)} / {p.unitName}
                                       </div>
                                     </div>
                                   ))}
@@ -3871,7 +3888,9 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         <td>
                           <input className="form-input" style={{ fontSize: 12, background: 'transparent' }}
                             value={REPAIR_CATEGORY_LABEL_BY_VALUE[item.repairCategory] || ''} readOnly
-                            title="Loại hình sửa chữa lấy tự động theo dịch vụ/gói đã chọn, không chỉnh sửa trực tiếp trên form" />
+                            title={item.lhsc === 'PT' && !item.repairCategory
+                              ? 'Phụ tùng mua thêm, không đi kèm dịch vụ nào nên không có loại hình sửa chữa'
+                              : 'Loại hình sửa chữa lấy tự động theo dịch vụ/gói đã chọn, không chỉnh sửa trực tiếp trên form'} />
                         </td>
                         <td>
                           {isChild ? (
@@ -3890,8 +3909,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                         <td>
                           {item.lhsc === 'DV' ? (
                             <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value="Công" readOnly />
-                          ) : isChild ? (
-                            <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.unit} readOnly />
+                          ) : (isChild || item.productId) ? (
+                            // Phu tung da chon tu kho: don vi lay theo danh muc kho, khong cho
+                            // sua o day de phieu khong lech voi phieu xuat kho.
+                            <input className="form-input" style={{ fontSize: 12, background: 'transparent' }} value={item.unit} readOnly
+                              title="Đơn vị lấy theo danh mục phụ tùng trong kho, không chỉnh trên phiếu" />
                           ) : (
                             <select className="form-select" style={{ fontSize: 12, background: 'transparent' }} value={item.unit} onChange={(e) => setItem(idx, 'unit', e.target.value)}>
                               {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -3915,13 +3937,16 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                           {(item.total || 0).toLocaleString('vi-VN')}
                           {exemptionShortLabel(item) ? (
                             <span style={{ fontWeight: 400, color: laDongDaThayDoi(item) ? 'var(--red)' : 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>
-                          ) : isQuantityReturned(item) && (
+                          ) : isQuantityReturned(item) ? (
                             <span style={{ fontWeight: 400, color: 'var(--red)' }}> (Khách hoàn trả hàng SL x {item.originalQty - item.qty})</span>
+                          ) : isQuantityIncreased(item) && (
+                            <span style={{ fontWeight: 400, color: 'var(--red)' }}> (Khách thêm SL x {item.qty - item.originalQty})</span>
                           )}
                         </td>
                         <td>
-                          {!isChild && canRemoveGroup(item) && (
-                            <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => removeItem(idx)}>Xóa</button>
+                          {((!isChild && canRemoveGroup(item)) || canRemoveZeroStandalonePart(item)) && (
+                            <button className="btn btn-danger btn-sm" style={{ fontSize: 11 }} onClick={() => removeItem(idx)}
+                              title={canRemoveZeroStandalonePart(item) ? 'Phụ tùng gọi thêm đã trả lại hết — xóa khỏi phiếu' : undefined}>Xóa</button>
                           )}
                           {/* Dong dau nhom/dich vu le DA la ban ghi that (canRemoveGroup=false vi
                               da co id) nen khong con nut Xoa - phai co nut Hủy rieng o day, khong

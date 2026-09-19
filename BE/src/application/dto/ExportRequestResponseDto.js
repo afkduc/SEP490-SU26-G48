@@ -74,3 +74,4 @@ class ExportRequestResponseDto {
 }
 
 module.exports = ExportRequestResponseDto;
+module.exports.toDDMMYYYYHHmm = toDDMMYYYYHHmm;

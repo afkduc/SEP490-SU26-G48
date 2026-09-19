@@ -454,6 +454,17 @@ test('updateUser rejects an invalid status from the edit form', async () => {
   const service = new AdminUserService({ adminUserRepository: mockRepo() });
   await assert.rejects(() => service.updateUser({ userId: 1, status: 'invalid' }), err => err.statusCode === 400);
 });
+test('updateUser rejects an inactive role', async () => {
+  const service = new AdminUserService({
+    adminUserRepository: mockRepo({
+      findRoleById: async () => ({ id: 9, roleName: 'Old role', isActive: false }),
+    }),
+  });
+  await assert.rejects(
+    () => service.updateUser({ userId: 1, roleId: 9 }),
+    (err) => err.statusCode === 400 && /ngừng hoạt động/i.test(err.message),
+  );
+});
 test('Hiển thị thông tin người dùng có mã tồn tại', async () => {
   const service = new AdminUserService({ adminUserRepository: mockRepo() });
   assert.deepEqual(await service.getUserDetail(1), {

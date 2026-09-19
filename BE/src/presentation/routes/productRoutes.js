@@ -17,6 +17,7 @@ function buildProductRouter() {
   router.get('/new-count', authorize('manager'), controller.getNewCount);
   router.get('/', controller.getAll);
   router.get('/units', controller.listUnits);
+  router.get('/:id/stock-history', controller.getStockHistory);
   router.get('/:id', controller.getById);
 
   // Ghi dữ liệu: theo role kho / quản lý / admin (không dùng ma trận screen:*)

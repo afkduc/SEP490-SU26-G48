@@ -540,6 +540,17 @@ class ManagerRepositoryImpl {
     return this.getServiceById(branchId, newId);
   }
 
+  async findServiceByCode(branchId, serviceCode) {
+    const result = await query(
+      `SELECT TOP 1 id, service_code
+       FROM services
+       WHERE branch_id = @branchId AND UPPER(service_code) = UPPER(@serviceCode)`,
+      { branchId: Number(branchId), serviceCode }
+    );
+    const row = result.recordset[0];
+    return row ? { id: row.id, code: row.service_code } : null;
+  }
+
   async updateService(branchId, id, { serviceName, categoryId, unitPrice, durationMin, description, isActive, repairCategory, parts }) {
     await query(
       `UPDATE services

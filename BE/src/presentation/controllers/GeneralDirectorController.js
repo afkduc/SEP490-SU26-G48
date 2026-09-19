@@ -27,6 +27,8 @@ class GeneralDirectorController {
       const data = await this.generalDirectorService.getRevenueReports({
         branchId: req.query.branchId || 'all',
         monthsBack: req.query.monthsBack,
+        fromDate: req.query.fromDate,
+        toDate: req.query.toDate,
       });
       return success(res, data, 'Lấy báo cáo doanh thu thành công');
     } catch (err) {

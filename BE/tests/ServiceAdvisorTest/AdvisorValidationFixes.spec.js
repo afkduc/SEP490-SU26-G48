@@ -59,6 +59,8 @@ test('#191 ngay xac nhan nhac bao duong o qua khu bi chan, hom nay va tuong lai 
 function customerRepo() {
   return {
     findByIdWithDetails: async () => ({ id: 1, fullName: 'Nguyễn Minh Tâm', phone: '0911222333' }),
+    // dev them buoc chan doi sang SDT cua khach khac (xem CustomerService.update)
+    findByPhone: async () => null,
     update: async (id, data) => ({ id, ...data }),
   };
 }

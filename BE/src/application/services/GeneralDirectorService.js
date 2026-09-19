@@ -18,6 +18,19 @@ class GeneralDirectorService {
       monthsBack: Number(filters.monthsBack) || 6,
     };
 
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (filters.fromDate) {
+      if (!datePattern.test(filters.fromDate)) throw new ApiError(400, 'Từ ngày không hợp lệ');
+      normalized.fromDate = filters.fromDate;
+    }
+    if (filters.toDate) {
+      if (!datePattern.test(filters.toDate)) throw new ApiError(400, 'Đến ngày không hợp lệ');
+      normalized.toDate = filters.toDate;
+    }
+    if (normalized.fromDate && normalized.toDate && normalized.fromDate > normalized.toDate) {
+      throw new ApiError(400, 'Khoảng ngày không hợp lệ: Từ ngày phải trước hoặc bằng Đến ngày');
+    }
+
     if (normalized.monthsBack < 3 || normalized.monthsBack > 24) {
       throw new ApiError(400, 'monthsBack phải nằm trong khoảng 3-24');
     }

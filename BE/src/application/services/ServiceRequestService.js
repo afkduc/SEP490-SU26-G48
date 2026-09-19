@@ -198,10 +198,16 @@ class ServiceRequestService {
   }
 
   async createAppointment(id, payload, { userId, branchId }) {
-    await this._assertOwnedByUser(id, { userId, branchId });
+    const request = await this._assertOwnedByUser(id, { userId, branchId });
     if (!payload.appointmentAt) throw new ApiError(400, 'Vui lòng chọn ngày giờ hẹn');
     this._assertNotPastDate(payload.appointmentAt);
     this._assertNotesLength(payload.notes);
+    if (request.appointment) {
+      const message = request.appointment.status === 'cancelled'
+        ? 'Lịch hẹn đã hủy không thể tạo lại'
+        : 'Yêu cầu này đã có lịch hẹn';
+      throw new ApiError(409, message);
+    }
 
     await this.serviceRequestRepository.createAppointment(
       id,
@@ -212,10 +218,18 @@ class ServiceRequestService {
   }
 
   async updateAppointment(id, appointmentId, payload, { userId, branchId }) {
-    await this._assertOwnedByUser(id, { userId, branchId });
+    const request = await this._assertOwnedByUser(id, { userId, branchId });
     if (!payload.appointmentAt) throw new ApiError(400, 'Vui lòng chọn ngày giờ hẹn');
     this._assertNotPastDate(payload.appointmentAt);
     this._assertNotesLength(payload.notes);
+
+    const appointment = request.appointment;
+    if (!appointment || String(appointment.id) !== String(appointmentId)) {
+      throw new ApiError(404, 'Không tìm thấy lịch hẹn');
+    }
+    if (appointment.status !== 'scheduled') {
+      throw new ApiError(409, 'Lịch hẹn đã hủy không thể chỉnh sửa');
+    }
 
     await this.serviceRequestRepository.updateAppointment(appointmentId, {
       appointmentAt: payload.appointmentAt,

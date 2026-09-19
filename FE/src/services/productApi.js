@@ -41,6 +41,17 @@ export async function getProductByIdApi(id) {
   return httpClient.get(`/products/${id}`);
 }
 
+/**
+ * Lich su bien dong ton kho cua 1 phu tung (bieu do o trang chi tiet).
+ * BE: GET /api/products/:id/stock-history ->
+ *   { productId, currentStock, openingStock,
+ *     events: [{ id, type: 'import'|'export'|'return', quantity, delta, balanceAfter,
+ *                slipCode, happenedAt, happenedAtLabel, performedByName }] }
+ */
+export async function getProductStockHistoryApi(id) {
+  return httpClient.get(`/products/${id}/stock-history`);
+}
+
 export async function createProductApi(payload) {
   return httpClient.post('/products', stripStock(payload));
 }
@@ -103,8 +114,9 @@ export async function searchProductsApi(term, branchId, modelId) {
   const qs = new URLSearchParams();
   qs.set('q', term);
   if (branchId) qs.set('branchId', String(branchId));
-  // Doi xe cua chiec dang lap phieu - BE bo phu tung cua doi xe khac, giu lai
-  // loai dung chung. Loc o BE vi danh sach bi cat con 10 dong.
+  // Doi xe cua chiec dang lap phieu - BE chi dung de xep phu tung dung doi
+  // len dau (roi dung chung, roi doi khac), KHONG bo phu tung doi xe khac:
+  // co van van chon duoc bat ky phu tung nao trong kho.
   if (modelId) qs.set('modelId', String(modelId));
   return httpClient.get(`/inventory/products/search?${qs.toString()}`);
 }

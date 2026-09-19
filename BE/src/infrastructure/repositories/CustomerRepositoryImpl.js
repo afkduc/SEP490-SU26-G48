@@ -2,6 +2,7 @@ const CustomerRepository = require('../../domain/repositories/CustomerRepository
 const Customer = require('../../domain/entities/Customer');
 const { query, sql } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const ApiError = require('../../utils/ApiError');
 
 function genCustomerCode(id) {
   const year = new Date().getFullYear();
@@ -43,6 +44,68 @@ class CustomerRepositoryImpl extends CustomerRepository {
     ]);
 
     return Customer.fromPersistence(row, vehiclesResult.recordset, countResult.recordset[0].cnt);
+  }
+
+  // Them 1 xe cho khach DA CO (nut "Them xe" o man Khach hang). Bien so la
+  // unique toan he thong (index vehicles_plate_uq) - kiem truoc de bao ro
+  // "xe dang thuoc khach nao" thay vi de SQL nem loi trung khoa kho hieu.
+  // Loai xe lay TEN tu catalog (vehicle_models) theo modelId, khong nhan text.
+  async addVehicle(customerId, data) {
+    return runInTransaction(async (tx) => {
+      const dup = await tx
+        .request()
+        .input('plate', sql.VarChar(20), data.licensePlate)
+        .query(`
+          SELECT v.id, c.full_name, c.customer_code
+          FROM vehicles v LEFT JOIN customers c ON c.id = v.customer_id
+          WHERE v.license_plate = @plate`);
+      if (dup.recordset[0]) {
+        const owner = dup.recordset[0];
+        const ownerText = owner.full_name ? ` của khách hàng "${owner.full_name}" (${owner.customer_code || ''})` : '';
+        throw new ApiError(409, `Biển số ${data.licensePlate} đã tồn tại${ownerText}`);
+      }
+
+      const model = await tx
+        .request()
+        .input('modelId', sql.BigInt, data.modelId)
+        .query(`SELECT id, display_name FROM vehicle_models WHERE id = @modelId`);
+      if (!model.recordset[0]) throw new ApiError(400, 'Dòng xe không tồn tại trong danh mục');
+
+      const inserted = await tx
+        .request()
+        .input('plate', sql.VarChar(20), data.licensePlate)
+        .input('customerId', sql.BigInt, customerId)
+        .input('modelText', sql.NVarChar(200), model.recordset[0].display_name)
+        .input('modelId', sql.BigInt, data.modelId)
+        .input('frameNumber', sql.VarChar(50), data.frameNumber || null)
+        .input('engineNumber', sql.VarChar(50), data.engineNumber || null)
+        .input('manufactureYear', sql.Int, data.manufactureYear ?? null)
+        .input('color', sql.NVarChar(50), data.color || null)
+        .input('currentKm', sql.Int, data.currentKm ?? 0)
+        .query(`
+          INSERT INTO vehicles (
+            license_plate, customer_id, vehicle_model_text, model_id,
+            frame_number, engine_number, manufacture_year, color, current_km
+          )
+          OUTPUT inserted.id
+          VALUES (
+            @plate, @customerId, @modelText, @modelId,
+            @frameNumber, @engineNumber, @manufactureYear, @color, @currentKm
+          )
+        `);
+      return { id: inserted.recordset[0].id, licensePlate: data.licensePlate, vehicleModel: model.recordset[0].display_name };
+    });
+  }
+
+  // Tim khach theo SDT (khoa nhan dien) - dung de chan sua SDT trung khach khac.
+  async findByPhone(phone) {
+    const result = await query(
+      `SELECT TOP 1 id, customer_code, full_name FROM customers WHERE phone = @phone`,
+      { phone }
+    );
+    const row = result.recordset[0];
+    if (!row) return null;
+    return { id: row.id, customerCode: row.customer_code, fullName: row.full_name };
   }
 
   async update(id, data) {
