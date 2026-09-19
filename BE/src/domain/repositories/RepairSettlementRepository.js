@@ -51,6 +51,10 @@ class RepairSettlementRepository {
     throw new Error('Method findPayosTransactionByOrderCode() must be implemented');
   }
 
+  async findReusablePayosTransaction(repairOrderId) {
+    throw new Error('Method findReusablePayosTransaction() must be implemented');
+  }
+
   async markPayosTransactionPaid(orderCode, { reference, paidAt }) {
     throw new Error('Method markPayosTransactionPaid() must be implemented');
   }

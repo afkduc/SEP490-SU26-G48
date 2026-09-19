@@ -761,7 +761,6 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
   const [payos, setPayos] = useState(null); // { qrCode, checkoutUrl, orderCode, expiredAt }
   const [payosLoading, setPayosLoading] = useState(false);
   const [payosError, setPayosError] = useState('');
-  const [secondsLeft, setSecondsLeft] = useState(0);
 
   // Phuong thuc thu cong thu 2 (ben canh PayOS/chuyen khoan) - khach tra tien
   // mat tai quay, CVDV tu bam xac nhan thay vi cho quet QR. Goi thang API
@@ -871,14 +870,6 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id, daKyQuyetToan]);
-
-  useEffect(() => {
-    if (!payos) return undefined;
-    const tick = () => setSecondsLeft(Math.max(0, payos.expiredAt - Math.floor(Date.now() / 1000)));
-    tick();
-    const intervalId = setInterval(tick, 1000);
-    return () => clearInterval(intervalId);
-  }, [payos]);
 
   const handlePrint = () => {
     const loi = printSettlement(order, payos?.qrCode);
@@ -1017,7 +1008,10 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 }}>
                 {order.status === 'waiting_payment' ? (
                   <>
-                    {payos && secondsLeft > 0 ? (
+                    {/* Ma QR khong con han dung va moi phieu chi sinh 1 ma -
+                        mo lai modal bao nhieu lan cung ra dung ma do. Khach
+                        quet xong thi PayOS dong link, quet lan 2 khong duoc. */}
+                    {payos ? (
                       <img
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(payos.qrCode)}`}
                         alt="QR thanh toán PayOS"
@@ -1028,15 +1022,15 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                         width: 130, height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: '1px dashed #ccc', textAlign: 'center', fontSize: 11, color: '#888', padding: 6,
                       }}>
-                        {payosLoading ? 'Đang tạo mã QR…' : payos ? 'Mã QR đã hết hạn' : (payosError || 'Chưa có mã QR')}
+                        {payosLoading ? 'Đang tạo mã QR…' : (payosError || 'Chưa có mã QR')}
                       </div>
                     )}
-                    {payos && secondsLeft > 0 ? (
-                      <div style={{ fontSize: 9, color: '#888' }}>Quét app ngân hàng — hết hạn sau {secondsLeft}s</div>
+                    {payos ? (
+                      <div style={{ fontSize: 9, color: '#888' }}>Quét app ngân hàng để thanh toán</div>
                     ) : (
                       !payosLoading && (
                         <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, padding: '4px 8px' }} onClick={requestPayosQr}>
-                          Tạo lại mã QR
+                          Thử lại
                         </button>
                       )
                     )}

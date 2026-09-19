@@ -724,13 +724,29 @@ class RepairSettlementService {
     }
     this._assertClosingSigned(existing);
 
-    // MOI phieu chi duoc 1 ma QR song tai 1 thoi diem: dong het ma cu truoc
-    // khi phat ma moi. Neu khong, moi lan bam la them 1 duong thu tien - khach
-    // quet nham ma cu la tien van di, con phieu thi da xuat hoa don theo ma khac.
+    // MOI PHIEU CHI SINH 1 MA QR: da co ma chua thanh toan thi tra lai chinh
+    // no, khong goi PayOS tao them. Ma khong co han dung nen khach quet luc
+    // nao cung duoc - in ra giay dan len phieu cung dung.
+    //
+    // Quet lan 2 tu nhien khong duoc: PayOS dong link ngay khi da thanh toan,
+    // va webhook chuyen phieu sang 'invoiced' - lop chan hasPaidPayosTransaction
+    // o tren chan luon ca viec sinh ma moi cho phieu da thu tien.
+    const maCu = await this.repairSettlementRepository.findReusablePayosTransaction(id);
+    if (maCu) {
+      return {
+        qrCode: maCu.qr_code,
+        checkoutUrl: maCu.checkout_url,
+        orderCode: Number(maCu.order_code),
+        expiredAt: null,
+      };
+    }
+
+    // Toi day la chua co ma nao dung duoc - co the la phieu chua tao ma bao
+    // gio, hoac chi con ma CU da het han (sinh truoc khi bo han dung). Dong
+    // not may ma het han do cho sach roi phat ma moi.
     await this._huyCacMaQrCu(id);
 
     const orderCode = Date.now();
-    const expiredAtUnix = Math.floor(Date.now() / 1000) + 60;
     const amount = Math.round(existing.total || 0);
 
     const paymentLink = await getPayOS().paymentRequests.create({
@@ -739,7 +755,7 @@ class RepairSettlementService {
       description: `TT ${existing.code}`.slice(0, 25),
       cancelUrl: `${config.frontendUrl}/repair-settlements`,
       returnUrl: `${config.frontendUrl}/repair-settlements`,
-      expiredAt: expiredAtUnix,
+      // KHONG truyen expiredAt -> link song vo thoi han.
       buyerName: existing.customer?.fullName || undefined,
     });
 
@@ -749,7 +765,7 @@ class RepairSettlementService {
       qrCode: paymentLink.qrCode,
       checkoutUrl: paymentLink.checkoutUrl,
       amount,
-      expiredAt: new Date(expiredAtUnix * 1000),
+      expiredAt: null,
     });
 
     await auditCrud.lifecycle(req, {
@@ -769,7 +785,7 @@ class RepairSettlementService {
       qrCode: paymentLink.qrCode,
       checkoutUrl: paymentLink.checkoutUrl,
       orderCode,
-      expiredAt: expiredAtUnix,
+      expiredAt: null,
     };
   }
 

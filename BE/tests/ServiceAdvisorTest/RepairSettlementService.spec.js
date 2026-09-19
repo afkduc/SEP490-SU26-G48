@@ -68,6 +68,9 @@ function mockRepos(overrides = {}) {
     findPendingPayosTransactions: async () => [],
     markPayosTransactionCancelled: async () => {},
     hasPaidPayosTransaction: async () => false,
+    // null = phieu chua co ma QR nao dung duoc -> sinh ma moi (xem
+    // RepairSettlementService.createPayosPaymentLink)
+    findReusablePayosTransaction: async () => null,
     findBranchTeamLeaders: async () => [{ id: 29, name: 'Nguyễn Đình Khương', phone: null }],
     getVehicleCurrentKm: async () => null,
     findPublicHistoryByVehicleIdentifier: async () => [],

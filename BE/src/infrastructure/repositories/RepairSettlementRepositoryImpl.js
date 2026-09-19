@@ -819,6 +819,22 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.recordset;
   }
 
+  // Ma QR CON DUNG DUOC cua phieu (de tai su dung thay vi sinh ma moi):
+  // chua thanh toan va khong co han dung. expired_at IS NULL = ma kieu moi
+  // (vinh vien); ma cu con han cung dung lai duoc, ma cu HET han thi bo qua
+  // o day de duong goi sinh ma moi thay the.
+  async findReusablePayosTransaction(repairOrderId) {
+    const result = await query(
+      `SELECT TOP 1 order_code, payment_link_id, qr_code, checkout_url, amount, expired_at
+       FROM   payos_transactions
+       WHERE  repair_order_id = @repairOrderId AND status = 'pending'
+         AND  (expired_at IS NULL OR expired_at > ${NOW_VN_SQL})
+       ORDER BY id DESC`,
+      { repairOrderId: Number(repairOrderId) }
+    );
+    return result.recordset[0] || null;
+  }
+
   async markPayosTransactionCancelled(orderCode) {
     await query(
       `UPDATE payos_transactions SET status = 'cancelled'

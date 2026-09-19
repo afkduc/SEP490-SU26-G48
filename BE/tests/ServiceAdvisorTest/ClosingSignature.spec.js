@@ -5,7 +5,10 @@ const assert = require('node:assert/strict');
 // PayOS khac (xem RepairSettlementService.spec.js).
 jest.mock('@payos/node', () => ({
   PayOS: class PayOS {
-    paymentRequests = { create: async () => ({}), cancel: async () => ({}) };
+    paymentRequests = {
+      create: async () => ({ paymentLinkId: 'plink_' + Date.now(), qrCode: 'QR-MOI', checkoutUrl: 'https://pay/moi' }),
+      cancel: async () => ({}),
+    };
     webhooks = { verify: async (raw) => ({ orderCode: (raw && raw.orderCode) || 123456 }) };
   },
 }));
@@ -28,7 +31,9 @@ function repo(overrides = {}) {
     findById: async () => null,
     saveClosingSignature: async () => true,
     hasPaidPayosTransaction: async () => false,
+    findReusablePayosTransaction: async () => null,
     findPendingPayosTransactions: async () => [],
+    createPayosTransaction: async () => {},
     markPayosTransactionCancelled: async () => {},
     updateStatus: async (id, status) => ({ id, status, paymentMethod: 'CASH' }),
     ...overrides,
@@ -117,4 +122,47 @@ test('webhook PayOS ghi issued_by = co van CHOT phieu, khong phai nguoi lap', as
   });
   await service.handlePayosWebhook({ orderCode: 123 }, {});
   assert.equal(issuedByGhiNhan, 9);
+});
+
+test('moi phieu chi sinh 1 ma QR: goi lai tra ve dung ma cu, khong tao moi', async () => {
+  let soLanTaoMoi = 0;
+  const maCu = {
+    order_code: '1789000000001', payment_link_id: 'plink_cu',
+    qr_code: 'QR-CU', checkout_url: 'https://pay/cu', amount: 972000, expired_at: null,
+  };
+  const service = svc({
+    findById: async () => ({ ...choThanhToan, ...daKy }),
+    findReusablePayosTransaction: async () => maCu,
+    createPayosTransaction: async () => { soLanTaoMoi += 1; },
+  });
+  const lan1 = await service.createPayosPaymentLink(50, {});
+  const lan2 = await service.createPayosPaymentLink(50, {});
+  assert.equal(lan1.qrCode, 'QR-CU');
+  assert.equal(lan2.qrCode, 'QR-CU');            // mo lai modal van ra dung ma do
+  assert.equal(lan1.expiredAt, null);            // khong co han dung
+  assert.equal(soLanTaoMoi, 0);                  // khong ghi them giao dich nao
+});
+
+test('phieu chua co ma thi sinh ma moi va KHONG dat han dung', async () => {
+  let daLuu = null;
+  const service = svc({
+    findById: async () => ({ ...choThanhToan, ...daKy }),
+    findReusablePayosTransaction: async () => null,
+    createPayosTransaction: async (id, data) => { daLuu = data; },
+  });
+  const ra = await service.createPayosPaymentLink(50, {});
+  assert.equal(ra.qrCode, 'QR-MOI');
+  assert.equal(ra.expiredAt, null);
+  assert.equal(daLuu.expiredAt, null);
+});
+
+test('phieu da thanh toan qua QR thi khong sinh ma nao nua (quet lan 2 vo nghia)', async () => {
+  const service = svc({
+    findById: async () => ({ ...choThanhToan, ...daKy }),
+    hasPaidPayosTransaction: async () => true,
+  });
+  await assert.rejects(
+    () => service.createPayosPaymentLink(50, {}),
+    (err) => err.statusCode === 409 && /đã được thanh toán qua QR/.test(err.message),
+  );
 });
