@@ -355,6 +355,20 @@ async function start() {
       process.exit(1);
     }
 
+    // Chu ky NV kho tren header phieu xuat (ky 1 lan/phieu). Khong nuot loi:
+    // confirmPickup va man phieu xuat SELECT/UPDATE thang cac cot nay.
+    try {
+      const { ensureExportIssuerSignature } = require('./infrastructure/database/ensureExportIssuerSignature');
+      const r = await ensureExportIssuerSignature();
+      console.log(r.skipped
+        ? '[BE] chu ky NV kho phieu xuat: da co tu truoc, bo qua'
+        : `[BE] chu ky NV kho phieu xuat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (isErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them chu ky NV kho phieu xuat that bai:');
+      console.error(isErr.message);
+      process.exit(1);
+    }
+
     // Ma khach hang (customers.customer_code) bat buoc - khong khach nao duoc
     // de trong. Doi rang buoc cot nen KHONG duoc nuot loi.
     try {

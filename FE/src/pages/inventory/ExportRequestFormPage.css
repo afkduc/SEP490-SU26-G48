@@ -288,14 +288,46 @@
   flex-shrink: 0;
 }
 
+.er-form__signatures {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
 .er-form__signature {
   display: inline-block;
-  max-width: 260px;
+  width: 260px;
+  max-width: 100%;
   margin-top: 16px;
   padding: 16px;
   background: var(--md-surface-container);
   border: 1px dashed var(--md-outline);
   border-radius: var(--md-shape-md);
+}
+/* Chu ky NV kho da ky o lan truoc - chi hien lai (khong ky nua). */
+.er-form__signature--done {
+  border-style: solid;
+  border-color: var(--md-success);
+  background: #f3faf4;
+}
+.er-form__signature-img-box {
+  max-width: 220px;
+  height: 90px;
+  background: #fff;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.er-form__signature-img { max-width: 100%; max-height: 100%; }
+.er-form__signature-note {
+  max-width: 220px;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--md-on-surface-variant);
 }
 
 .er-form__signature-pad {

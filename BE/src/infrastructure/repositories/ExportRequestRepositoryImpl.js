@@ -145,13 +145,15 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          c.full_name AS customer_name,
          v.license_plate AS vehicle_plate,
          COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.first_name, N'') + N' ' + ISNULL(u_perf.last_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name,
-         COALESCE(NULLIF(LTRIM(RTRIM(u_recv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_recv.first_name, N'') + N' ' + ISNULL(u_recv.last_name, N''))), N''), u_recv.pseudo_id) AS received_by_name
+         COALESCE(NULLIF(LTRIM(RTRIM(u_recv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_recv.first_name, N'') + N' ' + ISNULL(u_recv.last_name, N''))), N''), u_recv.pseudo_id) AS received_by_name,
+         COALESCE(NULLIF(LTRIM(RTRIM(u_iss.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_iss.first_name, N'') + N' ' + ISNULL(u_iss.last_name, N''))), N''), u_iss.pseudo_id) AS issuer_name
        FROM export_requests er
        LEFT JOIN repair_orders ro ON ro.id = er.repair_order_id
        LEFT JOIN customers c ON c.id = ro.customer_id
        LEFT JOIN vehicles v ON v.id = ro.vehicle_id
        LEFT JOIN users u_perf ON u_perf.id = er.performed_by
        LEFT JOIN users u_recv ON u_recv.id = er.received_by
+       LEFT JOIN users u_iss ON u_iss.id = er.issuer_signed_by
        WHERE er.id = @id`,
       { id }
     );
@@ -321,12 +323,15 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          c.full_name AS customer_name,
          v.license_plate AS vehicle_plate,
          tl.user_name AS team_leader_name,
-         er.id AS export_request_id
+         er.id AS export_request_id,
+         er.issuer_signature_data, er.issuer_signed_at,
+         COALESCE(NULLIF(LTRIM(RTRIM(iss.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(iss.first_name, N'') + N' ' + ISNULL(iss.last_name, N''))), N''), iss.pseudo_id) AS issuer_name
        FROM repair_orders ro
               LEFT JOIN customers c ON c.id = ro.customer_id
        LEFT JOIN vehicles v ON v.id = ro.vehicle_id
        LEFT JOIN users tl ON tl.id = ro.team_leader_id
        LEFT JOIN export_requests er ON er.repair_order_id = ro.id
+       LEFT JOIN users iss ON iss.id = er.issuer_signed_by
        WHERE ro.id = @id`,
       { id: repairOrderId }
     );
@@ -379,6 +384,10 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       vehiclePlate: header.vehicle_plate,
       teamLeaderName: header.team_leader_name,
       exportRequestId: header.export_request_id ?? null,
+      // Chu ky NV kho da ky o lan dau (null = lan nay NV kho phai ky).
+      issuerSignatureData: header.issuer_signature_data ?? null,
+      issuerSignedAt: toDDMMYYYYHHmm(header.issuer_signed_at),
+      issuerName: header.issuer_name ?? null,
       locked: !EXPORTABLE_RO_STATUSES.includes(header.status),
       items: itemsResult.recordset.map((r) => {
         const required = Number(r.required_quantity) || 0;
@@ -425,7 +434,8 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const roRow = (await tx.request()
       .input('repair_order_id', sql.BigInt, repairOrderId)
       .query(`
-        SELECT ro.id, ro.repair_code, ro.status, er.id AS export_request_id
+        SELECT ro.id, ro.repair_code, ro.status, er.id AS export_request_id,
+               er.issuer_signature_data
         FROM repair_orders ro WITH (UPDLOCK, HOLDLOCK)
         LEFT JOIN export_requests er ON er.repair_order_id = ro.id
         WHERE ro.id = @repair_order_id
@@ -433,6 +443,13 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     if (!roRow) throw new ApiError(404, 'Khong tim thay lenh sua chua');
     if (!EXPORTABLE_RO_STATUSES.includes(roRow.status)) {
       throw new ApiError(409, 'Lenh sua chua da chot, khong the xuat/tra phu tung nua');
+    }
+    // Chu ky NV kho: ky DUNG 1 LAN cho ca phieu - bat buoc khi phieu chua co
+    // (lan dau, hoac phieu cu tao truoc khi co tinh nang nay). Da co roi thi
+    // giu nguyen chu ky ban dau, bo qua chu ky gui len (neu co).
+    const needIssuerSignature = !roRow.issuer_signature_data;
+    if (needIssuerSignature && !data.issuer_signature_data) {
+      throw new ApiError(400, 'Nhân viên kho phải ký xác nhận phiếu xuất (chỉ ký 1 lần cho cả phiếu)');
     }
 
     // 2) Tinh lai pending o server cho dung cac productId duoc tick.
@@ -537,6 +554,22 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
             received_signed_at = GETDATE()
         WHERE id = @id
       `);
+
+    // Chu ky NV kho: chi ghi khi phieu CHUA co (WHERE ... IS NULL de 2 request
+    // dong thoi cung khong ghi de chu ky dau tien).
+    if (needIssuerSignature) {
+      await tx.request()
+        .input('id', sql.BigInt, exportRequestId)
+        .input('issuer_signed_by', sql.BigInt, data.performed_by)
+        .input('issuer_signature_data', sql.NVarChar(sql.MAX), data.issuer_signature_data)
+        .query(`
+          UPDATE export_requests
+          SET issuer_signature_data = @issuer_signature_data,
+              issuer_signed_by = @issuer_signed_by,
+              issuer_signed_at = GETDATE()
+          WHERE id = @id AND issuer_signature_data IS NULL
+        `);
+    }
 
     // 4) Ghi 1 lan lay hang (chu ky rieng cua lan nay).
     const pickupId = (await tx.request()

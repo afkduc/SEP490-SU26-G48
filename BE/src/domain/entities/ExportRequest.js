@@ -17,6 +17,11 @@ class ExportRequest {
     this.receivedBy = data.received_by ?? data.receivedBy ?? null;
     this.receivedSignatureData = data.received_signature_data ?? data.receivedSignatureData ?? null;
     this.receivedSignedAt = data.received_signed_at ?? data.receivedSignedAt ?? null;
+    // Chu ky NV kho - ky 1 lan cho ca phieu (o lan xuat dau tien).
+    this.issuerSignatureData = data.issuer_signature_data ?? data.issuerSignatureData ?? null;
+    this.issuerSignedBy = data.issuer_signed_by ?? data.issuerSignedBy ?? null;
+    this.issuerSignedAt = data.issuer_signed_at ?? data.issuerSignedAt ?? null;
+    this.issuerName = data.issuer_name ?? data.issuerName ?? null;
     this.exportDate = data.export_date ?? data.exportDate ?? null;
     this.status = data.status ?? 'completed';
     this.notes = data.notes ?? null;
@@ -45,6 +50,10 @@ class ExportRequest {
       received_by: row.received_by,
       received_signature_data: row.received_signature_data,
       received_signed_at: row.received_signed_at,
+      issuer_signature_data: row.issuer_signature_data,
+      issuer_signed_by: row.issuer_signed_by,
+      issuer_signed_at: row.issuer_signed_at,
+      issuer_name: row.issuer_name,
       export_date: row.export_date,
       status: row.status,
       notes: row.notes,
