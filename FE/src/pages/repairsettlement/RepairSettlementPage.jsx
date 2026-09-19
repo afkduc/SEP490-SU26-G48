@@ -296,12 +296,12 @@ function OChuKy({ tieuDe, anh, ten, luc }) {
       {anh ? (
         <img src={anh} alt={tieuDe}
           style={{
-            display: 'block', margin: '0 auto', height: 70, maxWidth: '100%', objectFit: 'contain',
+            display: 'block', margin: '0 auto', height: 84, maxWidth: '100%', objectFit: 'contain',
             border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff',
           }} />
       ) : (
         <div style={{
-          height: 70, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center',
           border: '1px dashed var(--gray-300)', borderRadius: 6,
           fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic',
         }}>Chưa ký</div>
@@ -1388,23 +1388,10 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
           <TaskProgressList tasks={order.tasks} bayNumber={order.bayNumber} technicians={order.technicians}
             onDecideNg={onDecideNg} decidingId={decidingId} />
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
-            <div className="card" style={{ flex: '1 1 420px' }}>
-              <div className="card-body">
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Chữ ký trên phiếu</div>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  <OChuKy tieuDe="Khách duyệt báo giá" anh={order.signatureData}
-                    ten={order.signerName} luc={order.signedAt} />
-                  <OChuKy tieuDe="CVDV lập phiếu" anh={order.advisorSignatureData}
-                    ten={order.advisor} luc={order.advisorSignedAt} />
-                  <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
-                    ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} />
-                  <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
-                    ten={order.closingAdvisorName} luc={order.closingSignedAt} />
-                </div>
-              </div>
-            </div>
-
+          {/* Khoi tong ket dung mot minh ben phai; khoi chu ky xuong hang
+              rieng ben duoi de 4 o ky nam CUNG MOT HANG nhu tren to phieu
+              giay - nhet canh tong ket thi chi du cho 2 o moi hang. */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
             <div className="summary-box" style={{ minWidth: 300 }}>
               {[
                 ['Tổng trước giảm giá', order.subtotal],
@@ -1415,6 +1402,22 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
                 <div key={l} className="summary-row"><span>{l}:</span><span>{(v || 0).toLocaleString('vi-VN')} đ</span></div>
               ))}
               <div className="summary-row total"><span>Tổng thanh toán:</span><span>{formatCurrency(order.total)}</span></div>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginTop: 12 }}>
+            <div className="card-body">
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Chữ ký trên phiếu</div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <OChuKy tieuDe="Khách duyệt báo giá" anh={order.signatureData}
+                  ten={order.signerName} luc={order.signedAt} />
+                <OChuKy tieuDe="CVDV lập phiếu" anh={order.advisorSignatureData}
+                  ten={order.advisor} luc={order.advisorSignedAt} />
+                <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
+                  ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} />
+                <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
+                  ten={order.closingAdvisorName} luc={order.closingSignedAt} />
+              </div>
             </div>
           </div>
         </div>
