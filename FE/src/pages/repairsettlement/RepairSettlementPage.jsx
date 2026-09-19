@@ -418,30 +418,53 @@ function TaskProgressList({ tasks, bayNumber, technicians, onDecideNg, decidingI
   // duoc giai quyet, dem vao chi lam co van tuong xe van con van de.
   const ngCount = activeServiceTasks.filter((t) => t.checkResult === 'NG' && !(t.ngDecision === 'accepted' && t.isDone)).length;
   const pendingCount = activeServiceTasks.filter((t) => t.ngDecision === 'pending').length;
+  // Goi bao duong co 30+ dau muc - de bung het thi phai cuon rat lau moi toi
+  // duoc khoi tong tien / chu ky ben duoi. Mac dinh MO (van la thong tin
+  // chinh khi xem phieu), bam tieu de de thu gon lai - giong cac khoi o man
+  // tiep nhan xe (xem CollapsibleCard).
+  const [mo, setMo] = useState(true);
   return (
     <div style={{ marginTop: 16 }}>
       <div className="form-section-title">
-        Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
+        <button type="button" onClick={() => setMo((v) => !v)} aria-expanded={mo}
+          title={mo ? 'Thu gọn' : 'Mở rộng'}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', background: 'none',
+            padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit',
+          }}>
+          <span style={{
+            fontSize: 11, color: 'var(--gray-500)', width: 16, textAlign: 'center',
+            transition: 'transform .15s', transform: mo ? 'rotate(90deg)' : 'none',
+          }}>▶</span>
+          Tiến độ công việc ({doneCount}/{activeServiceTasks.length})
+        </button>
         {/* Bao ro co bao nhieu dau muc KHONG DAT ngay tren tieu de - day la
             thu co van can tu van lai cho khach, khong the de lan trong danh
-            sach dai. */}
+            sach dai. Van hien CA KHI da thu gon. */}
         {ngCount > 0 && (
           <span style={{ color: '#B91C1C', fontWeight: 700 }}>{`  ·  ${ngCount} không đạt`}</span>
         )}
         {pendingCount > 0 && (
           <span style={{ color: '#B45309', fontWeight: 700 }}>{`  ·  ${pendingCount} chờ hỏi khách`}</span>
         )}
+        {!mo && (
+          <span style={{ fontSize: 12, color: 'var(--gray-600)', fontStyle: 'italic', fontWeight: 400 }}>
+            {`  ·  ${serviceTasks.length} đầu mục, bấm để xem`}
+          </span>
+        )}
       </div>
-      {(bayNumber || technicians?.length > 0) && (
+      {mo && (bayNumber || technicians?.length > 0) && (
         <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
           {bayNumber && <>Khoang đang thực hiện: <b>{bayNumber}</b></>}
           {bayNumber && technicians?.length > 0 && '  ·  '}
           {technicians?.length > 0 && <>Thợ thực hiện: <b>{technicians.map(formatTechnicianLabel).join(', ')}</b></>}
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {serviceTasks.map((t) => <TaskProgressRow key={t.id} t={t} onDecideNg={onDecideNg} decidingId={decidingId} />)}
-      </div>
+      {mo && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {serviceTasks.map((t) => <TaskProgressRow key={t.id} t={t} onDecideNg={onDecideNg} decidingId={decidingId} />)}
+        </div>
+      )}
     </div>
   );
 }
