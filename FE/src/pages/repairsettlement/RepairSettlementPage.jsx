@@ -1044,21 +1044,9 @@ function SettlementPreviewModal({ order, onClose }) {
               <div style={{ border: '1px solid var(--gray-300)', borderRadius: 8, padding: 12 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Ký quyết toán &amp; giao xe</div>
                 <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 10 }}>
-                  Cố vấn dịch vụ đang chốt phiếu và khách hàng nhận xe cùng ký. Ký xong mới thu được tiền.
+                  Khách hàng nhận xe và cố vấn dịch vụ chốt phiếu cùng ký. Ký xong mới thu được tiền.
                 </div>
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1 1 260px' }}>
-                    <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
-                      Cố vấn dịch vụ
-                    </div>
-                    <SignaturePad ref={closingAdvisorPadRef} onChange={setClosingAdvisorEmpty} />
-                    <div style={{
-                      textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 8,
-                      borderTop: '1px solid var(--gray-200)', paddingTop: 6,
-                    }}>
-                      {nguoiDangDangNhap?.name || 'Cố vấn dịch vụ'}
-                    </div>
-                  </div>
                   <div style={{ flex: '1 1 260px' }}>
                     <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
                       Khách hàng nhận xe
@@ -1073,6 +1061,18 @@ function SettlementPreviewModal({ order, onClose }) {
                       maxLength={255}
                       value={tenNguoiNhanXe}
                       onChange={(e) => setTenNguoiNhanXe(e.target.value)} />
+                  </div>
+                  <div style={{ flex: '1 1 260px' }}>
+                    <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
+                      Cố vấn dịch vụ
+                    </div>
+                    <SignaturePad ref={closingAdvisorPadRef} onChange={setClosingAdvisorEmpty} />
+                    <div style={{
+                      textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 8,
+                      borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+                    }}>
+                      {nguoiDangDangNhap?.name || 'Cố vấn dịch vụ'}
+                    </div>
                   </div>
                 </div>
                 {loiChuKy && (
