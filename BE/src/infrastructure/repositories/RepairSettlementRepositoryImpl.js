@@ -35,6 +35,9 @@ const HEADER_SELECT = `
          wr.purchase_date     AS vehicle_purchase_date,
          adv.user_name AS advisor_name,
          adv.phone     AS advisor_phone,
+         -- Co van CHOT phieu (ky o moc quyet toan/giao xe) - co the khac
+         -- nguoi lap phieu khi co ban giao ca. NULL = chua ky quyet toan.
+         cadv.user_name AS closing_advisor_name,
          tl.user_name  AS team_leader_name,
          -- To truong duoc co van CHI DINH san (khac team_leader_name o tren -
          -- do la nguoi DA NHAN viec). NULL = khong chi dinh, moi to truong deu
@@ -93,6 +96,7 @@ const HEADER_SELECT = `
   JOIN   users     adv ON adv.id = so.advisor_id
   LEFT JOIN users  tl  ON tl.id = so.team_leader_id
   LEFT JOIN users  atl ON atl.id = so.assigned_team_leader_id
+  LEFT JOIN users  cadv ON cadv.id = so.closing_advisor_id
   LEFT JOIN users  lockUser ON lockUser.id = so.locked_by_user_id
   OUTER APPLY (
       SELECT TOP 1 w.purchase_date
@@ -368,6 +372,8 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         .input('signerName', sql.NVarChar(255), data.signerName || null)
         .input('signedAt', sql.DateTime, nowVN())
         .input('assignedTeamLeaderId', sql.BigInt, data.assignedTeamLeaderId || null)
+        // Chu ky co van LAP phieu - ky cung luc voi khach o moc tiep nhan xe.
+        .input('advisorSignatureData', sql.NVarChar(sql.MAX), data.advisorSignatureData)
         .query(`
           INSERT INTO repair_orders (
             repair_code, branch_id, vehicle_id, customer_id, advisor_id,
@@ -375,6 +381,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             subtotal, discount_amount, after_discount, vat, free_amount, total,
             is_warranty, intake_date, intake_checklist,
             signature_data, signature_signer_name, signature_signed_at,
+            advisor_signature_data, advisor_signed_at,
             assigned_team_leader_id
           )
           VALUES (
@@ -383,6 +390,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             @subtotal, @discountAmount, @afterDiscount, @vat, @freeAmount, @total,
             @isWarranty, @intakeDate, @intakeChecklist,
             @signatureData, @signerName, @signedAt,
+            @advisorSignatureData, @signedAt,
             @assignedTeamLeaderId
           );
           SELECT SCOPE_IDENTITY() AS id;
@@ -811,6 +819,22 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.recordset;
   }
 
+  // Ma QR CON DUNG DUOC cua phieu (de tai su dung thay vi sinh ma moi):
+  // chua thanh toan va khong co han dung. expired_at IS NULL = ma kieu moi
+  // (vinh vien); ma cu con han cung dung lai duoc, ma cu HET han thi bo qua
+  // o day de duong goi sinh ma moi thay the.
+  async findReusablePayosTransaction(repairOrderId) {
+    const result = await query(
+      `SELECT TOP 1 order_code, payment_link_id, qr_code, checkout_url, amount, expired_at
+       FROM   payos_transactions
+       WHERE  repair_order_id = @repairOrderId AND status = 'pending'
+         AND  (expired_at IS NULL OR expired_at > ${NOW_VN_SQL})
+       ORDER BY id DESC`,
+      { repairOrderId: Number(repairOrderId) }
+    );
+    return result.recordset[0] || null;
+  }
+
   async markPayosTransactionCancelled(orderCode) {
     await query(
       `UPDATE payos_transactions SET status = 'cancelled'
@@ -982,6 +1006,33 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         decision,
         note: note || null,
         userId: Number(userId),
+      }
+    );
+    return result.rowsAffected[0] > 0;
+  }
+
+  // Luu chu ky o MOC 2 (quyet toan / giao xe): co van dang chot phieu va
+  // khach den nhan xe cung ky. Ghi luon closing_advisor_id = nguoi dang dang
+  // nhap - day la can cu duy nhat de biet "phieu nay CO VAN NAO done", vi
+  // duong thanh toan PayOS chay qua webhook khong co user context.
+  //
+  // Ghi de duoc (ky lai neu net ky hong) - chua xuat hoa don thi con sua duoc.
+  async saveClosingSignature(id, { advisorId, advisorSignatureData, customerSignatureData, customerSignerName }) {
+    const result = await query(
+      `UPDATE repair_orders
+       SET    closing_advisor_id = @advisorId,
+              closing_signature_data = @advisorSignatureData,
+              closing_signed_at = ${NOW_VN_SQL},
+              customer_final_signature_data = @customerSignatureData,
+              customer_final_signer_name = @customerSignerName,
+              customer_final_signed_at = ${NOW_VN_SQL}
+       WHERE  id = @id`,
+      {
+        id: Number(id),
+        advisorId: Number(advisorId),
+        advisorSignatureData,
+        customerSignatureData,
+        customerSignerName: customerSignerName || null,
       }
     );
     return result.rowsAffected[0] > 0;

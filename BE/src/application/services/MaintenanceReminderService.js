@@ -32,6 +32,15 @@ class MaintenanceReminderService {
 
   async markConfirmed(id, { branchId, confirmedDate, notes } = {}) {
     await this._getOwned(id, branchId);
+    // Ngay khach hen phai tu hom nay tro di - ghi ngay qua khu thi nhac nho
+    // vua xac nhan xong da thanh qua han, danh sach cham soc bao sai.
+    if (confirmedDate) {
+      const d = new Date(confirmedDate);
+      if (Number.isNaN(d.getTime())) throw new ApiError(400, 'Ngày hẹn không hợp lệ');
+      if (d.toISOString().slice(0, 10) < todayISODate()) {
+        throw new ApiError(400, 'Ngày hẹn không được ở quá khứ');
+      }
+    }
     const entity = await this.maintenanceReminderRepository.markConfirmed(id, {
       confirmedDate: confirmedDate || todayISODate(),
       notes,

@@ -56,6 +56,19 @@ class RepairSettlement {
     this.signatureData = data.signatureData ?? null;
     this.signerName = data.signerName ?? null;
     this.signedAt = data.signedAt ?? null;
+    // Chu ky CO VAN LAP phieu - ky cung luc voi khach o moc tiep nhan xe.
+    this.advisorSignatureData = data.advisorSignatureData ?? null;
+    this.advisorSignedAt = data.advisorSignedAt ?? null;
+    // MOC 2 - quyet toan/giao xe. closingAdvisorId co the KHAC advisorId khi
+    // phieu duoc ban giao ca, va chinh no tra loi "phieu nay ai done" (duong
+    // PayOS chay qua webhook khong co user context nen phai doc tu day).
+    this.closingAdvisorId = data.closingAdvisorId ?? null;
+    this.closingAdvisorName = data.closingAdvisorName ?? null;
+    this.closingSignatureData = data.closingSignatureData ?? null;
+    this.closingSignedAt = data.closingSignedAt ?? null;
+    this.customerFinalSignatureData = data.customerFinalSignatureData ?? null;
+    this.customerFinalSignerName = data.customerFinalSignerName ?? null;
+    this.customerFinalSignedAt = data.customerFinalSignedAt ?? null;
     // CVDV dang mo phieu nay (man Phieu quyet toan sua chua) - null neu khong
     // ai dang mo hoac khoa da het han (xem RepairSettlementRepositoryImpl
     // HEADER_SELECT, da loc TTL san trong SQL nen o day luon la "con hieu luc").
@@ -121,9 +134,21 @@ class RepairSettlement {
       cancelledAt: headerRow.cancelled_at,
       intakeChecklist: headerRow.intake_checklist ? JSON.parse(headerRow.intake_checklist) : null,
       note: headerRow.note ?? null,
+      // MOC 1 - luc lap phieu: khach duyet bao gia + co van lap phieu ky.
       signatureData: headerRow.signature_data ?? null,
       signerName: headerRow.signature_signer_name ?? null,
       signedAt: headerRow.signature_signed_at ?? null,
+      advisorSignatureData: headerRow.advisor_signature_data ?? null,
+      advisorSignedAt: headerRow.advisor_signed_at ?? null,
+      // MOC 2 - luc quyet toan/giao xe: co van CHOT phieu (co the khac nguoi
+      // lap) + khach xac nhan nhan xe. Xem ensureSettlementSignatures.js.
+      closingAdvisorId: headerRow.closing_advisor_id ?? null,
+      closingAdvisorName: headerRow.closing_advisor_name ?? null,
+      closingSignatureData: headerRow.closing_signature_data ?? null,
+      closingSignedAt: headerRow.closing_signed_at ?? null,
+      customerFinalSignatureData: headerRow.customer_final_signature_data ?? null,
+      customerFinalSignerName: headerRow.customer_final_signer_name ?? null,
+      customerFinalSignedAt: headerRow.customer_final_signed_at ?? null,
       lockedBy: headerRow.active_locked_by_user_id
         ? { id: headerRow.active_locked_by_user_id, name: headerRow.active_locked_by_name }
         : null,
