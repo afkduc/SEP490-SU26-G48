@@ -32,6 +32,7 @@ function mockRepo(overrides = {}) {
     listAssignableRoles: async () => ROLES,
     listEmployees: async () => [],
     findByEmail: async () => null,
+    findByPhone: async () => null,
     nextPseudoId: async () => 'NV-001',
     createEmployee: async data => ({
       id: 100,
@@ -960,6 +961,26 @@ test('Cập nhật thợ với đầy đủ thông tin đã nhập', async () =>
   assert.equal(updated.teamLeaderId, 900);
   assert.deepEqual(updated.specialtyIds, [1]);
   assert.equal(updated.status, 'active');
+});
+
+test('Không cập nhật thợ máy bằng số điện thoại đã thuộc nhân viên khác', async () => {
+  const service = new ManagerService(mockRepo({
+    getTechnicianById: async () => ({
+      id: 1,
+      email: 'tech@x.com',
+      phone: '0918162105',
+      status: 'active'
+    }),
+    findByPhone: async () => ({ id: 2, phone: '0901002001' })
+  }));
+
+  await assert.rejects(
+    () => service.updateTechnician(1, 1, baseTechnicianPayload({
+      email: 'tech@x.com',
+      phone: '0901002001'
+    })),
+    err => err.statusCode === 409 && /Số điện thoại đã tồn tại/i.test(err.message)
+  );
 });
 test("updateTechnician rejects duplicate email only when changed - case 01", async () => {
   const service = new ManagerService(mockRepo({

@@ -12,7 +12,7 @@ class CustomerController {
   getAll = async (req, res, next) => {
     try {
       const { search, page = 1, limit = 20 } = req.query;
-      const result = await this.customerService.getAll({ search, page: Number(page), limit: Number(limit) });
+      const result = await this.customerService.getAll({ search, page: Number(page), limit: Number(limit), branchId: req.user?.branchId });
       return success(res, result, 'Customers retrieved');
     } catch (err) {
       next(err);
@@ -21,7 +21,7 @@ class CustomerController {
 
   getById = async (req, res, next) => {
     try {
-      const item = await this.customerService.getById(req.params.id);
+      const item = await this.customerService.getById(req.params.id, req.user?.branchId);
       return success(res, item, 'Customer retrieved');
     } catch (err) {
       next(err);
@@ -30,7 +30,7 @@ class CustomerController {
 
   update = async (req, res, next) => {
     try {
-      const item = await this.customerService.update(req.params.id, req.body);
+      const item = await this.customerService.update(req.params.id, req.body, req.user?.branchId);
       await auditCrud.update(req, {
         tableName: 'customers',
         entityCode: item?.customer_code || `ID-${req.params.id}`,
@@ -54,7 +54,7 @@ class CustomerController {
   // POST /customers/:id/vehicles - them xe cho khach da co.
   addVehicle = async (req, res, next) => {
     try {
-      const vehicle = await this.customerService.addVehicle(req.params.id, req.body);
+      const vehicle = await this.customerService.addVehicle(req.params.id, req.body, req.user?.branchId);
       await auditCrud.create(req, {
         tableName: 'vehicles',
         entityCode: vehicle?.licensePlate || null,

@@ -126,6 +126,7 @@ class ManagerService {
     if (existed) {
       throw new ApiError(409, 'Email đã tồn tại');
     }
+    await this._assertPhoneAvailable(phone);
 
     const roles = await this.managerRepository.listAssignableRoles();
     const selectedRole = roles.find((role) => Number(role.id) === Number(roleId));
@@ -197,6 +198,7 @@ class ManagerService {
         throw new ApiError(409, 'Email đã tồn tại');
       }
     }
+    await this._assertPhoneAvailable(phone, id);
 
     const roles = await this.managerRepository.listAssignableRoles();
     const selectedRole = roles.find((role) => Number(role.id) === Number(roleId));
@@ -568,6 +570,13 @@ class ManagerService {
     }
   }
 
+  async _assertPhoneAvailable(phone, currentUserId = null) {
+    const existed = await this.managerRepository.findByPhone(phone.trim());
+    if (existed && Number(existed.id) !== Number(currentUserId)) {
+      throw new ApiError(409, 'Số điện thoại đã tồn tại');
+    }
+  }
+
   async _validateSpecialtyIds(specialtyIds) {
     if (specialtyIds === undefined || specialtyIds === null) return undefined;
     if (!Array.isArray(specialtyIds)) throw new ApiError(400, 'Danh sách chuyên môn không hợp lệ');
@@ -592,6 +601,7 @@ class ManagerService {
 
     const existed = await this.managerRepository.findByEmail(payload.email);
     if (existed) throw new ApiError(409, 'Email đã tồn tại');
+    await this._assertPhoneAvailable(payload.phone);
 
     // Tho may khong dang nhap qua form nay - sinh mat khau ngau nhien, ho dat
     // lai qua "Quen mat khau" khi thuc su can dang nhap.
@@ -632,6 +642,7 @@ class ManagerService {
         throw new ApiError(409, 'Email đã tồn tại');
       }
     }
+    await this._assertPhoneAvailable(payload.phone, id);
 
     return this.managerRepository.updateTechnician(branchId, id, {
       fullName: payload.fullName.trim(),

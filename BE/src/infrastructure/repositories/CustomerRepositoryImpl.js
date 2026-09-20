@@ -13,9 +13,17 @@ class CustomerRepositoryImpl extends CustomerRepository {
   // Lay het khach hang + xe + so lan lam dich vu - loc khong-dau tim kiem
   // duoc lam o tang Service (giong VehicleSearchService/InventoryService),
   // vi so luong khach hang chi vai tram dong.
-  async findAllWithDetails() {
+  async findAllWithDetails(branchId = null) {
     const [customersResult, vehiclesResult, countsResult] = await Promise.all([
-      query(`SELECT * FROM customers ORDER BY full_name`),
+      query(
+        `SELECT * FROM customers c
+         WHERE @branchId IS NULL OR EXISTS (
+           SELECT 1 FROM repair_orders ro
+           WHERE ro.customer_id = c.id AND ro.branch_id = @branchId
+         )
+         ORDER BY full_name`,
+        { branchId: branchId == null ? null : Number(branchId) }
+      ),
       query(`SELECT * FROM vehicles ORDER BY id`),
       query(`SELECT customer_id, COUNT(*) AS cnt FROM repair_orders GROUP BY customer_id`),
     ]);
@@ -33,8 +41,16 @@ class CustomerRepositoryImpl extends CustomerRepository {
     );
   }
 
-  async findByIdWithDetails(id) {
-    const customerResult = await query(`SELECT * FROM customers WHERE id = @id`, { id });
+  async findByIdWithDetails(id, branchId = null) {
+    const customerResult = await query(
+      `SELECT * FROM customers c
+       WHERE c.id = @id
+         AND (@branchId IS NULL OR EXISTS (
+           SELECT 1 FROM repair_orders ro
+           WHERE ro.customer_id = c.id AND ro.branch_id = @branchId
+         ))`,
+      { id, branchId: branchId == null ? null : Number(branchId) }
+    );
     const row = customerResult.recordset[0];
     if (!row) return null;
 
