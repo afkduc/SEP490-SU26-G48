@@ -53,9 +53,21 @@ class RepairSettlementResponseDto {
       vehicle: entity.vehicle ? { ...entity.vehicle, purchaseDate: toISODate(entity.vehicle.purchaseDate) } : null,
       customerRequest: entity.customerRequest,
       note: entity.note,
+      // 4 chu ky tren phieu: moc LAP PHIEU (khach duyet bao gia + co van lap
+      // phieu) va moc QUYET TOAN (co van chot phieu + khach nhan xe). Co van
+      // chot co the khac nguoi lap khi phieu duoc ban giao ca.
       signatureData: entity.signatureData,
       signerName: entity.signerName,
       signedAt: entity.signedAt ? toDDMMYYYYHHmm(entity.signedAt) : null,
+      advisorSignatureData: entity.advisorSignatureData ?? null,
+      advisorSignedAt: entity.advisorSignedAt ? toDDMMYYYYHHmm(entity.advisorSignedAt) : null,
+      closingAdvisorId: entity.closingAdvisorId ?? null,
+      closingAdvisorName: entity.closingAdvisorName ?? null,
+      closingSignatureData: entity.closingSignatureData ?? null,
+      closingSignedAt: entity.closingSignedAt ? toDDMMYYYYHHmm(entity.closingSignedAt) : null,
+      customerFinalSignatureData: entity.customerFinalSignatureData ?? null,
+      customerFinalSignerName: entity.customerFinalSignerName ?? null,
+      customerFinalSignedAt: entity.customerFinalSignedAt ? toDDMMYYYYHHmm(entity.customerFinalSignedAt) : null,
       items: entity.items,
       tasks: entity.tasks,
       subtotal: entity.subtotal,

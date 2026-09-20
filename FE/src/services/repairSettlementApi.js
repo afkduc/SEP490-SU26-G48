@@ -48,6 +48,16 @@ export async function logRepairSettlementPrintApi(id, kind = 'settlement') {
   return httpClient.post(`/repair-settlements/${id}/print-log`, { kind });
 }
 
+/**
+ * Ky quyet toan (MOC 2): co van dang dang nhap + khach den nhan xe cung ky.
+ * PHAI goi truoc khi xuat hoa don hoac tao ma QR - BE chan 409 neu chua ky.
+ * Co van ky o day co the khac nguoi lap phieu (ca truoc/ca sau), va chinh la
+ * nguoi duoc ghi nhan "da chot phieu nay".
+ */
+export async function saveClosingSignatureApi(id, payload) {
+  return httpClient.post(`/repair-settlements/${id}/closing-signature`, payload);
+}
+
 export async function createPayosPaymentLinkApi(id) {
   return httpClient.post(`/repair-settlements/${id}/payos/create-payment-link`);
 }

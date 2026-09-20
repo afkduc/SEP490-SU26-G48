@@ -31,3 +31,7 @@ Test/
 
 # Tai lieu tham chieu (file mau .xlsx tu ben nghiep vu) - giu o may, khong day len git
 Reference/
+
+# Ban nhap/ban xuat do Claude sinh ra (bao cao, diagram, file test tam) -
+# chi giu o may, ban chinh thuc nam tren Drive cua nhom.
+Claude outputs/
