@@ -541,7 +541,7 @@ function AssignTechniciansModal({ order, onClose, onDone }) {
 // Xem (khong tick duoc) - tick that su dien ra tai man hinh cong khai cua
 // dung khoang do (Landing), o day chi phan anh lai realtime qua SSE
 // 'task-updated'/danh sach orders duoc nap lai.
-function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId, onForwardNg, onResolveNg, forwardingTaskId }) {
+function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId, onForwardNg, onResolveNg, forwardingTaskId, changedBayIds, onSeenBay }) {
   const [intakeOrder, setIntakeOrder] = useState(null);
   // Goi bao duong bung ra 30+ dau muc, 3 khoang cung luc la phai cuon rat lau
   // moi xem het - trong khi to truong thuong chi dang quan tam 1 khoang. Nen
@@ -553,11 +553,16 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
   // SSE - neu seed lai theo bays thi khoang to truong vua mo se tu dong sap
   // lai ngay khi tho ben duoi tick 1 dau muc.
   const [expandedBays, setExpandedBays] = useState(() => new Set());
-  const toggleBay = (bayId) => setExpandedBays((prev) => {
-    const next = new Set(prev);
-    if (next.has(bayId)) next.delete(bayId); else next.add(bayId);
-    return next;
-  });
+  const toggleBay = (bayId) => {
+    setExpandedBays((prev) => {
+      const next = new Set(prev);
+      // Chi MO moi tinh la "da xem" - thu gon lai khong can bao lai nua vi
+      // noi dung khong doi, khoang van dang mo tu truoc.
+      if (next.has(bayId)) next.delete(bayId);
+      else { next.add(bayId); onSeenBay?.(bayId); }
+      return next;
+    });
+  };
 
   if (bays.length === 0) {
     return <div className="tld-empty">Bạn chưa được gán khoang xe nào. Liên hệ Quản lý chi nhánh.</div>;
@@ -605,7 +610,18 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                     title={thuGon ? 'Mở lại khoang này' : 'Thu gọn khoang này'}
                     style={{ transform: thuGon ? 'none' : 'rotate(90deg)' }}>▶</button>
                 )}
-                <span className="tld-bay-status-card__number">Khoang {bay.bayNumber}</span>
+                <span className="tld-bay-status-card__number">
+                  {/* Cham do - khoang vua co bien dong (tho tick dau muc, xe
+                      vao/ra...) ma to truong chua mo ra xem lai. Mat khi bam
+                      mo dung khoang nay (xem toggleBay o tren). */}
+                  {changedBayIds?.has(bay.id) && (
+                    <span title="Có cập nhật mới chưa xem" style={{
+                      display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                      background: '#E53935', marginRight: 6,
+                    }} />
+                  )}
+                  Khoang {bay.bayNumber}
+                </span>
                 {/* Thu gon: ca khung khoang co lai con dung thanh nay, nen
                     ghep luon khach hang + bien so vao de van biet khoang nao
                     dang lam xe nao ma khong phai mo ra. */}
@@ -899,6 +915,11 @@ export default function TeamLeaderDashboard() {
   const [pending, setPending] = useState(null);
   const [bays, setBays] = useState([]);
   const [orders, setOrders] = useState([]);
+  // Doc duoc "orders" moi nhat trong handleEvent (useCallback deps gon) ma
+  // khong phai them orders vao deps - tranh tao lai ham lien tuc lam SSE hook
+  // subscribe lai moi lan danh sach lenh doi.
+  const ordersRef = useRef([]);
+  useEffect(() => { ordersRef.current = orders; }, [orders]);
   const [error, setError] = useState('');
   const [claimingSettlement, setClaimingSettlement] = useState(null);
   const [assigningOrder, setAssigningOrder] = useState(null);
@@ -907,13 +928,27 @@ export default function TeamLeaderDashboard() {
   const [forwardingTaskId, setForwardingTaskId] = useState(null);
   const confirm = useConfirm();
   const [claimedElsewhere, setClaimedElsewhere] = useState({});
-  // So do goc tab - dem viec "chua xem": pendingSeenCount la mo (baseline) so
-  // luong pending tai lan cuoi mo tab "Viec cho nhan" (null = chua seed lan
-  // dau, tranh hien badge ngay khi vua vao trang du chua co gi moi that su);
-  // baysUpdateCount dem so lan co thay doi (claim/tick/huy/hoan thanh) trong
-  // luc KHONG dang mo tab "Khoang xe cua toi".
+  // So do goc tab "Viec cho nhan" - dem viec "chua xem": pendingSeenCount la
+  // moc (baseline) so luong pending tai lan cuoi mo tab nay (null = chua seed
+  // lan dau, tranh hien badge ngay khi vua vao trang du chua co gi moi that
+  // su). changedBayIds = tap khoang xe vua co bien dong (claim/tick/huy/hoan
+  // thanh) ma to truong CHUA MO ra xem lai - moi khoang 1 cham do rieng
+  // (xem BayStatusGrid), chi mat khi bam mo dung khoang do, khong phai chi
+  // chuyen sang tab la het nhu truoc.
   const [pendingSeenCount, setPendingSeenCount] = useState(null);
-  const [baysUpdateCount, setBaysUpdateCount] = useState(0);
+  const [changedBayIds, setChangedBayIds] = useState(() => new Set());
+  const danhDauKhoangThayDoi = (bayId) => {
+    if (bayId == null) return;
+    setChangedBayIds((prev) => (prev.has(bayId) ? prev : new Set(prev).add(bayId)));
+  };
+  const xoaDauKhoangThayDoi = (bayId) => {
+    setChangedBayIds((prev) => {
+      if (!prev.has(bayId)) return prev;
+      const next = new Set(prev);
+      next.delete(bayId);
+      return next;
+    });
+  };
   const activeTabRef = useRef('pending');
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
@@ -983,10 +1018,13 @@ export default function TeamLeaderDashboard() {
     if (BAY_REFRESH_EVENT_TYPES.has(event.type)) {
       loadBays();
     }
-    // BAY_REFRESH_EVENT_TYPES la tap con cua ORDER_REFRESH_EVENT_TYPES nen
-    // chi can kiem tra 1 lan - tranh dem trung khi 1 event khop ca 2 tap.
+    // Danh dau DUNG khoang vua bien dong (tra bayId qua orders dang co, doc
+    // qua ref de khong phai dua orders vao deps). Khong danh dau khi dang MO
+    // SAN tab "Khoang xe cua toi" - to truong dang nhin man hinh do that,
+    // khong can bao lai cai ho vua thay truoc mat.
     if (ORDER_REFRESH_EVENT_TYPES.has(event.type) && activeTabRef.current !== 'bays') {
-      setBaysUpdateCount((c) => c + 1);
+      const donHang = ordersRef.current.find((o) => String(o.id) === String(event.orderId));
+      if (donHang?.bayId != null) danhDauKhoangThayDoi(donHang.bayId);
     }
   }, [loadPending, loadBays, loadOrders]);
 
@@ -1101,12 +1139,14 @@ export default function TeamLeaderDashboard() {
 
   const activeTabLabel = TABS.find((t) => t.key === activeTab)?.label;
   const pendingBadge = pending && pendingSeenCount !== null ? Math.max(0, pending.length - pendingSeenCount) : 0;
-  const tabBadge = { pending: pendingBadge, bays: baysUpdateCount };
+  // Badge tab "Khoang xe cua toi" = so khoang con dang co bien dong chua xem
+  // (khong con reset ve 0 khi chi CHUYEN sang tab nua - phai mo dung khoang
+  // do moi mat, xem toggleBay trong BayStatusGrid).
+  const tabBadge = { pending: pendingBadge, bays: changedBayIds.size };
 
   const handleTabClick = (key) => {
     setActiveTab(key);
     if (key === 'pending') setPendingSeenCount(pending?.length ?? 0);
-    if (key === 'bays') setBaysUpdateCount(0);
   };
 
   return (
@@ -1190,7 +1230,7 @@ export default function TeamLeaderDashboard() {
         )
       )}
 
-      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} onConfirmComplete={handleConfirmComplete} confirmingId={confirmingId} onReopenTask={handleReopenTask} reopeningTaskId={reopeningTaskId} onForwardNg={handleForwardNg} onResolveNg={handleResolveNg} forwardingTaskId={forwardingTaskId} />}
+      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} onConfirmComplete={handleConfirmComplete} confirmingId={confirmingId} onReopenTask={handleReopenTask} reopeningTaskId={reopeningTaskId} onForwardNg={handleForwardNg} onResolveNg={handleResolveNg} forwardingTaskId={forwardingTaskId} changedBayIds={changedBayIds} onSeenBay={xoaDauKhoangThayDoi} />}
 
       {activeTab === 'history' && <HistoryPanel orders={orders} />}
 

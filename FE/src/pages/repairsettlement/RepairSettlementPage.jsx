@@ -1352,6 +1352,7 @@ function CollapsibleCard({ title, note, summary, actions, open, onToggle, bodySt
 // co van don gian doi y. Phieu da co nguoi nhan (inprogress tro di) thi BE
 // chan 409 - luc do xe da vao khoang roi, doi nguoi tren giay to vo nghia.
 function ReassignTeamLeaderModal({ order, onClose, onDone }) {
+  const confirm = useConfirm();
   const [teamLeaders, setTeamLeaders] = useState([]);
   const [selected, setSelected] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -1375,11 +1376,20 @@ function ReassignTeamLeaderModal({ order, onClose, onDone }) {
     }
   };
 
-  // Nguoi vua tu choi khong hien trong o chon - giao lai dung nguoi do la
-  // chac chan bi tu choi lan nua.
-  const dsChon = teamLeaders.filter(
-    (t) => String(t.id) !== String(order.assignmentDeclinedBy || '')
-  );
+  // Khong con nut "Day cho tat ca" rieng nua: de trong o chon = day chung,
+  // chi 1 nut xac nhan duy nhat. Nguoi vua tu choi VAN nam trong danh sach
+  // chon binh thuong (khong giau nua) - chon lai dung nguoi do thi hoi xac
+  // nhan them 1 buoc truoc khi gui, tranh giao nham lai cho nguoi vua tu choi.
+  const handleXacNhan = async () => {
+    if (selected && String(selected) === String(order.assignmentDeclinedBy || '')) {
+      const dongY = await confirm({
+        title: 'Chỉ định lại tổ trưởng đã từ chối',
+        message: `Tổ trưởng: ${order.assignmentDeclinedByName || ''} đã từng từ chối tiếp nhận phiếu quyết toán sửa chữa này, xác nhận chỉ định 1 lần nữa?`,
+      });
+      if (!dongY) return;
+    }
+    guiDi(selected ? Number(selected) : null);
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1407,23 +1417,18 @@ function ReassignTeamLeaderModal({ order, onClose, onDone }) {
             disabled={submitting}
             onChange={(e) => setSelected(e.target.value)}
           >
-            <option value="">— Chọn tổ trưởng —</option>
-            {dsChon.map((t) => (
+            <option value="">Tất cả tổ trưởng đều nhận được</option>
+            {teamLeaders.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
 
           {error && <div className="alert alert-error" style={{ marginTop: 12 }}>{error}</div>}
         </div>
-        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
-          {/* Duong thoat khi khong biet giao cho ai: ai ranh thi nhan truoc. */}
-          <button type="button" className="btn btn-secondary" disabled={submitting}
-            onClick={() => guiDi(null)}>
-            Đẩy cho tất cả tổ trưởng
-          </button>
-          <button type="button" className="btn btn-primary" disabled={!selected || submitting}
-            onClick={() => guiDi(Number(selected))}>
-            {submitting ? 'Đang lưu…' : 'Giao cho tổ trưởng này'}
+        <div className="modal-footer">
+          <button type="button" className="btn btn-primary" disabled={submitting}
+            onClick={handleXacNhan}>
+            {submitting ? 'Đang lưu…' : (selected ? 'Giao cho tổ trưởng này' : 'Đẩy cho tất cả tổ trưởng')}
           </button>
         </div>
       </div>
@@ -1872,6 +1877,25 @@ function RepairSettlementList() {
   const [cancelTarget, setCancelTarget] = useState(null);
   const PAGE_SIZE = 10;
 
+  // Phieu vua co bien dong (SSE) ma co van CHUA MO ra xem - hien cham do canh
+  // ma phieu + gop vao so do tren tung tab, kieu thong bao gio hang. Rieng
+  // phieu bi TU CHOI nhan viec khong dung set nay: no dung thang
+  // order.assignmentDeclinedAt (du lieu that tu DB) nen chi mat khi THAT SU
+  // giao lai duoc viec, khong phai chi mo xem la het (xem soPhieuBiTuChoi).
+  const [changedOrderIds, setChangedOrderIds] = useState(() => new Set());
+  const danhDauThayDoi = (orderId) => {
+    if (orderId == null) return;
+    setChangedOrderIds((prev) => (prev.has(orderId) ? prev : new Set(prev).add(orderId)));
+  };
+  const xoaDauThayDoi = (orderId) => {
+    setChangedOrderIds((prev) => {
+      if (!prev.has(orderId)) return prev;
+      const next = new Set(prev);
+      next.delete(orderId);
+      return next;
+    });
+  };
+
   // silent=true dung cho auto-refresh nen (poll/focus lai tab) - khong bat
   // loading/spinner de tranh giat man hinh. Can thiet vi trang nay khong tu
   // cap nhat khi to truong ben kia bam Hoan thanh (chi doi bang truc tiep
@@ -1928,7 +1952,16 @@ function RepairSettlementList() {
   //   - 'new-pending': co phieu quyet toan moi (CVDV khac trong cung chi
   //     nhanh vua tao) -> nap lai danh sach ngay, tranh phai doi poll/F5 moi
   //     thay phieu moi.
+  // Cac loai su kien tinh la "bien dong" dang bao cham do o hang + gop vao
+  // so tren tab - KHONG gom 'assignment-declined' (dung co riverg
+  // assignmentDeclinedAt, ben duoi), 'new-pending' (phieu vua tao, chinh
+  // co van vua lam thi khong can bao lai chinh ho) va 'locked'/'unlocked'
+  // (chi ai dang mo xem, khong phai bien dong nghiep vu).
+  const BIEN_DONG_EVENT_TYPES = new Set(['claimed', 'task-updated', 'order-completed', 'invoiced', 'order-cancelled']);
   const handleRepairOrderEvent = (event) => {
+    if (BIEN_DONG_EVENT_TYPES.has(event.type)) {
+      danhDauThayDoi(event.orderId);
+    }
     if (event.type === 'task-updated' && view && String(view.id) === String(event.orderId)) {
       getRepairSettlementApi(view.id).then(setView).catch(() => { });
     }
@@ -1992,13 +2025,22 @@ function RepairSettlementList() {
     invoiced: theoCoVan.filter((o) => o.status === 'invoiced').length,
     cancelled: theoCoVan.filter((o) => o.status === 'cancelled').length,
   };
-  // So phieu bi to truong duoc chi dinh rieng TU CHOI, con dang cho o van xu
-  // ly lai (giao nguoi khac / day chung) - hien thanh so do o goc tab "Chờ
-  // sửa chữa" kieu badge gio hang, de co van biet ngay ma khong phai mo tung
-  // phieu. Tu bien mat khi da giao lai (reassignTeamLeader xoa cac cot nay).
-  const soPhieuBiTuChoi = theoCoVan.filter(
-    (o) => displayStatus(o) === 'waiting_repair' && o.assignmentDeclinedAt
-  ).length;
+  // So do kieu gio hang tren goc tung tab - dem phieu can chu y ma co van
+  // CHUA xu ly: hoac vua co bien dong (changedOrderIds, xem
+  // handleRepairOrderEvent) hoac dang bi to truong tu choi nhan viec
+  // (assignmentDeclinedAt - rieng cai nay chi mat khi THAT SU giao lai
+  // duoc viec, khong phai mo xem la het).
+  const tabCuaPhieu = (o) => {
+    const ds = displayStatus(o);
+    return ds === 'waiting_repair' || ds === 'inprogress' ? ds : o.status;
+  };
+  const canBaoDo = (o) => Boolean(o.assignmentDeclinedAt) || changedOrderIds.has(o.id);
+  const badgeCounts = { waiting_repair: 0, inprogress: 0, waiting_payment: 0, invoiced: 0, cancelled: 0 };
+  theoCoVan.forEach((o) => {
+    if (!canBaoDo(o)) return;
+    const k = tabCuaPhieu(o);
+    if (k in badgeCounts) badgeCounts[k] += 1;
+  });
 
   // Danh sach Tổ trưởng duy nhat tu chinh du lieu dang co, cho dropdown loc -
   // khong goi API rieng, tranh phai dong bo them 1 nguon du lieu khac.
@@ -2055,6 +2097,7 @@ function RepairSettlementList() {
   };
 
   const handleViewDetail = async (o) => {
+    xoaDauThayDoi(o.id); // da mo xem - het "moi" tu day, du huong nao vao cung qua day.
     setView(o);
     setView(await fetchFullOrder(o));
   };
@@ -2119,9 +2162,9 @@ function RepairSettlementList() {
         {TABS.map((t) => {
           const isActive = tab === t.key;
           const count = counts[t.key] ?? 0;
-          // Badge tron do o goc tab "Chờ sửa chữa" - kieu so luong gio hang,
-          // bao co van co phieu vua bi to truong tu choi can xu ly lai.
-          const soTuChoi = t.key === 'waiting_repair' ? soPhieuBiTuChoi : 0;
+          // Badge tron do goc tab - kieu so luong gio hang, dem phieu can chu
+          // y trong tab nay (vua bien dong hoac dang bi tu choi nhan viec).
+          const soCanChuY = badgeCounts[t.key] ?? 0;
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
               style={{
@@ -2139,15 +2182,15 @@ function RepairSettlementList() {
                 color: isActive ? 'white' : 'var(--gray-600)',
                 borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700,
               }}>{count}</span>
-              {soTuChoi > 0 && (
-                <span title={`${soTuChoi} phiếu bị tổ trưởng từ chối, cần giao lại`}
+              {soCanChuY > 0 && (
+                <span title={`${soCanChuY} phiếu có cập nhật mới chưa xem`}
                   style={{
                     position: 'absolute', top: -7, right: -7,
                     background: '#E53935', color: 'white', border: '2px solid white',
                     borderRadius: '50%', minWidth: 19, height: 19, padding: '0 3px',
                     fontSize: 10.5, fontWeight: 800, lineHeight: '15px', textAlign: 'center',
                   }}>
-                  {soTuChoi}
+                  {soCanChuY}
                 </span>
               )}
             </button>
@@ -2274,7 +2317,20 @@ function RepairSettlementList() {
                     </div>,
                     document.body
                   )}
-                  <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{o.code}</span></td>
+                  <td>
+                    {/* Cham do canh ma phieu - bao THIS phieu vua co bien dong
+                        chua xem, de biet dung phieu nao giua ca bang chu khong
+                        chi biet "co gi do moi" chung chung o so tren tab. Phieu
+                        dang bi tu choi da co dong chu rieng ben duoi (do hon),
+                        khong can them cham nua keo roi. */}
+                    {!o.assignmentDeclinedAt && changedOrderIds.has(o.id) && (
+                      <span title="Có cập nhật mới chưa xem" style={{
+                        display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                        background: '#E53935', marginRight: 6,
+                      }} />
+                    )}
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{o.code}</span>
+                  </td>
                   <td style={{ fontSize: 12 }}>{o.advisor || <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>—</span>}</td>
                   <td>
                     <div style={{ fontWeight: 700 }}>{o.customer?.fullName}</div>
@@ -4515,7 +4571,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 <select className="form-select" autoFocus
                   value={assignedTeamLeaderId}
                   onChange={(e) => setAssignedTeamLeaderId(e.target.value)}>
-                  <option value="">Không chỉ định — mọi tổ trưởng đều nhận được</option>
+                  <option value="">Tất cả tổ trưởng đều nhận được</option>
                   {dsToTruong.map((tt) => (
                     <option key={tt.id} value={tt.id}>
                       {tt.phone ? `${tt.name} — ${tt.phone}` : tt.name}
