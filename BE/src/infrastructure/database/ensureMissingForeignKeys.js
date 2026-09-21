@@ -1,8 +1,9 @@
 const sql = require('mssql');
 const { getPool } = require('./sqlServer');
 
-// Khai bao khoa ngoai cho 9 bang tu truoc den nay chi "noi bang id trong code"
-// ma khong co FOREIGN KEY trong DB. App van chay vi moi JOIN deu dung id luu
+// Khai bao khoa ngoai cho cac cot tu truoc den nay chi "noi bang id trong code"
+// ma khong co FOREIGN KEY trong DB (8 bang khong co FK nao + vai cot le o bang
+// khac). App van chay vi moi JOIN deu dung id luu
 // trong cot, nhung thieu FK nen da sinh ra dong mo coi (thong bao cua user da
 // xoa, link PayOS cua lenh da xoa, khoang xe cua to truong da xoa...) va SSMS
 // diagram / ERD ve cac bang nay dung mot minh.
