@@ -42,13 +42,16 @@ const HEADER_SELECT = `
          -- To truong duoc co van CHI DINH san (khac team_leader_name o tren -
          -- do la nguoi DA NHAN viec). NULL = khong chi dinh, moi to truong deu
          -- thay phieu trong bang "Việc chờ nhận".
-         so.assigned_team_leader_id,
+         --
+         -- KHONG chon lai so.assigned_team_leader_id / so.assignment_declined_*
+         -- o day - "SELECT so.*" o tren da co san 4 cot nay roi (cung ten that
+         -- tren bang repair_orders). Chon lai lan nua bi TRUNG TEN COT, driver
+         -- mssql tra ve MANG 2 phan tu giong het nhau thay vi 1 gia tri don
+         -- (vd assignedTeamLeaderId = ["18","18"]) - FE so sanh === voi user.id
+         -- luon sai, nut "Từ chối" khong bao gio hien du chi dinh dung nguoi.
          atl.user_name AS assigned_team_leader_name,
          -- To truong da tu choi nhan viec (kem ly do). Co 3 cot nay nghia la
          -- phieu dang nam cho co van xu ly lai - xem ensureAssignmentDecline.js.
-         so.assignment_declined_by,
-         so.assignment_declined_reason,
-         so.assignment_declined_at,
          adb.user_name AS assignment_declined_by_name,
          inv.issued_at AS invoice_issued_at,
          inv.payment_method,
