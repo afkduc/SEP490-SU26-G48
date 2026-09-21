@@ -17,6 +17,7 @@ import {
   FUEL_GAUGE_OPTIONS,
 } from './IntakeChecklistSection';
 import { INTAKE_NOTICE_LINES } from './intakeNotice';
+import { khoiTieuDeIn, PRINT_HEADER_CSS } from './printHeader';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
@@ -74,8 +75,6 @@ export function printIntakeSheet(order, { khongChuKy = false } = {}, moCuaSoIn) 
 <title>Phiếu tiếp nhận xe ${esc(order.code)}</title>
 <style>
   body { font-family: Arial, sans-serif; font-size: 11px; margin: 10mm 12mm; color: #000; }
-  .tieu-de { text-align: center; margin-bottom: 8px; }
-  .tieu-de b { font-size: 14px; }
   table { width: 100%; border-collapse: collapse; }
   .head td { border: none; padding: 2px 0; font-size: 11px; }
   .khoi { margin-top: 7px; break-inside: avoid; }
@@ -90,11 +89,12 @@ export function printIntakeSheet(order, { khongChuKy = false } = {}, moCuaSoIn) 
   .sign-img { height: 46px; max-width: 100%; object-fit: contain; display: block; margin: 2px auto 0; }
   .sign-line { margin-top: 42px; border-top: 1px solid #000; padding-top: 3px; font-size: 10px; }
   .sign-line.has-img { margin-top: 0; }
+  ${PRINT_HEADER_CSS}
 </style></head><body>
-<div class="tieu-de">
-  <b>PHIẾU TIẾP NHẬN VÀ BÀN GIAO XE</b><br/>
-  <span>Số RO: <b>${esc(order.code)}</b> &nbsp;|&nbsp; Ngày tiếp nhận: <b>${esc(order.date || '')}</b></span>
-</div>
+${khoiTieuDeIn('PHIẾU TIẾP NHẬN VÀ BÀN GIAO XE', {
+    chiNhanh: order.branch,
+    phuDe: `Số RO: <b>${esc(order.code)}</b> &nbsp;|&nbsp; Ngày tiếp nhận: <b>${esc(order.date || '')}</b>`,
+  })}
 <table class="head">
   <tr>
     <td style="width:50%"><b>Khách hàng:</b> ${esc(kh.fullName)}</td>

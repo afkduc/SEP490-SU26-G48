@@ -39,6 +39,7 @@ import {
   repairCategoryShort,
   htttShort,
 } from '../../constants/settlementCodes';
+import { khoiTieuDeIn, urlLogo, PRINT_HEADER_CSS } from './printHeader';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
@@ -576,12 +577,12 @@ export function printWorkList(order) {
     </tr>`).join('');
   const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
 <title>Danh sách công việc ${order.code}</title>
-<style>body{font-family:Arial,sans-serif;font-size:11px;margin:10mm 15mm}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;border:1px solid #ccc;padding:5px 7px;text-align:center}.sign-row{display:flex;justify-content:space-between;margin-top:35px}.sign-box{text-align:center;width:45%}.sign-line{margin-top:45px;border-top:1px solid #000;padding-top:3px;font-size:10px}</style>
+<style>body{font-family:Arial,sans-serif;font-size:11px;margin:10mm 15mm}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;border:1px solid #ccc;padding:5px 7px;text-align:center}.sign-row{display:flex;justify-content:space-between;margin-top:35px}.sign-box{text-align:center;width:45%}.sign-line{margin-top:45px;border-top:1px solid #000;padding-top:3px;font-size:10px}${PRINT_HEADER_CSS}</style>
 </head><body>
-<div style="text-align:center;margin-bottom:8px">
-  <b style="font-size:13px">DANH SÁCH CÔNG VIỆC KỸ THUẬT</b><br/>
-  <span style="font-size:11px">Số RO: <b>${order.code}</b> &nbsp;|&nbsp; Ngày: <b>${order.date || new Date().toLocaleDateString('vi-VN')}</b></span>
-</div>
+${khoiTieuDeIn('DANH SÁCH CÔNG VIỆC KỸ THUẬT', {
+    chiNhanh: order.branch,
+    phuDe: `Số RO: <b>${order.code}</b> &nbsp;|&nbsp; Ngày: <b>${order.date || new Date().toLocaleDateString('vi-VN')}</b>`,
+  })}
 <table style="border:none;margin-bottom:8px">
   <tr>
     <td style="border:none;width:50%;padding:1px 0"><b>Khách hàng:</b> ${order.customer?.fullName || ''}</td>
@@ -705,9 +706,9 @@ function printSettlement(order, payosQrCode, { khongChuKy = false } = {}) {
      print-color-adjust de trinh duyet khong bo mau khi in ra giay. */
   tr.doi-sau td { color:#c00; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   @media print { body { margin:8mm 12mm; } }
+  ${PRINT_HEADER_CSS}
 </style></head><body>
-<div class="center bold" style="font-size:12px">CÔNG TY TNHH AUTOGARA – CHI NHÁNH ${(order.branch || MOCK_BRANCH).toUpperCase()}</div>
-<div class="center bold" style="font-size:16px; margin:6px 0">QUYẾT TOÁN SỬA CHỮA</div>
+${khoiTieuDeIn('QUYẾT TOÁN SỬA CHỮA', { chiNhanh: order.branch })}
 <div style="display:flex; justify-content:space-between; margin-bottom:6px">
   <div><b>Số RO:</b> ${order.code}</div>
   <div><b>Ngày:</b> ${order.date}</div>
@@ -930,11 +931,20 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
 
         <div className="modal-body">
           <div style={{ background: 'white', border: '1px solid #DDD', borderRadius: 8, padding: '18px 20px', fontFamily: 'Arial, sans-serif', fontSize: 12 }}>
-            <div style={{ textAlign: 'center', marginBottom: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 13 }}>
-                CÔNG TY TNHH AUTOGARA – CHI NHÁNH {(order.branch || MOCK_BRANCH).toUpperCase()}
+            {/* Cung bo cuc voi ban in (printHeader.js): logo trai, chu giua. */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              borderBottom: '2px solid #111', paddingBottom: 8, marginBottom: 10,
+            }}>
+              <img src={urlLogo()} alt="AutoGara"
+                style={{ width: 78, height: 50, objectFit: 'contain', objectPosition: 'left center', flexShrink: 0 }} />
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>
+                  CÔNG TY TNHH AUTOGARA – CHI NHÁNH {(order.branch || MOCK_BRANCH).toUpperCase()}
+                </div>
+                <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: 1, marginTop: 2 }}>QUYẾT TOÁN SỬA CHỮA</div>
               </div>
-              <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: 1, margin: '4px 0' }}>QUYẾT TOÁN SỬA CHỮA</div>
+              <div style={{ width: 78, flexShrink: 0 }} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, flexWrap: 'wrap', gap: 6 }}>
