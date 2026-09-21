@@ -826,12 +826,16 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
   const [dangLuuChuKy, setDangLuuChuKy] = useState(false);
   const [loiChuKy, setLoiChuKy] = useState('');
 
-  // Ky xong la LUU LUON, khong bat bam them nut: 2 o ky deu da co chu ky va
-  // da co ten nguoi nhan xe thi khong con gi de cho nua. Nguoi dung ky tren
-  // iPad, bat ho tim them 1 nut nua chi de "xac nhan lan 2" la thua.
+  // Luu chu ky quyet toan (goi API + xin QR ngay sau do). TRUOC DAY tu luu
+  // ngay khi du 2 chu ky + ten - nhung nut "Xác nhận tiền mặt" o footer van
+  // hien san o do, xam va khong bam duoc, nguoi dung khong biet phai lam gi
+  // tiep ("khi này cũng không bấm được nút xác nhận tiền mặt này"). Nay
+  // chuyen thanh bam RO RANG: nut "Xác nhận đã đủ chữ ký hợp lệ" nam DUNG
+  // cho o do trong footer, bam xong moi doi sang nut "Xác nhận tiền mặt"
+  // (xem modal-footer ben duoi).
   //
-  // dangGuiRef chan goi trung: effect co the chay lai (vd re-render do SSE)
-  // trong luc request chua ve.
+  // dangGuiRef chan goi trung: tranh 2 lan bam lien tiep hoac goi lai trong
+  // luc request truoc chua ve.
   const dangGuiRef = useRef(false);
   const luuChuKyQuyetToan = async () => {
     if (dangGuiRef.current) return;
@@ -857,14 +861,10 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
     }
   };
 
-  // Du 2 chu ky + ten nguoi nhan xe -> tu luu. Co loi thi dung lai cho nguoi
-  // dung bam "Thử lại" (khong tu goi lai vong lap khi server dang hong).
-  useEffect(() => {
-    if (daKyQuyetToan || loiChuKy) return;
-    if (closingAdvisorEmpty || closingCustomerEmpty || !tenNguoiNhanXe.trim()) return;
-    luuChuKyQuyetToan();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closingAdvisorEmpty, closingCustomerEmpty, tenNguoiNhanXe, daKyQuyetToan, loiChuKy]);
+  // Dieu kien de nut "Xác nhận đã đủ chữ ký hợp lệ" bat sang - du 2 chu ky va
+  // co ten nguoi nhan xe. Nut nam o modal-footer (thay cho "Xác nhận tiền
+  // mặt" trong luc chua ky), bam moi goi luuChuKyQuyetToan().
+  const duDieuKienKyQuyetToan = !closingAdvisorEmpty && !closingCustomerEmpty && Boolean(tenNguoiNhanXe.trim());
 
   const requestPayosQr = async () => {
     setPayosLoading(true);
@@ -1179,7 +1179,13 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                   </div>
                 ) : (
                   <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginTop: 10, fontStyle: 'italic' }}>
-                    {dangLuuChuKy ? 'Đang lưu chữ ký…' : (!tenNguoiNhanXe.trim() ? 'Nhập tên người nhận xe.' : '')}
+                    {dangLuuChuKy
+                      ? 'Đang lưu chữ ký…'
+                      : (closingAdvisorEmpty || closingCustomerEmpty)
+                        ? ''
+                        : !tenNguoiNhanXe.trim()
+                          ? 'Nhập tên người nhận xe.'
+                          : 'Đủ điều kiện — bấm "Xác nhận đã đủ chữ ký hợp lệ" bên dưới để lưu.'}
                   </div>
                 )}
               </div>
@@ -1198,12 +1204,29 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
         )}
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
+          {/* Truoc khi ky xong: nut "Xác nhận đã đủ chữ ký hợp lệ" nam DUNG
+              cho nay - thay vi hien san nut "Xác nhận tiền mặt" nhung xam va
+              khong bam duoc (nguoi dung khong biet phai lam gi tiep). Bam
+              xong moi doi sang nut Xac nhan tien mat, luc do da co the bam
+              that su. */}
           {order.status === 'waiting_payment' && (
-            <button className="btn btn-primary" disabled={confirmingCash || !daKyQuyetToan}
-              title={daKyQuyetToan ? '' : 'Cố vấn và khách hàng phải ký quyết toán trước'}
-              onClick={() => setShowCashConfirm(true)}>
-              {confirmingCash ? 'Đang xử lý…' : 'Xác nhận tiền mặt'}
-            </button>
+            daKyQuyetToan ? (
+              <button className="btn btn-primary" disabled={confirmingCash}
+                onClick={() => setShowCashConfirm(true)}>
+                {confirmingCash ? 'Đang xử lý…' : 'Xác nhận tiền mặt'}
+              </button>
+            ) : (
+              <button className="btn btn-primary"
+                disabled={dangLuuChuKy || !duDieuKienKyQuyetToan}
+                title={
+                  duDieuKienKyQuyetToan
+                    ? ''
+                    : 'Khách hàng và cố vấn dịch vụ phải ký, và nhập tên người nhận xe'
+                }
+                onClick={() => { setLoiChuKy(''); luuChuKyQuyetToan(); }}>
+                {dangLuuChuKy ? 'Đang lưu…' : 'Xác nhận đã đủ chữ ký hợp lệ'}
+              </button>
+            )
           )}
           <button className="btn btn-secondary" onClick={() => handlePrint(false)}>
             {hasPrinted ? 'In lại phiếu quyết toán' : 'In phiếu quyết toán'}
