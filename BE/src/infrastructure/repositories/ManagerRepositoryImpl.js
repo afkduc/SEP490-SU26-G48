@@ -320,6 +320,11 @@ class ManagerRepositoryImpl {
     return result.recordset[0] || null;
   }
 
+  async findByPhone(phone) {
+    const result = await query('SELECT TOP 1 id, phone FROM users WHERE phone = @phone', { phone });
+    return result.recordset[0] || null;
+  }
+
   async nextPseudoId() {
     const result = await query(
       `SELECT ISNULL(MAX(TRY_CAST(SUBSTRING(pseudo_id, 3, LEN(pseudo_id) - 2) AS INT)), 0) + 1 AS next_num

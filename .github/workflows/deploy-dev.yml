@@ -20,6 +20,12 @@ jobs:
           username: ${{ secrets.DEPLOY_USERNAME }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
           script_stop: true
+          # Mac dinh cua ssh-action la 10 phut - deploy binh thuong chi ~1-2
+          # phut, nhung hom npm registry cham (hoac server dang ban) thi rieng
+          # "npm install" cua landing da an gan het 10 phut va deploy chet giua
+          # chung: code da merge vao dev nhung SERVER VAN CHAY BAN CU, ma nhin
+          # vao chi thay "Run Command Timeout" khong ro vi sao.
+          command_timeout: 30m
           script: |
             set -e
             cd ~/SEP490-SU26-G48
@@ -27,8 +33,24 @@ jobs:
             git fetch origin
             git checkout dev
             git reset --hard origin/dev
+            # In tai nguyen truoc khi build - lan deploy hong ngay 20/09 chi
+            # thay "npm install" treo im lang 10 phut, khong biet la do het dia
+            # hay het RAM. Co 2 dong nay thi lan sau nhin log la biet ngay.
+            echo "=== Dia trong:"; df -h / | tail -1
+            echo "=== RAM:"; free -h | head -2
+            # Don rac Docker (image/layer cu khong con dung) - build --no-cache
+            # moi lan deploy de lai kha nhieu lop mo coi, day dia la npm install
+            # trong container treo ma khong bao loi gi.
+            docker image prune -f
+            docker builder prune -f --keep-storage 2GB || true
+
             # FE/Landing bundle "nuong" luc build — bat buoc no-cache
             # de fix /crm + redirect Landing khong bi Docker layer cu.
-            docker compose build --no-cache fe landing
+            #
+            # Build TUNG CAI MOT (khong de buildkit chay song song): 2 "npm
+            # install" + 2 "npm run build" cung luc tren VPS nho la du de swap,
+            # va khi treo thi khong biet cai nao treo vi log 2 ben xen ke nhau.
+            docker compose build --no-cache fe
+            docker compose build --no-cache landing
             docker compose up -d --build
             sudo systemctl reload nginx

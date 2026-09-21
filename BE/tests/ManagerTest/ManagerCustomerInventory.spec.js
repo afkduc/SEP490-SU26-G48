@@ -69,6 +69,19 @@ test('Hiển thị khách hàng có mã tồn tại', async () => {
   });
 });
 
+test('Không trả khách hàng ngoài phạm vi chi nhánh đăng nhập', async () => {
+  let receivedBranchId;
+  const service = new CustomerService({ customerRepository: customerRepo({
+    findByIdWithDetails: async (id, branchId) => {
+      receivedBranchId = branchId;
+      return null;
+    }
+  }) });
+
+  await assert.rejects(() => service.getById(8, 2), error => error.statusCode === 404);
+  assert.equal(receivedBranchId, 2);
+});
+
 test('Thông báo khi mã khách hàng không tồn tại', async () => {
   const service = new CustomerService({ customerRepository: customerRepo({ findByIdWithDetails: async () => null }) });
   await assert.rejects(() => service.getById(99999), error => (

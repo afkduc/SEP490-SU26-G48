@@ -51,12 +51,20 @@ class RepairSettlementRepository {
     throw new Error('Method findPayosTransactionByOrderCode() must be implemented');
   }
 
+  async findReusablePayosTransaction(repairOrderId) {
+    throw new Error('Method findReusablePayosTransaction() must be implemented');
+  }
+
   async markPayosTransactionPaid(orderCode, { reference, paidAt }) {
     throw new Error('Method markPayosTransactionPaid() must be implemented');
   }
 
   async setNgDecision(repairOrderId, taskId, { decision, note, userId }) {
     throw new Error('Method setNgDecision() must be implemented');
+  }
+
+  async saveClosingSignature(id, { advisorId, advisorSignatureData, customerSignatureData, customerSignerName }) {
+    throw new Error('Method saveClosingSignature() must be implemented');
   }
 
   async acquireLock(id, userId) {

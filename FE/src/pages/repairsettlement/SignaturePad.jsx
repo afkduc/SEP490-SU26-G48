@@ -63,7 +63,7 @@ const SignaturePad = forwardRef(function SignaturePad({ onChange }, ref) {
         {preview ? (
           <img src={preview} alt="Chữ ký" style={{ maxWidth: '100%', maxHeight: '100%' }} />
         ) : (
-          <span style={{ fontSize: 13, color: 'var(--gray-400)' }}>Nhấn để ký tên</span>
+          <span style={{ fontSize: 13, color: 'var(--gray-400)' }}>Nhấn để ký và ghi rõ họ tên</span>
         )}
       </div>
 

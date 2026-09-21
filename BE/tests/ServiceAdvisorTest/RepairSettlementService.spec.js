@@ -37,10 +37,20 @@ const validItem = {
 
 const signature = 'data:image/png;base64,iVBORw0KGgo=';
 
+// Phieu da ky o MOC 2 (co van chot + khach nhan xe) - dieu kien bat buoc de
+// xuat hoa don hoac tao ma QR, xem RepairSettlementService._assertClosingSigned.
+const daKyQuyetToan = {
+  closingAdvisorId: 5,
+  closingSignatureData: signature,
+  customerFinalSignatureData: signature,
+  customerFinalSignerName: 'Nguyen Van A',
+};
+
 function basePayload(overrides = {}) {
   return {
     signatureData: signature,
     signerName: 'Nguyen Van A',
+    advisorSignatureData: signature,
     customerId: 100,
     vehicleId: 200,
     currentKm: 45000,
@@ -58,6 +68,9 @@ function mockRepos(overrides = {}) {
     findPendingPayosTransactions: async () => [],
     markPayosTransactionCancelled: async () => {},
     hasPaidPayosTransaction: async () => false,
+    // null = phieu chua co ma QR nao dung duoc -> sinh ma moi (xem
+    // RepairSettlementService.createPayosPaymentLink)
+    findReusablePayosTransaction: async () => null,
     findBranchTeamLeaders: async () => [{ id: 29, name: 'Nguyễn Đình Khương', phone: null }],
     getVehicleCurrentKm: async () => null,
     findPublicHistoryByVehicleIdentifier: async () => [],
@@ -345,7 +358,7 @@ test('updateStatus invoiced only from waiting_payment', async () => {
 
   const serviceOk = new RepairSettlementService({
     repairSettlementRepository: mockRepos({
-      findById: async () => ({ id: 50, status: 'waiting_payment', branchId: 1, tasks: [] }),
+      findById: async () => ({ id: 50, status: 'waiting_payment', branchId: 1, tasks: [], ...daKyQuyetToan }),
     }),
     customerRepository: {},
   });
@@ -535,6 +548,7 @@ test('createPayosPaymentLink creates QR for waiting_payment', async () => {
         code: 'RO-2026-001',
         total: 972000,
         customer: { fullName: 'A' },
+        ...daKyQuyetToan,
       }),
       createPayosTransaction: async (id, data) => {
         savedTx = { id, ...data };
@@ -937,6 +951,7 @@ function advisorCreatePayload(overrides = {}) {
   return {
     signatureData: signature,
     signerName: 'Nguyễn Văn A',
+    advisorSignatureData: signature,
     customerId: null,
     vehicleId: null,
     customer: { fullName: 'Nguyễn Văn A', phone: '0912345678' },
@@ -1069,6 +1084,7 @@ test('Tạo phiếu quyết toán từ thông tin khách hàng và xe trên bi�
 
 for (const [overrides, message] of [
   [{ signatureData: null }, 'Vui lòng ký xác nhận trước khi lưu phiếu'],
+  [{ advisorSignatureData: null }, 'Cố vấn dịch vụ phải ký xác nhận trên phiếu'],
   [{ customer: { fullName: '', phone: '0912345678' } }, 'Phải nhập tên và số điện thoại khách hàng'],
   [{ customer: { fullName: 'Nguyễn Văn A', phone: '123' } }, 'Số điện thoại khách hàng không hợp lệ'],
   [{ vehicle: { licensePlate: '' } }, 'Phải nhập biển số xe'],
@@ -1164,7 +1180,7 @@ test('Thông báo khi hủy phiếu đang sửa đã có hạng mục hoàn thà
 
 test('Xác nhận thanh toán tiền mặt cho phiếu đang chờ thanh toán', async () => {
   const service = advisorSettlementService({
-    findById: async () => ({ id: 1, status: 'waiting_payment', branchId: 1, tasks: [] })
+    findById: async () => ({ id: 1, status: 'waiting_payment', branchId: 1, tasks: [], ...daKyQuyetToan })
   });
   const result = await service.updateStatus(1, 'invoiced', { issuedBy: 5 });
   assert.equal(result.id, 1);

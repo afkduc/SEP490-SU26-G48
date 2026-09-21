@@ -12,4 +12,26 @@ export const INTAKE_NOTICE_LINES = [
     + 'để phục vụ cho mục đích kiểm tra, sửa chữa.',
 ];
 
+// Style cua khoi cam ket - dung chung luon (truoc day copy o 2 file, sua 1
+// ben la lech ngay).
+//
+// Co chu theo be ngang man hinh bang clamp(): iPad doc (768px) ra ~15px,
+// iPad ngang / laptop (>=1024px) ra 17px, khong to vo han tren man rong.
+// Day la doan khach PHAI doc truoc khi ky nen khong duoc de chu nho nhu ghi
+// chu phu - CVDV thuong dua iPad cho khach doc tai cho.
+export const INTAKE_NOTICE_STYLE = {
+  marginTop: 16,
+  padding: '14px 18px',
+  borderRadius: 8,
+  background: 'var(--gray-50)',
+  border: '1px solid var(--gray-200)',
+  borderLeft: '4px solid var(--primary, #4F46E5)',
+  fontSize: 'clamp(15px, 1.1vw + 6px, 17px)',
+  lineHeight: 1.75,
+  color: '#1F2937',
+};
+
+// Khoang cach giua 2 dong cam ket - tach dong cho de doc, khong dinh lien.
+export const INTAKE_NOTICE_LINE_STYLE = { marginBottom: 6 };
+
 export default INTAKE_NOTICE_LINES;

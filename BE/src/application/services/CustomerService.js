@@ -11,11 +11,11 @@ class CustomerService {
 
   // Tra cuu danh sach khach hang - fetch het roi loc khong-dau + phan trang
   // o day (giong VehicleSearchService/InventoryService.searchProducts).
-  async getAll({ search, page = 1, limit = 20 } = {}) {
+  async getAll({ search, page = 1, limit = 20, branchId } = {}) {
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
 
-    const all = await this.customerRepository.findAllWithDetails();
+    const all = await this.customerRepository.findAllWithDetails(branchId);
 
     let filtered = all;
     if (search && search.trim().length > 0) {
@@ -44,17 +44,17 @@ class CustomerService {
     };
   }
 
-  async getById(id) {
-    const customer = await this.customerRepository.findByIdWithDetails(id);
+  async getById(id, branchId) {
+    const customer = await this.customerRepository.findByIdWithDetails(id, branchId);
     if (!customer) throw new ApiError(404, 'Không tìm thấy khách hàng');
     return customer;
   }
 
-  async update(id, data) {
+  async update(id, data, branchId) {
     const errors = getCustomerFieldErrors(data);
     if (errors.length) throw new ApiError(400, errors.join('. '));
 
-    const existing = await this.customerRepository.findByIdWithDetails(id);
+    const existing = await this.customerRepository.findByIdWithDetails(id, branchId);
     if (!existing) throw new ApiError(404, 'Không tìm thấy khách hàng');
 
     // SDT la khoa nhan dien khach (import Excel + tao phieu quyet toan deu
@@ -81,11 +81,11 @@ class CustomerService {
   }
 
   // Them 1 xe cho khach da co - thay cho viec phai chen thang vao DB.
-  async addVehicle(customerId, data) {
+  async addVehicle(customerId, data, branchId) {
     const errors = getVehicleFieldErrors(data);
     if (errors.length) throw new ApiError(400, errors.join('. '));
 
-    const existing = await this.customerRepository.findByIdWithDetails(customerId);
+    const existing = await this.customerRepository.findByIdWithDetails(customerId, branchId);
     if (!existing) throw new ApiError(404, 'Không tìm thấy khách hàng');
 
     const toOptionalUpper = (v) => (v ? String(v).trim().toUpperCase() : null);
