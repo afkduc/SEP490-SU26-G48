@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import {
+  REPAIR_CATEGORY_OPTIONS as REPAIR_CATEGORY_GOC,
+  REPAIR_CATEGORY_LABEL_BY_VALUE,
+} from '../../constants/settlementCodes';
 import { usePermission } from '../../contexts/PermissionContext';
 import { formatCurrency, formatDate } from '../../utils';
 import managerApi from '../../services/managerApi';
@@ -1184,22 +1188,13 @@ function ServiceListPage() {
   );
 }
 
-// Phai giu dong bo voi REPAIR_CATEGORY_OPTIONS trong RepairSettlementPage.jsx
-// va REPAIR_CATEGORY_VALUES trong RepairSettlementService.js/ManagerService.js -
-// khai bao san Loai hinh sua chua o day de man tao phieu quyet toan tu dong
-// dien theo dung dich vu/goi da chon, khong phai chon tay tung lan.
-const REPAIR_CATEGORY_OPTIONS = [
-  { value: '', label: '' },
-  { value: 'ER', label: 'Sửa chữa động cơ' },
-  { value: 'CB', label: 'Sửa chữa gầm' },
-  { value: 'EE', label: 'Sửa chữa điện - điện tử' },
-  { value: 'BP', label: 'Đồng sơn' },
-  { value: 'PM', label: 'Bảo dưỡng định kỳ' },
-  { value: 'CS', label: 'Chăm sóc xe' },
-];
+// Lay tu constants/settlementCodes.js (nguon duy nhat, dung chung voi man
+// Phieu quyet toan va ban in). O day them dong rong dau danh sach cho o chon
+// "chua phan loai" - man tao dich vu cho phep de trong.
+const REPAIR_CATEGORY_OPTIONS = [{ value: '', label: '' }, ...REPAIR_CATEGORY_GOC];
 
 function repairCategoryLabel(code) {
-  return REPAIR_CATEGORY_OPTIONS.find((o) => o.value === code)?.label || '—';
+  return REPAIR_CATEGORY_LABEL_BY_VALUE[code] || '—';
 }
 
 function ServiceFormPage({ mode }) {

@@ -29,6 +29,16 @@ import {
   unlockSettlementApi,
   getSettlementActivityLogApi,
 } from '../../services/repairSettlementApi';
+import {
+  REPAIR_CATEGORY_OPTIONS,
+  REPAIR_CATEGORY_LABEL_BY_VALUE,
+  HTTT_OPTIONS,
+  HTTT_CANCELLED_VALUE,
+  HTTT_CANCELLED_OPTION,
+  HTTT_LABEL_BY_VALUE,
+  repairCategoryShort,
+  htttShort,
+} from '../../constants/settlementCodes';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
@@ -49,34 +59,10 @@ const POLL_INTERVAL_MS = 15000;
 // phụ tùng" hoac theo catalog da chon) - chi dung noi bo de: (1) quyet dinh
 // pham vi tra cuu dich vu/goi combo hay kho phu tung, (2) nhom dong vao dung
 // section "Công việc thực hiện" hay "Phụ tùng, vật tư" khi hien thi.
-// LHSC thật - phân loại BẢN CHẤT công việc sửa chữa (không liên quan ai trả
-// tiền, cái đó là HTTT) - dùng để in lên phiếu quyết toán và báo cáo doanh thu
-// theo loại hình. Rút gọn còn 5 nhóm lớn theo hệ thống xe.
-const REPAIR_CATEGORY_OPTIONS = [
-  { value: 'ER', label: 'Sửa chữa động cơ' },
-  { value: 'CB', label: 'Sửa chữa gầm' },
-  { value: 'EE', label: 'Sửa chữa điện - điện tử' },
-  { value: 'BP', label: 'Đồng sơn' },
-  { value: 'PM', label: 'Bảo dưỡng định kỳ' },
-  { value: 'CS', label: 'Chăm sóc xe' },
-];
-const REPAIR_CATEGORY_LABEL_BY_VALUE = Object.fromEntries(REPAIR_CATEGORY_OPTIONS.map((o) => [o.value, o.label]));
-// HTTT = nơi DUY NHẤT xác định ai trả tiền cho dòng này. "Hợp đồng bảo dưỡng"
-// (gói trả trước, dùng nhiều lần) chưa có bảng theo dõi số dư nên tạm chưa đưa
-// vào đây - tránh cho chọn 1 lựa chọn "miễn phí" mà không có gì kiểm chứng.
-const HTTT_OPTIONS = [
-  { value: 'KHT', label: 'Khách hàng thanh toán' },
-  { value: 'BHH', label: 'Bảo hành hãng xe' },
-  { value: 'BH', label: 'Bảo hiểm chi trả' },
-  { value: 'NB', label: 'Nội bộ chịu phí' },
-];
-// "Khách hủy" - khach dang sua nua chung thi keu huy 1 hang muc (khong phai
-// huy ca phieu). KHONG nam trong HTTT_OPTIONS (danh sach chon binh thuong) vi
-// chi duoc phep chon khi: dang o man Chinh sua phieu "dang sua chua" VA hang
-// muc do CHUA duoc to truong/tho tick hoan thanh - xem canCancelItemHttt().
-const HTTT_CANCELLED_VALUE = 'HUY';
-const HTTT_CANCELLED_OPTION = { value: HTTT_CANCELLED_VALUE, label: 'Khách hủy' };
-const HTTT_LABEL_BY_VALUE = Object.fromEntries([...HTTT_OPTIONS, HTTT_CANCELLED_OPTION].map((o) => [o.value, o.label]));
+// LHSC/HTTT chuyen sang constants/settlementCodes.js - ban in va cac man
+// Quan ly / Tong giam doc cung phai doc dung bang nhan do (truoc day moi noi
+// tu chep lai, con ban in thi do thang MA THO ra giay: khach cam phieu thay
+// "CB", "PM", "KHT").
 // CCCD (12 so, mau moi) hoac CMND cu (9 so) - khop voi BE CCCD_REGEX.
 const CCCD_REGEX = /^[0-9]{9}([0-9]{3})?$/;
 // ĐVT thường gặp cho gara ô tô (chỉ áp dụng cho dòng phụ tùng - dòng dịch vụ
@@ -648,8 +634,8 @@ function printSettlement(order, payosQrCode, { khongChuKy = false } = {}) {
       <td style="text-align:center">${i + 1}</td>
       <td style="text-align:center">${item.code}</td>
       <td>${item.description}</td>
-      <td style="text-align:center">${item.repairCategory || ''}</td>
-      <td style="text-align:center">${item.httt}</td>
+      <td style="text-align:center">${repairCategoryShort(item.repairCategory)}</td>
+      <td style="text-align:center">${htttShort(item.httt)}</td>
       <td style="text-align:center">${item.unit}</td>
       <td style="text-align:center">${item.qty}</td>
       <td style="text-align:right">${(item.unitPrice || 0).toLocaleString('vi-VN')}</td>
@@ -983,7 +969,8 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                   <th className="th-cell" style={{ width: 28 }}>STT</th>
                   <th className="th-cell" style={{ width: 60 }}>Mã số</th>
                   <th className="th-cell">Nội dung công việc</th>
-                  <th className="th-cell" style={{ width: 42 }}>LHSC</th>
+                  <th className="th-cell" style={{ width: 64 }}>LHSC</th>
+                  <th className="th-cell" style={{ width: 64 }}>HTTT</th>
                   <th className="th-cell" style={{ width: 42 }}>ĐVT</th>
                   <th className="th-cell" style={{ width: 28 }}>SL</th>
                   <th className="th-cell" style={{ width: 95 }}>Đơn giá</th>
@@ -1009,7 +996,8 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                         {s.isFree && <span className="tag" style={{ marginLeft: 6 }}>Miễn phí</span>}
                         {!s.isFree && isExemptFromCustomerBilling(s) && <span className="tag" style={{ marginLeft: 6 }}>Miễn thu KH</span>}
                       </td>
-                      <td className="td-cell" style={{ textAlign: 'center' }}>{REPAIR_CATEGORY_LABEL_BY_VALUE[s.repairCategory] || '—'}</td>
+                      <td className="td-cell" style={{ textAlign: 'center' }}>{repairCategoryShort(s.repairCategory)}</td>
+                      <td className="td-cell" style={{ textAlign: 'center' }}>{htttShort(s.httt)}</td>
                       <td className="td-cell" style={{ textAlign: 'center' }}>{s.unit}</td>
                       <td className="td-cell" style={{ textAlign: 'center' }}>{s.qty}</td>
                       <td className="td-cell" style={{ textAlign: 'right' }}>{(s.unitPrice || 0).toLocaleString('vi-VN')}</td>
@@ -1024,11 +1012,11 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                     <>
                       <tr>
                         <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
-                        <td colSpan={6} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>CÔNG VIỆC CẦN THỰC HIỆN</td>
+                        <td colSpan={7} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>CÔNG VIỆC CẦN THỰC HIỆN</td>
                       </tr>
                       {laborRows.map(renderRow)}
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                        <td colSpan={8} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
                         <td style={{ fontWeight: 700, textAlign: 'right' }}>{laborSubtotal.toLocaleString('vi-VN')}</td>
                       </tr>
 
@@ -1036,11 +1024,11 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                         <>
                           <tr>
                             <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
-                            <td colSpan={6} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>PHỤ TÙNG, VẬT TƯ</td>
+                            <td colSpan={7} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>PHỤ TÙNG, VẬT TƯ</td>
                           </tr>
                           {partRows.map(renderRow)}
                           <tr>
-                            <td colSpan={7} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                            <td colSpan={8} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
                             <td style={{ fontWeight: 700, textAlign: 'right' }}>{partSubtotal.toLocaleString('vi-VN')}</td>
                           </tr>
                         </>
