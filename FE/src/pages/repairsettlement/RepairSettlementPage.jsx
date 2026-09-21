@@ -1181,11 +1181,9 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                   <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginTop: 10, fontStyle: 'italic' }}>
                     {dangLuuChuKy
                       ? 'Đang lưu chữ ký…'
-                      : (closingAdvisorEmpty || closingCustomerEmpty)
-                        ? ''
-                        : !tenNguoiNhanXe.trim()
-                          ? 'Nhập tên người nhận xe.'
-                          : 'Đủ điều kiện — bấm "Xác nhận đã đủ chữ ký hợp lệ" bên dưới để lưu.'}
+                      : (!closingAdvisorEmpty && !closingCustomerEmpty && !tenNguoiNhanXe.trim())
+                        ? 'Nhập tên người nhận xe.'
+                        : ''}
                   </div>
                 )}
               </div>
