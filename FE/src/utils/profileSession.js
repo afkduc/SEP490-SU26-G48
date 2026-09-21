@@ -10,7 +10,7 @@ export function mergeProfileIntoSessionUser(existing = {}, profile = {}) {
   const roles = profileRoles.length > 0 ? profileRoles : existingRoles;
 
   const displayName =
-    `${profile.firstName || ''} ${profile.lastName || ''}`.trim() ||
+    `${profile.lastName || ''} ${profile.firstName || ''}`.trim() ||
     existing.name ||
     profile.userName ||
     existing.userName;

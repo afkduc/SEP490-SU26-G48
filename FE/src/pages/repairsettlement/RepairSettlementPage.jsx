@@ -13,6 +13,7 @@ import { searchCatalogApi } from '../../services/catalogApi';
 import { searchProductsApi } from '../../services/productApi';
 import {
   listRepairSettlementsApi,
+  reassignTeamLeaderApi,
   decideNgTaskApi,
   getRepairSettlementApi,
   checkDuplicateSettlementApi,
@@ -28,10 +29,22 @@ import {
   unlockSettlementApi,
   getSettlementActivityLogApi,
 } from '../../services/repairSettlementApi';
+import {
+  REPAIR_CATEGORY_OPTIONS,
+  REPAIR_CATEGORY_LABEL_BY_VALUE,
+  HTTT_OPTIONS,
+  HTTT_CANCELLED_VALUE,
+  HTTT_CANCELLED_OPTION,
+  HTTT_LABEL_BY_VALUE,
+  repairCategoryShort,
+  htttShort,
+} from '../../constants/settlementCodes';
+import { khoiTieuDeIn, urlLogo, PRINT_HEADER_CSS } from './printHeader';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
 import IntakeChecklistView from './IntakeChecklistView';
+import { printIntakeSheet } from './printIntake';
 import VehicleHistoryModal from './VehicleHistoryModal';
 import { assignGroupIds, dongHangMucDeIn } from './settlementItems';
 import SignaturePad from './SignaturePad';
@@ -47,34 +60,10 @@ const POLL_INTERVAL_MS = 15000;
 // phụ tùng" hoac theo catalog da chon) - chi dung noi bo de: (1) quyet dinh
 // pham vi tra cuu dich vu/goi combo hay kho phu tung, (2) nhom dong vao dung
 // section "Công việc thực hiện" hay "Phụ tùng, vật tư" khi hien thi.
-// LHSC thật - phân loại BẢN CHẤT công việc sửa chữa (không liên quan ai trả
-// tiền, cái đó là HTTT) - dùng để in lên phiếu quyết toán và báo cáo doanh thu
-// theo loại hình. Rút gọn còn 5 nhóm lớn theo hệ thống xe.
-const REPAIR_CATEGORY_OPTIONS = [
-  { value: 'ER', label: 'Sửa chữa động cơ' },
-  { value: 'CB', label: 'Sửa chữa gầm' },
-  { value: 'EE', label: 'Sửa chữa điện - điện tử' },
-  { value: 'BP', label: 'Đồng sơn' },
-  { value: 'PM', label: 'Bảo dưỡng định kỳ' },
-  { value: 'CS', label: 'Chăm sóc xe' },
-];
-const REPAIR_CATEGORY_LABEL_BY_VALUE = Object.fromEntries(REPAIR_CATEGORY_OPTIONS.map((o) => [o.value, o.label]));
-// HTTT = nơi DUY NHẤT xác định ai trả tiền cho dòng này. "Hợp đồng bảo dưỡng"
-// (gói trả trước, dùng nhiều lần) chưa có bảng theo dõi số dư nên tạm chưa đưa
-// vào đây - tránh cho chọn 1 lựa chọn "miễn phí" mà không có gì kiểm chứng.
-const HTTT_OPTIONS = [
-  { value: 'KHT', label: 'Khách hàng thanh toán' },
-  { value: 'BHH', label: 'Bảo hành hãng xe' },
-  { value: 'BH', label: 'Bảo hiểm chi trả' },
-  { value: 'NB', label: 'Nội bộ chịu phí' },
-];
-// "Khách hủy" - khach dang sua nua chung thi keu huy 1 hang muc (khong phai
-// huy ca phieu). KHONG nam trong HTTT_OPTIONS (danh sach chon binh thuong) vi
-// chi duoc phep chon khi: dang o man Chinh sua phieu "dang sua chua" VA hang
-// muc do CHUA duoc to truong/tho tick hoan thanh - xem canCancelItemHttt().
-const HTTT_CANCELLED_VALUE = 'HUY';
-const HTTT_CANCELLED_OPTION = { value: HTTT_CANCELLED_VALUE, label: 'Khách hủy' };
-const HTTT_LABEL_BY_VALUE = Object.fromEntries([...HTTT_OPTIONS, HTTT_CANCELLED_OPTION].map((o) => [o.value, o.label]));
+// LHSC/HTTT chuyen sang constants/settlementCodes.js - ban in va cac man
+// Quan ly / Tong giam doc cung phai doc dung bang nhan do (truoc day moi noi
+// tu chep lai, con ban in thi do thang MA THO ra giay: khach cam phieu thay
+// "CB", "PM", "KHT").
 // CCCD (12 so, mau moi) hoac CMND cu (9 so) - khop voi BE CCCD_REGEX.
 const CCCD_REGEX = /^[0-9]{9}([0-9]{3})?$/;
 // ĐVT thường gặp cho gara ô tô (chỉ áp dụng cho dòng phụ tùng - dòng dịch vụ
@@ -542,6 +531,15 @@ function calcTotals(items) {
 //    w.document.write se nem "Cannot read properties of null" giua chung,
 //    khong ai biet chuyen gi. Tra ve ly do de cho goi bao cho tu te.
 //
+// 3. Doi readyState==='complete'/su kien 'load' cua WINDOW tuong la du, nhung
+//    voi trang dung document.write()+close() thi Chrome co the bao 'complete'
+//    NGAY LAP TUC (parse xong la xong), truoc ca khi kip gui request cho
+//    <img src="https://..."> con ma QR (qua api.qrserver.com, anh chu ky la
+//    data: URI nen luon tuc thi, khong dinh loi nay) - ket qua la ban in ra
+//    thieu han ma QR (o QR trong rong) du code van "cho load" nhu binh
+//    thuong. Phai doi RIENG tung <img> load/error xong that su, khong dua
+//    vao readyState nua.
+//
 // Tra ve '' neu in duoc, hoac cau thong bao loi.
 function moCuaSoIn(html) {
   const w = window.open('', '_blank');
@@ -551,7 +549,10 @@ function moCuaSoIn(html) {
   w.document.write(html);
   w.document.close();
 
+  let daIn = false;
   const inRa = () => {
+    if (daIn) return;
+    daIn = true;
     try {
       w.focus();
       w.print();
@@ -559,10 +560,31 @@ function moCuaSoIn(html) {
       /* nguoi dung dong cua so truoc khi kip in - khong co gi de lam */
     }
   };
-  // 'complete' = anh (neu co) da tai xong. Chua xong thi doi load; anh QR lay
-  // qua network nen in ngay se ra phieu thieu ma QR.
-  if (w.document.readyState === 'complete') inRa();
-  else w.addEventListener('load', inRa, { once: true });
+
+  // Doi TAT CA <img> trong trang (chu ky + ma QR) tai xong (load hoac error)
+  // roi moi in. Gioi han 2s de khong treo cua so in mai neu mang cham/mang
+  // hong - luc do in thieu ma QR con hon khong in duoc gi.
+  const choAnhRoiIn = () => {
+    const imgs = Array.from(w.document.images || []);
+    const chuaXong = imgs.filter((img) => !img.complete);
+    if (chuaXong.length === 0) {
+      inRa();
+      return;
+    }
+    let conLai = chuaXong.length;
+    const motAnhXong = () => {
+      conLai -= 1;
+      if (conLai <= 0) inRa();
+    };
+    chuaXong.forEach((img) => {
+      img.addEventListener('load', motAnhXong, { once: true });
+      img.addEventListener('error', motAnhXong, { once: true });
+    });
+    setTimeout(inRa, 2000);
+  };
+
+  if (w.document.readyState === 'complete') choAnhRoiIn();
+  else w.addEventListener('load', choAnhRoiIn, { once: true });
   return '';
 }
 
@@ -588,12 +610,12 @@ export function printWorkList(order) {
     </tr>`).join('');
   const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
 <title>Danh sách công việc ${order.code}</title>
-<style>body{font-family:Arial,sans-serif;font-size:11px;margin:10mm 15mm}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;border:1px solid #ccc;padding:5px 7px;text-align:center}.sign-row{display:flex;justify-content:space-between;margin-top:35px}.sign-box{text-align:center;width:45%}.sign-line{margin-top:45px;border-top:1px solid #000;padding-top:3px;font-size:10px}</style>
+<style>body{font-family:Arial,sans-serif;font-size:11px;margin:10mm 15mm}table{width:100%;border-collapse:collapse}th{background:#f0f0f0;border:1px solid #ccc;padding:5px 7px;text-align:center}.sign-row{display:flex;justify-content:space-between;margin-top:35px}.sign-box{text-align:center;width:45%}.sign-line{margin-top:45px;border-top:1px solid #000;padding-top:3px;font-size:10px}${PRINT_HEADER_CSS}</style>
 </head><body>
-<div style="text-align:center;margin-bottom:8px">
-  <b style="font-size:13px">DANH SÁCH CÔNG VIỆC KỸ THUẬT</b><br/>
-  <span style="font-size:11px">Số RO: <b>${order.code}</b> &nbsp;|&nbsp; Ngày: <b>${order.date || new Date().toLocaleDateString('vi-VN')}</b></span>
-</div>
+${khoiTieuDeIn('DANH SÁCH CÔNG VIỆC KỸ THUẬT', {
+    chiNhanh: order.branch,
+    phuDe: `Số RO: <b>${order.code}</b> &nbsp;|&nbsp; Ngày: <b>${order.date || new Date().toLocaleDateString('vi-VN')}</b>`,
+  })}
 <table style="border:none;margin-bottom:8px">
   <tr>
     <td style="border:none;width:50%;padding:1px 0"><b>Khách hàng:</b> ${order.customer?.fullName || ''}</td>
@@ -630,7 +652,7 @@ function oKy(tieuDe, anh, ten) {
 // payosQrCode: chuoi QR PayOS dang con hieu luc (chi co khi in tu modal xem
 // truoc luc phieu dang "cho thanh toan") - khong truyen thi khong hien QR
 // gi ca (vd in luc vua tao phieu, hoac in lai phieu da xuat hoa don roi).
-function printSettlement(order, payosQrCode) {
+function printSettlement(order, payosQrCode, { khongChuKy = false } = {}) {
   logPrintBestEffort(order, 'settlement');
   // Tach 2 nhom "Cong viec can thuc hien" / "Phu tung, vat tu" khi in - giong
   // cach hien thi ben form tao/sua phieu va modal Xem chi tiet (giu nguyen so
@@ -646,8 +668,8 @@ function printSettlement(order, payosQrCode) {
       <td style="text-align:center">${i + 1}</td>
       <td style="text-align:center">${item.code}</td>
       <td>${item.description}</td>
-      <td style="text-align:center">${item.repairCategory || ''}</td>
-      <td style="text-align:center">${item.httt}</td>
+      <td style="text-align:center">${repairCategoryShort(item.repairCategory)}</td>
+      <td style="text-align:center">${htttShort(item.httt)}</td>
       <td style="text-align:center">${item.unit}</td>
       <td style="text-align:center">${item.qty}</td>
       <td style="text-align:right">${(item.unitPrice || 0).toLocaleString('vi-VN')}</td>
@@ -708,15 +730,18 @@ function printSettlement(order, payosQrCode) {
     text-transform:uppercase; border-bottom:1px solid #999; padding-bottom:3px; margin-bottom:6px; }
   .sign-group-boxes { display:flex; justify-content:space-around; }
   .sign-group .sign-box { width:46%; }
+  /* Phieu quyet toan chi con 2 o ky (khach nhan xe + CVDV ban giao) nen o
+     rong hon, du cho ky tay khi in ban trang. */
+  .sign-row > .sign-box { width:38%; }
   .sign-line.has-img { margin-top:0; }
   /* Dong bi doi sau khi chot voi khach (khach huy / tra bot phu tung) - in
      mau do de nguoi doc thay ngay vi sao tien cuoi khac bao gia ban dau.
      print-color-adjust de trinh duyet khong bo mau khi in ra giay. */
   tr.doi-sau td { color:#c00; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   @media print { body { margin:8mm 12mm; } }
+  ${PRINT_HEADER_CSS}
 </style></head><body>
-<div class="center bold" style="font-size:12px">CÔNG TY TNHH AUTOGARA – CHI NHÁNH ${(order.branch || MOCK_BRANCH).toUpperCase()}</div>
-<div class="center bold" style="font-size:16px; margin:6px 0">QUYẾT TOÁN SỬA CHỮA</div>
+${khoiTieuDeIn('QUYẾT TOÁN SỬA CHỮA', { chiNhanh: order.branch })}
 <div style="display:flex; justify-content:space-between; margin-bottom:6px">
   <div><b>Số RO:</b> ${order.code}</div>
   <div><b>Ngày:</b> ${order.date}</div>
@@ -777,20 +802,10 @@ function printSettlement(order, payosQrCode) {
 </div>
 
 <div class="sign-row">
-  <div class="sign-group">
-    <div class="sign-group-title">Tiếp nhận xe</div>
-    <div class="sign-group-boxes">
-      ${oKy('Khách duyệt báo giá', order.signatureData, order.signerName || order.customer?.fullName)}
-      ${oKy('CVDV lập phiếu', order.advisorSignatureData, order.advisor)}
-    </div>
-  </div>
-  <div class="sign-group">
-    <div class="sign-group-title">Bàn giao xe</div>
-    <div class="sign-group-boxes">
-      ${oKy('Khách nhận xe', order.customerFinalSignatureData, order.customerFinalSignerName)}
-      ${oKy('CVDV quyết toán', order.closingSignatureData, order.closingAdvisorName)}
-    </div>
-  </div>
+  ${oKy('Khách hàng nhận xe', khongChuKy ? null : order.customerFinalSignatureData,
+        khongChuKy ? '' : order.customerFinalSignerName)}
+  ${oKy('Cố vấn dịch vụ bàn giao xe', khongChuKy ? null : order.closingSignatureData,
+        khongChuKy ? '' : order.closingAdvisorName)}
 </div>
 </body></html>`;
   return moCuaSoIn(html);
@@ -844,12 +859,16 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
   const [dangLuuChuKy, setDangLuuChuKy] = useState(false);
   const [loiChuKy, setLoiChuKy] = useState('');
 
-  // Ky xong la LUU LUON, khong bat bam them nut: 2 o ky deu da co chu ky va
-  // da co ten nguoi nhan xe thi khong con gi de cho nua. Nguoi dung ky tren
-  // iPad, bat ho tim them 1 nut nua chi de "xac nhan lan 2" la thua.
+  // Luu chu ky quyet toan (goi API + xin QR ngay sau do). TRUOC DAY tu luu
+  // ngay khi du 2 chu ky + ten - nhung nut "Xác nhận tiền mặt" o footer van
+  // hien san o do, xam va khong bam duoc, nguoi dung khong biet phai lam gi
+  // tiep ("khi này cũng không bấm được nút xác nhận tiền mặt này"). Nay
+  // chuyen thanh bam RO RANG: nut "Xác nhận đã đủ chữ ký hợp lệ" nam DUNG
+  // cho o do trong footer, bam xong moi doi sang nut "Xác nhận tiền mặt"
+  // (xem modal-footer ben duoi).
   //
-  // dangGuiRef chan goi trung: effect co the chay lai (vd re-render do SSE)
-  // trong luc request chua ve.
+  // dangGuiRef chan goi trung: tranh 2 lan bam lien tiep hoac goi lai trong
+  // luc request truoc chua ve.
   const dangGuiRef = useRef(false);
   const luuChuKyQuyetToan = async () => {
     if (dangGuiRef.current) return;
@@ -875,14 +894,11 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
     }
   };
 
-  // Du 2 chu ky + ten nguoi nhan xe -> tu luu. Co loi thi dung lai cho nguoi
-  // dung bam "Thử lại" (khong tu goi lai vong lap khi server dang hong).
-  useEffect(() => {
-    if (daKyQuyetToan || loiChuKy) return;
-    if (closingAdvisorEmpty || closingCustomerEmpty || !tenNguoiNhanXe.trim()) return;
-    luuChuKyQuyetToan();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closingAdvisorEmpty, closingCustomerEmpty, tenNguoiNhanXe, daKyQuyetToan, loiChuKy]);
+  // Dieu kien de nut "Xác nhận đã đủ chữ ký hợp lệ" bat sang - du 2 chu ky.
+  // Nut nam o modal-footer (thay cho "Xác nhận tiền mặt" trong luc chua ky),
+  // bam moi goi luuChuKyQuyetToan(). Khong con doi ten nguoi nhan xe nua -
+  // khong con o nhap rieng tren man hinh (xem tenNguoiNhanXe).
+  const duDieuKienKyQuyetToan = !closingAdvisorEmpty && !closingCustomerEmpty;
 
   const requestPayosQr = async () => {
     setPayosLoading(true);
@@ -927,8 +943,10 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id, daKyQuyetToan]);
 
-  const handlePrint = () => {
-    const loi = printSettlement(order, payos?.qrCode);
+  // khongChuKy = in ban TRANG de khach ky tay tren giay (co khach khong muon
+  // ky tren man hinh). Van in day du hang muc va tien, chi bo anh chu ky.
+  const handlePrint = (khongChuKy = false) => {
+    const loi = printSettlement(order, payos?.qrCode, { khongChuKy });
     if (loi) {
       setPrintError(loi);
       return;
@@ -947,11 +965,20 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
 
         <div className="modal-body">
           <div style={{ background: 'white', border: '1px solid #DDD', borderRadius: 8, padding: '18px 20px', fontFamily: 'Arial, sans-serif', fontSize: 12 }}>
-            <div style={{ textAlign: 'center', marginBottom: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 13 }}>
-                CÔNG TY TNHH AUTOGARA – CHI NHÁNH {(order.branch || MOCK_BRANCH).toUpperCase()}
+            {/* Cung bo cuc voi ban in (printHeader.js): logo trai, chu giua. */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              borderBottom: '2px solid #111', paddingBottom: 8, marginBottom: 10,
+            }}>
+              <img src={urlLogo()} alt="AutoGara"
+                style={{ width: 78, height: 50, objectFit: 'contain', objectPosition: 'left center', flexShrink: 0 }} />
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>
+                  CÔNG TY TNHH AUTOGARA – CHI NHÁNH {(order.branch || MOCK_BRANCH).toUpperCase()}
+                </div>
+                <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: 1, marginTop: 2 }}>QUYẾT TOÁN SỬA CHỮA</div>
               </div>
-              <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: 1, margin: '4px 0' }}>QUYẾT TOÁN SỬA CHỮA</div>
+              <div style={{ width: 78, flexShrink: 0 }} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, flexWrap: 'wrap', gap: 6 }}>
@@ -986,7 +1013,8 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                   <th className="th-cell" style={{ width: 28 }}>STT</th>
                   <th className="th-cell" style={{ width: 60 }}>Mã số</th>
                   <th className="th-cell">Nội dung công việc</th>
-                  <th className="th-cell" style={{ width: 42 }}>LHSC</th>
+                  <th className="th-cell" style={{ width: 64 }}>LHSC</th>
+                  <th className="th-cell" style={{ width: 64 }}>HTTT</th>
                   <th className="th-cell" style={{ width: 42 }}>ĐVT</th>
                   <th className="th-cell" style={{ width: 28 }}>SL</th>
                   <th className="th-cell" style={{ width: 95 }}>Đơn giá</th>
@@ -1012,7 +1040,8 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                         {s.isFree && <span className="tag" style={{ marginLeft: 6 }}>Miễn phí</span>}
                         {!s.isFree && isExemptFromCustomerBilling(s) && <span className="tag" style={{ marginLeft: 6 }}>Miễn thu KH</span>}
                       </td>
-                      <td className="td-cell" style={{ textAlign: 'center' }}>{REPAIR_CATEGORY_LABEL_BY_VALUE[s.repairCategory] || '—'}</td>
+                      <td className="td-cell" style={{ textAlign: 'center' }}>{repairCategoryShort(s.repairCategory)}</td>
+                      <td className="td-cell" style={{ textAlign: 'center' }}>{htttShort(s.httt)}</td>
                       <td className="td-cell" style={{ textAlign: 'center' }}>{s.unit}</td>
                       <td className="td-cell" style={{ textAlign: 'center' }}>{s.qty}</td>
                       <td className="td-cell" style={{ textAlign: 'right' }}>{(s.unitPrice || 0).toLocaleString('vi-VN')}</td>
@@ -1027,11 +1056,11 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                     <>
                       <tr>
                         <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
-                        <td colSpan={6} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>CÔNG VIỆC CẦN THỰC HIỆN</td>
+                        <td colSpan={7} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>CÔNG VIỆC CẦN THỰC HIỆN</td>
                       </tr>
                       {laborRows.map(renderRow)}
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                        <td colSpan={8} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
                         <td style={{ fontWeight: 700, textAlign: 'right' }}>{laborSubtotal.toLocaleString('vi-VN')}</td>
                       </tr>
 
@@ -1039,11 +1068,11 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                         <>
                           <tr>
                             <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
-                            <td colSpan={6} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>PHỤ TÙNG, VẬT TƯ</td>
+                            <td colSpan={7} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>PHỤ TÙNG, VẬT TƯ</td>
                           </tr>
                           {partRows.map(renderRow)}
                           <tr>
-                            <td colSpan={7} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                            <td colSpan={8} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
                             <td style={{ fontWeight: 700, textAlign: 'right' }}>{partSubtotal.toLocaleString('vi-VN')}</td>
                           </tr>
                         </>
@@ -1143,36 +1172,36 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
               </div>
             ) : (
               <div style={{ border: '1px solid var(--gray-300)', borderRadius: 8, padding: 12 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Ký quyết toán &amp; giao xe</div>
-                <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 10 }}>
-                  Khách hàng nhận xe và cố vấn dịch vụ chốt phiếu cùng ký. Ký xong mới thu được tiền.
-                </div>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Ký quyết toán &amp; giao xe</div>
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 260px' }}>
                     <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
                       Khách hàng nhận xe
                     </div>
                     <SignaturePad ref={closingCustomerPadRef} onChange={setClosingCustomerEmpty} />
-                    <input className="form-input"
-                      style={{
-                        width: '100%', textAlign: 'center', fontWeight: 600, marginTop: 8,
-                        border: 'none', borderTop: '1px solid var(--gray-200)', borderRadius: 0, paddingTop: 6,
-                      }}
-                      placeholder="Tên người nhận xe"
-                      maxLength={255}
-                      value={tenNguoiNhanXe}
-                      onChange={(e) => setTenNguoiNhanXe(e.target.value)} />
+                    {/* Khong hien o nhap ten nua - ky la da ghi ro ho ten trong
+                        o ky roi (giong ben CVDV). Ten nguoi nhan xe van gui len
+                        khi luu (mac dinh lay theo ten khach tren phieu, xem
+                        tenNguoiNhanXe) de dap ung yeu cau BE, chi la khong con
+                        o nhap rieng tren man hinh nay nua. */}
+                    <div style={{
+                      textAlign: 'center', fontSize: 12, fontStyle: 'italic', color: 'var(--gray-600)',
+                      marginTop: 8, borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+                    }}>
+                      Ký và ghi rõ họ tên
+                    </div>
                   </div>
                   <div style={{ flex: '1 1 260px' }}>
                     <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
                       Cố vấn dịch vụ
                     </div>
                     <SignaturePad ref={closingAdvisorPadRef} onChange={setClosingAdvisorEmpty} />
+                    {/* Khong hien ten nua - ky la da ghi ro ho ten trong o ky roi. */}
                     <div style={{
-                      textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 8,
-                      borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+                      textAlign: 'center', fontSize: 12, fontStyle: 'italic', color: 'var(--gray-600)',
+                      marginTop: 8, borderTop: '1px solid var(--gray-200)', paddingTop: 6,
                     }}>
-                      {nguoiDangDangNhap?.name || 'Cố vấn dịch vụ'}
+                      Ký và ghi rõ họ tên
                     </div>
                   </div>
                 </div>
@@ -1184,15 +1213,11 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                       Thử lại
                     </button>
                   </div>
-                ) : (
+                ) : dangLuuChuKy ? (
                   <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginTop: 10, fontStyle: 'italic' }}>
-                    {dangLuuChuKy
-                      ? 'Đang lưu chữ ký…'
-                      : (!tenNguoiNhanXe.trim()
-                        ? 'Nhập tên người nhận xe để lưu được chữ ký.'
-                        : 'Ký đủ hai bên là chữ ký tự động được lưu.')}
+                    Đang lưu chữ ký…
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -1209,15 +1234,36 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
         )}
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
+          {/* Truoc khi ky xong: nut "Xác nhận đã đủ chữ ký hợp lệ" nam DUNG
+              cho nay - thay vi hien san nut "Xác nhận tiền mặt" nhung xam va
+              khong bam duoc (nguoi dung khong biet phai lam gi tiep). Bam
+              xong moi doi sang nut Xac nhan tien mat, luc do da co the bam
+              that su. */}
           {order.status === 'waiting_payment' && (
-            <button className="btn btn-primary" disabled={confirmingCash || !daKyQuyetToan}
-              title={daKyQuyetToan ? '' : 'Cố vấn và khách hàng phải ký quyết toán trước'}
-              onClick={() => setShowCashConfirm(true)}>
-              {confirmingCash ? 'Đang xử lý…' : 'Xác nhận tiền mặt'}
-            </button>
+            daKyQuyetToan ? (
+              <button className="btn btn-primary" disabled={confirmingCash}
+                onClick={() => setShowCashConfirm(true)}>
+                {confirmingCash ? 'Đang xử lý…' : 'Xác nhận tiền mặt'}
+              </button>
+            ) : (
+              <button className="btn btn-primary"
+                disabled={dangLuuChuKy || !duDieuKienKyQuyetToan}
+                title={
+                  duDieuKienKyQuyetToan
+                    ? ''
+                    : 'Khách hàng và cố vấn dịch vụ phải ký trước'
+                }
+                onClick={() => { setLoiChuKy(''); luuChuKyQuyetToan(); }}>
+                {dangLuuChuKy ? 'Đang lưu…' : 'Xác nhận đã đủ chữ ký hợp lệ'}
+              </button>
+            )
           )}
-          <button className="btn btn-secondary" onClick={handlePrint}>
+          <button className="btn btn-secondary" onClick={() => handlePrint(false)}>
             {hasPrinted ? 'In lại phiếu quyết toán' : 'In phiếu quyết toán'}
+          </button>
+          <button className="btn btn-secondary" onClick={() => handlePrint(true)}
+            title="In phiếu để khách ký tay trên giấy">
+            In phiếu (ký tay)
           </button>
         </div>
       </div>
@@ -1301,7 +1347,96 @@ function CollapsibleCard({ title, note, summary, actions, open, onToggle, bodySt
   );
 }
 
-function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, decidingId }) {
+// Giao lai phieu CHUA AI NHAN cho to truong khac, hoac day lai cho tat ca.
+// Dung o 2 tinh huong: to truong duoc chi dinh vua tu choi (kem ly do), hoac
+// co van don gian doi y. Phieu da co nguoi nhan (inprogress tro di) thi BE
+// chan 409 - luc do xe da vao khoang roi, doi nguoi tren giay to vo nghia.
+function ReassignTeamLeaderModal({ order, onClose, onDone }) {
+  const confirm = useConfirm();
+  const [teamLeaders, setTeamLeaders] = useState([]);
+  const [selected, setSelected] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    listBranchTeamLeadersApi()
+      .then((data) => setTeamLeaders(data || []))
+      .catch(() => setTeamLeaders([]));
+  }, []);
+
+  const guiDi = async (teamLeaderId) => {
+    setSubmitting(true);
+    setError('');
+    try {
+      await reassignTeamLeaderApi(order.id, teamLeaderId);
+      onDone();
+    } catch (err) {
+      setError(err.message || 'Không giao lại được, vui lòng thử lại');
+      setSubmitting(false);
+    }
+  };
+
+  // Khong con nut "Day cho tat ca" rieng nua: de trong o chon = day chung,
+  // chi 1 nut xac nhan duy nhat. Nguoi vua tu choi VAN nam trong danh sach
+  // chon binh thuong (khong giau nua) - chon lai dung nguoi do thi hoi xac
+  // nhan them 1 buoc truoc khi gui, tranh giao nham lai cho nguoi vua tu choi.
+  const handleXacNhan = async () => {
+    if (selected && String(selected) === String(order.assignmentDeclinedBy || '')) {
+      const dongY = await confirm({
+        title: 'Chỉ định lại tổ trưởng đã từ chối',
+        message: `Tổ trưởng: ${order.assignmentDeclinedByName || ''} đã từng từ chối tiếp nhận phiếu quyết toán sửa chữa này, xác nhận chỉ định 1 lần nữa?`,
+      });
+      if (!dongY) return;
+    }
+    guiDi(selected ? Number(selected) : null);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">Giao lại việc — {order.code}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          {order.assignmentDeclinedAt && (
+            <div style={{
+              background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 6,
+              padding: '8px 12px', fontSize: 13, marginBottom: 14,
+            }}>
+              <b>{order.assignmentDeclinedByName || 'Tổ trưởng'}</b> đã từ chối lúc{' '}
+              {order.assignmentDeclinedAt}
+              <div style={{ marginTop: 4 }}>Lý do: <i>{order.assignmentDeclinedReason || '—'}</i></div>
+            </div>
+          )}
+
+          <label className="form-label">Giao cho tổ trưởng</label>
+          <select
+            className="form-input"
+            value={selected}
+            disabled={submitting}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            <option value="">Tất cả tổ trưởng đều nhận được</option>
+            {teamLeaders.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+
+          {error && <div className="alert alert-error" style={{ marginTop: 12 }}>{error}</div>}
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn-primary" disabled={submitting}
+            onClick={handleXacNhan}>
+            {submitting ? 'Đang lưu…' : (selected ? 'Giao cho tổ trưởng này' : 'Đẩy cho tất cả tổ trưởng')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, decidingId, onReassign }) {
   const st = STATUS_LABELS[displayStatus(order)];
   const [showIntake, setShowIntake] = useState(false);
   return (
@@ -1357,6 +1492,45 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
               ))}
             </div>
           </div>
+
+          {/* To truong duoc chi dinh da tu choi - phieu dang nam cho co van
+              xu ly, khong to truong nao con nhin thay no ca. */}
+          {order.assignmentDeclinedAt && (
+            <div style={{
+              background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 8,
+              padding: '10px 14px', marginBottom: 16, fontSize: 13,
+            }}>
+              <div style={{ fontWeight: 700, color: '#B91C1C' }}>
+                Tổ trưởng {order.assignmentDeclinedByName || ''} đã từ chối nhận việc
+                {order.assignmentDeclinedAt ? ` lúc ${order.assignmentDeclinedAt}` : ''}
+              </div>
+              <div style={{ marginTop: 4 }}>Lý do: <i>{order.assignmentDeclinedReason || '—'}</i></div>
+              {onReassign && (
+                <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 10 }}
+                  onClick={() => onReassign(order)}>
+                  Giao lại việc
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Phieu chua ai nhan thi con doi duoc nguoi nhan. */}
+          {!order.assignmentDeclinedAt && order.status === 'waiting_repair' && onReassign && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: 'var(--gray-100)', borderRadius: 8,
+              padding: '8px 14px', marginBottom: 16, fontSize: 13,
+            }}>
+              <span>
+                Người nhận việc:{' '}
+                <b>{order.assignedTeamLeaderName || 'Tất cả tổ trưởng'}</b>
+              </span>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }}
+                onClick={() => onReassign(order)}>
+                Đổi người nhận
+              </button>
+            </div>
+          )}
 
           <div className="form-section-title">Yêu cầu khách hàng</div>
           <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
@@ -1513,6 +1687,19 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
           <div className="modal-body">
             <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} />
           </div>
+          {/* In rieng phieu tiep nhan (kem chu ky khach + CVDV tiep nhan) -
+              day la to giay khach ky xac nhan tinh trang xe luc mang den,
+              khac han phieu quyet toan (tien nong, ky luc nhan xe ve). */}
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => printIntakeSheet(order, {}, moCuaSoIn)}>
+              In phiếu tiếp nhận
+            </button>
+            <button className="btn btn-secondary"
+              title="In phiếu để khách ký tay trên giấy"
+              onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
+              In phiếu (ký tay)
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -1632,6 +1819,8 @@ function RepairSettlementList() {
   }, [menuOpenId]);
   // Phieu dang xem "Nhat ky hoat dong" (modal rieng, khong lien quan view/khoa).
   const [activityLogFor, setActivityLogFor] = useState(null);
+  // Phieu dang mo modal "Giao lai viec" (doi to truong / day cho tat ca).
+  const [reassignTarget, setReassignTarget] = useState(null);
   // Khoa "dang mo phieu" (xem lockSettlementApi) - id phieu dang giu khoa +
   // interval gia han 20s/lan trong luc con mo view. Dung ref (khong phai
   // state) vi chi doc/ghi trong callback/cleanup, khong can re-render.
@@ -1687,6 +1876,25 @@ function RepairSettlementList() {
   const [page, setPage] = useState(1);
   const [cancelTarget, setCancelTarget] = useState(null);
   const PAGE_SIZE = 10;
+
+  // Phieu vua co bien dong (SSE) ma co van CHUA MO ra xem - hien cham do canh
+  // ma phieu + gop vao so do tren tung tab, kieu thong bao gio hang. Rieng
+  // phieu bi TU CHOI nhan viec khong dung set nay: no dung thang
+  // order.assignmentDeclinedAt (du lieu that tu DB) nen chi mat khi THAT SU
+  // giao lai duoc viec, khong phai chi mo xem la het (xem soPhieuBiTuChoi).
+  const [changedOrderIds, setChangedOrderIds] = useState(() => new Set());
+  const danhDauThayDoi = (orderId) => {
+    if (orderId == null) return;
+    setChangedOrderIds((prev) => (prev.has(orderId) ? prev : new Set(prev).add(orderId)));
+  };
+  const xoaDauThayDoi = (orderId) => {
+    setChangedOrderIds((prev) => {
+      if (!prev.has(orderId)) return prev;
+      const next = new Set(prev);
+      next.delete(orderId);
+      return next;
+    });
+  };
 
   // silent=true dung cho auto-refresh nen (poll/focus lai tab) - khong bat
   // loading/spinner de tranh giat man hinh. Can thiet vi trang nay khong tu
@@ -1744,7 +1952,16 @@ function RepairSettlementList() {
   //   - 'new-pending': co phieu quyet toan moi (CVDV khac trong cung chi
   //     nhanh vua tao) -> nap lai danh sach ngay, tranh phai doi poll/F5 moi
   //     thay phieu moi.
+  // Cac loai su kien tinh la "bien dong" dang bao cham do o hang + gop vao
+  // so tren tab - KHONG gom 'assignment-declined' (dung co riverg
+  // assignmentDeclinedAt, ben duoi), 'new-pending' (phieu vua tao, chinh
+  // co van vua lam thi khong can bao lai chinh ho) va 'locked'/'unlocked'
+  // (chi ai dang mo xem, khong phai bien dong nghiep vu).
+  const BIEN_DONG_EVENT_TYPES = new Set(['claimed', 'task-updated', 'order-completed', 'invoiced', 'order-cancelled']);
   const handleRepairOrderEvent = (event) => {
+    if (BIEN_DONG_EVENT_TYPES.has(event.type)) {
+      danhDauThayDoi(event.orderId);
+    }
     if (event.type === 'task-updated' && view && String(view.id) === String(event.orderId)) {
       getRepairSettlementApi(view.id).then(setView).catch(() => { });
     }
@@ -1775,6 +1992,14 @@ function RepairSettlementList() {
     if (event.type === 'order-cancelled') {
       loadAll({ silent: true });
     }
+    // To truong vua tu choi nhan viec - phieu quay ve tay co van, phai hien
+    // ngay bang canh bao chu khong doi nhip poll 20s.
+    if (event.type === 'assignment-declined') {
+      loadAll({ silent: true });
+      if (view && String(view.id) === String(event.orderId)) {
+        getRepairSettlementApi(view.id).then(setView).catch(() => { });
+      }
+    }
     // 1 CVDV khac vua chiem/nha khoa "dang mo phieu" - nap lai danh sach de
     // cot "Đang mở bởi" cap nhat ngay, khong can cho poll 20s.
     if (event.type === 'locked' || event.type === 'unlocked') {
@@ -1800,6 +2025,22 @@ function RepairSettlementList() {
     invoiced: theoCoVan.filter((o) => o.status === 'invoiced').length,
     cancelled: theoCoVan.filter((o) => o.status === 'cancelled').length,
   };
+  // So do kieu gio hang tren goc tung tab - dem phieu can chu y ma co van
+  // CHUA xu ly: hoac vua co bien dong (changedOrderIds, xem
+  // handleRepairOrderEvent) hoac dang bi to truong tu choi nhan viec
+  // (assignmentDeclinedAt - rieng cai nay chi mat khi THAT SU giao lai
+  // duoc viec, khong phai mo xem la het).
+  const tabCuaPhieu = (o) => {
+    const ds = displayStatus(o);
+    return ds === 'waiting_repair' || ds === 'inprogress' ? ds : o.status;
+  };
+  const canBaoDo = (o) => Boolean(o.assignmentDeclinedAt) || changedOrderIds.has(o.id);
+  const badgeCounts = { waiting_repair: 0, inprogress: 0, waiting_payment: 0, invoiced: 0, cancelled: 0 };
+  theoCoVan.forEach((o) => {
+    if (!canBaoDo(o)) return;
+    const k = tabCuaPhieu(o);
+    if (k in badgeCounts) badgeCounts[k] += 1;
+  });
 
   // Danh sach Tổ trưởng duy nhat tu chinh du lieu dang co, cho dropdown loc -
   // khong goi API rieng, tranh phai dong bo them 1 nguon du lieu khac.
@@ -1856,6 +2097,7 @@ function RepairSettlementList() {
   };
 
   const handleViewDetail = async (o) => {
+    xoaDauThayDoi(o.id); // da mo xem - het "moi" tu day, du huong nao vao cung qua day.
     setView(o);
     setView(await fetchFullOrder(o));
   };
@@ -1920,9 +2162,13 @@ function RepairSettlementList() {
         {TABS.map((t) => {
           const isActive = tab === t.key;
           const count = counts[t.key] ?? 0;
+          // Badge tron do goc tab - kieu so luong gio hang, dem phieu can chu
+          // y trong tab nay (vua bien dong hoac dang bi tu choi nhan viec).
+          const soCanChuY = badgeCounts[t.key] ?? 0;
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
               style={{
+                position: 'relative',
                 padding: '7px 16px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                 cursor: 'pointer', border: '2px solid',
                 borderColor: isActive ? ACTIVE_TAB_COLOR : 'var(--gray-300)',
@@ -1936,6 +2182,17 @@ function RepairSettlementList() {
                 color: isActive ? 'white' : 'var(--gray-600)',
                 borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700,
               }}>{count}</span>
+              {soCanChuY > 0 && (
+                <span title={`${soCanChuY} phiếu có cập nhật mới chưa xem`}
+                  style={{
+                    position: 'absolute', top: -7, right: -7,
+                    background: '#E53935', color: 'white', border: '2px solid white',
+                    borderRadius: '50%', minWidth: 19, height: 19, padding: '0 3px',
+                    fontSize: 10.5, fontWeight: 800, lineHeight: '15px', textAlign: 'center',
+                  }}>
+                  {soCanChuY}
+                </span>
+              )}
             </button>
           );
         })}
@@ -2060,7 +2317,20 @@ function RepairSettlementList() {
                     </div>,
                     document.body
                   )}
-                  <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{o.code}</span></td>
+                  <td>
+                    {/* Cham do canh ma phieu - bao THIS phieu vua co bien dong
+                        chua xem, de biet dung phieu nao giua ca bang chu khong
+                        chi biet "co gi do moi" chung chung o so tren tab. Phieu
+                        dang bi tu choi da co dong chu rieng ben duoi (do hon),
+                        khong can them cham nua keo roi. */}
+                    {!o.assignmentDeclinedAt && changedOrderIds.has(o.id) && (
+                      <span title="Có cập nhật mới chưa xem" style={{
+                        display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                        background: '#E53935', marginRight: 6,
+                      }} />
+                    )}
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-dark)' }}>{o.code}</span>
+                  </td>
                   <td style={{ fontSize: 12 }}>{o.advisor || <span style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>—</span>}</td>
                   <td>
                     <div style={{ fontWeight: 700 }}>{o.customer?.fullName}</div>
@@ -2090,6 +2360,14 @@ function RepairSettlementList() {
                     {o.ngPendingCount > 0 && (
                       <div style={{ fontSize: 10.5, color: '#B45309', fontWeight: 700, marginTop: 3 }}>
                         ⚠ {o.ngPendingCount} mục không đạt — cần hỏi khách
+                      </div>
+                    )}
+                    {/* To truong duoc chi dinh rieng vua tu choi - phieu quay
+                        ve tay co van, can mo ra giao lai nguoi khac (xem banner
+                        + nut "Giao lại việc" trong DetailModal). */}
+                    {o.assignmentDeclinedAt && (
+                      <div style={{ fontSize: 10.5, color: '#C62828', fontWeight: 700, marginTop: 3 }}>
+                        ⛔ Bị từ chối nhận việc — cần giao lại
                       </div>
                     )}
                     {o.lockedByName && (
@@ -2156,6 +2434,9 @@ function RepairSettlementList() {
           onPreview={setPreviewOrder}
           onDecideNg={canManage ? handleDecideNg : undefined}
           decidingId={decidingId}
+          // Chi co van (khong phai admin chi xem) moi giao lai viec duoc, va
+          // chi khi phieu con dang cho sua chua - da vao khoang thi thoi.
+          onReassign={canManage && view.status === 'waiting_repair' ? setReassignTarget : undefined}
           canEdit={canManage && view.status !== 'invoiced' && view.status !== 'waiting_payment' && view.status !== 'cancelled'}
           // Nha khoa "dang mo phieu" truoc khi roi sang trang Chinh sua - trang
           // do khong gui nhip gia han khoa, giu lai se thanh khoa "ma" treo den
@@ -2169,6 +2450,19 @@ function RepairSettlementList() {
             releaseLockIfHeld();
             setView(null);
             navigate(`/repair-settlement/edit/${view.id}`);
+          }}
+        />
+      )}
+
+      {reassignTarget && (
+        <ReassignTeamLeaderModal
+          order={reassignTarget}
+          onClose={() => setReassignTarget(null)}
+          onDone={() => {
+            setReassignTarget(null);
+            setView(null);
+            releaseLockIfHeld();
+            loadAll({ silent: true });
           }}
         />
       )}
@@ -4277,7 +4571,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 <select className="form-select" autoFocus
                   value={assignedTeamLeaderId}
                   onChange={(e) => setAssignedTeamLeaderId(e.target.value)}>
-                  <option value="">Không chỉ định — mọi tổ trưởng đều nhận được</option>
+                  <option value="">Tất cả tổ trưởng đều nhận được</option>
                   {dsToTruong.map((tt) => (
                     <option key={tt.id} value={tt.id}>
                       {tt.phone ? `${tt.name} — ${tt.phone}` : tt.name}
@@ -4327,7 +4621,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 Ngày {signatureDate.getDate()} tháng {signatureDate.getMonth() + 1} năm {signatureDate.getFullYear()}
               </div>
               <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 14 }}>
-                Xác nhận đồng ý phiếu quyết toán
+                Khách hàng xác nhận đồng ý phiếu quyết toán
               </div>
               <SignaturePad ref={signaturePadRef} onChange={setSignatureEmpty} />
               {/* Khach tu viet ten vao trong o ky luon (nhu phieu giay), khong

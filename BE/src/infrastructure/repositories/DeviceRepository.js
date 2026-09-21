@@ -276,7 +276,7 @@ class DeviceRepository {
     const items = dataResult.recordset.map((row) => ({
       ...mapRow(row),
       displayName: row.first_name && row.last_name
-        ? `${row.first_name} ${row.last_name}`
+        ? `${row.last_name} ${row.first_name}`
         : row.user_name || null,
       branchName: row.branch_name,
     }));

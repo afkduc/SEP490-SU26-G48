@@ -2,6 +2,7 @@ const GeneralDirectorRepository = require('../../domain/repositories/GeneralDire
 const { query } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
 const ApiError = require('../../utils/ApiError');
+const { tachHoTen } = require('../../utils/hoTen');
 
 function normalizeDate(value) {
   if (!value) return null;
@@ -87,7 +88,7 @@ function aggregateEmployees(rows = []) {
       map.set(key, {
         id: row.id,
         employeeId: row.pseudo_id || String(row.id),
-        fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+        fullName: row.user_name || `${row.last_name || ''} ${row.first_name || ''}`.trim() || '—',
         firstName: row.first_name,
         lastName: row.last_name,
         email: row.email,
@@ -172,7 +173,7 @@ function mapTechnician(row) {
   return {
     id: row.id,
     employeeId: row.pseudo_id || String(row.id),
-    fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+    fullName: row.user_name || `${row.last_name || ''} ${row.first_name || ''}`.trim() || '—',
     firstName: row.first_name,
     lastName: row.last_name,
     email: row.email,
@@ -204,7 +205,7 @@ function mapBranchManagerRow(row) {
   return {
     id: row.id,
     managerId: row.pseudo_id || String(row.id),
-    fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+    fullName: row.user_name || `${row.last_name || ''} ${row.first_name || ''}`.trim() || '—',
     email: row.email,
     phone: row.phone,
     status: row.status,
@@ -1131,6 +1132,8 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
         .request()
         .input('pseudoId', pseudoId)
         .input('fullName', fullName)
+        .input('ho', tachHoTen(fullName).ho)
+        .input('ten', tachHoTen(fullName).ten)
         .input('email', email)
         .input('passwordHash', passwordHash)
         .input('phone', phone || null)
@@ -1138,7 +1141,7 @@ class GeneralDirectorRepositoryImpl extends GeneralDirectorRepository {
         .input('status', status)
         .query(`INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status, team_size, created_at)
                 OUTPUT INSERTED.id
-                VALUES (@pseudoId, @fullName, @email, @passwordHash, @fullName, '', @phone, @branchId, @status, 0, GETDATE())`);
+                VALUES (@pseudoId, @fullName, @email, @passwordHash, @ten, @ho, @phone, @branchId, @status, 0, GETDATE())`);
 
       const userId = insertUser.recordset[0].id;
 

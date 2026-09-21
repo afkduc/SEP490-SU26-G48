@@ -203,6 +203,58 @@ class RepairSettlementController {
     }
   };
 
+  // To truong tu choi viec co van chi dinh rieng cho minh (kem ly do).
+  declineAssignment = async (req, res, next) => {
+    try {
+      const item = await this.repairSettlementService.declineAssignment(req.params.id, {
+        teamLeaderId: req.user.userId,
+        reason: req.body.reason,
+      });
+      await auditCrud.lifecycle(req, {
+        tableName: 'repair_settlements',
+        entityCode: item?.code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Phiếu quyết toán',
+        step: 'assignment_declined',
+        stepLabel: 'Tổ trưởng từ chối nhận việc',
+        action: 'UPDATE',
+        description: `Tổ trưởng ${req.user?.name || ''} từ chối nhận phiếu `
+          + `${item?.code || req.params.id}. Lý do: ${item?.assignmentDeclinedReason || ''}`,
+        snapshot: settlementSnapshot(item),
+      });
+      return success(res, item, 'Assignment declined');
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Co van giao lai phieu: body.teamLeaderId co gia tri -> doi sang to truong
+  // do; bo trong / null -> day lai cho tat ca to truong trong chi nhanh.
+  reassignTeamLeader = async (req, res, next) => {
+    try {
+      const item = await this.repairSettlementService.reassignTeamLeader(req.params.id, {
+        teamLeaderId: req.body.teamLeaderId || null,
+        branchId: req.user.branchId,
+      });
+      await auditCrud.lifecycle(req, {
+        tableName: 'repair_settlements',
+        entityCode: item?.code || `ID-${req.params.id}`,
+        recordId: item?.id || Number(req.params.id) || null,
+        entityName: 'Phiếu quyết toán',
+        step: 'assignment_changed',
+        stepLabel: 'Đổi người nhận việc',
+        action: 'UPDATE',
+        description: item?.assignedTeamLeaderName
+          ? `Phiếu ${item?.code || req.params.id} được giao cho tổ trưởng ${item.assignedTeamLeaderName}`
+          : `Phiếu ${item?.code || req.params.id} được đẩy cho tất cả tổ trưởng nhận`,
+        snapshot: settlementSnapshot(item),
+      });
+      return success(res, item, 'Team leader reassigned');
+    } catch (err) {
+      next(err);
+    }
+  };
+
   updateStatus = async (req, res, next) => {
     try {
       const item = await this.repairSettlementService.updateStatus(req.params.id, req.body.status, {

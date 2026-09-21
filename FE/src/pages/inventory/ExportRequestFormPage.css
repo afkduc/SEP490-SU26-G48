@@ -292,11 +292,14 @@
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
-  align-items: flex-start;
+  /* stretch (khong phai flex-start): 2 khung ky cao BANG NHAU du noi dung
+     ben trong khac nhau (o da ky co them anh + ten, o chua ky chi co pad). */
+  align-items: stretch;
 }
 
 .er-form__signature {
-  display: inline-block;
+  display: flex;
+  flex-direction: column;
   width: 260px;
   max-width: 100%;
   margin-top: 16px;

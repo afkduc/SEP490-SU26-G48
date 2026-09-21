@@ -489,7 +489,6 @@ export default function ExportRequestFormPage() {
                       <div className="er-form__signature-pad">
                         <SignaturePad ref={issuerPadRef} onChange={setIssuerSignatureEmpty} />
                       </div>
-                      <div className="er-form__signature-note">Ký 1 lần cho cả phiếu, dùng cho mọi lần xuất thêm / hoàn sau.</div>
                     </>
                   )}
                 </div>
@@ -503,7 +502,6 @@ export default function ExportRequestFormPage() {
                   {!signatureEmpty && receivedByName && (
                     <div className="er-form__signature-name">{receivedByName}</div>
                   )}
-                  <div className="er-form__signature-note">Ký lại ở mỗi lần lấy / hoàn phụ tùng.</div>
                 </div>
               </div>
             </div>

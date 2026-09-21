@@ -114,9 +114,9 @@ function formatDateTime(value) {
   }
 }
 
-function getInitials(firstName, lastName) {
-  const f = (firstName || '').charAt(0).toUpperCase();
-  const l = (lastName || '').charAt(0).toUpperCase();
+function getInitials(ho, ten) {
+  const f = (ho || '').charAt(0).toUpperCase();
+  const l = (ten || '').charAt(0).toUpperCase();
   return f || l ? `${f}${l}` : '?';
 }
 
@@ -286,12 +286,12 @@ export default function MyProfilePage({
       setEditError('Số điện thoại phải bắt đầu bằng 0, 10-11 chữ số');
       return;
     }
-    const firstNameErr = getPersonNameError(firstName, { required: false, label: 'Họ' });
+    const firstNameErr = getPersonNameError(firstName, { required: false, label: 'Tên' });
     if (firstNameErr) {
       setEditError(firstNameErr);
       return;
     }
-    const lastNameErr = getPersonNameError(lastName, { required: false, label: 'Tên' });
+    const lastNameErr = getPersonNameError(lastName, { required: false, label: 'Họ' });
     if (lastNameErr) {
       setEditError(lastNameErr);
       return;
@@ -321,11 +321,11 @@ export default function MyProfilePage({
   }
 
   const displayName = profile
-    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.userName
+    ? `${profile.lastName || ''} ${profile.firstName || ''}`.trim() || profile.userName
     : user?.name || '—';
 
   const initials = profile
-    ? getInitials(profile.firstName, profile.lastName)
+    ? getInitials(profile.lastName, profile.firstName)
     : '?';
 
   async function handleLogoutAllDevices() {
@@ -363,6 +363,15 @@ export default function MyProfilePage({
               <p className="admin-profile__subtitle">{subtitle}</p>
             </div>
           </div>
+          {/* Ho so mo tu menu tai khoan (goc phai) chu khong nam trong sidebar,
+              nen khong co duong nao quay lai ngoai nut Back cua trinh duyet -
+              moi role deu dung chung trang nay nen dat nut o day la du.
+              navigate(-1): ve dung man hinh vua roi, khong ep ve dashboard. */}
+          <button type="button" className="btn btn-secondary"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => navigate(-1)}>
+            ← Quay lại
+          </button>
         </div>
       )}
 
@@ -490,11 +499,11 @@ export default function MyProfilePage({
                 <div className="profile-info-grid">
                   <div className="profile-info-item">
                     <span className="profile-info-item__label">Họ</span>
-                    <span className="profile-info-item__value">{profile.firstName || '—'}</span>
+                    <span className="profile-info-item__value">{profile.lastName || '—'}</span>
                   </div>
                   <div className="profile-info-item">
                     <span className="profile-info-item__label">Tên</span>
-                    <span className="profile-info-item__value">{profile.lastName || '—'}</span>
+                    <span className="profile-info-item__value">{profile.firstName || '—'}</span>
                   </div>
                   <div className="profile-info-item profile-info-item--full">
                     <span className="profile-info-item__label">Email</span>
@@ -556,21 +565,7 @@ export default function MyProfilePage({
                 <form className="profile-form" onSubmit={handleEditSubmit}>
                   <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label" htmlFor="firstName">Họ</label>
-                      <input
-                        id="firstName"
-                        name="firstName"
-                        type="text"
-                        className="form-input"
-                        value={editForm.firstName}
-                        onChange={handleEditChange}
-                        placeholder="Nhập họ"
-                        maxLength={NAME_MAX_LENGTH}
-                        title={PERSON_NAME_HINT}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="lastName">Tên</label>
+                      <label className="form-label" htmlFor="lastName">Họ</label>
                       <input
                         id="lastName"
                         name="lastName"
@@ -578,7 +573,21 @@ export default function MyProfilePage({
                         className="form-input"
                         value={editForm.lastName}
                         onChange={handleEditChange}
-                        placeholder="Nhập tên"
+                        placeholder="Nhập họ"
+                        maxLength={NAME_MAX_LENGTH}
+                        title={PERSON_NAME_HINT}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="firstName">Tên</label>
+                      <input
+                        id="firstName"
+                        name="firstName"
+                        type="text"
+                        className="form-input"
+                        value={editForm.firstName}
+                        onChange={handleEditChange}
+                        placeholder="Nhập tên đệm và tên"
                         maxLength={NAME_MAX_LENGTH}
                         title={PERSON_NAME_HINT}
                       />

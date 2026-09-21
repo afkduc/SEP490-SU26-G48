@@ -101,8 +101,8 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         ro.repair_code AS repair_order_code,
         c.full_name AS customer_name,
         v.license_plate AS vehicle_plate,
-        COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.first_name, N'') + N' ' + ISNULL(u_perf.last_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name,
-        COALESCE(NULLIF(LTRIM(RTRIM(u_recv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_recv.first_name, N'') + N' ' + ISNULL(u_recv.last_name, N''))), N''), u_recv.pseudo_id) AS received_by_name,
+        COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.last_name, N'') + N' ' + ISNULL(u_perf.first_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name,
+        COALESCE(NULLIF(LTRIM(RTRIM(u_recv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_recv.last_name, N'') + N' ' + ISNULL(u_recv.first_name, N''))), N''), u_recv.pseudo_id) AS received_by_name,
         (SELECT COUNT(*) FROM export_request_items i WHERE i.export_request_id = er.id) AS item_count,
         (SELECT ISNULL(SUM(quantity), 0)
            FROM export_request_items i WHERE i.export_request_id = er.id) AS total_quantity
@@ -144,9 +144,9 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          ro.repair_code AS repair_order_code,
          c.full_name AS customer_name,
          v.license_plate AS vehicle_plate,
-         COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.first_name, N'') + N' ' + ISNULL(u_perf.last_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name,
-         COALESCE(NULLIF(LTRIM(RTRIM(u_recv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_recv.first_name, N'') + N' ' + ISNULL(u_recv.last_name, N''))), N''), u_recv.pseudo_id) AS received_by_name,
-         COALESCE(NULLIF(LTRIM(RTRIM(u_iss.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_iss.first_name, N'') + N' ' + ISNULL(u_iss.last_name, N''))), N''), u_iss.pseudo_id) AS issuer_name
+         COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.last_name, N'') + N' ' + ISNULL(u_perf.first_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name,
+         COALESCE(NULLIF(LTRIM(RTRIM(u_recv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_recv.last_name, N'') + N' ' + ISNULL(u_recv.first_name, N''))), N''), u_recv.pseudo_id) AS received_by_name,
+         COALESCE(NULLIF(LTRIM(RTRIM(u_iss.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_iss.last_name, N'') + N' ' + ISNULL(u_iss.first_name, N''))), N''), u_iss.pseudo_id) AS issuer_name
        FROM export_requests er
        LEFT JOIN repair_orders ro ON ro.id = er.repair_order_id
        LEFT JOIN customers c ON c.id = ro.customer_id
@@ -287,7 +287,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   async findTechnicians(branchId) {
     const result = await query(
       `SELECT u.id, u.pseudo_id,
-              COALESCE(NULLIF(LTRIM(RTRIM(u.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u.first_name, N'') + N' ' + ISNULL(u.last_name, N''))), N''), u.pseudo_id) AS full_name
+              COALESCE(NULLIF(LTRIM(RTRIM(u.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u.last_name, N'') + N' ' + ISNULL(u.first_name, N''))), N''), u.pseudo_id) AS full_name
        FROM users u
        WHERE u.branch_id = @branchId
          AND u.status = 'active'
@@ -325,7 +325,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          tl.user_name AS team_leader_name,
          er.id AS export_request_id,
          er.issuer_signature_data, er.issuer_signed_at,
-         COALESCE(NULLIF(LTRIM(RTRIM(iss.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(iss.first_name, N'') + N' ' + ISNULL(iss.last_name, N''))), N''), iss.pseudo_id) AS issuer_name
+         COALESCE(NULLIF(LTRIM(RTRIM(iss.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(iss.last_name, N'') + N' ' + ISNULL(iss.first_name, N''))), N''), iss.pseudo_id) AS issuer_name
        FROM repair_orders ro
               LEFT JOIN customers c ON c.id = ro.customer_id
        LEFT JOIN vehicles v ON v.id = ro.vehicle_id
@@ -705,9 +705,9 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const result = await query(
       `SELECT
          pk.id, pk.signed_at, pk.signature_data,
-         COALESCE(NULLIF(LTRIM(RTRIM(u.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u.first_name, N'') + N' ' + ISNULL(u.last_name, N''))), N''), u.pseudo_id) AS received_by_name,
+         COALESCE(NULLIF(LTRIM(RTRIM(u.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u.last_name, N'') + N' ' + ISNULL(u.first_name, N''))), N''), u.pseudo_id) AS received_by_name,
          u.pseudo_id AS received_by_code,
-         COALESCE(NULLIF(LTRIM(RTRIM(pf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(pf.first_name, N'') + N' ' + ISNULL(pf.last_name, N''))), N''), pf.pseudo_id) AS performed_by_name,
+         COALESCE(NULLIF(LTRIM(RTRIM(pf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(pf.last_name, N'') + N' ' + ISNULL(pf.first_name, N''))), N''), pf.pseudo_id) AS performed_by_name,
          it.transaction_type, it.quantity, it.transaction_code,
          it.product_id, p.product_code, p.product_name, un.unit_name
        FROM export_request_pickups pk

@@ -1,4 +1,5 @@
 import { formatCurrency, formatDateTime } from '../../utils';
+import { itemTypeLabel, htttShort } from '../../constants/settlementCodes';
 
 // Tach rieng khoi ManagerPage.jsx de dung chung duoc voi ManagerDashboardPage.jsx
 // (modal "phieu da thanh toan trong thang" khi bam vao diem tren bieu do Doanh
@@ -136,8 +137,8 @@ export default function SettlementDetailModal({ report, onClose }) {
                     <tr key={item.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{item.code || '—'}</td>
                       <td>{item.description}</td>
-                      <td>{item.lhsc || '—'}</td>
-                      <td>{item.httt || '—'}</td>
+                      <td>{itemTypeLabel(item.lhsc)}</td>
+                      <td>{htttShort(item.httt)}</td>
                       <td>{item.unit || '—'}</td>
                       <td>{item.qty || 0}</td>
                       <td>{formatCurrency(item.unitPrice)}</td>

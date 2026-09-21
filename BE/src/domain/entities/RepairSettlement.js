@@ -94,6 +94,10 @@ class RepairSettlement {
     // null = khong chi dinh, moi to truong deu thay - xem ensureAssignedTeamLeader.js
     this.assignedTeamLeaderId = data.assignedTeamLeaderId ?? null;
     this.assignedTeamLeaderName = data.assignedTeamLeaderName ?? null;
+    this.assignmentDeclinedBy = data.assignmentDeclinedBy ?? null;
+    this.assignmentDeclinedByName = data.assignmentDeclinedByName ?? null;
+    this.assignmentDeclinedReason = data.assignmentDeclinedReason ?? null;
+    this.assignmentDeclinedAt = data.assignmentDeclinedAt ?? null;
   }
 
   static fromPersistence(headerRow, itemRows = [], taskRows = [], technicianRows = []) {
@@ -115,6 +119,10 @@ class RepairSettlement {
       technicianNames: headerRow.technician_names ?? null,
       assignedTeamLeaderId: headerRow.assigned_team_leader_id ?? null,
       assignedTeamLeaderName: headerRow.assigned_team_leader_name ?? null,
+      assignmentDeclinedBy: headerRow.assignment_declined_by ?? null,
+      assignmentDeclinedByName: headerRow.assignment_declined_by_name ?? null,
+      assignmentDeclinedReason: headerRow.assignment_declined_reason ?? null,
+      assignmentDeclinedAt: headerRow.assignment_declined_at ?? null,
       customerRequest: headerRow.customer_request,
       currentKm: headerRow.current_km,
       status: headerRow.status,

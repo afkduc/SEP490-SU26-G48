@@ -48,7 +48,7 @@ async function cleanupStaleSessions() {
             nparams
           );
           for (const u of names.recordset || []) {
-            const full = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+            const full = [u.last_name, u.first_name].filter(Boolean).join(' ').trim();
             nameByUser.set(Number(u.id), full || u.user_name || `user#${u.id}`);
           }
         } catch (e) {

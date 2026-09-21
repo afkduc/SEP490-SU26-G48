@@ -11,7 +11,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { actionLabel, OTHER_GROUP_LABEL } from '../../constants/maintenanceChecklist';
-import { listRepairSettlementsApi } from '../../services/repairSettlementApi';
+import { listRepairSettlementsApi, declineAssignmentApi } from '../../services/repairSettlementApi';
+import { useAuth } from '../../contexts/AppContext';
 import { listMyBaysApi } from '../../services/vehicleBayApi';
 import {
   claimRepairOrderApi,
@@ -420,6 +421,68 @@ function ClaimModal({ settlement, bays, onClose, onDone }) {
   );
 }
 
+// To truong tu choi viec co van chi dinh RIENG cho minh. Bat buoc nhap ly do:
+// co van can biet vi sao de con quyet dinh giao cho ai - "tu choi" khong kem
+// giai thich thi phieu chi nam im them mot vong nua.
+function DeclineAssignmentModal({ settlement, onClose, onDone }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async () => {
+    const lyDo = reason.trim();
+    if (!lyDo) { setError('Vui lòng nhập lý do từ chối'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      await declineAssignmentApi(settlement.id, lyDo);
+      onDone();
+    } catch (err) {
+      setError(err.message || 'Không từ chối được, vui lòng thử lại');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal modal-sm">
+        <div className="modal-header">
+          <span className="modal-title">Từ chối nhận việc — {settlement.code}</span>
+          <button type="button" className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <p className="form-hint" style={{ marginTop: 0 }}>
+            Phiếu sẽ được trả lại cho cố vấn dịch vụ <b>{settlement.advisor || '—'}</b> để giao cho
+            tổ trưởng khác hoặc đẩy cho tất cả tổ trưởng nhận.
+          </p>
+          <label className="form-label" htmlFor="tld-decline-reason">
+            Lý do từ chối <span className="required">*</span>
+          </label>
+          <textarea
+            id="tld-decline-reason"
+            className="form-input"
+            rows={4}
+            maxLength={500}
+            autoFocus
+            value={reason}
+            onChange={(e) => setReason(e.target.value.slice(0, 500))}
+            placeholder="Ví dụ: Tổ đang kín xe đến hết ca, không có thợ chuyên gầm…"
+          />
+          {error && <div className="tld-error" style={{ marginTop: 12 }}>{error}</div>}
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+            Hủy
+          </button>
+          <button type="button" className="btn btn-danger" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? 'Đang gửi…' : 'Từ chối nhận việc'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Gan BO SUNG tho cho 1 khoang DA claim() tu truoc nhung dang khong co tho
 // nao (vd to truong dong tab/F5 giua chung o buoc chon tho cua ClaimModal -
 // claim() da khong the huy giua chung, nen lenh "ket" o Khoang xe cua toi
@@ -478,7 +541,7 @@ function AssignTechniciansModal({ order, onClose, onDone }) {
 // Xem (khong tick duoc) - tick that su dien ra tai man hinh cong khai cua
 // dung khoang do (Landing), o day chi phan anh lai realtime qua SSE
 // 'task-updated'/danh sach orders duoc nap lai.
-function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId, onForwardNg, onResolveNg, forwardingTaskId }) {
+function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, confirmingId, onReopenTask, reopeningTaskId, onForwardNg, onResolveNg, forwardingTaskId, changedBayCounts, onSeenBay }) {
   const [intakeOrder, setIntakeOrder] = useState(null);
   // Goi bao duong bung ra 30+ dau muc, 3 khoang cung luc la phai cuon rat lau
   // moi xem het - trong khi to truong thuong chi dang quan tam 1 khoang. Nen
@@ -490,11 +553,16 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
   // SSE - neu seed lai theo bays thi khoang to truong vua mo se tu dong sap
   // lai ngay khi tho ben duoi tick 1 dau muc.
   const [expandedBays, setExpandedBays] = useState(() => new Set());
-  const toggleBay = (bayId) => setExpandedBays((prev) => {
-    const next = new Set(prev);
-    if (next.has(bayId)) next.delete(bayId); else next.add(bayId);
-    return next;
-  });
+  const toggleBay = (bayId) => {
+    setExpandedBays((prev) => {
+      const next = new Set(prev);
+      // Chi MO moi tinh la "da xem" - thu gon lai khong can bao lai nua vi
+      // noi dung khong doi, khoang van dang mo tu truoc.
+      if (next.has(bayId)) next.delete(bayId);
+      else { next.add(bayId); onSeenBay?.(bayId); }
+      return next;
+    });
+  };
 
   if (bays.length === 0) {
     return <div className="tld-empty">Bạn chưa được gán khoang xe nào. Liên hệ Quản lý chi nhánh.</div>;
@@ -542,7 +610,23 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                     title={thuGon ? 'Mở lại khoang này' : 'Thu gọn khoang này'}
                     style={{ transform: thuGon ? 'none' : 'rotate(90deg)' }}>▶</button>
                 )}
-                <span className="tld-bay-status-card__number">Khoang {bay.bayNumber}</span>
+                <span className="tld-bay-status-card__number">
+                  Khoang {bay.bayNumber}
+                  {/* So do - khoang vua co bien dong (tho tick dau muc, xe
+                      vao/ra...) ma to truong chua mo ra xem lai, dem so lan.
+                      Cham do truoc day nho qua kho nhan ra nen doi sang so.
+                      Mat khi bam mo dung khoang nay (xem toggleBay o tren). */}
+                  {changedBayCounts?.get(bay.id) > 0 && (
+                    <span title={`${changedBayCounts.get(bay.id)} cập nhật mới chưa xem`} style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      minWidth: 19, height: 19, padding: '0 5px', marginLeft: 7,
+                      borderRadius: '50%', background: '#E53935', color: 'white',
+                      fontSize: 11, fontWeight: 800, lineHeight: 1, verticalAlign: 'middle',
+                    }}>
+                      {changedBayCounts.get(bay.id) > 9 ? '9+' : changedBayCounts.get(bay.id)}
+                    </span>
+                  )}
+                </span>
                 {/* Thu gon: ca khung khoang co lai con dung thanh nay, nen
                     ghep luon khach hang + bien so vao de van biet khoang nao
                     dang lam xe nao ma khong phai mo ra. */}
@@ -830,10 +914,17 @@ function HistoryPanel({ orders }) {
 }
 
 export default function TeamLeaderDashboard() {
+  const { user } = useAuth();
+  const [decliningSettlement, setDecliningSettlement] = useState(null);
   const [activeTab, setActiveTab] = useState('pending');
   const [pending, setPending] = useState(null);
   const [bays, setBays] = useState([]);
   const [orders, setOrders] = useState([]);
+  // Doc duoc "orders" moi nhat trong handleEvent (useCallback deps gon) ma
+  // khong phai them orders vao deps - tranh tao lai ham lien tuc lam SSE hook
+  // subscribe lai moi lan danh sach lenh doi.
+  const ordersRef = useRef([]);
+  useEffect(() => { ordersRef.current = orders; }, [orders]);
   const [error, setError] = useState('');
   const [claimingSettlement, setClaimingSettlement] = useState(null);
   const [assigningOrder, setAssigningOrder] = useState(null);
@@ -842,13 +933,32 @@ export default function TeamLeaderDashboard() {
   const [forwardingTaskId, setForwardingTaskId] = useState(null);
   const confirm = useConfirm();
   const [claimedElsewhere, setClaimedElsewhere] = useState({});
-  // So do goc tab - dem viec "chua xem": pendingSeenCount la mo (baseline) so
-  // luong pending tai lan cuoi mo tab "Viec cho nhan" (null = chua seed lan
-  // dau, tranh hien badge ngay khi vua vao trang du chua co gi moi that su);
-  // baysUpdateCount dem so lan co thay doi (claim/tick/huy/hoan thanh) trong
-  // luc KHONG dang mo tab "Khoang xe cua toi".
+  // So do goc tab "Viec cho nhan" - dem viec "chua xem": pendingSeenCount la
+  // moc (baseline) so luong pending tai lan cuoi mo tab nay (null = chua seed
+  // lan dau, tranh hien badge ngay khi vua vao trang du chua co gi moi that
+  // su). changedBayCounts = so LAN moi khoang vua co bien dong (claim/tick/
+  // huy/hoan thanh) ma to truong CHUA MO ra xem lai - moi khoang 1 so do rieng
+  // (cham do truoc day kho nhan ra, doi sang so cho de thay - xem
+  // BayStatusGrid), chi mat khi bam mo dung khoang do, khong phai chi chuyen
+  // sang tab la het nhu truoc.
   const [pendingSeenCount, setPendingSeenCount] = useState(null);
-  const [baysUpdateCount, setBaysUpdateCount] = useState(0);
+  const [changedBayCounts, setChangedBayCounts] = useState(() => new Map());
+  const danhDauKhoangThayDoi = (bayId) => {
+    if (bayId == null) return;
+    setChangedBayCounts((prev) => {
+      const next = new Map(prev);
+      next.set(bayId, (next.get(bayId) || 0) + 1);
+      return next;
+    });
+  };
+  const xoaDauKhoangThayDoi = (bayId) => {
+    setChangedBayCounts((prev) => {
+      if (!prev.has(bayId)) return prev;
+      const next = new Map(prev);
+      next.delete(bayId);
+      return next;
+    });
+  };
   const activeTabRef = useRef('pending');
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
@@ -918,10 +1028,13 @@ export default function TeamLeaderDashboard() {
     if (BAY_REFRESH_EVENT_TYPES.has(event.type)) {
       loadBays();
     }
-    // BAY_REFRESH_EVENT_TYPES la tap con cua ORDER_REFRESH_EVENT_TYPES nen
-    // chi can kiem tra 1 lan - tranh dem trung khi 1 event khop ca 2 tap.
+    // Danh dau DUNG khoang vua bien dong (tra bayId qua orders dang co, doc
+    // qua ref de khong phai dua orders vao deps). Khong danh dau khi dang MO
+    // SAN tab "Khoang xe cua toi" - to truong dang nhin man hinh do that,
+    // khong can bao lai cai ho vua thay truoc mat.
     if (ORDER_REFRESH_EVENT_TYPES.has(event.type) && activeTabRef.current !== 'bays') {
-      setBaysUpdateCount((c) => c + 1);
+      const donHang = ordersRef.current.find((o) => String(o.id) === String(event.orderId));
+      if (donHang?.bayId != null) danhDauKhoangThayDoi(donHang.bayId);
     }
   }, [loadPending, loadBays, loadOrders]);
 
@@ -1036,12 +1149,14 @@ export default function TeamLeaderDashboard() {
 
   const activeTabLabel = TABS.find((t) => t.key === activeTab)?.label;
   const pendingBadge = pending && pendingSeenCount !== null ? Math.max(0, pending.length - pendingSeenCount) : 0;
-  const tabBadge = { pending: pendingBadge, bays: baysUpdateCount };
+  // Badge tab "Khoang xe cua toi" = so khoang con dang co bien dong chua xem
+  // (khong con reset ve 0 khi chi CHUYEN sang tab nua - phai mo dung khoang
+  // do moi mat, xem toggleBay trong BayStatusGrid).
+  const tabBadge = { pending: pendingBadge, bays: changedBayCounts.size };
 
   const handleTabClick = (key) => {
     setActiveTab(key);
     if (key === 'pending') setPendingSeenCount(pending?.length ?? 0);
-    if (key === 'bays') setBaysUpdateCount(0);
   };
 
   return (
@@ -1081,6 +1196,8 @@ export default function TeamLeaderDashboard() {
           <div className="tld-pending-grid">
             {pending.map((s) => {
               const claimedBay = claimedElsewhere[s.id];
+              const chiDinhRieng = s.assignedTeamLeaderId
+                && String(s.assignedTeamLeaderId) === String(user?.id);
               return (
                 <div key={s.id} className="tld-pending-card">
                   <div className="tld-pending-card__header">
@@ -1090,6 +1207,9 @@ export default function TeamLeaderDashboard() {
                   <div className="tld-pending-card__customer">{s.customer?.fullName} — {s.vehicle?.licensePlate}</div>
                   <div className="tld-pending-card__vehicle">{s.vehicle?.vehicleModel}</div>
                   {s.advisor && <div className="tld-pending-card__advisor">Cố vấn: <b>{s.advisor}</b></div>}
+                  {chiDinhRieng && (
+                    <div className="tld-pending-card__assigned">Cố vấn chỉ định riêng cho bạn</div>
+                  )}
                   <div className="tld-pending-card__request">
                     <span className="tld-pending-card__request-label">Yêu cầu:</span> {s.customerRequest || '—'}
                   </div>
@@ -1097,9 +1217,20 @@ export default function TeamLeaderDashboard() {
                     {claimedBay ? (
                       <span className="tld-pending-card__taken">Khoang {claimedBay} đã nhận</span>
                     ) : (
-                      <button type="button" className="btn btn-primary" onClick={() => setClaimingSettlement(s)}>
-                        Nhận việc
-                      </button>
+                      <>
+                        <button type="button" className="btn btn-primary" onClick={() => setClaimingSettlement(s)}>
+                          Nhận việc
+                        </button>
+                        {/* Chi phieu chi dinh RIENG moi tu choi duoc: phieu chung
+                            (khong chi dinh ai) thi khong nhan la xong, khong co
+                            gi de tu choi va cung khong nen giau no khoi to khac. */}
+                        {chiDinhRieng && (
+                          <button type="button" className="btn btn-secondary"
+                            onClick={() => setDecliningSettlement(s)}>
+                            Từ chối
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1109,7 +1240,7 @@ export default function TeamLeaderDashboard() {
         )
       )}
 
-      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} onConfirmComplete={handleConfirmComplete} confirmingId={confirmingId} onReopenTask={handleReopenTask} reopeningTaskId={reopeningTaskId} onForwardNg={handleForwardNg} onResolveNg={handleResolveNg} forwardingTaskId={forwardingTaskId} />}
+      {activeTab === 'bays' && <BayStatusGrid bays={bays} orders={orders} onAssignTechnicians={setAssigningOrder} onConfirmComplete={handleConfirmComplete} confirmingId={confirmingId} onReopenTask={handleReopenTask} reopeningTaskId={reopeningTaskId} onForwardNg={handleForwardNg} onResolveNg={handleResolveNg} forwardingTaskId={forwardingTaskId} changedBayCounts={changedBayCounts} onSeenBay={xoaDauKhoangThayDoi} />}
 
       {activeTab === 'history' && <HistoryPanel orders={orders} />}
 
@@ -1119,6 +1250,14 @@ export default function TeamLeaderDashboard() {
           bays={bays}
           onClose={() => setClaimingSettlement(null)}
           onDone={handleClaimDone}
+        />
+      )}
+
+      {decliningSettlement && (
+        <DeclineAssignmentModal
+          settlement={decliningSettlement}
+          onClose={() => setDecliningSettlement(null)}
+          onDone={() => { setDecliningSettlement(null); loadPending(); }}
         />
       )}
 

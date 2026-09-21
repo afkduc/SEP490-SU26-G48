@@ -35,9 +35,9 @@ function formatDateTime(value) {
   }
 }
 
-function getInitials(firstName, lastName) {
-  if (firstName || lastName) {
-    return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
+function getInitials(ho, ten) {
+  if (ho || ten) {
+    return `${(ho || '').charAt(0)}${(ten || '').charAt(0)}`.toUpperCase();
   }
   return '?';
 }
@@ -117,7 +117,7 @@ export default function UserDetailPage() {
   }
 
   const fullName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || '—'
+    ? [user.lastName, user.firstName].filter(Boolean).join(' ') || user.name || '—'
     : '—';
 
   return (
@@ -185,7 +185,7 @@ export default function UserDetailPage() {
           <>
             <div className="user-detail-hero">
               <div className="user-detail-hero__avatar">
-                {getInitials(user.firstName, user.lastName)}
+                {getInitials(user.lastName, user.firstName)}
               </div>
               <div className="user-detail-hero__meta">
                 <h2 className="user-detail-hero__name">{fullName}</h2>
@@ -232,8 +232,8 @@ export default function UserDetailPage() {
               <section className="user-detail-section">
                 <h3 className="user-detail-section__title">Thông tin cá nhân</h3>
                 <div className="user-detail-grid">
-                  <Field label="Họ" value={user.firstName || '—'} />
-                  <Field label="Tên" value={user.lastName || '—'} />
+                  <Field label="Họ" value={user.lastName || '—'} />
+                  <Field label="Tên" value={user.firstName || '—'} />
                   <Field label="Số điện thoại" value={user.phone ? formatPhoneDisplay(user.phone) : '—'} />
                 </div>
               </section>

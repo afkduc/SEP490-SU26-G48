@@ -34,7 +34,7 @@ class BranchRepositoryImpl {
       phone: row.phone,
       email: row.email,
       managerId: row.manager_id,
-      managerName: [row.manager_first_name, row.manager_last_name].filter(Boolean).join(' ').trim()
+      managerName: [row.manager_last_name, row.manager_first_name].filter(Boolean).join(' ').trim()
         || row.manager_user_name
         || null,
       managerEmail: row.manager_email,
@@ -77,7 +77,7 @@ class BranchRepositoryImpl {
       phone: row.phone,
       email: row.email,
       managerId: row.manager_id,
-      managerName: [row.manager_first_name, row.manager_last_name].filter(Boolean).join(' ').trim()
+      managerName: [row.manager_last_name, row.manager_first_name].filter(Boolean).join(' ').trim()
         || row.manager_user_name
         || null,
       managerEmail: row.manager_email,
@@ -102,7 +102,7 @@ class BranchRepositoryImpl {
     return result.recordset.map((row) => ({
       id: row.id,
       userName: row.user_name,
-      displayName: [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || row.user_name,
+      displayName: [row.last_name, row.first_name].filter(Boolean).join(' ').trim() || row.user_name,
       email: row.email,
       status: row.status,
       branchName: row.branch_name || null,
@@ -126,7 +126,7 @@ class BranchRepositoryImpl {
     return result.recordset.map((row) => ({
       id: row.id,
       userName: row.user_name,
-      displayName: [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || row.user_name,
+      displayName: [row.last_name, row.first_name].filter(Boolean).join(' ').trim() || row.user_name,
       email: row.email,
       status: row.status,
     }));

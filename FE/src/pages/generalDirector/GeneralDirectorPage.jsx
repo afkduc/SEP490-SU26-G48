@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AppContext';
+import { itemTypeLabel, htttShort } from '../../constants/settlementCodes';
 import { usePermission } from '../../contexts/PermissionContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency, formatDate } from '../../utils';
@@ -302,8 +303,8 @@ function DetailModal({ report, onClose }) {
                     <tr key={item.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{item.code || '—'}</td>
                       <td>{item.description}</td>
-                      <td>{item.lhsc || '—'}</td>
-                      <td>{item.httt || '—'}</td>
+                      <td>{itemTypeLabel(item.lhsc)}</td>
+                      <td>{htttShort(item.httt)}</td>
                       <td>{item.unit || '—'}</td>
                       <td>{item.qty || 0}</td>
                       <td>{currency(item.unitPrice)}</td>

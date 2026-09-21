@@ -58,6 +58,23 @@ export async function saveClosingSignatureApi(id, payload) {
   return httpClient.post(`/repair-settlements/${id}/closing-signature`, payload);
 }
 
+/**
+ * To truong TU CHOI nhan viec co van chi dinh rieng cho minh (kem ly do).
+ * Sau khi tu choi, phieu bien mat khoi bang "Việc chờ nhận" cua MOI to truong
+ * va quay ve tay co van de doi nguoi khac / day lai cho tat ca.
+ */
+export async function declineAssignmentApi(id, reason) {
+  return httpClient.post(`/repair-settlements/${id}/decline-assignment`, { reason });
+}
+
+/**
+ * Co van giao lai phieu chua ai nhan.
+ * @param {number|null} teamLeaderId - null = day lai cho TAT CA to truong.
+ */
+export async function reassignTeamLeaderApi(id, teamLeaderId) {
+  return httpClient.patch(`/repair-settlements/${id}/assigned-team-leader`, { teamLeaderId });
+}
+
 export async function createPayosPaymentLinkApi(id) {
   return httpClient.post(`/repair-settlements/${id}/payos/create-payment-link`);
 }
