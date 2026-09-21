@@ -5,17 +5,29 @@ const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoi
 
 // Loai hinh sua chua THAT (repair_order_items.repair_category) - khac voi
 // danh muc dich vu (service_categories) va khac ca LHSC (loai hang muc: cong/
-// vat tu). Gia tri + nhan phai khop voi REPAIR_CATEGORY_OPTIONS trong
-// RepairSettlementPage.jsx. 'OTHER' la bucket cho dong chua duoc gan loai hinh.
-const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'OTHER'];
+// vat tu). Dung 5 loai cua dich vu le (ER/CB/EE/BP/CS - xem ManagerService
+// SERVICE_REPAIR_CATEGORY_VALUES) + PM dai dien cho GOI bao duong. Dong chua
+// gan loai hinh (phu tung goi them le, khong di kem dich vu) KHONG tinh vao
+// bieu do - no la vat tu, khong phai 1 loai hinh sua chua.
+// Phai khop voi REPAIR_CATEGORY_ORDER/LABELS trong FE DashboardCharts.jsx.
+const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'CS', 'PM'];
 const REPAIR_CATEGORY_LABELS = {
   ER: 'Sửa chữa động cơ',
   CB: 'Sửa chữa gầm',
   EE: 'Sửa chữa điện - điện tử',
   BP: 'Đồng sơn',
-  PM: 'Bảo dưỡng định kỳ',
-  OTHER: 'Khác',
+  CS: 'Chăm sóc xe',
+  PM: 'Bảo dưỡng định kỳ (gói)',
 };
+const REPAIR_CATEGORY_SQL_LIST = REPAIR_CATEGORY_ORDER.map((c) => `'${c}'`).join(',');
+
+// Doanh thu theo loai hinh = tong cac DONG hang muc (soi.total, truoc VAT/giam
+// gia) nhan he so total/subtotal cua phieu -> VAT va giam gia/mien phi cua phieu
+// duoc phan bo theo ty le vao tung dong, nen cong cac loai hinh = dung "Tong
+// doanh thu" (repair_orders.total, da gom VAT) tren KPI/bieu do. Khong co he so
+// nay thi bang loai hinh luon thieu dung phan VAT (8%) so voi so tren cung.
+// subtotal = 0 (phieu chua co hang muc) -> he so 1 de khong chia cho 0.
+const ORDER_LINE_FACTOR_SQL = 'CASE WHEN ISNULL(so.subtotal, 0) = 0 THEN 1.0 ELSE CAST(so.total AS FLOAT) / so.subtotal END';
 
 function monthLabel(monthStart) {
   if (!monthStart) return '';
@@ -147,38 +159,7 @@ class DashboardRepositoryImpl extends DashboardRepository {
     // khac, khong lien quan).
     const repairCategoryTrendResult = await query(
       `WITH date_status_orders AS (
-         SELECT so.id, so.status, so.intake_date
-         FROM   repair_orders so
-         WHERE  so.branch_id = @branchId
-           AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
-           AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
-           AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
-           AND  (@status IS NULL OR so.status = @status)
-       ),
-       item_repair AS (
-         SELECT
-           dso.id AS order_id,
-           DATEFROMPARTS(YEAR(dso.intake_date), MONTH(dso.intake_date), 1) AS month_start,
-           CASE WHEN soi.repair_category IS NULL OR soi.repair_category = '' THEN 'OTHER' ELSE soi.repair_category END AS repair_category
-         FROM   date_status_orders dso
-         JOIN   repair_order_items soi ON soi.repair_order_id = dso.id
-       ),
-       month_category_orders AS (
-         SELECT DISTINCT month_start, repair_category, order_id
-         FROM   item_repair
-       )
-       SELECT month_start, repair_category, COUNT(*) AS order_count
-       FROM   month_category_orders
-       GROUP BY month_start, repair_category
-       ORDER BY month_start ASC`,
-      { branchId: params.branchId, advisorId: params.advisorId, fromDate: params.fromDate, toDate: params.toDate, status: params.status }
-    );
-
-    // Hieu suat tong theo loai hinh sua chua (khong loc theo categoryId, cung
-    // ly do nhu tren) - dung cho bang "Hieu suat theo loai hinh sua chua".
-    const repairCategoryOverallResult = await query(
-      `WITH date_status_orders AS (
-         SELECT so.id, so.status
+         SELECT so.id, so.status, so.intake_date, ${ORDER_LINE_FACTOR_SQL} AS line_factor
          FROM   repair_orders so
          WHERE  so.branch_id = @branchId
            AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
@@ -190,10 +171,59 @@ class DashboardRepositoryImpl extends DashboardRepository {
          SELECT
            dso.id AS order_id,
            dso.status AS order_status,
-           CASE WHEN soi.repair_category IS NULL OR soi.repair_category = '' THEN 'OTHER' ELSE soi.repair_category END AS repair_category,
-           soi.total AS item_total
+           DATEFROMPARTS(YEAR(dso.intake_date), MONTH(dso.intake_date), 1) AS month_start,
+           soi.repair_category,
+           soi.total * dso.line_factor AS item_total
          FROM   date_status_orders dso
          JOIN   repair_order_items soi ON soi.repair_order_id = dso.id
+         WHERE  soi.repair_category IN (${REPAIR_CATEGORY_SQL_LIST})
+       ),
+       month_category_orders AS (
+         SELECT DISTINCT month_start, repair_category, order_id
+         FROM   item_repair
+       ),
+       month_category_counts AS (
+         SELECT month_start, repair_category, COUNT(*) AS order_count
+         FROM   month_category_orders
+         GROUP BY month_start, repair_category
+       ),
+       -- Doanh thu theo thang x loai hinh (chi phieu da xuat hoa don) - de bang
+       -- "Hieu suat theo loai hinh" loc duoc theo tung thang ngay tren FE.
+       month_category_revenue AS (
+         SELECT month_start, repair_category,
+                SUM(CASE WHEN order_status = 'invoiced' THEN item_total ELSE 0 END) AS revenue
+         FROM   item_repair
+         GROUP BY month_start, repair_category
+       )
+       SELECT c.month_start, c.repair_category, c.order_count, ISNULL(r.revenue, 0) AS revenue
+       FROM   month_category_counts c
+       LEFT JOIN month_category_revenue r
+         ON r.month_start = c.month_start AND r.repair_category = c.repair_category
+       ORDER BY c.month_start ASC`,
+      { branchId: params.branchId, advisorId: params.advisorId, fromDate: params.fromDate, toDate: params.toDate, status: params.status }
+    );
+
+    // Hieu suat tong theo loai hinh sua chua (khong loc theo categoryId, cung
+    // ly do nhu tren) - dung cho bang "Hieu suat theo loai hinh sua chua".
+    const repairCategoryOverallResult = await query(
+      `WITH date_status_orders AS (
+         SELECT so.id, so.status, ${ORDER_LINE_FACTOR_SQL} AS line_factor
+         FROM   repair_orders so
+         WHERE  so.branch_id = @branchId
+           AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
+           AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
+           AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
+           AND  (@status IS NULL OR so.status = @status)
+       ),
+       item_repair AS (
+         SELECT
+           dso.id AS order_id,
+           dso.status AS order_status,
+           soi.repair_category,
+           soi.total * dso.line_factor AS item_total
+         FROM   date_status_orders dso
+         JOIN   repair_order_items soi ON soi.repair_order_id = dso.id
+         WHERE  soi.repair_category IN (${REPAIR_CATEGORY_SQL_LIST})
        ),
        category_revenue AS (
          SELECT repair_category,
@@ -265,39 +295,42 @@ class DashboardRepositoryImpl extends DashboardRepository {
     // Gom du lieu loai hinh sua chua theo thang (moi dong la 1 thang + 1 loai
     // hinh). Dam bao co du cac thang da xuat hien o monthlyTrend (ke ca thang
     // khong co dong nao gan loai hinh) de 2 bieu do dung chung 1 truc thang.
+    const emptyMonthBucket = (month, label) => ({
+      month,
+      label,
+      total: 0,
+      byCategory: Object.fromEntries(REPAIR_CATEGORY_ORDER.map((c) => [c, 0])),
+      // doanh thu (phieu da xuat hoa don) theo loai hinh trong thang - bang
+      // "Hieu suat theo loai hinh" loc theo thang dung cai nay
+      byCategoryRevenue: Object.fromEntries(REPAIR_CATEGORY_ORDER.map((c) => [c, 0])),
+    });
     const repairMonthMap = new Map();
     for (const m of monthlyTrend) {
-      repairMonthMap.set(m.month, {
-        month: m.month,
-        label: m.label,
-        total: 0,
-        byCategory: Object.fromEntries(REPAIR_CATEGORY_ORDER.map((c) => [c, 0])),
-      });
+      repairMonthMap.set(m.month, emptyMonthBucket(m.month, m.label));
     }
     for (const row of repairCategoryTrendResult.recordset) {
       const key = monthKey(row.month_start);
       if (!repairMonthMap.has(key)) {
-        repairMonthMap.set(key, {
-          month: key,
-          label: monthLabel(row.month_start),
-          total: 0,
-          byCategory: Object.fromEntries(REPAIR_CATEGORY_ORDER.map((c) => [c, 0])),
-        });
+        repairMonthMap.set(key, emptyMonthBucket(key, monthLabel(row.month_start)));
       }
       const bucket = repairMonthMap.get(key);
-      const cat = REPAIR_CATEGORY_ORDER.includes(row.repair_category) ? row.repair_category : 'OTHER';
+      const cat = row.repair_category;
+      if (!REPAIR_CATEGORY_ORDER.includes(cat)) continue; // SQL da loc, phong ho
       const count = Number(row.order_count || 0);
       bucket.byCategory[cat] += count;
+      bucket.byCategoryRevenue[cat] += Math.round(Number(row.revenue || 0));
       bucket.total += count;
     }
     const repairCategoryMonthly = Array.from(repairMonthMap.values()).sort((a, b) => (a.month > b.month ? 1 : -1));
 
-    const repairCategoryPerformance = repairCategoryOverallResult.recordset.map((row) => {
+    const repairCategoryPerformance = repairCategoryOverallResult.recordset.filter((row) => (
+      REPAIR_CATEGORY_ORDER.includes(row.repair_category)
+    )).map((row) => {
       const invoiced = Number(row.invoiced_count || 0);
       const cancelled = Number(row.cancelled_count || 0);
       const concluded = invoiced + cancelled;
-      const revenue = Number(row.revenue || 0);
-      const cat = REPAIR_CATEGORY_ORDER.includes(row.repair_category) ? row.repair_category : 'OTHER';
+      const revenue = Math.round(Number(row.revenue || 0));
+      const cat = row.repair_category;
       return {
         repairCategory: cat,
         repairCategoryName: REPAIR_CATEGORY_LABELS[cat] || cat,
@@ -325,6 +358,63 @@ class DashboardRepositoryImpl extends DashboardRepository {
   async listCategories() {
     const result = await query(`SELECT id, category_name FROM service_categories ORDER BY category_name ASC`);
     return result.recordset.map((row) => ({ id: String(row.id), name: row.category_name }));
+  }
+
+  // Bam vao 1 loai hinh o bang "Hieu suat theo loai hinh" -> dich vu nao da
+  // dung + so phieu / so luong / doanh thu. Cung pham vi loc (chi nhanh, co
+  // van, khoang ngay, trang thai) voi getOverview de so phieu khop bang.
+  //
+  // Dong trong repair_order_items:
+  //   dich vu le      item_type='service', service_id co   -> gom theo service_id
+  //   goi bao duong   item_type='service', service_id NULL, item_code 'PKG-...'
+  //                   (dong header cua goi; cac hang muc con cua goi cung mang
+  //                   PM nhung la checklist, khong liet ke)   -> gom theo item_code
+  // Voi PM chi lay dong header goi; loai khac chi lay dich vu le.
+  async listRepairCategoryServices({ branchId, advisorId, fromDate, toDate, status, repairCategory } = {}) {
+    const params = { ...buildScopeParams({ branchId, advisorId, fromDate, toDate, status }), repairCategory };
+    const isPackage = repairCategory === 'PM';
+    const result = await query(
+      `WITH scoped_orders AS (
+         SELECT so.id, so.status
+         FROM   repair_orders so
+         WHERE  so.branch_id = @branchId
+           AND  (@advisorId IS NULL OR so.advisor_id = @advisorId)
+           AND  (@fromDate IS NULL OR so.intake_date >= @fromDate)
+           AND  (@toDate IS NULL OR so.intake_date < DATEADD(day, 1, CAST(@toDate AS DATE)))
+           AND  (@status IS NULL OR so.status = @status)
+       ),
+       items AS (
+         SELECT
+           ${isPackage ? 'soi.item_code' : 'CAST(soi.service_id AS NVARCHAR(20))'} AS item_key,
+           soi.item_code, soi.item_description, so.id AS order_id, so.status AS order_status,
+           soi.quantity, soi.total
+         FROM   scoped_orders so
+         JOIN   repair_order_items soi ON soi.repair_order_id = so.id
+         WHERE  soi.repair_category = @repairCategory
+           AND  soi.item_type = 'service'
+           AND  ${isPackage ? 'soi.service_id IS NULL AND soi.product_id IS NULL' : 'soi.service_id IS NOT NULL'}
+       )
+       SELECT
+         item_key,
+         MAX(item_code) AS item_code,
+         MAX(item_description) AS item_name,
+         COUNT(DISTINCT order_id) AS order_count,
+         SUM(quantity) AS quantity,
+         SUM(CASE WHEN order_status = 'invoiced' THEN total ELSE 0 END) AS revenue
+       FROM   items
+       GROUP BY item_key
+       ORDER BY order_count DESC, quantity DESC, item_code ASC`,
+      params
+    );
+    return result.recordset.map((row) => ({
+      key: String(row.item_key),
+      code: row.item_code,
+      name: row.item_name,
+      kind: isPackage ? 'package' : 'service',
+      orders: Number(row.order_count || 0),
+      quantity: Number(row.quantity || 0),
+      revenue: Number(row.revenue || 0),
+    }));
   }
 }
 

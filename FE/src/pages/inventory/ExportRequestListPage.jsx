@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PermissionGate } from '../../components/PermissionGate';
 import { useInventoryBranch } from './InventoryLayout';
+import { toLocalISODate } from '../../utils';
 import { useExportRequests } from '../../hooks/inventory/useExportRequests';
 import './ExportRequestListPage.css';
 
@@ -20,7 +21,7 @@ function formatDateTime(d) {
 function yearsFromToday(offset) {
   const d = new Date();
   d.setFullYear(d.getFullYear() + offset);
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 }
 const MIN_FILTER_DATE = yearsFromToday(-5);
 const MAX_FILTER_DATE = yearsFromToday(5);

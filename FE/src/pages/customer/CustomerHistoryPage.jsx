@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { formatCurrency, formatDate } from '../../utils';
+import { formatCurrency, formatDate, toLocalISODate } from '../../utils';
 import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
 import { listCustomersApi, getCustomerApi, updateCustomerApi, importCustomersApi, addCustomerVehicleApi } from '../../services/customerApi';
 import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi, listVehicleModelsApi, listVehicleSegmentsApi, createVehicleModelApi } from '../../services/vehicleApi';
@@ -247,7 +247,7 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
   const [newFullName, setNewFullName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newAddress, setNewAddress] = useState('');
-  const [transferDate, setTransferDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [transferDate, setTransferDate] = useState(() => toLocalISODate());
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');

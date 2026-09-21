@@ -717,7 +717,7 @@ function EmployeeFormPage({ mode }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
           <div className="form-section-title">👥 Thông tin nhân viên</div>
 
@@ -1081,7 +1081,7 @@ function ServiceListPage() {
 
         <select className="filter-select" value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)}>
           <option value="all">Tất cả loại hình sửa chữa</option>
-          {REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
+          {SERVICE_REPAIR_CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
@@ -1197,6 +1197,10 @@ const REPAIR_CATEGORY_OPTIONS = [
   { value: 'PM', label: 'Bảo dưỡng định kỳ' },
   { value: 'CS', label: 'Chăm sóc xe' },
 ];
+// Dich vu LE khong co "Bao duong dinh ky" - loai hinh do danh rieng cho GOI bao
+// duong (BE ManagerService cung chan PM khi tao/sua dich vu le). Dung cho bo
+// loc + form dich vu le; REPAIR_CATEGORY_OPTIONS day du van dung de hien nhan.
+const SERVICE_REPAIR_CATEGORY_OPTIONS = REPAIR_CATEGORY_OPTIONS.filter((o) => o.value !== 'PM');
 
 function repairCategoryLabel(code) {
   return REPAIR_CATEGORY_OPTIONS.find((o) => o.value === code)?.label || '—';
@@ -1268,14 +1272,14 @@ function ServiceFormPage({ mode }) {
     if (!isEdit && !form.serviceCode.trim()) errors.serviceCode = 'Vui lòng nhập mã dịch vụ';
     if (!form.serviceName.trim()) errors.serviceName = 'Vui lòng nhập tên dịch vụ';
     if (form.unitPrice === '' || Number.isNaN(Number(form.unitPrice)) || Number(form.unitPrice) < 0) {
-      errors.unitPrice = 'Đơn giá không hợp lệ';
+      errors.unitPrice = Number(form.unitPrice) < 0 ? 'Đơn giá không được nhỏ hơn 0' : 'Vui lòng nhập đơn giá hợp lệ';
     }
     if (form.durationMin !== '' && (Number.isNaN(Number(form.durationMin)) || Number(form.durationMin) < 0)) {
-      errors.durationMin = 'Thời gian không hợp lệ';
+      errors.durationMin = Number(form.durationMin) < 0 ? 'Thời gian thực hiện không được nhỏ hơn 0' : 'Thời gian thực hiện phải là số phút hợp lệ';
     }
     const filledParts = parts.filter((p) => p.productId !== '');
     if (filledParts.some((p) => !p.quantity || Number(p.quantity) <= 0)) {
-      errors.parts = 'Số lượng phụ tùng phải lớn hơn 0';
+      errors.parts = 'Số lượng mỗi phụ tùng phải từ 1 trở lên';
     }
     const productIds = filledParts.map((p) => p.productId);
     if (new Set(productIds).size !== productIds.length) {
@@ -1389,7 +1393,7 @@ function ServiceFormPage({ mode }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
           <div className="form-section-title">🛠️ Thông tin dịch vụ</div>
 
@@ -1429,7 +1433,7 @@ function ServiceFormPage({ mode }) {
             <div className="form-group">
               <label className="form-label">Loại hình sửa chữa</label>
               <select className="form-select" value={form.repairCategory} onChange={(e) => setField('repairCategory', e.target.value)}>
-                {REPAIR_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {SERVICE_REPAIR_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
               <div style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
                 Dùng để tự điền khi cố vấn dịch vụ chọn dịch vụ này trên phiếu quyết toán.
@@ -2012,7 +2016,7 @@ function ServicePackageFormPage({ mode }) {
     const errors = {};
     if (!form.packageName.trim()) errors.packageName = 'Vui lòng nhập tên gói';
     if (form.totalPrice === '' || Number.isNaN(Number(form.totalPrice)) || Number(form.totalPrice) < 0) {
-      errors.totalPrice = 'Giá gói không hợp lệ';
+      errors.totalPrice = Number(form.totalPrice) < 0 ? 'Giá gói không được nhỏ hơn 0' : 'Vui lòng nhập giá gói hợp lệ';
     }
     if (form.serviceIds.length === 0) errors.serviceIds = 'Vui lòng chọn ít nhất 1 dịch vụ cho gói';
     setFieldErrors(errors);
@@ -2105,7 +2109,7 @@ function ServicePackageFormPage({ mode }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
           <div className="form-section-title">📦 Thông tin gói bảo dưỡng</div>
 
@@ -2939,7 +2943,7 @@ function TechnicianFormPage({ mode }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <div className="table-wrapper" style={{ padding: 20, marginBottom: 16 }}>
           <div className="form-section-title">🛠️ Thông tin thợ máy</div>
 

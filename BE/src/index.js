@@ -398,6 +398,23 @@ async function start() {
       process.exit(1);
     }
 
+    // Khoa ngoai cho 9 bang truoc gio chi noi bang id trong code (login_sessions,
+    // notifications, payos_transactions, export_request_pickups, vehicle_bays...).
+    // PHAI chay CUOI CUNG: can cac cot/bang do ensureExportPickups va
+    // ensureExportIssuerSignature tao ra. Khong nuot loi: don dong mo coi + them
+    // FK trong 1 transaction, hong la DB o trang thai cu.
+    try {
+      const { ensureMissingForeignKeys } = require('./infrastructure/database/ensureMissingForeignKeys');
+      const r = await ensureMissingForeignKeys();
+      console.log(r.skipped
+        ? '[BE] khoa ngoai con thieu: da co tu truoc, bo qua'
+        : `[BE] khoa ngoai con thieu: DA THEM XONG (${r.steps} buoc, don ${r.cleaned.reduce((s, c) => s + c.n, 0)} dong mo coi)`);
+    } catch (fkErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them khoa ngoai con thieu that bai:');
+      console.error(fkErr.message);
+      process.exit(1);
+    }
+
     const server = http.createServer({ maxHeaderSize: 32768 }, app);
     server.listen(config.port, () => {
       console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);

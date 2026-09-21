@@ -7,7 +7,7 @@ import { useConfirm } from '../../components/common/ConfirmDialog';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { ROLES } from '../../constants/roles';
 import { actionLabel, consumesPart } from '../../constants/maintenanceChecklist';
-import { formatCurrency } from '../../utils';
+import { formatCurrency, toLocalISODate } from '../../utils';
 import { searchVehiclesApi, listVehicleModelsApi } from '../../services/vehicleApi';
 import { searchCatalogApi } from '../../services/catalogApi';
 import { searchProductsApi } from '../../services/productApi';
@@ -2404,7 +2404,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   const nowStr = new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   // Chan chon "Ngày mua" xe trong tuong lai (input type=date) - xe khong the
   // mua o mot ngay chua toi.
-  const todayInputValue = new Date().toISOString().slice(0, 10);
+  const todayInputValue = toLocalISODate();
 
   const [customerQuery, setCustomerQuery] = useState(existingOrder?.customer?.fullName || '');
   const [plateQuery, setPlateQuery] = useState(existingOrder?.vehicle?.licensePlate || '');

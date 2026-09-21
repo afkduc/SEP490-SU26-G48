@@ -370,10 +370,10 @@ test('Lọc danh sách dịch vụ theo từ khóa, trạng thái và loại hì
     }
   }));
   assert.deepEqual(await service.listServices(1, {
-    search: 'thay dầu', status: 'active', repairCategory: 'PM'
+    search: 'thay dầu', status: 'active', repairCategory: 'ER'
   }), [{ id: 700, serviceName: 'Thay dầu máy' }]);
   assert.deepEqual(calls, [[1, {
-    search: 'thay dầu', status: 'active', repairCategory: 'PM'
+    search: 'thay dầu', status: 'active', repairCategory: 'ER'
   }]]);
 });
 test('Không tìm thấy dịch vụ theo bộ lọc trên giao diện', async () => {
@@ -400,12 +400,24 @@ function baseServicePayload(overrides = {}) {
     serviceName: 'Dịch vụ kiểm thử',
     unitPrice: 500000,
     durationMin: 30,
-    repairCategory: 'PM',
+    repairCategory: 'ER',
     description: 'Thay dầu động cơ',
     parts: [{ productId: 500, quantity: 1 }],
     ...overrides
   };
 }
+test('Dịch vụ lẻ không nhận loại hình "Bảo dưỡng định kỳ" (PM dành cho gói) - tạo/sửa/lọc', async () => {
+  const service = new ManagerService(mockRepo());
+  await assert.rejects(() => service.createService(1, baseServicePayload({ repairCategory: 'PM' })), err => (
+    err.statusCode === 400 && /dành cho gói bảo dưỡng/.test(err.message)
+  ));
+  await assert.rejects(() => service.updateService(1, 1, baseServicePayload({ repairCategory: 'PM' })), err => (
+    err.statusCode === 400 && /dành cho gói bảo dưỡng/.test(err.message)
+  ));
+  await assert.rejects(() => service.listServices(1, { repairCategory: 'PM' }), err => (
+    err.statusCode === 400 && err.message === 'Loại hình sửa chữa không hợp lệ'
+  ));
+});
 test("createService validates required name/price, price, duration, repairCategory - case 01", async () => {
   const service = new ManagerService(mockRepo());
   await assert.rejects(() => service.createService(1, baseServicePayload({
@@ -479,7 +491,7 @@ test('createService succeeds with a unique code and a valid part', async () => {
   assert.equal(created.unitPrice, 500000);
   assert.equal(created.serviceName, 'Dịch vụ kiểm thử');
   assert.equal(created.durationMin, 30);
-  assert.equal(created.repairCategory, 'PM');
+  assert.equal(created.repairCategory, 'ER');
   assert.equal(created.description, 'Thay dầu động cơ');
   assert.deepEqual(created.parts, [{ productId: 500, quantity: 1 }]);
 });
@@ -530,7 +542,7 @@ test('Cập nhật dịch vụ và giữ trạng thái hoạt động', async ()
   assert.equal(resultNoChange.serviceName, 'Dịch vụ kiểm thử');
   assert.equal(resultNoChange.unitPrice, 500000);
   assert.equal(resultNoChange.durationMin, 30);
-  assert.equal(resultNoChange.repairCategory, 'PM');
+  assert.equal(resultNoChange.repairCategory, 'ER');
   assert.equal(resultNoChange.description, 'Thay dầu động cơ');
   assert.deepEqual(resultNoChange.parts, [{ productId: 500, quantity: 1 }]);
   assert.equal(resultNoChange.isActive, true);
