@@ -44,6 +44,12 @@ const HEADER_SELECT = `
          -- thay phieu trong bang "Việc chờ nhận".
          so.assigned_team_leader_id,
          atl.user_name AS assigned_team_leader_name,
+         -- To truong da tu choi nhan viec (kem ly do). Co 3 cot nay nghia la
+         -- phieu dang nam cho co van xu ly lai - xem ensureAssignmentDecline.js.
+         so.assignment_declined_by,
+         so.assignment_declined_reason,
+         so.assignment_declined_at,
+         adb.user_name AS assignment_declined_by_name,
          inv.issued_at AS invoice_issued_at,
          inv.payment_method,
          vb.bay_number AS bay_number,
@@ -96,6 +102,7 @@ const HEADER_SELECT = `
   JOIN   users     adv ON adv.id = so.advisor_id
   LEFT JOIN users  tl  ON tl.id = so.team_leader_id
   LEFT JOIN users  atl ON atl.id = so.assigned_team_leader_id
+  LEFT JOIN users  adb ON adb.id = so.assignment_declined_by
   LEFT JOIN users  cadv ON cadv.id = so.closing_advisor_id
   LEFT JOIN users  lockUser ON lockUser.id = so.locked_by_user_id
   OUTER APPLY (
@@ -159,7 +166,13 @@ function buildConditions({ branchId, status, search, customerId, vehicleId, from
   // de biet phieu minh lap dang nam o dau.
   if (forTeamLeaderId) {
     params.forTeamLeaderId = forTeamLeaderId;
-    conditions.push('(so.assigned_team_leader_id IS NULL OR so.assigned_team_leader_id = @forTeamLeaderId)');
+    // assignment_declined_at IS NULL: phieu vua bi tu choi thi bien mat khoi
+    // bang cua MOI to truong (ke ca nguoi vua tu choi) - no quay ve tay co van
+    // cho den khi co van doi nguoi hoac day lai cho tat ca.
+    conditions.push(
+      '((so.assigned_team_leader_id IS NULL OR so.assigned_team_leader_id = @forTeamLeaderId)'
+      + ' AND so.assignment_declined_at IS NULL)'
+    );
   }
 
   if (status) {
@@ -1034,6 +1047,41 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         customerSignatureData,
         customerSignerName: customerSignerName || null,
       }
+    );
+    return result.rowsAffected[0] > 0;
+  }
+
+  // To truong tu choi nhan viec. WHERE rang buoc du 3 dieu kien de khong ai
+  // tu choi ho nguoi khac, va khong tu choi duoc phieu da co nguoi nhan:
+  // dung phieu duoc chi dinh cho minh, va phieu con dang cho sua chua.
+  async declineAssignment(id, { teamLeaderId, reason }) {
+    const result = await query(
+      `UPDATE repair_orders
+       SET    assignment_declined_by = @teamLeaderId,
+              assignment_declined_reason = @reason,
+              assignment_declined_at = ${NOW_VN_SQL}
+       WHERE  id = @id
+         AND  assigned_team_leader_id = @teamLeaderId
+         AND  status = 'waiting_repair'
+         AND  assignment_declined_at IS NULL`,
+      { id: Number(id), teamLeaderId: Number(teamLeaderId), reason }
+    );
+    return result.rowsAffected[0] > 0;
+  }
+
+  // Co van giao lai phieu: teamLeaderId = so -> chi dinh nguoi moi;
+  // teamLeaderId = null -> day lai cho TAT CA to truong.
+  // Luon xoa dau vet tu choi cu - ly do cua nguoi truoc khong con y nghia voi
+  // nguoi nhan moi, va con thi phieu se bi bo loc an di vinh vien.
+  async reassignTeamLeader(id, teamLeaderId) {
+    const result = await query(
+      `UPDATE repair_orders
+       SET    assigned_team_leader_id = @teamLeaderId,
+              assignment_declined_by = NULL,
+              assignment_declined_reason = NULL,
+              assignment_declined_at = NULL
+       WHERE  id = @id AND status = 'waiting_repair'`,
+      { id: Number(id), teamLeaderId: teamLeaderId ? Number(teamLeaderId) : null }
     );
     return result.rowsAffected[0] > 0;
   }

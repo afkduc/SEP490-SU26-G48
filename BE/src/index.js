@@ -232,6 +232,21 @@ async function start() {
       process.exit(1);
     }
 
+    // Cot to truong TU CHOI nhan viec (kem ly do) - di lien voi cot chi dinh
+    // o tren. KHONG duoc nuot loi: bang "Việc chờ nhận" loc theo cot nay, thieu
+    // cot la to truong nao cung thay phieu cua nguoi khac.
+    try {
+      const { ensureAssignmentDecline } = require('./infrastructure/database/ensureAssignmentDecline');
+      const r = await ensureAssignmentDecline();
+      console.log(r.skipped
+        ? '[BE] tu choi nhan viec: da co tu truoc, bo qua'
+        : `[BE] tu choi nhan viec: DA THEM XONG (${r.steps} buoc)`);
+    } catch (declineErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them cot tu choi nhan viec that bai:');
+      console.error(declineErr.message);
+      process.exit(1);
+    }
+
     // Loai hinh sua chua 'CS' (Cham soc xe) - FE/BE da cho phep nhung rang
     // buoc CHECK cua repair_order_items thi chua, nen luu phieu co dich vu
     // cham soc xe la chet o INSERT. KHONG duoc nuot loi: bo qua thi CVDV van

@@ -107,7 +107,7 @@ class PasswordResetService {
     const includeBoth = config.frontendIncludeBothLinks
       && config.frontendUrlLocal !== config.frontendUrlProd;
     const userName =
-      [user.first_name, user.last_name].filter(Boolean).join(' ')
+      [user.last_name, user.first_name].filter(Boolean).join(' ')
       || user.user_name
       || user.email;
 

@@ -38,6 +38,10 @@ function buildRepairSettlementRouter() {
   // 3 vai tro nay lay dung theo chan cua FE (AppRoutes.jsx, route
   // /repair-settlement/* mo cho SERVICE_ADVISOR / MANAGER / ADMIN) - de FE va
   // BE khong lech nhau.
+  // To truong tu choi nhan viec - vai tro NGUOC voi chiCoVan nen dat rieng.
+  // Service con kiem lai phieu co dung duoc chi dinh cho nguoi goi khong.
+  router.post('/:id/decline-assignment', authorize('team_leader'), controller.declineAssignment);
+
   const chiCoVan = authorize('service_advisor', 'manager', 'admin');
   router.post('/', chiCoVan, controller.create);
   router.put('/:id', chiCoVan, controller.update);
@@ -48,6 +52,9 @@ function buildRepairSettlementRouter() {
   router.post('/:id/closing-signature', chiCoVan, controller.saveClosingSignature);
   router.post('/:id/lock', chiCoVan, controller.lock);
   router.delete('/:id/lock', chiCoVan, controller.unlock);
+  // Doi to truong nhan viec / day lai cho tat ca - sau khi bi tu choi, hoac
+  // don gian la co van doi y khi phieu chua ai nhan.
+  router.patch('/:id/assigned-team-leader', chiCoVan, controller.reassignTeamLeader);
   router.post('/:id/payos/create-payment-link', chiCoVan, controller.createPaymentLink);
 
   return router;

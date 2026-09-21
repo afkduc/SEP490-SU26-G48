@@ -55,14 +55,14 @@ class ProfileService {
 
     if (payload.firstName !== undefined && payload.firstName !== null) {
       const firstName = String(payload.firstName).trim().replace(/\s+/g, ' ');
-      const firstNameErr = getPersonNameError(firstName, { required: false, label: 'Họ' });
+      const firstNameErr = getPersonNameError(firstName, { required: false, label: 'Tên' });
       if (firstNameErr) errors.push(firstNameErr);
       else payload.firstName = firstName;
     }
 
     if (payload.lastName !== undefined && payload.lastName !== null) {
       const lastName = String(payload.lastName).trim().replace(/\s+/g, ' ');
-      const lastNameErr = getPersonNameError(lastName, { required: false, label: 'Tên' });
+      const lastNameErr = getPersonNameError(lastName, { required: false, label: 'Họ' });
       if (lastNameErr) errors.push(lastNameErr);
       else payload.lastName = lastName;
     }

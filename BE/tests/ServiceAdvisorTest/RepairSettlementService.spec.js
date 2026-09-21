@@ -1011,6 +1011,9 @@ test('Lọc phiếu quyết toán theo trạng thái, từ khóa, cố vấn và
     ...filters,
     customerId: undefined,
     vehicleId: undefined,
+    // Bo loc "chi phieu cua to truong nay" - undefined voi co van dich vu,
+    // xem TeamLeaderAssignment.spec.js.
+    forTeamLeaderId: undefined,
   });
   assert.deepEqual(countFilters, {
     branchId: 1,
@@ -1021,6 +1024,7 @@ test('Lọc phiếu quyết toán theo trạng thái, từ khóa, cố vấn và
     fromDate: '2026-09-01',
     toDate: '2026-09-10',
     advisorId: 5,
+    forTeamLeaderId: undefined,
   });
 });
 

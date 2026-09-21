@@ -1,4 +1,5 @@
 const { query } = require('../database/sqlServer');
+const { ghepHoTen } = require('../../utils/hoTen');
 
 // Cot chinh cua user (khong bao gom branchName - do ProfileBranchService
 // Branch scope: users.branch_id (+ ProfileBranchService).
@@ -122,6 +123,22 @@ class ProfileRepositoryImpl {
       updates.push(`phone = @p${p}`);
       params[`p${p}`] = phone || null;
       p++;
+    }
+
+    // Ten hien thi o moi man hinh khac deu doc users.user_name, nen sua ho/ten
+    // trong ho so ma khong dong bo lai thi nguoi dung doi ten xong van thay ten
+    // cu o danh sach phieu, nhat ky, chu ky...
+    if (firstName !== undefined || lastName !== undefined) {
+      const hienTai = await this.findById(userId);
+      const hoTen = ghepHoTen(
+        lastName !== undefined ? lastName : hienTai?.lastName,
+        firstName !== undefined ? firstName : hienTai?.firstName
+      );
+      if (hoTen) {
+        updates.push(`user_name = @p${p}`);
+        params[`p${p}`] = hoTen;
+        p++;
+      }
     }
 
     // Set updated_at = SYSUTCDATETIME() de trigger khong can chay.

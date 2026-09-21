@@ -1,5 +1,6 @@
 const { query, sql } = require('../database/sqlServer');
 const { runInTransaction } = require('../../utils/sqlTransaction');
+const { tachHoTen } = require('../../utils/hoTen');
 
 // Tổ trưởng đã gộp vào module Nhân viên (dùng chung listEmployees/createEmployee/...),
 // nên phải nằm trong EMPLOYEE_ROLES để hiện ra trong danh sách/tìm kiếm nhân viên.
@@ -27,7 +28,7 @@ function aggregateEmployees(rows = []) {
       map.set(key, {
         id: row.id,
         employeeId: row.pseudo_id || String(row.id),
-        fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+        fullName: row.user_name || `${row.last_name || ''} ${row.first_name || ''}`.trim() || '—',
         firstName: row.first_name,
         lastName: row.last_name,
         email: row.email,
@@ -133,7 +134,7 @@ function mapTechnicianRow(row) {
   return {
     id: row.id,
     employeeId: row.pseudo_id || String(row.id),
-    fullName: row.user_name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || '—',
+    fullName: row.user_name || `${row.last_name || ''} ${row.first_name || ''}`.trim() || '—',
     email: row.email,
     phone: row.phone,
     status: row.status,
@@ -339,10 +340,11 @@ class ManagerRepositoryImpl {
     const result = await query(
       `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status, team_size, created_at)
        OUTPUT INSERTED.id
-       VALUES (@pseudoId, @fullName, @email, @passwordHash, @fullName, '', @phone, @branchId, @status, 0, GETDATE())`,
+       VALUES (@pseudoId, @fullName, @email, @passwordHash, @ten, @ho, @phone, @branchId, @status, 0, GETDATE())`,
       {
         pseudoId,
         fullName,
+        ...tachHoTen(fullName),
         email,
         passwordHash,
         phone: phone || null,
@@ -365,13 +367,15 @@ class ManagerRepositoryImpl {
     await query(
       `UPDATE users
        SET user_name = @fullName,
-           first_name = @fullName,
+           first_name = @ten,
+           last_name = @ho,
            email = @email,
            phone = @phone,
            status = @status
        WHERE id = @id AND branch_id = @branchId`,
       {
         fullName,
+        ...tachHoTen(fullName),
         email,
         phone: phone || null,
         status,
@@ -1035,10 +1039,11 @@ class ManagerRepositoryImpl {
     const result = await query(
       `INSERT INTO users (pseudo_id, user_name, email, user_password, first_name, last_name, phone, branch_id, status, team_size, team_leader_id, created_at)
        OUTPUT INSERTED.id
-       VALUES (@pseudoId, @fullName, @email, @passwordHash, @fullName, '', @phone, @branchId, @status, 0, @teamLeaderId, GETDATE())`,
+       VALUES (@pseudoId, @fullName, @email, @passwordHash, @ten, @ho, @phone, @branchId, @status, 0, @teamLeaderId, GETDATE())`,
       {
         pseudoId,
         fullName,
+        ...tachHoTen(fullName),
         email,
         passwordHash,
         phone: phone || null,
@@ -1060,7 +1065,8 @@ class ManagerRepositoryImpl {
     await query(
       `UPDATE users
        SET user_name = @fullName,
-           first_name = @fullName,
+           first_name = @ten,
+           last_name = @ho,
            email = @email,
            phone = @phone,
            status = @status,
@@ -1068,6 +1074,7 @@ class ManagerRepositoryImpl {
        WHERE id = @id AND branch_id = @branchId`,
       {
         fullName,
+        ...tachHoTen(fullName),
         email,
         phone: phone || null,
         status,

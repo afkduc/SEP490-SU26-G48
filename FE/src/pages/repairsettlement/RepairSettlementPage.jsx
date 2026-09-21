@@ -13,6 +13,7 @@ import { searchCatalogApi } from '../../services/catalogApi';
 import { searchProductsApi } from '../../services/productApi';
 import {
   listRepairSettlementsApi,
+  reassignTeamLeaderApi,
   decideNgTaskApi,
   getRepairSettlementApi,
   checkDuplicateSettlementApi,
@@ -32,6 +33,7 @@ import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
 import IntakeChecklistView from './IntakeChecklistView';
+import { printIntakeSheet } from './printIntake';
 import VehicleHistoryModal from './VehicleHistoryModal';
 import { assignGroupIds, dongHangMucDeIn } from './settlementItems';
 import SignaturePad from './SignaturePad';
@@ -630,7 +632,7 @@ function oKy(tieuDe, anh, ten) {
 // payosQrCode: chuoi QR PayOS dang con hieu luc (chi co khi in tu modal xem
 // truoc luc phieu dang "cho thanh toan") - khong truyen thi khong hien QR
 // gi ca (vd in luc vua tao phieu, hoac in lai phieu da xuat hoa don roi).
-function printSettlement(order, payosQrCode) {
+function printSettlement(order, payosQrCode, { khongChuKy = false } = {}) {
   logPrintBestEffort(order, 'settlement');
   // Tach 2 nhom "Cong viec can thuc hien" / "Phu tung, vat tu" khi in - giong
   // cach hien thi ben form tao/sua phieu va modal Xem chi tiet (giu nguyen so
@@ -708,6 +710,9 @@ function printSettlement(order, payosQrCode) {
     text-transform:uppercase; border-bottom:1px solid #999; padding-bottom:3px; margin-bottom:6px; }
   .sign-group-boxes { display:flex; justify-content:space-around; }
   .sign-group .sign-box { width:46%; }
+  /* Phieu quyet toan chi con 2 o ky (khach nhan xe + CVDV ban giao) nen o
+     rong hon, du cho ky tay khi in ban trang. */
+  .sign-row > .sign-box { width:38%; }
   .sign-line.has-img { margin-top:0; }
   /* Dong bi doi sau khi chot voi khach (khach huy / tra bot phu tung) - in
      mau do de nguoi doc thay ngay vi sao tien cuoi khac bao gia ban dau.
@@ -777,20 +782,10 @@ function printSettlement(order, payosQrCode) {
 </div>
 
 <div class="sign-row">
-  <div class="sign-group">
-    <div class="sign-group-title">Tiếp nhận xe</div>
-    <div class="sign-group-boxes">
-      ${oKy('Khách duyệt báo giá', order.signatureData, order.signerName || order.customer?.fullName)}
-      ${oKy('CVDV lập phiếu', order.advisorSignatureData, order.advisor)}
-    </div>
-  </div>
-  <div class="sign-group">
-    <div class="sign-group-title">Bàn giao xe</div>
-    <div class="sign-group-boxes">
-      ${oKy('Khách nhận xe', order.customerFinalSignatureData, order.customerFinalSignerName)}
-      ${oKy('CVDV quyết toán', order.closingSignatureData, order.closingAdvisorName)}
-    </div>
-  </div>
+  ${oKy('Khách hàng nhận xe', khongChuKy ? null : order.customerFinalSignatureData,
+        khongChuKy ? '' : order.customerFinalSignerName)}
+  ${oKy('Cố vấn dịch vụ bàn giao xe', khongChuKy ? null : order.closingSignatureData,
+        khongChuKy ? '' : order.closingAdvisorName)}
 </div>
 </body></html>`;
   return moCuaSoIn(html);
@@ -927,8 +922,10 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id, daKyQuyetToan]);
 
-  const handlePrint = () => {
-    const loi = printSettlement(order, payos?.qrCode);
+  // khongChuKy = in ban TRANG de khach ky tay tren giay (co khach khong muon
+  // ky tren man hinh). Van in day du hang muc va tien, chi bo anh chu ky.
+  const handlePrint = (khongChuKy = false) => {
+    const loi = printSettlement(order, payos?.qrCode, { khongChuKy });
     if (loi) {
       setPrintError(loi);
       return;
@@ -1143,10 +1140,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
               </div>
             ) : (
               <div style={{ border: '1px solid var(--gray-300)', borderRadius: 8, padding: 12 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Ký quyết toán &amp; giao xe</div>
-                <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 10 }}>
-                  Khách hàng nhận xe và cố vấn dịch vụ chốt phiếu cùng ký. Ký xong mới thu được tiền.
-                </div>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Ký quyết toán &amp; giao xe</div>
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 260px' }}>
                     <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
@@ -1168,11 +1162,12 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                       Cố vấn dịch vụ
                     </div>
                     <SignaturePad ref={closingAdvisorPadRef} onChange={setClosingAdvisorEmpty} />
+                    {/* Khong hien ten nua - ky la da ghi ro ho ten trong o ky roi. */}
                     <div style={{
-                      textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 8,
-                      borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+                      textAlign: 'center', fontSize: 12, fontStyle: 'italic', color: 'var(--gray-600)',
+                      marginTop: 8, borderTop: '1px solid var(--gray-200)', paddingTop: 6,
                     }}>
-                      {nguoiDangDangNhap?.name || 'Cố vấn dịch vụ'}
+                      Ký và ghi rõ họ tên
                     </div>
                   </div>
                 </div>
@@ -1186,11 +1181,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                   </div>
                 ) : (
                   <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginTop: 10, fontStyle: 'italic' }}>
-                    {dangLuuChuKy
-                      ? 'Đang lưu chữ ký…'
-                      : (!tenNguoiNhanXe.trim()
-                        ? 'Nhập tên người nhận xe để lưu được chữ ký.'
-                        : 'Ký đủ hai bên là chữ ký tự động được lưu.')}
+                    {dangLuuChuKy ? 'Đang lưu chữ ký…' : (!tenNguoiNhanXe.trim() ? 'Nhập tên người nhận xe.' : '')}
                   </div>
                 )}
               </div>
@@ -1216,8 +1207,12 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
               {confirmingCash ? 'Đang xử lý…' : 'Xác nhận tiền mặt'}
             </button>
           )}
-          <button className="btn btn-secondary" onClick={handlePrint}>
+          <button className="btn btn-secondary" onClick={() => handlePrint(false)}>
             {hasPrinted ? 'In lại phiếu quyết toán' : 'In phiếu quyết toán'}
+          </button>
+          <button className="btn btn-secondary" onClick={() => handlePrint(true)}
+            title="In phiếu để khách ký tay trên giấy">
+            In phiếu (ký tay)
           </button>
         </div>
       </div>
@@ -1301,7 +1296,91 @@ function CollapsibleCard({ title, note, summary, actions, open, onToggle, bodySt
   );
 }
 
-function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, decidingId }) {
+// Giao lai phieu CHUA AI NHAN cho to truong khac, hoac day lai cho tat ca.
+// Dung o 2 tinh huong: to truong duoc chi dinh vua tu choi (kem ly do), hoac
+// co van don gian doi y. Phieu da co nguoi nhan (inprogress tro di) thi BE
+// chan 409 - luc do xe da vao khoang roi, doi nguoi tren giay to vo nghia.
+function ReassignTeamLeaderModal({ order, onClose, onDone }) {
+  const [teamLeaders, setTeamLeaders] = useState([]);
+  const [selected, setSelected] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    listBranchTeamLeadersApi()
+      .then((data) => setTeamLeaders(data || []))
+      .catch(() => setTeamLeaders([]));
+  }, []);
+
+  const guiDi = async (teamLeaderId) => {
+    setSubmitting(true);
+    setError('');
+    try {
+      await reassignTeamLeaderApi(order.id, teamLeaderId);
+      onDone();
+    } catch (err) {
+      setError(err.message || 'Không giao lại được, vui lòng thử lại');
+      setSubmitting(false);
+    }
+  };
+
+  // Nguoi vua tu choi khong hien trong o chon - giao lai dung nguoi do la
+  // chac chan bi tu choi lan nua.
+  const dsChon = teamLeaders.filter(
+    (t) => String(t.id) !== String(order.assignmentDeclinedBy || '')
+  );
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">Giao lại việc — {order.code}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          {order.assignmentDeclinedAt && (
+            <div style={{
+              background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 6,
+              padding: '8px 12px', fontSize: 13, marginBottom: 14,
+            }}>
+              <b>{order.assignmentDeclinedByName || 'Tổ trưởng'}</b> đã từ chối lúc{' '}
+              {order.assignmentDeclinedAt}
+              <div style={{ marginTop: 4 }}>Lý do: <i>{order.assignmentDeclinedReason || '—'}</i></div>
+            </div>
+          )}
+
+          <label className="form-label">Giao cho tổ trưởng</label>
+          <select
+            className="form-input"
+            value={selected}
+            disabled={submitting}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            <option value="">— Chọn tổ trưởng —</option>
+            {dsChon.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+
+          {error && <div className="alert alert-error" style={{ marginTop: 12 }}>{error}</div>}
+        </div>
+        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+          {/* Duong thoat khi khong biet giao cho ai: ai ranh thi nhan truoc. */}
+          <button type="button" className="btn btn-secondary" disabled={submitting}
+            onClick={() => guiDi(null)}>
+            Đẩy cho tất cả tổ trưởng
+          </button>
+          <button type="button" className="btn btn-primary" disabled={!selected || submitting}
+            onClick={() => guiDi(Number(selected))}>
+            {submitting ? 'Đang lưu…' : 'Giao cho tổ trưởng này'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, decidingId, onReassign }) {
   const st = STATUS_LABELS[displayStatus(order)];
   const [showIntake, setShowIntake] = useState(false);
   return (
@@ -1357,6 +1436,45 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
               ))}
             </div>
           </div>
+
+          {/* To truong duoc chi dinh da tu choi - phieu dang nam cho co van
+              xu ly, khong to truong nao con nhin thay no ca. */}
+          {order.assignmentDeclinedAt && (
+            <div style={{
+              background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 8,
+              padding: '10px 14px', marginBottom: 16, fontSize: 13,
+            }}>
+              <div style={{ fontWeight: 700, color: '#B91C1C' }}>
+                Tổ trưởng {order.assignmentDeclinedByName || ''} đã từ chối nhận việc
+                {order.assignmentDeclinedAt ? ` lúc ${order.assignmentDeclinedAt}` : ''}
+              </div>
+              <div style={{ marginTop: 4 }}>Lý do: <i>{order.assignmentDeclinedReason || '—'}</i></div>
+              {onReassign && (
+                <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 10 }}
+                  onClick={() => onReassign(order)}>
+                  Giao lại việc
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Phieu chua ai nhan thi con doi duoc nguoi nhan. */}
+          {!order.assignmentDeclinedAt && order.status === 'waiting_repair' && onReassign && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: 'var(--gray-100)', borderRadius: 8,
+              padding: '8px 14px', marginBottom: 16, fontSize: 13,
+            }}>
+              <span>
+                Người nhận việc:{' '}
+                <b>{order.assignedTeamLeaderName || 'Tất cả tổ trưởng'}</b>
+              </span>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }}
+                onClick={() => onReassign(order)}>
+                Đổi người nhận
+              </button>
+            </div>
+          )}
 
           <div className="form-section-title">Yêu cầu khách hàng</div>
           <div style={{ background: 'var(--gray-100)', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
@@ -1513,6 +1631,19 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
           <div className="modal-body">
             <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} />
           </div>
+          {/* In rieng phieu tiep nhan (kem chu ky khach + CVDV tiep nhan) -
+              day la to giay khach ky xac nhan tinh trang xe luc mang den,
+              khac han phieu quyet toan (tien nong, ky luc nhan xe ve). */}
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => printIntakeSheet(order, {}, moCuaSoIn)}>
+              In phiếu tiếp nhận
+            </button>
+            <button className="btn btn-secondary"
+              title="In phiếu để khách ký tay trên giấy"
+              onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
+              In phiếu (ký tay)
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -1632,6 +1763,8 @@ function RepairSettlementList() {
   }, [menuOpenId]);
   // Phieu dang xem "Nhat ky hoat dong" (modal rieng, khong lien quan view/khoa).
   const [activityLogFor, setActivityLogFor] = useState(null);
+  // Phieu dang mo modal "Giao lai viec" (doi to truong / day cho tat ca).
+  const [reassignTarget, setReassignTarget] = useState(null);
   // Khoa "dang mo phieu" (xem lockSettlementApi) - id phieu dang giu khoa +
   // interval gia han 20s/lan trong luc con mo view. Dung ref (khong phai
   // state) vi chi doc/ghi trong callback/cleanup, khong can re-render.
@@ -1774,6 +1907,14 @@ function RepairSettlementList() {
     }
     if (event.type === 'order-cancelled') {
       loadAll({ silent: true });
+    }
+    // To truong vua tu choi nhan viec - phieu quay ve tay co van, phai hien
+    // ngay bang canh bao chu khong doi nhip poll 20s.
+    if (event.type === 'assignment-declined') {
+      loadAll({ silent: true });
+      if (view && String(view.id) === String(event.orderId)) {
+        getRepairSettlementApi(view.id).then(setView).catch(() => { });
+      }
     }
     // 1 CVDV khac vua chiem/nha khoa "dang mo phieu" - nap lai danh sach de
     // cot "Đang mở bởi" cap nhat ngay, khong can cho poll 20s.
@@ -2156,6 +2297,9 @@ function RepairSettlementList() {
           onPreview={setPreviewOrder}
           onDecideNg={canManage ? handleDecideNg : undefined}
           decidingId={decidingId}
+          // Chi co van (khong phai admin chi xem) moi giao lai viec duoc, va
+          // chi khi phieu con dang cho sua chua - da vao khoang thi thoi.
+          onReassign={canManage && view.status === 'waiting_repair' ? setReassignTarget : undefined}
           canEdit={canManage && view.status !== 'invoiced' && view.status !== 'waiting_payment' && view.status !== 'cancelled'}
           // Nha khoa "dang mo phieu" truoc khi roi sang trang Chinh sua - trang
           // do khong gui nhip gia han khoa, giu lai se thanh khoa "ma" treo den
@@ -2169,6 +2313,19 @@ function RepairSettlementList() {
             releaseLockIfHeld();
             setView(null);
             navigate(`/repair-settlement/edit/${view.id}`);
+          }}
+        />
+      )}
+
+      {reassignTarget && (
+        <ReassignTeamLeaderModal
+          order={reassignTarget}
+          onClose={() => setReassignTarget(null)}
+          onDone={() => {
+            setReassignTarget(null);
+            setView(null);
+            releaseLockIfHeld();
+            loadAll({ silent: true });
           }}
         />
       )}
@@ -4327,7 +4484,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                 Ngày {signatureDate.getDate()} tháng {signatureDate.getMonth() + 1} năm {signatureDate.getFullYear()}
               </div>
               <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 14 }}>
-                Xác nhận đồng ý phiếu quyết toán
+                Khách hàng xác nhận đồng ý phiếu quyết toán
               </div>
               <SignaturePad ref={signaturePadRef} onChange={setSignatureEmpty} />
               {/* Khach tu viet ten vao trong o ky luon (nhu phieu giay), khong

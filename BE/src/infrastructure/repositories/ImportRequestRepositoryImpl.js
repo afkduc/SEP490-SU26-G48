@@ -74,8 +74,8 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
       SELECT
         ir.*,
         s.supplier_name,
-        COALESCE(NULLIF(LTRIM(RTRIM(u_req.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_req.first_name, N'') + N' ' + ISNULL(u_req.last_name, N''))), N''), u_req.pseudo_id) AS requested_by_name,
-        COALESCE(NULLIF(LTRIM(RTRIM(u_apv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_apv.first_name, N'') + N' ' + ISNULL(u_apv.last_name, N''))), N''), u_apv.pseudo_id) AS approved_by_name,
+        COALESCE(NULLIF(LTRIM(RTRIM(u_req.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_req.last_name, N'') + N' ' + ISNULL(u_req.first_name, N''))), N''), u_req.pseudo_id) AS requested_by_name,
+        COALESCE(NULLIF(LTRIM(RTRIM(u_apv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_apv.last_name, N'') + N' ' + ISNULL(u_apv.first_name, N''))), N''), u_apv.pseudo_id) AS approved_by_name,
         (SELECT COUNT(*) FROM import_request_items i WHERE i.import_request_id = ir.id) AS item_count,
         (SELECT ISNULL(SUM(quantity), 0)
            FROM import_request_items i WHERE i.import_request_id = ir.id) AS total_quantity
@@ -108,8 +108,8 @@ class ImportRequestRepositoryImpl extends ImportRequestRepository {
       `SELECT
          ir.*,
          s.supplier_name,
-         COALESCE(NULLIF(LTRIM(RTRIM(u_req.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_req.first_name, N'') + N' ' + ISNULL(u_req.last_name, N''))), N''), u_req.pseudo_id) AS requested_by_name,
-         COALESCE(NULLIF(LTRIM(RTRIM(u_apv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_apv.first_name, N'') + N' ' + ISNULL(u_apv.last_name, N''))), N''), u_apv.pseudo_id) AS approved_by_name
+         COALESCE(NULLIF(LTRIM(RTRIM(u_req.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_req.last_name, N'') + N' ' + ISNULL(u_req.first_name, N''))), N''), u_req.pseudo_id) AS requested_by_name,
+         COALESCE(NULLIF(LTRIM(RTRIM(u_apv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_apv.last_name, N'') + N' ' + ISNULL(u_apv.first_name, N''))), N''), u_apv.pseudo_id) AS approved_by_name
        FROM import_requests ir
        LEFT JOIN suppliers s ON s.id = ir.supplier_id
        LEFT JOIN users u_req ON u_req.id = ir.requested_by

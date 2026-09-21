@@ -175,10 +175,10 @@ export default function UserFormPage({ mode: modeProp }) {
     if (!isEdit && form.password && !isValidPassword(form.password)) {
       errs.password = 'Mật khẩu tối thiểu 6 ký tự, gồm chữ và số';
     }
-    const lastNameErr = getPersonNameError(form.lastName, { required: true, label: 'Tên' });
-    if (lastNameErr) errs.lastName = lastNameErr;
-    const firstNameErr = getPersonNameError(form.firstName, { required: false, label: 'Họ' });
+    const firstNameErr = getPersonNameError(form.firstName, { required: true, label: 'Tên' });
     if (firstNameErr) errs.firstName = firstNameErr;
+    const lastNameErr = getPersonNameError(form.lastName, { required: false, label: 'Họ' });
+    if (lastNameErr) errs.lastName = lastNameErr;
     if (form.email && !isValidEmail(form.email)) {
       errs.email = EMAIL_HINT;
     }
@@ -231,7 +231,7 @@ export default function UserFormPage({ mode: modeProp }) {
           email: form.email.trim(),
           password: form.password,
           firstName: form.firstName.trim().replace(/\s+/g, ' ') || form.name.trim(),
-          lastName: form.lastName.trim().replace(/\s+/g, ' '),
+          lastName: form.lastName.trim().replace(/\s+/g, ' '),   // ho
           phone: phoneDigitsOnly(form.phone),
           roleId: Number(form.roleId),
         };
@@ -356,28 +356,28 @@ export default function UserFormPage({ mode: modeProp }) {
               <div className="form__field">
                 <label className="form__label">Họ</label>
                 <input
-                  className={`input ${errors.firstName ? 'input--error' : ''}`}
-                  value={form.firstName}
-                  onChange={(e) => handleChange('firstName', e.target.value.slice(0, NAME_MAX_LENGTH))}
+                  className={`input ${errors.lastName ? 'input--error' : ''}`}
+                  value={form.lastName}
+                  onChange={(e) => handleChange('lastName', e.target.value.slice(0, NAME_MAX_LENGTH))}
                   placeholder="Nguyễn"
                   autoComplete="off"
                   maxLength={NAME_MAX_LENGTH}
                 />
                 <span className="form__hint">{PERSON_NAME_HINT} · tối đa {NAME_MAX_LENGTH} ký tự</span>
-                {errors.firstName && <span className="form__err">{errors.firstName}</span>}
+                {errors.lastName && <span className="form__err">{errors.lastName}</span>}
               </div>
               <div className="form__field">
                 <label className="form__label">Tên <span className="required">*</span></label>
                 <input
-                  className={`input ${errors.lastName ? 'input--error' : ''}`}
-                  value={form.lastName}
-                  onChange={(e) => handleChange('lastName', e.target.value.slice(0, NAME_MAX_LENGTH))}
+                  className={`input ${errors.firstName ? 'input--error' : ''}`}
+                  value={form.firstName}
+                  onChange={(e) => handleChange('firstName', e.target.value.slice(0, NAME_MAX_LENGTH))}
                   placeholder="Văn A"
                   autoComplete="off"
                   maxLength={NAME_MAX_LENGTH}
                 />
                 <span className="form__hint">{PERSON_NAME_HINT} · tối đa {NAME_MAX_LENGTH} ký tự</span>
-                {errors.lastName && <span className="form__err">{errors.lastName}</span>}
+                {errors.firstName && <span className="form__err">{errors.firstName}</span>}
               </div>
             </div>
 

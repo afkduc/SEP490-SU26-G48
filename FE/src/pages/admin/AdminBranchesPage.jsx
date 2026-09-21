@@ -62,9 +62,9 @@ const IconAlert = () => (
   </svg>
 );
 
-function getInitials(firstName, lastName, userName) {
-  const f = firstName || '';
-  const l = lastName || '';
+function getInitials(ho, ten, userName) {
+  const f = ho || '';
+  const l = ten || '';
   if (f || l) return `${f.charAt(0)}${l.charAt(0)}`.toUpperCase();
   if (userName) return userName.slice(0, 2).toUpperCase();
   return '?';

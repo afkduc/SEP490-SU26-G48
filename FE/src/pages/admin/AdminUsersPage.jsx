@@ -39,9 +39,9 @@ const STATUS_CLASS = {
   inactive: 'badge--danger',
 };
 
-function getInitials(firstName, lastName) {
-  if (firstName || lastName) {
-    return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
+function getInitials(ho, ten) {
+  if (ho || ten) {
+    return `${(ho || '').charAt(0)}${(ten || '').charAt(0)}`.toUpperCase();
   }
   return '?';
 }
@@ -419,12 +419,12 @@ export default function AdminUsersPage() {
                         <td data-label="Người dùng">
                           <div className="user-name-row">
                             <div className="user-avatar">
-                              {getInitials(u.firstName, u.lastName)}
+                              {getInitials(u.lastName, u.firstName)}
                             </div>
                             <div className="user-name-cell">
                               <span className="user-name-cell__main">
                                 {u.firstName && u.lastName
-                                  ? `${u.firstName} ${u.lastName}`
+                                  ? `${u.lastName} ${u.firstName}`
                                   : u.name || '—'}
                               </span>
                               <span className="user-name-cell__sub">

@@ -48,7 +48,7 @@ const STATUS_VALUES = ['waiting_repair', 'inprogress', 'waiting_payment', 'invoi
 const KM_TOI_DA = 2000000;
 // Do dai cot trong DB (nvarchar) - chan o day de bao duoc dung o nao qua dai,
 // thay vi de SQL Server nem loi "String or binary data would be truncated".
-const DAI_TOI_DA = { customerRequest: 1000, note: 1000, itemNote: 500, signerName: 255 };
+const DAI_TOI_DA = { customerRequest: 1000, note: 1000, itemNote: 500, signerName: 255, declineReason: 500 };
 
 // So hang muc toi da tren 1 phieu. Goi bao duong lon nhat khoang 35 dau muc +
 // phu tung di kem, nen 200 la rat rong rai. Chan lai vi moi hang muc keo theo
@@ -159,10 +159,13 @@ class RepairSettlementService {
     return this.repairSettlementRepository.findBranchAdvisors(branchId);
   }
 
-  async getAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page, limit } = {}) {
+  async getAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, forTeamLeaderId, page, limit } = {}) {
+    // forTeamLeaderId truoc day bi roi o day (controller co tinh nhung service
+    // khong nhan) nen bang "Việc chờ nhận" cua to truong nao cung hien ca phieu
+    // co van chi dinh rieng cho nguoi khac.
     const [items, total] = await Promise.all([
-      this.repairSettlementRepository.findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, page, limit }),
-      this.repairSettlementRepository.count({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId }),
+      this.repairSettlementRepository.findAll({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, forTeamLeaderId, page, limit }),
+      this.repairSettlementRepository.count({ branchId, status, search, customerId, vehicleId, fromDate, toDate, advisorId, forTeamLeaderId }),
     ]);
     return {
       items: RepairSettlementResponseDto.fromEntityList(items),
@@ -575,6 +578,64 @@ class RepairSettlementService {
     });
     // Tra ve DTO (khong phai entity tho) - FE dung ngay ket qua nay de hien
     // 4 o chu ky va de IN phieu, khong phai tai lai phieu.
+    return RepairSettlementResponseDto.fromEntity(await this.repairSettlementRepository.findById(id));
+  }
+
+  // ─── Giao/tu choi viec cho to truong ────────────────────────────────────
+  // To truong TU CHOI viec co van chi dinh rieng cho minh (kem ly do bat buoc).
+  // Sau buoc nay phieu bien mat khoi bang "Việc chờ nhận" cua MOI to truong va
+  // quay ve tay co van - xem ensureAssignmentDecline.js.
+  async declineAssignment(id, { teamLeaderId, reason } = {}) {
+    const existing = await this.repairSettlementRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
+    if (String(existing.assignedTeamLeaderId || '') !== String(teamLeaderId)) {
+      throw new ApiError(403, 'Phiếu này không được chỉ định cho bạn');
+    }
+    if (existing.status !== 'waiting_repair') {
+      throw new ApiError(409, 'Phiếu đã được nhận hoặc không còn ở trạng thái chờ sửa chữa');
+    }
+    const lyDo = String(reason || '').trim().replace(/\s+/g, ' ');
+    if (!lyDo) throw new ApiError(400, 'Vui lòng nhập lý do từ chối nhận việc');
+    if (lyDo.length > DAI_TOI_DA.declineReason) {
+      throw new ApiError(400, `Lý do từ chối quá dài (tối đa ${DAI_TOI_DA.declineReason} ký tự)`);
+    }
+
+    // Thua race voi chinh to truong do bam 2 lan, hoac phieu vua bi huy.
+    const ok = await this.repairSettlementRepository.declineAssignment(id, { teamLeaderId, reason: lyDo });
+    if (!ok) throw new ApiError(409, 'Phiếu vừa thay đổi trạng thái, vui lòng tải lại danh sách');
+
+    emitRepairOrderEvent(existing.branchId, 'assignment-declined', {
+      orderId: Number(id), code: existing.code, teamLeaderId: Number(teamLeaderId), reason: lyDo,
+    });
+    return RepairSettlementResponseDto.fromEntity(await this.repairSettlementRepository.findById(id));
+  }
+
+  // Co van giao lai phieu chua ai nhan: teamLeaderId co gia tri -> chi dinh
+  // nguoi khac; teamLeaderId = null -> day lai cho TAT CA to truong.
+  async reassignTeamLeader(id, { teamLeaderId, branchId } = {}) {
+    const existing = await this.repairSettlementRepository.findById(id);
+    if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
+    if (existing.status !== 'waiting_repair') {
+      throw new ApiError(409, 'Chỉ đổi được người nhận khi phiếu còn đang chờ sửa chữa');
+    }
+
+    let idMoi = null;
+    if (teamLeaderId) {
+      // Cung ly do nhu luc tao phieu: khong kiem thi goi thang API co the chi
+      // dinh 1 id bat ky va phieu bien mat khoi bang cua moi to truong.
+      const dsToTruong = await this.repairSettlementRepository.findBranchTeamLeaders(branchId ?? existing.branchId);
+      if (!dsToTruong.some((t) => String(t.id) === String(teamLeaderId))) {
+        throw new ApiError(400, 'Tổ trưởng được chỉ định không thuộc chi nhánh này hoặc đã ngưng hoạt động');
+      }
+      idMoi = Number(teamLeaderId);
+    }
+
+    const ok = await this.repairSettlementRepository.reassignTeamLeader(id, idMoi);
+    if (!ok) throw new ApiError(409, 'Phiếu vừa thay đổi trạng thái, vui lòng tải lại danh sách');
+
+    // 'new-pending' de bang "Việc chờ nhận" cua nguoi nhan moi (hoac ca chi
+    // nhanh) hien ngay phieu nay, khong cho den nhip poll 15s.
+    emitRepairOrderEvent(existing.branchId, 'new-pending', { orderId: Number(id), code: existing.code });
     return RepairSettlementResponseDto.fromEntity(await this.repairSettlementRepository.findById(id));
   }
 

@@ -667,3 +667,18 @@
   line-height: 1.4;
   color: var(--gray-600);
 }
+
+/* Nhan tren the phieu duoc co van chi dinh RIENG cho to truong dang dang nhap -
+   phai noi bat hon dong "Co van: ..." vi no doi kem trach nhiem tra loi. */
+.tld-pending-card__assigned {
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #FEF3C7;
+  color: #92400E;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.tld-pending-card__footer .btn + .btn { margin-left: 8px; }

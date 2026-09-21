@@ -11,7 +11,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRepairOrderEventsSSE } from '../../hooks/useRepairOrderEventsSSE';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { actionLabel, OTHER_GROUP_LABEL } from '../../constants/maintenanceChecklist';
-import { listRepairSettlementsApi } from '../../services/repairSettlementApi';
+import { listRepairSettlementsApi, declineAssignmentApi } from '../../services/repairSettlementApi';
+import { useAuth } from '../../contexts/AppContext';
 import { listMyBaysApi } from '../../services/vehicleBayApi';
 import {
   claimRepairOrderApi,
@@ -415,6 +416,68 @@ function ClaimModal({ settlement, bays, onClose, onDone }) {
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// To truong tu choi viec co van chi dinh RIENG cho minh. Bat buoc nhap ly do:
+// co van can biet vi sao de con quyet dinh giao cho ai - "tu choi" khong kem
+// giai thich thi phieu chi nam im them mot vong nua.
+function DeclineAssignmentModal({ settlement, onClose, onDone }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async () => {
+    const lyDo = reason.trim();
+    if (!lyDo) { setError('Vui lòng nhập lý do từ chối'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      await declineAssignmentApi(settlement.id, lyDo);
+      onDone();
+    } catch (err) {
+      setError(err.message || 'Không từ chối được, vui lòng thử lại');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal modal-sm">
+        <div className="modal-header">
+          <span className="modal-title">Từ chối nhận việc — {settlement.code}</span>
+          <button type="button" className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <p className="form-hint" style={{ marginTop: 0 }}>
+            Phiếu sẽ được trả lại cho cố vấn dịch vụ <b>{settlement.advisor || '—'}</b> để giao cho
+            tổ trưởng khác hoặc đẩy cho tất cả tổ trưởng nhận.
+          </p>
+          <label className="form-label" htmlFor="tld-decline-reason">
+            Lý do từ chối <span className="required">*</span>
+          </label>
+          <textarea
+            id="tld-decline-reason"
+            className="form-input"
+            rows={4}
+            maxLength={500}
+            autoFocus
+            value={reason}
+            onChange={(e) => setReason(e.target.value.slice(0, 500))}
+            placeholder="Ví dụ: Tổ đang kín xe đến hết ca, không có thợ chuyên gầm…"
+          />
+          {error && <div className="tld-error" style={{ marginTop: 12 }}>{error}</div>}
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+            Hủy
+          </button>
+          <button type="button" className="btn btn-danger" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? 'Đang gửi…' : 'Từ chối nhận việc'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -830,6 +893,8 @@ function HistoryPanel({ orders }) {
 }
 
 export default function TeamLeaderDashboard() {
+  const { user } = useAuth();
+  const [decliningSettlement, setDecliningSettlement] = useState(null);
   const [activeTab, setActiveTab] = useState('pending');
   const [pending, setPending] = useState(null);
   const [bays, setBays] = useState([]);
@@ -1081,6 +1146,8 @@ export default function TeamLeaderDashboard() {
           <div className="tld-pending-grid">
             {pending.map((s) => {
               const claimedBay = claimedElsewhere[s.id];
+              const chiDinhRieng = s.assignedTeamLeaderId
+                && String(s.assignedTeamLeaderId) === String(user?.id);
               return (
                 <div key={s.id} className="tld-pending-card">
                   <div className="tld-pending-card__header">
@@ -1090,6 +1157,9 @@ export default function TeamLeaderDashboard() {
                   <div className="tld-pending-card__customer">{s.customer?.fullName} — {s.vehicle?.licensePlate}</div>
                   <div className="tld-pending-card__vehicle">{s.vehicle?.vehicleModel}</div>
                   {s.advisor && <div className="tld-pending-card__advisor">Cố vấn: <b>{s.advisor}</b></div>}
+                  {chiDinhRieng && (
+                    <div className="tld-pending-card__assigned">Cố vấn chỉ định riêng cho bạn</div>
+                  )}
                   <div className="tld-pending-card__request">
                     <span className="tld-pending-card__request-label">Yêu cầu:</span> {s.customerRequest || '—'}
                   </div>
@@ -1097,9 +1167,20 @@ export default function TeamLeaderDashboard() {
                     {claimedBay ? (
                       <span className="tld-pending-card__taken">Khoang {claimedBay} đã nhận</span>
                     ) : (
-                      <button type="button" className="btn btn-primary" onClick={() => setClaimingSettlement(s)}>
-                        Nhận việc
-                      </button>
+                      <>
+                        <button type="button" className="btn btn-primary" onClick={() => setClaimingSettlement(s)}>
+                          Nhận việc
+                        </button>
+                        {/* Chi phieu chi dinh RIENG moi tu choi duoc: phieu chung
+                            (khong chi dinh ai) thi khong nhan la xong, khong co
+                            gi de tu choi va cung khong nen giau no khoi to khac. */}
+                        {chiDinhRieng && (
+                          <button type="button" className="btn btn-secondary"
+                            onClick={() => setDecliningSettlement(s)}>
+                            Từ chối
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1119,6 +1200,14 @@ export default function TeamLeaderDashboard() {
           bays={bays}
           onClose={() => setClaimingSettlement(null)}
           onDone={handleClaimDone}
+        />
+      )}
+
+      {decliningSettlement && (
+        <DeclineAssignmentModal
+          settlement={decliningSettlement}
+          onClose={() => setDecliningSettlement(null)}
+          onDone={() => { setDecliningSettlement(null); loadPending(); }}
         />
       )}
 
