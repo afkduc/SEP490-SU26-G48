@@ -531,6 +531,15 @@ function calcTotals(items) {
 //    w.document.write se nem "Cannot read properties of null" giua chung,
 //    khong ai biet chuyen gi. Tra ve ly do de cho goi bao cho tu te.
 //
+// 3. Doi readyState==='complete'/su kien 'load' cua WINDOW tuong la du, nhung
+//    voi trang dung document.write()+close() thi Chrome co the bao 'complete'
+//    NGAY LAP TUC (parse xong la xong), truoc ca khi kip gui request cho
+//    <img src="https://..."> con ma QR (qua api.qrserver.com, anh chu ky la
+//    data: URI nen luon tuc thi, khong dinh loi nay) - ket qua la ban in ra
+//    thieu han ma QR (o QR trong rong) du code van "cho load" nhu binh
+//    thuong. Phai doi RIENG tung <img> load/error xong that su, khong dua
+//    vao readyState nua.
+//
 // Tra ve '' neu in duoc, hoac cau thong bao loi.
 function moCuaSoIn(html) {
   const w = window.open('', '_blank');
@@ -540,7 +549,10 @@ function moCuaSoIn(html) {
   w.document.write(html);
   w.document.close();
 
+  let daIn = false;
   const inRa = () => {
+    if (daIn) return;
+    daIn = true;
     try {
       w.focus();
       w.print();
@@ -548,10 +560,31 @@ function moCuaSoIn(html) {
       /* nguoi dung dong cua so truoc khi kip in - khong co gi de lam */
     }
   };
-  // 'complete' = anh (neu co) da tai xong. Chua xong thi doi load; anh QR lay
-  // qua network nen in ngay se ra phieu thieu ma QR.
-  if (w.document.readyState === 'complete') inRa();
-  else w.addEventListener('load', inRa, { once: true });
+
+  // Doi TAT CA <img> trong trang (chu ky + ma QR) tai xong (load hoac error)
+  // roi moi in. Gioi han 2s de khong treo cua so in mai neu mang cham/mang
+  // hong - luc do in thieu ma QR con hon khong in duoc gi.
+  const choAnhRoiIn = () => {
+    const imgs = Array.from(w.document.images || []);
+    const chuaXong = imgs.filter((img) => !img.complete);
+    if (chuaXong.length === 0) {
+      inRa();
+      return;
+    }
+    let conLai = chuaXong.length;
+    const motAnhXong = () => {
+      conLai -= 1;
+      if (conLai <= 0) inRa();
+    };
+    chuaXong.forEach((img) => {
+      img.addEventListener('load', motAnhXong, { once: true });
+      img.addEventListener('error', motAnhXong, { once: true });
+    });
+    setTimeout(inRa, 2000);
+  };
+
+  if (w.document.readyState === 'complete') choAnhRoiIn();
+  else w.addEventListener('load', choAnhRoiIn, { once: true });
   return '';
 }
 
