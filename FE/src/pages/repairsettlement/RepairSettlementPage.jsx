@@ -861,10 +861,11 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
     }
   };
 
-  // Dieu kien de nut "Xác nhận đã đủ chữ ký hợp lệ" bat sang - du 2 chu ky va
-  // co ten nguoi nhan xe. Nut nam o modal-footer (thay cho "Xác nhận tiền
-  // mặt" trong luc chua ky), bam moi goi luuChuKyQuyetToan().
-  const duDieuKienKyQuyetToan = !closingAdvisorEmpty && !closingCustomerEmpty && Boolean(tenNguoiNhanXe.trim());
+  // Dieu kien de nut "Xác nhận đã đủ chữ ký hợp lệ" bat sang - du 2 chu ky.
+  // Nut nam o modal-footer (thay cho "Xác nhận tiền mặt" trong luc chua ky),
+  // bam moi goi luuChuKyQuyetToan(). Khong con doi ten nguoi nhan xe nua -
+  // khong con o nhap rieng tren man hinh (xem tenNguoiNhanXe).
+  const duDieuKienKyQuyetToan = !closingAdvisorEmpty && !closingCustomerEmpty;
 
   const requestPayosQr = async () => {
     setPayosLoading(true);
@@ -1145,15 +1146,17 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                       Khách hàng nhận xe
                     </div>
                     <SignaturePad ref={closingCustomerPadRef} onChange={setClosingCustomerEmpty} />
-                    <input className="form-input"
-                      style={{
-                        width: '100%', textAlign: 'center', fontWeight: 600, marginTop: 8,
-                        border: 'none', borderTop: '1px solid var(--gray-200)', borderRadius: 0, paddingTop: 6,
-                      }}
-                      placeholder="Tên người nhận xe"
-                      maxLength={255}
-                      value={tenNguoiNhanXe}
-                      onChange={(e) => setTenNguoiNhanXe(e.target.value)} />
+                    {/* Khong hien o nhap ten nua - ky la da ghi ro ho ten trong
+                        o ky roi (giong ben CVDV). Ten nguoi nhan xe van gui len
+                        khi luu (mac dinh lay theo ten khach tren phieu, xem
+                        tenNguoiNhanXe) de dap ung yeu cau BE, chi la khong con
+                        o nhap rieng tren man hinh nay nua. */}
+                    <div style={{
+                      textAlign: 'center', fontSize: 12, fontStyle: 'italic', color: 'var(--gray-600)',
+                      marginTop: 8, borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+                    }}>
+                      Ký và ghi rõ họ tên
+                    </div>
                   </div>
                   <div style={{ flex: '1 1 260px' }}>
                     <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
@@ -1177,15 +1180,11 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                       Thử lại
                     </button>
                   </div>
-                ) : (
+                ) : dangLuuChuKy ? (
                   <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginTop: 10, fontStyle: 'italic' }}>
-                    {dangLuuChuKy
-                      ? 'Đang lưu chữ ký…'
-                      : (!closingAdvisorEmpty && !closingCustomerEmpty && !tenNguoiNhanXe.trim())
-                        ? 'Nhập tên người nhận xe.'
-                        : ''}
+                    Đang lưu chữ ký…
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -1219,7 +1218,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                 title={
                   duDieuKienKyQuyetToan
                     ? ''
-                    : 'Khách hàng và cố vấn dịch vụ phải ký, và nhập tên người nhận xe'
+                    : 'Khách hàng và cố vấn dịch vụ phải ký trước'
                 }
                 onClick={() => { setLoiChuKy(''); luuChuKyQuyetToan(); }}>
                 {dangLuuChuKy ? 'Đang lưu…' : 'Xác nhận đã đủ chữ ký hợp lệ'}
