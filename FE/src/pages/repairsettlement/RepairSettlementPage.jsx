@@ -1992,6 +1992,13 @@ function RepairSettlementList() {
     invoiced: theoCoVan.filter((o) => o.status === 'invoiced').length,
     cancelled: theoCoVan.filter((o) => o.status === 'cancelled').length,
   };
+  // So phieu bi to truong duoc chi dinh rieng TU CHOI, con dang cho o van xu
+  // ly lai (giao nguoi khac / day chung) - hien thanh so do o goc tab "Chờ
+  // sửa chữa" kieu badge gio hang, de co van biet ngay ma khong phai mo tung
+  // phieu. Tu bien mat khi da giao lai (reassignTeamLeader xoa cac cot nay).
+  const soPhieuBiTuChoi = theoCoVan.filter(
+    (o) => displayStatus(o) === 'waiting_repair' && o.assignmentDeclinedAt
+  ).length;
 
   // Danh sach Tổ trưởng duy nhat tu chinh du lieu dang co, cho dropdown loc -
   // khong goi API rieng, tranh phai dong bo them 1 nguon du lieu khac.
@@ -2112,9 +2119,13 @@ function RepairSettlementList() {
         {TABS.map((t) => {
           const isActive = tab === t.key;
           const count = counts[t.key] ?? 0;
+          // Badge tron do o goc tab "Chờ sửa chữa" - kieu so luong gio hang,
+          // bao co van co phieu vua bi to truong tu choi can xu ly lai.
+          const soTuChoi = t.key === 'waiting_repair' ? soPhieuBiTuChoi : 0;
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
               style={{
+                position: 'relative',
                 padding: '7px 16px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                 cursor: 'pointer', border: '2px solid',
                 borderColor: isActive ? ACTIVE_TAB_COLOR : 'var(--gray-300)',
@@ -2128,6 +2139,17 @@ function RepairSettlementList() {
                 color: isActive ? 'white' : 'var(--gray-600)',
                 borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700,
               }}>{count}</span>
+              {soTuChoi > 0 && (
+                <span title={`${soTuChoi} phiếu bị tổ trưởng từ chối, cần giao lại`}
+                  style={{
+                    position: 'absolute', top: -7, right: -7,
+                    background: '#E53935', color: 'white', border: '2px solid white',
+                    borderRadius: '50%', minWidth: 19, height: 19, padding: '0 3px',
+                    fontSize: 10.5, fontWeight: 800, lineHeight: '15px', textAlign: 'center',
+                  }}>
+                  {soTuChoi}
+                </span>
+              )}
             </button>
           );
         })}
@@ -2282,6 +2304,14 @@ function RepairSettlementList() {
                     {o.ngPendingCount > 0 && (
                       <div style={{ fontSize: 10.5, color: '#B45309', fontWeight: 700, marginTop: 3 }}>
                         ⚠ {o.ngPendingCount} mục không đạt — cần hỏi khách
+                      </div>
+                    )}
+                    {/* To truong duoc chi dinh rieng vua tu choi - phieu quay
+                        ve tay co van, can mo ra giao lai nguoi khac (xem banner
+                        + nut "Giao lại việc" trong DetailModal). */}
+                    {o.assignmentDeclinedAt && (
+                      <div style={{ fontSize: 10.5, color: '#C62828', fontWeight: 700, marginTop: 3 }}>
+                        ⛔ Bị từ chối nhận việc — cần giao lại
                       </div>
                     )}
                     {o.lockedByName && (
