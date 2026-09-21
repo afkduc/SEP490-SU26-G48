@@ -24,27 +24,27 @@ export const STATUS_HUES = {
 export const CATEGORY_HUES = ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7', '#e34948', '#e87ba4', '#eb6834'];
 export const PARTS_HUE = '#94a3b8';
 
-// Loai hinh sua chua THAT (repair_order_items.repair_category) - khop voi
-// REPAIR_CATEGORY_OPTIONS trong RepairSettlementPage.jsx. Tai su dung bang mau
-// CATEGORY_HUES da validate; "Khac" dung mau xam trung tinh nhu PARTS_HUE.
-export const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS', 'OTHER'];
+// Loai hinh sua chua THAT (repair_order_items.repair_category): 5 loai cua
+// dich vu le (dung thu tu bo loc trang Dich vu le - ManagerPage.jsx
+// SERVICE_REPAIR_CATEGORY_OPTIONS) + PM dai dien cho GOI bao duong. Khong co
+// "Khac": phu tung goi them le (khong gan loai hinh) la vat tu, BE da loai
+// khoi so lieu (DashboardRepositoryImpl REPAIR_CATEGORY_ORDER - phai khop).
+export const REPAIR_CATEGORY_ORDER = ['ER', 'CB', 'EE', 'BP', 'CS', 'PM'];
 export const REPAIR_CATEGORY_LABELS = {
   ER: 'Sửa chữa động cơ',
   CB: 'Sửa chữa gầm',
   EE: 'Sửa chữa điện - điện tử',
   BP: 'Đồng sơn',
-  PM: 'Bảo dưỡng định kỳ',
   CS: 'Chăm sóc xe',
-  OTHER: 'Khác',
+  PM: 'Bảo dưỡng định kỳ (gói)',
 };
 export const REPAIR_CATEGORY_HUES = {
   ER: CATEGORY_HUES[0],
   CB: CATEGORY_HUES[1],
   EE: CATEGORY_HUES[2],
   BP: CATEGORY_HUES[3],
-  PM: CATEGORY_HUES[4],
   CS: CATEGORY_HUES[5],
-  OTHER: PARTS_HUE,
+  PM: CATEGORY_HUES[4],
 };
 
 // ─── Stat tile (KPI card) ─────────────────────────────────────────────
@@ -62,7 +62,12 @@ export function StatTile({ label, value }) {
 // khi bam vao 1 diem - dung cho ManagerDashboardPage mo danh sach phieu da
 // thanh toan cua thang do. Trang Co van (DashboardPage) khong truyen prop
 // nay nen hanh vi/giao dien khong doi.
-export function RevenueLineChart({ data, onPointClick }) {
+// clickHint (tuy chon): dong goi y trong tooltip khi co onPointClick - trang
+// quan ly doi theo trang thai dang loc (da xuat hoa don / da huy).
+// valueKey (tuy chon): dai luong ve theo thang - mac dinh 'totalRevenue'
+// (doanh thu, dinh dang tien); 'totalOrders' ve SO PHIEU (trang quan ly dung
+// khi loc "Da huy" vi phieu huy khong co doanh thu, ve tien thi duong thang 0).
+export function RevenueLineChart({ data, onPointClick, clickHint = 'Bấm để xem danh sách phiếu đã thanh toán', valueKey = 'totalRevenue' }) {
   const width = 560;
   const height = 220;
   const padding = { top: 16, right: 16, bottom: 26, left: 54 };
@@ -78,18 +83,27 @@ export function RevenueLineChart({ data, onPointClick }) {
     );
   }
 
-  const maxRevenue = Math.max(...data.map((d) => d.totalRevenue), 1);
-  const niceMax = Math.ceil((maxRevenue || 1) / 4) * 4 || 1;
+  const isCount = valueKey === 'totalOrders';
+  const formatValue = (v) => (isCount ? `${Number(v || 0).toLocaleString('vi-VN')} phiếu` : formatCurrency(v));
+  const maxValue = Math.max(...data.map((d) => Number(d[valueKey] || 0)), 1);
+  const niceMax = Math.ceil((maxValue || 1) / 4) * 4 || 1;
   const stepX = data.length > 1 ? innerW / (data.length - 1) : 0;
 
   const points = data.map((d, i) => {
     const x = padding.left + (data.length > 1 ? i * stepX : innerW / 2);
-    const y = padding.top + innerH - (d.totalRevenue / niceMax) * innerH;
+    const y = padding.top + innerH - (Number(d[valueKey] || 0) / niceMax) * innerH;
     return { x, y, ...d };
   });
 
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${(padding.top + innerH).toFixed(1)} L ${points[0].x.toFixed(1)} ${(padding.top + innerH).toFixed(1)} Z`;
+  // Chi co 1 thang ("Thang nay") thi khong co diem thu 2 de noi -> keo 1 duong
+  // thang ngang qua ca bieu do o muc doanh thu do (cham van o giua) de nhin
+  // giong dang duong nhu khi chon "3 thang gan day", thay vi 1 cham lo lung.
+  const lineXs = points.length === 1
+    ? [padding.left, width - padding.right]
+    : points.map((p) => p.x);
+  const lineYs = points.length === 1 ? [points[0].y, points[0].y] : points.map((p) => p.y);
+  const linePath = lineXs.map((x, i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${lineYs[i].toFixed(1)}`).join(' ');
+  const areaPath = `${linePath} L ${lineXs[lineXs.length - 1].toFixed(1)} ${(padding.top + innerH).toFixed(1)} L ${lineXs[0].toFixed(1)} ${(padding.top + innerH).toFixed(1)} Z`;
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(niceMax * f));
 
   return (
@@ -101,7 +115,7 @@ export function RevenueLineChart({ data, onPointClick }) {
             <g key={t}>
               <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="var(--gray-200)" strokeWidth="1" />
               <text x={padding.left - 8} y={y + 3} textAnchor="end" fontSize="10" fill="var(--gray-500)">
-                {t >= 1000000 ? `${(t / 1000000).toFixed(0)}tr` : t.toLocaleString('vi-VN')}
+                {!isCount && t >= 1000000 ? `${(t / 1000000).toFixed(0)}tr` : t.toLocaleString('vi-VN')}
               </text>
             </g>
           );
@@ -142,9 +156,9 @@ export function RevenueLineChart({ data, onPointClick }) {
             pointerEvents: 'none', zIndex: 10, boxShadow: 'var(--shadow)',
           }}
         >
-          <div style={{ fontWeight: 700 }}>{formatCurrency(points[hoverIdx].totalRevenue)}</div>
-          <div style={{ opacity: 0.8 }}>{points[hoverIdx].label} · {points[hoverIdx].totalOrders} phiếu</div>
-          {onPointClick && <div style={{ opacity: 0.65, fontSize: 10, marginTop: 2 }}>Bấm để xem danh sách phiếu đã thanh toán</div>}
+          <div style={{ fontWeight: 700 }}>{formatValue(points[hoverIdx][valueKey])}</div>
+          <div style={{ opacity: 0.8 }}>{points[hoverIdx].label}{isCount ? '' : ` · ${points[hoverIdx].totalOrders} phiếu`}</div>
+          {onPointClick && <div style={{ opacity: 0.65, fontSize: 10, marginTop: 2 }}>{clickHint}</div>}
         </div>
       )}
     </div>

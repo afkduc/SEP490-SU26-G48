@@ -2,16 +2,16 @@ import { Fragment, useEffect, useState } from 'react';
 import { useInventoryBranch } from './InventoryLayout';
 import { getStockSummaryApi, getTopUsedPartsApi } from '../../services/inventoryApi';
 import { getProductsApi } from '../../services/productApi';
-import { formatCurrency } from '../../utils';
+import { formatCurrency, toLocalISODate } from '../../utils';
 import { StatTile, TopPartsBarChart } from './InventoryDashboardCharts';
 import '../dashboard/DashboardPage.css';
 import './DashboardPage.css';
 
 // Cac moc thoi gian thong ke phu tung su dung nhieu nhat - "Tuan nay",
 // "Thang nay", "Nam nay" theo lich duong (khong phai 7/30/365 ngay gan day).
-function toISODate(d) {
-  return d.toISOString().slice(0, 10);
-}
+// Ngay theo gio may (xem toLocalISODate) - toISOString() doi sang UTC nen tu
+// 0h-7h sang toDate la HOM QUA, giao dich xuat kho trong ngay bi bo sot.
+const toISODate = toLocalISODate;
 
 function startOfWeek(now) {
   // Tuan bat dau tu Thu Hai (chuan VN).

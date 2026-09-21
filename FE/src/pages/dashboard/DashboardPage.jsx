@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AppContext';
 import { getDashboardOverviewApi } from '../../services/dashboardApi';
-import { formatCurrency } from '../../utils';
+import { formatCurrency, toLocalISODate } from '../../utils';
 import { STATUS_LABELS } from '../repairsettlement/mockData';
 import {
   STATUS_ORDER, REPAIR_CATEGORY_HUES,
@@ -9,27 +9,28 @@ import {
 } from './DashboardCharts';
 import './DashboardPage.css';
 
+// Khong co "Thang nay": bieu do doanh thu theo thang chi co 1 diem, khong ve
+// duoc xu huong - "3 thang gan day" da bao gom thang hien tai.
 const DATE_PRESETS = [
   { key: 'all', label: 'Tất cả thời gian' },
-  { key: 'month', label: 'Tháng này' },
   { key: '3m', label: '3 tháng gần đây' },
   { key: '6m', label: '6 tháng gần đây' },
 ];
 
-function toISODate(d) {
-  return d.toISOString().slice(0, 10);
-}
+// Ngay theo gio may (xem toLocalISODate) - toISOString() doi sang UTC nen tu
+// 0h-7h sang toDate la HOM QUA, phieu tiep nhan trong ngay bi loai khoi so lieu.
+const toISODate = toLocalISODate;
 
 function computeDateRange(presetKey) {
   const now = new Date();
-  if (presetKey === 'month') {
-    return { fromDate: toISODate(new Date(now.getFullYear(), now.getMonth(), 1)), toDate: toISODate(now) };
-  }
+  // "N thang gan day" = N thang LICH tinh ca thang hien tai -> ket thuc o CUOI
+  // thang nay (bieu do gom theo thang), khong cat o hom nay.
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   if (presetKey === '3m') {
-    return { fromDate: toISODate(new Date(now.getFullYear(), now.getMonth() - 2, 1)), toDate: toISODate(now) };
+    return { fromDate: toISODate(new Date(now.getFullYear(), now.getMonth() - 2, 1)), toDate: toISODate(endOfMonth) };
   }
   if (presetKey === '6m') {
-    return { fromDate: toISODate(new Date(now.getFullYear(), now.getMonth() - 5, 1)), toDate: toISODate(now) };
+    return { fromDate: toISODate(new Date(now.getFullYear(), now.getMonth() - 5, 1)), toDate: toISODate(endOfMonth) };
   }
   return { fromDate: '', toDate: '' };
 }

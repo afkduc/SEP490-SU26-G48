@@ -27,7 +27,9 @@ class PasswordResetService {
         BEGIN
           CREATE TABLE password_reset_tokens (
             id INT IDENTITY(1,1) PRIMARY KEY,
-            user_id INT NOT NULL,
+            -- BIGINT cho cung kieu users.id (FK fk_password_reset_tokens_user
+            -- do ensureMissingForeignKeys them - SQL Server bat buoc cung kieu)
+            user_id BIGINT NOT NULL,
             token_hash NVARCHAR(128) NOT NULL,
             expires_at DATETIME2 NOT NULL,
             used_at DATETIME2 NULL,
