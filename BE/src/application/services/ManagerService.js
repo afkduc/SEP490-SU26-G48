@@ -9,6 +9,10 @@ const VALID_STATUSES = ['active', 'inactive'];
 // khai bao san Loai hinh sua chua cho dich vu/goi tai day de man tao phieu
 // quyet toan tu dong dien theo, khong phai chon tay tung lan.
 const REPAIR_CATEGORY_VALUES = ['ER', 'CB', 'EE', 'BP', 'PM', 'CS'];
+// Dich vu LE khong duoc mang 'PM' - "Bao duong dinh ky" la loai hinh danh
+// rieng cho GOI bao duong. Bo loc + form dich vu le tren FE (ManagerPage.jsx
+// SERVICE_REPAIR_CATEGORY_OPTIONS) cung khong co lua chon nay.
+const SERVICE_REPAIR_CATEGORY_VALUES = REPAIR_CATEGORY_VALUES.filter((v) => v !== 'PM');
 
 let vehicleBayRepository = null;
 function getVehicleBayRepository() {
@@ -237,7 +241,7 @@ class ManagerService {
     if (normalized.status !== 'all' && !VALID_STATUSES.includes(normalized.status)) {
       throw new ApiError(400, 'Trạng thái không hợp lệ');
     }
-    if (normalized.repairCategory !== 'all' && !REPAIR_CATEGORY_VALUES.includes(normalized.repairCategory)) {
+    if (normalized.repairCategory !== 'all' && !SERVICE_REPAIR_CATEGORY_VALUES.includes(normalized.repairCategory)) {
       throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
     }
 
@@ -305,8 +309,10 @@ class ManagerService {
       }
     }
 
-    if (payload.repairCategory && !REPAIR_CATEGORY_VALUES.includes(payload.repairCategory)) {
-      throw new ApiError(400, 'Loại hình sửa chữa không hợp lệ');
+    if (payload.repairCategory && !SERVICE_REPAIR_CATEGORY_VALUES.includes(payload.repairCategory)) {
+      throw new ApiError(400, payload.repairCategory === 'PM'
+        ? 'Dịch vụ lẻ không dùng loại hình "Bảo dưỡng định kỳ" - loại hình này dành cho gói bảo dưỡng'
+        : 'Loại hình sửa chữa không hợp lệ');
     }
 
     return { price, duration };

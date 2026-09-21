@@ -14,6 +14,7 @@ function buildDashboardRouter() {
 
   router.use(authenticate, trackActivity);
   router.get('/overview', controller.getOverview);
+  router.get('/repair-categories/:code/services', controller.listRepairCategoryServices);
 
   return router;
 }

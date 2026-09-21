@@ -5,6 +5,7 @@ import {
   markMaintenanceReminderSentApi,
   markMaintenanceReminderConfirmedApi,
 } from '../../services/maintenanceReminderApi';
+import { toLocalISODate } from '../../utils';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -52,7 +53,7 @@ function dueDateMeta(dueDate) {
 
 // ─── Modal xác nhận khách đồng ý lịch hẹn bảo dưỡng ───────────────────
 function ConfirmReminderModal({ reminder, onClose, onConfirmed }) {
-  const [confirmedDate, setConfirmedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [confirmedDate, setConfirmedDate] = useState(() => toLocalISODate());
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
