@@ -189,7 +189,7 @@ ${khoiSoDoXe(xe.vehicleModel, (v.exteriorBody || {}).marks)}
 <div class="cam-ket">${INTAKE_NOTICE_LINES.map((d) => `<div>${esc(d)}</div>`).join('')}</div>
 
 <div class="sign-row">
-  ${oKy('Khách hàng', khongChuKy ? null : order.signatureData, khongChuKy ? '' : (order.signerName || kh.fullName))}
+  ${oKy('Khách hàng bàn giao xe', khongChuKy ? null : order.signatureData, khongChuKy ? '' : (order.signerName || kh.fullName))}
   ${oKy('Cố vấn dịch vụ tiếp nhận', khongChuKy ? null : order.advisorSignatureData, khongChuKy ? '' : order.advisor)}
 </div>
 </body></html>`;
