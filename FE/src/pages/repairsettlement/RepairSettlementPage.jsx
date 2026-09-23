@@ -2010,13 +2010,21 @@ function RepairSettlementList() {
   };
   useRepairOrderEventsSSE(handleRepairOrderEvent, true);
 
+  // "Chu" thuc su cua 1 phieu: ngoai thuc te, phieu duoc TINH CHO co van nao
+  // CHOT xong (khach thanh toan thanh cong), khong phai co van lap phieu ban
+  // dau - co van A lap phieu nhung co van B la nguoi chot/thu tien thi phieu
+  // do duoc tinh cho B. "Nguoi tao" tren cot rieng van hien dung A, khong doi.
+  // Chua ai chot (closingAdvisorId con null) thi mac dinh chu van la nguoi
+  // tao, dung nhu luc moi lap phieu.
+  const chuPhieu = (o) => o.closingAdvisorId ?? o.advisorId;
+
   // Bo loc co van ap cho CA so dem tren tab lan danh sach - neu chi ap cho
   // danh sach thi tab ghi "Đang sửa chữa 2" trong khi ben duoi chi co 1 dong,
   // nguoi dung tuong mat phieu.
   const dungCoVan = (o) => {
-    if (filterAdvisor === 'me') return String(o.advisorId) === String(user?.id);
+    if (filterAdvisor === 'me') return String(chuPhieu(o)) === String(user?.id);
     if (filterAdvisor === 'all') return true;
-    return String(o.advisorId) === filterAdvisor;
+    return String(chuPhieu(o)) === filterAdvisor;
   };
   const theoCoVan = orders.filter(dungCoVan);
 
