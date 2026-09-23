@@ -36,12 +36,16 @@ const SEGMENT_LABEL = { sedan: 'Sedan/Hatchback', suv: 'SUV/Crossover', pickup: 
 function khoiSoDoXe(vehicleModelText, marks) {
   const phanKhuc = detectSegmentFromModelText(vehicleModelText);
   const images = SEGMENT_DIAGRAMS[phanKhuc] || SEGMENT_DIAGRAMS.sedan;
-  const oAnh = images.map((img) => {
+  // Dung dinh dang 2 cot NHU tren man hinh tiep nhan (ExteriorBodyCheck):
+  // trai/phai 1 hang, truoc/sau 1 hang, tren le loi rieng 1 hang - can giua
+  // (anh cuoi cua mang 5 anh luon la "top" nen cu index cuoi la biet le loi).
+  const oAnh = images.map((img, i) => {
     const goc = img.split('-')[1];
     const dauXCuaAnh = (marks || []).filter((m) => m.diagram === img);
     const dauX = dauXCuaAnh.map((m) => `<span class="sdx-x" style="left:${m.xPct}%;top:${m.yPct}%">✕</span>`).join('');
+    const leLoi = i === images.length - 1 && images.length % 2 === 1;
     return `
-      <div class="sdx-item">
+      <div class="sdx-item${leLoi ? ' sdx-item--le' : ''}">
         <div class="sdx-wrap"><img src="${urlAsset(`/vehicle-diagrams/${img}.png`)}" />${dauX}</div>
         <div class="sdx-label">${esc(NHAN_GOC[goc] || goc)}</div>
       </div>`;
@@ -113,8 +117,15 @@ export function printIntakeSheet(order, { khongChuKy = false } = {}, moCuaSoIn) 
   .kt .lbl { width: 30%; }
   .kt .val { width: 20%; text-align: center; }
   .ghi-chu { border: 1px solid #CCC; padding: 5px 6px; min-height: 26px; }
-  .sdx-grid { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding-top: 4px; }
-  .sdx-item { width: 31%; text-align: center; }
+  /* 2 cot: trai/phai 1 hang, truoc/sau 1 hang - anh "tren" le loi (sdx-item--le)
+     chiem het hang, tu can giua bang margin:auto + gioi han lai rong = nua cot. */
+  .sdx-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding-top: 4px; }
+  .sdx-item { text-align: center; }
+  .sdx-item--le { grid-column: 1 / -1; width: calc(50% - 4px); margin: 0 auto; }
+  /* height:auto (KHONG ep chieu cao co dinh/object-fit): dau X luu %x/%y tinh
+     tren khung anh dung ty le goc (giong het MarkableImage tren man hinh) -
+     ep chieu cao khac se lam anh bi "letterbox" va dau X lech vi tri that. 2
+     cot rong bang nhau la du de moi hang (trai/phai, truoc/sau) trong deu. */
   .sdx-wrap { position: relative; border: 1px solid #CCC; background: #fff; }
   .sdx-wrap img { width: 100%; height: auto; display: block; }
   .sdx-x { position: absolute; transform: translate(-50%, -50%); color: #dc2626; font-size: 14px;
