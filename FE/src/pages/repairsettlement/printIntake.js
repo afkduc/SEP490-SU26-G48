@@ -85,8 +85,11 @@ function dongDoi(cap) {
 }
 
 function oKy(tieuDe, anh, ten) {
+  // Da ky roi thi CHI in anh - ten da ghi ro tay trong luc ky, in lai chu ben
+  // duoi la thua. Chi hien dong "Ky va ghi ro ho ten" (ten rong) khi in ban
+  // trang de khach ky tay.
   const than = anh
-    ? `<img class="sign-img" src="${anh}" /><div class="sign-line has-img">${esc(ten || '')}</div>`
+    ? `<img class="sign-img" src="${anh}" />`
     : `<div class="sign-line">${esc(ten || '')}</div>`;
   return `<div class="sign-box"><div class="bold">${esc(tieuDe)}</div>${than}</div>`;
 }
@@ -136,7 +139,6 @@ export function printIntakeSheet(order, { khongChuKy = false } = {}, moCuaSoIn) 
   .sign-box { text-align: center; width: 40%; }
   .sign-img { height: 60px; max-width: 100%; object-fit: contain; display: block; margin: 2px auto 0; }
   .sign-line { margin-top: 42px; border-top: 1px solid #000; padding-top: 3px; font-size: 10px; }
-  .sign-line.has-img { margin-top: 0; }
   ${PRINT_HEADER_CSS}
 </style></head><body>
 ${khoiTieuDeIn('PHIẾU TIẾP NHẬN VÀ BÀN GIAO XE', {

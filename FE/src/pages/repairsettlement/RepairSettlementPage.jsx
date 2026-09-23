@@ -642,8 +642,11 @@ ${khoiTieuDeIn('DANH SÁCH CÔNG VIỆC KỸ THUẬT', {
 // Mot o ky tren ban in. Co chu ky dien tu thi in anh chu ky len tren duong
 // ke; chua ky thi de trong 40px nhu cu de con ky tay tren giay.
 function oKy(tieuDe, anh, ten) {
+  // Da ky roi thi CHI in anh - ten da ghi ro tay trong luc ky, in lai chu ben
+  // duoi la thua. Chi hien dong ky tay (ten rong) khi in ban trang de khach
+  // ky tay.
   const than = anh
-    ? `<img class="sign-img" src="${anh}" /><div class="sign-line has-img">${ten || ''}</div>`
+    ? `<img class="sign-img" src="${anh}" />`
     : `<div class="sign-line">${ten || ''}</div>`;
   return `<div class="sign-box"><div class="bold">${tieuDe}</div>${than}</div>`;
 }
@@ -733,7 +736,6 @@ function printSettlement(order, payosQrCode, { khongChuKy = false } = {}) {
   /* Phieu quyet toan chi con 2 o ky (khach nhan xe + CVDV ban giao) nen o
      rong hon, du cho ky tay khi in ban trang. */
   .sign-row > .sign-box { width:38%; }
-  .sign-line.has-img { margin-top:0; }
   /* Dong bi doi sau khi chot voi khach (khach huy / tra bot phu tung) - in
      mau do de nguoi doc thay ngay vi sao tien cuoi khac bao gia ban dau.
      print-color-adjust de trinh duyet khong bo mau khi in ra giay. */
