@@ -134,7 +134,7 @@ export function printIntakeSheet(order, { khongChuKy = false } = {}, moCuaSoIn) 
   .cam-ket { margin-top: 8px; border: 1px solid #999; border-left: 3px solid #333; padding: 6px 8px; font-size: 10.5px; line-height: 1.5; }
   .sign-row { display: flex; justify-content: space-around; margin-top: 16px; }
   .sign-box { text-align: center; width: 40%; }
-  .sign-img { height: 46px; max-width: 100%; object-fit: contain; display: block; margin: 2px auto 0; }
+  .sign-img { height: 60px; max-width: 100%; object-fit: contain; display: block; margin: 2px auto 0; }
   .sign-line { margin-top: 42px; border-top: 1px solid #000; padding-top: 3px; font-size: 10px; }
   .sign-line.has-img { margin-top: 0; }
   ${PRINT_HEADER_CSS}

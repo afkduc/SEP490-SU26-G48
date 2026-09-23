@@ -723,7 +723,7 @@ function printSettlement(order, payosQrCode, { khongChuKy = false } = {}) {
   .sign-line { margin-top:40px; border-top:1px solid #000; padding-top:3px; font-size:10px; }
   /* O ky da co chu ky dien tu: anh chu ky nam ngay tren duong ke, khong con
      chua 40px trong de ky tay nua. */
-  .sign-img { height:46px; max-width:100%; object-fit:contain; display:block; margin:2px auto 0; }
+  .sign-img { height:60px; max-width:100%; object-fit:contain; display:block; margin:2px auto 0; }
   /* 4 o ky chia 2 nhom theo 2 moc: tiep nhan xe / ban giao xe */
   .sign-group { width:48%; }
   .sign-group-title { text-align:center; font-size:10px; font-weight:700; letter-spacing:.4px;
