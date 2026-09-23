@@ -15,13 +15,43 @@ import {
   PRIORITY_FIELDS,
   OTHER_INFO_FIELDS,
   FUEL_GAUGE_OPTIONS,
+  SEGMENT_DIAGRAMS,
+  detectSegmentFromModelText,
 } from './IntakeChecklistSection';
 import { INTAKE_NOTICE_LINES } from './intakeNotice';
-import { khoiTieuDeIn, PRINT_HEADER_CSS } from './printHeader';
+import { khoiTieuDeIn, PRINT_HEADER_CSS, urlAsset } from './printHeader';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
 ));
+
+const NHAN_GOC = { left: 'Trái', right: 'Phải', front: 'Trước', rear: 'Sau', top: 'Trên' };
+const SEGMENT_LABEL = { sedan: 'Sedan/Hatchback', suv: 'SUV/Crossover', pickup: 'Bán tải' };
+
+// So do xe kem dau X danh dau vet xuoc/mop - IN LAI DUNG NHU tren man hinh
+// tiep nhan (MarkableImage trong IntakeChecklistSection.jsx): cung 5 anh theo
+// phan khuc, cung toa do %x/%y, cung mau do. Anh tinh nam trong FE/public/
+// vehicle-diagrams/ nen phai qua urlAsset() (duong dan tuyet doi) - cua so in
+// mo bang document.write() khong co <base> de giai duong dan tuong doi.
+function khoiSoDoXe(vehicleModelText, marks) {
+  const phanKhuc = detectSegmentFromModelText(vehicleModelText);
+  const images = SEGMENT_DIAGRAMS[phanKhuc] || SEGMENT_DIAGRAMS.sedan;
+  const oAnh = images.map((img) => {
+    const goc = img.split('-')[1];
+    const dauXCuaAnh = (marks || []).filter((m) => m.diagram === img);
+    const dauX = dauXCuaAnh.map((m) => `<span class="sdx-x" style="left:${m.xPct}%;top:${m.yPct}%">✕</span>`).join('');
+    return `
+      <div class="sdx-item">
+        <div class="sdx-wrap"><img src="${urlAsset(`/vehicle-diagrams/${img}.png`)}" />${dauX}</div>
+        <div class="sdx-label">${esc(NHAN_GOC[goc] || goc)}</div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="khoi">
+      <div class="khoi-title">Sơ đồ đánh dấu vết xước / móp (${esc(SEGMENT_LABEL[phanKhuc] || phanKhuc)})</div>
+      <div class="sdx-grid">${oAnh}</div>
+    </div>`;
+}
 
 // Cac muc kiem tra luu 3 trang thai: 'OK' | 'NG' | null (chua danh gia).
 const okNg = (v) => (v === 'OK' ? 'Đạt' : v === 'NG' ? 'Không đạt' : '—');
@@ -83,6 +113,13 @@ export function printIntakeSheet(order, { khongChuKy = false } = {}, moCuaSoIn) 
   .kt .lbl { width: 30%; }
   .kt .val { width: 20%; text-align: center; }
   .ghi-chu { border: 1px solid #CCC; padding: 5px 6px; min-height: 26px; }
+  .sdx-grid { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding-top: 4px; }
+  .sdx-item { width: 31%; text-align: center; }
+  .sdx-wrap { position: relative; border: 1px solid #CCC; background: #fff; }
+  .sdx-wrap img { width: 100%; height: auto; display: block; }
+  .sdx-x { position: absolute; transform: translate(-50%, -50%); color: #dc2626; font-size: 14px;
+           font-weight: 900; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 2px #fff; }
+  .sdx-label { font-size: 9.5px; font-weight: 700; color: #555; margin-top: 2px; }
   .cam-ket { margin-top: 8px; border: 1px solid #999; border-left: 3px solid #333; padding: 6px 8px; font-size: 10.5px; line-height: 1.5; }
   .sign-row { display: flex; justify-content: space-around; margin-top: 16px; }
   .sign-box { text-align: center; width: 40%; }
@@ -125,13 +162,10 @@ ${khoiOkNg('Khoang động cơ', ENGINE_BAY_FIELDS, v.engineBay)}
 ${bang('Ưu tiên', dongDoi(PRIORITY_FIELDS.map(([k, l]) => [l, coKhong((v.priority || {})[k])])))}
 ${bang('Thông tin khác', dongDoi(OTHER_INFO_FIELDS.map(([k, l]) => [l, coKhong((v.otherInfo || {})[k])])))}
 
+${khoiSoDoXe(xe.vehicleModel, (v.exteriorBody || {}).marks)}
 <div class="khoi">
-  <div class="khoi-title">Tình trạng thân vỏ (vết xước / móp)</div>
-  <div class="ghi-chu">${esc((v.exteriorBody || {}).notes) || '—'}
-    ${((v.exteriorBody || {}).marks || []).length
-      ? ` <i>(đã đánh dấu ${((v.exteriorBody || {}).marks || []).length} vị trí trên sơ đồ xe trong hệ thống)</i>`
-      : ''}
-  </div>
+  <div class="khoi-title">Tình trạng thân vỏ (vết xước / móp) — ghi chú</div>
+  <div class="ghi-chu">${esc((v.exteriorBody || {}).notes) || '—'}</div>
 </div>
 
 <div class="khoi">

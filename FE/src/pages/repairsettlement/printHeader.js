@@ -10,10 +10,15 @@ const TEN_CONG_TY = 'CÔNG TY TNHH AUTOGARA';
 
 // Cửa sổ in được mở bằng window.open('', '_blank') rồi document.write - tài
 // liệu đó không có <base>, nên đường dẫn tương đối ("/crm/...") có thể không
-// giải được. Dùng absolute theo origin hiện tại cho chắc.
-export function urlLogo() {
+// giải được. Dùng absolute theo origin hiện tại cho chắc - dùng chung cho MOI
+// anh tinh trong FE/public (logo, so do xe...), khong chi rieng logo.
+export function urlAsset(duongDan) {
   const goc = typeof window !== 'undefined' ? window.location.origin : '';
-  return `${goc}${BASE_PATH}/AutoGaraLogo-Photoroom.png`;
+  return `${goc}${BASE_PATH}${duongDan}`;
+}
+
+export function urlLogo() {
+  return urlAsset('/AutoGaraLogo-Photoroom.png');
 }
 
 // CSS cho khối tiêu đề - nhúng vào <style> của từng mẫu in.
