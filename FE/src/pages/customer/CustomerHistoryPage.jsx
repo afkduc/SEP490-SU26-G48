@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency, formatDate, toLocalISODate } from '../../utils';
+import { actionLabel } from '../../constants/maintenanceChecklist';
+import { HTTT_CANCELLED_VALUE } from '../../constants/settlementCodes';
 import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
 import { listCustomersApi, getCustomerApi, updateCustomerApi, importCustomersApi, addCustomerVehicleApi } from '../../services/customerApi';
 import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi, listVehicleModelsApi, listVehicleSegmentsApi, createVehicleModelApi } from '../../services/vehicleApi';
@@ -12,6 +14,17 @@ import { normalizeRoles } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
 
 const IMPORT_ALLOWED_ROLES = [ROLES.MANAGER];
+
+// Hạng mục có HTTT = Bảo hành hãng xe / Bảo hiểm chi trả / Nội bộ chịu phí /
+// Khách hủy -> khách không phải trả - giống hệt logic ở RepairSettlementPage,
+// nhân đôi 2 hàm nhỏ này ở đây vì bên đó không export.
+function isExemptFromCustomerBilling(item) {
+  return item.httt === 'BHH' || item.httt === 'BH' || item.httt === 'NB' || item.httt === HTTT_CANCELLED_VALUE;
+}
+const EXEMPTION_SHORT_LABEL = { BHH: 'Bảo hành', BH: 'Bảo hiểm', NB: 'Nội bộ', [HTTT_CANCELLED_VALUE]: 'Khách hủy' };
+function exemptionShortLabel(item) {
+  return EXEMPTION_SHORT_LABEL[item.httt] || null;
+}
 
 // ─── Modal xem chi tiết 1 phiếu quyết toán trong lịch sử ─────────────
 function SettlementDetailModal({ settlementId, onClose }) {
@@ -120,47 +133,83 @@ function SettlementDetailModal({ settlementId, onClose }) {
                     <tr><th>#</th><th>Nội dung</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th></tr>
                   </thead>
                   <tbody>
-                    {(detail.items || []).map((item, i) => (
-                      <tr key={i}>
-                        <td style={{ textAlign: 'center' }}>{i + 1}</td>
-                        <td>{item.description}</td>
-                        <td style={{ textAlign: 'center' }}>{item.qty}</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(item.total)}</td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      const indexed = (detail.items || []).map((item, i) => ({ item, i }));
+                      const laborRows = indexed.filter(({ item }) => item.lhsc !== 'PT');
+                      const partRows = indexed.filter(({ item }) => item.lhsc === 'PT');
+                      const laborSubtotal = laborRows.reduce((s, { item }) => s + (item.total || 0), 0);
+                      const partSubtotal = partRows.reduce((s, { item }) => s + (item.total || 0), 0);
+
+                      // "Nội dung" hien them tag Mien thu KH + yeu cau thuc hien -
+                      // giong het cach RepairSettlementPage hien cho co van, de
+                      // khach hieu ngay vi sao mot dong lai 0d thay vi doan mo.
+                      const renderRow = ({ item, i }) => (
+                        <tr key={i}>
+                          <td style={{ textAlign: 'center' }}>{i + 1}</td>
+                          <td>
+                            {item.description}
+                            {!item.isFree && isExemptFromCustomerBilling(item) && <span className="tag" style={{ marginLeft: 6 }}>Miễn thu KH</span>}
+                            {actionLabel(item.actionCode) && (
+                              <div style={{ fontSize: 11, color: 'var(--gray-600)', fontStyle: 'italic' }}>{actionLabel(item.actionCode)}</div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>{item.qty}</td>
+                          <td style={{ textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                            {formatCurrency(item.total)}
+                            {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
+                          </td>
+                        </tr>
+                      );
+
+                      return (
+                        <>
+                          <tr>
+                            <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
+                            <td colSpan={3} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>CÔNG VIỆC CẦN THỰC HIỆN</td>
+                          </tr>
+                          {laborRows.map(renderRow)}
+                          <tr>
+                            <td colSpan={4} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                            <td style={{ fontWeight: 700, textAlign: 'right' }}>{formatCurrency(laborSubtotal)}</td>
+                          </tr>
+
+                          {partRows.length > 0 && (
+                            <>
+                              <tr>
+                                <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
+                                <td colSpan={3} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>PHỤ TÙNG, VẬT TƯ</td>
+                              </tr>
+                              {partRows.map(renderRow)}
+                              <tr>
+                                <td colSpan={4} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                                <td style={{ fontWeight: 700, textAlign: 'right' }}>{formatCurrency(partSubtotal)}</td>
+                              </tr>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                   </tbody>
                 </table>
               </div>
 
               {(() => {
-                const serviceTasks = (detail.tasks || []).filter((t) => t.taskType === 'service');
-                if (serviceTasks.length === 0) return null;
-                const doneCount = serviceTasks.filter((t) => t.isDone).length;
+                // Khach chi can biet dau muc nao KHONG DAT ma ho tu choi sua -
+                // khong can liet ke het 30 dau muc kem tick nhu ban co van xem,
+                // thong tin do la cho noi bo (to truong/co van theo doi tien do).
+                const declinedTasks = (detail.tasks || []).filter((t) => t.taskType === 'service' && t.ngDecision === 'declined');
+                if (declinedTasks.length === 0) return null;
                 return (
                   <div style={{ marginTop: 4, marginBottom: 16 }}>
-                    <div className="form-section-title">
-                      Tiến độ công việc ({doneCount}/{serviceTasks.length})
-                    </div>
-                    {detail.technicians?.length > 0 && (
-                      <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
-                        Thợ thực hiện: <b>{detail.technicians.map((t) => t.fullName).join(', ')}</b>
-                      </div>
-                    )}
+                    <div className="form-section-title">Hạng mục không đạt, khách từ chối sửa</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {serviceTasks.map((t) => (
-                        <label
-                          key={t.id}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                            background: t.isDone ? '#E8F5E9' : 'var(--gray-50)', borderRadius: 6,
-                            fontSize: 13,
-                            color: t.isDone ? '#2E7D32' : 'var(--gray-900)',
-                          }}
-                        >
-                          <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#2E7D32' }} />
-                          <span>{t.taskName}</span>
-                        </label>
+                      {declinedTasks.map((t) => (
+                        <div key={t.id} style={{ padding: '8px 10px', background: '#FDECEA', borderRadius: 6, fontSize: 13, color: '#B91C1C' }}>
+                          <b>{t.taskName}</b>
+                          {t.checkNote && ` — ${t.checkNote}`}
+                          {t.ngNote && <div style={{ fontWeight: 600, marginTop: 2 }}>Khách từ chối thay — {t.ngNote}</div>}
+                        </div>
                       ))}
                     </div>
                   </div>
