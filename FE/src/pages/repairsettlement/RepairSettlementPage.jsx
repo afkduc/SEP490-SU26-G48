@@ -822,6 +822,10 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
   const order = orderMoi || orderGoc;
   // Chi con dung de doi chu nut in ("In phieu" vs "In lai phieu").
   const [hasPrinted, setHasPrinted] = useState(false);
+  // Xem lai tinh trang xe luc tiep nhan (giong het nut cung ten trong
+  // DetailModal) - co van hay can doi chieu luc quyet toan xem xe co dung
+  // tinh trang nhu luc nhan hay khong.
+  const [showIntake, setShowIntake] = useState(false);
   // Trinh duyet chan popup thi bam In khong ra gi ca - phai noi ro, khong thi
   // nguoi dung bam di bam lai tuong nut hong.
   const [printError, setPrintError] = useState('');
@@ -959,7 +963,8 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 860 }}>
+      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: showIntake ? 'min(640px, 50vw)' : 860, transition: 'max-width 0.25s ease' }}>
         <div className="modal-header">
           <h3 className="modal-title">Quyết toán sửa chữa — {order.code}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -1235,6 +1240,9 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
           </div>
         )}
         <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={() => setShowIntake((s) => !s)}>
+            {showIntake ? 'Ẩn xem tình trạng xe ban đầu' : 'Xem tình trạng xe ban đầu'}
+          </button>
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
           {/* Truoc khi ky xong: nut "Xác nhận đã đủ chữ ký hợp lệ" nam DUNG
               cho nay - thay vi hien san nut "Xác nhận tiền mặt" nhung xam va
@@ -1269,6 +1277,41 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
           </button>
         </div>
       </div>
+
+      {showIntake && (
+        <div
+          className="modal modal-xl no-scrollbar"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            maxWidth: 'min(440px, 38vw)',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: 14,
+            overflowX: 'hidden',
+          }}
+        >
+          <div className="modal-header">
+            <h3 className="modal-title">Tiếp nhận và bàn giao xe</h3>
+            <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
+          </div>
+          <div className="modal-body">
+            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} />
+          </div>
+          {/* In rieng phieu tiep nhan (kem chu ky khach + CVDV tiep nhan) -
+              giong het nut o DetailModal, dung chung 1 mau in. */}
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => printIntakeSheet(order, {}, moCuaSoIn)}>
+              In phiếu tiếp nhận
+            </button>
+            <button className="btn btn-secondary"
+              title="In phiếu để khách ký tay trên giấy"
+              onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
+              In phiếu (ký tay)
+            </button>
+          </div>
+        </div>
+      )}
 
       {showCashConfirm && (
         <div className="modal-overlay" onClick={(e) => e.stopPropagation()} style={{ zIndex: 1100 }}>
