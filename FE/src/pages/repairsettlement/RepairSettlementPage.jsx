@@ -44,7 +44,7 @@ import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
 import IntakeChecklistView from './IntakeChecklistView';
-import { printIntakeSheet } from './printIntake';
+import { printIntakeSheet, daDuChuKyTiepNhan } from './printIntake';
 import VehicleHistoryModal from './VehicleHistoryModal';
 import { assignGroupIds, dongHangMucDeIn } from './settlementItems';
 import SignaturePad from './SignaturePad';
@@ -1236,11 +1236,13 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
             <button className="btn btn-secondary" onClick={() => printIntakeSheet(order, {}, moCuaSoIn)}>
               In phiếu tiếp nhận
             </button>
-            <button className="btn btn-secondary"
-              title="In phiếu để khách ký tay trên giấy"
-              onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
-              In phiếu (ký tay)
-            </button>
+            {!daDuChuKyTiepNhan(order) && (
+              <button className="btn btn-secondary"
+                title="In phiếu để khách ký tay trên giấy"
+                onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
+                In phiếu (ký tay)
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1671,11 +1673,13 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
             <button className="btn btn-secondary" onClick={() => printIntakeSheet(order, {}, moCuaSoIn)}>
               In phiếu tiếp nhận
             </button>
-            <button className="btn btn-secondary"
-              title="In phiếu để khách ký tay trên giấy"
-              onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
-              In phiếu (ký tay)
-            </button>
+            {!daDuChuKyTiepNhan(order) && (
+              <button className="btn btn-secondary"
+                title="In phiếu để khách ký tay trên giấy"
+                onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
+                In phiếu (ký tay)
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -4251,11 +4255,13 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               <button className="btn btn-secondary btn-sm" onClick={() => printIntakeSheet(existingOrder, {}, moCuaSoIn)}>
                 In phiếu tiếp nhận
               </button>
-              <button className="btn btn-secondary btn-sm"
-                title="In phiếu để khách ký tay trên giấy"
-                onClick={() => printIntakeSheet(existingOrder, { khongChuKy: true }, moCuaSoIn)}>
-                In phiếu (ký tay)
-              </button>
+              {!daDuChuKyTiepNhan(existingOrder) && (
+                <button className="btn btn-secondary btn-sm"
+                  title="In phiếu để khách ký tay trên giấy"
+                  onClick={() => printIntakeSheet(existingOrder, { khongChuKy: true }, moCuaSoIn)}>
+                  In phiếu (ký tay)
+                </button>
+              )}
             </>
           )}
         >

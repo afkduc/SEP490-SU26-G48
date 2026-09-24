@@ -5,7 +5,7 @@ import { listCustomersApi, getCustomerApi, updateCustomerApi, importCustomersApi
 import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi, listVehicleModelsApi, listVehicleSegmentsApi, createVehicleModelApi } from '../../services/vehicleApi';
 import { STATUS_LABELS } from '../repairsettlement/mockData';
 import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
-import { printIntakeSheet } from '../repairsettlement/printIntake';
+import { printIntakeSheet, daDuChuKyTiepNhan } from '../repairsettlement/printIntake';
 import { moCuaSoIn } from '../repairsettlement/printHeader';
 import { useAuth } from '../../contexts';
 import { normalizeRoles } from '../../contexts/AppContext';
@@ -237,11 +237,13 @@ function SettlementDetailModal({ settlementId, onClose }) {
             <button className="btn btn-secondary" onClick={() => printIntakeSheet(detail, {}, moCuaSoIn)}>
               In phiếu tiếp nhận
             </button>
-            <button className="btn btn-secondary"
-              title="In phiếu để khách ký tay trên giấy"
-              onClick={() => printIntakeSheet(detail, { khongChuKy: true }, moCuaSoIn)}>
-              In phiếu (ký tay)
-            </button>
+            {!daDuChuKyTiepNhan(detail) && (
+              <button className="btn btn-secondary"
+                title="In phiếu để khách ký tay trên giấy"
+                onClick={() => printIntakeSheet(detail, { khongChuKy: true }, moCuaSoIn)}>
+                In phiếu (ký tay)
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -25,7 +25,7 @@ import {
   resolveNgTaskApi,
 } from '../../services/repairOrderApi';
 import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
-import { printIntakeSheet } from '../repairsettlement/printIntake';
+import { printIntakeSheet, daDuChuKyTiepNhan } from '../repairsettlement/printIntake';
 import { moCuaSoIn } from '../repairsettlement/printHeader';
 import './TeamLeaderDashboard.css';
 
@@ -806,11 +806,13 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
               <button className="btn btn-secondary" onClick={() => printIntakeSheet(intakeOrder, {}, moCuaSoIn)}>
                 In phiếu tiếp nhận
               </button>
-              <button className="btn btn-secondary"
-                title="In phiếu để khách ký tay trên giấy"
-                onClick={() => printIntakeSheet(intakeOrder, { khongChuKy: true }, moCuaSoIn)}>
-                In phiếu (ký tay)
-              </button>
+              {!daDuChuKyTiepNhan(intakeOrder) && (
+                <button className="btn btn-secondary"
+                  title="In phiếu để khách ký tay trên giấy"
+                  onClick={() => printIntakeSheet(intakeOrder, { khongChuKy: true }, moCuaSoIn)}>
+                  In phiếu (ký tay)
+                </button>
+              )}
             </div>
           </div>
         </div>
