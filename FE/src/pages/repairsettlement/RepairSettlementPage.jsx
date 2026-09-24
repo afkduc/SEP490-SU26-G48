@@ -2629,6 +2629,12 @@ function ActivityLogModal({ order, onClose }) {
                     <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
                       {s.by || 'Hệ thống'}{at && !Number.isNaN(at.getTime()) ? ` · ${at.toLocaleString('vi-VN')}` : ''}
                     </div>
+                    {/* description ghi ro buoc do lam gi voi CAI GI (vd "Khách
+                        đồng ý thay" nhung khong biet thay dau muc nao neu chi
+                        hien mỗi label) - chi hien khi co gi them ngoai ten buoc. */}
+                    {s.description && s.description !== s.label && (
+                      <div style={{ fontSize: 12.5, color: 'var(--gray-800)', marginTop: 3 }}>{s.description}</div>
+                    )}
                     {Array.isArray(s.changes) && s.changes.length > 0 && <ChangesList changes={s.changes} />}
                   </div>
                 );

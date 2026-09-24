@@ -345,8 +345,9 @@ class RepairSettlementController {
         step: dongY ? 'ng_accepted' : 'ng_declined',
         stepLabel: dongY ? 'Khách đồng ý thay' : 'Khách từ chối thay',
         action: 'UPDATE',
-        description: `${dongY ? 'Khách đồng ý thay' : 'Khách từ chối thay'}`
-          + `${tenDauMuc ? ` — ${tenDauMuc}` : ''} (phiếu ${item?.code || req.params.id})`
+        // Khong lap lai stepLabel o dau description (FE hien ca 2 canh nhau) -
+        // chi can ro CAI GI duoc dong y/tu choi (xem ActivityLogModal).
+        description: `${tenDauMuc || 'Đầu mục'} (phiếu ${item?.code || req.params.id})`
           + (req.body.note ? ` — ${req.body.note}` : ''),
       });
       return success(res, item, 'NG decision saved');
