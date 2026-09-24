@@ -472,6 +472,12 @@ body {
   top: 0;
   background: white;
   z-index: 1;
+  /* .modal khong dat overflow:hidden (se pha mat overflow-y:auto can de cuon
+     noi dung) nen goc bo tron cua .modal KHONG tu dong "cat" duoc header/footer
+     dinh (sticky) o tren duoi - phai bo tron rieng 2 goc tren cua chinh header
+     nay thi moi khop voi khung ngoai khi da cuon xuong. */
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
 }
 
 .modal-title { font-size: 17px; font-weight: 700; color: var(--gray-900); }
@@ -501,6 +507,9 @@ body {
   bottom: 0;
   background: white;
   flex-wrap: wrap;
+  /* Cung ly do voi .modal-header o tren - bo tron rieng 2 goc duoi. */
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
 }
 
 .detail-row { display: flex; border-bottom: 1px solid var(--gray-200); }
