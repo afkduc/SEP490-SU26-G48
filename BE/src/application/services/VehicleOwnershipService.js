@@ -1,4 +1,5 @@
 const ApiError = require('../../utils/ApiError');
+const { getCustomerFieldErrors } = require('./customerValidation');
 
 class VehicleOwnershipService {
   constructor({ vehicleOwnershipRepository }) {
@@ -15,8 +16,12 @@ class VehicleOwnershipService {
     if (!newCustomerId && !newCustomer) {
       throw new ApiError(400, 'Vui lòng chọn khách hàng nhận chuyển nhượng hoặc nhập thông tin khách hàng mới');
     }
-    if (newCustomer && (!newCustomer.fullName?.trim() || !newCustomer.phone?.trim())) {
-      throw new ApiError(400, 'Khách hàng mới phải có họ tên và số điện thoại');
+    // Rang buoc dung chung voi form sua khach hang / import Excel - khach hang
+    // moi tao tu day cung phai sach du lieu nhu moi duong vao khac (xem
+    // customerValidation.js).
+    if (newCustomer) {
+      const errors = getCustomerFieldErrors(newCustomer);
+      if (errors.length) throw new ApiError(400, errors.join('. '));
     }
 
     const history = await this.vehicleOwnershipRepository.findHistoryByVehicleId(vehicleId);

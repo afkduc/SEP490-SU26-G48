@@ -324,6 +324,12 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
   const [newFullName, setNewFullName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newAddress, setNewAddress] = useState('');
+  const [newCccd, setNewCccd] = useState('');
+  const [newDateOfBirth, setNewDateOfBirth] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newTaxCode, setNewTaxCode] = useState('');
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
   const [transferDate, setTransferDate] = useState(() => toLocalISODate());
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -361,7 +367,17 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
     try {
       await transferVehicleOwnerApi(vehicleId, {
         newCustomerId: mode === 'existing' ? selected.id : undefined,
-        newCustomer: mode === 'new' ? { fullName: newFullName.trim(), phone: newPhone.trim(), address: newAddress.trim() || undefined } : undefined,
+        newCustomer: mode === 'new' ? {
+          fullName: newFullName.trim(),
+          phone: newPhone.trim(),
+          address: newAddress.trim() || undefined,
+          cccd: newCccd.trim() || undefined,
+          dateOfBirth: newDateOfBirth || undefined,
+          email: newEmail.trim() || undefined,
+          taxCode: newTaxCode.trim() || undefined,
+          contactName: newContactName.trim() || undefined,
+          contactPhone: newContactPhone.trim() || undefined,
+        } : undefined,
         transferDate,
         notes,
       });
@@ -427,9 +443,33 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
             <label className="form-label required">Số điện thoại</label>
             <input className="form-input" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="0912345678" />
           </div>
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+          <div className="form-group">
+            <label className="form-label">CCCD</label>
+            <input className="form-input" value={newCccd} onChange={(e) => setNewCccd(e.target.value)} placeholder="CCCD (tuỳ chọn)" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Ngày sinh</label>
+            <input className="form-input" type="date" value={newDateOfBirth} onChange={(e) => setNewDateOfBirth(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Email</label>
+            <input className="form-input" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="example@email.com" />
+          </div>
+          <div className="form-group">
             <label className="form-label">Địa chỉ</label>
             <input className="form-input" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Địa chỉ (tuỳ chọn)" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Mã số thuế</label>
+            <input className="form-input" value={newTaxCode} onChange={(e) => setNewTaxCode(e.target.value)} placeholder="Mã số thuế (tuỳ chọn)" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Người liên hệ</label>
+            <input className="form-input" value={newContactName} onChange={(e) => setNewContactName(e.target.value)} placeholder="Người liên hệ (tuỳ chọn)" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">SĐT người liên hệ</label>
+            <input className="form-input" value={newContactPhone} onChange={(e) => setNewContactPhone(e.target.value)} placeholder="SĐT người liên hệ (tuỳ chọn)" />
           </div>
         </div>
       )}
