@@ -30,7 +30,9 @@ function exemptionShortLabel(item) {
 // 1 o chu ky luc quyet toan - dung chung style voi OChuKy trong
 // RepairSettlementPage.jsx (khong export duoc nen nhan doi o day). Chua ky
 // thi hien "Chưa ký" xam, khong an han ca o.
-function ChuKyQuyetToan({ tieuDe, anh, ten, luc }) {
+// Da ky roi thi ten da ghi ro tay trong chinh anh chu ky - khong in lai ten
+// ben duoi, chi giu ngay gio ky (dong nhat voi moi cho hien chu ky khac).
+function ChuKyQuyetToan({ tieuDe, anh, luc }) {
   return (
     <div style={{ flex: '1 1 170px', minWidth: 150 }}>
       <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, marginBottom: 6 }}>{tieuDe}</div>
@@ -47,11 +49,12 @@ function ChuKyQuyetToan({ tieuDe, anh, ten, luc }) {
           fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic',
         }}>Chưa ký</div>
       )}
-      <div style={{
-        textAlign: 'center', fontSize: 12, fontWeight: 600, marginTop: 8,
-        borderTop: '1px solid var(--gray-200)', paddingTop: 6,
-      }}>{ten || '—'}</div>
-      {luc && <div style={{ textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)' }}>{luc}</div>}
+      {luc && (
+        <div style={{
+          textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)', marginTop: 8,
+          borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+        }}>{luc}</div>
+      )}
     </div>
   );
 }
@@ -231,10 +234,8 @@ function SettlementDetailModal({ settlementId, onClose }) {
                   <div className="card" style={{ flex: '1 1 280px', maxWidth: 460 }}>
                     <div className="card-body">
                       <div style={{ display: 'flex', gap: 16 }}>
-                        <ChuKyQuyetToan tieuDe="Khách hàng xác nhận" anh={detail.signatureData}
-                          ten={detail.signerName} luc={detail.signedAt} />
-                        <ChuKyQuyetToan tieuDe="Cố vấn dịch vụ quyết toán" anh={detail.closingSignatureData}
-                          ten={detail.closingAdvisorName} luc={detail.closingSignedAt} />
+                        <ChuKyQuyetToan tieuDe="Khách hàng xác nhận" anh={detail.signatureData} luc={detail.signedAt} />
+                        <ChuKyQuyetToan tieuDe="Cố vấn dịch vụ quyết toán" anh={detail.closingSignatureData} luc={detail.closingSignedAt} />
                       </div>
                     </div>
                   </div>

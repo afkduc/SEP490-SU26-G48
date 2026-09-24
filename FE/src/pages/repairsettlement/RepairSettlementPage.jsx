@@ -4747,30 +4747,48 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           </div>
         )}
 
+        {/* Da ky roi thi ten da ghi ro tay trong chinh anh chu ky - khong in
+            lai ten ben duoi (giong sua o IntakeChecklistView/DetailModal),
+            chi giu ngay gio ky. Hien CA 2 chu ky (khach + CVDV lap phieu),
+            khong chi rieng khach. */}
         {isEdit && (existingOrder?.signatureData ? (
-          <div className="card" style={{ flex: '1 1 280px', maxWidth: 360 }}>
+          <div className="card" style={{ flex: '1 1 460px', maxWidth: 560 }}>
             <div className="card-body">
               <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
                 Xác nhận đồng ý phiếu quyết toán
               </div>
-              <img
-                src={existingOrder.signatureData}
-                alt="Chữ ký xác nhận"
-                style={{ display: 'block', margin: '0 auto', height: 90, border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
-              />
-              {existingOrder.signerName && (
-                <div style={{
-                  textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 10,
-                  borderTop: '1px solid var(--gray-200)', paddingTop: 8,
-                }}>
-                  {existingOrder.signerName}
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ flex: '1 1 200px' }}>
+                  <div style={{ textAlign: 'center', fontWeight: 600, fontSize: 12, marginBottom: 6, color: 'var(--gray-600)' }}>Khách hàng</div>
+                  <img
+                    src={existingOrder.signatureData}
+                    alt="Chữ ký khách hàng"
+                    style={{ display: 'block', margin: '0 auto', height: 90, maxWidth: '100%', objectFit: 'contain', border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
+                  />
+                  {existingOrder.signedAt && (
+                    <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--gray-500)', marginTop: 8, borderTop: '1px solid var(--gray-200)', paddingTop: 6 }}>
+                      Ký lúc: {existingOrder.signedAt}
+                    </div>
+                  )}
                 </div>
-              )}
-              {existingOrder.signedAt && (
-                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
-                  Ký lúc: {existingOrder.signedAt}
+                <div style={{ flex: '1 1 200px' }}>
+                  <div style={{ textAlign: 'center', fontWeight: 600, fontSize: 12, marginBottom: 6, color: 'var(--gray-600)' }}>Cố vấn dịch vụ lập phiếu</div>
+                  {existingOrder.advisorSignatureData ? (
+                    <img
+                      src={existingOrder.advisorSignatureData}
+                      alt="Chữ ký cố vấn dịch vụ"
+                      style={{ display: 'block', margin: '0 auto', height: 90, maxWidth: '100%', objectFit: 'contain', border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
+                    />
+                  ) : (
+                    <div style={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--gray-300)', borderRadius: 6, fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic' }}>Chưa ký</div>
+                  )}
+                  {existingOrder.advisorSignedAt && (
+                    <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--gray-500)', marginTop: 8, borderTop: '1px solid var(--gray-200)', paddingTop: 6 }}>
+                      Ký lúc: {existingOrder.advisorSignedAt}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         ) : <div />)}
