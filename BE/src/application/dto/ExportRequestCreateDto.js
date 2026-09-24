@@ -42,12 +42,12 @@ function validateConfirmPickup(payload) {
     throw new ApiError(400, 'Vui lòng ký xác nhận');
   }
 
-  // Chu ky NV KHO (nguoi xuat): chi bat buoc o LAN DAU cua phieu (header chua
-  // co chu ky) - repository kiem tra trong transaction vi phai biet phieu da
-  // ton tai chua. O day chi kiem dinh dang neu co gui len.
+  // Chu ky NV KHO (nguoi xuat): bat buoc o MOI lan xac nhan, khong chi lan
+  // dau - lan nay co the la NV kho khac lan truoc (ai dang truc kho luc do
+  // thi nguoi do ky), khong dung lai chu ky cu duoc.
   const issuerSignatureData = payload.issuerSignatureData ?? payload.issuer_signature_data ?? null;
-  if (issuerSignatureData && !String(issuerSignatureData).startsWith('data:image/png;base64,')) {
-    throw new ApiError(400, 'Chữ ký nhân viên kho không hợp lệ');
+  if (!(issuerSignatureData || '').startsWith('data:image/png;base64,')) {
+    throw new ApiError(400, 'Vui lòng ký xác nhận (nhân viên kho)');
   }
 
   const rawIds = Array.isArray(payload.productIds ?? payload.product_ids)

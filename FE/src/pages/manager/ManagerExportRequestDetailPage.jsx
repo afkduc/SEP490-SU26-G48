@@ -108,10 +108,11 @@ export default function ManagerExportRequestDetailPage() {
           <div className="mer-detail__section">
             <h2 className="mer-detail__section-title">Chữ ký xác nhận</h2>
             <div className="mer-detail__signatures">
-              {/* NV kho ky 1 lan cho ca phieu (lan xuat dau tien). */}
+              {/* NV kho ky lai MOI lan xuat/tra - day la chu ky cua LAN GAN
+                  NHAT, xem het lich su tung lan o "Lich su luu phieu". */}
               {data.issuerSignatureData && (
                 <div className="mer-detail__signature-box">
-                  <div className="mer-detail__signature-role">Nhân viên kho</div>
+                  <div className="mer-detail__signature-role">Nhân viên kho (lần gần nhất)</div>
                   <img src={data.issuerSignatureData} alt="Chữ ký nhân viên kho" className="mer-detail__signature-img" />
                   {data.issuerName && <div className="mer-detail__signature-name">{data.issuerName}</div>}
                   {data.issuerSignedAt && <div className="mer-detail__signature-date">Ký lúc: {data.issuerSignedAt}</div>}

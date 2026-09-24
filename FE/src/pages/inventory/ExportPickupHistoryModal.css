@@ -81,6 +81,7 @@
 .eph__item-body .font-mono { font-family: 'Courier New', monospace; font-size: 12.5px; font-weight: 700; color: #4f46e5; }
 .eph__item-body .text-right { text-align: right; }
 
+.eph__signatures { display: flex; gap: 12px; flex-wrap: wrap; }
 .eph__signature {
   display: inline-block;
   margin-top: 12px;
@@ -91,6 +92,7 @@
 }
 .eph__signature img { display: block; max-width: 220px; max-height: 90px; background: white; border-radius: 6px; }
 .eph__signature-name { margin-top: 6px; font-size: 12.5px; font-weight: 600; color: var(--gray-800); }
+.eph__signature-role { font-weight: 400; color: var(--gray-500); }
 
 @media (max-width: 640px) {
   .eph__item-head { grid-template-columns: auto 1fr auto; }

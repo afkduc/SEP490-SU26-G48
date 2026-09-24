@@ -77,7 +77,7 @@ export default function ExportRequestListPage() {
         </div>
         <PermissionGate permission="export_requests:create">
           <Link to="/inventory/export-requests/new" className="btn btn--primary">
-            + Tạo phiếu xuất
+            + Tạo phiếu xuất/trả
           </Link>
         </PermissionGate>
       </div>
