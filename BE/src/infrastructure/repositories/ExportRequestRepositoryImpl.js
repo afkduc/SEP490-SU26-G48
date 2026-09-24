@@ -384,7 +384,8 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       vehiclePlate: header.vehicle_plate,
       teamLeaderName: header.team_leader_name,
       exportRequestId: header.export_request_id ?? null,
-      // Chu ky NV kho da ky o lan dau (null = lan nay NV kho phai ky).
+      // Chu ky NV kho cua LAN GAN NHAT - chi de tham khao, form luon bat NV
+      // kho ky lai MOI lan xac nhan (khong con dung de bo qua o cua nay nua).
       issuerSignatureData: header.issuer_signature_data ?? null,
       issuerSignedAt: toDDMMYYYYHHmm(header.issuer_signed_at),
       issuerName: header.issuer_name ?? null,
@@ -434,8 +435,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const roRow = (await tx.request()
       .input('repair_order_id', sql.BigInt, repairOrderId)
       .query(`
-        SELECT ro.id, ro.repair_code, ro.status, er.id AS export_request_id,
-               er.issuer_signature_data
+        SELECT ro.id, ro.repair_code, ro.status, er.id AS export_request_id
         FROM repair_orders ro WITH (UPDLOCK, HOLDLOCK)
         LEFT JOIN export_requests er ON er.repair_order_id = ro.id
         WHERE ro.id = @repair_order_id
@@ -444,13 +444,9 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     if (!EXPORTABLE_RO_STATUSES.includes(roRow.status)) {
       throw new ApiError(409, 'Lenh sua chua da chot, khong the xuat/tra phu tung nua');
     }
-    // Chu ky NV kho: ky DUNG 1 LAN cho ca phieu - bat buoc khi phieu chua co
-    // (lan dau, hoac phieu cu tao truoc khi co tinh nang nay). Da co roi thi
-    // giu nguyen chu ky ban dau, bo qua chu ky gui len (neu co).
-    const needIssuerSignature = !roRow.issuer_signature_data;
-    if (needIssuerSignature && !data.issuer_signature_data) {
-      throw new ApiError(400, 'Nhân viên kho phải ký xác nhận phiếu xuất (chỉ ký 1 lần cho cả phiếu)');
-    }
+    // Chu ky NV kho: bat buoc MOI lan (DTO da kiem dinh dang o
+    // validateConfirmPickup) - moi lan co the la nguoi khac nhau dang truc
+    // kho, khong dung lai chu ky cu.
 
     // 2) Tinh lai pending o server cho dung cac productId duoc tick.
     // Chi giu so nguyen duong - idList duoc noi thang vao cau SQL nen tuyet
@@ -541,48 +537,41 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         `)).recordset[0].id;
     }
 
-    // Header luon giu chu ky/nguoi lay cua LAN GAN NHAT (lich su day du nam
-    // o export_request_pickups).
+    // Header luon giu chu ky/nguoi cua LAN GAN NHAT (ca nguoi lay lan NV kho -
+    // lich su day du tung lan nam o export_request_pickups).
     await tx.request()
       .input('id', sql.BigInt, exportRequestId)
       .input('received_by', sql.BigInt, data.received_by)
       .input('signature_data', sql.NVarChar(sql.MAX), data.signature_data)
+      .input('issuer_signed_by', sql.BigInt, data.performed_by)
+      .input('issuer_signature_data', sql.NVarChar(sql.MAX), data.issuer_signature_data)
       .query(`
         UPDATE export_requests
         SET received_by = @received_by,
             received_signature_data = @signature_data,
-            received_signed_at = GETDATE()
+            received_signed_at = GETDATE(),
+            issuer_signature_data = @issuer_signature_data,
+            issuer_signed_by = @issuer_signed_by,
+            issuer_signed_at = GETDATE()
         WHERE id = @id
       `);
 
-    // Chu ky NV kho: chi ghi khi phieu CHUA co (WHERE ... IS NULL de 2 request
-    // dong thoi cung khong ghi de chu ky dau tien).
-    if (needIssuerSignature) {
-      await tx.request()
-        .input('id', sql.BigInt, exportRequestId)
-        .input('issuer_signed_by', sql.BigInt, data.performed_by)
-        .input('issuer_signature_data', sql.NVarChar(sql.MAX), data.issuer_signature_data)
-        .query(`
-          UPDATE export_requests
-          SET issuer_signature_data = @issuer_signature_data,
-              issuer_signed_by = @issuer_signed_by,
-              issuer_signed_at = GETDATE()
-          WHERE id = @id AND issuer_signature_data IS NULL
-        `);
-    }
-
-    // 4) Ghi 1 lan lay hang (chu ky rieng cua lan nay).
+    // 4) Ghi 1 lan lay hang (chu ky rieng cua lan nay - CA nguoi lay lan NV kho,
+    // giu du lich su ai xuat/ai lay cho tung lan rieng biet).
     const pickupId = (await tx.request()
       .input('export_request_id', sql.BigInt, exportRequestId)
       .input('received_by', sql.BigInt, data.received_by)
       .input('signature_data', sql.NVarChar(sql.MAX), data.signature_data)
       .input('performed_by', sql.BigInt, data.performed_by)
+      .input('issuer_signature_data', sql.NVarChar(sql.MAX), data.issuer_signature_data)
       .query(`
         INSERT INTO export_request_pickups (
-          export_request_id, received_by, signature_data, signed_at, performed_by, created_at
+          export_request_id, received_by, signature_data, signed_at, performed_by,
+          issuer_signature_data, created_at
         )
         OUTPUT INSERTED.id
-        VALUES (@export_request_id, @received_by, @signature_data, GETDATE(), @performed_by, GETDATE())
+        VALUES (@export_request_id, @received_by, @signature_data, GETDATE(), @performed_by,
+          @issuer_signature_data, GETDATE())
       `)).recordset[0].id;
 
     // 5) Cong/tru kho + cong don item + ghi so giao dich.
@@ -704,7 +693,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   async findPickups(exportRequestId) {
     const result = await query(
       `SELECT
-         pk.id, pk.signed_at, pk.signature_data,
+         pk.id, pk.signed_at, pk.signature_data, pk.issuer_signature_data,
          COALESCE(NULLIF(LTRIM(RTRIM(u.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u.last_name, N'') + N' ' + ISNULL(u.first_name, N''))), N''), u.pseudo_id) AS received_by_name,
          u.pseudo_id AS received_by_code,
          COALESCE(NULLIF(LTRIM(RTRIM(pf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(pf.last_name, N'') + N' ' + ISNULL(pf.first_name, N''))), N''), pf.pseudo_id) AS performed_by_name,
@@ -730,6 +719,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
           signedAt: r.signed_at,
           signedAtLabel: toDDMMYYYYHHmm(r.signed_at),
           signatureData: r.signature_data,
+          issuerSignatureData: r.issuer_signature_data,
           receivedByName: r.received_by_name,
           receivedByCode: r.received_by_code,
           performedByName: r.performed_by_name,

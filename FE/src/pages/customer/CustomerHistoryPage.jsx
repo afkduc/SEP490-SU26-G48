@@ -1,15 +1,63 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency, formatDate, toLocalISODate } from '../../utils';
+import { actionLabel } from '../../constants/maintenanceChecklist';
+import { HTTT_CANCELLED_VALUE } from '../../constants/settlementCodes';
 import { listRepairSettlementsApi, getRepairSettlementApi } from '../../services/repairSettlementApi';
 import { listCustomersApi, getCustomerApi, updateCustomerApi, importCustomersApi, addCustomerVehicleApi } from '../../services/customerApi';
 import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi, listVehicleModelsApi, listVehicleSegmentsApi, createVehicleModelApi } from '../../services/vehicleApi';
 import { STATUS_LABELS } from '../repairsettlement/mockData';
 import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
+import { printIntakeSheet, daDuChuKyTiepNhan } from '../repairsettlement/printIntake';
+import DeclinedTasksSummary from '../repairsettlement/DeclinedTasksSummary';
+import { moCuaSoIn } from '../repairsettlement/printHeader';
 import { useAuth } from '../../contexts';
 import { normalizeRoles } from '../../contexts/AppContext';
 import { ROLES } from '../../constants/roles';
 
 const IMPORT_ALLOWED_ROLES = [ROLES.MANAGER];
+
+// Hạng mục có HTTT = Bảo hành hãng xe / Bảo hiểm chi trả / Nội bộ chịu phí /
+// Khách hủy -> khách không phải trả - giống hệt logic ở RepairSettlementPage,
+// nhân đôi 2 hàm nhỏ này ở đây vì bên đó không export.
+function isExemptFromCustomerBilling(item) {
+  return item.httt === 'BHH' || item.httt === 'BH' || item.httt === 'NB' || item.httt === HTTT_CANCELLED_VALUE;
+}
+const EXEMPTION_SHORT_LABEL = { BHH: 'Bảo hành', BH: 'Bảo hiểm', NB: 'Nội bộ', [HTTT_CANCELLED_VALUE]: 'Khách hủy' };
+function exemptionShortLabel(item) {
+  return EXEMPTION_SHORT_LABEL[item.httt] || null;
+}
+
+// 1 o chu ky luc quyet toan - dung chung style voi OChuKy trong
+// RepairSettlementPage.jsx (khong export duoc nen nhan doi o day). Chua ky
+// thi hien "Chưa ký" xam, khong an han ca o.
+// Da ky roi thi ten da ghi ro tay trong chinh anh chu ky - khong in lai ten
+// ben duoi, chi giu ngay gio ky (dong nhat voi moi cho hien chu ky khac).
+function ChuKyQuyetToan({ tieuDe, anh, luc }) {
+  return (
+    <div style={{ flex: '1 1 170px', minWidth: 150 }}>
+      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, marginBottom: 6 }}>{tieuDe}</div>
+      {anh ? (
+        <img src={anh} alt={tieuDe}
+          style={{
+            display: 'block', margin: '0 auto', height: 84, maxWidth: '100%', objectFit: 'contain',
+            border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff',
+          }} />
+      ) : (
+        <div style={{
+          height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '1px dashed var(--gray-300)', borderRadius: 6,
+          fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic',
+        }}>Chưa ký</div>
+      )}
+      {luc && (
+        <div style={{
+          textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)', marginTop: 8,
+          borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+        }}>{luc}</div>
+      )}
+    </div>
+  );
+}
 
 // ─── Modal xem chi tiết 1 phiếu quyết toán trong lịch sử ─────────────
 function SettlementDetailModal({ settlementId, onClose }) {
@@ -118,84 +166,89 @@ function SettlementDetailModal({ settlementId, onClose }) {
                     <tr><th>#</th><th>Nội dung</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th></tr>
                   </thead>
                   <tbody>
-                    {(detail.items || []).map((item, i) => (
-                      <tr key={i}>
-                        <td style={{ textAlign: 'center' }}>{i + 1}</td>
-                        <td>{item.description}</td>
-                        <td style={{ textAlign: 'center' }}>{item.qty}</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(item.total)}</td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      const indexed = (detail.items || []).map((item, i) => ({ item, i }));
+                      const laborRows = indexed.filter(({ item }) => item.lhsc !== 'PT');
+                      const partRows = indexed.filter(({ item }) => item.lhsc === 'PT');
+                      const laborSubtotal = laborRows.reduce((s, { item }) => s + (item.total || 0), 0);
+                      const partSubtotal = partRows.reduce((s, { item }) => s + (item.total || 0), 0);
+
+                      // "Nội dung" hien them tag Mien thu KH + yeu cau thuc hien -
+                      // giong het cach RepairSettlementPage hien cho co van, de
+                      // khach hieu ngay vi sao mot dong lai 0d thay vi doan mo.
+                      const renderRow = ({ item, i }) => (
+                        <tr key={i}>
+                          <td style={{ textAlign: 'center' }}>{i + 1}</td>
+                          <td>
+                            {item.description}
+                            {!item.isFree && isExemptFromCustomerBilling(item) && <span className="tag" style={{ marginLeft: 6 }}>Miễn thu KH</span>}
+                            {actionLabel(item.actionCode) && (
+                              <div style={{ fontSize: 11, color: 'var(--gray-600)', fontStyle: 'italic' }}>{actionLabel(item.actionCode)}</div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>{item.qty}</td>
+                          <td style={{ textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                            {formatCurrency(item.total)}
+                            {exemptionShortLabel(item) && <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}> ({exemptionShortLabel(item)})</span>}
+                          </td>
+                        </tr>
+                      );
+
+                      return (
+                        <>
+                          <tr>
+                            <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
+                            <td colSpan={3} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>CÔNG VIỆC CẦN THỰC HIỆN</td>
+                          </tr>
+                          {laborRows.map(renderRow)}
+                          <tr>
+                            <td colSpan={4} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                            <td style={{ fontWeight: 700, textAlign: 'right' }}>{formatCurrency(laborSubtotal)}</td>
+                          </tr>
+
+                          {partRows.length > 0 && (
+                            <>
+                              <tr>
+                                <td colSpan={2} style={{ background: 'var(--gray-200)' }}></td>
+                                <td colSpan={3} style={{ background: 'var(--gray-200)', fontWeight: 700, fontSize: 12, padding: '6px 10px' }}>PHỤ TÙNG, VẬT TƯ</td>
+                              </tr>
+                              {partRows.map(renderRow)}
+                              <tr>
+                                <td colSpan={4} style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>Cộng</td>
+                                <td style={{ fontWeight: 700, textAlign: 'right' }}>{formatCurrency(partSubtotal)}</td>
+                              </tr>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                   </tbody>
                 </table>
               </div>
 
-              {(() => {
-                const serviceTasks = (detail.tasks || []).filter((t) => t.taskType === 'service');
-                if (serviceTasks.length === 0) return null;
-                const doneCount = serviceTasks.filter((t) => t.isDone).length;
-                return (
-                  <div style={{ marginTop: 4, marginBottom: 16 }}>
-                    <div className="form-section-title">
-                      Tiến độ công việc ({doneCount}/{serviceTasks.length})
-                    </div>
-                    {detail.technicians?.length > 0 && (
-                      <div style={{ fontSize: 12.5, color: 'var(--gray-600)', marginBottom: 8 }}>
-                        Thợ thực hiện: <b>{detail.technicians.map((t) => t.fullName).join(', ')}</b>
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {serviceTasks.map((t) => (
-                        <label
-                          key={t.id}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                            background: t.isDone ? '#E8F5E9' : 'var(--gray-50)', borderRadius: 6,
-                            fontSize: 13,
-                            color: t.isDone ? '#2E7D32' : 'var(--gray-900)',
-                          }}
-                        >
-                          <input type="checkbox" checked={t.isDone} disabled readOnly style={{ accentColor: '#2E7D32' }} />
-                          <span>{t.taskName}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+              <DeclinedTasksSummary tasks={detail.tasks} />
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-                {detail.signatureData ? (
-                  <div className="card" style={{ flex: '1 1 280px', maxWidth: 360 }}>
+                {(detail.signatureData || detail.closingSignatureData) ? (
+                  <div className="card" style={{ flex: '1 1 280px', maxWidth: 460 }}>
                     <div className="card-body">
-                      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
-                        Xác nhận đồng ý phiếu quyết toán
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        <ChuKyQuyetToan tieuDe="Khách hàng xác nhận" anh={detail.signatureData} luc={detail.signedAt} />
+                        <ChuKyQuyetToan tieuDe="Cố vấn dịch vụ quyết toán" anh={detail.closingSignatureData} luc={detail.closingSignedAt} />
                       </div>
-                      <img
-                        src={detail.signatureData}
-                        alt="Chữ ký xác nhận"
-                        style={{ display: 'block', margin: '0 auto', height: 90, border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
-                      />
-                      {detail.signerName && (
-                        <div style={{
-                          textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 10,
-                          borderTop: '1px solid var(--gray-200)', paddingTop: 8,
-                        }}>
-                          {detail.signerName}
-                        </div>
-                      )}
-                      {detail.signedAt && (
-                        <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
-                          Ký lúc: {detail.signedAt}
-                        </div>
-                      )}
                     </div>
                   </div>
                 ) : <div />}
 
                 <div className="summary-box" style={{ minWidth: 260 }}>
-                  <div className="summary-row total"><span>Tổng cộng:</span><span>{formatCurrency(detail.total)}</span></div>
+                  <div className="summary-row"><span>Tổng trước giảm giá:</span><span>{(detail.subtotal || 0).toLocaleString('vi-VN')} đ</span></div>
+                  <div className="summary-row"><span>Tổng giảm giá:</span><span>{(detail.discountAmount || 0).toLocaleString('vi-VN')} đ</span></div>
+                  <div className="summary-row"><span>Thuế GTGT (8%):</span><span>{(detail.vat || 0).toLocaleString('vi-VN')} đ</span></div>
+                  {detail.freeAmount > 0 && (
+                    <div className="summary-row"><span>Miễn phí:</span><span>{(detail.freeAmount || 0).toLocaleString('vi-VN')} đ</span></div>
+                  )}
+                  <div className="summary-row total"><span>Tổng thanh toán:</span><span>{formatCurrency(detail.total)}</span></div>
                 </div>
               </div>
             </>
@@ -229,7 +282,19 @@ function SettlementDetailModal({ settlementId, onClose }) {
             <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
           </div>
           <div className="modal-body">
-            <IntakeChecklistView value={detail.intakeChecklist} vehicleModelText={detail.vehicle?.vehicleModel} />
+            <IntakeChecklistView value={detail.intakeChecklist} vehicleModelText={detail.vehicle?.vehicleModel} order={detail} />
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => printIntakeSheet(detail, {}, moCuaSoIn)}>
+              In phiếu tiếp nhận
+            </button>
+            {!daDuChuKyTiepNhan(detail) && (
+              <button className="btn btn-secondary"
+                title="In phiếu để khách ký tay trên giấy"
+                onClick={() => printIntakeSheet(detail, { khongChuKy: true }, moCuaSoIn)}>
+                In phiếu (ký tay)
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -247,6 +312,10 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
   const [newFullName, setNewFullName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newAddress, setNewAddress] = useState('');
+  const [newCccd, setNewCccd] = useState('');
+  const [newDateOfBirth, setNewDateOfBirth] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newTaxCode, setNewTaxCode] = useState('');
   const [transferDate, setTransferDate] = useState(() => toLocalISODate());
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -284,7 +353,15 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
     try {
       await transferVehicleOwnerApi(vehicleId, {
         newCustomerId: mode === 'existing' ? selected.id : undefined,
-        newCustomer: mode === 'new' ? { fullName: newFullName.trim(), phone: newPhone.trim(), address: newAddress.trim() || undefined } : undefined,
+        newCustomer: mode === 'new' ? {
+          fullName: newFullName.trim(),
+          phone: newPhone.trim(),
+          address: newAddress.trim() || undefined,
+          cccd: newCccd.trim() || undefined,
+          dateOfBirth: newDateOfBirth || undefined,
+          email: newEmail.trim() || undefined,
+          taxCode: newTaxCode.trim() || undefined,
+        } : undefined,
         transferDate,
         notes,
       });
@@ -350,9 +427,25 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
             <label className="form-label required">Số điện thoại</label>
             <input className="form-input" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="0912345678" />
           </div>
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+          <div className="form-group">
+            <label className="form-label">CCCD</label>
+            <input className="form-input" value={newCccd} onChange={(e) => setNewCccd(e.target.value)} placeholder="CCCD (tuỳ chọn)" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Ngày sinh</label>
+            <input className="form-input" type="date" value={newDateOfBirth} onChange={(e) => setNewDateOfBirth(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Email</label>
+            <input className="form-input" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="example@email.com" />
+          </div>
+          <div className="form-group">
             <label className="form-label">Địa chỉ</label>
             <input className="form-input" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Địa chỉ (tuỳ chọn)" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Mã số thuế</label>
+            <input className="form-input" value={newTaxCode} onChange={(e) => setNewTaxCode(e.target.value)} placeholder="Mã số thuế (tuỳ chọn)" />
           </div>
         </div>
       )}
@@ -360,7 +453,7 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
       <div className="form-grid form-grid-2">
         <div className="form-group">
           <label className="form-label">Ngày chuyển nhượng</label>
-          <input className="form-input" type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} />
+          <input className="form-input" type="date" value={transferDate} max={toLocalISODate()} onChange={(e) => setTransferDate(e.target.value)} />
         </div>
         <div className="form-group">
           <label className="form-label">Ghi chú</label>

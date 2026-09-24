@@ -21,6 +21,78 @@ export function urlLogo() {
   return urlAsset('/AutoGaraLogo-Photoroom.png');
 }
 
+// Mo 1 cua so moi va in noi dung HTML da dung san - dung chung cho MOI mau in
+// (quyet toan, danh sach cong viec, phieu tiep nhan...) va MOI man hinh goi
+// in (trang quyet toan, lich su khach hang, man to truong).
+//
+// 2 loi that da gap khi tu viet doan nay o moi cho:
+//
+// 1. `w.onload = () => w.print()` gan SAU khi document.close(): neu trang
+//    khong co anh nao (phieu in luc chua co ma QR) thi no da load xong TRUOC
+//    luc gan, su kien load khong bao gio ban nua -> bam In khong ra hop thoai
+//    nao, nguoi dung tuong nut hong. Phai xet readyState truoc.
+//
+// 2. window.open tra ve null khi bi trinh duyet chan popup - goi thang
+//    w.document.write se nem "Cannot read properties of null" giua chung,
+//    khong ai biet chuyen gi. Tra ve ly do de cho goi bao cho tu te.
+//
+// 3. Doi readyState==='complete'/su kien 'load' cua WINDOW tuong la du, nhung
+//    voi trang dung document.write()+close() thi Chrome co the bao 'complete'
+//    NGAY LAP TUC (parse xong la xong), truoc ca khi kip gui request cho
+//    <img src="https://..."> con ma QR (qua api.qrserver.com, anh chu ky la
+//    data: URI nen luon tuc thi, khong dinh loi nay) - ket qua la ban in ra
+//    thieu han ma QR (o QR trong rong) du code van "cho load" nhu binh
+//    thuong. Phai doi RIENG tung <img> load/error xong that su, khong dua
+//    vao readyState nua.
+//
+// Tra ve '' neu in duoc, hoac cau thong bao loi.
+export function moCuaSoIn(html) {
+  const w = window.open('', '_blank');
+  if (!w) {
+    return 'Trình duyệt đã chặn cửa sổ in. Hãy cho phép pop-up cho trang này rồi bấm In lại.';
+  }
+  w.document.write(html);
+  w.document.close();
+
+  let daIn = false;
+  const inRa = () => {
+    if (daIn) return;
+    daIn = true;
+    try {
+      w.focus();
+      w.print();
+    } catch {
+      /* nguoi dung dong cua so truoc khi kip in - khong co gi de lam */
+    }
+  };
+
+  // Doi TAT CA <img> trong trang (chu ky + ma QR) tai xong (load hoac error)
+  // roi moi in. Gioi han 2s de khong treo cua so in mai neu mang cham/mang
+  // hong - luc do in thieu ma QR con hon khong in duoc gi.
+  const choAnhRoiIn = () => {
+    const imgs = Array.from(w.document.images || []);
+    const chuaXong = imgs.filter((img) => !img.complete);
+    if (chuaXong.length === 0) {
+      inRa();
+      return;
+    }
+    let conLai = chuaXong.length;
+    const motAnhXong = () => {
+      conLai -= 1;
+      if (conLai <= 0) inRa();
+    };
+    chuaXong.forEach((img) => {
+      img.addEventListener('load', motAnhXong, { once: true });
+      img.addEventListener('error', motAnhXong, { once: true });
+    });
+    setTimeout(inRa, 2000);
+  };
+
+  if (w.document.readyState === 'complete') choAnhRoiIn();
+  else w.addEventListener('load', choAnhRoiIn, { once: true });
+  return '';
+}
+
 // CSS cho khối tiêu đề - nhúng vào <style> của từng mẫu in.
 // Bố cục: logo ghim bên trái, phần chữ vẫn CĂN GIỮA như mẫu phiếu cũ (ô trống
 // bên phải rộng bằng logo để chữ giữa thật, không bị lệch).

@@ -39,12 +39,13 @@ import {
   repairCategoryShort,
   htttShort,
 } from '../../constants/settlementCodes';
-import { khoiTieuDeIn, urlLogo, PRINT_HEADER_CSS } from './printHeader';
+import { khoiTieuDeIn, urlLogo, PRINT_HEADER_CSS, moCuaSoIn } from './printHeader';
 import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
 import IntakeChecklistView from './IntakeChecklistView';
-import { printIntakeSheet } from './printIntake';
+import DeclinedTasksSummary from './DeclinedTasksSummary';
+import { printIntakeSheet, daDuChuKyTiepNhan } from './printIntake';
 import VehicleHistoryModal from './VehicleHistoryModal';
 import { assignGroupIds, dongHangMucDeIn } from './settlementItems';
 import SignaturePad from './SignaturePad';
@@ -278,7 +279,7 @@ function TaskNameLabel({ t }) {
 // phieu (moc tiep nhan), co van chot phieu + khach nhan xe (moc quyet toan).
 // Chua ky thi van hien o xam "Chưa ký" - nhin la biet phieu con thieu gi, va
 // phieu cu tao truoc khi co tinh nang nay cung hien dung thuc te.
-function OChuKy({ tieuDe, anh, ten, luc }) {
+function OChuKy({ tieuDe, anh, ten, luc, hideName }) {
   return (
     <div style={{ flex: '1 1 170px', minWidth: 150 }}>
       <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, marginBottom: 6 }}>{tieuDe}</div>
@@ -295,11 +296,23 @@ function OChuKy({ tieuDe, anh, ten, luc }) {
           fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic',
         }}>Chưa ký</div>
       )}
-      <div style={{
-        textAlign: 'center', fontSize: 12, fontWeight: 600, marginTop: 8,
-        borderTop: '1px solid var(--gray-200)', paddingTop: 6,
-      }}>{ten || '—'}</div>
-      {luc && <div style={{ textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)' }}>{luc}</div>}
+      {/* Da ky roi thi ten da ghi ro tay trong anh chu ky - in lai chu ben
+          duoi la thua (chi bat khi hideName). Ngay gio ky thi van giu, khong
+          "ghi ro" duoc trong anh. */}
+      {!hideName && (
+        <div style={{
+          textAlign: 'center', fontSize: 12, fontWeight: 600, marginTop: 8,
+          borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+        }}>{ten || '—'}</div>
+      )}
+      {luc && (
+        <div style={{
+          textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)',
+          marginTop: hideName ? 8 : 0,
+          borderTop: hideName ? '1px solid var(--gray-200)' : 'none',
+          paddingTop: hideName ? 6 : 0,
+        }}>{luc}</div>
+      )}
     </div>
   );
 }
@@ -309,7 +322,13 @@ function OChuKy({ tieuDe, anh, ten, luc }) {
 //
 // Ghi ro "TIẾP NHẬN XE" / "BÀN GIAO XE" tren tung cap: nhin phieu la biet
 // chu ky nao ky luc nao, khong phai doan theo tieu de tung o.
-function KhoiChuKy({ order }) {
+//
+// onlyHandover: rieng man Truy cap phieu (DetailModal) chi can 2 chu ky luc
+// BAN GIAO (khach nhan xe + CVDV quyet toan) - 2 chu ky luc tiep nhan da xem
+// duoc qua "Xem tinh trang xe ban dau" roi, khong can lap lai o day. CHI ap
+// dung cho man nay, modal Ky quyet toan (goi KhoiChuKy khong truyen prop nay)
+// van giu nguyen 4 chu ky nhu cu.
+function KhoiChuKy({ order, onlyHandover, hideName }) {
   const nhom = (tieuDe, cac_o) => (
     <div style={{ flex: '1 1 320px', minWidth: 300 }}>
       <div style={{
@@ -322,6 +341,17 @@ function KhoiChuKy({ order }) {
       <div style={{ display: 'flex', gap: 12 }}>{cac_o}</div>
     </div>
   );
+  const oBanGiao = (
+    <>
+      <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
+        ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} hideName={hideName} />
+      <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
+        ten={order.closingAdvisorName} luc={order.closingSignedAt} hideName={hideName} />
+    </>
+  );
+  if (onlyHandover) {
+    return <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>{oBanGiao}</div>;
+  }
   return (
     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
       {nhom('Tiếp nhận xe', (
@@ -332,14 +362,7 @@ function KhoiChuKy({ order }) {
             ten={order.advisor} luc={order.advisorSignedAt} />
         </>
       ))}
-      {nhom('Bàn giao xe', (
-        <>
-          <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
-            ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} />
-          <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
-            ten={order.closingAdvisorName} luc={order.closingSignedAt} />
-        </>
-      ))}
+      {nhom('Bàn giao xe', oBanGiao)}
     </div>
   );
 }
@@ -516,76 +539,6 @@ function calcTotals(items) {
     exemptedAmount: Math.round(exemptedAmount),
     total: Math.round(subtotal) + vat,
   };
-}
-
-// Mo 1 cua so moi va in noi dung HTML da dung san.
-//
-// 2 loi that da gap khi tu viet doan nay o moi cho:
-//
-// 1. `w.onload = () => w.print()` gan SAU khi document.close(): neu trang
-//    khong co anh nao (phieu in luc chua co ma QR) thi no da load xong TRUOC
-//    luc gan, su kien load khong bao gio ban nua -> bam In khong ra hop thoai
-//    nao, nguoi dung tuong nut hong. Phai xet readyState truoc.
-//
-// 2. window.open tra ve null khi bi trinh duyet chan popup - goi thang
-//    w.document.write se nem "Cannot read properties of null" giua chung,
-//    khong ai biet chuyen gi. Tra ve ly do de cho goi bao cho tu te.
-//
-// 3. Doi readyState==='complete'/su kien 'load' cua WINDOW tuong la du, nhung
-//    voi trang dung document.write()+close() thi Chrome co the bao 'complete'
-//    NGAY LAP TUC (parse xong la xong), truoc ca khi kip gui request cho
-//    <img src="https://..."> con ma QR (qua api.qrserver.com, anh chu ky la
-//    data: URI nen luon tuc thi, khong dinh loi nay) - ket qua la ban in ra
-//    thieu han ma QR (o QR trong rong) du code van "cho load" nhu binh
-//    thuong. Phai doi RIENG tung <img> load/error xong that su, khong dua
-//    vao readyState nua.
-//
-// Tra ve '' neu in duoc, hoac cau thong bao loi.
-function moCuaSoIn(html) {
-  const w = window.open('', '_blank');
-  if (!w) {
-    return 'Trình duyệt đã chặn cửa sổ in. Hãy cho phép pop-up cho trang này rồi bấm In lại.';
-  }
-  w.document.write(html);
-  w.document.close();
-
-  let daIn = false;
-  const inRa = () => {
-    if (daIn) return;
-    daIn = true;
-    try {
-      w.focus();
-      w.print();
-    } catch {
-      /* nguoi dung dong cua so truoc khi kip in - khong co gi de lam */
-    }
-  };
-
-  // Doi TAT CA <img> trong trang (chu ky + ma QR) tai xong (load hoac error)
-  // roi moi in. Gioi han 2s de khong treo cua so in mai neu mang cham/mang
-  // hong - luc do in thieu ma QR con hon khong in duoc gi.
-  const choAnhRoiIn = () => {
-    const imgs = Array.from(w.document.images || []);
-    const chuaXong = imgs.filter((img) => !img.complete);
-    if (chuaXong.length === 0) {
-      inRa();
-      return;
-    }
-    let conLai = chuaXong.length;
-    const motAnhXong = () => {
-      conLai -= 1;
-      if (conLai <= 0) inRa();
-    };
-    chuaXong.forEach((img) => {
-      img.addEventListener('load', motAnhXong, { once: true });
-      img.addEventListener('error', motAnhXong, { once: true });
-    });
-    setTimeout(inRa, 2000);
-  };
-
-  if (w.document.readyState === 'complete') choAnhRoiIn();
-  else w.addEventListener('load', choAnhRoiIn, { once: true });
-  return '';
 }
 
 function logPrintBestEffort(order, kind) {
@@ -822,6 +775,10 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
   const order = orderMoi || orderGoc;
   // Chi con dung de doi chu nut in ("In phieu" vs "In lai phieu").
   const [hasPrinted, setHasPrinted] = useState(false);
+  // Xem lai tinh trang xe luc tiep nhan (giong het nut cung ten trong
+  // DetailModal) - co van hay can doi chieu luc quyet toan xem xe co dung
+  // tinh trang nhu luc nhan hay khong.
+  const [showIntake, setShowIntake] = useState(false);
   // Trinh duyet chan popup thi bam In khong ra gi ca - phai noi ro, khong thi
   // nguoi dung bam di bam lai tuong nut hong.
   const [printError, setPrintError] = useState('');
@@ -959,7 +916,8 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 860 }}>
+      <div className="modal modal-lg no-scrollbar" onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 940 }}>
         <div className="modal-header">
           <h3 className="modal-title">Quyết toán sửa chữa — {order.code}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -1164,7 +1122,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
         {order.status === 'waiting_payment' && (
           <div style={{ margin: '0 16px 12px' }}>
             {daKyQuyetToan ? (
-              <div style={{ border: '1px solid #A5D6A7', borderRadius: 8, background: '#F1F8F2', padding: 12 }}>
+              <div style={{ border: '1px solid #A5D6A7', borderRadius: 12, background: '#F1F8F2', padding: 12 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: '#2E7D32', marginBottom: 10 }}>
                   ✓ Đã ký quyết toán
                 </div>
@@ -1173,7 +1131,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                 <KhoiChuKy order={order} />
               </div>
             ) : (
-              <div style={{ border: '1px solid var(--gray-300)', borderRadius: 8, padding: 12 }}>
+              <div style={{ border: '1px solid var(--gray-300)', borderRadius: 12, padding: 12 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Ký quyết toán &amp; giao xe</div>
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 260px' }}>
@@ -1235,7 +1193,9 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
           </div>
         )}
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
+          <button className="btn btn-secondary" onClick={() => setShowIntake((s) => !s)}>
+            {showIntake ? 'Ẩn xem tình trạng xe ban đầu' : 'Xem tình trạng xe ban đầu'}
+          </button>
           {/* Truoc khi ky xong: nut "Xác nhận đã đủ chữ ký hợp lệ" nam DUNG
               cho nay - thay vi hien san nut "Xác nhận tiền mặt" nhung xam va
               khong bam duoc (nguoi dung khong biet phai lam gi tiep). Bam
@@ -1267,8 +1227,48 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
             title="In phiếu để khách ký tay trên giấy">
             In phiếu (ký tay)
           </button>
+          {/* Day rieng ra ngoai cung ben phai (marginLeft: auto), tach khoi
+              nhom nut hanh dong (ky/in) - "Đóng" chi la thoat man hinh. */}
+          <button className="btn btn-secondary" style={{ marginLeft: 'auto' }} onClick={onClose}>Đóng</button>
         </div>
       </div>
+
+      {showIntake && (
+        <div
+          className="modal modal-xl no-scrollbar"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            maxWidth: 'min(440px, 38vw)',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: 14,
+            overflowX: 'hidden',
+          }}
+        >
+          <div className="modal-header">
+            <h3 className="modal-title">Tiếp nhận và bàn giao xe</h3>
+            <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
+          </div>
+          <div className="modal-body">
+            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} order={order} />
+          </div>
+          {/* In rieng phieu tiep nhan (kem chu ky khach + CVDV tiep nhan) -
+              giong het nut o DetailModal, dung chung 1 mau in. */}
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => printIntakeSheet(order, {}, moCuaSoIn)}>
+              In phiếu tiếp nhận
+            </button>
+            {!daDuChuKyTiepNhan(order) && (
+              <button className="btn btn-secondary"
+                title="In phiếu để khách ký tay trên giấy"
+                onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
+                In phiếu (ký tay)
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {showCashConfirm && (
         <div className="modal-overlay" onClick={(e) => e.stopPropagation()} style={{ zIndex: 1100 }}>
@@ -1625,8 +1625,17 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
             </table>
           </div>
 
-          <TaskProgressList tasks={order.tasks} bayNumber={order.bayNumber} technicians={order.technicians}
-            onDecideNg={onDecideNg} decidingId={decidingId} />
+          {/* Phieu da xuat hoa don thi khong con gi de thao tac (onDecideNg
+              cung khong duoc goi nua) - liet ke het checklist kem tick xanh
+              chi thua thong tin, doi sang ban rut gon giong het man Lich su
+              khach hang. Phieu con dang xu ly thi giu nguyen ban day du de
+              co van/to truong theo doi tien do. */}
+          {order.status === 'invoiced' ? (
+            <DeclinedTasksSummary tasks={order.tasks} />
+          ) : (
+            <TaskProgressList tasks={order.tasks} bayNumber={order.bayNumber} technicians={order.technicians}
+              onDecideNg={onDecideNg} decidingId={decidingId} />
+          )}
 
           {/* Khoi tong ket dung mot minh ben phai; khoi chu ky xuong hang
               rieng ben duoi de 4 o ky nam CUNG MOT HANG nhu tren to phieu
@@ -1648,7 +1657,9 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
           <div className="card" style={{ marginTop: 12 }}>
             <div className="card-body">
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Chữ ký trên phiếu</div>
-              <KhoiChuKy order={order} />
+              {/* Man nay chi can 2 chu ky luc ban giao - 2 chu ky tiep nhan
+                  xem qua "Xem tinh trang xe ban dau" o footer roi. */}
+              <KhoiChuKy order={order} onlyHandover hideName />
             </div>
           </div>
         </div>
@@ -1687,7 +1698,7 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
             <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
           </div>
           <div className="modal-body">
-            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} />
+            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} order={order} />
           </div>
           {/* In rieng phieu tiep nhan (kem chu ky khach + CVDV tiep nhan) -
               day la to giay khach ky xac nhan tinh trang xe luc mang den,
@@ -1696,11 +1707,13 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
             <button className="btn btn-secondary" onClick={() => printIntakeSheet(order, {}, moCuaSoIn)}>
               In phiếu tiếp nhận
             </button>
-            <button className="btn btn-secondary"
-              title="In phiếu để khách ký tay trên giấy"
-              onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
-              In phiếu (ký tay)
-            </button>
+            {!daDuChuKyTiepNhan(order) && (
+              <button className="btn btn-secondary"
+                title="In phiếu để khách ký tay trên giấy"
+                onClick={() => printIntakeSheet(order, { khongChuKy: true }, moCuaSoIn)}>
+                In phiếu (ký tay)
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1758,7 +1771,7 @@ function RepairSettlementList() {
       const ok = await confirm({
         title: 'Khách đồng ý thay',
         message: `Khách đồng ý thay "${task.taskName}"?`,
-        detail: 'Hệ thống sẽ tự thêm phụ tùng vào phiếu, tính lại tổng tiền, và mở lại đầu mục này để thợ thay.',
+        detail: 'Hệ thống sẽ tự thêm phụ tùng (nếu có) và tiền công cho đầu mục này vào phiếu, tính lại tổng tiền, và mở lại đầu mục để thợ thay.',
         confirmText: 'Khách đồng ý',
         tone: 'success',
       });
@@ -1769,16 +1782,26 @@ function RepairSettlementList() {
       const updated = await decideNgTaskApi(view.id, task.id, decision, note);
       setView(updated);
       loadAll({ silent: true });
-      // Bao ro da them phu tung gi - co van con doi chieu voi gia da bao
-      // khach qua dien thoai truoc khi chot.
+      // Bao ro da them phu tung/tien cong gi - co van con doi chieu voi gia
+      // da bao khach qua dien thoai truoc khi chot.
       const daThem = updated?.ngAddedParts || [];
+      const congThem = updated?.ngAddedLabor;
       if (decision === 'accepted') {
-        if (daThem.length > 0) {
-          toast.success(`Đã thêm vào phiếu: ${daThem.map((p) => `${p.name} (${p.quantity} ${p.unit || 'Cái'})`).join(', ')}. Đầu mục đã mở lại để thợ thay.`);
+        const phanPT = daThem.length > 0
+          ? `phụ tùng ${daThem.map((p) => `${p.name} (${p.quantity} ${p.unit || 'Cái'})`).join(', ')}`
+          : '';
+        // Dau muc thay/sua that phat sinh cong NGOAI pham vi kiem tra da tinh
+        // trong gia goi bao duong - tu dong tinh them cong nay du dau muc co
+        // kem phu tung hay khong (vd chi dieu chinh, khong thay linh kien).
+        const phanCong = congThem ? `tiền công ${formatCurrency(congThem.unitPrice)}` : '';
+        const daThemText = [phanPT, phanCong].filter(Boolean).join(' + ');
+        if (daThemText) {
+          toast.success(`Đã thêm vào phiếu: ${daThemText}. Đầu mục đã mở lại để thợ thay.`);
         } else {
-          // Dich vu khong khai dinh muc phu tung - co van phai tu them
+          // Dau muc khong khop dich vu nao trong catalog (truong hop hiem,
+          // vd task cu tu truoc khi dong bo catalog) - co van phai tu them
           // tay, khong de im lang tuong la da xong.
-          toast.warning('Đã ghi nhận khách đồng ý, nhưng đầu mục này chưa khai định mức phụ tùng - hãy vào Chỉnh sửa phiếu để thêm tay');
+          toast.warning('Đã ghi nhận khách đồng ý, nhưng không tự tính được phụ tùng/tiền công cho đầu mục này - hãy vào Chỉnh sửa phiếu để thêm tay');
         }
       }
     } catch (err) {
@@ -2606,6 +2629,12 @@ function ActivityLogModal({ order, onClose }) {
                     <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
                       {s.by || 'Hệ thống'}{at && !Number.isNaN(at.getTime()) ? ` · ${at.toLocaleString('vi-VN')}` : ''}
                     </div>
+                    {/* description ghi ro buoc do lam gi voi CAI GI (vd "Khách
+                        đồng ý thay" nhung khong biet thay dau muc nao neu chi
+                        hien mỗi label) - chi hien khi co gi them ngoai ten buoc. */}
+                    {s.description && s.description !== s.label && (
+                      <div style={{ fontSize: 12.5, color: 'var(--gray-800)', marginTop: 3 }}>{s.description}</div>
+                    )}
                     {Array.isArray(s.changes) && s.changes.length > 0 && <ChangesList changes={s.changes} />}
                   </div>
                 );
@@ -3392,12 +3421,21 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // khong doi (day chinh la nguyen nhan bug "doi so luong dau nhom nhung
   // dong con khong doi theo").
   const handleGroupQtyChange = (idx, rawValue) => {
+    let vuotTonKho = false;
     setItems((prev) => {
       const next = [...prev];
       const target = next[idx];
       const isEmpty = rawValue === '';
       const parsed = Number(rawValue);
-      const newQty = isEmpty || Number.isNaN(parsed) ? '' : parsed;
+      let newQty = isEmpty || Number.isNaN(parsed) ? '' : parsed;
+      // Phu tung chon tu "Phu tung trong kho" co ghi lai ton kho luc chon
+      // (xem selectProduct) - sua so luong vuot qua muc do thi keo lai dung
+      // muc toi da va bao, khong cho ghi qua ton kho thuc te.
+      if (target.lhsc === 'PT' && target.stockQuantity != null
+          && typeof newQty === 'number' && newQty > Number(target.stockQuantity)) {
+        newQty = Number(target.stockQuantity);
+        vuotTonKho = true;
+      }
       // Phu tung DA TUNG LUU (originalQty) duoc sua ca tang lan giam ngay tai
       // o nay: giam = khach hoan tra hang, tang = khach dung them. BE tu dong
       // bo checklist to truong ("Khách thêm số lượng, tổng là: N") va kho se
@@ -3428,6 +3466,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       }
       return next;
     });
+    if (vuotTonKho) toast.warning('Số lượng sản phẩm không đủ');
   };
 
   // "Thêm dòng" luôn thêm 1 dòng Dịch vụ (mặc định của emptyItem) - không cần
@@ -3651,6 +3690,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // Chọn 1 phụ tùng thật trong kho -> điền đúng dòng đang gõ, đơn giá và ĐVT
   // lấy theo đúng thông tin đã khai báo trong kho (products), không giảm giá.
   const selectProduct = (idx, product) => {
+    // Dropdown da chan san pham het hang (xem hetHang o cho render goi y),
+    // nen toi day chac chan stockQuantity > 0. Van con truong hop cong don
+    // +1 vao dong da co san (xem duoi) co the vuot ton kho - bao qua bien
+    // ngoai vi khong nen goi toast() ngay trong ham cap nhat setState
+    // (StrictMode goi ham nay 2 lan luc dev, se hien toast trung lap).
+    let vuotTonKho = false;
     setItems((prev) => {
       // Phu tung vua chon da TRUNG voi 1 dong co san o noi khac (vd phu tung
       // phu thuoc cua 1 goi/dich vu da chon truoc do) -> cong don +1 so luong
@@ -3662,7 +3707,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         const adjDupIdx = dupIdx > idx ? dupIdx - 1 : dupIdx;
         const target = next[adjDupIdx];
         const newQty = (target.qtyBasis || target.qty || 1) + 1;
-        next[adjDupIdx] = recalcItem({ ...target, qty: newQty, qtyBasis: newQty, manualQtyUnlock: true });
+        if (Number(product.stockQuantity) > 0 && newQty > Number(product.stockQuantity)) {
+          vuotTonKho = true;
+          return prev;
+        }
+        next[adjDupIdx] = recalcItem({ ...target, qty: newQty, qtyBasis: newQty, manualQtyUnlock: true, stockQuantity: product.stockQuantity });
         return next;
       }
 
@@ -3678,9 +3727,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         lhsc: 'PT',
         httt: 'KHT',
         discount: 0,
+        stockQuantity: product.stockQuantity,
       });
       return next;
     });
+    if (vuotTonKho) toast.warning('Số lượng sản phẩm không đủ');
     closeCatalogSuggestions(idx);
   };
 
@@ -4271,8 +4322,22 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               (Chỉ xem — ghi nhận lúc tiếp nhận xe, không sửa được)
             </span>
           )}
+          actions={(
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => printIntakeSheet(existingOrder, {}, moCuaSoIn)}>
+                In phiếu tiếp nhận
+              </button>
+              {!daDuChuKyTiepNhan(existingOrder) && (
+                <button className="btn btn-secondary btn-sm"
+                  title="In phiếu để khách ký tay trên giấy"
+                  onClick={() => printIntakeSheet(existingOrder, { khongChuKy: true }, moCuaSoIn)}>
+                  In phiếu (ký tay)
+                </button>
+              )}
+            </>
+          )}
         >
-          <IntakeChecklistView value={intakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
+          <IntakeChecklistView value={intakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} order={existingOrder} />
         </CollapsibleCard>
       ) : (
         <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist}
@@ -4386,17 +4451,29 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                               {suggestion.type === 'product' && suggestion.products?.length > 0 && (
                                 <div>
                                   <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Phụ tùng trong kho</div>
-                                  {suggestion.products.map((p) => (
-                                    <div key={`prod-${p.id}`} onMouseDown={() => selectProduct(idx, p)}
-                                      style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
-                                      <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
-                                      {/* Khong hien ton kho o day - CVDV chi chon phu tung, ton kho la
-                                          viec cua NV Kho khi xuat (form xuat kho tu bao thieu). */}
-                                      <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>
-                                        {formatCurrency(p.unitPrice)} / {p.unitName}
+                                  {suggestion.products.map((p) => {
+                                    // Het hang thi khong cho chon luon - hien mo + gach
+                                    // ly do, giong cach "goi combo" bi chan van hien
+                                    // nhung mo di o cho nay.
+                                    const hetHang = Number(p.stockQuantity || 0) <= 0;
+                                    return (
+                                      <div key={`prod-${p.id}`}
+                                        onMouseDown={() => (hetHang ? toast.warning('Số lượng sản phẩm không đủ') : selectProduct(idx, p))}
+                                        style={{
+                                          padding: '8px 10px', cursor: hetHang ? 'not-allowed' : 'pointer', fontSize: 12,
+                                          borderBottom: '1px solid var(--gray-100)',
+                                          background: hetHang ? 'var(--gray-50)' : undefined,
+                                          color: hetHang ? 'var(--gray-400)' : undefined,
+                                        }}>
+                                        <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: hetHang ? undefined : 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
+                                        <div style={{ fontSize: 11, color: hetHang ? '#B45309' : 'var(--gray-600)' }}>
+                                          {formatCurrency(p.unitPrice)} / {p.unitName}
+                                          {' · '}
+                                          {hetHang ? 'Hết hàng' : `Tồn kho: ${p.stockQuantity} ${p.unitName || ''}`}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                               {suggestion.type === 'catalog' && suggestion.packages?.length > 0 && (
@@ -4670,32 +4747,49 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
           </div>
         )}
 
+        {/* Da ky roi thi ten da ghi ro tay trong chinh anh chu ky - khong in
+            lai ten ben duoi (giong sua o IntakeChecklistView/DetailModal),
+            chi giu ngay gio ky. Hien CA 2 chu ky (khach + CVDV lap phieu),
+            khong chi rieng khach - moi chu ky 1 the RIENG (giong het cach 2
+            o ky CHUA ky o tren lam), khong nhet chung 1 the rong lech het co
+            khi chi co minh no trong hang flex (flex-grow keo dai ra het co). */}
         {isEdit && (existingOrder?.signatureData ? (
-          <div className="card" style={{ flex: '1 1 280px', maxWidth: 360 }}>
-            <div className="card-body">
-              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
-                Xác nhận đồng ý phiếu quyết toán
+          <>
+            <div className="card" style={{ flex: '1 1 360px', maxWidth: 460 }}>
+              <div className="card-body">
+                <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Khách hàng xác nhận</div>
+                <img
+                  src={existingOrder.signatureData}
+                  alt="Chữ ký khách hàng"
+                  style={{ display: 'block', margin: '0 auto', height: 150, maxWidth: '100%', objectFit: 'contain', border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
+                />
+                {existingOrder.signedAt && (
+                  <div style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--gray-600)', marginTop: 10, borderTop: '1px solid var(--gray-200)', paddingTop: 10 }}>
+                    Ký lúc: {existingOrder.signedAt}
+                  </div>
+                )}
               </div>
-              <img
-                src={existingOrder.signatureData}
-                alt="Chữ ký xác nhận"
-                style={{ display: 'block', margin: '0 auto', height: 90, border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
-              />
-              {existingOrder.signerName && (
-                <div style={{
-                  textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 10,
-                  borderTop: '1px solid var(--gray-200)', paddingTop: 8,
-                }}>
-                  {existingOrder.signerName}
-                </div>
-              )}
-              {existingOrder.signedAt && (
-                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
-                  Ký lúc: {existingOrder.signedAt}
-                </div>
-              )}
             </div>
-          </div>
+            <div className="card" style={{ flex: '1 1 360px', maxWidth: 460 }}>
+              <div className="card-body">
+                <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Cố vấn dịch vụ lập phiếu</div>
+                {existingOrder.advisorSignatureData ? (
+                  <img
+                    src={existingOrder.advisorSignatureData}
+                    alt="Chữ ký cố vấn dịch vụ"
+                    style={{ display: 'block', margin: '0 auto', height: 150, maxWidth: '100%', objectFit: 'contain', border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
+                  />
+                ) : (
+                  <div style={{ height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--gray-300)', borderRadius: 6, fontSize: 13, color: 'var(--gray-400)', fontStyle: 'italic' }}>Chưa ký</div>
+                )}
+                {existingOrder.advisorSignedAt && (
+                  <div style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--gray-600)', marginTop: 10, borderTop: '1px solid var(--gray-200)', paddingTop: 10 }}>
+                    Ký lúc: {existingOrder.advisorSignedAt}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
         ) : <div />)}
 
         {/* Tổng kết */}

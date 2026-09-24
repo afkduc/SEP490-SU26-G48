@@ -25,6 +25,13 @@ const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
 ));
 
+// Phieu da co du 2 chu ky dien tu (khach + CVDV) roi thi nut "In phieu (ky
+// tay)" khong con y nghia - phieu nay khong can khach ky tay tren giay nua,
+// hien nut do chi gay hieu lam (tuong nhu chua ky).
+export function daDuChuKyTiepNhan(order) {
+  return Boolean(order?.signatureData && order?.advisorSignatureData);
+}
+
 const NHAN_GOC = { left: 'Trái', right: 'Phải', front: 'Trước', rear: 'Sau', top: 'Trên' };
 const SEGMENT_LABEL = { sedan: 'Sedan/Hatchback', suv: 'SUV/Crossover', pickup: 'Bán tải' };
 

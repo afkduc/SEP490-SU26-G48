@@ -40,15 +40,52 @@ class VehicleOwnershipRepositoryImpl extends VehicleOwnershipRepository {
         customerId = existing.recordset[0]?.id || null;
 
         if (!customerId) {
+          // Cung bo du lieu (CCCD, ngay sinh, email, dia chi, MST, nguoi lien
+          // he) va cung kiem tra trung email/CCCD nhu duong import Excel -
+          // xem CustomerRepositoryImpl.importCustomerVehicleRow.
+          if (newCustomer.email || newCustomer.cccd) {
+            const conflict = await tx
+              .request()
+              .input('phone', sql.VarChar(20), newCustomer.phone)
+              .input('email', sql.VarChar(100), newCustomer.email || null)
+              .input('cccd', sql.VarChar(20), newCustomer.cccd || null)
+              .query(`
+                SELECT TOP 1
+                  phone,
+                  CASE WHEN @email IS NOT NULL AND email = @email THEN 1 ELSE 0 END AS email_match,
+                  CASE WHEN @cccd IS NOT NULL AND cccd = @cccd THEN 1 ELSE 0 END AS cccd_match
+                FROM customers
+                WHERE phone <> @phone
+                  AND ((@email IS NOT NULL AND email = @email) OR (@cccd IS NOT NULL AND cccd = @cccd))
+              `);
+            const row = conflict.recordset[0];
+            if (row) {
+              const field = row.email_match ? 'Email' : 'CCCD';
+              throw new Error(`${field} đã được dùng bởi khách hàng khác (SĐT ${row.phone})`);
+            }
+          }
+
           const inserted = await tx
             .request()
             .input('fullName', sql.NVarChar(150), newCustomer.fullName)
             .input('phone', sql.VarChar(20), newCustomer.phone)
+            .input('cccd', sql.VarChar(20), newCustomer.cccd || null)
+            .input('dateOfBirth', sql.Date, newCustomer.dateOfBirth || null)
+            .input('email', sql.VarChar(100), newCustomer.email || null)
             .input('address', sql.NVarChar(255), newCustomer.address || null)
+            .input('taxCode', sql.VarChar(20), newCustomer.taxCode || null)
+            .input('contactName', sql.NVarChar(100), newCustomer.contactName || null)
+            .input('contactPhone', sql.VarChar(20), newCustomer.contactPhone || null)
             .query(`
-              INSERT INTO customers (customer_code, full_name, phone, address, created_at)
+              INSERT INTO customers (
+                customer_code, full_name, phone, cccd, date_of_birth, email, address,
+                tax_code, contact_name, contact_phone, created_at
+              )
               OUTPUT inserted.id
-              VALUES ('', @fullName, @phone, @address, GETDATE())
+              VALUES (
+                '', @fullName, @phone, @cccd, @dateOfBirth, @email, @address,
+                @taxCode, @contactName, @contactPhone, GETDATE()
+              )
             `);
           customerId = inserted.recordset[0].id;
           await tx

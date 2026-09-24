@@ -110,10 +110,11 @@ export default function ExportRequestDetailPage() {
           <div className="er-detail__section">
             <h2 className="er-detail__section-title">Chữ ký xác nhận</h2>
             <div className="er-detail__signatures">
-              {/* NV kho ky 1 lan cho ca phieu (lan xuat dau tien). */}
+              {/* NV kho ky lai MOI lan xuat/tra - day la chu ky cua LAN GAN
+                  NHAT, xem het lich su tung lan o "Lich su luu phieu". */}
               {data.issuerSignatureData && (
                 <div className="er-detail__signature-box">
-                  <div className="er-detail__signature-role">Nhân viên kho</div>
+                  <div className="er-detail__signature-role">Nhân viên kho (lần gần nhất)</div>
                   <img src={data.issuerSignatureData} alt="Chữ ký nhân viên kho" className="er-detail__signature-img" />
                   {data.issuerName && <div className="er-detail__signature-name">{data.issuerName}</div>}
                   {data.issuerSignedAt && <div className="er-detail__signature-date">Ký lúc: {data.issuerSignedAt}</div>}

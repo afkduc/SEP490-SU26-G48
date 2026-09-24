@@ -384,6 +384,21 @@ async function start() {
       process.exit(1);
     }
 
+    // Chu ky NV kho THEO TUNG LAN xuat/tra (export_request_pickups.issuer_signature_data)
+    // - thay cho chu ky 1-lan-cho-ca-phieu o header (moi lan co the la NV kho
+    // khac nhau). Khong nuot loi: confirmPickup ghi thang cot nay moi lan.
+    try {
+      const { ensureExportPickupIssuerSignature } = require('./infrastructure/database/ensureExportPickupIssuerSignature');
+      const r = await ensureExportPickupIssuerSignature();
+      console.log(r.skipped
+        ? '[BE] chu ky NV kho theo tung lan xuat: da co tu truoc, bo qua'
+        : `[BE] chu ky NV kho theo tung lan xuat: DA THEM XONG (${r.steps} buoc)`);
+    } catch (pkIsErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them chu ky NV kho theo tung lan xuat that bai:');
+      console.error(pkIsErr.message);
+      process.exit(1);
+    }
+
     // Ma khach hang (customers.customer_code) bat buoc - khong khach nao duoc
     // de trong. Doi rang buoc cot nen KHONG duoc nuot loi.
     try {

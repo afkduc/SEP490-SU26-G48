@@ -25,6 +25,8 @@ import {
   resolveNgTaskApi,
 } from '../../services/repairOrderApi';
 import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
+import { printIntakeSheet, daDuChuKyTiepNhan } from '../repairsettlement/printIntake';
+import { moCuaSoIn } from '../repairsettlement/printHeader';
 import './TeamLeaderDashboard.css';
 
 const POLL_INTERVAL_MS = 15000;
@@ -798,7 +800,19 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
               <button type="button" className="modal-close" onClick={() => setIntakeOrder(null)}>✕</button>
             </div>
             <div className="modal-body">
-              <IntakeChecklistView value={intakeOrder.intakeChecklist} vehicleModelText={intakeOrder.vehicle?.vehicleModel} />
+              <IntakeChecklistView value={intakeOrder.intakeChecklist} vehicleModelText={intakeOrder.vehicle?.vehicleModel} order={intakeOrder} />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => printIntakeSheet(intakeOrder, {}, moCuaSoIn)}>
+                In phiếu tiếp nhận
+              </button>
+              {!daDuChuKyTiepNhan(intakeOrder) && (
+                <button className="btn btn-secondary"
+                  title="In phiếu để khách ký tay trên giấy"
+                  onClick={() => printIntakeSheet(intakeOrder, { khongChuKy: true }, moCuaSoIn)}>
+                  In phiếu (ký tay)
+                </button>
+              )}
             </div>
           </div>
         </div>

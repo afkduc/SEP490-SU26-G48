@@ -118,10 +118,20 @@ export default function ExportPickupHistoryModal({ exportRequestId, repairOrderC
                         </tbody>
                       </table>
                     </div>
-                    {pk.signatureData && (
-                      <div className="eph__signature">
-                        <img src={pk.signatureData} alt={`Chữ ký lần ${pk.seq}`} />
-                        <div className="eph__signature-name">{pk.receivedByName}</div>
+                    {(pk.issuerSignatureData || pk.signatureData) && (
+                      <div className="eph__signatures">
+                        {pk.issuerSignatureData && (
+                          <div className="eph__signature">
+                            <img src={pk.issuerSignatureData} alt={`Chữ ký nhân viên kho lần ${pk.seq}`} />
+                            <div className="eph__signature-name">{pk.performedByName} <span className="eph__signature-role">(NV kho)</span></div>
+                          </div>
+                        )}
+                        {pk.signatureData && (
+                          <div className="eph__signature">
+                            <img src={pk.signatureData} alt={`Chữ ký người lấy lần ${pk.seq}`} />
+                            <div className="eph__signature-name">{pk.receivedByName} <span className="eph__signature-role">(người lấy)</span></div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
