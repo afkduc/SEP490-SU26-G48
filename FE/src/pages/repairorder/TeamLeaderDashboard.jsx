@@ -798,7 +798,7 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
               <button type="button" className="modal-close" onClick={() => setIntakeOrder(null)}>✕</button>
             </div>
             <div className="modal-body">
-              <IntakeChecklistView value={intakeOrder.intakeChecklist} vehicleModelText={intakeOrder.vehicle?.vehicleModel} />
+              <IntakeChecklistView value={intakeOrder.intakeChecklist} vehicleModelText={intakeOrder.vehicle?.vehicleModel} order={intakeOrder} />
             </div>
           </div>
         </div>

@@ -229,7 +229,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
             <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
           </div>
           <div className="modal-body">
-            <IntakeChecklistView value={detail.intakeChecklist} vehicleModelText={detail.vehicle?.vehicleModel} />
+            <IntakeChecklistView value={detail.intakeChecklist} vehicleModelText={detail.vehicle?.vehicleModel} order={detail} />
           </div>
         </div>
       )}
