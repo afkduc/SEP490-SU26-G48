@@ -399,6 +399,23 @@ async function start() {
       process.exit(1);
     }
 
+    // Backfill chu ky NV kho vao dong pickup DAU TIEN cua du lieu CU (tao
+    // truoc khi co cot o tren) - khong thi "Lich su luu phieu" cua nhung
+    // phieu xuat tu truoc deploy nay se thieu han chu ky NV kho o lan dau.
+    // PHAI chay SAU ensureExportPickupIssuerSignature (can cot vua tao).
+    // Khong nuot loi: sai thi lich su hien sai nguoi ky.
+    try {
+      const { ensureExportPickupIssuerSignatureBackfill } = require('./infrastructure/database/ensureExportPickupIssuerSignatureBackfill');
+      const r = await ensureExportPickupIssuerSignatureBackfill();
+      console.log(r.skipped
+        ? '[BE] backfill chu ky NV kho lan xuat dau: khong con gi de chep, bo qua'
+        : `[BE] backfill chu ky NV kho lan xuat dau: DA CHEP ${r.updated} phieu`);
+    } catch (pkBfErr) {
+      console.error('[BE] KHONG THE KHOI DONG - backfill chu ky NV kho lan xuat dau that bai:');
+      console.error(pkBfErr.message);
+      process.exit(1);
+    }
+
     // Ma khach hang (customers.customer_code) bat buoc - khong khach nao duoc
     // de trong. Doi rang buoc cot nen KHONG duoc nuot loi.
     try {
