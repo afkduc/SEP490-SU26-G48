@@ -279,7 +279,7 @@ function TaskNameLabel({ t }) {
 // phieu (moc tiep nhan), co van chot phieu + khach nhan xe (moc quyet toan).
 // Chua ky thi van hien o xam "Chưa ký" - nhin la biet phieu con thieu gi, va
 // phieu cu tao truoc khi co tinh nang nay cung hien dung thuc te.
-function OChuKy({ tieuDe, anh, ten, luc }) {
+function OChuKy({ tieuDe, anh, ten, luc, hideName }) {
   return (
     <div style={{ flex: '1 1 170px', minWidth: 150 }}>
       <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, marginBottom: 6 }}>{tieuDe}</div>
@@ -296,11 +296,23 @@ function OChuKy({ tieuDe, anh, ten, luc }) {
           fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic',
         }}>Chưa ký</div>
       )}
-      <div style={{
-        textAlign: 'center', fontSize: 12, fontWeight: 600, marginTop: 8,
-        borderTop: '1px solid var(--gray-200)', paddingTop: 6,
-      }}>{ten || '—'}</div>
-      {luc && <div style={{ textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)' }}>{luc}</div>}
+      {/* Da ky roi thi ten da ghi ro tay trong anh chu ky - in lai chu ben
+          duoi la thua (chi bat khi hideName). Ngay gio ky thi van giu, khong
+          "ghi ro" duoc trong anh. */}
+      {!hideName && (
+        <div style={{
+          textAlign: 'center', fontSize: 12, fontWeight: 600, marginTop: 8,
+          borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+        }}>{ten || '—'}</div>
+      )}
+      {luc && (
+        <div style={{
+          textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)',
+          marginTop: hideName ? 8 : 0,
+          borderTop: hideName ? '1px solid var(--gray-200)' : 'none',
+          paddingTop: hideName ? 6 : 0,
+        }}>{luc}</div>
+      )}
     </div>
   );
 }
@@ -310,7 +322,13 @@ function OChuKy({ tieuDe, anh, ten, luc }) {
 //
 // Ghi ro "TIẾP NHẬN XE" / "BÀN GIAO XE" tren tung cap: nhin phieu la biet
 // chu ky nao ky luc nao, khong phai doan theo tieu de tung o.
-function KhoiChuKy({ order }) {
+//
+// onlyHandover: rieng man Truy cap phieu (DetailModal) chi can 2 chu ky luc
+// BAN GIAO (khach nhan xe + CVDV quyet toan) - 2 chu ky luc tiep nhan da xem
+// duoc qua "Xem tinh trang xe ban dau" roi, khong can lap lai o day. CHI ap
+// dung cho man nay, modal Ky quyet toan (goi KhoiChuKy khong truyen prop nay)
+// van giu nguyen 4 chu ky nhu cu.
+function KhoiChuKy({ order, onlyHandover, hideName }) {
   const nhom = (tieuDe, cac_o) => (
     <div style={{ flex: '1 1 320px', minWidth: 300 }}>
       <div style={{
@@ -323,6 +341,17 @@ function KhoiChuKy({ order }) {
       <div style={{ display: 'flex', gap: 12 }}>{cac_o}</div>
     </div>
   );
+  const oBanGiao = (
+    <>
+      <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
+        ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} hideName={hideName} />
+      <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
+        ten={order.closingAdvisorName} luc={order.closingSignedAt} hideName={hideName} />
+    </>
+  );
+  if (onlyHandover) {
+    return <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>{oBanGiao}</div>;
+  }
   return (
     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
       {nhom('Tiếp nhận xe', (
@@ -333,14 +362,7 @@ function KhoiChuKy({ order }) {
             ten={order.advisor} luc={order.advisorSignedAt} />
         </>
       ))}
-      {nhom('Bàn giao xe', (
-        <>
-          <OChuKy tieuDe="Khách nhận xe" anh={order.customerFinalSignatureData}
-            ten={order.customerFinalSignerName} luc={order.customerFinalSignedAt} />
-          <OChuKy tieuDe="CVDV quyết toán" anh={order.closingSignatureData}
-            ten={order.closingAdvisorName} luc={order.closingSignedAt} />
-        </>
-      ))}
+      {nhom('Bàn giao xe', oBanGiao)}
     </div>
   );
 }
@@ -1635,7 +1657,9 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
           <div className="card" style={{ marginTop: 12 }}>
             <div className="card-body">
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Chữ ký trên phiếu</div>
-              <KhoiChuKy order={order} />
+              {/* Man nay chi can 2 chu ky luc ban giao - 2 chu ky tiep nhan
+                  xem qua "Xem tinh trang xe ban dau" o footer roi. */}
+              <KhoiChuKy order={order} onlyHandover hideName />
             </div>
           </div>
         </div>
