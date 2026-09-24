@@ -92,7 +92,7 @@
 }
 .eph__signature img { display: block; max-width: 220px; max-height: 90px; background: white; border-radius: 6px; }
 .eph__signature-name { margin-top: 6px; font-size: 12.5px; font-weight: 600; color: var(--gray-800); }
-.eph__signature-role { font-weight: 400; color: var(--gray-500); }
+.eph__signature-role { margin-bottom: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--gray-500); }
 
 @media (max-width: 640px) {
   .eph__item-head { grid-template-columns: auto 1fr auto; }

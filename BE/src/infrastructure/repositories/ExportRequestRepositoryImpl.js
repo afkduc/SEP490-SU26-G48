@@ -5,6 +5,7 @@ const ExportRequestItem = require('../../domain/entities/ExportRequestItem');
 const { query } = require('../database/sqlServer');
 const ApiError = require('../../utils/ApiError');
 const { toDDMMYYYYHHmm } = require('../../application/dto/ExportRequestResponseDto');
+const AuditRepository = require('./AuditRepository');
 
 // Chi con thao tac kho (xuat them / tra hang) khi Lenh sua chua CHUA chot -
 // dung dung 2 trang thai ma CVDV con sua duoc phieu quyet toan (xem
@@ -12,6 +13,11 @@ const { toDDMMYYYYHHmm } = require('../../application/dto/ExportRequestResponseD
 // 'cancelled' la khoa han, vi luc do so lieu phai chot de thu tien.
 const EXPORTABLE_RO_STATUSES = ['waiting_repair', 'inprogress'];
 const EXPORTABLE_RO_STATUS_SQL = `ro.status IN ('waiting_repair', 'inprogress')`;
+
+// Cac buoc trong Nhat ky hoat dong (audit_logs lifecycle) CO THE lam doi so
+// luong phu tung can xuat/tra - dung de suy ra "CVDV yeu cau" cho tung lan
+// xuat/tra (xem findPickups._attachRequestedByName).
+const PARTS_CHANGING_STEPS = new Set(['created', 'created_signed', 'updated', 'ng_accepted']);
 
 /**
  * Loc chung cho findAll / count: branchId, status, repairOrderId, fromDate, toDate, search.
@@ -103,6 +109,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         v.license_plate AS vehicle_plate,
         COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.last_name, N'') + N' ' + ISNULL(u_perf.first_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name,
         COALESCE(NULLIF(LTRIM(RTRIM(u_recv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_recv.last_name, N'') + N' ' + ISNULL(u_recv.first_name, N''))), N''), u_recv.pseudo_id) AS received_by_name,
+        COALESCE(NULLIF(LTRIM(RTRIM(u_adv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_adv.last_name, N'') + N' ' + ISNULL(u_adv.first_name, N''))), N''), u_adv.pseudo_id) AS advisor_name,
         (SELECT COUNT(*) FROM export_request_items i WHERE i.export_request_id = er.id) AS item_count,
         (SELECT ISNULL(SUM(quantity), 0)
            FROM export_request_items i WHERE i.export_request_id = er.id) AS total_quantity
@@ -112,6 +119,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       LEFT JOIN vehicles v ON v.id = ro.vehicle_id
       LEFT JOIN users u_perf ON u_perf.id = er.performed_by
       LEFT JOIN users u_recv ON u_recv.id = er.received_by
+      LEFT JOIN users u_adv ON u_adv.id = COALESCE(ro.closing_advisor_id, ro.advisor_id)
       ${whereSql}
       ORDER BY er.created_at DESC
       OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
@@ -146,7 +154,8 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
          v.license_plate AS vehicle_plate,
          COALESCE(NULLIF(LTRIM(RTRIM(u_perf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_perf.last_name, N'') + N' ' + ISNULL(u_perf.first_name, N''))), N''), u_perf.pseudo_id) AS performed_by_name,
          COALESCE(NULLIF(LTRIM(RTRIM(u_recv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_recv.last_name, N'') + N' ' + ISNULL(u_recv.first_name, N''))), N''), u_recv.pseudo_id) AS received_by_name,
-         COALESCE(NULLIF(LTRIM(RTRIM(u_iss.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_iss.last_name, N'') + N' ' + ISNULL(u_iss.first_name, N''))), N''), u_iss.pseudo_id) AS issuer_name
+         COALESCE(NULLIF(LTRIM(RTRIM(u_iss.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_iss.last_name, N'') + N' ' + ISNULL(u_iss.first_name, N''))), N''), u_iss.pseudo_id) AS issuer_name,
+         COALESCE(NULLIF(LTRIM(RTRIM(u_adv.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u_adv.last_name, N'') + N' ' + ISNULL(u_adv.first_name, N''))), N''), u_adv.pseudo_id) AS advisor_name
        FROM export_requests er
        LEFT JOIN repair_orders ro ON ro.id = er.repair_order_id
        LEFT JOIN customers c ON c.id = ro.customer_id
@@ -154,6 +163,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
        LEFT JOIN users u_perf ON u_perf.id = er.performed_by
        LEFT JOIN users u_recv ON u_recv.id = er.received_by
        LEFT JOIN users u_iss ON u_iss.id = er.issuer_signed_by
+       LEFT JOIN users u_adv ON u_adv.id = COALESCE(ro.closing_advisor_id, ro.advisor_id)
        WHERE er.id = @id`,
       { id }
     );
@@ -412,6 +422,34 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   }
 
   /**
+   * Sinh ma phieu xuat rieng, dang ERB-{branchId}-{yyyymmdd}-{0001} - cung
+   * mot kieu voi ma phieu nhap (import_requests.request_code, xem
+   * ImportRequestRepositoryImpl.getNextRequestCode). KHONG con dung lai ma
+   * cua Lenh sua chua (repair_code) nua - 2 ma do la 2 khai niem khac nhau
+   * (1 RO co the co nhieu phieu nhap/xuat/hoa don khac nhau ve sau), giu
+   * chung 1 ma se nhin nham la cung 1 thu.
+   */
+  async _getNextExportRequestCode(tx, branchId) {
+    const d = new Date();
+    const dateKey = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const prefix = `ERB-${branchId}-${dateKey}-`;
+    const result = await tx.request()
+      .input('pattern', sql.VarChar(40), `${prefix}%`)
+      .query(`
+        SELECT TOP 1 request_code
+        FROM export_requests WITH (UPDLOCK, HOLDLOCK)
+        WHERE request_code LIKE @pattern
+        ORDER BY request_code DESC
+      `);
+    let sequence = 1;
+    if (result.recordset[0]) {
+      const lastSeq = parseInt(result.recordset[0].request_code.substring(prefix.length), 10);
+      if (Number.isFinite(lastSeq)) sequence = lastSeq + 1;
+    }
+    return `${prefix}${String(sequence).padStart(4, '0')}`;
+  }
+
+  /**
    * Xac nhan 1 LAN lay hang (co the gom nhieu dong xuat va/hoac tra), tat ca
    * trong 1 transaction:
    *   1) Khoa RO, kiem tra con thao tac kho duoc khong.
@@ -516,11 +554,15 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       }
     }
 
-    // 3) Header: 1 RO = 1 phieu, tao lan dau roi dung lai mai.
+    // 3) Header: 1 RO = 1 phieu, tao lan dau roi dung lai mai. Ma phieu xuat
+    // rieng (ERB-...), khong dung lai ma cua Lenh sua chua nua - truoc day
+    // request_code = repair_code khien cot "Ma phieu" tren danh sach nhin
+    // giong het cot "Phieu sua chua" ben canh, tuong nhu loi hien thi trung.
     let exportRequestId = roRow.export_request_id;
     if (!exportRequestId) {
+      const requestCode = await this._getNextExportRequestCode(tx, branchId);
       exportRequestId = (await tx.request()
-        .input('request_code', sql.VarChar(30), roRow.repair_code)
+        .input('request_code', sql.VarChar(30), requestCode)
         .input('branch_id', sql.BigInt, branchId)
         .input('repair_order_id', sql.BigInt, repairOrderId)
         .input('performed_by', sql.BigInt, data.performed_by)
@@ -694,12 +736,14 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const result = await query(
       `SELECT
          pk.id, pk.signed_at, pk.signature_data, pk.issuer_signature_data,
+         er.repair_order_id,
          COALESCE(NULLIF(LTRIM(RTRIM(u.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u.last_name, N'') + N' ' + ISNULL(u.first_name, N''))), N''), u.pseudo_id) AS received_by_name,
          u.pseudo_id AS received_by_code,
          COALESCE(NULLIF(LTRIM(RTRIM(pf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(pf.last_name, N'') + N' ' + ISNULL(pf.first_name, N''))), N''), pf.pseudo_id) AS performed_by_name,
          it.transaction_type, it.quantity, it.transaction_code,
          it.product_id, p.product_code, p.product_name, un.unit_name
        FROM export_request_pickups pk
+       JOIN export_requests er ON er.id = pk.export_request_id
        LEFT JOIN users u ON u.id = pk.received_by
        LEFT JOIN users pf ON pf.id = pk.performed_by
        LEFT JOIN inventory_transactions it ON it.pickup_id = pk.id
@@ -710,9 +754,11 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       { id: exportRequestId }
     );
 
+    let repairOrderId = null;
     const byPickup = new Map();
     for (const r of result.recordset) {
       if (!byPickup.has(r.id)) {
+        repairOrderId = repairOrderId ?? r.repair_order_id;
         byPickup.set(r.id, {
           id: r.id,
           seq: byPickup.size + 1,
@@ -744,7 +790,53 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         });
       }
     }
-    return [...byPickup.values()].reverse();
+
+    const orderedPickups = [...byPickup.values()]; // id ASC = thu tu thoi gian
+    await this._attachRequestedByName(orderedPickups, repairOrderId);
+    return orderedPickups.reverse();
+  }
+
+  // "CVDV yeu cau" cho tung lan xuat/tra - AI la nguoi sua phieu (them/bot
+  // phu tung) gan nhat TINH DEN LUC lan xuat/tra do duoc xac nhan. Khong co
+  // cot luu san dieu nay (repair_order_items khong theo doi nguoi sua tung
+  // dong), nen suy ra tu chinh Nhat ky hoat dong cua phieu quyet toan (audit
+  // log "lifecycle" da co san 'by' cho tung buoc): voi MOI lan xuat/tra, lay
+  // buoc GAN NHAT thuoc nhom co-the-doi-phu-tung (tao phieu / sua phieu /
+  // khach dong y thay dau muc NG) co thoi diem <= luc lan do duoc ky.
+  //
+  // CO Y khong gioi han rieng tung buoc cho 1 lan duy nhat (khong "tieu thu"
+  // buoc sau khi da gan cho 1 lan): 1 lan sua co the tao ra nhieu dau muc,
+  // nhung NV kho khong bat buoc xuat het trong 1 lan - phan con lai xuat o
+  // lan sau van phai quy ve DUNG nguoi da sua lan do, khong phai de trong.
+  // Neu 2 lan xuat lien tiep khong co sua gi o giua thi CA HAI cung hien
+  // dung 1 nguoi - dung thuc te, khong phai loi trung lap.
+  async _attachRequestedByName(orderedPickups, repairOrderId) {
+    if (!repairOrderId || orderedPickups.length === 0) return;
+    const log = await AuditRepository.findLifecycleAuditLog('repair_settlements', repairOrderId);
+    if (!log?.new_value) return;
+    let steps;
+    try {
+      const parsed = typeof log.new_value === 'string' ? JSON.parse(log.new_value) : log.new_value;
+      steps = Array.isArray(parsed?.steps) ? parsed.steps : [];
+    } catch {
+      return;
+    }
+    const relevant = steps
+      .filter((s) => PARTS_CHANGING_STEPS.has(s.step))
+      .map((s) => ({ at: new Date(s.at).getTime(), by: s.by }))
+      .filter((s) => Number.isFinite(s.at))
+      .sort((a, b) => a.at - b.at);
+    if (relevant.length === 0) return;
+
+    for (const pickup of orderedPickups) {
+      const windowEnd = new Date(pickup.signedAt).getTime();
+      let found = null;
+      for (const step of relevant) {
+        if (step.at <= windowEnd) found = step; // relevant da sap tang dan -> giu cai cuoi cung con khop
+        else break;
+      }
+      pickup.requestedByName = found?.by || null;
+    }
   }
 
   /**

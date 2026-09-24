@@ -384,6 +384,22 @@ async function start() {
       process.exit(1);
     }
 
+    // Ma phieu xuat RIENG (ERB-...), khong con dung lai ma cua Lenh sua chua
+    // nua - cot "Ma phieu" tren danh sach truoc day hien y het cot "Phieu sua
+    // chua" ben canh. Backfill lai ma cho phieu cu theo dung thu tu tao.
+    // Khong nuot loi: sai thi trung ma / ma sai dinh dang.
+    try {
+      const { ensureExportRequestOwnCode } = require('./infrastructure/database/ensureExportRequestOwnCode');
+      const r = await ensureExportRequestOwnCode();
+      console.log(r.skipped
+        ? '[BE] ma phieu xuat rieng: khong con phieu nao dung ma cu, bo qua'
+        : `[BE] ma phieu xuat rieng: DA DOI ${r.updated} phieu`);
+    } catch (ercErr) {
+      console.error('[BE] KHONG THE KHOI DONG - doi ma phieu xuat rieng that bai:');
+      console.error(ercErr.message);
+      process.exit(1);
+    }
+
     // Chu ky NV kho THEO TUNG LAN xuat/tra (export_request_pickups.issuer_signature_data)
     // - thay cho chu ky 1-lan-cho-ca-phieu o header (moi lan co the la NV kho
     // khac nhau). Khong nuot loi: confirmPickup ghi thang cot nay moi lan.
@@ -396,6 +412,23 @@ async function start() {
     } catch (pkIsErr) {
       console.error('[BE] KHONG THE KHOI DONG - them chu ky NV kho theo tung lan xuat that bai:');
       console.error(pkIsErr.message);
+      process.exit(1);
+    }
+
+    // Backfill chu ky NV kho vao dong pickup DAU TIEN cua du lieu CU (tao
+    // truoc khi co cot o tren) - khong thi "Lich su luu phieu" cua nhung
+    // phieu xuat tu truoc deploy nay se thieu han chu ky NV kho o lan dau.
+    // PHAI chay SAU ensureExportPickupIssuerSignature (can cot vua tao).
+    // Khong nuot loi: sai thi lich su hien sai nguoi ky.
+    try {
+      const { ensureExportPickupIssuerSignatureBackfill } = require('./infrastructure/database/ensureExportPickupIssuerSignatureBackfill');
+      const r = await ensureExportPickupIssuerSignatureBackfill();
+      console.log(r.skipped
+        ? '[BE] backfill chu ky NV kho lan xuat dau: khong con gi de chep, bo qua'
+        : `[BE] backfill chu ky NV kho lan xuat dau: DA CHEP ${r.updated} phieu`);
+    } catch (pkBfErr) {
+      console.error('[BE] KHONG THE KHOI DONG - backfill chu ky NV kho lan xuat dau that bai:');
+      console.error(pkBfErr.message);
       process.exit(1);
     }
 

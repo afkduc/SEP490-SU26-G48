@@ -31,6 +31,7 @@ class ExportRequestResponseDto {
       repairOrderCode: header.repairOrderCode,
       customerName: header.customerName,
       vehiclePlate: header.vehiclePlate,
+      advisorName: header.advisorName,
       performedBy: header.performedBy,
       performedByName: header.performedByName,
       receivedBy: header.receivedBy,

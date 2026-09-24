@@ -60,13 +60,14 @@ export default function ManagerExportRequestDetailPage() {
         <div className="mer-detail__section">
           <h2 className="mer-detail__section-title">Thông tin chung</h2>
           <dl className="info-list">
-            {/* Ma phieu xuat = ma lenh sua chua, da hien o tieu de - giu 1 dong. */}
+            {/* Ma phieu xuat gio la ma RIENG (ERB-...), khac ma Lenh sua chua. */}
             <InfoRow label="Lệnh sửa chữa" value={data.repairOrderCode} />
             <InfoRow label="Khách hàng" value={data.customerName} />
             <InfoRow label="Xe" value={data.vehiclePlate} />
+            <InfoRow label="Cố vấn dịch vụ" value={data.advisorName} />
             <InfoRow label="Ngày tạo" value={formatDateTime(data.createdAt)} />
             <InfoRow label="Người xuất" value={data.performedByName} />
-            <InfoRow label="Người lấy" value={data.receivedByName} />
+            <InfoRow label="Người lấy/trả" value={data.receivedByName} />
           </dl>
         </div>
 
@@ -120,7 +121,7 @@ export default function ManagerExportRequestDetailPage() {
               )}
               {data.receivedSignatureData && (
                 <div className="mer-detail__signature-box">
-                  <div className="mer-detail__signature-role">Người lấy (lần gần nhất)</div>
+                  <div className="mer-detail__signature-role">Người lấy/trả (lần gần nhất)</div>
                   <img src={data.receivedSignatureData} alt="Chữ ký người lấy" className="mer-detail__signature-img" />
                   {data.receivedByName && <div className="mer-detail__signature-name">{data.receivedByName}</div>}
                   {data.receivedSignedAt && <div className="mer-detail__signature-date">Ký lúc: {data.receivedSignedAt}</div>}

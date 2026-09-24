@@ -130,6 +130,7 @@ export default function ExportRequestListPage() {
                 <th>Ngày tạo</th>
                 <th>Phiếu sửa chữa</th>
                 <th>Khách hàng</th>
+                <th>Cố vấn dịch vụ</th>
                 <th>Số dòng</th>
                 <th>Tổng SL</th>
                 <th>Trạng thái</th>
@@ -139,7 +140,7 @@ export default function ExportRequestListPage() {
             <tbody>
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="table__empty">
+                  <td colSpan={9} className="table__empty">
                     Không có phiếu xuất nào
                   </td>
                 </tr>
@@ -152,6 +153,7 @@ export default function ExportRequestListPage() {
                       <td>{formatDateTime(r.createdAt)}</td>
                       <td><span className="font-mono">{r.repairOrderCode || '—'}</span></td>
                       <td>{r.customerName || '—'}</td>
+                      <td>{r.advisorName || '—'}</td>
                       <td className="text-right">{r.itemCount ?? 0}</td>
                       <td className="text-right">{r.totalQuantity ?? 0}</td>
                       <td>

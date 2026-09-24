@@ -29,7 +29,13 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="vi" className={beVietnamPro.variable}>
-      <body>{children}</body>
+      {/* suppressHydrationWarning: chi tat canh bao lech attribute ngay tai
+          body - mot so extension trinh duyet (vd ColorZilla) tu chen
+          cz-shortcut-listen="true" vao day SAU khi server da render, khien
+          React bao "hydration mismatch" du khong phai loi cua app. Khong
+          anh huong den cac loi hydration that (sai noi dung/cau truc) o
+          nhung cho khac. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
