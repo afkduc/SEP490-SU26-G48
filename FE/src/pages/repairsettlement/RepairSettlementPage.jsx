@@ -1298,7 +1298,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
             <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
           </div>
           <div className="modal-body">
-            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} />
+            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} order={order} />
           </div>
           {/* In rieng phieu tiep nhan (kem chu ky khach + CVDV tiep nhan) -
               giong het nut o DetailModal, dung chung 1 mau in. */}
@@ -1732,7 +1732,7 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
             <button className="modal-close" onClick={() => setShowIntake(false)}>✕</button>
           </div>
           <div className="modal-body">
-            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} />
+            <IntakeChecklistView value={order.intakeChecklist} vehicleModelText={order.vehicle?.vehicleModel} order={order} />
           </div>
           {/* In rieng phieu tiep nhan (kem chu ky khach + CVDV tiep nhan) -
               day la to giay khach ky xac nhan tinh trang xe luc mang den,
@@ -4317,7 +4317,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
             </span>
           )}
         >
-          <IntakeChecklistView value={intakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} />
+          <IntakeChecklistView value={intakeChecklist} vehicleModelText={vehicleInfo.vehicleModel} order={existingOrder} />
         </CollapsibleCard>
       ) : (
         <IntakeChecklistSection value={intakeChecklist} onChange={setIntakeChecklist}

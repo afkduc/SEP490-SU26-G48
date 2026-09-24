@@ -128,7 +128,37 @@ function ExteriorBodyView({ exteriorBody, vehicleModelText }) {
   );
 }
 
-export default function IntakeChecklistView({ value, vehicleModelText }) {
+// Chu ky khach + CVDV luc TIEP NHAN xe - dung chung style voi OChuKy trong
+// RepairSettlementPage.jsx (khong import duoc vi component do khong export),
+// hien o day de man hinh khop voi ban in (printIntakeSheet cuoi trang cung in
+// 2 chu ky nay).
+function OChuKyTiepNhan({ tieuDe, anh, ten, luc }) {
+  return (
+    <div style={{ flex: '1 1 170px', minWidth: 150 }}>
+      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, marginBottom: 6 }}>{tieuDe}</div>
+      {anh ? (
+        <img src={anh} alt={tieuDe}
+          style={{
+            display: 'block', margin: '0 auto', height: 84, maxWidth: '100%', objectFit: 'contain',
+            border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff',
+          }} />
+      ) : (
+        <div style={{
+          height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '1px dashed var(--gray-300)', borderRadius: 6,
+          fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic',
+        }}>Chưa ký</div>
+      )}
+      <div style={{
+        textAlign: 'center', fontSize: 12, fontWeight: 600, marginTop: 8,
+        borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+      }}>{ten || '—'}</div>
+      {luc && <div style={{ textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)' }}>{luc}</div>}
+    </div>
+  );
+}
+
+export default function IntakeChecklistView({ value, vehicleModelText, order }) {
   const v = value || DEFAULT_INTAKE_CHECKLIST;
 
   const renderOkNgGroup = (group, fields) => (
@@ -197,6 +227,15 @@ export default function IntakeChecklistView({ value, vehicleModelText }) {
           <div key={dong} style={INTAKE_NOTICE_LINE_STYLE}>{dong}</div>
         ))}
       </div>
+
+      {order && (
+        <div style={{ display: 'flex', gap: 12, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--gray-200)' }}>
+          <OChuKyTiepNhan tieuDe="Khách hàng bàn giao xe" anh={order.signatureData}
+            ten={order.signerName} luc={order.signedAt} />
+          <OChuKyTiepNhan tieuDe="Cố vấn dịch vụ tiếp nhận" anh={order.advisorSignatureData}
+            ten={order.advisor} luc={order.advisorSignedAt} />
+        </div>
+      )}
     </div>
   );
 }
