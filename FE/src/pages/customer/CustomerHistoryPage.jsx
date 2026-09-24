@@ -328,8 +328,6 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
   const [newDateOfBirth, setNewDateOfBirth] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newTaxCode, setNewTaxCode] = useState('');
-  const [newContactName, setNewContactName] = useState('');
-  const [newContactPhone, setNewContactPhone] = useState('');
   const [transferDate, setTransferDate] = useState(() => toLocalISODate());
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -375,8 +373,6 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
           dateOfBirth: newDateOfBirth || undefined,
           email: newEmail.trim() || undefined,
           taxCode: newTaxCode.trim() || undefined,
-          contactName: newContactName.trim() || undefined,
-          contactPhone: newContactPhone.trim() || undefined,
         } : undefined,
         transferDate,
         notes,
@@ -463,21 +459,13 @@ function TransferOwnerForm({ vehicleId, currentOwnerId, onDone, onCancel }) {
             <label className="form-label">Mã số thuế</label>
             <input className="form-input" value={newTaxCode} onChange={(e) => setNewTaxCode(e.target.value)} placeholder="Mã số thuế (tuỳ chọn)" />
           </div>
-          <div className="form-group">
-            <label className="form-label">Người liên hệ</label>
-            <input className="form-input" value={newContactName} onChange={(e) => setNewContactName(e.target.value)} placeholder="Người liên hệ (tuỳ chọn)" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">SĐT người liên hệ</label>
-            <input className="form-input" value={newContactPhone} onChange={(e) => setNewContactPhone(e.target.value)} placeholder="SĐT người liên hệ (tuỳ chọn)" />
-          </div>
         </div>
       )}
 
       <div className="form-grid form-grid-2">
         <div className="form-group">
           <label className="form-label">Ngày chuyển nhượng</label>
-          <input className="form-input" type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} />
+          <input className="form-input" type="date" value={transferDate} max={toLocalISODate()} onChange={(e) => setTransferDate(e.target.value)} />
         </div>
         <div className="form-group">
           <label className="form-label">Ghi chú</label>

@@ -24,6 +24,14 @@ class VehicleOwnershipService {
       if (errors.length) throw new ApiError(400, errors.join('. '));
     }
 
+    // Xe khong the "chuyen nhuong truoc" o mot ngay chua toi - giong rang
+    // buoc ngay sinh o customerValidation.js.
+    if (transferDate) {
+      const d = new Date(transferDate);
+      if (Number.isNaN(d.getTime())) throw new ApiError(400, 'Ngày chuyển nhượng không đúng định dạng');
+      if (d.getTime() > Date.now()) throw new ApiError(400, 'Ngày chuyển nhượng không được ở tương lai');
+    }
+
     const history = await this.vehicleOwnershipRepository.findHistoryByVehicleId(vehicleId);
     if (history.length === 0) throw new ApiError(404, 'Không tìm thấy xe');
 
