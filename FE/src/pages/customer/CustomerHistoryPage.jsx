@@ -241,7 +241,13 @@ function SettlementDetailModal({ settlementId, onClose }) {
                 ) : <div />}
 
                 <div className="summary-box" style={{ minWidth: 260 }}>
-                  <div className="summary-row total"><span>Tổng cộng:</span><span>{formatCurrency(detail.total)}</span></div>
+                  <div className="summary-row"><span>Tổng trước giảm giá:</span><span>{(detail.subtotal || 0).toLocaleString('vi-VN')} đ</span></div>
+                  <div className="summary-row"><span>Tổng giảm giá:</span><span>{(detail.discountAmount || 0).toLocaleString('vi-VN')} đ</span></div>
+                  <div className="summary-row"><span>Thuế GTGT (8%):</span><span>{(detail.vat || 0).toLocaleString('vi-VN')} đ</span></div>
+                  {detail.freeAmount > 0 && (
+                    <div className="summary-row"><span>Miễn phí:</span><span>{(detail.freeAmount || 0).toLocaleString('vi-VN')} đ</span></div>
+                  )}
+                  <div className="summary-row total"><span>Tổng thanh toán:</span><span>{formatCurrency(detail.total)}</span></div>
                 </div>
               </div>
             </>
