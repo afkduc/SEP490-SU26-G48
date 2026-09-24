@@ -44,6 +44,7 @@ import { MOCK_BRANCH, STATUS_LABELS } from './mockData';
 import { isValidPhone, isValidEmail, EMAIL_HINT } from '../../utils/validation';
 import IntakeChecklistSection, { DEFAULT_INTAKE_CHECKLIST, isIntakeChecklistComplete } from './IntakeChecklistSection';
 import IntakeChecklistView from './IntakeChecklistView';
+import DeclinedTasksSummary from './DeclinedTasksSummary';
 import { printIntakeSheet, daDuChuKyTiepNhan } from './printIntake';
 import VehicleHistoryModal from './VehicleHistoryModal';
 import { assignGroupIds, dongHangMucDeIn } from './settlementItems';
@@ -1602,8 +1603,17 @@ function DetailModal({ order, onClose, onPreview, canEdit, onEdit, onDecideNg, d
             </table>
           </div>
 
-          <TaskProgressList tasks={order.tasks} bayNumber={order.bayNumber} technicians={order.technicians}
-            onDecideNg={onDecideNg} decidingId={decidingId} />
+          {/* Phieu da xuat hoa don thi khong con gi de thao tac (onDecideNg
+              cung khong duoc goi nua) - liet ke het checklist kem tick xanh
+              chi thua thong tin, doi sang ban rut gon giong het man Lich su
+              khach hang. Phieu con dang xu ly thi giu nguyen ban day du de
+              co van/to truong theo doi tien do. */}
+          {order.status === 'invoiced' ? (
+            <DeclinedTasksSummary tasks={order.tasks} />
+          ) : (
+            <TaskProgressList tasks={order.tasks} bayNumber={order.bayNumber} technicians={order.technicians}
+              onDecideNg={onDecideNg} decidingId={decidingId} />
+          )}
 
           {/* Khoi tong ket dung mot minh ben phai; khoi chu ky xuong hang
               rieng ben duoi de 4 o ky nam CUNG MOT HANG nhu tren to phieu

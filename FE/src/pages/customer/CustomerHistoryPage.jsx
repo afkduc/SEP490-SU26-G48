@@ -8,6 +8,7 @@ import { getVehicleOwnerHistoryApi, transferVehicleOwnerApi, listVehicleModelsAp
 import { STATUS_LABELS } from '../repairsettlement/mockData';
 import IntakeChecklistView from '../repairsettlement/IntakeChecklistView';
 import { printIntakeSheet, daDuChuKyTiepNhan } from '../repairsettlement/printIntake';
+import DeclinedTasksSummary from '../repairsettlement/DeclinedTasksSummary';
 import { moCuaSoIn } from '../repairsettlement/printHeader';
 import { useAuth } from '../../contexts';
 import { normalizeRoles } from '../../contexts/AppContext';
@@ -223,27 +224,7 @@ function SettlementDetailModal({ settlementId, onClose }) {
                 </table>
               </div>
 
-              {(() => {
-                // Khach chi can biet dau muc nao KHONG DAT ma ho tu choi sua -
-                // khong can liet ke het 30 dau muc kem tick nhu ban co van xem,
-                // thong tin do la cho noi bo (to truong/co van theo doi tien do).
-                const declinedTasks = (detail.tasks || []).filter((t) => t.taskType === 'service' && t.ngDecision === 'declined');
-                if (declinedTasks.length === 0) return null;
-                return (
-                  <div style={{ marginTop: 4, marginBottom: 16 }}>
-                    <div className="form-section-title">Hạng mục không đạt, khách từ chối sửa</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {declinedTasks.map((t) => (
-                        <div key={t.id} style={{ padding: '8px 10px', background: '#FDECEA', borderRadius: 6, fontSize: 13, color: '#B91C1C' }}>
-                          <b>{t.taskName}</b>
-                          {t.checkNote && ` — ${t.checkNote}`}
-                          {t.ngNote && <div style={{ fontWeight: 600, marginTop: 2 }}>Khách từ chối thay — {t.ngNote}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+              <DeclinedTasksSummary tasks={detail.tasks} />
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
                 {(detail.signatureData || detail.closingSignatureData) ? (
