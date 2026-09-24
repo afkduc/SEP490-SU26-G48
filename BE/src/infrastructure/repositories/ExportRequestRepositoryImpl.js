@@ -797,15 +797,19 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   }
 
   // "CVDV yeu cau" cho tung lan xuat/tra - AI la nguoi sua phieu (them/bot
-  // phu tung) lam phat sinh so luong can xuat/tra CUA LAN DO. Khong co cot
-  // luu san dieu nay (repair_order_items khong theo doi nguoi sua tung
+  // phu tung) gan nhat TINH DEN LUC lan xuat/tra do duoc xac nhan. Khong co
+  // cot luu san dieu nay (repair_order_items khong theo doi nguoi sua tung
   // dong), nen suy ra tu chinh Nhat ky hoat dong cua phieu quyet toan (audit
-  // log "lifecycle" da co san 'by' cho tung buoc): buoc GAN NHAT thuoc nhom
-  // co-the-doi-phu-tung (tao phieu / sua phieu / khach dong y thay dau muc
-  // NG) ma xay ra TRONG khoang thoi gian giua lan xuat/tra TRUOC va lan nay -
-  // chinh la nguoi vua sua khien lan nay phat sinh. Neu khong co buoc nao
-  // khop (vd NV kho tu xuat lai phan con thieu tu truoc, khong ai vua sua
-  // gi) thi de trong, khong doan bay.
+  // log "lifecycle" da co san 'by' cho tung buoc): voi MOI lan xuat/tra, lay
+  // buoc GAN NHAT thuoc nhom co-the-doi-phu-tung (tao phieu / sua phieu /
+  // khach dong y thay dau muc NG) co thoi diem <= luc lan do duoc ky.
+  //
+  // CO Y khong gioi han rieng tung buoc cho 1 lan duy nhat (khong "tieu thu"
+  // buoc sau khi da gan cho 1 lan): 1 lan sua co the tao ra nhieu dau muc,
+  // nhung NV kho khong bat buoc xuat het trong 1 lan - phan con lai xuat o
+  // lan sau van phai quy ve DUNG nguoi da sua lan do, khong phai de trong.
+  // Neu 2 lan xuat lien tiep khong co sua gi o giua thi CA HAI cung hien
+  // dung 1 nguoi - dung thuc te, khong phai loi trung lap.
   async _attachRequestedByName(orderedPickups, repairOrderId) {
     if (!repairOrderId || orderedPickups.length === 0) return;
     const log = await AuditRepository.findLifecycleAuditLog('repair_settlements', repairOrderId);
@@ -824,15 +828,14 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       .sort((a, b) => a.at - b.at);
     if (relevant.length === 0) return;
 
-    let windowStart = -Infinity;
     for (const pickup of orderedPickups) {
       const windowEnd = new Date(pickup.signedAt).getTime();
       let found = null;
       for (const step of relevant) {
-        if (step.at > windowStart && step.at <= windowEnd) found = step; // giu step MOI NHAT trong khoang
+        if (step.at <= windowEnd) found = step; // relevant da sap tang dan -> giu cai cuoi cung con khop
+        else break;
       }
       pickup.requestedByName = found?.by || null;
-      windowStart = windowEnd;
     }
   }
 
