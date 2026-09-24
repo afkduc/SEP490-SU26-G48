@@ -15,13 +15,47 @@ import {
   PRIORITY_FIELDS,
   OTHER_INFO_FIELDS,
   FUEL_GAUGE_OPTIONS,
+  SEGMENT_DIAGRAMS,
+  detectSegmentFromModelText,
 } from './IntakeChecklistSection';
 import { INTAKE_NOTICE_LINES } from './intakeNotice';
-import { khoiTieuDeIn, PRINT_HEADER_CSS } from './printHeader';
+import { khoiTieuDeIn, PRINT_HEADER_CSS, urlAsset } from './printHeader';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
 ));
+
+const NHAN_GOC = { left: 'Trái', right: 'Phải', front: 'Trước', rear: 'Sau', top: 'Trên' };
+const SEGMENT_LABEL = { sedan: 'Sedan/Hatchback', suv: 'SUV/Crossover', pickup: 'Bán tải' };
+
+// So do xe kem dau X danh dau vet xuoc/mop - IN LAI DUNG NHU tren man hinh
+// tiep nhan (MarkableImage trong IntakeChecklistSection.jsx): cung 5 anh theo
+// phan khuc, cung toa do %x/%y, cung mau do. Anh tinh nam trong FE/public/
+// vehicle-diagrams/ nen phai qua urlAsset() (duong dan tuyet doi) - cua so in
+// mo bang document.write() khong co <base> de giai duong dan tuong doi.
+function khoiSoDoXe(vehicleModelText, marks) {
+  const phanKhuc = detectSegmentFromModelText(vehicleModelText);
+  const images = SEGMENT_DIAGRAMS[phanKhuc] || SEGMENT_DIAGRAMS.sedan;
+  // Dung dinh dang 2 cot NHU tren man hinh tiep nhan (ExteriorBodyCheck):
+  // trai/phai 1 hang, truoc/sau 1 hang, tren le loi rieng 1 hang - can giua
+  // (anh cuoi cua mang 5 anh luon la "top" nen cu index cuoi la biet le loi).
+  const oAnh = images.map((img, i) => {
+    const goc = img.split('-')[1];
+    const dauXCuaAnh = (marks || []).filter((m) => m.diagram === img);
+    const dauX = dauXCuaAnh.map((m) => `<span class="sdx-x" style="left:${m.xPct}%;top:${m.yPct}%">✕</span>`).join('');
+    const leLoi = i === images.length - 1 && images.length % 2 === 1;
+    return `
+      <div class="sdx-item${leLoi ? ' sdx-item--le' : ''}">
+        <div class="sdx-wrap"><img src="${urlAsset(`/vehicle-diagrams/${img}.png`)}" />${dauX}</div>
+        <div class="sdx-label">${esc(NHAN_GOC[goc] || goc)}</div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="khoi">
+      <div class="khoi-title">Sơ đồ đánh dấu vết xước / móp (${esc(SEGMENT_LABEL[phanKhuc] || phanKhuc)})</div>
+      <div class="sdx-grid">${oAnh}</div>
+    </div>`;
+}
 
 // Cac muc kiem tra luu 3 trang thai: 'OK' | 'NG' | null (chua danh gia).
 const okNg = (v) => (v === 'OK' ? 'Đạt' : v === 'NG' ? 'Không đạt' : '—');
@@ -51,8 +85,11 @@ function dongDoi(cap) {
 }
 
 function oKy(tieuDe, anh, ten) {
+  // Da ky roi thi CHI in anh - ten da ghi ro tay trong luc ky, in lai chu ben
+  // duoi la thua. Chi hien dong "Ky va ghi ro ho ten" (ten rong) khi in ban
+  // trang de khach ky tay.
   const than = anh
-    ? `<img class="sign-img" src="${anh}" /><div class="sign-line has-img">${esc(ten || '')}</div>`
+    ? `<img class="sign-img" src="${anh}" />`
     : `<div class="sign-line">${esc(ten || '')}</div>`;
   return `<div class="sign-box"><div class="bold">${esc(tieuDe)}</div>${than}</div>`;
 }
@@ -83,12 +120,25 @@ export function printIntakeSheet(order, { khongChuKy = false } = {}, moCuaSoIn) 
   .kt .lbl { width: 30%; }
   .kt .val { width: 20%; text-align: center; }
   .ghi-chu { border: 1px solid #CCC; padding: 5px 6px; min-height: 26px; }
+  /* 2 cot: trai/phai 1 hang, truoc/sau 1 hang - anh "tren" le loi (sdx-item--le)
+     chiem het hang, tu can giua bang margin:auto + gioi han lai rong = nua cot. */
+  .sdx-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding-top: 4px; }
+  .sdx-item { text-align: center; }
+  .sdx-item--le { grid-column: 1 / -1; width: calc(50% - 4px); margin: 0 auto; }
+  /* height:auto (KHONG ep chieu cao co dinh/object-fit): dau X luu %x/%y tinh
+     tren khung anh dung ty le goc (giong het MarkableImage tren man hinh) -
+     ep chieu cao khac se lam anh bi "letterbox" va dau X lech vi tri that. 2
+     cot rong bang nhau la du de moi hang (trai/phai, truoc/sau) trong deu. */
+  .sdx-wrap { position: relative; border: 1px solid #CCC; background: #fff; }
+  .sdx-wrap img { width: 100%; height: auto; display: block; }
+  .sdx-x { position: absolute; transform: translate(-50%, -50%); color: #dc2626; font-size: 14px;
+           font-weight: 900; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 2px #fff; }
+  .sdx-label { font-size: 9.5px; font-weight: 700; color: #555; margin-top: 2px; }
   .cam-ket { margin-top: 8px; border: 1px solid #999; border-left: 3px solid #333; padding: 6px 8px; font-size: 10.5px; line-height: 1.5; }
   .sign-row { display: flex; justify-content: space-around; margin-top: 16px; }
   .sign-box { text-align: center; width: 40%; }
-  .sign-img { height: 46px; max-width: 100%; object-fit: contain; display: block; margin: 2px auto 0; }
+  .sign-img { height: 60px; max-width: 100%; object-fit: contain; display: block; margin: 2px auto 0; }
   .sign-line { margin-top: 42px; border-top: 1px solid #000; padding-top: 3px; font-size: 10px; }
-  .sign-line.has-img { margin-top: 0; }
   ${PRINT_HEADER_CSS}
 </style></head><body>
 ${khoiTieuDeIn('PHIẾU TIẾP NHẬN VÀ BÀN GIAO XE', {
@@ -125,13 +175,10 @@ ${khoiOkNg('Khoang động cơ', ENGINE_BAY_FIELDS, v.engineBay)}
 ${bang('Ưu tiên', dongDoi(PRIORITY_FIELDS.map(([k, l]) => [l, coKhong((v.priority || {})[k])])))}
 ${bang('Thông tin khác', dongDoi(OTHER_INFO_FIELDS.map(([k, l]) => [l, coKhong((v.otherInfo || {})[k])])))}
 
+${khoiSoDoXe(xe.vehicleModel, (v.exteriorBody || {}).marks)}
 <div class="khoi">
-  <div class="khoi-title">Tình trạng thân vỏ (vết xước / móp)</div>
-  <div class="ghi-chu">${esc((v.exteriorBody || {}).notes) || '—'}
-    ${((v.exteriorBody || {}).marks || []).length
-      ? ` <i>(đã đánh dấu ${((v.exteriorBody || {}).marks || []).length} vị trí trên sơ đồ xe trong hệ thống)</i>`
-      : ''}
-  </div>
+  <div class="khoi-title">Tình trạng thân vỏ (vết xước / móp) — ghi chú</div>
+  <div class="ghi-chu">${esc((v.exteriorBody || {}).notes) || '—'}</div>
 </div>
 
 <div class="khoi">
@@ -142,7 +189,7 @@ ${bang('Thông tin khác', dongDoi(OTHER_INFO_FIELDS.map(([k, l]) => [l, coKhong
 <div class="cam-ket">${INTAKE_NOTICE_LINES.map((d) => `<div>${esc(d)}</div>`).join('')}</div>
 
 <div class="sign-row">
-  ${oKy('Khách hàng', khongChuKy ? null : order.signatureData, khongChuKy ? '' : (order.signerName || kh.fullName))}
+  ${oKy('Khách hàng bàn giao xe', khongChuKy ? null : order.signatureData, khongChuKy ? '' : (order.signerName || kh.fullName))}
   ${oKy('Cố vấn dịch vụ tiếp nhận', khongChuKy ? null : order.advisorSignatureData, khongChuKy ? '' : order.advisor)}
 </div>
 </body></html>`;

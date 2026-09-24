@@ -642,8 +642,11 @@ ${khoiTieuDeIn('DANH SÁCH CÔNG VIỆC KỸ THUẬT', {
 // Mot o ky tren ban in. Co chu ky dien tu thi in anh chu ky len tren duong
 // ke; chua ky thi de trong 40px nhu cu de con ky tay tren giay.
 function oKy(tieuDe, anh, ten) {
+  // Da ky roi thi CHI in anh - ten da ghi ro tay trong luc ky, in lai chu ben
+  // duoi la thua. Chi hien dong ky tay (ten rong) khi in ban trang de khach
+  // ky tay.
   const than = anh
-    ? `<img class="sign-img" src="${anh}" /><div class="sign-line has-img">${ten || ''}</div>`
+    ? `<img class="sign-img" src="${anh}" />`
     : `<div class="sign-line">${ten || ''}</div>`;
   return `<div class="sign-box"><div class="bold">${tieuDe}</div>${than}</div>`;
 }
@@ -723,7 +726,7 @@ function printSettlement(order, payosQrCode, { khongChuKy = false } = {}) {
   .sign-line { margin-top:40px; border-top:1px solid #000; padding-top:3px; font-size:10px; }
   /* O ky da co chu ky dien tu: anh chu ky nam ngay tren duong ke, khong con
      chua 40px trong de ky tay nua. */
-  .sign-img { height:46px; max-width:100%; object-fit:contain; display:block; margin:2px auto 0; }
+  .sign-img { height:60px; max-width:100%; object-fit:contain; display:block; margin:2px auto 0; }
   /* 4 o ky chia 2 nhom theo 2 moc: tiep nhan xe / ban giao xe */
   .sign-group { width:48%; }
   .sign-group-title { text-align:center; font-size:10px; font-weight:700; letter-spacing:.4px;
@@ -733,7 +736,6 @@ function printSettlement(order, payosQrCode, { khongChuKy = false } = {}) {
   /* Phieu quyet toan chi con 2 o ky (khach nhan xe + CVDV ban giao) nen o
      rong hon, du cho ky tay khi in ban trang. */
   .sign-row > .sign-box { width:38%; }
-  .sign-line.has-img { margin-top:0; }
   /* Dong bi doi sau khi chot voi khach (khach huy / tra bot phu tung) - in
      mau do de nguoi doc thay ngay vi sao tien cuoi khac bao gia ban dau.
      print-color-adjust de trinh duyet khong bo mau khi in ra giay. */
@@ -2008,13 +2010,21 @@ function RepairSettlementList() {
   };
   useRepairOrderEventsSSE(handleRepairOrderEvent, true);
 
+  // "Chu" thuc su cua 1 phieu: ngoai thuc te, phieu duoc TINH CHO co van nao
+  // CHOT xong (khach thanh toan thanh cong), khong phai co van lap phieu ban
+  // dau - co van A lap phieu nhung co van B la nguoi chot/thu tien thi phieu
+  // do duoc tinh cho B. "Nguoi tao" tren cot rieng van hien dung A, khong doi.
+  // Chua ai chot (closingAdvisorId con null) thi mac dinh chu van la nguoi
+  // tao, dung nhu luc moi lap phieu.
+  const chuPhieu = (o) => o.closingAdvisorId ?? o.advisorId;
+
   // Bo loc co van ap cho CA so dem tren tab lan danh sach - neu chi ap cho
   // danh sach thi tab ghi "Đang sửa chữa 2" trong khi ben duoi chi co 1 dong,
   // nguoi dung tuong mat phieu.
   const dungCoVan = (o) => {
-    if (filterAdvisor === 'me') return String(o.advisorId) === String(user?.id);
+    if (filterAdvisor === 'me') return String(chuPhieu(o)) === String(user?.id);
     if (filterAdvisor === 'all') return true;
-    return String(o.advisorId) === filterAdvisor;
+    return String(chuPhieu(o)) === filterAdvisor;
   };
   const theoCoVan = orders.filter(dungCoVan);
 

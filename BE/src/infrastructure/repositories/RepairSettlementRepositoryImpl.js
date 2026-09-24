@@ -160,7 +160,11 @@ function buildConditions({ branchId, status, search, customerId, vehicleId, from
     conditions.push('so.branch_id = @branchId');
     if (advisorId) {
       params.advisorId = advisorId;
-      conditions.push('so.advisor_id = @advisorId');
+      // "Chu" thuc su cua phieu la co van CHOT xong (khach thanh toan thanh
+      // cong), khong phai nguoi lap phieu ban dau - co van A lap, co van B
+      // chot thi phieu tinh cho B. Chua chot (closing_advisor_id con NULL)
+      // thi mac dinh chu van la nguoi lap, dung nhu luc moi tao phieu.
+      conditions.push('COALESCE(so.closing_advisor_id, so.advisor_id) = @advisorId');
     }
   }
 
