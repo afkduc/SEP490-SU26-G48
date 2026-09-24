@@ -963,7 +963,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}
+      <div className="modal modal-lg no-scrollbar" onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: 940 }}>
         <div className="modal-header">
           <h3 className="modal-title">Quyết toán sửa chữa — {order.code}</h3>
