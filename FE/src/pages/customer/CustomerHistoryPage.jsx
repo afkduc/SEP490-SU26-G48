@@ -26,6 +26,35 @@ function exemptionShortLabel(item) {
   return EXEMPTION_SHORT_LABEL[item.httt] || null;
 }
 
+// 1 o chu ky luc quyet toan - dung chung style voi OChuKy trong
+// RepairSettlementPage.jsx (khong export duoc nen nhan doi o day). Chua ky
+// thi hien "Chưa ký" xam, khong an han ca o.
+function ChuKyQuyetToan({ tieuDe, anh, ten, luc }) {
+  return (
+    <div style={{ flex: '1 1 170px', minWidth: 150 }}>
+      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, marginBottom: 6 }}>{tieuDe}</div>
+      {anh ? (
+        <img src={anh} alt={tieuDe}
+          style={{
+            display: 'block', margin: '0 auto', height: 84, maxWidth: '100%', objectFit: 'contain',
+            border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff',
+          }} />
+      ) : (
+        <div style={{
+          height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '1px dashed var(--gray-300)', borderRadius: 6,
+          fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic',
+        }}>Chưa ký</div>
+      )}
+      <div style={{
+        textAlign: 'center', fontSize: 12, fontWeight: 600, marginTop: 8,
+        borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+      }}>{ten || '—'}</div>
+      {luc && <div style={{ textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)' }}>{luc}</div>}
+    </div>
+  );
+}
+
 // ─── Modal xem chi tiết 1 phiếu quyết toán trong lịch sử ─────────────
 function SettlementDetailModal({ settlementId, onClose }) {
   const [detail, setDetail] = useState(null);
@@ -217,30 +246,15 @@ function SettlementDetailModal({ settlementId, onClose }) {
               })()}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-                {detail.signatureData ? (
-                  <div className="card" style={{ flex: '1 1 280px', maxWidth: 360 }}>
+                {(detail.signatureData || detail.closingSignatureData) ? (
+                  <div className="card" style={{ flex: '1 1 280px', maxWidth: 460 }}>
                     <div className="card-body">
-                      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
-                        Xác nhận đồng ý phiếu quyết toán
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        <ChuKyQuyetToan tieuDe="Khách hàng xác nhận" anh={detail.signatureData}
+                          ten={detail.signerName} luc={detail.signedAt} />
+                        <ChuKyQuyetToan tieuDe="Cố vấn dịch vụ quyết toán" anh={detail.closingSignatureData}
+                          ten={detail.closingAdvisorName} luc={detail.closingSignedAt} />
                       </div>
-                      <img
-                        src={detail.signatureData}
-                        alt="Chữ ký xác nhận"
-                        style={{ display: 'block', margin: '0 auto', height: 90, border: '1px solid var(--gray-200)', borderRadius: 6, background: '#fff' }}
-                      />
-                      {detail.signerName && (
-                        <div style={{
-                          textAlign: 'center', fontSize: 12.5, fontWeight: 600, marginTop: 10,
-                          borderTop: '1px solid var(--gray-200)', paddingTop: 8,
-                        }}>
-                          {detail.signerName}
-                        </div>
-                      )}
-                      {detail.signedAt && (
-                        <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
-                          Ký lúc: {detail.signedAt}
-                        </div>
-                      )}
                     </div>
                   </div>
                 ) : <div />}
