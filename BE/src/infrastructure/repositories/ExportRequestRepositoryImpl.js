@@ -412,6 +412,34 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
   }
 
   /**
+   * Sinh ma phieu xuat rieng, dang ERB-{branchId}-{yyyymmdd}-{0001} - cung
+   * mot kieu voi ma phieu nhap (import_requests.request_code, xem
+   * ImportRequestRepositoryImpl.getNextRequestCode). KHONG con dung lai ma
+   * cua Lenh sua chua (repair_code) nua - 2 ma do la 2 khai niem khac nhau
+   * (1 RO co the co nhieu phieu nhap/xuat/hoa don khac nhau ve sau), giu
+   * chung 1 ma se nhin nham la cung 1 thu.
+   */
+  async _getNextExportRequestCode(tx, branchId) {
+    const d = new Date();
+    const dateKey = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const prefix = `ERB-${branchId}-${dateKey}-`;
+    const result = await tx.request()
+      .input('pattern', sql.VarChar(40), `${prefix}%`)
+      .query(`
+        SELECT TOP 1 request_code
+        FROM export_requests WITH (UPDLOCK, HOLDLOCK)
+        WHERE request_code LIKE @pattern
+        ORDER BY request_code DESC
+      `);
+    let sequence = 1;
+    if (result.recordset[0]) {
+      const lastSeq = parseInt(result.recordset[0].request_code.substring(prefix.length), 10);
+      if (Number.isFinite(lastSeq)) sequence = lastSeq + 1;
+    }
+    return `${prefix}${String(sequence).padStart(4, '0')}`;
+  }
+
+  /**
    * Xac nhan 1 LAN lay hang (co the gom nhieu dong xuat va/hoac tra), tat ca
    * trong 1 transaction:
    *   1) Khoa RO, kiem tra con thao tac kho duoc khong.
@@ -516,11 +544,15 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       }
     }
 
-    // 3) Header: 1 RO = 1 phieu, tao lan dau roi dung lai mai.
+    // 3) Header: 1 RO = 1 phieu, tao lan dau roi dung lai mai. Ma phieu xuat
+    // rieng (ERB-...), khong dung lai ma cua Lenh sua chua nua - truoc day
+    // request_code = repair_code khien cot "Ma phieu" tren danh sach nhin
+    // giong het cot "Phieu sua chua" ben canh, tuong nhu loi hien thi trung.
     let exportRequestId = roRow.export_request_id;
     if (!exportRequestId) {
+      const requestCode = await this._getNextExportRequestCode(tx, branchId);
       exportRequestId = (await tx.request()
-        .input('request_code', sql.VarChar(30), roRow.repair_code)
+        .input('request_code', sql.VarChar(30), requestCode)
         .input('branch_id', sql.BigInt, branchId)
         .input('repair_order_id', sql.BigInt, repairOrderId)
         .input('performed_by', sql.BigInt, data.performed_by)
