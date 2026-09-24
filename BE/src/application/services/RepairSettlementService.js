@@ -450,6 +450,7 @@ class RepairSettlementService {
     }
 
     let daThem = [];
+    let congThem = null;
     if (decision === 'accepted') {
       // Khach dong y -> chen luon phu tung theo dinh muc cua chinh dich vu do,
       // tinh lai tien va dong bo checklist, tat ca trong 1 transaction.
@@ -459,6 +460,7 @@ class RepairSettlementService {
       });
       if (!kq.ok) throw new ApiError(409, 'Đầu mục vừa được người khác xử lý, tải lại trang rồi thử lại');
       daThem = kq.added;
+      congThem = kq.laborAdded;
     } else {
       const ok = await this.repairSettlementRepository.setNgDecision(id, taskId, {
         decision,
@@ -475,7 +477,7 @@ class RepairSettlementService {
     // Tra kem danh sach phu tung vua chen de FE bao lai cho co van biet da
     // them gi vao phieu, khong phai tu do lai bang hang muc.
     const item = await this.getById(id);
-    return { ...item, ngAddedParts: daThem };
+    return { ...item, ngAddedParts: daThem, ngAddedLabor: congThem };
   }
 
   async update(id, payload) {

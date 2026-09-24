@@ -1737,7 +1737,7 @@ function RepairSettlementList() {
       const ok = await confirm({
         title: 'Khách đồng ý thay',
         message: `Khách đồng ý thay "${task.taskName}"?`,
-        detail: 'Hệ thống sẽ tự thêm phụ tùng vào phiếu, tính lại tổng tiền, và mở lại đầu mục này để thợ thay.',
+        detail: 'Hệ thống sẽ tự thêm phụ tùng (nếu có) và tiền công cho đầu mục này vào phiếu, tính lại tổng tiền, và mở lại đầu mục để thợ thay.',
         confirmText: 'Khách đồng ý',
         tone: 'success',
       });
@@ -1748,16 +1748,26 @@ function RepairSettlementList() {
       const updated = await decideNgTaskApi(view.id, task.id, decision, note);
       setView(updated);
       loadAll({ silent: true });
-      // Bao ro da them phu tung gi - co van con doi chieu voi gia da bao
-      // khach qua dien thoai truoc khi chot.
+      // Bao ro da them phu tung/tien cong gi - co van con doi chieu voi gia
+      // da bao khach qua dien thoai truoc khi chot.
       const daThem = updated?.ngAddedParts || [];
+      const congThem = updated?.ngAddedLabor;
       if (decision === 'accepted') {
-        if (daThem.length > 0) {
-          toast.success(`Đã thêm vào phiếu: ${daThem.map((p) => `${p.name} (${p.quantity} ${p.unit || 'Cái'})`).join(', ')}. Đầu mục đã mở lại để thợ thay.`);
+        const phanPT = daThem.length > 0
+          ? `phụ tùng ${daThem.map((p) => `${p.name} (${p.quantity} ${p.unit || 'Cái'})`).join(', ')}`
+          : '';
+        // Dau muc thay/sua that phat sinh cong NGOAI pham vi kiem tra da tinh
+        // trong gia goi bao duong - tu dong tinh them cong nay du dau muc co
+        // kem phu tung hay khong (vd chi dieu chinh, khong thay linh kien).
+        const phanCong = congThem ? `tiền công ${formatCurrency(congThem.unitPrice)}` : '';
+        const daThemText = [phanPT, phanCong].filter(Boolean).join(' + ');
+        if (daThemText) {
+          toast.success(`Đã thêm vào phiếu: ${daThemText}. Đầu mục đã mở lại để thợ thay.`);
         } else {
-          // Dich vu khong khai dinh muc phu tung - co van phai tu them
+          // Dau muc khong khop dich vu nao trong catalog (truong hop hiem,
+          // vd task cu tu truoc khi dong bo catalog) - co van phai tu them
           // tay, khong de im lang tuong la da xong.
-          toast.warning('Đã ghi nhận khách đồng ý, nhưng đầu mục này chưa khai định mức phụ tùng - hãy vào Chỉnh sửa phiếu để thêm tay');
+          toast.warning('Đã ghi nhận khách đồng ý, nhưng không tự tính được phụ tùng/tiền công cho đầu mục này - hãy vào Chỉnh sửa phiếu để thêm tay');
         }
       }
     } catch (err) {

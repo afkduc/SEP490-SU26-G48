@@ -906,12 +906,18 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
 
       // 2. Dich vu tuong ung: dong hang muc con cua goi co dung ten do.
       //    Task duoc sinh tu chinh ten dich vu nen khop 1-1 (xem
-      //    repairOrderTaskBuilder.computeDesiredTasks).
+      //    repairOrderTaskBuilder.computeDesiredTasks). Lay them id + gia goc
+      //    cua chinh dich vu (services.unit_price) - dong hang muc nay dang
+      //    unit_price=0 vi luc them goi da gop cong vao gia goi chung (xem
+      //    RepairSettlementPage.jsx/selectCatalogPackage), can de tinh lai
+      //    cong o buoc 3b ben duoi.
       const svc = (await req()
         .input('roId2', sql.BigInt, repairOrderId)
         .input('ten', sql.NVarChar(300), taskRow.task_name)
-        .query(`SELECT TOP 1 service_id, repair_category FROM repair_order_items
-                WHERE repair_order_id=@roId2 AND item_description=@ten AND service_id IS NOT NULL`)).recordset[0];
+        .query(`SELECT TOP 1 roi.id, roi.service_id, roi.repair_category, s.unit_price AS labor_price
+                FROM   repair_order_items roi
+                JOIN   services s ON s.id = roi.service_id
+                WHERE  roi.repair_order_id=@roId2 AND roi.item_description=@ten AND roi.service_id IS NOT NULL`)).recordset[0];
 
       // 3. Dinh muc phu tung cua dich vu do
       const parts = svc ? (await req()
@@ -966,6 +972,28 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         added.push({ name: p.product_name, quantity: p.quantity, unit: p.unit_name, unitPrice: gia });
       }
 
+      // 3b. Tinh CONG rieng cho chinh dau muc nay - dang unit_price=0 (gop
+      //     trong gia goi). Khach dong y sua/thay la phat sinh cong NGOAI
+      //     pham vi kiem tra da tinh san trong gia goi, nen phai tinh THEM
+      //     dong cong nay - AP DUNG CA KHI dau muc khong kem phu tung nao
+      //     (vd "Khe hở supap" chỉ điều chỉnh, không có phụ tùng nhưng vẫn
+      //     tốn công riêng). Chi cap nhat khi dang = 0 de khong dung vao dong
+      //     da co gia that (dich vu le tu them tay, khong qua goi).
+      let laborAdded = null;
+      if (svc && Number(svc.labor_price) > 0) {
+        const giaCong = Number(svc.labor_price);
+        const ketQua = await req()
+          .input('itemId', sql.BigInt, svc.id)
+          .input('giaCong', sql.Decimal(18, 2), giaCong)
+          .query(`UPDATE repair_order_items SET unit_price=@giaCong, total=@giaCong
+                  WHERE id=@itemId AND unit_price = 0`);
+        if (ketQua.rowsAffected[0] > 0) {
+          const dong = items.find((r) => r.id === svc.id);
+          if (dong) { dong.unit_price = giaCong; dong.total = giaCong; }
+          laborAdded = { name: taskRow.task_name, unitPrice: giaCong };
+        }
+      }
+
       // 5. Tinh lai tien tren TOAN BO hang muc (dung chung cong thuc voi
       //    service - xem utils/settlementTotals.js)
       const tong = calcTotalsFromItems(items.map((r) => ({
@@ -1006,7 +1034,7 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
       //    duoc danh dau "(Khách thêm)" vi xuat hien sau luc nhan viec.
       await this._syncRepairOrderTasks(tx, repairOrderId);
 
-      return { ok: true, added };
+      return { ok: true, added, laborAdded };
     });
   }
 
