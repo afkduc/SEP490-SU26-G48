@@ -634,6 +634,7 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
                     dang lam xe nao ma khong phai mo ra. */}
                 {thuGon && order && (
                   <span className="tld-bay-collapsed-hint">
+                    {order.code && <b>{order.code}</b>} {order.code && '· '}
                     {order.customer?.fullName} — {order.vehicle?.licensePlate}
                     {/* Mac dinh dong het nen phai nhin ra ngay khoang nao dang
                         cho CHINH to truong quyet, khong the bat ho mo tung
@@ -658,6 +659,9 @@ function BayStatusGrid({ bays, orders, onAssignTechnicians, onConfirmComplete, c
 
             {busy && order && !thuGon && (
               <>
+                {order.code && (
+                  <div className="tld-bay-status-card__code">Mã phiếu: <b>{order.code}</b></div>
+                )}
                 <div className="tld-bay-status-card__customer">Khách hàng: {order.customer?.fullName} — {order.vehicle?.licensePlate}</div>
                 {order.advisorName && (
                   <div className="tld-bay-status-card__advisor">CVDV: <b>{order.advisorName}</b></div>
