@@ -3421,12 +3421,21 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // khong doi (day chinh la nguyen nhan bug "doi so luong dau nhom nhung
   // dong con khong doi theo").
   const handleGroupQtyChange = (idx, rawValue) => {
+    let vuotTonKho = false;
     setItems((prev) => {
       const next = [...prev];
       const target = next[idx];
       const isEmpty = rawValue === '';
       const parsed = Number(rawValue);
-      const newQty = isEmpty || Number.isNaN(parsed) ? '' : parsed;
+      let newQty = isEmpty || Number.isNaN(parsed) ? '' : parsed;
+      // Phu tung chon tu "Phu tung trong kho" co ghi lai ton kho luc chon
+      // (xem selectProduct) - sua so luong vuot qua muc do thi keo lai dung
+      // muc toi da va bao, khong cho ghi qua ton kho thuc te.
+      if (target.lhsc === 'PT' && target.stockQuantity != null
+          && typeof newQty === 'number' && newQty > Number(target.stockQuantity)) {
+        newQty = Number(target.stockQuantity);
+        vuotTonKho = true;
+      }
       // Phu tung DA TUNG LUU (originalQty) duoc sua ca tang lan giam ngay tai
       // o nay: giam = khach hoan tra hang, tang = khach dung them. BE tu dong
       // bo checklist to truong ("Khách thêm số lượng, tổng là: N") va kho se
@@ -3457,6 +3466,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
       }
       return next;
     });
+    if (vuotTonKho) toast.warning('Số lượng sản phẩm không đủ');
   };
 
   // "Thêm dòng" luôn thêm 1 dòng Dịch vụ (mặc định của emptyItem) - không cần
@@ -3680,6 +3690,12 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // Chọn 1 phụ tùng thật trong kho -> điền đúng dòng đang gõ, đơn giá và ĐVT
   // lấy theo đúng thông tin đã khai báo trong kho (products), không giảm giá.
   const selectProduct = (idx, product) => {
+    // Dropdown da chan san pham het hang (xem hetHang o cho render goi y),
+    // nen toi day chac chan stockQuantity > 0. Van con truong hop cong don
+    // +1 vao dong da co san (xem duoi) co the vuot ton kho - bao qua bien
+    // ngoai vi khong nen goi toast() ngay trong ham cap nhat setState
+    // (StrictMode goi ham nay 2 lan luc dev, se hien toast trung lap).
+    let vuotTonKho = false;
     setItems((prev) => {
       // Phu tung vua chon da TRUNG voi 1 dong co san o noi khac (vd phu tung
       // phu thuoc cua 1 goi/dich vu da chon truoc do) -> cong don +1 so luong
@@ -3691,7 +3707,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         const adjDupIdx = dupIdx > idx ? dupIdx - 1 : dupIdx;
         const target = next[adjDupIdx];
         const newQty = (target.qtyBasis || target.qty || 1) + 1;
-        next[adjDupIdx] = recalcItem({ ...target, qty: newQty, qtyBasis: newQty, manualQtyUnlock: true });
+        if (Number(product.stockQuantity) > 0 && newQty > Number(product.stockQuantity)) {
+          vuotTonKho = true;
+          return prev;
+        }
+        next[adjDupIdx] = recalcItem({ ...target, qty: newQty, qtyBasis: newQty, manualQtyUnlock: true, stockQuantity: product.stockQuantity });
         return next;
       }
 
@@ -3707,9 +3727,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
         lhsc: 'PT',
         httt: 'KHT',
         discount: 0,
+        stockQuantity: product.stockQuantity,
       });
       return next;
     });
+    if (vuotTonKho) toast.warning('Số lượng sản phẩm không đủ');
     closeCatalogSuggestions(idx);
   };
 
@@ -4429,17 +4451,29 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                               {suggestion.type === 'product' && suggestion.products?.length > 0 && (
                                 <div>
                                   <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: 'var(--primary-very-light)' }}>Phụ tùng trong kho</div>
-                                  {suggestion.products.map((p) => (
-                                    <div key={`prod-${p.id}`} onMouseDown={() => selectProduct(idx, p)}
-                                      style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--gray-100)' }}>
-                                      <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
-                                      {/* Khong hien ton kho o day - CVDV chi chon phu tung, ton kho la
-                                          viec cua NV Kho khi xuat (form xuat kho tu bao thieu). */}
-                                      <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>
-                                        {formatCurrency(p.unitPrice)} / {p.unitName}
+                                  {suggestion.products.map((p) => {
+                                    // Het hang thi khong cho chon luon - hien mo + gach
+                                    // ly do, giong cach "goi combo" bi chan van hien
+                                    // nhung mo di o cho nay.
+                                    const hetHang = Number(p.stockQuantity || 0) <= 0;
+                                    return (
+                                      <div key={`prod-${p.id}`}
+                                        onMouseDown={() => (hetHang ? toast.warning('Số lượng sản phẩm không đủ') : selectProduct(idx, p))}
+                                        style={{
+                                          padding: '8px 10px', cursor: hetHang ? 'not-allowed' : 'pointer', fontSize: 12,
+                                          borderBottom: '1px solid var(--gray-100)',
+                                          background: hetHang ? 'var(--gray-50)' : undefined,
+                                          color: hetHang ? 'var(--gray-400)' : undefined,
+                                        }}>
+                                        <div style={{ fontWeight: 600 }}>{p.productName} <span style={{ color: hetHang ? undefined : 'var(--gray-500)', fontWeight: 400 }}>({p.productCode})</span></div>
+                                        <div style={{ fontSize: 11, color: hetHang ? '#B45309' : 'var(--gray-600)' }}>
+                                          {formatCurrency(p.unitPrice)} / {p.unitName}
+                                          {' · '}
+                                          {hetHang ? 'Hết hàng' : `Tồn kho: ${p.stockQuantity} ${p.unitName || ''}`}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                               {suggestion.type === 'catalog' && suggestion.packages?.length > 0 && (
