@@ -132,7 +132,10 @@ function ExteriorBodyView({ exteriorBody, vehicleModelText }) {
 // RepairSettlementPage.jsx (khong import duoc vi component do khong export),
 // hien o day de man hinh khop voi ban in (printIntakeSheet cuoi trang cung in
 // 2 chu ky nay).
-function OChuKyTiepNhan({ tieuDe, anh, ten, luc }) {
+// Da ky roi thi ten da ghi ro tay trong chinh anh chu ky - khong in lai ten
+// o duoi nua (ap dung cho CA 5 man dung component nay), chi giu dong ngay
+// gio ky.
+function OChuKyTiepNhan({ tieuDe, anh, luc }) {
   return (
     <div style={{ flex: '1 1 170px', minWidth: 150 }}>
       <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, marginBottom: 6 }}>{tieuDe}</div>
@@ -149,11 +152,12 @@ function OChuKyTiepNhan({ tieuDe, anh, ten, luc }) {
           fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic',
         }}>Chưa ký</div>
       )}
-      <div style={{
-        textAlign: 'center', fontSize: 12, fontWeight: 600, marginTop: 8,
-        borderTop: '1px solid var(--gray-200)', paddingTop: 6,
-      }}>{ten || '—'}</div>
-      {luc && <div style={{ textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)' }}>{luc}</div>}
+      {luc && (
+        <div style={{
+          textAlign: 'center', fontSize: 10.5, color: 'var(--gray-500)', marginTop: 8,
+          borderTop: '1px solid var(--gray-200)', paddingTop: 6,
+        }}>{luc}</div>
+      )}
     </div>
   );
 }
@@ -230,10 +234,8 @@ export default function IntakeChecklistView({ value, vehicleModelText, order }) 
 
       {order && (
         <div style={{ display: 'flex', gap: 12, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--gray-200)' }}>
-          <OChuKyTiepNhan tieuDe="Khách hàng bàn giao xe" anh={order.signatureData}
-            ten={order.signerName} luc={order.signedAt} />
-          <OChuKyTiepNhan tieuDe="Cố vấn dịch vụ tiếp nhận" anh={order.advisorSignatureData}
-            ten={order.advisor} luc={order.advisorSignedAt} />
+          <OChuKyTiepNhan tieuDe="Khách hàng bàn giao xe" anh={order.signatureData} luc={order.signedAt} />
+          <OChuKyTiepNhan tieuDe="Cố vấn dịch vụ tiếp nhận" anh={order.advisorSignatureData} luc={order.advisorSignedAt} />
         </div>
       )}
     </div>
