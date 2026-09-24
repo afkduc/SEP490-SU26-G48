@@ -964,7 +964,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: showIntake ? 'min(640px, 50vw)' : 860, transition: 'max-width 0.25s ease' }}>
+        style={{ maxWidth: 860 }}>
         <div className="modal-header">
           <h3 className="modal-title">Quyết toán sửa chữa — {order.code}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -1169,7 +1169,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
         {order.status === 'waiting_payment' && (
           <div style={{ margin: '0 16px 12px' }}>
             {daKyQuyetToan ? (
-              <div style={{ border: '1px solid #A5D6A7', borderRadius: 8, background: '#F1F8F2', padding: 12 }}>
+              <div style={{ border: '1px solid #A5D6A7', borderRadius: 12, background: '#F1F8F2', padding: 12 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: '#2E7D32', marginBottom: 10 }}>
                   ✓ Đã ký quyết toán
                 </div>
@@ -1178,7 +1178,7 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
                 <KhoiChuKy order={order} />
               </div>
             ) : (
-              <div style={{ border: '1px solid var(--gray-300)', borderRadius: 8, padding: 12 }}>
+              <div style={{ border: '1px solid var(--gray-300)', borderRadius: 12, padding: 12 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Ký quyết toán &amp; giao xe</div>
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 260px' }}>
@@ -1243,7 +1243,6 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
           <button className="btn btn-secondary" onClick={() => setShowIntake((s) => !s)}>
             {showIntake ? 'Ẩn xem tình trạng xe ban đầu' : 'Xem tình trạng xe ban đầu'}
           </button>
-          <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
           {/* Truoc khi ky xong: nut "Xác nhận đã đủ chữ ký hợp lệ" nam DUNG
               cho nay - thay vi hien san nut "Xác nhận tiền mặt" nhung xam va
               khong bam duoc (nguoi dung khong biet phai lam gi tiep). Bam
@@ -1275,6 +1274,9 @@ function SettlementPreviewModal({ order: orderGoc, onClose }) {
             title="In phiếu để khách ký tay trên giấy">
             In phiếu (ký tay)
           </button>
+          {/* Day rieng ra ngoai cung ben phai (marginLeft: auto), tach khoi
+              nhom nut hanh dong (ky/in) - "Đóng" chi la thoat man hinh. */}
+          <button className="btn btn-secondary" style={{ marginLeft: 'auto' }} onClick={onClose}>Đóng</button>
         </div>
       </div>
 
