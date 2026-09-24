@@ -190,8 +190,8 @@ export default function ExportRequestFormPage() {
     if (tickedIds.size < tickableCount) {
       return `Còn ${tickableCount - tickedIds.size} dòng chưa tích — phải tích đủ tất cả các dòng mới lưu được phiếu`;
     }
-    if (!receivedBy) return 'Vui lòng chọn người lấy (thợ nhận phụ tùng)';
-    if (signaturePadRef.current?.isEmpty() ?? true) return 'Vui lòng ký xác nhận đã lấy phụ tùng';
+    if (!receivedBy) return 'Vui lòng chọn người lấy/trả (thợ nhận hoặc trả phụ tùng)';
+    if (signaturePadRef.current?.isEmpty() ?? true) return 'Vui lòng ký xác nhận đã lấy/trả phụ tùng';
     if (issuerPadRef.current?.isEmpty() ?? true) return 'Nhân viên kho ký xác nhận phiếu xuất/trả';
     return '';
   }
@@ -228,8 +228,8 @@ export default function ExportRequestFormPage() {
   // Phai DIEN DU ca 3 phan moi cho luu: tich het dong, chon nguoi lay, va da ky.
   const missing = [];
   if (!allTicked) missing.push(`tích đủ các dòng (${tickedIds.size}/${tickableCount})`);
-  if (!receivedBy) missing.push('chọn người lấy');
-  if (signatureEmpty) missing.push('người lấy ký');
+  if (!receivedBy) missing.push('chọn người lấy/trả');
+  if (signatureEmpty) missing.push('người lấy/trả ký');
   if (issuerSignatureEmpty) missing.push('nhân viên kho ký');
   const canSubmit = Boolean(selectedRo) && !selectedRo?.locked && missing.length === 0;
   const missingLabel = missing.length ? `Còn thiếu: ${missing.join(', ')}` : '';
@@ -336,7 +336,7 @@ export default function ExportRequestFormPage() {
                 </div>
 
                 <div className="er-form__field">
-                  <label className="er-form__label">Người lấy <span className="required">*</span></label>
+                  <label className="er-form__label">Người lấy/trả <span className="required">*</span></label>
                   {receivedBy ? (
                     <div className="er-form__picked-chip">
                       <span>{receivedByName}</span>
@@ -477,7 +477,7 @@ export default function ExportRequestFormPage() {
 
                 {/* Nguoi lay (tho) ky MOI LAN lay/tra hang. */}
                 <div className="er-form__signature">
-                  <h3 className="er-form__add-title">Người lấy ký xác nhận <span className="required">*</span></h3>
+                  <h3 className="er-form__add-title">Người lấy/trả ký xác nhận <span className="required">*</span></h3>
                   <div className="er-form__signature-pad">
                     <SignaturePad ref={signaturePadRef} onChange={setSignatureEmpty} />
                   </div>

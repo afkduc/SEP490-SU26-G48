@@ -73,8 +73,11 @@ export default function ExportPickupHistoryModal({ exportRequestId, repairOrderC
                   <span className="eph__meta">
                     <span className="eph__time">{pk.signedAtLabel || '—'}</span>
                     <span className="eph__who">
-                      Người lấy: <b>{pk.receivedByName || '—'}</b>
+                      Người lấy/trả: <b>{pk.receivedByName || '—'}</b>
                       {' · '}Người xuất: <b>{pk.performedByName || '—'}</b>
+                      {pk.requestedByName && (
+                        <>{' · '}CVDV yêu cầu: <b>{pk.requestedByName}</b></>
+                      )}
                     </span>
                   </span>
                   <span className="eph__sum">
@@ -132,8 +135,8 @@ export default function ExportPickupHistoryModal({ exportRequestId, repairOrderC
                         )}
                         {pk.signatureData && (
                           <div className="eph__signature">
-                            <div className="eph__signature-role">Người lấy</div>
-                            <img src={pk.signatureData} alt={`Chữ ký người lấy lần ${pk.seq}`} />
+                            <div className="eph__signature-role">Người lấy/trả</div>
+                            <img src={pk.signatureData} alt={`Chữ ký người lấy/trả lần ${pk.seq}`} />
                             <div className="eph__signature-name">{pk.receivedByName}</div>
                           </div>
                         )}

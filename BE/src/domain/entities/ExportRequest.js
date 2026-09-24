@@ -31,6 +31,10 @@ class ExportRequest {
     this.repairOrderCode = data.repair_order_code ?? data.repairOrderCode ?? null;
     this.customerName = data.customer_name ?? data.customerName ?? null;
     this.vehiclePlate = data.vehicle_plate ?? data.vehiclePlate ?? null;
+    // Co van dich vu dang "so huu" Lenh sua chua nay - de biet phieu xuat nay
+    // cua ai (giong nguyen tac o RepairSettlement: nguoi CHOT phieu (closing
+    // advisor) moi tinh la chu, chua chot thi van la nguoi lap phieu).
+    this.advisorName = data.advisor_name ?? data.advisorName ?? null;
     this.performedByName = data.performed_by_name ?? data.performedByName ?? null;
     this.receivedByName = data.received_by_name ?? data.receivedByName ?? null;
     this.totalQuantity = data.total_quantity ?? data.totalQuantity ?? null;
@@ -61,6 +65,7 @@ class ExportRequest {
       repair_order_code: row.repair_order_code,
       customer_name: row.customer_name,
       vehicle_plate: row.vehicle_plate,
+      advisor_name: row.advisor_name,
       performed_by_name: row.performed_by_name,
       received_by_name: row.received_by_name,
       total_quantity: row.total_quantity,
