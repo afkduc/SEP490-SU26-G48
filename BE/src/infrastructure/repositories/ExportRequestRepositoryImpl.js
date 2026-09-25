@@ -5,7 +5,6 @@ const ExportRequestItem = require('../../domain/entities/ExportRequestItem');
 const { query } = require('../database/sqlServer');
 const ApiError = require('../../utils/ApiError');
 const { toDDMMYYYYHHmm } = require('../../application/dto/ExportRequestResponseDto');
-const AuditRepository = require('./AuditRepository');
 
 // Chi con thao tac kho (xuat them / tra hang) khi Lenh sua chua CHUA chot -
 // dung dung 2 trang thai ma CVDV con sua duoc phieu quyet toan (xem
@@ -13,11 +12,6 @@ const AuditRepository = require('./AuditRepository');
 // 'cancelled' la khoa han, vi luc do so lieu phai chot de thu tien.
 const EXPORTABLE_RO_STATUSES = ['waiting_repair', 'inprogress'];
 const EXPORTABLE_RO_STATUS_SQL = `ro.status IN ('waiting_repair', 'inprogress')`;
-
-// Cac buoc trong Nhat ky hoat dong (audit_logs lifecycle) CO THE lam doi so
-// luong phu tung can xuat/tra - dung de suy ra "CVDV yeu cau" cho tung lan
-// xuat/tra (xem findPickups._attachRequestedByName).
-const PARTS_CHANGING_STEPS = new Set(['created', 'created_signed', 'updated', 'ng_accepted']);
 
 /**
  * Loc chung cho findAll / count: branchId, status, repairOrderId, fromDate, toDate, search.
@@ -522,7 +516,18 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         SELECT COALESCE(rq.product_id, mv.product_id) AS product_id,
                ISNULL(rq.required_quantity, 0) - ISNULL(mv.exported_quantity, 0) AS pending_quantity,
                p.product_code, p.product_name, u.unit_name,
-               p.stock_quantity AS current_stock
+               p.stock_quantity AS current_stock,
+               -- CVDV yeu cau (repair_order_items.requested_by) cua dong GAN
+               -- NHAT khop san pham nay trong chinh RO nay - 1 san pham co
+               -- the nam trong nhieu dong (tu nhieu dich vu/goi khac nhau),
+               -- lay dong moi nhat la du cho muc dich hien thi lich su.
+               (
+                 SELECT TOP 1 roi.requested_by
+                 FROM repair_order_items roi
+                 WHERE roi.repair_order_id = @repair_order_id
+                   AND roi.product_id = COALESCE(rq.product_id, mv.product_id)
+                 ORDER BY roi.id DESC
+               ) AS requested_by
         FROM required rq
         FULL OUTER JOIN moved mv ON mv.product_id = rq.product_id
         LEFT JOIN products p WITH (UPDLOCK) ON p.id = COALESCE(rq.product_id, mv.product_id)
@@ -539,6 +544,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         unit: r.unit_name ?? null,
         pending: Number(r.pending_quantity) || 0,
         stock: Number(r.current_stock) || 0,
+        requestedBy: r.requested_by ?? null,
       }))
       .filter((l) => l.pending !== 0);
 
@@ -694,16 +700,20 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
         .input('pickup_id', sql.BigInt, pickupId)
         .input('performed_by', sql.BigInt, data.performed_by)
         .input('note', sql.NVarChar(500), `${isReturn ? 'Tra hang' : 'Xuat kho'} theo phieu ${roRow.repair_code}`)
+        // Snapshot CVDV yeu cau NGAY LUC xuat - repair_order_items bi xoa/chen
+        // lai moi lan sua phieu nen doc live sau nay se sai neu phieu bi sua
+        // tiep (xem ensureInventoryTransactionRequestedBy.js).
+        .input('requested_by', sql.BigInt, l.requestedBy || null)
         .query(`
           INSERT INTO inventory_transactions (
             transaction_code, transaction_type, branch_id, product_id,
             quantity, export_request_id, repair_order_id, pickup_id, performed_by,
-            transaction_date, status, notes
+            transaction_date, status, notes, requested_by
           )
           VALUES (
             @transaction_code, @transaction_type, @branch_id, @product_id,
             @quantity, @export_request_id, @repair_order_id, @pickup_id, @performed_by,
-            GETDATE(), 'completed', @note
+            GETDATE(), 'completed', @note, @requested_by
           )
         `);
     }
@@ -736,29 +746,27 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const result = await query(
       `SELECT
          pk.id, pk.signed_at, pk.signature_data, pk.issuer_signature_data,
-         er.repair_order_id,
          COALESCE(NULLIF(LTRIM(RTRIM(u.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(u.last_name, N'') + N' ' + ISNULL(u.first_name, N''))), N''), u.pseudo_id) AS received_by_name,
          u.pseudo_id AS received_by_code,
          COALESCE(NULLIF(LTRIM(RTRIM(pf.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(pf.last_name, N'') + N' ' + ISNULL(pf.first_name, N''))), N''), pf.pseudo_id) AS performed_by_name,
          it.transaction_type, it.quantity, it.transaction_code,
-         it.product_id, p.product_code, p.product_name, un.unit_name
+         it.product_id, p.product_code, p.product_name, un.unit_name,
+         COALESCE(NULLIF(LTRIM(RTRIM(rq.user_name)), N''), NULLIF(LTRIM(RTRIM(ISNULL(rq.last_name, N'') + N' ' + ISNULL(rq.first_name, N''))), N''), rq.pseudo_id) AS requested_by_name
        FROM export_request_pickups pk
-       JOIN export_requests er ON er.id = pk.export_request_id
        LEFT JOIN users u ON u.id = pk.received_by
        LEFT JOIN users pf ON pf.id = pk.performed_by
        LEFT JOIN inventory_transactions it ON it.pickup_id = pk.id
        LEFT JOIN products p ON p.id = it.product_id
        LEFT JOIN units un ON un.id = p.unit_id
+       LEFT JOIN users rq ON rq.id = it.requested_by
        WHERE pk.export_request_id = @id
        ORDER BY pk.id ASC, it.id ASC`,
       { id: exportRequestId }
     );
 
-    let repairOrderId = null;
     const byPickup = new Map();
     for (const r of result.recordset) {
       if (!byPickup.has(r.id)) {
-        repairOrderId = repairOrderId ?? r.repair_order_id;
         byPickup.set(r.id, {
           id: r.id,
           seq: byPickup.size + 1,
@@ -772,6 +780,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
           exportQuantity: 0,
           returnQuantity: 0,
           lines: [],
+          requestedByNames: new Set(),
         });
       }
       if (r.product_id) {
@@ -788,55 +797,18 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
           type: r.transaction_type,
           transactionCode: r.transaction_code,
         });
+        // "CVDV yeu cau" chup san TAI THOI DIEM xuat/tra dong nay (xem
+        // confirmPickup - snapshot vao inventory_transactions.requested_by,
+        // khong doc live tu repair_order_items vi bang do bi xoa/chen lai
+        // moi lan sua phieu). 1 lan co the gom hang muc cua NHIEU nguoi yeu
+        // cau khac nhau - gop het lai, khong chi lay 1 nguoi roi bo sot.
+        if (r.requested_by_name) pickup.requestedByNames.add(r.requested_by_name);
       }
     }
 
-    const orderedPickups = [...byPickup.values()]; // id ASC = thu tu thoi gian
-    await this._attachRequestedByName(orderedPickups, repairOrderId);
-    return orderedPickups.reverse();
-  }
-
-  // "CVDV yeu cau" cho tung lan xuat/tra - AI la nguoi sua phieu (them/bot
-  // phu tung) gan nhat TINH DEN LUC lan xuat/tra do duoc xac nhan. Khong co
-  // cot luu san dieu nay (repair_order_items khong theo doi nguoi sua tung
-  // dong), nen suy ra tu chinh Nhat ky hoat dong cua phieu quyet toan (audit
-  // log "lifecycle" da co san 'by' cho tung buoc): voi MOI lan xuat/tra, lay
-  // buoc GAN NHAT thuoc nhom co-the-doi-phu-tung (tao phieu / sua phieu /
-  // khach dong y thay dau muc NG) co thoi diem <= luc lan do duoc ky.
-  //
-  // CO Y khong gioi han rieng tung buoc cho 1 lan duy nhat (khong "tieu thu"
-  // buoc sau khi da gan cho 1 lan): 1 lan sua co the tao ra nhieu dau muc,
-  // nhung NV kho khong bat buoc xuat het trong 1 lan - phan con lai xuat o
-  // lan sau van phai quy ve DUNG nguoi da sua lan do, khong phai de trong.
-  // Neu 2 lan xuat lien tiep khong co sua gi o giua thi CA HAI cung hien
-  // dung 1 nguoi - dung thuc te, khong phai loi trung lap.
-  async _attachRequestedByName(orderedPickups, repairOrderId) {
-    if (!repairOrderId || orderedPickups.length === 0) return;
-    const log = await AuditRepository.findLifecycleAuditLog('repair_settlements', repairOrderId);
-    if (!log?.new_value) return;
-    let steps;
-    try {
-      const parsed = typeof log.new_value === 'string' ? JSON.parse(log.new_value) : log.new_value;
-      steps = Array.isArray(parsed?.steps) ? parsed.steps : [];
-    } catch {
-      return;
-    }
-    const relevant = steps
-      .filter((s) => PARTS_CHANGING_STEPS.has(s.step))
-      .map((s) => ({ at: new Date(s.at).getTime(), by: s.by }))
-      .filter((s) => Number.isFinite(s.at))
-      .sort((a, b) => a.at - b.at);
-    if (relevant.length === 0) return;
-
-    for (const pickup of orderedPickups) {
-      const windowEnd = new Date(pickup.signedAt).getTime();
-      let found = null;
-      for (const step of relevant) {
-        if (step.at <= windowEnd) found = step; // relevant da sap tang dan -> giu cai cuoi cung con khop
-        else break;
-      }
-      pickup.requestedByName = found?.by || null;
-    }
+    return [...byPickup.values()]
+      .map((pk) => ({ ...pk, requestedByName: [...pk.requestedByNames].join(', ') || null, requestedByNames: undefined }))
+      .reverse();
   }
 
   /**

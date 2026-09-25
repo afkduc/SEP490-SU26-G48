@@ -480,7 +480,7 @@ class RepairSettlementService {
     return { ...item, ngAddedParts: daThem, ngAddedLabor: congThem };
   }
 
-  async update(id, payload) {
+  async update(id, payload, { editorId } = {}) {
     const existing = await this.repairSettlementRepository.findById(id);
     if (!existing) throw new ApiError(404, 'Không tìm thấy phiếu quyết toán');
     if (existing.status === 'invoiced') {
@@ -508,7 +508,7 @@ class RepairSettlementService {
       throw new ApiError(409, 'Có đầu mục công việc đã được xác nhận hoàn thành, không thể hủy hoặc xóa hạng mục tương ứng nữa');
     }
 
-    const entity = await this.repairSettlementRepository.update(id, data);
+    const entity = await this.repairSettlementRepository.update(id, data, { editorId });
 
     // Realtime: neu phieu dang co lenh sua chua "inprogress" (da co to
     // truong/tho), sua hang muc (vd khach huy giua chung) co the lam checklist

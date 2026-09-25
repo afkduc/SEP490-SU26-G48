@@ -135,6 +135,18 @@ function itemTypeFor(lhsc) {
   return lhsc === 'PT' ? 'product' : 'service';
 }
 
+// Khoa nhan dang "cung 1 hang muc" giua 2 lan luu (dung de biet 1 dong trong
+// data.items MOI la dong DA CO TU TRUOC hay dong THAT SU MOI) - cung logic
+// voi itemDiffKey ben RepairSettlementService.js (dung cho Nhat ky hoat
+// dong), viet lai 2 ban vi 1 ben doc row DB (item_code/item_description),
+// 1 ben doc object camelCase (code/description) tu payload FE.
+function itemRowDiffKey(r) {
+  return (r.item_code && String(r.item_code).trim()) || `desc:${String(r.item_description || '').trim().toLowerCase()}`;
+}
+function itemDataDiffKey(it) {
+  return (it.code && String(it.code).trim()) || `desc:${String(it.description || '').trim().toLowerCase()}`;
+}
+
 // Dung chung cho findAll/count - tra ve mang cac dieu kien WHERE + gan params.
 // customerId va vehicleId co the ket hop CUNG LUC (vd: man "Lich su dich vu"
 // cua 1 khach hang loc theo 1 xe cu the cua ho) - khac voi truoc day chi cho
@@ -420,7 +432,9 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
       await tx.request().input('id', sql.BigInt, id).input('code', sql.VarChar(30), genCode('RO', id))
         .query(`UPDATE repair_orders SET repair_code = @code WHERE id = @id`);
 
-      await this._insertItems(tx, id, data.items);
+      // Tao moi: nguoi tao phieu la nguoi "yeu cau" TAT CA hang muc ban dau.
+      const itemsWithRequester = (data.items || []).map((it) => ({ ...it, requestedBy: advisorId }));
+      await this._insertItems(tx, id, itemsWithRequester);
       await this._bumpVehicleKm(tx, data.vehicleId, data.currentKm);
 
       return id;
@@ -429,7 +443,14 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return this.findById(newId);
   }
 
-  async update(id, data) {
+  // editorId: CVDV dang thuc hien lan sua nay (co the KHAC nguoi tao phieu).
+  // Dong hang muc MOI hoac tang so luong so voi truoc -> gan "yeu cau" cho
+  // chinh nguoi nay; dong khong doi/giam so luong -> giu nguyen nguoi da
+  // yeu cau truoc do (repair_order_items bi xoa/chen lai TOAN BO moi lan sua
+  // - xem _insertItems - nen phai chu dong mang requested_by cu sang, khong
+  // thi lan sua nao cung xoa mat lich su "ai yeu cau" cua nhung dong khong
+  // lien quan gi den lan sua do).
+  async update(id, data, { editorId } = {}) {
     await runInTransaction(async (tx) => {
       const isWarranty = await this._checkWarranty(data.vehicleId, data.currentKm);
 
@@ -463,8 +484,20 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
           WHERE id = @id
         `);
 
+      const existingItemsResult = await tx.request().input('id', sql.BigInt, id)
+        .query(`SELECT item_code, item_description, quantity, requested_by FROM repair_order_items WHERE repair_order_id = @id`);
+      const existingByKey = new Map(existingItemsResult.recordset.map((r) => [itemRowDiffKey(r), r]));
+      const itemsWithRequester = (data.items || []).map((it) => {
+        const prev = existingByKey.get(itemDataDiffKey(it));
+        // Da co san VA so luong khong tang -> giu nguyen nguoi da yeu cau tu
+        // truoc (khong phai nguoi dang thao tac lan nay). Moi hoac tang so
+        // luong (= mot yeu cau moi phat sinh) -> gan cho nguoi dang sua.
+        const keepPrevious = prev && Number(it.qty || 0) <= Number(prev.quantity || 0);
+        return { ...it, requestedBy: keepPrevious ? (prev.requested_by ?? editorId ?? null) : (editorId ?? prev?.requested_by ?? null) };
+      });
+
       await tx.request().input('id', sql.BigInt, id).query(`DELETE FROM repair_order_items WHERE repair_order_id = @id`);
-      await this._insertItems(tx, id, data.items);
+      await this._insertItems(tx, id, itemsWithRequester);
       await this._syncRepairOrderTasks(tx, id);
 
       if (data.vehicleId) {
@@ -724,6 +757,11 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
     return result.rowsAffected[0] > 0;
   }
 
+  // requestedBy: CVDV yeu cau tung dong (tao phieu hoac sua phieu them/tang
+  // so luong) - PHAI duoc goi da annotate san tren tung item (xem
+  // RepairSettlementService.create/update, ham do lo phan xac dinh "giu
+  // nguyen nguoi cu hay doi sang nguoi vua sua" bang cach so sanh voi items
+  // CU, roi truyen xuong day chi de GHI, khong tinh toan gi them o day).
   async _insertItems(tx, repairOrderId, items) {
     for (const item of items) {
       await tx
@@ -747,16 +785,17 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
         // Yeu cau thuc hien theo bieu mau BDDK (I/R/M/V) - chi co o dong dich
         // vu con sinh tu 1 goi bao duong; dich vu le/phu tung de NULL.
         .input('actionCode', sql.VarChar(4), item.actionCode || null)
+        .input('requestedBy', sql.BigInt, item.requestedBy || null)
         .query(`
           INSERT INTO repair_order_items (
             repair_order_id, item_type, product_id, service_id, item_code, item_description,
             lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total, note,
-            action_code
+            action_code, requested_by
           )
           VALUES (
             @repairOrderId, @itemType, @productId, @serviceId, @itemCode, @itemDescription,
             @lhsc, @httt, @repairCategory, @unit, @quantity, @unitPrice, @discountPct, @isFree, @total, @note,
-            @actionCode
+            @actionCode, @requestedBy
           )
         `);
     }
@@ -947,7 +986,10 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             .input('id', sql.BigInt, cu.id)
             .input('sl', sql.Int, slMoi)
             .input('tt', sql.Decimal(18, 2), slMoi * Number(cu.unit_price || 0))
-            .query(`UPDATE repair_order_items SET quantity=@sl, total=@tt WHERE id=@id`);
+            // Them so luong vi khach vua dong y thay -> chinh nguoi xu ly lan
+            // nay (userId) la nguoi "yeu cau" phan them nay, ghi de nguoi cu.
+            .input('reqBy', sql.BigInt, userId)
+            .query(`UPDATE repair_order_items SET quantity=@sl, total=@tt, requested_by=@reqBy WHERE id=@id`);
           cu.quantity = slMoi;
           cu.total = slMoi * Number(cu.unit_price || 0);
         } else {
@@ -962,11 +1004,14 @@ class RepairSettlementRepositoryImpl extends RepairSettlementRepository {
             .input('gia', sql.Decimal(18, 2), gia)
             .input('tt2', sql.Decimal(18, 2), sl * gia)
             .input('lhsc2', sql.VarChar(10), svc?.repair_category || null)
+            .input('reqBy2', sql.BigInt, userId)
             .query(`INSERT INTO repair_order_items
                       (repair_order_id, item_type, product_id, service_id, item_code, item_description,
-                       lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total, note)
+                       lhsc, httt, repair_category, unit, quantity, unit_price, discount_pct, is_free, total, note,
+                       requested_by)
                     VALUES (@roId4, 'product', @pid, NULL, @ma, @ten2,
-                       'PT', 'KHT', @lhsc2, @dvt, @sl2, @gia, 0, 0, @tt2, N'Khách đồng ý thay sau khi kiểm tra')`);
+                       'PT', 'KHT', @lhsc2, @dvt, @sl2, @gia, 0, 0, @tt2, N'Khách đồng ý thay sau khi kiểm tra',
+                       @reqBy2)`);
           items.push({ product_id: p.product_id, quantity: sl, unit_price: gia, is_free: 0, httt: 'KHT', discount_pct: 0 });
         }
         added.push({ name: p.product_name, quantity: p.quantity, unit: p.unit_name, unitPrice: gia });
