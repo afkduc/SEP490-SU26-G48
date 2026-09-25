@@ -17,6 +17,19 @@ const SPECIALTY_NAME_MAX = 100;
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(com|vn|edu\.vn)$/i;
 
 const PHONE_REGEX = /^0[0-9]{9,10}$/;
+/**
+ * Bien so VN: 2 so tinh + 1-2 chu (co the kem 1 so) + 4-5 so serial.
+ * Dau "-" bat buoc (phan tach vung/serial), dau "." KHONG con trong regex vi
+ * chi la cach trinh bay cho de doc ("30A-123.45" == "30A-12345" ngoai doi) -
+ * normalizeBienSo() da loai no truoc khi test/luu/so sanh, xem ham do.
+ */
+const BIEN_SO_REGEX = /^\d{2}[A-Z]{1,2}\d?-\d{4,5}$/;
+/**
+ * So khung (VIN) chuan quoc te ISO 3779: DUNG 17 ky tu chu+so. Chi ap dung
+ * cho SO KHUNG (frame_number) - so may (engine_number) KHONG theo chuan nay,
+ * do dai tuy hang xe nen validate rieng, long hon (xem customerValidation.js).
+ */
+const FRAME_NUMBER_REGEX = /^[A-Z0-9]{17}$/;
 /** 3–50 ký tự; chỉ chữ/số/._-; bắt buộc có ít nhất 1 chữ cái (không cho toàn số). */
 const USERNAME_REGEX = /^(?=.*[A-Za-z])[A-Za-z0-9._-]{3,50}$/;
 /** Họ/Tên: chữ cái Unicode (có dấu), khoảng trắng / dấu nháy / gạch giữa các từ. */
@@ -43,6 +56,17 @@ function phoneDigitsOnly(value) {
 function isValidPhone(value) {
   if (value === undefined || value === null) return false;
   return PHONE_REGEX.test(phoneDigitsOnly(value));
+}
+
+/**
+ * Chuan hoa bien so de VALIDATE, LUU va SO SANH deu dung CHUNG 1 gia tri:
+ * xoa khoang trang, viet hoa, va xoa dau "." (thuan tuy trinh bay, khong
+ * phai ky tu phan biet 2 bien so khac nhau). Phai goi ham nay o MOI noi
+ * tao/tim xe theo bien so - neu chi doi regex ma quen doi noi INSERT/SELECT
+ * thi "30A-123.45" va "30A-12345" van tao ra 2 xe khac nhau trong DB.
+ */
+function normalizeBienSo(value) {
+  return String(value || '').trim().toUpperCase().replace(/\s+/g, '').replace(/\./g, '');
 }
 
 function isValidUsername(value) {
@@ -128,6 +152,8 @@ function parsePositiveInt(value) {
 module.exports = {
   EMAIL_REGEX,
   PHONE_REGEX,
+  BIEN_SO_REGEX,
+  FRAME_NUMBER_REGEX,
   USERNAME_REGEX,
   PERSON_NAME_REGEX,
   EMAIL_MAX_LENGTH,
@@ -144,6 +170,7 @@ module.exports = {
   isValidEmail,
   isValidPhone,
   phoneDigitsOnly,
+  normalizeBienSo,
   isValidUsername,
   getUsernameError,
   isValidPersonName,

@@ -3812,16 +3812,27 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
   // BE se tu tim-hoac-tao khach hang (theo SDT) va xe (theo bien so) that,
   // xem RepairSettlementService._resolveCustomerAndVehicle - chi can du cac o
   // bat buoc toi thieu de tao duoc 1 ban ghi hop le.
+  // Khach/xe MOI hoan toan (khong qua tra cuu) - bat buoc DAY DU moi truong,
+  // CHI TRU Ma so thue (khach ca nhan thi khong co). Khop voi
+  // RepairSettlementService._resolveCustomerAndVehicle o BE.
   const canSave = isFromLookup
     ? Boolean(customerInfo.id) && Boolean(vehicleInfo.id)
     : (!isEdit
       && Boolean((customerInfo.fullName || '').trim())
       && Boolean((customerInfo.phone || '').trim())
+      && Boolean((customerInfo.address || '').trim())
+      && Boolean((customerInfo.cccd || '').trim())
+      && Boolean((customerInfo.email || '').trim())
+      && Boolean((customerInfo.contactPerson || '').trim())
+      && Boolean((customerInfo.contactPhone || '').trim())
       && Boolean((vehicleInfo.licensePlate || '').trim())
       // Loai xe BAT BUOC chon tu catalog (modelId), khong con go tay duoc -
       // xe khong gan duoc doi xe thi sau nay khong loc duoc goi bao duong va
       // khong tra dung dinh muc phu tung.
-      && Boolean(vehicleInfo.modelId));
+      && Boolean(vehicleInfo.modelId)
+      && Boolean((vehicleInfo.frameNumber || '').trim())
+      && Boolean((vehicleInfo.engineNumber || '').trim())
+      && Boolean((vehicleInfo.purchaseDate || '').trim()));
 
   const buildPayload = () => ({
     customerId: customerInfo.id || null,
@@ -3854,7 +3865,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
     if (!canSave) {
       setSaveError(isFromLookup
         ? 'Vui lòng chọn khách hàng và xe từ gợi ý tra cứu trước khi lưu.'
-        : 'Vui lòng nhập đủ tên khách hàng, số điện thoại, biển số xe, hãng xe và tên xe trước khi lưu.');
+        : 'Vui lòng nhập đầy đủ thông tin khách hàng và xe (trừ Mã số thuế) trước khi lưu.');
       return;
     }
     // Khach/xe go tay hoan toan moi (khong qua tra cuu) - cac o nay con sua
@@ -4062,7 +4073,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               </div>
 
               <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Địa chỉ</label>
+                <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Địa chỉ</label>
                 <input className="form-input" value={customerInfo.address} readOnly={isFromLookup || isEdit} onChange={(e) => cInfoSet('address', e.target.value)} placeholder="Địa chỉ khách hàng" />
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
@@ -4094,7 +4105,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group">
-                  <label className="form-label">CCCD</label>
+                  <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>CCCD</label>
                   <input className="form-input"
                     value={customerInfo.cccd}
                     readOnly={isFromLookup || isEdit}
@@ -4102,7 +4113,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                     placeholder="Số CCCD / CMND" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Email</label>
+                  <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Email</label>
                   <input className="form-input"
                     value={customerInfo.email}
                     readOnly={isFromLookup || isEdit}
@@ -4112,11 +4123,11 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               </div>
               <div className="form-grid form-grid-2">
                 <div className="form-group">
-                  <label className="form-label">Người liên hệ</label>
+                  <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Người liên hệ</label>
                   <input className="form-input" value={customerInfo.contactPerson} onChange={(e) => cInfoSet('contactPerson', e.target.value)} placeholder="Tên người liên hệ" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Điện thoại liên hệ</label>
+                  <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Điện thoại liên hệ</label>
                   <input className="form-input" value={customerInfo.contactPhone} onChange={(e) => cInfoSet('contactPhone', e.target.value)} placeholder="SĐT người liên hệ" />
                 </div>
               </div>
@@ -4209,7 +4220,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               </div>
               <div className="form-grid form-grid-2" style={{ marginBottom: 12 }}>
                 <div className="form-group" style={{ position: 'relative' }}>
-                  <label className="form-label">Số khung</label>
+                  <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Số khung</label>
                   <input className="form-input" value={vehicleInfo.frameNumber}
                     readOnly={isFromLookup || isEdit}
                     onChange={(e) => { vInfoSet('frameNumber', e.target.value); setIsFromLookup(false); setActiveField('frame'); setShowSuggestions(true); }}
@@ -4228,7 +4239,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   )}
                 </div>
                 <div className="form-group" style={{ position: 'relative' }}>
-                  <label className="form-label">Số máy</label>
+                  <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Số máy</label>
                   <input className="form-input" value={vehicleInfo.engineNumber}
                     readOnly={isFromLookup || isEdit}
                     onChange={(e) => { vInfoSet('engineNumber', e.target.value); setIsFromLookup(false); setActiveField('engine'); setShowSuggestions(true); }}
@@ -4249,7 +4260,7 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
               </div>
               <div className="form-grid form-grid-2">
                 <div className="form-group">
-                  <label className="form-label">Ngày mua</label>
+                  <label className={`form-label${!isFromLookup && !isEdit ? ' required' : ''}`}>Ngày mua</label>
                   <input className="form-input" type="date" value={vehicleInfo.purchaseDate} max={todayInputValue} readOnly={isFromLookup || isEdit} onChange={(e) => vInfoSet('purchaseDate', e.target.value)} />
                 </div>
                 <div className="form-group">
@@ -4263,13 +4274,15 @@ function RepairSettlementFormInner({ isEdit, existingOrder }) {
                   </label>
                   <input
                     className="form-input"
-                    type="number"
-                    min={vehicleInfo.lastKnownKm || 0}
+                    type="text"
+                    inputMode="numeric"
                     value={vehicleInfo.currentKm}
                     ref={kmInputRef}
                     aria-invalid={Boolean(kmLoi)}
                     style={kmLoi ? { borderColor: 'var(--red)' } : undefined}
-                    onChange={(e) => vInfoSet('currentKm', e.target.value)}
+                    // Chi cho go chu so 0-9 - loc ngay luc go, khong doi den
+                    // luc luu moi bao loi (paste van bi loc, chi giu lai chu so).
+                    onChange={(e) => vInfoSet('currentKm', e.target.value.replace(/\D/g, ''))}
                     onBlur={kiemTraKmKhiRoiO}
                   />
                   {kmLoi && <div className="form-error" style={{ marginTop: 4 }}>{kmLoi}</div>}

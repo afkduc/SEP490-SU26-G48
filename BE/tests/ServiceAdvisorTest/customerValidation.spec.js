@@ -63,7 +63,7 @@ test('CustomerService.update rejects bad fields with 400 and blocks phone alread
   assert.equal(norm.fullName, 'Trần Văn B');
 });
 
-const { getVehicleFieldErrors } = require('../../src/application/services/customerValidation');
+const { getVehicleFieldErrors, normalizePlate } = require('../../src/application/services/customerValidation');
 
 test('vehicle validation: plate format, model required, VIN/engine, year, km', () => {
   const ok = { licensePlate: '30a-123.45', modelId: 2, frameNumber: 'rn2k25326nm100130', engineNumber: 'PY31308930', manufactureYear: 2022, color: 'Trắng', currentKm: 15200 };
@@ -73,12 +73,21 @@ test('vehicle validation: plate format, model required, VIN/engine, year, km', (
   assert.match(only({ licensePlate: '' })[0], /không được để trống/);
   assert.match(only({ licensePlate: 'ABC' })[0], /không đúng định dạng/);
   assert.match(only({ modelId: null })[0], /chọn dòng xe/);
-  assert.match(only({ frameNumber: 'AB 12' })[0], /Số khung chỉ gồm chữ và số/);
+  assert.match(only({ frameNumber: 'AB 12' })[0], /Số khung phải gồm đúng 17 ký tự/);
+  assert.match(only({ frameNumber: 'RN2K25326NM10013' })[0], /Số khung phải gồm đúng 17 ký tự/, '16 ky tu (thieu 1) phai bi tu choi');
+  assert.match(only({ frameNumber: 'RN2K25326NM1001300' })[0], /Số khung phải gồm đúng 17 ký tự/, '18 ky tu (thua 1) phai bi tu choi');
   assert.match(only({ manufactureYear: 1950 })[0], /Năm sản xuất/);
   assert.match(only({ manufactureYear: new Date().getFullYear() + 5 })[0], /Năm sản xuất/);
   assert.match(only({ currentKm: -1 })[0], /không âm/);
   assert.match(only({ currentKm: 5000000 })[0], /vượt quá/);
   assert.match(only({ currentKm: 1.5 })[0], /số nguyên/);
+});
+
+test('vehicle validation: dau "." trong bien so chi la trinh bay - go co hay khong deu ra CUNG 1 gia tri', () => {
+  assert.equal(normalizePlate('30a-123.45'), normalizePlate('30A-12345'), 'co/khong dau cham phai chuan hoa ve giong het nhau');
+  assert.equal(normalizePlate(' 30a-123.45 '), '30A-12345');
+  assert.deepEqual(getVehicleFieldErrors({ licensePlate: '30A-12345', modelId: 1 }), [], 'bien khong dau cham van hop le');
+  assert.match(getVehicleFieldErrors({ licensePlate: '30A12345', modelId: 1 })[0], /không đúng định dạng/, 'thieu dau "-" van phai bi tu choi');
 });
 
 test('CustomerService.addVehicle normalizes fields and rejects bad input / unknown customer', async () => {
@@ -92,10 +101,16 @@ test('CustomerService.addVehicle normalizes fields and rejects bad input / unkno
   await assert.rejects(() => service.addVehicle(7, { licensePlate: 'xx', modelId: 1 }), (e) => e.statusCode === 400);
   await assert.rejects(() => service.addVehicle(8, { licensePlate: '30A-123.45', modelId: 1 }), (e) => e.statusCode === 404);
 
-  const v = await service.addVehicle('7', { licensePlate: ' 30a-123.45 ', modelId: '2', frameNumber: 'abc123', manufactureYear: '', currentKm: '' });
+  await assert.rejects(
+    () => service.addVehicle('7', { licensePlate: '30A-99999', modelId: '2', frameNumber: 'abc123' }),
+    (e) => e.statusCode === 400 && /Số khung phải gồm đúng 17 ký tự/.test(e.message),
+    'so khung ngan hon 17 ky tu phai bi tu choi',
+  );
+
+  const v = await service.addVehicle('7', { licensePlate: ' 30a-123.45 ', modelId: '2', frameNumber: 'rn2k25326nm100130', manufactureYear: '', currentKm: '' });
   assert.equal(v.id, 99);
   assert.deepEqual(calls[0], [7, {
-    licensePlate: '30A-123.45', modelId: 2, frameNumber: 'ABC123', engineNumber: null,
+    licensePlate: '30A-12345', modelId: 2, frameNumber: 'RN2K25326NM100130', engineNumber: null,
     manufactureYear: null, color: null, currentKm: 0,
   }]);
 });
