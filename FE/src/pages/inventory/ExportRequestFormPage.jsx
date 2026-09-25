@@ -137,6 +137,7 @@ export default function ExportRequestFormPage() {
       customerName: detail.customerName,
       vehiclePlate: detail.vehiclePlate,
       teamLeaderName: detail.teamLeaderName,
+      technicianNames: detail.technicianNames || [],
       exportRequestId: detail.exportRequestId,
       issuerSignatureData: detail.issuerSignatureData || null,
       issuerSignedAt: detail.issuerSignedAt || null,
@@ -246,7 +247,7 @@ export default function ExportRequestFormPage() {
     <div className="er-form">
       <div className="er-form__header">
         <div>
-          <h1 className="er-form__title">Tạo phiếu xuất kho</h1>
+          <h1 className="er-form__title">Tạo phiếu xuất/trả kho</h1>
           <p className="er-form__subtitle">
             Chọn phiếu sửa chữa (Service Order) cần xuất phụ tùng, điều chỉnh số lượng và lưu.
             Tồn kho sẽ bị trừ ngay khi tạo phiếu.
@@ -312,6 +313,7 @@ export default function ExportRequestFormPage() {
                 <div><strong>Khách hàng:</strong> {selectedRo.customerName || '—'}</div>
                 <div><strong>Xe:</strong> {selectedRo.vehiclePlate || '—'}</div>
                 <div><strong>Tổ trưởng:</strong> {selectedRo.teamLeaderName || '—'}</div>
+                <div><strong>Thợ thực hiện:</strong> {selectedRo.technicianNames?.length > 0 ? selectedRo.technicianNames.join(', ') : '—'}</div>
               </div>
               <button type="button" className="btn btn--ghost btn--sm" onClick={handleChangeRo}>
                 Bỏ chọn

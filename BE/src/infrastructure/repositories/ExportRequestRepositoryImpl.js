@@ -342,6 +342,17 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
     const header = headerResult.recordset[0];
     if (!header) return null;
 
+    // Tho dang thuc hien lenh sua chua nay - de NV kho biet giao/nhan phu
+    // tung voi ai (co the nhieu tho cung lam 1 xe).
+    const techniciansResult = await query(
+      `SELECT u.user_name
+       FROM   repair_order_technicians rot
+       JOIN   users u ON u.id = rot.technician_id
+       WHERE  rot.repair_order_id = @id
+       ORDER  BY u.user_name ASC`,
+      { id: repairOrderId }
+    );
+
     const itemsResult = await query(
       `WITH required AS (
          SELECT rot.product_id,
@@ -387,6 +398,7 @@ class ExportRequestRepositoryImpl extends ExportRequestRepository {
       customerName: header.customer_name,
       vehiclePlate: header.vehicle_plate,
       teamLeaderName: header.team_leader_name,
+      technicianNames: techniciansResult.recordset.map((r) => r.user_name),
       exportRequestId: header.export_request_id ?? null,
       // Chu ky NV kho cua LAN GAN NHAT - chi de tham khao, form luon bat NV
       // kho ky lai MOI lan xac nhan (khong con dung de bo qua o cua nay nua).
