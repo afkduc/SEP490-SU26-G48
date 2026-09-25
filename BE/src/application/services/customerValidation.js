@@ -1,4 +1,4 @@
-const { isValidEmail, isValidPhone, PERSON_NAME_REGEX, EMAIL_HINT } = require('../../utils/fieldValidation');
+const { isValidEmail, isValidPhone, PERSON_NAME_REGEX, EMAIL_HINT, BIEN_SO_REGEX, normalizeBienSo, FRAME_NUMBER_REGEX } = require('../../utils/fieldValidation');
 
 // Rang buoc du lieu KHACH HANG dung chung cho moi duong vao (sua qua form,
 // import Excel) - truoc day moi noi tu kiem 1 kieu (sua chi bat "ten/SDT
@@ -91,9 +91,9 @@ function getCustomerFieldErrors(data = {}) {
 }
 
 // ── Xe ───────────────────────────────────────────────────────────────────
-// Bien so VN: 2 so tinh + 1-2 chu (co the kem 1 so) + 4-5 so, viet dang
-// "30A-123.45" hoac "30A-02465" - GIONG het rang buoc o form quyet toan.
-const BIEN_SO_REGEX = /^\d{2}[A-Z]{1,2}\d?-(\d{3}\.\d{2}|\d{4,5})$/;
+// Bien so VN: 2 so tinh + 1-2 chu (co the kem 1 so) + 4-5 so serial, viet
+// dang "30A-123.45" hoac "30A-02465" - dung CHUNG BIEN_SO_REGEX/normalizeBienSo
+// voi form quyet toan (RepairSettlementService), xem giai thich o fieldValidation.js.
 const PLATE_MAX = 20;            // vehicles.license_plate varchar(20)
 const VIN_MAX = 50;              // frame_number / engine_number varchar(50)
 const COLOR_MAX = 50;            // vehicles.color nvarchar(50)
@@ -103,7 +103,7 @@ const YEAR_MIN = 1980;
 const VIN_REGEX = /^[A-Z0-9]+$/;
 
 function normalizePlate(v) {
-  return clean(v).toUpperCase();
+  return normalizeBienSo(v);
 }
 
 /**
@@ -122,10 +122,11 @@ function getVehicleFieldErrors(data = {}) {
   const modelId = Number(data.modelId);
   if (!Number.isInteger(modelId) || modelId <= 0) errors.push('Vui lòng chọn dòng xe');
 
+  // So khung (VIN) chuan quoc te DUNG 17 ky tu - khac so may (khong co
+  // chuan do dai chung, xem VIN_REGEX ben duoi).
   const frame = clean(data.frameNumber).toUpperCase();
-  if (frame) {
-    if (frame.length > VIN_MAX) errors.push(`Số khung tối đa ${VIN_MAX} ký tự`);
-    else if (!VIN_REGEX.test(frame)) errors.push('Số khung chỉ gồm chữ và số');
+  if (frame && !FRAME_NUMBER_REGEX.test(frame)) {
+    errors.push('Số khung phải gồm đúng 17 ký tự chữ và số (chuẩn VIN)');
   }
 
   const engine = clean(data.engineNumber).toUpperCase();

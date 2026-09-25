@@ -2,6 +2,7 @@ const ExcelJS = require('exceljs');
 const ApiError = require('../../utils/ApiError');
 const { normalizeVietnamese } = require('../../utils/vietnamese');
 const { getCustomerFieldErrors } = require('./customerValidation');
+const { normalizeBienSo } = require('../../utils/fieldValidation');
 
 const MAX_ROWS = 1000;
 
@@ -117,7 +118,7 @@ async function parseCustomerImportFile(buffer) {
 
     const fullName = toStr(get('fullName'));
     const phone = toStr(get('phone'));
-    const licensePlate = toStr(get('licensePlate')).toUpperCase();
+    const licensePlate = normalizeBienSo(get('licensePlate'));
 
     if (!fullName && !phone && !licensePlate) continue; // dòng trống bỏ qua, không tính vào kết quả
 

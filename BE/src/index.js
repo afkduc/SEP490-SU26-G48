@@ -510,6 +510,22 @@ async function start() {
       process.exit(1);
     }
 
+    // vehicles.license_plate: xoa dau "." con sot lai tu du lieu cu - chi la
+    // cach trinh bay, khong phai ky tu phan biet 2 bien so (xem
+    // normalizeBienSo trong utils/fieldValidation.js). Doi rang buoc du lieu
+    // nen KHONG duoc nuot loi.
+    try {
+      const { ensureVehiclePlateNormalized } = require('./infrastructure/database/ensureVehiclePlateNormalized');
+      const r = await ensureVehiclePlateNormalized();
+      console.log(r.skipped
+        ? '[BE] chuan hoa bien so xe: da xoa dau cham tu truoc, bo qua'
+        : `[BE] chuan hoa bien so xe: DA XOA DAU CHAM XONG (${r.steps} buoc)`);
+    } catch (plateErr) {
+      console.error('[BE] KHONG THE KHOI DONG - chuan hoa bien so xe that bai:');
+      console.error(plateErr.message);
+      process.exit(1);
+    }
+
     // Khoa ngoai cho 9 bang truoc gio chi noi bang id trong code (login_sessions,
     // notifications, payos_transactions, export_request_pickups, vehicle_bays...).
     // PHAI chay CUOI CUNG: can cac cot/bang do ensureExportPickups va

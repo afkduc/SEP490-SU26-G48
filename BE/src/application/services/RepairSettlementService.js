@@ -9,7 +9,7 @@ const { calcTotalsFromItems } = require('../../utils/settlementTotals');
 const { auditCrud } = require('../../utils/auditHelper');
 const { settlementSnapshot } = require('../../utils/auditSnapshots');
 const AuditRepository = require('../../infrastructure/repositories/AuditRepository');
-const { isValidPhone, isValidEmail, EMAIL_HINT } = require('../../utils/fieldValidation');
+const { isValidPhone, isValidEmail, EMAIL_HINT, BIEN_SO_REGEX, normalizeBienSo, FRAME_NUMBER_REGEX } = require('../../utils/fieldValidation');
 
 // CCCD (12 so, mau moi) hoac CMND cu (9 so) - chap nhan ca 2 vi du lieu cu
 // van con luu CMND 9 so.
@@ -56,10 +56,9 @@ const DAI_TOI_DA = { customerRequest: 1000, note: 1000, itemNote: 500, signerNam
 // (xem _syncRepairOrderTasks) - gui vai nghin dong la treo request.
 const SO_HANG_MUC_TOI_DA = 200;
 
-// Bien so xe Viet Nam: 2 so tinh + 1-2 chu (co the kem 1 so) + 4-5 so, viet
-// dang "30A-123.45" hoac "30A-02465". Chi ap cho xe MOI tao tu form - xe chon
-// tu tra cuu thi da co san trong DB, khong kiem lai.
-const BIEN_SO_REGEX = /^\d{2}[A-Z]{1,2}\d?-(\d{3}\.\d{2}|\d{4,5})$/;
+// Bien so xe: dung chung BIEN_SO_REGEX/normalizeBienSo voi customerValidation.js
+// (xem giai thich o utils/fieldValidation.js). Chi ap cho xe MOI tao tu form -
+// xe chon tu tra cuu thi da co san trong DB, khong kiem lai.
 
 // Tinh lai toan bo tong tien tu CHINH danh sach hang muc - khong tin theo
 // subtotal/discountAmount/vat/total FE gui len trong payload (truoc day BE
@@ -301,30 +300,71 @@ class RepairSettlementService {
 
     const customer = payload.customer || {};
     const vehicle = payload.vehicle || {};
-    if (!(customer.fullName || '').trim() || !(customer.phone || '').trim()) {
-      throw new ApiError(400, 'Phải nhập tên và số điện thoại khách hàng');
+    // Nhap KHACH/XE MOI hoan toan (khong qua tra cuu) - bat buoc DAY DU moi
+    // truong, CHI TRU Ma so thue (khach ca nhan thi khong co). Thieu du lieu
+    // luc tao la mat luon co hoi thu thap - sau nay khach da rai xe la kho
+    // lien lac lai de bo sung ho so.
+    if (!(customer.fullName || '').trim()) {
+      throw new ApiError(400, 'Phải nhập tên khách hàng');
     }
+    if (!(customer.phone || '').trim()) {
+      throw new ApiError(400, 'Phải nhập số điện thoại khách hàng');
+    }
+    if (!isValidPhone(customer.phone)) {
+      throw new ApiError(400, 'Số điện thoại khách hàng không hợp lệ');
+    }
+    if (!(customer.address || '').trim()) {
+      throw new ApiError(400, 'Phải nhập địa chỉ khách hàng');
+    }
+    if (!(customer.cccd || '').trim()) {
+      throw new ApiError(400, 'Phải nhập số CCCD/CMND');
+    }
+    if (!CCCD_REGEX.test(customer.cccd.trim())) {
+      throw new ApiError(400, 'Số CCCD/CMND không hợp lệ (phải là 9 hoặc 12 chữ số)');
+    }
+    if (!(customer.email || '').trim()) {
+      throw new ApiError(400, 'Phải nhập email khách hàng');
+    }
+    if (!isValidEmail(customer.email)) {
+      throw new ApiError(400, EMAIL_HINT);
+    }
+    if (!(customer.contactPerson || '').trim()) {
+      throw new ApiError(400, 'Phải nhập tên người liên hệ');
+    }
+    if (!(customer.contactPhone || '').trim()) {
+      throw new ApiError(400, 'Phải nhập số điện thoại người liên hệ');
+    }
+    if (!isValidPhone(customer.contactPhone)) {
+      throw new ApiError(400, 'Số điện thoại người liên hệ không hợp lệ');
+    }
+
     if (!(vehicle.licensePlate || '').trim()) {
       throw new ApiError(400, 'Phải nhập biển số xe');
     }
     // Bien so sai dinh dang -> sinh ra xe rac trong danh muc, sau nay tra cuu
     // lich su xe khong ra va phai don tay.
-    const bienSo = vehicle.licensePlate.trim().toUpperCase().replace(/\s+/g, '');
+    const bienSo = normalizeBienSo(vehicle.licensePlate);
     if (!BIEN_SO_REGEX.test(bienSo)) {
       throw new ApiError(400,
         `Biển số xe "${vehicle.licensePlate.trim()}" không đúng định dạng (ví dụ: 30A-123.45 hoặc 30A-02465)`);
     }
-    if (!isValidPhone(customer.phone)) {
-      throw new ApiError(400, 'Số điện thoại khách hàng không hợp lệ');
+    if (!vehicle.modelId) {
+      throw new ApiError(400, 'Phải chọn loại xe');
     }
-    if ((customer.contactPhone || '').trim() && !isValidPhone(customer.contactPhone)) {
-      throw new ApiError(400, 'Số điện thoại người liên hệ không hợp lệ');
+    // So khung (VIN) chuan quoc te DUNG 17 ky tu, khop voi du lieu that dang
+    // co trong DB.
+    const frameNumber = (vehicle.frameNumber || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (!frameNumber) {
+      throw new ApiError(400, 'Phải nhập số khung xe');
     }
-    if ((customer.email || '').trim() && !isValidEmail(customer.email)) {
-      throw new ApiError(400, EMAIL_HINT);
+    if (!FRAME_NUMBER_REGEX.test(frameNumber)) {
+      throw new ApiError(400, 'Số khung phải gồm đúng 17 ký tự chữ và số (chuẩn VIN)');
     }
-    if ((customer.cccd || '').trim() && !CCCD_REGEX.test(customer.cccd.trim())) {
-      throw new ApiError(400, 'Số CCCD/CMND không hợp lệ (phải là 9 hoặc 12 chữ số)');
+    if (!(vehicle.engineNumber || '').trim()) {
+      throw new ApiError(400, 'Phải nhập số máy xe');
+    }
+    if (!(vehicle.purchaseDate || '').trim()) {
+      throw new ApiError(400, 'Phải nhập ngày mua xe');
     }
 
     const { customerId, vehicleId } = await this.customerRepository.findOrCreateForSettlement({
@@ -343,8 +383,8 @@ class RepairSettlementService {
       // duoc dien qua duong nhap Excel (importCustomerVehicleRow).
       vehicleModelText: vehicle.vehicleModel || null,
       modelId: vehicle.modelId || null,
-      frameNumber: vehicle.frameNumber || null,
-      engineNumber: vehicle.engineNumber || null,
+      frameNumber: frameNumber || null,
+      engineNumber: vehicle.engineNumber.trim().toUpperCase(),
       currentKm: payload.currentKm || null,
       purchaseDate: vehicle.purchaseDate || null,
     });

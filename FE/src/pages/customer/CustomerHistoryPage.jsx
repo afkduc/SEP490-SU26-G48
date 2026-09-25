@@ -758,8 +758,8 @@ function AddVehicleForm({ customerId, onAdded, onCancel }) {
         </div>
         <div className="form-group">
           <label className="form-label">Km hiện tại</label>
-          <input className="form-input" type="number" min="0" step="1" value={form.currentKm}
-            onChange={(e) => setF('currentKm', e.target.value)} placeholder="0" />
+          <input className="form-input" type="text" inputMode="numeric" value={form.currentKm}
+            onChange={(e) => setF('currentKm', e.target.value.replace(/\D/g, ''))} placeholder="0" />
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>

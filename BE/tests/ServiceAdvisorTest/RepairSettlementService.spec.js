@@ -24,6 +24,7 @@ const auditHelper = require('../../src/utils/auditHelper');
 auditHelper.auditCrud.lifecycle = async () => ({});
 
 const RepairSettlementService = require('../../src/application/services/RepairSettlementService');
+const { EMAIL_HINT } = require('../../src/utils/fieldValidation');
 
 const validItem = {
   description: 'Thay dầu',
@@ -910,6 +911,18 @@ test('create: chan ghi chu hang muc qua dai', async () => {
   );
 });
 
+// Khach/xe MOI hoan toan (khong qua tra cuu) - tu day tro di BAT BUOC day du
+// moi truong TRU Ma so thue, xem RepairSettlementService._resolveCustomerAndVehicle.
+const validCustomerMoi = {
+  fullName: 'Trần Văn X', phone: '0912345678', address: '12 Láng Hạ, Hà Nội',
+  cccd: '012345678901', email: 'tranvanx@gmail.com',
+  contactPerson: 'Trần Văn X', contactPhone: '0912345678',
+};
+const validVehicleMoi = {
+  licensePlate: '30A-123.45', modelId: 2, frameNumber: 'RN2K25326NM100130',
+  engineNumber: 'PY31308930', purchaseDate: '2023-01-01',
+};
+
 // Bien so sai dinh dang -> sinh ra xe rac trong danh muc, tra cuu lich su
 // khong ra va phai don tay.
 test('create: kiem dinh dang bien so khi tao xe moi', async () => {
@@ -922,8 +935,8 @@ test('create: kiem dinh dang bien so khi tao xe moi', async () => {
   });
   const xeMoi = (bienSo) => basePayload({
     customerId: null, vehicleId: null,
-    customer: { fullName: 'Trần Văn X', phone: '0912345678' },
-    vehicle: { licensePlate: bienSo },
+    customer: { ...validCustomerMoi },
+    vehicle: { ...validVehicleMoi, licensePlate: bienSo },
   });
   for (const xau of ['xe cua toi', '233323', '30A123.45']) {
     await assert.rejects(
@@ -932,9 +945,41 @@ test('create: kiem dinh dang bien so khi tao xe moi', async () => {
       `bien so "${xau}" le ra phai bi tu choi`,
     );
   }
-  // Hop le, va duoc chuan hoa ve chu hoa khong dau cach
+  // Hop le, va duoc chuan hoa ve chu hoa khong dau cach, khong dau cham
+  // (dau "." chi la cach trinh bay - "30a-123.45" va "30A-12345" la 1 bien so)
   await service.create(xeMoi(' 30a-123.45 '), { branchId: 1, advisorId: 4 });
-  assert.equal(goiVoi.at(-1).licensePlate, '30A-123.45');
+  assert.equal(goiVoi.at(-1).licensePlate, '30A-12345');
+});
+
+test('create: so khung (VIN) xe moi phai dung 17 ky tu - truoc day khong kiem gi ca', async () => {
+  const goiVoi = [];
+  const service = new RepairSettlementService({
+    repairSettlementRepository: mockRepos(),
+    customerRepository: {
+      findOrCreateForSettlement: async (x) => { goiVoi.push(x); return { customerId: 100, vehicleId: 200 }; },
+    },
+  });
+  const xeMoi = (frameNumber) => basePayload({
+    customerId: null, vehicleId: null,
+    customer: { ...validCustomerMoi },
+    vehicle: { ...validVehicleMoi, licensePlate: '30A-99999', frameNumber },
+  });
+  for (const xau of ['abc123', 'RN2K25326NM10013', 'RN2K25326NM1001300']) {
+    await assert.rejects(
+      () => service.create(xeMoi(xau), { branchId: 1, advisorId: 4 }),
+      (err) => err.statusCode === 400 && /Số khung phải gồm đúng 17 ký tự/.test(err.message),
+      `so khung "${xau}" le ra phai bi tu choi`,
+    );
+  }
+  // Trong (khong nhap) gio KHONG con hop le nua - so khung la truong BAT BUOC
+  // (xem test rieng ve cac truong bat buoc o duoi).
+  await assert.rejects(
+    () => service.create(xeMoi(''), { branchId: 1, advisorId: 4 }),
+    (err) => err.statusCode === 400 && err.message === 'Phải nhập số khung xe',
+  );
+  // Dung 17 ky tu, duoc chuan hoa ve chu hoa.
+  await service.create(xeMoi(' rn2k25326nm100130 '), { branchId: 1, advisorId: 4 });
+  assert.equal(goiVoi.at(-1).frameNumber, 'RN2K25326NM100130');
 });
 
 const advisorItem = {
@@ -954,8 +999,8 @@ function advisorCreatePayload(overrides = {}) {
     advisorSignatureData: signature,
     customerId: null,
     vehicleId: null,
-    customer: { fullName: 'Nguyễn Văn A', phone: '0912345678' },
-    vehicle: { licensePlate: '30A-123.45' },
+    customer: { ...validCustomerMoi, fullName: 'Nguyễn Văn A' },
+    vehicle: { ...validVehicleMoi },
     currentKm: 50000,
     fuelLevel: '1/2',
     customerRequest: 'Kiểm tra xe',
@@ -1083,15 +1128,15 @@ test('Tạo phiếu quyết toán từ thông tin khách hàng và xe trên bi�
   assert.equal(result.items[0].discount, 0);
   assert.equal(customerVehicle.fullName, 'Nguyễn Văn A');
   assert.equal(customerVehicle.phone, '0912345678');
-  assert.equal(customerVehicle.licensePlate, '30A-123.45');
+  assert.equal(customerVehicle.licensePlate, '30A-12345');
 });
 
 for (const [overrides, message] of [
   [{ signatureData: null }, 'Vui lòng ký xác nhận trước khi lưu phiếu'],
   [{ advisorSignatureData: null }, 'Cố vấn dịch vụ phải ký xác nhận trên phiếu'],
-  [{ customer: { fullName: '', phone: '0912345678' } }, 'Phải nhập tên và số điện thoại khách hàng'],
-  [{ customer: { fullName: 'Nguyễn Văn A', phone: '123' } }, 'Số điện thoại khách hàng không hợp lệ'],
-  [{ vehicle: { licensePlate: '' } }, 'Phải nhập biển số xe'],
+  [{ customer: { ...validCustomerMoi, fullName: '' } }, 'Phải nhập tên khách hàng'],
+  [{ customer: { ...validCustomerMoi, phone: '123' } }, 'Số điện thoại khách hàng không hợp lệ'],
+  [{ vehicle: { ...validVehicleMoi, licensePlate: '' } }, 'Phải nhập biển số xe'],
   [{ currentKm: -1 }, 'Số km hiện tại không được là số âm'],
   [{ items: [] }, 'Phải có ít nhất 1 hạng mục công việc/phụ tùng'],
   [{ items: [{ ...advisorItem, qty: 0 }] }, 'Số lượng không hợp lệ ở hạng mục "Thay dầu máy"'],
@@ -1103,6 +1148,53 @@ for (const [overrides, message] of [
     }), err => err.statusCode === 400 && err.message === message);
   });
 }
+
+test('create: khach/xe MOI (khong qua tra cuu) bat buoc DAY DU moi truong, TRU Ma so thue', async () => {
+  const service = advisorSettlementService();
+  const truongKhach = [
+    ['address', '', 'Phải nhập địa chỉ khách hàng'],
+    ['cccd', '', 'Phải nhập số CCCD/CMND'],
+    ['cccd', '123', 'Số CCCD/CMND không hợp lệ (phải là 9 hoặc 12 chữ số)'],
+    ['email', '', 'Phải nhập email khách hàng'],
+    ['email', 'sai-dinh-dang', EMAIL_HINT],
+    ['contactPerson', '', 'Phải nhập tên người liên hệ'],
+    ['contactPhone', '', 'Phải nhập số điện thoại người liên hệ'],
+    ['contactPhone', '123', 'Số điện thoại người liên hệ không hợp lệ'],
+  ];
+  for (const [field, value, message] of truongKhach) {
+    await assert.rejects(
+      () => service.create(
+        advisorCreatePayload({ customer: { ...validCustomerMoi, [field]: value } }),
+        { branchId: 1, advisorId: 5 },
+      ),
+      (err) => err.statusCode === 400 && err.message === message,
+      `customer.${field} = "${value}" le ra phai bi tu choi voi thong bao "${message}"`,
+    );
+  }
+
+  const truongXe = [
+    ['modelId', null, 'Phải chọn loại xe'],
+    ['frameNumber', '', 'Phải nhập số khung xe'],
+    ['engineNumber', '', 'Phải nhập số máy xe'],
+    ['purchaseDate', '', 'Phải nhập ngày mua xe'],
+  ];
+  for (const [field, value, message] of truongXe) {
+    await assert.rejects(
+      () => service.create(
+        advisorCreatePayload({ vehicle: { ...validVehicleMoi, [field]: value } }),
+        { branchId: 1, advisorId: 5 },
+      ),
+      (err) => err.statusCode === 400 && err.message === message,
+      `vehicle.${field} = "${value}" le ra phai bi tu choi voi thong bao "${message}"`,
+    );
+  }
+
+  // Ma so thue VAN la truong DUY NHAT con tuy chon - de trong van luu duoc.
+  await service.create(
+    advisorCreatePayload({ customer: { ...validCustomerMoi, taxCode: '' } }),
+    { branchId: 1, advisorId: 5 },
+  );
+});
 
 test('Cập nhật phiếu quyết toán ID 1', async () => {
   let updatedData;
