@@ -209,6 +209,11 @@ class RepairSettlement {
         // Yeu cau thuc hien cua bieu mau BDDK - de mo lai phieu cu van hien
         // dung "Thay the"/"Kiem tra..." tren tung dau muc con cua goi.
         actionCode: r.action_code ?? null,
+        // AI yeu cau dong hang muc nay (tao phieu hoac sua phieu them/tang so
+        // luong sau do) - dung de giu nguyen qua cac lan sua tiep theo (xem
+        // RepairSettlementService.update) va de "CVDV yeu cau" o Lich su luu
+        // phieu xuat kho tra dung nguoi.
+        requestedBy: r.requested_by ?? null,
       })),
       tasks: taskRows.map((r) => ({
         id: r.id,

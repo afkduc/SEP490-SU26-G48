@@ -149,7 +149,7 @@ class RepairSettlementController {
 
   update = async (req, res, next) => {
     try {
-      const { item, changes } = await this.repairSettlementService.update(req.params.id, req.body);
+      const { item, changes } = await this.repairSettlementService.update(req.params.id, req.body, { editorId: req.user?.userId });
       await auditCrud.lifecycle(req, {
         tableName: 'repair_settlements',
         entityCode: item?.code || `ID-${req.params.id}`,

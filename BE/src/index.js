@@ -340,6 +340,39 @@ async function start() {
       process.exit(1);
     }
 
+    // CVDV yeu cau tren tung dong hang muc (repair_order_items.requested_by) -
+    // thay cho cach doan nguoc tu Nhat ky hoat dong theo thoi gian (sai khi 1
+    // lan xuat kho gom hang muc cua nhieu lan sua khac nhau). Khong nuot loi:
+    // RepairSettlementRepositoryImpl._insertItems ghi thang cot nay.
+    try {
+      const { ensureRepairOrderItemRequestedBy } = require('./infrastructure/database/ensureRepairOrderItemRequestedBy');
+      const r = await ensureRepairOrderItemRequestedBy();
+      console.log(r.skipped
+        ? '[BE] CVDV yeu cau tren hang muc phieu: da co tu truoc, bo qua'
+        : `[BE] CVDV yeu cau tren hang muc phieu: DA THEM XONG (${r.steps} buoc)`);
+    } catch (roiRbErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them CVDV yeu cau tren hang muc phieu that bai:');
+      console.error(roiRbErr.message);
+      process.exit(1);
+    }
+
+    // Snapshot CVDV yeu cau vao tung dong giao dich kho luc xuat/tra (inventory_transactions
+    // .requested_by) - repair_order_items bi xoa/chen lai moi lan sua phieu
+    // nen phai chup lai tai thoi diem xuat, doc live se sai neu phieu bi sua
+    // tiep sau do. Khong nuot loi: ExportRequestRepositoryImpl.confirmPickup
+    // ghi thang cot nay.
+    try {
+      const { ensureInventoryTransactionRequestedBy } = require('./infrastructure/database/ensureInventoryTransactionRequestedBy');
+      const r = await ensureInventoryTransactionRequestedBy();
+      console.log(r.skipped
+        ? '[BE] snapshot CVDV yeu cau tren giao dich kho: da co tu truoc, bo qua'
+        : `[BE] snapshot CVDV yeu cau tren giao dich kho: DA THEM XONG (${r.steps} buoc)`);
+    } catch (itRbErr) {
+      console.error('[BE] KHONG THE KHOI DONG - them snapshot CVDV yeu cau tren giao dich kho that bai:');
+      console.error(itRbErr.message);
+      process.exit(1);
+    }
+
     // Bang export_request_pickups + cot inventory_transactions.pickup_id -
     // cho phep xuat kho nhieu lan / tra hang tren cung 1 phieu xuat. KHONG
     // duoc nuot loi: thieu bang thi man xuat kho hong hoan toan.
