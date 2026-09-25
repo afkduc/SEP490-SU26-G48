@@ -75,9 +75,7 @@ export default function ExportPickupHistoryModal({ exportRequestId, repairOrderC
                     <span className="eph__who">
                       Người lấy/trả: <b>{pk.receivedByName || '—'}</b>
                       {' · '}Người xuất: <b>{pk.performedByName || '—'}</b>
-                      {pk.requestedByName && (
-                        <>{' · '}CVDV yêu cầu: <b>{pk.requestedByName}</b></>
-                      )}
+                      {' · '}CVDV yêu cầu: <b>{pk.requestedByName || '—'}</b>
                     </span>
                   </span>
                   <span className="eph__sum">
